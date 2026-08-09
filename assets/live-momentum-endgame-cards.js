@@ -146,12 +146,15 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804e`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809a`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
     image.loading = 'lazy';
     image.decoding = 'async';
+    if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(card.id)) {
+      artwork.classList.add('end-game-card-photo--edge-crop');
+    }
     shade.className = 'end-game-card-photo-shade';
     top.className = 'end-game-card-kicker';
     top.textContent = card.type === 'origin'

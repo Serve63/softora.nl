@@ -43,7 +43,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260804e" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260809a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -172,6 +172,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.habit-board\s*\{[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/);
   assert.match(css, /\.habit-board::\-webkit-scrollbar\s*\{[^}]*display:\s*none;/);
   assert.match(css, /\.end-game-title\s*\{[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*font-size:\s*2rem;[\s\S]*text-align:\s*center;/);
+  assert.match(endGameNumbersCss, /\.end-game-card-photo--edge-crop \.end-game-card-photo-image\s*\{[\s\S]*transform:\s*scale\(1\.1\);[\s\S]*transform-origin:\s*center bottom;/);
   assert.match(progressCss, /\.end-game-heading\s*\{[\s\S]*width:\s*max-content;[\s\S]*margin:\s*clamp\(3\.5rem, 7vh, 6rem\) auto 0;/);
   assert.match(progressCss, /\.end-game-heading \.end-game-title\s*\{[\s\S]*margin:\s*0;/);
   assert.match(progressCss, /\.end-game-progress\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*4px;[\s\S]*background:\s*rgba\(26, 26, 46, \.1\);/);
@@ -375,7 +376,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.imageId \|\| card\.id\}\.png\?v=20260804e/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.imageId \|\| card\.id\}\.png\?v=20260809a/);
+  assert.match(endGameCardsJs, /\['kantoorpand-in-haaren', 'eigen-koophuis-kopen'\]\.includes\(card\.id\)/);
   assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
   assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
   assert.match(endGameCardsJs, /title:\s*'Ketting & Armband'/);
