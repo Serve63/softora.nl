@@ -152,6 +152,9 @@
     image.height = 307;
     image.loading = 'lazy';
     image.decoding = 'async';
+    if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(card.id)) {
+      artwork.classList.add('end-game-card-photo--edge-crop');
+    }
     shade.className = 'end-game-card-photo-shade';
     top.className = 'end-game-card-kicker';
     top.textContent = card.type === 'origin'
