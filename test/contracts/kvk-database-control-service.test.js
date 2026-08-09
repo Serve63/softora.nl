@@ -188,6 +188,60 @@ test('stale worker heartbeat is exposed as waiting for self-healing', async () =
   assert.match(response.payload.control.workers.controle.workerMessage, /hervat automatisch/);
 });
 
+test('fresh heartbeats cannot hide a lane without persisted progress', async () => {
+  const { service, setNow } = createInMemoryService();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
+
+  setNow('2026-07-26T21:01:00.000Z');
+  const report = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'running',
+        workerProgressAt: '2026-07-26T20:30:00.000Z',
+        queuePending: true,
+        queueHeadKvk: '12345678',
+      },
+    },
+    report
+  );
+
+  assert.equal(report.payload.control.workers.vuller.workerState, 'waiting');
+  assert.equal(report.payload.control.workers.vuller.stalled, true);
+  assert.equal(report.payload.control.workerState, 'starting');
+  assert.match(report.payload.control.workers.vuller.workerMessage, /geen opgeslagen voortgang/);
+});
+
+test('a healthy empty lane is idle instead of pretending to be busy', async () => {
+  const { service } = createInMemoryService();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
+  const report = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'goedgekeurd',
+        workerState: 'running',
+        workerProgressAt: '2026-07-26T20:30:00.000Z',
+        queuePending: false,
+      },
+    },
+    report
+  );
+
+  assert.equal(report.payload.control.workers.goedgekeurd.workerState, 'idle');
+  assert.equal(report.payload.control.workers.goedgekeurd.stalled, false);
+  assert.match(report.payload.control.workers.goedgekeurd.workerMessage, /wachtrij leeg/);
+});
+
 test('kvk database control validates browser and worker payloads', async () => {
   const { service } = createInMemoryService();
   const unauthorizedCommand = createJsonResponse();
