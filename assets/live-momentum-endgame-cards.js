@@ -25,7 +25,7 @@
     { id: 'serves-gezondheidsdossier', title: "Servé's gezondheidsdossier" },
     { id: 'ruben-zet-toto', title: 'Ruben zet toto' },
     { id: 'world-watcher', title: 'world watcher' },
-    { id: 'transfermarkt', title: 'Transfermarkt' },
+    { id: 'transfermarkt', title: 'Ruben Romano' },
     { id: 'rubens-company', title: 'Ruben’s Company' },
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'jurisalem-af', title: 'Jurisalem af' },
@@ -151,7 +151,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260809e`;
+    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260809f`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
