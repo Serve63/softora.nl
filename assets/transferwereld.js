@@ -3,13 +3,7 @@
 
   const baseDataset = window.TRANSFERWERELD_DATA;
   const scopeDataset = window.TRANSFERWERELD_SCOPE_DATA;
-  const dataset = scopeDataset?.clubs?.length
-    ? {
-      ...baseDataset,
-      clubs: [...(baseDataset.clubs || []), ...scopeDataset.clubs],
-      scopeLeagues: scopeDataset.scopeLeagues || baseDataset.scopeLeagues,
-    }
-    : baseDataset;
+  const dataset = window.TransferwereldScope?.buildScopedDataset(baseDataset, scopeDataset) || baseDataset;
   if (!dataset?.clubs?.length) {
     document.querySelector('main').insertAdjacentHTML('beforeend', '<p class="empty">De transferdata wordt nog opgebouwd. Ververs de pagina over een moment.</p>');
     return;
@@ -147,7 +141,7 @@
   }
 
   function clubCell(club) {
-    const rank = Number(club.rank) > 0 && Number(club.rank) < 10000 ? `#${club.rank} wereldwijd` : 'geen wereldrang';
+    const rank = Number(club.rank) > 0 && Number(club.rank) < 10000 ? `#${club.rank} wereldwijd` : 'wereldrang niet beschikbaar';
     const meta = [club.country, club.league].filter(Boolean).join(' · ');
     return `<div class="club-cell"><img class="crest" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.hidden=true"><div><strong>${escapeHtml(club.name)}</strong><small>${escapeHtml(meta)}${meta ? ' · ' : ''}${escapeHtml(rank)}</small></div></div>`;
   }
@@ -243,13 +237,21 @@
     const query = normalize(document.querySelector('#rumour-search').value.trim());
     document.querySelector('#rumour-output').textContent = `${minimum}%`;
     const filtered = rumours.filter((rumour) => rumour.probability >= minimum && (!query || normalize(`${rumour.player} ${rumour.club.name} ${rumour.currentClub}`).includes(query)));
-    document.querySelector('#rumour-grid').innerHTML = filtered.length ? filtered.map((rumour) => `
-      <article class="rumour-card" data-chance="${rumour.probability}">
-        <div class="rumour-top"><span class="direction">Gerucht</span><span class="chance">${rumour.probability}%</span></div>
-        <h3>${escapeHtml(rumour.player)}</h3>
-        <p class="rumour-route">${escapeHtml(rumour.currentClub || 'Huidige club onbekend')} → <strong>${escapeHtml(rumour.club.name)}</strong></p>
-        <div class="rumour-meta"><span>${escapeHtml(rumour.marketValue || 'Waarde onbekend')}</span>${rumour.source ? `<a href="${escapeHtml(rumour.source)}" target="_blank" rel="noopener noreferrer">Bekijk signaal ↗</a>` : `<span>${escapeHtml(rumour.updated)}</span>`}</div>
-      </article>`).join('') : '<p class="empty">Geen geruchten boven deze waarschijnlijkheid gevonden.</p>';
+    document.querySelector('#rumour-list').innerHTML = filtered.length ? `
+      <div class="rumour-list-head" aria-hidden="true"><span>#</span><span>Speler</span><span>Betrokken clubs</span><span>Kans</span><span>Waarde</span><span>Bron</span></div>
+      ${filtered.map((rumour, index) => {
+        const currentClub = rumour.currentClub || 'Huidige club onbekend';
+        const sameClub = normalize(currentClub) === normalize(rumour.club.name);
+        const route = sameClub ? rumour.club.name : `${currentClub} → ${rumour.club.name}`;
+        return `<article class="rumour-row">
+          <span class="rumour-index">${String(index + 1).padStart(2, '0')}</span>
+          <div class="rumour-player"><strong>${escapeHtml(rumour.player)}</strong><small>Gerucht</small></div>
+          <div class="rumour-route">${escapeHtml(route)}</div>
+          <span class="rumour-chance">${rumour.probability}%</span>
+          <span class="rumour-value">${escapeHtml(rumour.marketValue || 'Onbekend')}</span>
+          ${rumour.source ? `<a class="rumour-source" href="${escapeHtml(rumour.source)}" target="_blank" rel="noopener noreferrer">Bekijk ↗</a>` : `<span class="rumour-updated">${escapeHtml(rumour.updated || '—')}</span>`}
+        </article>`;
+      }).join('')}` : '<p class="empty">Geen geruchten boven deze waarschijnlijkheid gevonden.</p>';
   }
 
   function impactLabel(score) {
@@ -302,7 +304,8 @@
       return `<article class="role-card ${good ? 'good' : 'weak'}"><div class="role-head"><div><span class="role-code">${role}</span><small>${ROLE_LABELS[role]}</small></div><span class="role-status" title="${good ? 'Dubbel op niveau' : 'Nog niet dubbel op niveau'}"></span></div>${players.length ? players.map((player) => `<div class="role-player"><span>${escapeHtml(player.player)}</span><span>${formatMoney(player.marketValueNumber)}</span></div>`).join('') : '<small>Geen primaire speler</small>'}</article>`;
     }).join('');
     const coach = club.context?.coach?.name ? `Trainer ${escapeHtml(club.context.coach.name)}` : 'Trainer onbekend';
-    document.querySelector('#depth-detail').innerHTML = `<div class="depth-summary"><div><p class="eyebrow">#${club.rank} wereldwijd</p><h3>${escapeHtml(club.name)}</h3><small>Drempel tweede speler: ${formatMoney(club.depth.threshold)} · ${coach} · ${club.context?.injuries?.length || 0} afwezig</small></div><div class="depth-score">${club.depth.score}<small>/100</small></div></div><div class="role-grid">${roles}</div>`;
+    const ranking = Number(club.rank) > 0 && Number(club.rank) < 10000 ? `#${club.rank} wereldwijd` : escapeHtml(club.league);
+    document.querySelector('#depth-detail').innerHTML = `<div class="depth-summary"><div><p class="eyebrow">${ranking}</p><h3>${escapeHtml(club.name)}</h3><small>Drempel tweede speler: ${formatMoney(club.depth.threshold)} · ${coach} · ${club.context?.injuries?.length || 0} afwezig</small></div><div class="depth-score">${club.depth.score}<small>/100</small></div></div><div class="role-grid">${roles}</div>`;
   }
 
   function forecastScore(team, league) {
@@ -339,7 +342,7 @@
         if (team.club?.context?.injuries?.length) context.push(`${team.club.context.injuries.length} afwezig`);
         if (team.club?.context?.coach?.name) context.push(team.club.context.coach.name);
         const displayName = team.club?.name || team.name;
-        return `<div class="forecast-row"><span class="forecast-rank">${index + 1}</span><strong><span>${escapeHtml(displayName)}${team.club?.isTop100 ? '<span class="top100-chip">T100</span>' : ''}</span>${context.length ? `<small>${escapeHtml(context.join(' · '))}</small>` : ''}</strong><span class="model">${team.score.toFixed(1)}</span><span class="chance">${index === 0 ? `${chance}% kampioen` : `${chance}%`}</span></div>`;
+        return `<div class="forecast-row"><span class="forecast-rank">${index + 1}</span><strong><span>${escapeHtml(displayName)}</span>${context.length ? `<small>${escapeHtml(context.join(' · '))}</small>` : ''}</strong><span class="model">${team.score.toFixed(1)}</span><span class="chance">${index === 0 ? `${chance}% kampioen` : `${chance}%`}</span></div>`;
       }).join('');
       return `<article class="forecast-card"><div class="forecast-head"><h3>${escapeHtml(league.name)}</h3><span>${escapeHtml(league.country)} · ${league.teams.length} clubs</span></div>${rows}</article>`;
     }).join('');

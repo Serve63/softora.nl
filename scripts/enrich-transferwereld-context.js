@@ -326,6 +326,12 @@ async function main() {
   if (!process.env.TRANSFER_BROWSER_EXECUTABLE) throw new Error('TRANSFER_BROWSER_EXECUTABLE is required');
   const missingOnly = process.env.TRANSFER_CONTEXT_MISSING_ONLY === '1';
   const dataset = loadDataset();
+  const scopedClubIds = new Set((dataset.scopeLeagues || []).flatMap((league) => (
+    (league.teams || []).map((team) => Number(team.transfermarktId)).filter(Number.isFinite)
+  )));
+  const contextClubs = scopedClubIds.size
+    ? dataset.clubs.filter((club) => scopedClubIds.has(Number(club.transfermarkt?.id)))
+    : dataset.clubs;
   const optaSource = await (await fetch(OPTA_URL, { headers: { 'user-agent': USER_AGENT } })).text();
   const optaTeams = extractOptaTeams(optaSource);
   const browser = await chromium.launch({ headless: true, executablePath: process.env.TRANSFER_BROWSER_EXECUTABLE });
@@ -333,7 +339,7 @@ async function main() {
   let contexts;
   const fullLeagueTables = new Map();
   try {
-    contexts = await withConcurrency(dataset.clubs, 4, async (club) => {
+    contexts = await withConcurrency(contextClubs, 4, async (club) => {
       const warnings = [];
       const previousWarnings = String(club.contextWarning || '');
       let injuries = club.context && !previousWarnings.includes('injuries') ? (club.context.injuries || []) : [];
@@ -341,7 +347,7 @@ async function main() {
       let schedule = { competitionCode: '', tableRoute: '', leagueName: '', leagueTable: [], fixtures: [] };
       if (missingOnly && club.context && !previousWarnings) {
         completed += 1;
-        process.stdout.write(`\rContext ${completed}/${dataset.clubs.length}`);
+        process.stdout.write(`\rContext ${completed}/${contextClubs.length}`);
         return { club, injuries, coach, schedule, warnings, reusedContext: true };
       }
       const page = await browser.newPage({ locale: 'en-GB', userAgent: USER_AGENT });
@@ -354,7 +360,7 @@ async function main() {
       try { schedule = await readSchedule(page, club); } catch { warnings.push('schedule'); }
       await page.close();
       completed += 1;
-      process.stdout.write(`\rContext ${completed}/${dataset.clubs.length}`);
+      process.stdout.write(`\rContext ${completed}/${contextClubs.length}`);
       return { club, injuries, coach, schedule, warnings };
     });
     if (!missingOnly) {
@@ -387,9 +393,10 @@ async function main() {
   const contextByClub = new Map(contexts.map((entry) => [entry.club.name, entry]));
   dataset.clubs = dataset.clubs.map((club) => {
     const entry = contextByClub.get(club.name);
+    if (!entry) return club;
     const { contextWarning: _previousContextWarning, ...baseClub } = club;
     if (entry.reusedContext) return baseClub;
-    const now = Date.UTC(2026, 7, 4);
+    const now = Date.UTC(2026, 7, 9);
     const fixtures = entry.schedule.fixtures
       .map((fixture) => ({ ...fixture, timestamp: parseDate(fixture.date) }))
       .filter((fixture) => fixture.timestamp)

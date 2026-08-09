@@ -13,14 +13,16 @@ const {
 
 const TRANSFERMARKT_ORIGIN = 'https://www.transfermarkt.com';
 const TOP_COMPETITIONS = [
-  { id: 'tm-GB1', code: 'GB1', name: 'Premier League', country: 'England', slug: 'premier-league', kind: 'top-7' },
-  { id: 'tm-ES1', code: 'ES1', name: 'LaLiga', country: 'Spain', slug: 'laliga', kind: 'top-7' },
-  { id: 'tm-IT1', code: 'IT1', name: 'Serie A', country: 'Italy', slug: 'serie-a', kind: 'top-7' },
-  { id: 'tm-L1', code: 'L1', name: 'Bundesliga', country: 'Germany', slug: 'bundesliga', kind: 'top-7' },
-  { id: 'tm-FR1', code: 'FR1', name: 'Ligue 1', country: 'France', slug: 'ligue-1', kind: 'top-7' },
-  { id: 'tm-NL1', code: 'NL1', name: 'Eredivisie', country: 'Netherlands', slug: 'eredivisie', kind: 'top-7' },
-  { id: 'tm-PO1', code: 'PO1', name: 'Liga Portugal', country: 'Portugal', slug: 'primeira-liga', kind: 'top-7' },
-  { id: 'tm-NL2', code: 'NL2', name: 'Keuken Kampioen Divisie', country: 'Netherlands', slug: 'eerste-divisie', kind: 'extra' },
+  { id: 'tm-GB1', code: 'GB1', name: 'Premier League', country: 'England', slug: 'premier-league', uefaRank: 1 },
+  { id: 'tm-IT1', code: 'IT1', name: 'Serie A', country: 'Italy', slug: 'serie-a', uefaRank: 2 },
+  { id: 'tm-ES1', code: 'ES1', name: 'LaLiga', country: 'Spain', slug: 'laliga', uefaRank: 3 },
+  { id: 'tm-L1', code: 'L1', name: 'Bundesliga', country: 'Germany', slug: 'bundesliga', uefaRank: 4 },
+  { id: 'tm-FR1', code: 'FR1', name: 'Ligue 1', country: 'France', slug: 'ligue-1', uefaRank: 5 },
+  { id: 'tm-NL1', code: 'NL1', name: 'Eredivisie', country: 'Netherlands', slug: 'eredivisie', uefaRank: 6 },
+  { id: 'tm-PO1', code: 'PO1', name: 'Liga Portugal', country: 'Portugal', slug: 'primeira-liga', uefaRank: 7 },
+  { id: 'tm-BE1', code: 'BE1', name: 'Jupiler Pro League', country: 'Belgium', slug: 'jupiler-pro-league', uefaRank: 8 },
+  { id: 'tm-TR1', code: 'TR1', name: 'Süper Lig', country: 'Türkiye', slug: 'super-lig', uefaRank: 9 },
+  { id: 'tm-TS1', code: 'TS1', name: 'Chance Liga', country: 'Czechia', slug: 'chance-liga', uefaRank: 10 },
 ];
 
 function sleep(ms) {
@@ -172,7 +174,8 @@ function buildTeam(definition, row, candidate, existingById, existingByName) {
     },
     isTop100,
     isExpandedCompetition: true,
-    competitionScope: definition.kind,
+    competitionScope: 'uefa-top-10',
+    uefaAssociationRank: definition.uefaRank,
   };
 }
 
@@ -201,7 +204,8 @@ async function main() {
       code: definition.code,
       name: definition.name,
       country: definition.country,
-      kind: definition.kind,
+      kind: 'uefa-top-10',
+      uefaRank: definition.uefaRank,
       teams: rows,
     });
     rows.forEach((row) => {
@@ -217,22 +221,25 @@ async function main() {
   console.log(`Enriching ${uniqueTargetRows.length} unique competition clubs...`);
   const expandedTargetClubs = await addClubData(uniqueTargetRows, existingClubs);
   const expandedById = new Map(expandedTargetClubs.map((club) => [club.transfermarkt.id, club]));
-  const existingIds = new Set(dataset.clubs.map((club) => club.transfermarkt?.id));
-  const updatedExistingClubs = dataset.clubs.map((club) => expandedById.get(club.transfermarkt?.id) || club);
-  const newCompetitionClubs = expandedTargetClubs.filter((club) => !existingIds.has(club.transfermarkt?.id));
-  dataset.clubs = [...updatedExistingClubs, ...newCompetitionClubs];
+  const baseClubCount = Number(dataset.meta?.baseClubCount) || Math.min(101, dataset.clubs.length);
+  const baseClubs = dataset.clubs.slice(0, baseClubCount);
+  const baseIds = new Set(baseClubs.map((club) => Number(club.transfermarkt?.id)));
+  const updatedBaseClubs = baseClubs.map((club) => expandedById.get(Number(club.transfermarkt?.id)) || club);
+  const scopedExtraClubs = expandedTargetClubs.filter((club) => !baseIds.has(Number(club.transfermarkt?.id)));
+  dataset.clubs = [...updatedBaseClubs, ...scopedExtraClubs];
   dataset.scopeLeagues = scopeLeagues;
   Object.assign(dataset, normalizeDatasetIdentity(dataset));
   dataset.meta = {
     ...dataset.meta,
-    title: 'Transferwereld — top 7 competities + KKD',
+    title: 'Transferwereld — top 10 competities',
     scope: {
-      primary: TOP_COMPETITIONS.filter((definition) => definition.kind === 'top-7').map((definition) => definition.name),
-      extra: TOP_COMPETITIONS.filter((definition) => definition.kind === 'extra').map((definition) => definition.name),
+      source: 'UEFA men\'s association club rankings (five-year coefficient)',
+      sourceUrl: 'https://www.uefa.com/uefachampionsleague/news/02a0-1f8b9164ba92-1dd42564c706-1000--uefa-rankings-2025-which-teams-and-nations-are-on-top/',
+      competitions: TOP_COMPETITIONS.map((definition) => definition.name),
     },
     scopeClubCount: uniqueTargetRows.length,
     scopeFetchedAt: new Date().toISOString(),
-    warnings: dataset.clubs.filter((club) => club.dataWarning).length,
+    warnings: expandedTargetClubs.filter((club) => club.dataWarning).length,
   };
   const sizes = writeTransferwereldDataset(dataset);
   console.log(`Wrote split transfer data (${sizes.baseBytes} + ${sizes.scopeBytes} bytes)`);

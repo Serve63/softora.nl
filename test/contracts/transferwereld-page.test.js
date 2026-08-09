@@ -15,14 +15,8 @@ function loadDataset() {
   vm.createContext(context);
   vm.runInContext(read('assets/transferwereld-data.js'), context);
   vm.runInContext(read('assets/transferwereld-scope-data.js'), context);
-  const scope = context.window.TRANSFERWERELD_SCOPE_DATA;
-  return scope?.clubs?.length
-    ? {
-      ...context.window.TRANSFERWERELD_DATA,
-      clubs: [...context.window.TRANSFERWERELD_DATA.clubs, ...scope.clubs],
-      scopeLeagues: scope.scopeLeagues,
-    }
-    : context.window.TRANSFERWERELD_DATA;
+  const { buildScopedDataset } = require('../../assets/transferwereld-scope.js');
+  return buildScopedDataset(context.window.TRANSFERWERELD_DATA, context.window.TRANSFERWERELD_SCOPE_DATA);
 }
 
 test('transferwereld exposes all requested analysis tabs and defaults to fee sorting', () => {
@@ -37,10 +31,11 @@ test('transferwereld exposes all requested analysis tabs and defaults to fee sor
     'Competitieprognoses',
   ];
   tabNames.forEach((name) => assert.match(html, new RegExp(name.replace('/', '\\/'))));
-  assert.match(html, /Alle transfers van de top 100 clubs/);
+  assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.match(html, /<select id="transfer-sort"><option value="fee">Hoogste transfersom<\/option>/);
   assert.match(html, /transferwereld-scope-data\.js\?v=20260809a/);
+  assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
   assert.match(html, /transferwereld-deals\.js\?v=20260809a/);
   assert.doesNotMatch(html, /id="transfer-direction"/);
   const script = read('assets/transferwereld.js');
@@ -98,26 +93,22 @@ test('transferwereld shows a desktop-only notice below the desktop breakpoint', 
   assert.match(css, /body > main,[\s\S]*body > footer,[\s\S]*body > dialog \{ display: none !important; \}/);
 });
 
-test('transferwereld dataset covers the Opta top 100 plus the requested competition scope', () => {
+test('transferwereld dataset contains every club from exactly the UEFA top ten leagues', () => {
   const data = loadDataset();
-  assert.ok(data.clubs.length >= 180, `expected top 100 plus competition clubs, found ${data.clubs.length}`);
-  assert.deepEqual(Array.from(data.clubs.slice(0, 100), (club) => club.rank), Array.from({ length: 100 }, (_, index) => index + 1));
-  const ajax = data.clubs.find((club) => club.transfermarkt?.id === 610);
-  assert.equal(ajax?.rank, 133);
-  assert.equal(ajax?.isWildcard, true);
-  assert.equal(data.clubs.filter((club) => club.isTop100).length, 100);
-  assert.equal(new Set(data.clubs.filter((club) => club.isTop100).map((club) => club.rank)).size, 100);
-  const espanyol = data.clubs.find((club) => club.transfermarkt?.id === 714);
-  assert.equal(espanyol?.name, 'RCD Espanyol Barcelona');
-  assert.equal(espanyol?.isTop100, false);
-  assert.ok(Number(espanyol?.rank) > 100);
+  assert.equal(data.clubs.length, 184);
   assert.equal(new Set(data.clubs.map((club) => club.name)).size, data.clubs.length, 'club names must be unique across views');
   assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.name), [
-    'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie', 'Liga Portugal', 'Keuken Kampioen Divisie',
+    'Premier League', 'Serie A', 'LaLiga', 'Bundesliga', 'Ligue 1', 'Eredivisie', 'Liga Portugal', 'Jupiler Pro League', 'Süper Lig', 'Chance Liga',
   ]);
-  assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.teams.length), [20, 20, 20, 18, 18, 18, 18, 20]);
-  assert.equal(data.meta.scopeClubCount, 152);
-  const reserveMapping = data.clubs.slice(0, 101).find((club) => /\b(u[- ]?(17|18|19|20|21|23)|reserves?|academy|youth)\b/i.test(club.transfermarkt.matchedName));
+  assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.uefaRank), Array.from({ length: 10 }, (_, index) => index + 1));
+  assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.teams.length), [20, 20, 20, 18, 18, 18, 18, 18, 18, 16]);
+  assert.equal(data.meta.scopeClubCount, 184);
+  assert.match(data.meta.scope.source, /UEFA men's association club rankings/);
+  const expectedIds = new Set(data.scopeLeagues.flatMap((league) => league.teams.map((team) => Number(team.transfermarktId))));
+  const clubIds = new Set(data.clubs.map((club) => Number(club.transfermarkt?.id)));
+  assert.deepEqual(clubIds, expectedIds, 'every active club must come from exactly one top-ten league');
+  assert.equal(data.clubs.some((club) => club.league === 'Keuken Kampioen Divisie'), false);
+  const reserveMapping = data.clubs.find((club) => /\b(u[- ]?(17|18|19|20|21|23)|reserves?|academy|youth)\b/i.test(club.transfermarkt.matchedName));
   assert.equal(reserveMapping, undefined, `reserve team mapping found for ${reserveMapping?.name || 'unknown club'}`);
 });
 
@@ -127,8 +118,8 @@ test('transferwereld generated data is complete enough for the requested analysi
   const squadCount = data.clubs.reduce((total, club) => total + club.squad.length, 0);
   const clubsWithTransfers = data.clubs.filter((club) => club.arrivals.length + club.departures.length > 0).length;
   const clubsWithFullSquads = data.clubs.filter((club) => club.squad.length >= 16).length;
-  assert.ok(transferCount >= 3_000, `expected at least 3,000 transfer movements, found ${transferCount}`);
-  assert.ok(squadCount >= 5_000, `expected at least 5,000 squad players, found ${squadCount}`);
+  assert.ok(transferCount >= 2_800, `expected at least 2,800 transfer movements, found ${transferCount}`);
+  assert.ok(squadCount >= 5_200, `expected at least 5,200 squad players, found ${squadCount}`);
   assert.equal(clubsWithTransfers, data.clubs.length, `transfer coverage incomplete: ${clubsWithTransfers}/${data.clubs.length} clubs`);
   assert.equal(clubsWithFullSquads, data.clubs.length, `squad coverage incomplete: ${clubsWithFullSquads}/${data.clubs.length} clubs`);
   assert.equal(data.meta.warnings, 0);
@@ -138,16 +129,16 @@ test('transferwereld generated data is complete enough for the requested analysi
 test('deep forecast context covers every club and every competition table', () => {
   const data = loadDataset();
   assert.deepEqual({ ...data.meta.contextCoverage }, {
-    injuries: 101,
-    coaches: 101,
-    schedules: 101,
+    injuries: data.clubs.length,
+    coaches: data.clubs.length,
+    schedules: data.clubs.length,
     leagues: data.leagues.length,
     estimatedRatings: 0,
     fullLeagueTables: data.leagues.length,
   });
   assert.equal(data.meta.contextWarnings, 0);
   const contextClubs = data.clubs.filter((club) => club.context);
-  assert.equal(contextClubs.length, 102);
+  assert.equal(contextClubs.length, data.clubs.length);
   assert.ok(contextClubs.every((club) => club.context?.coach?.name), 'a context club is missing its manager');
   assert.ok(contextClubs.every((club) => Array.isArray(club.context?.injuries)), 'a context club is missing injury context');
   assert.ok(contextClubs.every((club) => Array.isArray(club.context?.nextFixtures)), 'a context club is missing fixture context');
@@ -155,14 +146,27 @@ test('deep forecast context covers every club and every competition table', () =
   ['standingModifier', 'injuryModifier', 'formModifier', 'fixtureModifier', 'coachModifier'].forEach((factor) => assert.match(script, new RegExp(factor)));
 });
 
-test('transferwereld frontend applies the expanded competition scope to every analysis view', () => {
+test('transferwereld frontend applies the UEFA top ten scope to every analysis view', () => {
   const html = read('transfers.html');
   const script = read('assets/transferwereld.js');
   assert.match(html, /id="transfer-competition"/);
-  assert.match(html, /top 7 competities \+ KKD/i);
+  assert.match(html, /top 10 competities/i);
+  assert.doesNotMatch(html, /top 100|KKD|Keuken Kampioen/i);
+  assert.match(script, /buildScopedDataset/);
   assert.match(script, /scopeLeagues/);
   assert.match(script, /routeClubs\.some\(\(club\) => club\.league === competition\)/);
   assert.match(script, /scopeLeagues\.map\(\(league\)/);
+});
+
+test('rumours render as compact comparable rows instead of oversized cards', () => {
+  const html = read('transfers.html');
+  const script = read('assets/transferwereld.js');
+  const css = read('assets/transferwereld.css');
+  assert.match(html, /id="rumour-list" class="rumour-list"/);
+  assert.match(script, /class="rumour-row"/);
+  assert.match(css, /\.rumour-row \{[^}]*display: grid/);
+  assert.doesNotMatch(script, /rumour-card/);
+  assert.doesNotMatch(css, /\.rumour-card/);
 });
 
 test('localized transfer fees are normalized without turning thousands into millions', () => {

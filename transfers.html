@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#080b11">
-  <title>Transferwereld — top 7 competities + KKD</title>
-  <meta name="description" content="Transfers, uitgaven, inkomsten, geruchten, transferimpact, selectiediepte en competitieprognoses voor de mondiale top 100, de top 7 competities en de KKD.">
-  <meta property="og:title" content="Transferwereld — top 7 competities + KKD">
-  <meta property="og:description" content="Alle transferanalyses van de mondiale top 100, de zeven grootste competities en de Keuken Kampioen Divisie.">
+  <title>Transferwereld — top 10 competities</title>
+  <meta name="description" content="Transfers, uitgaven, inkomsten, geruchten, transferimpact, selectiediepte en competitieprognoses voor alle clubs uit de tien sterkste Europese competities.">
+  <meta property="og:title" content="Transferwereld — top 10 competities">
+  <meta property="og:description" content="Alle transferanalyses voor alle clubs uit de tien sterkste Europese competities volgens de UEFA-vijfjaarsranglijst.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="http://127.0.0.1:4173/assets/transferwereld-og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -16,19 +16,19 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/fonts.css">
-  <link rel="stylesheet" href="/assets/transferwereld.css?v=20260805a">
+  <link rel="stylesheet" href="/assets/transferwereld.css?v=20260809b">
 </head>
 <body>
   <section class="mobile-desktop-gate" aria-labelledby="desktop-only-title">
-    <span class="wordmark-mark" aria-hidden="true">T100</span>
-    <p class="eyebrow">Transferwereld 100</p>
+    <span class="wordmark-mark" aria-hidden="true">T10</span>
+    <p class="eyebrow">Transferwereld top 10</p>
     <h1 id="desktop-only-title">Enkel beschikbaar<br>op desktop</h1>
     <p>Open deze pagina op een computer met een scherm van minimaal 1024 pixels.</p>
   </section>
 
   <header class="masthead">
-    <a class="wordmark" href="#top" aria-label="Transferwereld 100, naar boven">
-      <span class="wordmark-mark">T100</span>
+    <a class="wordmark" href="#top" aria-label="Transferwereld top 10, naar boven">
+      <span class="wordmark-mark">T10</span>
       <span>Transferwereld</span>
     </a>
     <div class="masthead-meta">
@@ -40,11 +40,11 @@
   <main id="top">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Zomerwindow 2026 · top 7 + KKD</p>
+        <p class="eyebrow">Zomerwindow 2026 · top 10 competities</p>
         <h1>Wie wint de<br><em>transfermarkt?</em></h1>
-        <p class="hero-lead">De bevestigde deals, geldstromen, geruchten en selectiekracht van de mondiale top 100, alle clubs uit de top 7 competities en de KKD — in één onafhankelijke transferdesk.</p>
+        <p class="hero-lead">De bevestigde deals, geldstromen, geruchten en selectiekracht van alle clubs uit de tien sterkste Europese competities — in één onafhankelijke transferdesk.</p>
         <div class="source-line">
-          <span>Clubs gerangschikt met</span>
+          <span>Competities via UEFA · clubkracht via</span>
           <a href="https://theanalyst.com/articles/who-are-the-best-football-team-in-the-world-opta-power-rankings" target="_blank" rel="noopener noreferrer">Opta Power Rankings ↗</a>
           <span data-meta-coverage></span>
         </div>
@@ -75,8 +75,8 @@
 
     <section class="panel" id="panel-transfers" role="tabpanel" aria-labelledby="tab-transfers" data-panel="transfers">
       <div class="section-head">
-        <div><p class="eyebrow">Bevestigd · uitgebreid competitie-universum</p><h2>Alle transfers van de top 100 clubs + top 7 competities</h2></div>
-        <p>Elke bevestigde deal staat één keer als duidelijke route van club naar club. De mondiale top 100, alle clubs uit zeven topcompetities en de Keuken Kampioen Divisie zijn opgenomen; huurreturns en transfervrije deals blijven zichtbaar.</p>
+        <div><p class="eyebrow">Bevestigd · volledig competitie-universum</p><h2>Alle transfers uit de top 10 competities</h2></div>
+        <p>Elke bevestigde deal staat één keer als duidelijke route van club naar club. Alle clubs uit de tien sterkste Europese hoofdcompetities zijn opgenomen; huurreturns en transfervrije deals blijven zichtbaar.</p>
       </div>
       <form class="filterbar" id="transfer-filters" aria-label="Transferfilters">
         <label class="search-field"><span>Zoeken</span><input type="search" id="transfer-search" placeholder="Club, speler of tegenpartij"></label>
@@ -100,9 +100,9 @@
     </section>
 
     <section class="panel" id="panel-rumours" role="tabpanel" aria-labelledby="tab-rumours" data-panel="rumours" hidden>
-      <div class="section-head"><div><p class="eyebrow">Nog niet rond</p><h2>Geruchten rond de top 100 clubs</h2></div><p>Door Transfermarkt-gebruikers ingeschatte waarschijnlijkheden; signalen, geen bevestigde journalistieke feiten.</p></div>
+      <div class="section-head"><div><p class="eyebrow">Nog niet rond</p><h2>Geruchten uit de top 10 competities</h2></div><p>Door Transfermarkt-gebruikers ingeschatte waarschijnlijkheden; signalen, geen bevestigde journalistieke feiten.</p></div>
       <div class="rumour-toolbar"><label><span>Minimale kans</span><input id="rumour-probability" type="range" min="0" max="90" step="10" value="20"><output id="rumour-output">20%</output></label><label><span>Zoeken</span><input id="rumour-search" type="search" placeholder="Club of speler"></label></div>
-      <div id="rumour-grid" class="rumour-grid"></div>
+      <div id="rumour-list" class="rumour-list"></div>
     </section>
 
     <section class="panel" id="panel-impact" role="tabpanel" aria-labelledby="tab-impact" data-panel="impact" hidden>
@@ -120,15 +120,15 @@
     </section>
 
     <section class="panel" id="panel-forecast" role="tabpanel" aria-labelledby="tab-forecast" data-panel="forecast" hidden>
-      <div class="section-head"><div><p class="eyebrow">Seizoensmodel 2026–27 · top 7 + KKD</p><h2>Verwachte top 7 per competitie</h2></div><p>Voorspelling voor de zeven topcompetities en de extra KKD, gebaseerd op Opta-kracht, actuele standen, transfers, selectiediepte, blessures, recente vorm, trainerstermijn en komende tegenstanders.</p></div>
+      <div class="section-head"><div><p class="eyebrow">Seizoensmodel 2026–27 · top 10 competities</p><h2>Verwachte top 7 per competitie</h2></div><p>Voorspelling voor elk van de tien competities, gebaseerd op Opta-kracht, actuele standen, transfers, selectiediepte, blessures, recente vorm, trainerstermijn en komende tegenstanders.</p></div>
       <div class="forecast-note"><strong>Zo lees je dit</strong><span>De kampioenskans is de relatieve modelkans binnen de volledige competitie. Lopende competities verwerken punten en positie; bij competities die nog niet begonnen zijn wegen selectie en structurele clubkracht zwaarder.</span></div>
       <div id="forecast-grid" class="forecast-grid"></div>
     </section>
   </main>
 
   <footer>
-    <div><span class="wordmark-mark">T100</span><p>Een lokale transferdesk, gebouwd op actuele openbare voetbaldata.</p></div>
-    <div class="footer-sources"><strong>Bronnen & methode</strong><a href="https://theanalyst.com/articles/power-rankings-your-club-ranked" target="_blank" rel="noopener noreferrer">Opta-methodiek ↗</a><a href="https://www.transfermarkt.com" target="_blank" rel="noopener noreferrer">Transfermarkt ↗</a><button type="button" id="method-button">Bekijk scoringsmethode</button></div>
+    <div><span class="wordmark-mark">T10</span><p>Een lokale transferdesk, gebouwd op actuele openbare voetbaldata.</p></div>
+    <div class="footer-sources"><strong>Bronnen & methode</strong><a href="https://www.uefa.com/uefachampionsleague/news/02a0-1f8b9164ba92-1dd42564c706-1000--uefa-rankings-2025-which-teams-and-nations-are-on-top/" target="_blank" rel="noopener noreferrer">UEFA-ranglijst ↗</a><a href="https://theanalyst.com/articles/power-rankings-your-club-ranked" target="_blank" rel="noopener noreferrer">Opta-methodiek ↗</a><a href="https://www.transfermarkt.com" target="_blank" rel="noopener noreferrer">Transfermarkt ↗</a><button type="button" id="method-button">Bekijk scoringsmethode</button></div>
   </footer>
 
   <dialog id="method-dialog">
@@ -136,7 +136,7 @@
     <p class="eyebrow">Transparantie</p>
     <h2>Hoe de analyses zijn berekend</h2>
     <div class="method-grid">
-      <article><strong>Clubselectie</strong><p>De mondiale clubrang komt rechtstreeks uit de Opta Power Ranking van 3 augustus 2026: een hiërarchisch Elo-model met wedstrijdresultaten en, waar beschikbaar, xG. Iedere opgenomen club behoudt zijn echte wereldrang.</p></article>
+      <article><strong>Clubselectie</strong><p>De scope bestaat uit alle clubs uit de hoogste divisies van de tien best gerangschikte landen in UEFA's vijfjaarscoëfficiënt: Engeland, Italië, Spanje, Duitsland, Frankrijk, Nederland, Portugal, België, Turkije en Tsjechië. Opta-ratings bepalen alleen de relatieve clubkracht in de analyses.</p></article>
       <article><strong>Transferimpact</strong><p>Netto-investering wordt afgezet tegen selectiewaarde en aangevuld met het verschil tussen inkomende en uitgaande bewegingen en de huidige dieptescore.</p></article>
       <article><strong>Selectiediepte</strong><p>Per hoofdpositie tellen de twee duurste spelers. De kwaliteitsdrempel is 1,8% van de totale selectiewaarde, met €1 miljoen als minimum. Alleen de primaire Transfermarkt-positie telt.</p></article>
       <article><strong>Prognose</strong><p>De basis is 68% actuele Opta-rating, 22% seizoensgemiddelde en 10% recente rating. Begrensde correcties verwerken daarna stand, transferimpact, dubbele bezetting, blessurelast, laatste resultaten, trainerstermijn en zwaarte van de komende vijf duels.</p></article>
@@ -146,7 +146,8 @@
 
   <script src="/assets/transferwereld-data.js?v=20260809a"></script>
   <script src="/assets/transferwereld-scope-data.js?v=20260809a"></script>
+  <script src="/assets/transferwereld-scope.js?v=20260809b"></script>
   <script src="/assets/transferwereld-deals.js?v=20260809a"></script>
-  <script src="/assets/transferwereld.js?v=20260809a" defer></script>
+  <script src="/assets/transferwereld.js?v=20260809b" defer></script>
 </body>
 </html>
