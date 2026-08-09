@@ -1,12 +1,13 @@
-.stat-card-total-found {
+.stat-card-directory,
+.unusable-grade-directory {
   position: relative;
 }
 
-.stat-card-total-found .stat-main {
-  padding-right: 30px;
+.stat-card-directory .stat-main {
+  padding-right: 38px;
 }
 
-.stat-card-total-found__open {
+.stat-card-directory__open {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -23,18 +24,34 @@
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-.stat-card-total-found__open svg {
+.stat-card-directory__open svg {
   width: 15px;
   height: 15px;
 }
 
-.stat-card-total-found__open:hover {
+.stat-card-directory__open:hover {
   background: rgba(142, 47, 95, 0.1);
 }
 
-.stat-card-total-found__open:focus-visible {
+.stat-card-directory__open:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.stat-card-directory__open--grade {
+  top: 7px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+}
+
+.stat-card-directory__open--grade svg {
+  width: 13px;
+  height: 13px;
+}
+
+.unusable-grade-directory {
+  padding-right: 27px !important;
 }
 
 .total-found-source-status {
