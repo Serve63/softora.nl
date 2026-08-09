@@ -1,7 +1,15 @@
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE,
+  MAILBOX_CAMPAIGN_SNAPSHOT_FRESH_MS,
+  MAILBOX_CAMPAIGN_SNAPSHOT_MAX_STALE_MS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  getMailboxCampaignSnapshotAgeMs,
+  isMailboxCampaignSnapshotInvalidated,
+  markMailboxCampaignSnapshotStale,
   parseMailboxCampaignSnapshot,
+  parseMailboxCampaignSnapshotInvalidatedAt,
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 
@@ -78,10 +86,28 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     readTimeoutMs = 1200,
     freshCacheMs = 15_000,
     staleCacheMs = 6 * 60 * 60 * 1000,
+    mailboxFreshMs = MAILBOX_CAMPAIGN_SNAPSHOT_FRESH_MS,
+    mailboxMaxStaleMs = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_STALE_MS,
+    mailboxRefreshWaitMs = 1200,
   } = deps;
   const scopeCache = new Map();
   let mailboxCache = null;
   let mailboxRefreshPromise = null;
+
+  function getNow() {
+    const value = now();
+    return value instanceof Date ? value : new Date(value);
+  }
+
+  function getUsableMailboxSnapshot(snapshot, staleReason = 'snapshot_stale') {
+    if (!snapshot) return null;
+    const ageMs = getMailboxCampaignSnapshotAgeMs(snapshot, getNow());
+    if (ageMs > Math.max(0, Number(mailboxMaxStaleMs) || 0)) return null;
+    return markMailboxCampaignSnapshotStale(
+      snapshot,
+      ageMs > Math.max(0, Number(mailboxFreshMs) || 0) ? staleReason : 'bootstrap_unconfirmed'
+    );
+  }
 
   function getScopesForPage(fileName) {
     return PAGE_STATE_SCOPES[normalizeFileName(fileName)] || [];
@@ -139,26 +165,32 @@ function createPremiumPageStateBootstrapService(deps = {}) {
         includeSnapshotMessages: true,
         hydrateBodies: false,
       });
+      const snapshotAt = result && (result.contentAt || result.savedAt) || getNow().toISOString();
       const snapshot = {
         ok: result && result.ok !== false,
+        savedAt: result && result.savedAt || snapshotAt,
+        contentAt: result && result.contentAt || snapshotAt,
         messages: Array.isArray(result && result.snapshotMessages)
           ? result.snapshotMessages
           : Array.isArray(result && result.messages) ? result.messages : [],
         sync: result && result.sync && typeof result.sync === 'object' ? result.sync : null,
       };
       const compactSnapshot = snapshot.messages.length
-        ? parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot(snapshot))
+        ? parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot(snapshot, {
+            savedAt: snapshot.savedAt,
+            contentAt: snapshot.contentAt,
+          }))
         : snapshot;
       mailboxCache = { snapshot: compactSnapshot, cachedAt: Date.now() };
-      return compactSnapshot;
+      return getUsableMailboxSnapshot(compactSnapshot, 'bootstrap_unconfirmed');
     } catch (_error) {
-      return mailboxCache ? mailboxCache.snapshot : null;
+      return getUsableMailboxSnapshot(mailboxCache && mailboxCache.snapshot, 'refresh_failed');
     }
   }
 
   async function readPersistedMailboxSnapshot() {
     try {
-      const result = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
+      const readOptions = {
         uiStateReadTimeoutMs: Math.max(100, Math.min(1000, Number(readTimeoutMs) || 1000)),
         bypassReadFailureCooldown: true,
         suppressReadFailureCooldown: true,
@@ -166,13 +198,24 @@ function createPremiumPageStateBootstrapService(deps = {}) {
         preferSupabaseRestRead: true,
         ignoreSupabaseRestFailureCooldown: true,
         suppressSupabaseRestFailureCooldown: true,
-      });
+      };
+      const [result, invalidationResult] = await Promise.all([
+        getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, readOptions),
+        getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE, readOptions),
+      ]);
+      if (!result || !result.values || !invalidationResult || !invalidationResult.values) return null;
       const snapshot = parseMailboxCampaignSnapshot(
         result && result.values && result.values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]
       );
-      if (!snapshot) return null;
-      mailboxCache = { snapshot, cachedAt: Date.now() };
-      return snapshot;
+      const invalidatedAt = parseMailboxCampaignSnapshotInvalidatedAt(
+        invalidationResult && invalidationResult.values &&
+        invalidationResult.values[MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY]
+      );
+      if (isMailboxCampaignSnapshotInvalidated(snapshot, invalidatedAt)) return null;
+      const usableSnapshot = getUsableMailboxSnapshot(snapshot);
+      if (!usableSnapshot) return null;
+      mailboxCache = { snapshot: usableSnapshot, cachedAt: Date.now() };
+      return usableSnapshot;
     } catch (_error) {
       return null;
     }
@@ -187,22 +230,38 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     return mailboxRefreshPromise;
   }
 
+  async function waitForMailboxRefresh(fallback = null) {
+    const waitMs = Math.max(0, Math.min(2500, Number(mailboxRefreshWaitMs) || 0));
+    if (!waitMs) return refreshMailboxSnapshot();
+    let timeoutId = null;
+    try {
+      const refreshed = await Promise.race([
+        refreshMailboxSnapshot(),
+        new Promise((resolve) => {
+          timeoutId = setTimeout(() => resolve(null), waitMs);
+        }),
+      ]);
+      return refreshed || fallback;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   async function readMailboxSnapshot(fileName) {
     if (normalizeFileName(fileName) !== 'premium-mailbox.html') return null;
     const cacheAgeMs = mailboxCache ? Math.max(0, Date.now() - mailboxCache.cachedAt) : Infinity;
     if (mailboxCache && cacheAgeMs <= Math.max(0, Number(freshCacheMs) || 0)) {
-      return mailboxCache.snapshot;
+      return getUsableMailboxSnapshot(mailboxCache.snapshot);
     }
     if (mailboxCache && cacheAgeMs <= Math.max(0, Number(staleCacheMs) || 0)) {
-      void refreshMailboxSnapshot();
-      return mailboxCache.snapshot;
+      const cachedSnapshot = getUsableMailboxSnapshot(mailboxCache.snapshot);
+      if (cachedSnapshot) return waitForMailboxRefresh(cachedSnapshot);
     }
     const persistedSnapshot = await readPersistedMailboxSnapshot();
     if (persistedSnapshot) {
-      void refreshMailboxSnapshot();
-      return persistedSnapshot;
+      return waitForMailboxRefresh(persistedSnapshot);
     }
-    return refreshMailboxSnapshot();
+    return waitForMailboxRefresh(null);
   }
 
   async function buildPageStateBootstrapPayload(fileName, options = {}) {

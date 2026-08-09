@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
+  isMailboxCampaignSnapshotInvalidated,
   markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
   parseMailboxCampaignSnapshot,
@@ -405,8 +406,9 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 14,
+    version: 15,
     savedAt: '2026-07-23T15:00:00.000Z',
+    contentAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{
       id: 'martijn@softora.nl|inbox|23',
@@ -530,11 +532,21 @@ test('mailbox campaign snapshot verwijdert alleen de exact gekozen mail', () => 
   ]);
 });
 
-test('mailbox campaign snapshot weigert lege en ongeldige data', () => {
-  assert.equal(serializeMailboxCampaignSnapshot({ ok: true, messages: [] }), '');
+test('mailbox campaign snapshot bewaart een authoritative lege lijst en weigert ongeldige data', () => {
+  assert.deepEqual(
+    parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot({ ok: true, messages: [] })).messages,
+    []
+  );
   assert.equal(parseMailboxCampaignSnapshot('{kapot'), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 10, messages: [{ id: 'stale-mhc' }] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 2, messages: [] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 3, messages: [{}] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 7, messages: [{}] })), null);
+});
+
+test('mailbox campaign snapshot wordt alleen door een nieuwere indexupdate geïnvalideerd', () => {
+  const snapshot = { contentAt: '2026-08-09T20:00:00.000Z' };
+  assert.equal(isMailboxCampaignSnapshotInvalidated(snapshot, '2026-08-09T19:59:59.999Z'), false);
+  assert.equal(isMailboxCampaignSnapshotInvalidated(snapshot, '2026-08-09T20:00:00.000Z'), true);
+  assert.equal(isMailboxCampaignSnapshotInvalidated(snapshot, '2026-08-09T20:00:00.001Z'), true);
 });

@@ -7,12 +7,16 @@ const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 14;
+const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE = 'premium_mailbox_campaign_snapshot_invalidation';
+const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY = 'softora_mailbox_campaign_snapshot_invalidated_at_v1';
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 15;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_FRESH_MS = 2 * 60 * 1000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_STALE_MS = 15 * 60 * 1000;
 // Keep the durable bootstrap focused on the complete conversation list. The
 // newest few bodies remain instant; older bodies are fetched from the mailbox
 // index only when opened, so hundreds of historical rows still fit in the
@@ -22,6 +26,44 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
+}
+
+function getMailboxCampaignSnapshotAgeMs(snapshot, nowValue = Date.now()) {
+  const savedAtMs = Date.parse(snapshot && snapshot.contentAt || '');
+  const currentMs = nowValue instanceof Date ? nowValue.getTime() : Number(nowValue);
+  if (!Number.isFinite(savedAtMs) || !Number.isFinite(currentMs)) return Infinity;
+  return Math.max(0, currentMs - savedAtMs);
+}
+
+function parseMailboxCampaignSnapshotInvalidatedAt(value) {
+  return Number.isFinite(Date.parse(value || '')) ? new Date(value).toISOString() : null;
+}
+
+function isMailboxCampaignSnapshotInvalidated(snapshot, invalidatedAt) {
+  const contentAtMs = Date.parse(snapshot && snapshot.contentAt || '');
+  const invalidatedAtMs = Date.parse(invalidatedAt || '');
+  return Number.isFinite(invalidatedAtMs) && (
+    !Number.isFinite(contentAtMs) || contentAtMs <= invalidatedAtMs
+  );
+}
+
+function markMailboxCampaignSnapshotStale(snapshot, reason = 'snapshot_stale') {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  return {
+    ...snapshot,
+    degraded: true,
+    sync: {
+      ...(snapshot.sync && typeof snapshot.sync === 'object' ? snapshot.sync : {}),
+      indexed: true,
+      stale: true,
+      source: 'campaign-replies-degraded-snapshot',
+      refreshRecommended: true,
+      warming: false,
+      degraded: true,
+      degradedReason: text(reason, 120),
+      contentAt: snapshot.contentAt || null,
+    },
+  };
 }
 
 function selectSnapshotMessages(value) {
@@ -400,14 +442,18 @@ function serializeMailboxCampaignSnapshot(result, options = {}) {
       includeBody: index < MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT,
       includeImages: index < MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT,
     }));
-  if (!messages.length) return '';
   const savedAtValue = options.savedAt || new Date().toISOString();
   const savedAt = Number.isFinite(Date.parse(savedAtValue))
     ? new Date(savedAtValue).toISOString()
     : new Date().toISOString();
+  const contentAtValue = options.contentAt || result && result.contentAt || savedAt;
+  const contentAt = Number.isFinite(Date.parse(contentAtValue))
+    ? new Date(contentAtValue).toISOString()
+    : savedAt;
   return fitSnapshotToBudget({
     version: MAILBOX_CAMPAIGN_SNAPSHOT_VERSION,
     savedAt,
+    contentAt,
     ok: result && result.ok !== false,
     messages,
     sync: result && result.sync && typeof result.sync === 'object'
@@ -432,8 +478,8 @@ function parseMailboxCampaignSnapshot(rawValue) {
       !parsed ||
       typeof parsed !== 'object' ||
       Number(parsed.version) !== MAILBOX_CAMPAIGN_SNAPSHOT_VERSION ||
-      !Array.isArray(parsed.messages) ||
-      !parsed.messages.length
+      !Number.isFinite(Date.parse(parsed.contentAt || '')) ||
+      !Array.isArray(parsed.messages)
     ) {
       return null;
     }
@@ -441,6 +487,9 @@ function parseMailboxCampaignSnapshot(rawValue) {
       ok: parsed.ok !== false,
       savedAt: Number.isFinite(Date.parse(parsed.savedAt || ''))
         ? new Date(parsed.savedAt).toISOString()
+        : null,
+      contentAt: Number.isFinite(Date.parse(parsed.contentAt || ''))
+        ? new Date(parsed.contentAt).toISOString()
         : null,
       messages: parsed.messages
         .slice(0, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES)
@@ -477,7 +526,7 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
     serialized: messages.length
       ? serializeMailboxCampaignSnapshot(
           { ok: snapshot.ok, messages, sync: snapshot.sync },
-          { savedAt: options.savedAt || new Date().toISOString() }
+          { savedAt: options.savedAt || new Date().toISOString(), contentAt: snapshot.contentAt }
         )
       : '',
   };
@@ -516,7 +565,7 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
       { ok: snapshot.ok, messages, sync: snapshot.sync },
-      { savedAt: options.savedAt || dismissedAt }
+      { savedAt: options.savedAt || dismissedAt, contentAt: snapshot.contentAt }
     ),
   };
 }
@@ -552,18 +601,26 @@ function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) 
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
       { ok: snapshot.ok, messages, sync: snapshot.sync },
-      { savedAt: options.savedAt || readAt }
+      { savedAt: options.savedAt || readAt, contentAt: snapshot.contentAt }
     ),
   };
 }
 
 module.exports = {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE,
+  MAILBOX_CAMPAIGN_SNAPSHOT_FRESH_MS,
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
+  MAILBOX_CAMPAIGN_SNAPSHOT_MAX_STALE_MS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  getMailboxCampaignSnapshotAgeMs,
+  isMailboxCampaignSnapshotInvalidated,
   markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
+  markMailboxCampaignSnapshotStale,
   parseMailboxCampaignSnapshot,
+  parseMailboxCampaignSnapshotInvalidatedAt,
   removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
 };
