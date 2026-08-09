@@ -116,6 +116,13 @@ function createKvkDatabaseSnapshotService(deps = {}) {
 
   function buildSuccessfulFoundTracker(snapshot, storedPayload) {
     const currentUsable = getUsableCount(snapshot);
+    const submittedSuccessfulFound = snapshot?.state?.successful_found;
+    if (submittedSuccessfulFound !== null && submittedSuccessfulFound !== undefined) {
+      return {
+        total: normalizeCount(submittedSuccessfulFound),
+        currentUsable,
+      };
+    }
     const storedSnapshot = storedPayload?.snapshot;
     if (!storedSnapshot || typeof storedSnapshot !== 'object') {
       return { total: currentUsable, currentUsable };

@@ -8,6 +8,16 @@ const MAX_PAGE_SIZE = 100;
 const MAX_SYNC_BATCH_SIZE = 5000;
 const DEFAULT_READ_TIMEOUT_MS = 30_000;
 const DEFAULT_WRITE_TIMEOUT_MS = 120_000;
+const DIRECTORY_CATEGORIES = Object.freeze({
+  all: 'all',
+  behandeld: 'behandeld',
+  'succesvol-gevonden': 'succesvol-gevonden',
+  bruikbaar: 'bruikbaar',
+  'met-website': 'met-website',
+  'zonder-werkende-website': 'zonder-werkende-website',
+  controle: 'controle',
+  definitief: 'definitief',
+});
 const DIRECTORY_SELECT_COLUMNS = [
   'source_company_id',
   'bedrijfsnaam',
@@ -24,6 +34,8 @@ const DIRECTORY_SELECT_COLUMNS = [
   'provincie',
   'usable_review_state',
   'usable_review_outcome',
+  'unusable_review_grade',
+  'premium_database_transferred',
 ].join(',');
 
 function createKvkCompanyDirectoryService(deps = {}) {
@@ -123,6 +135,58 @@ function createKvkCompanyDirectoryService(deps = {}) {
     return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
   }
 
+  function normalizeCategory(value) {
+    const category = normalizeString(value).toLowerCase();
+    return DIRECTORY_CATEGORIES[category] || DIRECTORY_CATEGORIES.all;
+  }
+
+  function normalizeCategoryTotals(value) {
+    const totals = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return Object.fromEntries(
+      Object.values(DIRECTORY_CATEGORIES).map((category) => [
+        category,
+        Math.max(0, Math.trunc(Number(totals[category]) || 0)),
+      ])
+    );
+  }
+
+  function applyDirectoryCategoryFilter(request, category) {
+    if (category === DIRECTORY_CATEGORIES.behandeld) {
+      return request.in('lead_status', ['usable', 'unusable']);
+    }
+    if (category === DIRECTORY_CATEGORIES['succesvol-gevonden']) {
+      return request.eq('lead_status', 'usable');
+    }
+    if (category === DIRECTORY_CATEGORIES.bruikbaar) {
+      return request
+        .eq('lead_status', 'usable')
+        .eq('usable_review_state', 'verified')
+        .eq('premium_database_transferred', false);
+    }
+    if (category === DIRECTORY_CATEGORIES['met-website']) {
+      return request
+        .eq('lead_status', 'usable')
+        .eq('usable_review_state', 'verified')
+        .eq('premium_database_transferred', false)
+        .eq('website_status', 'found')
+        .neq('website', '');
+    }
+    if (category === DIRECTORY_CATEGORIES['zonder-werkende-website']) {
+      return request
+        .eq('lead_status', 'usable')
+        .eq('usable_review_state', 'verified')
+        .eq('premium_database_transferred', false)
+        .in('website_status', ['no_website', 'not_working']);
+    }
+    if (category === DIRECTORY_CATEGORIES.controle) {
+      return request.eq('lead_status', 'unusable').eq('unusable_review_grade', 1);
+    }
+    if (category === DIRECTORY_CATEGORIES.definitief) {
+      return request.eq('lead_status', 'unusable').gte('unusable_review_grade', 2);
+    }
+    return request;
+  }
+
   function normalizeSyncRow(row, generation) {
     const sourceCompanyId = Number(row?.source_company_id);
     const kvkNummer = normalizedField(row?.kvk_nummer, 32);
@@ -147,6 +211,8 @@ function createKvkCompanyDirectoryService(deps = {}) {
       provincie: normalizedField(row?.provincie, 200),
       usable_review_state: normalizedField(row?.usable_review_state || 'not_required', 40),
       usable_review_outcome: normalizedField(row?.usable_review_outcome, 80),
+      unusable_review_grade: Math.max(0, Math.min(3, Math.trunc(Number(row?.unusable_review_grade) || 0))),
+      premium_database_transferred: Boolean(row?.premium_database_transferred),
       sync_generation: generation,
       source_updated_at: normalizeTimestamp(row?.source_updated_at || row?.updated_at),
       synced_at: now().toISOString(),
@@ -166,7 +232,12 @@ function createKvkCompanyDirectoryService(deps = {}) {
     return normalized;
   }
 
-  async function fetchDirectoryRows({ query = '', cursor = 0, limit = DEFAULT_PAGE_SIZE } = {}) {
+  async function fetchDirectoryRows({
+    query = '',
+    cursor = 0,
+    limit = DEFAULT_PAGE_SIZE,
+    category = DIRECTORY_CATEGORIES.all,
+  } = {}) {
     const client = directoryClient();
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     let request = client
@@ -174,6 +245,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
       .select(DIRECTORY_SELECT_COLUMNS)
       .order('source_company_id', { ascending: true })
       .limit(limit + 1);
+    request = applyDirectoryCategoryFilter(request, normalizeCategory(category));
     if (cursor > 0) request = request.gt('source_company_id', cursor);
     for (const term of searchTerms(query)) {
       request = request.ilike('search_text', `%${escapeIlikePattern(term)}%`);
@@ -198,7 +270,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
       const result = await withTimeout(
         client
           .from(META_TABLE)
-          .select('total,completed,sync_generation,source_updated_at,updated_at')
+          .select('total,category_totals,completed,sync_generation,source_updated_at,updated_at')
           .eq('id', META_ID)
           .limit(1),
         readTimeoutMs,
@@ -243,7 +315,13 @@ function createKvkCompanyDirectoryService(deps = {}) {
     }
   }
 
-  async function upsertDirectoryMeta({ total, completed, generation, sourceUpdatedAt }) {
+  async function upsertDirectoryMeta({
+    total,
+    categoryTotals,
+    completed,
+    generation,
+    sourceUpdatedAt,
+  }) {
     const client = directoryClient();
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     try {
@@ -252,6 +330,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
           {
             id: META_ID,
             total,
+            category_totals: normalizeCategoryTotals(categoryTotals),
             completed,
             sync_generation: generation,
             source_updated_at: normalizeTimestamp(sourceUpdatedAt),
@@ -271,6 +350,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
 
   async function sendGetDirectoryResponse(req, res) {
     const query = normalizedField(req?.query?.q, 120);
+    const category = normalizeCategory(req?.query?.categorie);
     const cursor = Math.max(0, Number(req?.query?.after) || 0);
     const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(req?.query?.limit) || DEFAULT_PAGE_SIZE));
     if (query && !searchTerms(query).length) {
@@ -282,6 +362,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
         after: cursor,
         next_cursor: null,
         has_more: false,
+        category,
         total_is_exact: true,
         source: 'supabase',
         updated_at: '',
@@ -294,7 +375,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
       ? deps.fetchDirectoryMeta
       : fetchDirectoryMeta;
     const [rowsResult, metaResult] = await Promise.all([
-      rowsReader({ query, cursor, limit }),
+      rowsReader({ query, cursor, limit, category }),
       metaReader(),
     ]);
     if (!rowsResult.ok) {
@@ -309,6 +390,18 @@ function createKvkCompanyDirectoryService(deps = {}) {
         error: 'Online bedrijvendatabase wordt nog opgebouwd.',
       });
     }
+    const categoryTotals = metaResult.row.category_totals;
+    if (
+      category !== DIRECTORY_CATEGORIES.all &&
+      (!categoryTotals ||
+        typeof categoryTotals !== 'object' ||
+        !Object.prototype.hasOwnProperty.call(categoryTotals, category))
+    ) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Deze bedrijfscategorie wordt nog opgebouwd.',
+      });
+    }
 
     const hasMore = rowsResult.rows.length > limit;
     const rows = rowsResult.rows.slice(0, limit);
@@ -316,7 +409,12 @@ function createKvkCompanyDirectoryService(deps = {}) {
     return res.status(200).json({
       ok: true,
       rows,
-      total: query ? 0 : Math.max(0, Number(metaResult.row.total) || 0),
+      total: query
+        ? 0
+        : category === DIRECTORY_CATEGORIES.all
+          ? Math.max(0, Number(metaResult.row.total) || 0)
+          : normalizeCategoryTotals(categoryTotals)[category],
+      category,
       limit,
       after: cursor,
       next_cursor: nextCursor,
@@ -396,6 +494,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
         completed: complete || mode === 'incremental',
         generation,
         sourceUpdatedAt: body.sourceUpdatedAt,
+        categoryTotals: body.categoryTotals,
       });
       if (!metaResult.ok) {
         return res.status(502).json({
@@ -419,6 +518,8 @@ function createKvkCompanyDirectoryService(deps = {}) {
     fetchDirectoryRows,
     hasValidSyncToken,
     normalizeSyncRow,
+    normalizeCategory,
+    normalizeCategoryTotals,
     normalizedSearchValue,
     searchTerms,
     sendGetDirectoryResponse,
@@ -428,6 +529,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
 
 module.exports = {
   DEFAULT_PAGE_SIZE,
+  DIRECTORY_CATEGORIES,
   DIRECTORY_TABLE,
   MAX_PAGE_SIZE,
   MAX_SYNC_BATCH_SIZE,

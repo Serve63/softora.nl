@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260804c">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
-  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809a">
+  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809b">
 </head>
 <body>
   <main class="app-shell">
@@ -33,8 +33,8 @@
     </header>
 
     <section class="stats-grid" aria-label="Scraper status">
-      <article id="companies-total-card" class="stat-card stat-card-primary stat-card-total-found kvk-stat-card-enhanced">
-        <button id="companies-total-open" class="stat-card-total-found__open" type="button" aria-label="Bekijk alle bedrijven" title="Bekijk alle bedrijven">
+      <article id="companies-total-card" class="stat-card stat-card-primary stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-total-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven" title="Bekijk alle bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
         <div class="stat-main stat-main-full">
@@ -42,35 +42,50 @@
           <strong id="companies-total">0</strong>
         </div>
       </article>
-      <article class="stat-card kvk-stat-card-enhanced">
+      <article class="stat-card stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-treated-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle behandelde bedrijven" title="Bekijk alle behandelde bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
         <div class="stat-main">
           <span>Totaal Behandeld</span>
           <strong id="companies-treated">0</strong>
         </div>
         <div class="stat-delta" id="companies-treated-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card kvk-stat-card-enhanced">
+      <article class="stat-card stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-successful-found-open" class="stat-card-directory__open" type="button" aria-label="Bekijk succesvol gevonden bedrijven" title="Bekijk succesvol gevonden bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
         <div class="stat-main">
           <span>Succesvol Gevonden</span>
           <strong id="companies-successful-found">0</strong>
         </div>
         <div class="stat-delta" id="companies-successful-found-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card stat-card-usable kvk-stat-card-enhanced">
+      <article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-usable-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bruikbare bedrijven" title="Bekijk alle bruikbare bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
         <div class="stat-main">
           <span>Bruikbaar</span>
           <strong id="companies-usable">0</strong>
         </div>
         <div class="stat-delta" id="companies-usable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card stat-card-usable kvk-stat-card-enhanced">
+      <article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-with-website-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven met website" title="Bekijk alle bedrijven met website">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
         <div class="stat-main">
           <span>Mét Website</span>
           <strong id="companies-with-website">0</strong>
         </div>
         <div class="stat-delta" id="companies-with-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card stat-card-usable stat-card-without-website kvk-stat-card-enhanced">
+      <article class="stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-without-website-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven zonder werkende website" title="Bekijk alle bedrijven zonder werkende website">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
         <div class="stat-main">
           <span>Zonder Werkende Website</span>
           <strong id="companies-without-website">0</strong>
@@ -80,12 +95,18 @@
       <article class="stat-card stat-card-unusable kvk-stat-card-enhanced" aria-label="Onbruikbare bedrijven per reviewgrade">
         <strong id="companies-unusable" class="kvk-visually-hidden" aria-hidden="true">0</strong>
         <div class="unusable-grade-grid">
-          <div>
+          <div class="unusable-grade-directory">
+            <button id="companies-control-open" class="stat-card-directory__open stat-card-directory__open--grade" type="button" aria-label="Bekijk alle bedrijven in controle" title="Bekijk alle bedrijven in controle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </button>
             <span>Controle</span>
             <strong id="companies-unusable-grade-1">0</strong>
             <small id="companies-unusable-grade-1-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span><span class="unusable-grade-delta-removed">-0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
           </div>
-          <div>
+          <div class="unusable-grade-directory">
+            <button id="companies-definitive-open" class="stat-card-directory__open stat-card-directory__open--grade" type="button" aria-label="Bekijk alle definitief afgekeurde bedrijven" title="Bekijk alle definitief afgekeurde bedrijven">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </button>
             <span>Definitief</span>
             <strong id="companies-unusable-grade-2">0</strong>
             <small id="companies-unusable-grade-2-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
@@ -143,109 +164,21 @@
             <tbody id="table-body"></tbody>
           </table>
         </div>
-      </div>
-    </section>
-
-    <section class="panel data-panel wide-data-panel capped-data-panel" data-collapsible="usable">
-      <div class="panel-heading data-heading">
-        <div>
-          <p class="eyebrow">Bedrijven</p>
-          <h2>Bruikbaar</h2>
-        </div>
-        <div class="heading-actions">
-          <div class="table-tools">
-            <label class="search-field">
-              <span>Zoeken</span>
-              <input id="usable-search-input" type="search" placeholder="Bedrijfsnaam, KVK, website of locatie">
-            </label>
-          </div>
-          <button class="collapse-toggle" type="button" aria-label="Bruikbaar inklappen" aria-expanded="true"></button>
-        </div>
-      </div>
-      <div class="table-frame" id="usable-table-frame">
-        <table>
-          <thead id="usable-table-head"></thead>
-          <tbody id="usable-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel data-panel wide-data-panel capped-data-panel" data-collapsible="with-website">
-      <div class="panel-heading data-heading">
-        <div>
-          <p class="eyebrow">Bedrijven</p>
-          <h2>Mét Website</h2>
-        </div>
-        <div class="heading-actions">
-          <div class="table-tools">
-            <label class="search-field">
-              <span>Zoeken</span>
-              <input id="with-website-search-input" type="search" placeholder="Bedrijfsnaam, KVK, website of locatie">
-            </label>
-          </div>
-          <button class="collapse-toggle" type="button" aria-label="Mét Website inklappen" aria-expanded="true"></button>
-        </div>
-      </div>
-      <div class="table-frame" id="with-website-table-frame">
-        <table>
-          <thead id="with-website-table-head"></thead>
-          <tbody id="with-website-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel data-panel wide-data-panel capped-data-panel" data-collapsible="without-website">
-      <div class="panel-heading data-heading">
-        <div>
-          <p class="eyebrow">Bedrijven</p>
-          <h2>Zonder Werkende Website</h2>
-        </div>
-        <div class="heading-actions">
-          <div class="table-tools">
-            <label class="search-field">
-              <span>Zoeken</span>
-              <input id="no-website-search-input" type="search" placeholder="Bedrijfsnaam, KVK, website of locatie">
-            </label>
-          </div>
-          <button class="collapse-toggle" type="button" aria-label="Zonder Werkende Website inklappen" aria-expanded="true"></button>
-        </div>
-      </div>
-      <div class="table-frame" id="no-website-table-frame">
-        <table>
-          <thead id="no-website-table-head"></thead>
-          <tbody id="no-website-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel data-panel wide-data-panel capped-data-panel" data-collapsible="unusable">
-      <div class="panel-heading data-heading">
-        <div>
-          <p class="eyebrow">Bedrijven</p>
-          <h2>Niet Bruikbaar</h2>
-        </div>
-        <div class="heading-actions">
-          <div class="table-tools">
-            <label class="search-field">
-              <span>Zoeken</span>
-              <input id="unusable-search-input" type="search" placeholder="Bedrijfsnaam, KVK, mailadres of locatie">
-            </label>
-          </div>
-          <button class="collapse-toggle" type="button" aria-label="Niet Bruikbaar inklappen" aria-expanded="true"></button>
-        </div>
-      </div>
-      <div class="table-frame" id="unusable-table-frame">
-        <table>
-          <thead id="unusable-table-head"></thead>
-          <tbody id="unusable-table-body"></tbody>
-        </table>
+        <input id="usable-search-input" type="search" tabindex="-1">
+        <div id="usable-table-frame"><table><thead id="usable-table-head"></thead><tbody id="usable-table-body"></tbody></table></div>
+        <input id="with-website-search-input" type="search" tabindex="-1">
+        <div id="with-website-table-frame"><table><thead id="with-website-table-head"></thead><tbody id="with-website-table-body"></tbody></table></div>
+        <input id="no-website-search-input" type="search" tabindex="-1">
+        <div id="no-website-table-frame"><table><thead id="no-website-table-head"></thead><tbody id="no-website-table-body"></tbody></table></div>
+        <input id="unusable-search-input" type="search" tabindex="-1">
+        <div id="unusable-table-frame"><table><thead id="unusable-table-head"></thead><tbody id="unusable-table-body"></tbody></table></div>
       </div>
     </section>
   </main>
 
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database.js?v=20260804a"></script>
-  <script src="/assets/kvk-database-total-found.js?v=20260809c"></script>
+  <script src="/assets/kvk-database-total-found.js?v=20260809d"></script>
   <script src="/assets/kvk-database-metrics.js?v=20260804d"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260804b"></script>
   <script src="/assets/kvk-database-control.js?v=20260804b"></script>

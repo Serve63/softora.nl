@@ -16,6 +16,66 @@
   const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
   const PAGE_SIZE = 100;
   const REQUEST_TIMEOUT_MS = 30000;
+  const DIRECTORY_CATEGORIES = Object.freeze({
+    all: {
+      title: 'Alle gevonden bedrijven',
+      intro: 'Eén doorlopende lijst met bekende gegevens en de status van ieder bedrijf.',
+      totalLabel: 'Totaal gevonden',
+      loadingLabel: 'Volledige landelijke lijst laden…',
+    },
+    behandeld: {
+      title: 'Alle behandelde bedrijven',
+      intro: 'Alle bedrijven waarvoor de Searcher een eindstatus heeft bepaald.',
+      totalLabel: 'Totaal behandeld',
+      loadingLabel: 'Behandelde bedrijven laden…',
+    },
+    'succesvol-gevonden': {
+      title: 'Succesvol gevonden bedrijven',
+      intro: 'Alle bedrijven die succesvol als bruikbare kandidaat zijn gevonden.',
+      totalLabel: 'Succesvol gevonden',
+      loadingLabel: 'Succesvol gevonden bedrijven laden…',
+    },
+    bruikbaar: {
+      title: 'Bruikbare bedrijven',
+      intro: 'Alle volledig gecontroleerde bedrijven die klaarstaan voor de Premium Database.',
+      totalLabel: 'Bruikbaar',
+      loadingLabel: 'Bruikbare bedrijven laden…',
+    },
+    'met-website': {
+      title: 'Bedrijven met website',
+      intro: 'Alle bruikbare bedrijven met een bevestigde werkende website.',
+      totalLabel: 'Mét website',
+      loadingLabel: 'Bedrijven met website laden…',
+    },
+    'zonder-werkende-website': {
+      title: 'Bedrijven zonder werkende website',
+      intro: 'Alle bruikbare bedrijven zonder gevonden werkende website.',
+      totalLabel: 'Zonder werkende website',
+      loadingLabel: 'Bedrijven zonder werkende website laden…',
+    },
+    controle: {
+      title: 'Bedrijven in controle',
+      intro: 'Alle afgekeurde bedrijven die nog één volledige controle krijgen.',
+      totalLabel: 'Controle',
+      loadingLabel: 'Controlelijst laden…',
+    },
+    definitief: {
+      title: 'Definitief afgekeurde bedrijven',
+      intro: 'Alle bedrijven die na de tweede controle definitief zijn afgekeurd.',
+      totalLabel: 'Definitief',
+      loadingLabel: 'Definitieve afwijzingen laden…',
+    },
+  });
+  const DASHBOARD_DIRECTORY_BUTTONS = Object.freeze({
+    'companies-total-open': 'all',
+    'companies-treated-open': 'behandeld',
+    'companies-successful-found-open': 'succesvol-gevonden',
+    'companies-usable-open': 'bruikbaar',
+    'companies-with-website-open': 'met-website',
+    'companies-without-website-open': 'zonder-werkende-website',
+    'companies-control-open': 'controle',
+    'companies-definitive-open': 'definitief',
+  });
   const TREATED_CONTACT_STATUSES = new Set(['checked', 'done', 'searched', 'unusable']);
   const FINAL_LEAD_STATUSES = new Set(['usable', 'unusable']);
   const UNUSABLE_LABELS = {
@@ -107,11 +167,29 @@
     `;
   }
 
-  function buildCompanyApiUrl(query, cursor) {
+  function normalizeDirectoryCategory(value) {
+    const category = String(value || '').trim().toLowerCase();
+    return DIRECTORY_CATEGORIES[category] ? category : 'all';
+  }
+
+  function selectedDirectoryCategory(browserWindow) {
+    const params = new URLSearchParams(String(browserWindow?.location?.search || ''));
+    return normalizeDirectoryCategory(params.get('categorie'));
+  }
+
+  function directoryPageUrl(category = 'all') {
+    const normalizedCategory = normalizeDirectoryCategory(category);
+    return normalizedCategory === 'all'
+      ? DIRECTORY_PAGE_URL
+      : `${DIRECTORY_PAGE_URL}?categorie=${encodeURIComponent(normalizedCategory)}`;
+  }
+
+  function buildCompanyApiUrl(query, cursor, category = 'all') {
     const params = new URLSearchParams({
       q: String(query || '').trim(),
       limit: String(PAGE_SIZE),
       after: String(Math.max(0, Number(cursor) || 0)),
+      categorie: normalizeDirectoryCategory(category),
     });
     return `${COMPANY_API_URL}?${params.toString()}`;
   }
@@ -125,23 +203,25 @@
     return options;
   }
 
-  function navigateToDirectory(browserWindow) {
+  function navigateToDirectory(browserWindow, category = 'all') {
     const targetWindow = browserWindow?.top && browserWindow.top !== browserWindow
       ? browserWindow.top
       : browserWindow;
-    targetWindow?.location?.assign(DIRECTORY_PAGE_URL);
+    targetWindow?.location?.assign(directoryPageUrl(category));
   }
 
   function mountDashboardLink(browserWindow) {
     const document = browserWindow?.document;
-    const card = document?.getElementById('companies-total-card');
-    const openButton = document?.getElementById('companies-total-open');
-    if (!card || !openButton) return null;
-
-    const openDirectory = () => navigateToDirectory(browserWindow);
-    openButton.addEventListener('click', openDirectory);
-
-    return { openDirectory };
+    if (!document) return null;
+    const mounted = [];
+    for (const [buttonId, category] of Object.entries(DASHBOARD_DIRECTORY_BUTTONS)) {
+      const openButton = document.getElementById(buttonId);
+      if (!openButton) continue;
+      const openDirectory = () => navigateToDirectory(browserWindow, category);
+      openButton.addEventListener('click', openDirectory);
+      mounted.push({ buttonId, category, openDirectory });
+    }
+    return mounted.length ? { mounted } : null;
   }
 
   function mountDirectory(browserWindow) {
@@ -154,7 +234,18 @@
     const sourceStatus = document?.getElementById('company-directory-source-status');
     const retryButton = document?.getElementById('company-directory-retry');
     const totalCount = document?.getElementById('company-directory-total');
+    const title = document?.getElementById('company-directory-title');
+    const intro = document?.getElementById('company-directory-intro');
+    const totalLabel = document?.getElementById('company-directory-total-label');
     if (!page || !frame || !head || !body || !searchInput || !sourceStatus || !totalCount) return null;
+
+    const category = selectedDirectoryCategory(browserWindow);
+    const categoryConfig = DIRECTORY_CATEGORIES[category];
+    if (title) title.textContent = categoryConfig.title;
+    if (intro) intro.textContent = categoryConfig.intro;
+    if (totalLabel) totalLabel.textContent = categoryConfig.totalLabel;
+    document.title = `Softora Database | ${categoryConfig.title}`;
+    page.dataset.category = category;
 
     const state = {
       rows: [],
@@ -165,6 +256,7 @@
       error: false,
       errorMessage: '',
       query: '',
+      category,
       requestVersion: 0,
     };
     const numberFormat = new Intl.NumberFormat('nl-NL');
@@ -192,9 +284,9 @@
       } else if (state.error) {
         body.innerHTML = `<tr class="empty-row"><td colspan="7">${escapeHtml(state.errorMessage || 'Online bedrijvendatabase niet bereikbaar.')}</td></tr>`;
       } else if (!state.loading) {
-        body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.query ? 'Geen bedrijven gevonden.' : 'Nog geen bedrijven geladen.'}</td></tr>`;
+        body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.query ? 'Geen bedrijven gevonden.' : `Nog geen bedrijven in ${escapeHtml(categoryConfig.totalLabel.toLowerCase())}.`}</td></tr>`;
       }
-      totalCount.textContent = state.total ? numberFormat.format(state.total) : '—';
+      totalCount.textContent = state.error ? '—' : numberFormat.format(state.total);
       if (!state.loading && !state.error) {
         if (retryButton) retryButton.hidden = true;
         setSourceStatus('', 'ready');
@@ -225,7 +317,7 @@
       state.loading = true;
       if (retryButton) retryButton.hidden = true;
       setSourceStatus(
-        reset ? 'Volledige landelijke lijst laden…' : 'Meer bedrijven laden…',
+        reset ? categoryConfig.loadingLabel : 'Meer bedrijven laden…',
         'loading'
       );
       const AbortControllerClass = browserWindow?.AbortController;
@@ -237,7 +329,7 @@
         : null;
       try {
         const response = await browserWindow.fetch(
-          buildCompanyApiUrl(state.query, state.cursor),
+          buildCompanyApiUrl(state.query, state.cursor, state.category),
           companyFetchOptions(controller?.signal)
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -291,6 +383,8 @@
 
   return {
     COMPANY_API_URL,
+    DASHBOARD_DIRECTORY_BUTTONS,
+    DIRECTORY_CATEGORIES,
     DIRECTORY_PAGE_URL,
     PAGE_SIZE,
     REQUEST_TIMEOUT_MS,
@@ -298,11 +392,14 @@
     companyFetchOptions,
     companyRowHtml,
     companyStatus,
+    directoryPageUrl,
     isTreated,
     missingLabel,
     mount,
     mountDashboardLink,
     mountDirectory,
     navigateToDirectory,
+    normalizeDirectoryCategory,
+    selectedDirectoryCategory,
   };
 });
