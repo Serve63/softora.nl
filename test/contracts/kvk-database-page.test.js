@@ -138,7 +138,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809c/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -346,7 +346,7 @@ test('kvk planning stays compact without a separate scroll-status footer', () =>
   assert.doesNotMatch(styleSource, /planning-scroll-status/);
 });
 
-test('kvk database shows every new Searcher result and only material Controller corrections', () => {
+test('kvk database shows every Searcher result and only material Controller corrections', () => {
   const lunaErrors = require('../../assets/kvk-database-luna-errors.js');
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-luna-errors.js'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
@@ -356,6 +356,7 @@ test('kvk database shows every new Searcher result and only material Controller 
   assert.match(scriptSource, /Nog geen nieuwe Searcher-resultaten of Controleur-correcties\./);
   assert.match(scriptSource, /incorrect_approval: 'Onterecht goedgekeurd'/);
   assert.match(scriptSource, /missed_usable: 'Onterecht afgekeurd'/);
+  assert.doesNotMatch(scriptSource, /Afwijzing bevestigd|Bruikbaar bevestigd/);
   assert.match(scriptSource, /activity\.found_by_model_label/);
   assert.match(scriptSource, /deps\.window\.setInterval\(controller\.render, 1000\)/);
 
@@ -379,6 +380,9 @@ test('kvk database shows every new Searcher result and only material Controller 
   assert.match(html, /Searcher/);
   assert.match(html, /Luna 5\.6 Max/);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
+
+  assert.equal(lunaErrors.activityStatus({ review_finding: 'missed_usable' }), 'Onterecht afgekeurd');
+  assert.equal(lunaErrors.activityStatus({ review_finding: 'incorrect_approval' }), 'Onterecht goedgekeurd');
 });
 
 test('kvk database hides the page scrollbar without disabling scrolling', () => {
@@ -495,6 +499,8 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.doesNotMatch(controlSource, /addEventListener\('click'/);
   assert.doesNotMatch(controlSource, /JSON\.stringify\(\{ enabled:/);
   assert.match(controlSource, /statusLabel = workerState === 'error'/);
+  assert.doesNotMatch(controlSource, /'WACHT'/);
+  assert.match(controlSource, /enabled\s*\? 'AAN'/);
   assert.match(controlSource, /uitsluitend via de Codex-chat/);
   assert.match(controlSource, /\['vuller', 'controle', 'goedgekeurd'\]/);
   assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
@@ -505,6 +511,20 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced/);
   assert.match(metricsStyles, /\.stat-card-without-website \.stat-main > span/);
   assert.match(metricsStyles, /white-space: nowrap/);
+});
+
+test('kvk framed content uses the same solid background as the surrounding page', () => {
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const directorySource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-company-directory.html'), 'utf8');
+  const frameStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-frame.css'), 'utf8');
+
+  assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260809a/);
+  assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809c/);
+  assert.match(
+    frameStyleSource,
+    /html\[data-softora-sidebar-content-frame="1"\][\s\S]*background:\s*#f4f1ed !important;/
+  );
 });
 
 test('kvk database APIs keep reads protected and expose only token-protected sync posts', () => {

@@ -89,11 +89,9 @@
       ? 'FOUT'
       : enabled && workerState === 'running'
         ? 'BEZIG'
-        : enabled && running
-          ? 'WACHT'
-          : enabled
-            ? 'AAN'
-            : 'UIT';
+        : enabled
+          ? 'AAN'
+          : 'UIT';
     fillButtonLabel.textContent = statusLabel;
     fillButton.setAttribute('aria-busy', enabled && running ? 'true' : 'false');
     fillButton.setAttribute('aria-label', `Database vullen: ${statusLabel.toLowerCase()}. Alleen-lezen status.`);
