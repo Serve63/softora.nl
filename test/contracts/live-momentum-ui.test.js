@@ -385,6 +385,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*"Servé's gezondheidsdossier"/);
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
+  assert.match(endGameCardsJs, /\{ id: 'vaste-parfum-voorraad', title: 'Vaste Parfum voorraad', imageId: 'eigen-parfum' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -402,7 +403,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(!isFixed\) article\.append\(createCompletionOverlay\(\), createActions\(card, state\.completed\)\)/);
   assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
   [
-    'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Gezichtsbeharing naar wens',
+    'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Vaste Parfum voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Transfermarkt',
