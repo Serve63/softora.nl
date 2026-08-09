@@ -273,6 +273,20 @@ function createKvkCompanyDirectoryService(deps = {}) {
     const query = normalizedField(req?.query?.q, 120);
     const cursor = Math.max(0, Number(req?.query?.after) || 0);
     const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(req?.query?.limit) || DEFAULT_PAGE_SIZE));
+    if (query && !searchTerms(query).length) {
+      return res.status(200).json({
+        ok: true,
+        rows: [],
+        total: 0,
+        limit,
+        after: cursor,
+        next_cursor: null,
+        has_more: false,
+        total_is_exact: true,
+        source: 'supabase',
+        updated_at: '',
+      });
+    }
     const rowsReader = typeof deps.fetchDirectoryRows === 'function'
       ? deps.fetchDirectoryRows
       : fetchDirectoryRows;

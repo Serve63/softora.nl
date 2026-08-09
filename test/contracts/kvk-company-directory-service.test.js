@@ -69,6 +69,24 @@ test('online KVK directory stays unavailable until the full mirror is complete',
   assert.equal(response.payload.ok, false);
 });
 
+test('online KVK directory does not turn a one-character search into an unfiltered list', async () => {
+  let reads = 0;
+  const service = createKvkCompanyDirectoryService({
+    fetchDirectoryRows: async () => {
+      reads += 1;
+      return { ok: true, rows: [] };
+    },
+  });
+  const response = createJsonResponse();
+
+  await service.sendGetDirectoryResponse({ query: { q: 'a' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload.total, 0);
+  assert.equal(response.payload.has_more, false);
+  assert.equal(reads, 0);
+});
+
 test('online KVK directory sync is token protected and normalizes its compact rows', async () => {
   let writtenRows = null;
   const service = createKvkCompanyDirectoryService({
