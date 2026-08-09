@@ -44,7 +44,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260809e" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260809f" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -378,7 +378,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /const imageId = card\.imageId \|\| card\.id/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260809e/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260809f/);
   assert.match(endGameCardsJs, /\{ id: 'jurisalem-af', title: 'Jurisalem af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'nieuwe-fiets', title: 'Nieuwe fiets' \}/);
   assert.match(endGameCardsJs, /\{ id: 'dertig-dagen-streak', title: '30 dagen streak' \}/);
@@ -414,7 +414,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Vaste Parfum voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
-    "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Transfermarkt',
+    "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Ruben Romano',
     'Ruben’s Company', 'Ruben’s Trading System', 'Jurisalem af', 'Gewenst lang kapsel', 'Gewenste kledingkast',
     'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
