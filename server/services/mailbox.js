@@ -10,7 +10,7 @@ const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
-const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, listMailboxCampaignReplySets, mergeCampaignReplies, resolveReplyIdentity, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
+const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, resolveReplyIdentity, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const { createMailboxReadMessageService } = require('./mailbox-read-message');
@@ -28,11 +28,7 @@ const {
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
-const {
-  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
-  MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
-  serializeMailboxCampaignSnapshot,
-} = require('./mailbox-campaign-snapshot');
+const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list');
 const {
   MAILBOX_MESSAGE_IMAGE_MAX_INDEX,
   decodeMailboxMessageImage,
@@ -615,6 +611,15 @@ function createMailboxService(deps = {}) {
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
       env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY
   );
+  const listCampaignReplies = createMailboxCampaignRepliesList({
+    mailboxCampaignRepliesService,
+    instantlyMailboxService,
+    filterVisibleMailboxMessages,
+    setUiStateValues,
+    logger,
+    normalizeString,
+    truncateText,
+  });
 
   const baseAccount = {
     email: normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser).toLowerCase(),
@@ -2442,36 +2447,6 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-  async function listCampaignReplies({ limit = 100, owner = '', refreshInstantly = false, includeSnapshotMessages = false, hydrateBodies = true } = {}) {
-    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies });
-    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
-    const result = {
-      ok: true,
-      messages,
-      sync: {
-        indexed: true,
-        stale: instantlySync?.ok === false,
-        source: instantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index',
-        refreshRecommended: instantlySync?.ok === false,
-        warming: false,
-        instantly: instantlySync,
-      },
-    };
-    const serializedSnapshot = serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
-    if (serializedSnapshot) {
-      try {
-        await setUiStateValues(
-          MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
-          { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serializedSnapshot },
-          { source: 'mailbox-campaign-replies', actor: 'Mailbox index' }
-        );
-      } catch (error) {
-        logger.warn('[Mailbox][CampaignSnapshot]', error?.message || error);
-      }
-    }
-    return includeSnapshotMessages ? { ...result, snapshotMessages } : result;
-  }
-
   async function campaignRepliesResponse(req, res) {
     try {
       return res.status(200).json(await listCampaignReplies({
