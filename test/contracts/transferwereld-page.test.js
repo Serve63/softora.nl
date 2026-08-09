@@ -40,10 +40,52 @@ test('transferwereld exposes all requested analysis tabs and defaults to fee sor
   assert.match(html, /Alle transfers van de top 100 clubs/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.match(html, /<select id="transfer-sort"><option value="fee">Hoogste transfersom<\/option>/);
-  assert.match(html, /transferwereld-scope-data\.js\?v=20260805b/);
+  assert.match(html, /transferwereld-scope-data\.js\?v=20260809a/);
+  assert.match(html, /transferwereld-deals\.js\?v=20260809a/);
+  assert.doesNotMatch(html, /id="transfer-direction"/);
   const script = read('assets/transferwereld.js');
   assert.match(script, /if \(sort === 'fee'\) return right\.feeValue - left\.feeValue/);
   assert.match(script, /secondaryKey === 'income' \? 'verdiend' : 'uitgegeven'/);
+});
+
+test('mirrored incoming and outgoing records render as one club-to-club deal', () => {
+  const { buildUniqueDeals } = require('../../assets/transferwereld-deals.js');
+  const clubs = [
+    {
+      name: 'Aston Villa', fullName: 'Aston Villa FC', rank: 7, transfermarkt: { id: 405 },
+      arrivals: [],
+      departures: [{ player: 'Morgan Rogers', position: 'Attacking Midfield', age: 23, counterpart: 'Chelsea FC', fee: '€138.00m', feeValue: 138_000_000 }],
+    },
+    {
+      name: 'Chelsea', fullName: 'Chelsea FC', rank: 19, transfermarkt: { id: 631 },
+      arrivals: [{ player: 'Morgan Rogers', position: 'Trequartista', age: 23, counterpart: 'Aston Villa', fee: '138,00 mln €', feeValue: 138_000_000 }],
+      departures: [],
+    },
+  ];
+  const deals = buildUniqueDeals(clubs);
+  assert.equal(deals.length, 1);
+  assert.equal(deals[0].sourceName, 'Aston Villa');
+  assert.equal(deals[0].destinationName, 'Chelsea');
+  assert.equal(deals[0].feeValue, 138_000_000);
+  assert.equal(deals[0].records, 2);
+  const script = read('assets/transferwereld.js');
+  assert.match(script, /buildUniqueDeals\(clubs\)/);
+  assert.match(script, /routeClub\(deal\.sourceName[\s\S]*routeClub\(deal\.destinationName/);
+  assert.doesNotMatch(script, /transfer\.direction === 'in' \? 'In' : 'Uit'/);
+});
+
+test('loan returns and permanent transfers on the same route remain separate deals', () => {
+  const { buildUniqueDeals } = require('../../assets/transferwereld-deals.js');
+  const clubs = [{
+    name: 'Example FC', transfermarkt: { id: 1 }, departures: [],
+    arrivals: [
+      { player: 'Zelfde Speler', counterpart: 'Other FC', fee: 'End of loan', feeValue: 0 },
+      { player: 'Zelfde Speler', counterpart: 'Other FC', fee: '€2.00m', feeValue: 2_000_000 },
+    ],
+  }];
+  const deals = buildUniqueDeals(clubs);
+  assert.equal(deals.length, 2);
+  assert.deepEqual(deals.map((deal) => deal.kind).sort(), ['return', 'transfer']);
 });
 
 test('transferwereld shows a desktop-only notice below the desktop breakpoint', () => {
@@ -119,7 +161,7 @@ test('transferwereld frontend applies the expanded competition scope to every an
   assert.match(html, /id="transfer-competition"/);
   assert.match(html, /top 7 competities \+ KKD/i);
   assert.match(script, /scopeLeagues/);
-  assert.match(script, /transfer\.club\.league !== competition/);
+  assert.match(script, /routeClubs\.some\(\(club\) => club\.league === competition\)/);
   assert.match(script, /scopeLeagues\.map\(\(league\)/);
 });
 

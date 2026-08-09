@@ -52,7 +52,7 @@
       <div class="hero-score" aria-label="Hoofdstatistieken">
         <div class="score-primary">
           <span data-stat="moves">—</span>
-          <small>clubbewegingen</small>
+          <small>unieke deals</small>
         </div>
         <div class="score-pair">
           <div><span data-stat="spent">—</span><small>uitgegeven</small></div>
@@ -76,11 +76,10 @@
     <section class="panel" id="panel-transfers" role="tabpanel" aria-labelledby="tab-transfers" data-panel="transfers">
       <div class="section-head">
         <div><p class="eyebrow">Bevestigd · uitgebreid competitie-universum</p><h2>Alle transfers van de top 100 clubs + top 7 competities</h2></div>
-        <p>Senior inkomende en uitgaande bewegingen voor de mondiale top 100, alle clubs uit zeven topcompetities en de Keuken Kampioen Divisie; huurreturns en transfervrije deals blijven zichtbaar.</p>
+        <p>Elke bevestigde deal staat één keer als duidelijke route van club naar club. De mondiale top 100, alle clubs uit zeven topcompetities en de Keuken Kampioen Divisie zijn opgenomen; huurreturns en transfervrije deals blijven zichtbaar.</p>
       </div>
       <form class="filterbar" id="transfer-filters" aria-label="Transferfilters">
         <label class="search-field"><span>Zoeken</span><input type="search" id="transfer-search" placeholder="Club, speler of tegenpartij"></label>
-        <label><span>Richting</span><select id="transfer-direction"><option value="all">Alles</option><option value="in">Inkomend</option><option value="out">Uitgaand</option></select></label>
         <label><span>Competitie</span><select id="transfer-competition"><option value="all">Alle competities</option></select></label>
         <label><span>Land</span><select id="transfer-country"><option value="all">Alle landen</option></select></label>
         <label><span>Sortering</span><select id="transfer-sort"><option value="fee">Hoogste transfersom</option><option value="rank">Clubrang</option><option value="club">Clubnaam</option></select></label>
@@ -145,8 +144,9 @@
     <p class="fineprint">Transfersommen, marktwaarden en geruchtkansen kunnen schattingen zijn. Een modelrang is analyse, geen feit of weddenschapsadvies.</p>
   </dialog>
 
-  <script src="/assets/transferwereld-data.js?v=20260805b"></script>
-  <script src="/assets/transferwereld-scope-data.js?v=20260805b"></script>
-  <script src="/assets/transferwereld.js?v=20260805b" defer></script>
+  <script src="/assets/transferwereld-data.js?v=20260809a"></script>
+  <script src="/assets/transferwereld-scope-data.js?v=20260809a"></script>
+  <script src="/assets/transferwereld-deals.js?v=20260809a"></script>
+  <script src="/assets/transferwereld.js?v=20260809a" defer></script>
 </body>
 </html>

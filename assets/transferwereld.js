@@ -97,10 +97,7 @@
 
   const clubByName = new Map(clubs.map((club) => [normalize(club.name), club]));
   const clubByTransfermarktId = new Map(clubs.map((club) => [Number(club.transfermarkt?.id), club]));
-  const transfers = clubs.flatMap((club) => [
-    ...(club.arrivals || []).map((transfer) => ({ ...transfer, club })),
-    ...(club.departures || []).map((transfer) => ({ ...transfer, club })),
-  ]);
+  const deals = window.TransferwereldDeals?.buildUniqueDeals(clubs) || [];
   const rumours = clubs.flatMap((club) => (club.rumours || []).map((rumour) => ({ ...rumour, club })))
     .sort((left, right) => right.probability - left.probability);
 
@@ -108,7 +105,7 @@
     const totalSpent = clubs.reduce((total, club) => total + club.spend, 0);
     const transferCoverage = clubs.filter((club) => (club.arrivals?.length || 0) + (club.departures?.length || 0) > 0).length;
     const squadCoverage = clubs.filter((club) => club.depth.available).length;
-    document.querySelector('[data-stat="moves"]').textContent = transfers.length.toLocaleString('nl-NL');
+    document.querySelector('[data-stat="moves"]').textContent = deals.length.toLocaleString('nl-NL');
     document.querySelector('[data-stat="spent"]').textContent = formatMoney(totalSpent);
     document.querySelector('[data-stat="rumours"]').textContent = rumours.length.toLocaleString('nl-NL');
     document.querySelector('[data-meta-coverage]').textContent = `· ${transferCoverage}/${clubs.length} transfers · ${squadCoverage}/${clubs.length} selecties · ${scopeLeagues.length} competities in scope`;
@@ -155,6 +152,25 @@
     return `<div class="club-cell"><img class="crest" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.hidden=true"><div><strong>${escapeHtml(club.name)}</strong><small>${escapeHtml(meta)}${meta ? ' · ' : ''}${escapeHtml(rank)}</small></div></div>`;
   }
 
+  function routeClub(name, club, label) {
+    const crest = club?.badge
+      ? `<img class="route-crest" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.hidden=true">`
+      : '<span class="route-crest route-crest-placeholder" aria-hidden="true"></span>';
+    return `<div class="route-club">${crest}<div><small>${label}</small><strong>${escapeHtml(name || 'Onbekend')}</strong></div></div>`;
+  }
+
+  function dealTypeLabel(kind) {
+    return ({ transfer: 'Transfer', loan: 'Huur', return: 'Huurreturn', free: 'Transfervrij' })[kind] || 'Transfer';
+  }
+
+  function dealFee(deal) {
+    if (deal.feeValue > 0) return formatMoney(deal.feeValue);
+    if (deal.kind === 'free') return 'Transfervrij';
+    if (deal.kind === 'loan') return 'Huur';
+    if (deal.kind === 'return') return 'Einde huur';
+    return deal.fee || 'Onbekend';
+  }
+
   function populateTransferFilters() {
     const competitions = [...new Set(clubs.map((club) => club.league).filter(Boolean))].sort((left, right) => left.localeCompare(right));
     const countries = [...new Set(clubs.map((club) => club.country))].sort((left, right) => left.localeCompare(right));
@@ -172,21 +188,20 @@
 
   function filteredTransfers() {
     const query = normalize(document.querySelector('#transfer-search').value.trim());
-    const direction = document.querySelector('#transfer-direction').value;
     const competition = document.querySelector('#transfer-competition').value;
     const country = document.querySelector('#transfer-country').value;
     const sort = document.querySelector('#transfer-sort').value;
-    const filtered = transfers.filter((transfer) => {
-      if (direction !== 'all' && transfer.direction !== direction) return false;
-      if (competition !== 'all' && transfer.club.league !== competition) return false;
-      if (country !== 'all' && transfer.club.country !== country) return false;
+    const filtered = deals.filter((deal) => {
+      const routeClubs = [deal.sourceClub, deal.destinationClub].filter(Boolean);
+      if (competition !== 'all' && !routeClubs.some((club) => club.league === competition)) return false;
+      if (country !== 'all' && !routeClubs.some((club) => club.country === country)) return false;
       if (!query) return true;
-      return [transfer.player, transfer.club.name, transfer.counterpart, transfer.position].some((value) => normalize(value).includes(query));
+      return [deal.player, deal.sourceName, deal.destinationName, deal.position, dealTypeLabel(deal.kind)].some((value) => normalize(value).includes(query));
     });
     filtered.sort((left, right) => {
-      if (sort === 'fee') return right.feeValue - left.feeValue || left.club.rank - right.club.rank;
-      if (sort === 'club') return left.club.name.localeCompare(right.club.name) || right.feeValue - left.feeValue;
-      return left.club.rank - right.club.rank || (left.direction === 'in' ? -1 : 1) || right.feeValue - left.feeValue;
+      if (sort === 'fee') return right.feeValue - left.feeValue || left.rank - right.rank;
+      if (sort === 'club') return left.sourceName.localeCompare(right.sourceName) || left.destinationName.localeCompare(right.destinationName) || right.feeValue - left.feeValue;
+      return left.rank - right.rank || right.feeValue - left.feeValue;
     });
     return filtered;
   }
@@ -194,15 +209,18 @@
   function renderTransfers() {
     const filtered = filteredTransfers();
     const visible = filtered.slice(0, state.transferLimit);
-    document.querySelector('#transfer-summary').innerHTML = `<span><strong>${filtered.length.toLocaleString('nl-NL')}</strong> bewegingen gevonden</span><span>${Math.min(visible.length, filtered.length)} zichtbaar</span>`;
-    document.querySelector('#transfer-list').innerHTML = visible.length ? visible.map((transfer) => `
+    document.querySelector('#transfer-summary').innerHTML = `<span><strong>${filtered.length.toLocaleString('nl-NL')}</strong> unieke deals gevonden</span><span>${Math.min(visible.length, filtered.length)} zichtbaar</span>`;
+    document.querySelector('#transfer-list').innerHTML = visible.length ? visible.map((deal, index) => `
       <article class="transfer-row">
-        <span class="rank-num">${Number(transfer.club.rank) < 10000 ? String(transfer.club.rank).padStart(2, '0') : '—'}</span>
-        ${clubCell(transfer.club)}
-        <div class="player-cell"><strong>${escapeHtml(transfer.player)}</strong><small>${escapeHtml(transfer.position)}${transfer.age ? ` · ${transfer.age}` : ''}</small></div>
-        <span class="direction ${transfer.direction === 'out' ? 'out' : ''}">${transfer.direction === 'in' ? 'In' : 'Uit'}</span>
-        <div class="counterpart"><small>${transfer.direction === 'in' ? 'Van' : 'Naar'}</small>${escapeHtml(transfer.counterpart || 'Onbekend')}</div>
-        <div class="fee">${escapeHtml(transfer.fee)}</div>
+        <span class="rank-num">${String(index + 1).padStart(2, '0')}</span>
+        <div class="player-cell"><strong>${escapeHtml(deal.player)}</strong><small>${escapeHtml(deal.position)}${deal.age ? ` · ${deal.age}` : ''}</small></div>
+        <div class="deal-route">
+          ${routeClub(deal.sourceName, deal.sourceClub, 'Van')}
+          <span class="route-arrow" aria-hidden="true">→</span>
+          ${routeClub(deal.destinationName, deal.destinationClub, 'Naar')}
+        </div>
+        <span class="deal-type ${deal.kind}">${dealTypeLabel(deal.kind)}</span>
+        <div class="fee">${escapeHtml(dealFee(deal))}</div>
       </article>`).join('') : '<p class="empty">Geen transfers gevonden met deze filters.</p>';
     document.querySelector('#transfer-more').hidden = visible.length >= filtered.length;
   }
