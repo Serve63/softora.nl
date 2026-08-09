@@ -64,6 +64,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
@@ -73,6 +74,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
 });
 
@@ -112,7 +114,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805h/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
@@ -143,6 +145,10 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
   assert.doesNotMatch(scriptSource, /card\.addEventListener/);
   assert.match(styleSource, /\.stat-card-total-found__open\s*\{/);
   assert.match(styleSource, /\.stat-card-total-found__open:focus-visible/);
+  assert.match(
+    styleSource,
+    /\.company-directory-shell-page \.sidebar\s*\{[^}]*bottom:\s*0 !important;[^}]*height:\s*auto !important;[^}]*min-height:\s*0 !important;[^}]*max-height:\s*none !important;/s
+  );
   assert.doesNotMatch(styleSource, /\.company-directory-shell-page\s*\{[^}]*--(?:ink|muted|page|panel):/s);
   assert.match(styleSource, /\.company-directory\s*\{[^}]*--ink:\s*#252229;/s);
   assert.match(scriptSource, /Online bedrijvendatabase is tijdelijk niet bereikbaar\./);

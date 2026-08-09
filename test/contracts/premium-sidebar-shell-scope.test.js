@@ -368,6 +368,7 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
 test('kvk database route keeps the canonical sidebar outside its scraper frame', () => {
   const pageSource = readRepoFile('premium-kvk-database-shell.html');
   const directoryShellSource = readRepoFile('premium-kvk-company-directory-shell.html');
+  const directoryStyleSource = readRepoFile('assets/kvk-database-total-found.css');
   const themeSource = readRepoFile('assets/personnel-theme.js');
 
   assert.match(pageSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
@@ -380,7 +381,12 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
+  assert.match(
+    directoryStyleSource,
+    /\.company-directory-shell-page \.sidebar\s*\{[^}]*bottom:\s*0 !important;[^}]*height:\s*auto !important;[^}]*min-height:\s*0 !important;[^}]*max-height:\s*none !important;/s
+  );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
 });
