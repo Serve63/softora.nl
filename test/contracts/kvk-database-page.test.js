@@ -138,7 +138,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809c/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -499,6 +499,8 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.doesNotMatch(controlSource, /addEventListener\('click'/);
   assert.doesNotMatch(controlSource, /JSON\.stringify\(\{ enabled:/);
   assert.match(controlSource, /statusLabel = workerState === 'error'/);
+  assert.doesNotMatch(controlSource, /'WACHT'/);
+  assert.match(controlSource, /enabled\s*\? 'AAN'/);
   assert.match(controlSource, /uitsluitend via de Codex-chat/);
   assert.match(controlSource, /\['vuller', 'controle', 'goedgekeurd'\]/);
   assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
@@ -509,6 +511,20 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced/);
   assert.match(metricsStyles, /\.stat-card-without-website \.stat-main > span/);
   assert.match(metricsStyles, /white-space: nowrap/);
+});
+
+test('kvk framed content uses the same solid background as the surrounding page', () => {
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const directorySource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-company-directory.html'), 'utf8');
+  const frameStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-frame.css'), 'utf8');
+
+  assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260809a/);
+  assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809c/);
+  assert.match(
+    frameStyleSource,
+    /html\[data-softora-sidebar-content-frame="1"\][\s\S]*background:\s*#f4f1ed !important;/
+  );
 });
 
 test('kvk database APIs keep reads protected and expose only token-protected sync posts', () => {

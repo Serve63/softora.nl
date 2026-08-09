@@ -1,0 +1,4 @@
+html[data-softora-sidebar-content-frame="1"],
+html[data-softora-sidebar-content-frame="1"] body {
+  background: #f4f1ed !important;
+}
