@@ -97,6 +97,10 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /BEKIJK ALLE BEDRIJVEN|Bekijk alle bedrijven →/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*aria-controls=/);
   assert.doesNotMatch(pageSource, /id="total-found-source-status"/);
+  assert.doesNotMatch(pageSource, /data-collapsible="total-found"/);
+  assert.doesNotMatch(pageSource, /<h2 id="table-title">Totaal Gevonden<\/h2>/);
+  assert.doesNotMatch(pageSource, /aria-label="Totaal Gevonden inklappen"/);
+  assert.match(pageSource, /<div hidden aria-hidden="true">[\s\S]*?id="main-table-frame"/);
   assert.match(pageSource, /id="companies-successful-found"/);
   assert.ok(
     pageSource.indexOf('id="companies-successful-found"') <

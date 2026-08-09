@@ -133,29 +133,17 @@
         <ol class="location-list" id="location-list"></ol>
       </aside>
 
-      <section class="panel data-panel" data-collapsible="total-found">
-        <div class="panel-heading data-heading">
-          <div>
-            <p class="eyebrow" id="table-eyebrow">Bedrijven</p>
-            <h2 id="table-title">Totaal Gevonden</h2>
-          </div>
-          <div class="heading-actions">
-            <div class="table-tools">
-              <label class="search-field">
-                <span>Zoeken</span>
-                <input id="search-input" type="search" placeholder="Bedrijfsnaam, KVK, website of locatie">
-              </label>
-            </div>
-            <button class="collapse-toggle" type="button" aria-label="Totaal Gevonden inklappen" aria-expanded="true"></button>
-          </div>
-        </div>
-        <div class="table-frame" id="main-table-frame">
+      <div hidden aria-hidden="true">
+        <span id="table-eyebrow"></span>
+        <span id="table-title"></span>
+        <input id="search-input" type="search" tabindex="-1">
+        <div id="main-table-frame">
           <table>
             <thead id="table-head"></thead>
             <tbody id="table-body"></tbody>
           </table>
         </div>
-      </section>
+      </div>
     </section>
 
     <section class="panel data-panel wide-data-panel capped-data-panel" data-collapsible="usable">
