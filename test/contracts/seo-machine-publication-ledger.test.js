@@ -106,6 +106,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/blog/chatbot-crm-koppeling-leads-opvolgen',
+        '2026-08-09',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });

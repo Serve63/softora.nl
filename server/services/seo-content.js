@@ -1847,55 +1847,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'blog',
-    slug: 'chatbot-crm-koppeling-leads-opvolgen',
-    title: 'Chatbot en CRM koppelen om leads beter op te volgen',
-    description:
-      'Waarom een chatbot sterker wordt wanneer gesprekken direct eindigen in CRM, leadstatus, samenvatting en een duidelijke opvolgtaak.',
-    category: 'Chatbots',
-    intent: 'Koopintentie',
-    publishedAt: '2026-06-18',
-    updatedAt: '2026-06-18',
-    image: Object.freeze({
-      src: '/assets/seo-content/chatbot-menselijke-overdracht-klantcontact-softora.jpg',
-      alt: 'Team bekijkt chatbotgesprekken en CRM-opvolging met duidelijke overdracht van leadvragen naar medewerkers.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Een chatbot wordt waardevoller wanneer elk passend gesprek wordt samengevat, opgeslagen en opgevolgd in CRM.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Een chatbotgesprek moet ergens landen',
-        paragraphs: Object.freeze([
-          'Een chatbot kan bezoekers sneller helpen met vragen, intake en kwalificatie. Maar als het gesprek daarna alleen in een chatgeschiedenis blijft staan, mist het team alsnog context voor opvolging.',
-          'Door de chatbot aan CRM te koppelen, wordt het gesprek onderdeel van de commerciële route. De samenvatting, contactgegevens, interesse en vervolgstap staan dan op een plek waar iemand ermee verder kan.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Leg niet alles vast, maar wel het juiste',
-        paragraphs: Object.freeze([
-          'Een CRM-koppeling hoeft niet elk woord te bewaren. Meestal zijn de belangrijkste velden voldoende: naam, bedrijf, vraag, dienst, urgentie, bronpagina, samenvatting en voorgestelde actie.',
-          'AI kan helpen om die informatie uit het gesprek te halen. De workflow moet daarbij duidelijk aangeven wanneer een gesprek geschikt is voor opvolging en wanneer een medewerker eerst moet controleren.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Maak overdracht naar mensen expliciet',
-        paragraphs: Object.freeze([
-          'De beste chatbotflow heeft een duidelijke grens. Veelgestelde vragen kan de chatbot zelfstandig voorbereiden, maar bij twijfel, complexiteit of commerciële intentie moet overdracht naar een mens logisch zijn.',
-          'Softora bouwt chatbot en CRM daarom samen: de chatbot vangt de eerste laag op, CRM houdt status en taak vast en het team blijft verantwoordelijk voor de klantrelatie.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Chatbot vs livechat', href: '/vergelijkingen/chatbot-vs-livechat' }),
-      Object.freeze({ label: 'Website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'kennisbank',
     slug: 'wat-is-een-klantportaal',
     title: 'Wat is een klantportaal?',
@@ -3879,7 +3830,7 @@ function renderSecondaryImage(item) {
       : '';
   return [
     '    <figure class="artikel-support-image">',
-    `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${dimensions} loading="lazy" decoding="async">`,
+    `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${dimensions} loading="lazy" decoding="async" fetchpriority="low">`,
     image.caption ? `      <figcaption>${escapeHtml(image.caption)}</figcaption>` : '',
     '    </figure>',
   ].filter(Boolean).join('\n');
