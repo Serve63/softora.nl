@@ -18,9 +18,9 @@ const TOP_COMPETITIONS = [
   { id: 'tm-ES1', code: 'ES1', name: 'LaLiga', country: 'Spain', slug: 'laliga', uefaRank: 3 },
   { id: 'tm-L1', code: 'L1', name: 'Bundesliga', country: 'Germany', slug: 'bundesliga', uefaRank: 4 },
   { id: 'tm-FR1', code: 'FR1', name: 'Ligue 1', country: 'France', slug: 'ligue-1', uefaRank: 5 },
-  { id: 'tm-NL1', code: 'NL1', name: 'Eredivisie', country: 'Netherlands', slug: 'eredivisie', uefaRank: 6 },
-  { id: 'tm-PO1', code: 'PO1', name: 'Liga Portugal', country: 'Portugal', slug: 'primeira-liga', uefaRank: 7 },
-  { id: 'tm-BE1', code: 'BE1', name: 'Jupiler Pro League', country: 'Belgium', slug: 'jupiler-pro-league', uefaRank: 8 },
+  { id: 'tm-PO1', code: 'PO1', name: 'Liga Portugal', country: 'Portugal', slug: 'primeira-liga', uefaRank: 6 },
+  { id: 'tm-BE1', code: 'BE1', name: 'Jupiler Pro League', country: 'Belgium', slug: 'jupiler-pro-league', uefaRank: 7 },
+  { id: 'tm-NL1', code: 'NL1', name: 'Eredivisie', country: 'Netherlands', slug: 'eredivisie', uefaRank: 8 },
   { id: 'tm-TR1', code: 'TR1', name: 'Süper Lig', country: 'Türkiye', slug: 'super-lig', uefaRank: 9 },
   { id: 'tm-TS1', code: 'TS1', name: 'Chance Liga', country: 'Czechia', slug: 'chance-liga', uefaRank: 10 },
 ];
@@ -229,16 +229,18 @@ async function main() {
   dataset.clubs = [...updatedBaseClubs, ...scopedExtraClubs];
   dataset.scopeLeagues = scopeLeagues;
   Object.assign(dataset, normalizeDatasetIdentity(dataset));
+  const refreshedAt = new Date().toISOString();
   dataset.meta = {
     ...dataset.meta,
     title: 'Transferwereld — top 10 competities',
     scope: {
       source: 'UEFA men\'s association club rankings (five-year coefficient)',
-      sourceUrl: 'https://www.uefa.com/uefachampionsleague/news/02a0-1f8b9164ba92-1dd42564c706-1000--uefa-rankings-2025-which-teams-and-nations-are-on-top/',
+      sourceUrl: 'https://www.uefa.com/nationalassociations/uefarankings/?year=2026',
       competitions: TOP_COMPETITIONS.map((definition) => definition.name),
     },
     scopeClubCount: uniqueTargetRows.length,
-    scopeFetchedAt: new Date().toISOString(),
+    scopeFetchedAt: refreshedAt,
+    transfersFetchedAt: refreshedAt,
     warnings: expandedTargetClubs.filter((club) => club.dataWarning).length,
   };
   const sizes = writeTransferwereldDataset(dataset);

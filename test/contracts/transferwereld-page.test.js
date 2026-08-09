@@ -33,7 +33,8 @@ test('transferwereld exposes the five active analysis tabs and defaults to fee s
   assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.doesNotMatch(html, /id="transfer-filters"|id="transfer-summary"|id="transfer-sort"/);
-  assert.match(html, /transferwereld-scope-data\.js\?v=20260809a/);
+  assert.match(html, /transferwereld-data\.js\?v=20260809b/);
+  assert.match(html, /transferwereld-scope-data\.js\?v=20260809b/);
   assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
   assert.match(html, /transferwereld-deals\.js\?v=20260809a/);
   assert.doesNotMatch(html, /id="transfer-direction"/);
@@ -97,7 +98,7 @@ test('transferwereld dataset contains every club from exactly the UEFA top ten l
   assert.equal(data.clubs.length, 184);
   assert.equal(new Set(data.clubs.map((club) => club.name)).size, data.clubs.length, 'club names must be unique across views');
   assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.name), [
-    'Premier League', 'Serie A', 'LaLiga', 'Bundesliga', 'Ligue 1', 'Eredivisie', 'Liga Portugal', 'Jupiler Pro League', 'Süper Lig', 'Chance Liga',
+    'Premier League', 'Serie A', 'LaLiga', 'Bundesliga', 'Ligue 1', 'Liga Portugal', 'Jupiler Pro League', 'Eredivisie', 'Süper Lig', 'Chance Liga',
   ]);
   assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.uefaRank), Array.from({ length: 10 }, (_, index) => index + 1));
   assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.teams.length), [20, 20, 20, 18, 18, 18, 18, 18, 18, 16]);
@@ -123,6 +124,11 @@ test('transferwereld generated data is complete enough for the requested analysi
   assert.equal(clubsWithFullSquads, data.clubs.length, `squad coverage incomplete: ${clubsWithFullSquads}/${data.clubs.length} clubs`);
   assert.equal(data.meta.warnings, 0);
   assert.equal(data.meta.warnings, data.clubs.filter((club) => club.dataWarning).length);
+  const repeatedMovements = data.clubs.flatMap((club) => ['arrivals', 'departures'].flatMap((field) => {
+    const keys = club[field].map((transfer) => [transfer.player, transfer.counterpart, transfer.feeValue].join('|').toLowerCase());
+    return keys.filter((key, index) => keys.indexOf(key) !== index).map((key) => `${club.name}:${field}:${key}`);
+  }));
+  assert.deepEqual(repeatedMovements, [], `duplicate transfer movements found: ${repeatedMovements.join(', ')}`);
 });
 
 test('deep club context remains complete for the active analyses', () => {
@@ -168,8 +174,27 @@ test('rumours render as compact comparable rows instead of oversized cards', () 
 });
 
 test('localized transfer fees are normalized without turning thousands into millions', () => {
+  const { parseFeeValue } = require('../../scripts/build-transferwereld-data.js');
   const data = loadDataset();
   const transfers = data.clubs.flatMap((club) => [...club.arrivals, ...club.departures]);
   const suspicious = transfers.find((transfer) => /(?:mil|mila)\s*€/i.test(transfer.fee) && transfer.feeValue >= 1_000_000);
   assert.equal(suspicious, undefined, `localized thousands parsed as millions for ${suspicious?.player || 'unknown player'}`);
+  assert.equal(parseFeeValue('25 dzd. €'), 25_000);
+  assert.equal(parseFeeValue('300 Tsd. €'), 300_000);
+  assert.equal(parseFeeValue('1,5 Mio. €'), 1_500_000);
+});
+
+test('transferwereld refresh scripts can force current source data without blanking failed clubs', () => {
+  const buildScript = read('scripts/build-transferwereld-data.js');
+  const scopeScript = read('scripts/expand-transferwereld-scope.js');
+  const contextScript = read('scripts/enrich-transferwereld-context.js');
+  assert.match(buildScript, /TRANSFER_FORCE_REFRESH/);
+  assert.match(buildScript, /TRANSFER_REFRESH_WARNINGS_ONLY/);
+  assert.match(buildScript, /TRANSFER_REFRESH_COMPONENTS/);
+  assert.match(buildScript, /arrivals = existing\?\.arrivals \|\| \[\]/);
+  assert.match(buildScript, /squad = existing\?\.squad \|\| \[\]/);
+  assert.match(buildScript, /rumours = existing\?\.rumours \|\| \[\]/);
+  assert.match(contextScript, /TRANSFER_CONTEXT_FORCE_REFRESH/);
+  assert.match(contextScript, /const now = Date\.now\(\)/);
+  assert.match(scopeScript, /uefarankings\/\?year=2026/);
 });

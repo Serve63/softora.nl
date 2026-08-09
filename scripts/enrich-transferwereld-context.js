@@ -63,12 +63,12 @@ function similarity(left, right) {
 function parseMoney(value) {
   const normalized = String(value || '').toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/\s+/g, '');
   if (!normalized.includes('€')) return 0;
-  const match = normalized.match(/€?([0-9]+(?:\.[0-9]+)?)(bn|mio\.?|mill\.?|mln\.?|mila|mil|m|k)?€?/);
+  const match = normalized.match(/€?([0-9]+(?:\.[0-9]+)?)(bn|mio\.?|mill\.?|mln\.?|mila|mil|dzd\.?|tsd\.?|thsd\.?|th\.?|m|k)?€?/);
   if (!match) return 0;
   const amount = Number(match[1]);
   if (match[2] === 'bn') return Math.round(amount * 1_000_000_000);
   if (['m', 'mio', 'mio.', 'mill', 'mill.', 'mln', 'mln.'].includes(match[2])) return Math.round(amount * 1_000_000);
-  if (['k', 'mil', 'mila'].includes(match[2])) return Math.round(amount * 1_000);
+  if (['k', 'mil', 'mila', 'dzd', 'dzd.', 'tsd', 'tsd.', 'thsd', 'thsd.', 'th', 'th.'].includes(match[2])) return Math.round(amount * 1_000);
   return Math.round(amount);
 }
 
@@ -325,6 +325,8 @@ function buildForecastLeagues(dataset, contexts, optaTeams, fullLeagueTables) {
 async function main() {
   if (!process.env.TRANSFER_BROWSER_EXECUTABLE) throw new Error('TRANSFER_BROWSER_EXECUTABLE is required');
   const missingOnly = process.env.TRANSFER_CONTEXT_MISSING_ONLY === '1';
+  const forceRefresh = process.env.TRANSFER_CONTEXT_FORCE_REFRESH === '1';
+  const contextConcurrency = Math.max(1, Math.min(12, Number(process.env.TRANSFER_CONTEXT_CONCURRENCY) || 4));
   const dataset = loadDataset();
   const scopedClubIds = new Set((dataset.scopeLeagues || []).flatMap((league) => (
     (league.teams || []).map((team) => Number(team.transfermarktId)).filter(Number.isFinite)
@@ -339,22 +341,22 @@ async function main() {
   let contexts;
   const fullLeagueTables = new Map();
   try {
-    contexts = await withConcurrency(contextClubs, 4, async (club) => {
+    contexts = await withConcurrency(contextClubs, contextConcurrency, async (club) => {
       const warnings = [];
       const previousWarnings = String(club.contextWarning || '');
       let injuries = club.context && !previousWarnings.includes('injuries') ? (club.context.injuries || []) : [];
       let coach = club.context && !previousWarnings.includes('coach') ? (club.context.coach || null) : null;
       let schedule = { competitionCode: '', tableRoute: '', leagueName: '', leagueTable: [], fixtures: [] };
-      if (missingOnly && club.context && !previousWarnings) {
+      if (missingOnly && !forceRefresh && club.context && !previousWarnings) {
         completed += 1;
         process.stdout.write(`\rContext ${completed}/${contextClubs.length}`);
         return { club, injuries, coach, schedule, warnings, reusedContext: true };
       }
       const page = await browser.newPage({ locale: 'en-GB', userAgent: USER_AGENT });
-      if (!club.context || previousWarnings.includes('injuries')) {
+      if (forceRefresh || !club.context || previousWarnings.includes('injuries')) {
         try { injuries = await readInjuries(page, club); } catch { warnings.push('injuries'); }
       }
-      if (!club.context || previousWarnings.includes('coach')) {
+      if (forceRefresh || !club.context || previousWarnings.includes('coach')) {
         try { coach = await readCoach(page, club); } catch { warnings.push('coach'); }
       }
       try { schedule = await readSchedule(page, club); } catch { warnings.push('schedule'); }
@@ -396,7 +398,10 @@ async function main() {
     if (!entry) return club;
     const { contextWarning: _previousContextWarning, ...baseClub } = club;
     if (entry.reusedContext) return baseClub;
-    const now = Date.UTC(2026, 7, 9);
+    if (entry.warnings.includes('schedule') && baseClub.context) {
+      return { ...baseClub, contextWarning: entry.warnings.join(', ') };
+    }
+    const now = Date.now();
     const fixtures = entry.schedule.fixtures
       .map((fixture) => ({ ...fixture, timestamp: parseDate(fixture.date) }))
       .filter((fixture) => fixture.timestamp)

@@ -420,11 +420,12 @@ function parseFeeValue(label) {
     .replace(/(\d),(\d)/g, '$1.$2')
     .replace(/\s+/g, '');
   if (!normalized.includes('€')) return 0;
-  const match = normalized.match(/€?([0-9]+(?:\.[0-9]+)?)(mio\.?|mill\.?|mln\.?|mila|mil|m|k)?€?/);
+  const match = normalized.match(/€?([0-9]+(?:\.[0-9]+)?)(bn|mio\.?|mill\.?|mln\.?|mila|mil|dzd\.?|tsd\.?|thsd\.?|th\.?|m|k)?€?/);
   if (!match) return 0;
   const amount = Number(match[1]);
+  if (match[2] === 'bn') return Math.round(amount * 1_000_000_000);
   if (['m', 'mio', 'mio.', 'mill', 'mill.', 'mln', 'mln.'].includes(match[2])) return Math.round(amount * 1_000_000);
-  if (['k', 'mil', 'mila'].includes(match[2])) return Math.round(amount * 1_000);
+  if (['k', 'mil', 'mila', 'dzd', 'dzd.', 'tsd', 'tsd.', 'thsd', 'thsd.', 'th', 'th.'].includes(match[2])) return Math.round(amount * 1_000);
   return Math.round(amount);
 }
 
@@ -572,44 +573,79 @@ function loadExistingClubs() {
   }
 }
 
+function normalizeTransferRows(transfers) {
+  const unique = new Map();
+  for (const { direction, player, position, age, counterpart, fee } of transfers || []) {
+    const row = { direction, player, position, age, counterpart, fee, feeValue: parseFeeValue(fee) };
+    const key = [direction, cleanText(player).toLowerCase(), cleanText(counterpart).toLowerCase(), row.feeValue].join('|');
+    const previous = unique.get(key);
+    if (!previous || (!previous.age && row.age)) unique.set(key, row);
+  }
+  return [...unique.values()];
+}
+
 async function addClubData(teams, existingClubs = new Map()) {
+  const forceRefresh = process.env.TRANSFER_FORCE_REFRESH === '1';
+  const refreshWarningsOnly = process.env.TRANSFER_REFRESH_WARNINGS_ONLY === '1';
+  const refreshComponents = new Set(String(process.env.TRANSFER_REFRESH_COMPONENTS || '')
+    .split(',').map((component) => component.trim().toLowerCase()).filter(Boolean));
   let complete = 0;
   const enriched = await mapWithConcurrency(teams, 4, async (team, index) => {
     const { id, slug } = team.transfermarkt;
     const existing = existingClubs.get(id);
     const seasonId = transfermarktSeasonId(team);
-    const canReuseSeasonData = existing?.transfermarkt?.seasonId === seasonId
-      || (!existing?.transfermarkt?.seasonId && seasonId === 2026);
-    const warnings = [];
+    const forceClubRefresh = forceRefresh && (!refreshWarningsOnly || Boolean(existing?.dataWarning));
+    const forceTransfers = forceClubRefresh && (!refreshComponents.size || refreshComponents.has('transfers'));
+    const forceSquad = forceClubRefresh && (!refreshComponents.size || refreshComponents.has('squad'));
+    const forceRumours = forceClubRefresh && (!refreshComponents.size || refreshComponents.has('rumours'));
+    const canReuseSeasonData = (
+      existing?.transfermarkt?.seasonId === seasonId
+      || (!existing?.transfermarkt?.seasonId && seasonId === 2026)
+    );
+    const refreshedWarningLabels = new Set([
+      ...(refreshComponents.has('transfers') ? ['Transfers niet opgehaald'] : []),
+      ...(refreshComponents.has('squad') ? ['Selectie niet opgehaald'] : []),
+      ...(refreshComponents.has('rumours') ? ['Geruchten niet opgehaald'] : []),
+    ]);
+    const warnings = refreshComponents.size
+      ? String(existing?.dataWarning || '')
+        .split(';')
+        .map((warning) => warning.trim())
+        .filter((warning) => warning && !refreshedWarningLabels.has(warning))
+      : [];
     const base = `/${slug}`;
-    let arrivals = canReuseSeasonData ? (existing?.arrivals || []) : [];
-    let departures = canReuseSeasonData ? (existing?.departures || []) : [];
-    let squad = canReuseSeasonData ? (existing?.squad || []) : [];
-    let rumours = existing?.rumours || [];
+    let arrivals = canReuseSeasonData && !forceTransfers ? (existing?.arrivals || []) : [];
+    let departures = canReuseSeasonData && !forceTransfers ? (existing?.departures || []) : [];
+    let squad = canReuseSeasonData && !forceSquad ? (existing?.squad || []) : [];
+    let rumours = forceRumours ? [] : (existing?.rumours || []);
 
-    if (!arrivals.length && !departures.length) {
+    if (forceTransfers || (!refreshComponents.size && !arrivals.length && !departures.length)) {
       try {
         const html = await fetchTransfermarkt(`${base}/transfers/verein/${id}/saison_id/${seasonId}`, index * 3);
         arrivals = extractTransfers(html, 'Arrivals');
         departures = extractTransfers(html, 'Departures');
       } catch (error) {
+        arrivals = existing?.arrivals || [];
+        departures = existing?.departures || [];
         warnings.push('Transfers niet opgehaald');
       }
     }
-    if (squad.length < 16) {
+    if (forceSquad || (!refreshComponents.size && squad.length < 16)) {
       try {
         const html = await fetchTransfermarkt(`${base}/kader/verein/${id}/saison_id/${seasonId}`, index * 3 + 1);
         squad = extractSquad(html);
         if (squad.length < 16) throw new Error(`Only ${squad.length} squad rows parsed`);
       } catch (error) {
+        squad = existing?.squad || [];
         warnings.push('Selectie niet opgehaald');
       }
     }
-    if (!rumours.length) {
+    if (forceRumours || (!refreshComponents.size && !rumours.length)) {
       try {
         const html = await fetchTransfermarkt(`${base}/geruechte/verein/${id}`, index * 3 + 2);
         rumours = extractRumours(html);
       } catch (error) {
+        rumours = existing?.rumours || [];
         warnings.push('Geruchten niet opgehaald');
       }
     }
@@ -627,12 +663,8 @@ async function addClubData(teams, existingClubs = new Map()) {
         sourceUrl: `${TRANSFERMARKT_ORIGIN}/${slug}/transfers/verein/${id}/saison_id/${seasonId}`,
         matchedName: team.transfermarkt.name,
       },
-      arrivals: arrivals.map(({ direction, player, position, age, counterpart, fee }) => (
-        { direction, player, position, age, counterpart, fee, feeValue: parseFeeValue(fee) }
-      )),
-      departures: departures.map(({ direction, player, position, age, counterpart, fee }) => (
-        { direction, player, position, age, counterpart, fee, feeValue: parseFeeValue(fee) }
-      )),
+      arrivals: normalizeTransferRows(arrivals),
+      departures: normalizeTransferRows(departures),
       squad: squad.map(({ player, position, marketValueNumber }) => ({ player, position, marketValueNumber })),
       rumours: rumours.map(({ player, currentClub, marketValue, probability, updated, source }) => (
         { player, currentClub, marketValue, probability, updated, source }
