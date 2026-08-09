@@ -26,6 +26,7 @@
     { id: 'transfermarkt', title: 'Transfermarkt' },
     { id: 'rubens-company', title: 'Ruben’s Company' },
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
+    { id: 'jurisalem-af', title: 'Jurisalem af' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
     { id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' },
@@ -146,7 +147,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809a`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809b`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
