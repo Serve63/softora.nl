@@ -1,0 +1,1 @@
+drop index if exists public.softora_kvk_company_directory_source_updated_idx;

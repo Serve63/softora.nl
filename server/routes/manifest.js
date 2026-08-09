@@ -28,6 +28,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/premium-coldmailing-lead', marker: 'Softora | Coldmailing Lead - Premium', allowLoginFallback: true },
   { path: '/premium-actieve-opdrachten', marker: 'Softora | Actieve Opdrachten — Premium', allowLoginFallback: true },
   { path: '/kvk-database', marker: 'Bedrijven Scraper', allowLoginFallback: true },
+  { path: '/kvk-database-bedrijven', marker: 'Alle gevonden bedrijven', allowLoginFallback: true },
 ]);
 
 const contractTargets = Object.freeze([

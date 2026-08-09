@@ -6,6 +6,7 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
   const {
     coordinator,
     controlCoordinator,
+    directoryCoordinator,
     requirePremiumAdminApiAccess = passThrough,
   } = deps;
 
@@ -25,6 +26,18 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
     coordinator && typeof coordinator.sendGetLocationStatsResponse === 'function'
       ? coordinator.sendGetLocationStatsResponse(req, res)
       : res.status(503).json({ ok: false, error: 'KVK locatiestatistieken zijn tijdelijk niet beschikbaar.' })
+  );
+
+  app.get('/api/kvk-database/company-directory', requirePremiumAdminApiAccess, (req, res) =>
+    directoryCoordinator && typeof directoryCoordinator.sendGetDirectoryResponse === 'function'
+      ? directoryCoordinator.sendGetDirectoryResponse(req, res)
+      : res.status(503).json({ ok: false, error: 'Online bedrijvendatabase is tijdelijk niet beschikbaar.' })
+  );
+
+  app.post('/api/kvk-database/company-directory/sync', (req, res) =>
+    directoryCoordinator && typeof directoryCoordinator.sendPostDirectorySyncResponse === 'function'
+      ? directoryCoordinator.sendPostDirectorySyncResponse(req, res)
+      : res.status(503).json({ ok: false, error: 'Online bedrijvendatabase-sync is tijdelijk niet beschikbaar.' })
   );
 
   app.get('/api/kvk-database/control', requirePremiumAdminApiAccess, (req, res) =>

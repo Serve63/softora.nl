@@ -64,8 +64,8 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809a/);
-  assert.match(shellSource, />Database verbinden<\/button>/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
+  assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
   assert.match(pageSource, /<h1 id="company-directory-title">Alle gevonden bedrijven<\/h1>/);
@@ -73,7 +73,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -111,14 +111,14 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805h/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
-test('totaal gevonden opent de productiepagina met de volledige lokale bedrijfsbron', () => {
+test('totaal gevonden opent de productiepagina met de volledige online bedrijfsbron', () => {
   const totalFound = require('../../assets/kvk-database-total-found.js');
   const scriptSource = fs.readFileSync(
     path.join(repoRoot, 'assets/kvk-database-total-found.js'),
@@ -129,19 +129,15 @@ test('totaal gevonden opent de productiepagina met de volledige lokale bedrijfsb
     'utf8'
   );
 
-  assert.equal(totalFound.COMPANY_API_URL, 'http://127.0.0.1:8000/api/company-directory');
-  assert.equal(totalFound.LOCAL_DATABASE_ORIGIN, 'http://127.0.0.1:8000');
+  assert.equal(totalFound.COMPANY_API_URL, '/api/kvk-database/company-directory');
   assert.equal(totalFound.DIRECTORY_PAGE_URL, '/kvk-database-bedrijven');
   assert.equal(totalFound.PAGE_SIZE, 100);
-  assert.equal(totalFound.AUTO_CONNECT_TIMEOUT_MS, 8000);
-  assert.equal(totalFound.USER_CONNECT_TIMEOUT_MS, 30000);
+  assert.equal(totalFound.REQUEST_TIMEOUT_MS, 30000);
   assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /q=Caf%C3%A9\+%26\+Zoon/);
-  assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /offset=200/);
+  assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /after=200/);
   assert.deepEqual(totalFound.companyFetchOptions(), {
     cache: 'no-store',
-    credentials: 'omit',
-    mode: 'cors',
-    targetAddressSpace: 'loopback',
+    credentials: 'same-origin',
   });
   assert.match(scriptSource, /openButton\.addEventListener\('click', openDirectory\)/);
   assert.doesNotMatch(scriptSource, /card\.addEventListener/);
@@ -149,17 +145,15 @@ test('totaal gevonden opent de productiepagina met de volledige lokale bedrijfsb
   assert.match(styleSource, /\.stat-card-total-found__open:focus-visible/);
   assert.doesNotMatch(styleSource, /\.company-directory-shell-page\s*\{[^}]*--(?:ink|muted|page|panel):/s);
   assert.match(styleSource, /\.company-directory\s*\{[^}]*--ink:\s*#252229;/s);
-  assert.match(scriptSource, /Lokale databaseservice is niet bereikbaar\./);
-  assert.match(scriptSource, /permissionState === 'prompt' \|\| permissionState === 'denied'/);
+  assert.match(scriptSource, /Online bedrijvendatabase is tijdelijk niet bereikbaar\./);
   assert.doesNotMatch(styleSource, /content:\s*["']/);
   assert.match(scriptSource, /targetWindow\?\.location\?\.assign\(DIRECTORY_PAGE_URL\)/);
   assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
   assert.match(scriptSource, /if \(!reset && \(state\.loading \|\| !state\.hasMore\)\) return;/);
   assert.match(scriptSource, /if \(!state\.query\) state\.total = Math\.max/);
-  assert.match(scriptSource, /retryButton\?\.addEventListener\('click', \(\) => loadPage\(\{ reset: true, userInitiated: true \}\)\)/);
-  assert.match(scriptSource, /permissions\.query\(\{ name \}\)/);
-  assert.match(scriptSource, /permissionState === 'prompt' \|\| permissionState === 'denied'/);
-  assert.match(scriptSource, /browserWindow\.setTimeout\(\(\) => controller\.abort\(\), timeoutMs\)/);
+  assert.match(scriptSource, /retryButton\?\.addEventListener\('click', \(\) => loadPage\(\{ reset: true \}\)\)/);
+  assert.match(scriptSource, /browserWindow\.setTimeout\(\(\) => controller\.abort\(\), REQUEST_TIMEOUT_MS\)/);
+  assert.doesNotMatch(scriptSource, /127\.0\.0\.1|localhost|local-network-access|loopback-network|targetAddressSpace/);
   assert.doesNotMatch(scriptSource, /scrollIntoView/);
 
   let assignedUrl = '';
@@ -167,15 +161,6 @@ test('totaal gevonden opent de productiepagina met de volledige lokale bedrijfsb
     top: { location: { assign(url) { assignedUrl = url; } } },
   });
   assert.equal(assignedUrl, '/kvk-database-bedrijven');
-  assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: '127.0.0.1' } }), true);
-  assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: 'localhost' } }), true);
-  assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: 'www.softora.nl' } }), false);
-
-  assert.doesNotMatch(
-    scriptSource,
-    /if \(!isLocalDirectoryRuntime\(browserWindow\)\) \{[\s\S]*navigateToDirectory\(browserWindow\)/
-  );
-
   const untreatedHtml = totalFound.companyRowHtml({
     bedrijfsnaam: 'Nog te doen B.V.',
     kvk_nummer: '12345678',
@@ -206,27 +191,7 @@ test('totaal gevonden opent de productiepagina met de volledige lokale bedrijfsb
   assert.doesNotMatch(treatedHtml, /Nog niet behandeld/);
 });
 
-test('alle gevonden bedrijven herkent geblokkeerde lokale netwerktoegang', async () => {
-  const totalFound = require('../../assets/kvk-database-total-found.js');
-  const queriedNames = [];
-  const permissionState = await totalFound.localNetworkPermissionState({
-    navigator: {
-      permissions: {
-        async query({ name }) {
-          queriedNames.push(name);
-          if (name === 'loopback-network') throw new TypeError('unsupported');
-          return { state: 'denied' };
-        },
-      },
-    },
-  });
-
-  assert.equal(permissionState, 'denied');
-  assert.deepEqual(queriedNames, ['loopback-network', 'local-network-access']);
-  assert.equal(await totalFound.localNetworkPermissionState({}), 'unknown');
-});
-
-test('lokale bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkprompt', async () => {
+test('online bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkprompt', async () => {
   const totalFound = require('../../assets/kvk-database-total-found.js');
   const elements = new Map();
   const makeElement = (extra = {}) => ({
@@ -250,29 +215,22 @@ test('lokale bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkpro
     elements.set(id, makeElement());
   }
 
-  let permissionQueries = 0;
+  let fetchedOptions = null;
   const controller = totalFound.mountDirectory({
     AbortController,
     clearTimeout,
     document: { getElementById(id) { return elements.get(id) || null; } },
-    location: { hostname: '127.0.0.1' },
-    navigator: {
-      permissions: {
-        async query() {
-          permissionQueries += 1;
-          return { state: 'prompt' };
-        },
-      },
-    },
     setTimeout,
-    async fetch(url) {
-      assert.match(url, /^http:\/\/127\.0\.0\.1:8000\/api\/company-directory\?/);
+    async fetch(url, options) {
+      fetchedOptions = options;
+      assert.match(url, /^\/api\/kvk-database\/company-directory\?/);
       return {
         ok: true,
         async json() {
           return {
             total: 2_924_398,
             has_more: true,
+            next_cursor: 123,
             rows: [{ bedrijfsnaam: 'Scouting St. Joris Haaren', kvk_nummer: '40217416' }],
           };
         },
@@ -281,7 +239,8 @@ test('lokale bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkpro
   });
 
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(permissionQueries, 0);
+  assert.equal(fetchedOptions.credentials, 'same-origin');
+  assert.equal(controller.state.cursor, 123);
   assert.equal(controller.state.total, 2_924_398);
   assert.equal(controller.state.rows.length, 1);
   assert.match(elements.get('company-directory-body').innerHTML, /Scouting St\. Joris Haaren/);
@@ -471,7 +430,7 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.match(metricsStyles, /white-space: nowrap/);
 });
 
-test('kvk database snapshot API is wired and only public for token-protected sync posts', () => {
+test('kvk database APIs keep reads protected and expose only token-protected sync posts', () => {
   const routesSource = fs.readFileSync(path.join(repoRoot, 'server/routes/kvk-database.js'), 'utf8');
   const runtimeSource = fs.readFileSync(path.join(repoRoot, 'server/services/feature-routes-runtime.js'), 'utf8');
   const authSource = fs.readFileSync(path.join(repoRoot, 'server/security/premium-auth.js'), 'utf8');
@@ -479,6 +438,8 @@ test('kvk database snapshot API is wired and only public for token-protected syn
 
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/snapshot'/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/snapshot'/);
+  assert.match(routesSource, /app\.get\('\/api\/kvk-database\/company-directory', requirePremiumAdminApiAccess/);
+  assert.match(routesSource, /app\.post\('\/api\/kvk-database\/company-directory\/sync'/);
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/location-stats', requirePremiumAdminApiAccess/);
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/control', requirePremiumAdminApiAccess/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control', requirePremiumAdminApiAccess/);
@@ -487,13 +448,38 @@ test('kvk database snapshot API is wired and only public for token-protected syn
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control\/worker'/);
   assert.match(runtimeSource, /createKvkDatabaseSnapshotService/);
   assert.match(runtimeSource, /createKvkDatabaseControlService/);
+  assert.match(runtimeSource, /createKvkCompanyDirectoryService/);
   assert.match(runtimeSource, /registerKvkDatabaseRoutes/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'POST'/);
   assert.doesNotMatch(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'GET'/);
+  assert.match(authSource, /requestPath === '\/api\/kvk-database\/company-directory\/sync' && method === 'POST'/);
+  assert.doesNotMatch(authSource, /requestPath === '\/api\/kvk-database\/company-directory' && method === 'GET'/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/poll'/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/command'/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/worker'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/poll'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/command'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/worker'/);
+  assert.match(requestContextSource, /'\/api\/kvk-database\/company-directory\/sync'/);
+});
+
+test('online KVK directory tables are server-only and protected by RLS', () => {
+  const migrationSource = fs.readFileSync(
+    path.join(repoRoot, 'supabase/migrations/20260809111248_kvk_company_directory_online.sql'),
+    'utf8'
+  );
+
+  assert.match(migrationSource, /create table if not exists public\.softora_kvk_company_directory \(/i);
+  assert.match(migrationSource, /create table if not exists public\.softora_kvk_company_directory_meta \(/i);
+  assert.match(migrationSource, /alter table public\.softora_kvk_company_directory enable row level security;/i);
+  assert.match(migrationSource, /revoke all on table public\.softora_kvk_company_directory from anon, authenticated;/i);
+  assert.match(migrationSource, /grant select, insert, update, delete on table public\.softora_kvk_company_directory to service_role;/i);
+  assert.doesNotMatch(migrationSource, /grant .* to anon|grant .* to authenticated/i);
+
+  const searchMigrationSource = fs.readFileSync(
+    path.join(repoRoot, 'supabase/migrations/20260809123000_kvk_company_directory_search_index.sql'),
+    'utf8'
+  );
+  assert.match(searchMigrationSource, /create extension if not exists pg_trgm with schema extensions;/i);
+  assert.match(searchMigrationSource, /using gin \(search_text extensions\.gin_trgm_ops\);/i);
 });

@@ -546,6 +546,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         },
       },
       kvkDatabaseSnapshot: {
+        getSupabaseClient: platformRuntime.getSupabaseClient,
         fetchSupabaseRowByKeyViaRest: platformRuntime.fetchSupabaseRowByKeyViaRest,
         upsertSupabaseRowViaRest: platformRuntime.upsertSupabaseRowViaRest,
         supabaseStateKey: envConfig.SUPABASE_STATE_KEY,
