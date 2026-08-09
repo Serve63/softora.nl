@@ -6,6 +6,11 @@ const {
   createMailboxMessageReferenceLookup,
 } = require('../repositories/mailbox-message-reference-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
+const { executeMailboxIndexQuery } = require('./mailbox-index-query-timeout');
+const {
+  createMailboxAtomicCommitQuery,
+  normalizeMailboxAtomicCommitResult,
+} = require('./mailbox-index-atomic-commit');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -97,36 +102,16 @@ function createMailboxIndexStore(deps = {}) {
     logSoftIndexError('circuit-open', failureCooldownReason);
   }
 
-  function createTimeoutError(label) {
-    const timeoutMs = Math.max(250, Math.min(10_000, Number(mailboxIndexQueryTimeoutMs) || 2500));
-    const error = new Error(`Mailbox index ${label} timeout na ${timeoutMs}ms`);
-    error.code = 'MAILBOX_INDEX_TIMEOUT';
-    return error;
-  }
-
-  async function withQueryTimeout(promise, label) {
-    const timeoutMs = Math.max(250, Math.min(10_000, Number(mailboxIndexQueryTimeoutMs) || 2500));
-    let timeoutId = null;
-    try {
-      return await Promise.race([
-        Promise.resolve(promise),
-        new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(createTimeoutError(label)), timeoutMs);
-        }),
-      ]);
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
-    }
-  }
-
-  async function run(label, operation) {
+  async function run(label, operation, { mutationSignal = null } = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
     if (isFailureCooldownActive()) {
       return { ok: false, unavailable: false, data: null, error: createFailureCooldownError() };
     }
     try {
-      const result = await withQueryTimeout(operation(client), label);
+      const result = await executeMailboxIndexQuery(operation(client), {
+        label, timeoutMs: mailboxIndexQueryTimeoutMs, mutationSignal,
+      });
       if (result && result.error) throw result.error;
       failureCooldownUntilMs = 0;
       failureCooldownReason = '';
@@ -417,20 +402,24 @@ function createMailboxIndexStore(deps = {}) {
     };
   }
 
-  async function upsertProviderMessages({ provider, messages = [] } = {}) {
+  async function upsertProviderMessages({
+    provider, messages = [], signal, mutationId, requestKey,
+  } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const rows = (Array.isArray(messages) ? messages : [])
       .map((message) => buildProviderMessageRow({ ...message, provider: normalizedProvider }))
       .filter(Boolean);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) =>
-      client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
-        onConflict: 'message_key',
-        defaultToNull: false,
-      })
-    );
-    if (!result.ok) return result;
-    return { ...result, upserted: rows.length };
+    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) => signal
+      ? createMailboxAtomicCommitQuery(client, {
+          mutationId, requestKey, rows, result: { provider: normalizedProvider },
+        })
+      : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
+          onConflict: 'message_key', defaultToNull: false,
+        }), { mutationSignal: signal });
+    return signal
+      ? normalizeMailboxAtomicCommitResult(result, rows.length)
+      : (result.ok ? { ...result, upserted: rows.length } : result);
   }
 
   async function listProviderMessages({
@@ -947,19 +936,24 @@ function createMailboxIndexStore(deps = {}) {
     return oldestUid;
   }
 
-  async function upsertMessages({ accountEmail, folder = 'inbox', messages = [] }) {
-    const rows = (Array.isArray(messages) ? messages : [])
-      .map((message, index) => buildMessageRow(message, accountEmail, folder, index))
+  async function upsertMessages({
+    accountEmail, folder = 'inbox', messages = [], signal, mutationId, requestKey,
+  } = {}) {
+    const rows = (Array.isArray(messages) ? messages : []).map(
+      (message, index) => buildMessageRow(message, accountEmail, folder, index)
+    )
       .filter((row) => row.uid > 0);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run('upsert-messages', (client) =>
-      client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
-        onConflict: 'message_key',
-        defaultToNull: false,
-      })
-    );
-    if (!result.ok) return result;
-    return { ...result, upserted: rows.length };
+    const result = await run('upsert-messages', (client) => signal
+      ? createMailboxAtomicCommitQuery(client, {
+          mutationId, requestKey, rows, result: { source: 'imap-sync' },
+        })
+      : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
+          onConflict: 'message_key', defaultToNull: false,
+        }), { mutationSignal: signal });
+    return signal
+      ? normalizeMailboxAtomicCommitResult(result, rows.length)
+      : (result.ok ? { ...result, upserted: rows.length } : result);
   }
 
   async function markMessageRead({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
