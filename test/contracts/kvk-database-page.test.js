@@ -122,8 +122,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.match(pageSource, /id="planning-search-input"/);
-  assert.match(pageSource, /id="planning-scroll-status"/);
-  assert.match(pageSource, /id="planning-scroll-status-label"/);
+  assert.doesNotMatch(pageSource, /planning-scroll-status/);
   assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
   assert.match(pageSource, /id="latest-luna-errors-table-frame"/);
   assert.ok(
@@ -135,8 +134,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809b/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.js\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809c/);
+  assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
@@ -333,24 +332,17 @@ test('kvk database planning merges current parallel route progress', () => {
   assert.match(scriptSource, /function getContactActiveCodes\(\)/);
 });
 
-test('kvk planning stays compact while exposing the full scroll range and real end', () => {
-  const planning = require('../../assets/kvk-database-planning.js');
+test('kvk planning stays compact without a separate scroll-status footer', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-planning.css'), 'utf8');
 
-  const locationChild = { classList: { contains: () => false } };
-  const emptyChild = { classList: { contains: (name) => name === 'location-empty' } };
-  assert.equal(planning.planningViewportState({ children: [], scrollTop: 0, clientHeight: 0, scrollHeight: 0 }), 'loading');
-  assert.equal(planning.planningViewportState({ children: [emptyChild], scrollTop: 0, clientHeight: 420, scrollHeight: 420 }), 'loading');
-  assert.equal(planning.planningViewportState({ children: [locationChild], scrollTop: 0, clientHeight: 420, scrollHeight: 900 }), 'more');
-  assert.equal(planning.planningViewportState({ children: [locationChild], scrollTop: 480, clientHeight: 420, scrollHeight: 900 }), 'end');
-  assert.equal(planning.planningViewportLabel('more'), 'Meer locaties hieronder');
-  assert.equal(planning.planningViewportLabel('end'), 'Einde planning bereikt');
-  assert.match(pageSource, /<ol class="location-list" id="location-list"><\/ol>[\s\S]*id="planning-scroll-status"/);
+  assert.match(pageSource, /<ol class="location-list" id="location-list"><\/ol>/);
+  assert.doesNotMatch(pageSource, /planning-scroll-status|Meer locaties hieronder|Einde planning bereikt/);
+  assert.doesNotMatch(pageSource, /kvk-database-planning\.js/);
   assert.match(styleSource, /\.planning-panel\s*\{\s*height:\s*300px;\s*min-height:\s*300px;/);
   assert.doesNotMatch(styleSource, /\.planning-panel\s*\{[\s\S]*height:\s*clamp\(/);
   assert.match(styleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
-  assert.match(styleSource, /\.planning-scroll-status\[data-state="end"\]/);
+  assert.doesNotMatch(styleSource, /planning-scroll-status/);
 });
 
 test('kvk database shows every new Searcher result and only material Controller corrections', () => {

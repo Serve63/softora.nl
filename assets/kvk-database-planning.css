@@ -45,42 +45,9 @@ body::-webkit-scrollbar-thumb,
   height: 9px;
 }
 
-.planning-scroll-status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 8px 16px;
-  border-top: 1px solid #e6ddd7;
-  background: #fbf8f6;
-  color: #8b2552;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.planning-scroll-status__indicator {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.planning-scroll-status[data-state="end"] {
-  background: #edf7f2;
-  color: #287760;
-}
-
-.planning-scroll-status[data-state="end"] .planning-scroll-status__indicator {
-  transform: rotate(-90deg);
-}
-
 .planning-panel.is-collapsed {
   height: auto;
   min-height: 0;
-}
-
-.planning-panel.is-collapsed .planning-scroll-status {
-  display: none;
 }
 
 @media (max-width: 760px) {
