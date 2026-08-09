@@ -64,8 +64,9 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
+  assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -74,8 +75,9 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
+  assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -113,7 +115,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
@@ -252,6 +254,8 @@ test('online bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkpro
   assert.match(elements.get('company-directory-body').innerHTML, /Scouting St\. Joris Haaren/);
   assert.equal(elements.get('company-directory-total').textContent, '2.924.398');
   assert.equal(elements.get('company-directory-retry').hidden, true);
+  assert.equal(elements.get('company-directory-source-status').textContent, '');
+  assert.equal(elements.get('company-directory-source-status').dataset.tone, 'ready');
 });
 
 test('kvk database collapse state survives a refresh', () => {

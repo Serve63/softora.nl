@@ -197,11 +197,7 @@
       totalCount.textContent = state.total ? numberFormat.format(state.total) : '—';
       if (!state.loading && !state.error) {
         if (retryButton) retryButton.hidden = true;
-        const totalText = numberFormat.format(state.total);
-        const statusText = state.query
-          ? `${numberFormat.format(state.rows.length)} zoekresultaten geladen${state.hasMore ? ' · meer beschikbaar' : ''}`
-          : `${totalText} bedrijven · ${numberFormat.format(state.rows.length)} geladen`;
-        setSourceStatus(statusText, 'ready');
+        setSourceStatus('', 'ready');
       }
     }
 
