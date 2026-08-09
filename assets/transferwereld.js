@@ -165,15 +165,7 @@
     return deal.fee || 'Onbekend';
   }
 
-  function populateTransferFilters() {
-    const competitions = [...new Set(clubs.map((club) => club.league).filter(Boolean))].sort((left, right) => left.localeCompare(right));
-    const countries = [...new Set(clubs.map((club) => club.country))].sort((left, right) => left.localeCompare(right));
-    document.querySelector('#transfer-competition').insertAdjacentHTML('beforeend', competitions.map((competition) => `<option value="${escapeHtml(competition)}">${escapeHtml(competition)}</option>`).join(''));
-    document.querySelector('#transfer-country').insertAdjacentHTML('beforeend', countries.map((country) => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`).join(''));
-    document.querySelectorAll('#transfer-filters input, #transfer-filters select').forEach((control) => control.addEventListener('input', () => {
-      state.transferLimit = 80;
-      renderTransfers();
-    }));
+  function setupTransferList() {
     document.querySelector('#transfer-more').addEventListener('click', () => {
       state.transferLimit += 100;
       renderTransfers();
@@ -181,29 +173,12 @@
   }
 
   function filteredTransfers() {
-    const query = normalize(document.querySelector('#transfer-search').value.trim());
-    const competition = document.querySelector('#transfer-competition').value;
-    const country = document.querySelector('#transfer-country').value;
-    const sort = document.querySelector('#transfer-sort').value;
-    const filtered = deals.filter((deal) => {
-      const routeClubs = [deal.sourceClub, deal.destinationClub].filter(Boolean);
-      if (competition !== 'all' && !routeClubs.some((club) => club.league === competition)) return false;
-      if (country !== 'all' && !routeClubs.some((club) => club.country === country)) return false;
-      if (!query) return true;
-      return [deal.player, deal.sourceName, deal.destinationName, deal.position, dealTypeLabel(deal.kind)].some((value) => normalize(value).includes(query));
-    });
-    filtered.sort((left, right) => {
-      if (sort === 'fee') return right.feeValue - left.feeValue || left.rank - right.rank;
-      if (sort === 'club') return left.sourceName.localeCompare(right.sourceName) || left.destinationName.localeCompare(right.destinationName) || right.feeValue - left.feeValue;
-      return left.rank - right.rank || right.feeValue - left.feeValue;
-    });
-    return filtered;
+    return [...deals].sort((left, right) => right.feeValue - left.feeValue || left.rank - right.rank);
   }
 
   function renderTransfers() {
     const filtered = filteredTransfers();
     const visible = filtered.slice(0, state.transferLimit);
-    document.querySelector('#transfer-summary').innerHTML = `<span><strong>${filtered.length.toLocaleString('nl-NL')}</strong> unieke deals gevonden</span><span>${Math.min(visible.length, filtered.length)} zichtbaar</span>`;
     document.querySelector('#transfer-list').innerHTML = visible.length ? visible.map((deal, index) => `
       <article class="transfer-row">
         <span class="rank-num">${String(index + 1).padStart(2, '0')}</span>
@@ -215,7 +190,7 @@
         </div>
         <span class="deal-type ${deal.kind}">${dealTypeLabel(deal.kind)}</span>
         <div class="fee">${escapeHtml(dealFee(deal))}</div>
-      </article>`).join('') : '<p class="empty">Geen transfers gevonden met deze filters.</p>';
+      </article>`).join('') : '<p class="empty">Geen transfers gevonden.</p>';
     document.querySelector('#transfer-more').hidden = visible.length >= filtered.length;
   }
 
@@ -359,7 +334,7 @@
 
   setHeroStats();
   setupTabs();
-  populateTransferFilters();
+  setupTransferList();
   renderTransfers();
   renderMoneyRanking('#spend-ranking', 'spend', 'income');
   renderMoneyRanking('#income-ranking', 'income', 'spend');

@@ -60,13 +60,10 @@ h1 em { color: var(--acid); font-style: normal; }
 .section-head h2, dialog h2 { margin-bottom: 0; font: 800 clamp(38px, 5vw, 72px)/.95 Oswald, sans-serif; letter-spacing: -.03em; text-transform: uppercase; }
 .section-head > p { margin: 0; color: var(--muted); font-size: 15px; }
 
-.filterbar { display: grid; grid-template-columns: minmax(280px, 1.5fr) repeat(3, minmax(160px, .8fr)); border: 1px solid var(--line); background: var(--panel); }
-.filterbar label, .rumour-toolbar label, .club-picker { display: grid; gap: 7px; padding: 15px 18px; }
-.filterbar label + label { border-left: 1px solid var(--line); }
+.rumour-toolbar label, .club-picker { display: grid; gap: 7px; padding: 15px 18px; }
 label > span { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 input, select { width: 100%; min-height: 34px; border: 0; outline: 0; background: transparent; color: var(--ink); }
 input::placeholder { color: #727b8c; }
-.result-summary { display: flex; justify-content: space-between; gap: 24px; padding: 22px 0 14px; color: var(--muted); font-size: 12px; }
 .transfer-list { border-top: 1px solid var(--line); }
 .transfer-row { display: grid; grid-template-columns: 56px minmax(210px, .8fr) minmax(410px, 1.6fr) 108px 140px; gap: 18px; align-items: center; min-height: 98px; padding: 14px 18px; border-bottom: 1px solid var(--line); transition: background .18s ease; }
 .transfer-row:hover { background: var(--panel); }
@@ -189,9 +186,6 @@ dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(6px); }
   .hero { grid-template-columns: 1fr; min-height: auto; }
   .hero-score { display: grid; grid-template-columns: 1fr 1fr; }
   .score-primary { border-right: 1px solid var(--line); border-bottom: 0; }
-  .filterbar { grid-template-columns: 1fr 1fr; }
-  .filterbar label:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
-  .filterbar label:nth-child(4) { border-top: 1px solid var(--line); }
   .transfer-row { grid-template-columns: 44px minmax(180px, .75fr) minmax(360px, 1.5fr) 110px; }
   .transfer-row .deal-type { display: none; }
   .ranking-row { grid-template-columns: 50px minmax(220px, 1fr) 1fr 120px; }
@@ -215,9 +209,8 @@ dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(6px); }
   .panel { padding: 50px 0 80px; }
   .section-head { grid-template-columns: 1fr; gap: 18px; }
   .section-head h2 { font-size: 42px; }
-  .filterbar, .rumour-toolbar { grid-template-columns: 1fr; }
-  .filterbar label + label, .rumour-toolbar label + label { border-left: 0; border-top: 1px solid var(--line); }
-  .filterbar label:nth-child(2) { border-top: 1px solid var(--line); }
+  .rumour-toolbar { grid-template-columns: 1fr; }
+  .rumour-toolbar label + label { border-left: 0; border-top: 1px solid var(--line); }
   .transfer-row { grid-template-columns: 38px 1fr auto; gap: 10px; padding: 14px 8px; }
   .transfer-row .deal-route, .transfer-row .deal-type { display: none; }
   .player-cell strong { white-space: normal; }

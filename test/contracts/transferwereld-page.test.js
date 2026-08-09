@@ -33,13 +33,13 @@ test('transferwereld exposes all requested analysis tabs and defaults to fee sor
   tabNames.forEach((name) => assert.match(html, new RegExp(name.replace('/', '\\/'))));
   assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
-  assert.match(html, /<select id="transfer-sort"><option value="fee">Hoogste transfersom<\/option>/);
+  assert.doesNotMatch(html, /id="transfer-filters"|id="transfer-summary"|id="transfer-sort"/);
   assert.match(html, /transferwereld-scope-data\.js\?v=20260809a/);
   assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
   assert.match(html, /transferwereld-deals\.js\?v=20260809a/);
   assert.doesNotMatch(html, /id="transfer-direction"/);
   const script = read('assets/transferwereld.js');
-  assert.match(script, /if \(sort === 'fee'\) return right\.feeValue - left\.feeValue/);
+  assert.match(script, /\[\.\.\.deals\]\.sort\(\(left, right\) => right\.feeValue - left\.feeValue \|\| left\.rank - right\.rank\)/);
   assert.match(script, /secondaryKey === 'income' \? 'verdiend' : 'uitgegeven'/);
 });
 
@@ -149,12 +149,12 @@ test('deep forecast context covers every club and every competition table', () =
 test('transferwereld frontend applies the UEFA top ten scope to every analysis view', () => {
   const html = read('transfers.html');
   const script = read('assets/transferwereld.js');
-  assert.match(html, /id="transfer-competition"/);
   assert.match(html, /top 10 competities/i);
   assert.doesNotMatch(html, /top 100|KKD|Keuken Kampioen/i);
   assert.match(script, /buildScopedDataset/);
   assert.match(script, /scopeLeagues/);
-  assert.match(script, /routeClubs\.some\(\(club\) => club\.league === competition\)/);
+  assert.match(script, /const clubs = dataset\.clubs/);
+  assert.match(script, /clubs\.flatMap\(\(club\)/);
   assert.match(script, /scopeLeagues\.map\(\(league\)/);
 });
 
