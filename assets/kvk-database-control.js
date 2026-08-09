@@ -85,11 +85,7 @@
     const running = ['starting', 'running', 'waiting'].includes(workerState);
     fillButton.classList.toggle('is-on', enabled);
     fillButton.classList.toggle('is-error', workerState === 'error');
-    const statusLabel = workerState === 'error'
-      ? 'FOUT'
-      : enabled && workerState === 'running'
-        ? 'BEZIG'
-        : '';
+    const statusLabel = workerState === 'error' ? 'FOUT' : '';
     const accessibleStatusLabel = workerState === 'error'
       ? 'fout'
       : enabled && workerState === 'running'
