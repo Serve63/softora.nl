@@ -341,6 +341,9 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/kvk-database/snapshot' && method === 'POST') {
         return true;
       }
+      if (requestPath === '/api/kvk-database/company-directory/sync' && method === 'POST') {
+        return true;
+      }
       if (
         (requestPath === '/api/kvk-database/control/command' ||
           requestPath === '/api/kvk-database/control/poll' ||

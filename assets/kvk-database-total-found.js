@@ -12,12 +12,10 @@
 })(typeof window === 'object' ? window : null, function createKvkTotalFoundModule() {
   'use strict';
 
-  const LOCAL_DATABASE_ORIGIN = 'http://127.0.0.1:8000';
-  const COMPANY_API_URL = `${LOCAL_DATABASE_ORIGIN}/api/company-directory`;
+  const COMPANY_API_URL = '/api/kvk-database/company-directory';
   const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
   const PAGE_SIZE = 100;
-  const AUTO_CONNECT_TIMEOUT_MS = 8000;
-  const USER_CONNECT_TIMEOUT_MS = 30000;
+  const REQUEST_TIMEOUT_MS = 30000;
   const TREATED_CONTACT_STATUSES = new Set(['checked', 'done', 'searched', 'unusable']);
   const FINAL_LEAD_STATUSES = new Set(['usable', 'unusable']);
   const UNUSABLE_LABELS = {
@@ -109,11 +107,11 @@
     `;
   }
 
-  function buildCompanyApiUrl(query, offset) {
+  function buildCompanyApiUrl(query, cursor) {
     const params = new URLSearchParams({
       q: String(query || '').trim(),
       limit: String(PAGE_SIZE),
-      offset: String(Math.max(0, Number(offset) || 0)),
+      after: String(Math.max(0, Number(cursor) || 0)),
     });
     return `${COMPANY_API_URL}?${params.toString()}`;
   }
@@ -121,26 +119,10 @@
   function companyFetchOptions(signal) {
     const options = {
       cache: 'no-store',
-      credentials: 'omit',
-      mode: 'cors',
-      targetAddressSpace: 'loopback',
+      credentials: 'same-origin',
     };
     if (signal) options.signal = signal;
     return options;
-  }
-
-  async function localNetworkPermissionState(browserWindow) {
-    const permissions = browserWindow?.navigator?.permissions;
-    if (!permissions || typeof permissions.query !== 'function') return 'unknown';
-    for (const name of ['loopback-network', 'local-network-access']) {
-      try {
-        const result = await permissions.query({ name });
-        if (result?.state) return String(result.state);
-      } catch {
-        /* Older browsers do not know these permission names yet. */
-      }
-    }
-    return 'unknown';
   }
 
   function navigateToDirectory(browserWindow) {
@@ -148,11 +130,6 @@
       ? browserWindow.top
       : browserWindow;
     targetWindow?.location?.assign(DIRECTORY_PAGE_URL);
-  }
-
-  function isLocalDirectoryRuntime(browserWindow) {
-    const hostname = String(browserWindow?.location?.hostname || '').trim().toLowerCase();
-    return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1';
   }
 
   function mountDashboardLink(browserWindow) {
@@ -181,12 +158,11 @@
 
     const state = {
       rows: [],
-      offset: 0,
+      cursor: 0,
       total: 0,
       hasMore: true,
       loading: false,
       error: false,
-      connectionRequired: false,
       errorMessage: '',
       query: '',
       requestVersion: 0,
@@ -213,13 +189,13 @@
       `;
       if (state.rows.length) {
         body.innerHTML = state.rows.map(companyRowHtml).join('');
-      } else if (state.error || state.connectionRequired) {
-        body.innerHTML = `<tr class="empty-row"><td colspan="7">${escapeHtml(state.errorMessage || 'Lokale bedrijvendatabase niet bereikbaar.')}</td></tr>`;
+      } else if (state.error) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="7">${escapeHtml(state.errorMessage || 'Online bedrijvendatabase niet bereikbaar.')}</td></tr>`;
       } else if (!state.loading) {
         body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.query ? 'Geen bedrijven gevonden.' : 'Nog geen bedrijven geladen.'}</td></tr>`;
       }
       totalCount.textContent = state.total ? numberFormat.format(state.total) : '—';
-      if (!state.loading && !state.error && !state.connectionRequired) {
+      if (!state.loading && !state.error) {
         if (retryButton) retryButton.hidden = true;
         const totalText = numberFormat.format(state.total);
         const statusText = state.query
@@ -229,38 +205,23 @@
       }
     }
 
-    function setConnectionRequired(permissionState) {
-      const blocked = permissionState === 'denied';
-      state.hasMore = false;
-      state.rows = [];
-      state.error = blocked;
-      state.connectionRequired = !blocked;
-      state.errorMessage = blocked
-        ? 'Lokale netwerktoegang is geblokkeerd. Sta deze toe in de site-instellingen van softora.nl en probeer opnieuw.'
-        : 'Chrome heeft éénmalig toestemming nodig. Klik op Database verbinden en kies Toestaan.';
-      setSourceStatus(state.errorMessage, blocked ? 'error' : 'permission');
-      if (retryButton) retryButton.hidden = false;
-    }
-
     function setServiceUnavailable() {
       state.hasMore = false;
       state.rows = [];
       state.error = true;
-      state.connectionRequired = false;
-      state.errorMessage = 'Lokale databaseservice is niet bereikbaar. Start de databasekoppeling en probeer opnieuw.';
+      state.errorMessage = 'Online bedrijvendatabase is tijdelijk niet bereikbaar. Probeer opnieuw.';
       setSourceStatus(state.errorMessage, 'error');
       if (retryButton) retryButton.hidden = false;
     }
 
-    async function loadPage({ reset = false, userInitiated = false } = {}) {
+    async function loadPage({ reset = false } = {}) {
       if (!reset && (state.loading || !state.hasMore)) return;
       if (reset) {
         state.rows = [];
-        state.offset = 0;
+        state.cursor = 0;
         if (!state.query) state.total = 0;
         state.hasMore = true;
         state.error = false;
-        state.connectionRequired = false;
         state.errorMessage = '';
         state.requestVersion += 1;
       }
@@ -268,24 +229,19 @@
       state.loading = true;
       if (retryButton) retryButton.hidden = true;
       setSourceStatus(
-        userInitiated
-          ? 'Kies Toestaan in de Chrome-melding…'
-          : reset
-            ? 'Volledige landelijke lijst laden…'
-            : 'Meer bedrijven laden…',
+        reset ? 'Volledige landelijke lijst laden…' : 'Meer bedrijven laden…',
         'loading'
       );
       const AbortControllerClass = browserWindow?.AbortController;
       const controller = typeof AbortControllerClass === 'function'
         ? new AbortControllerClass()
         : null;
-      const timeoutMs = userInitiated ? USER_CONNECT_TIMEOUT_MS : AUTO_CONNECT_TIMEOUT_MS;
       const timeoutHandle = controller && typeof browserWindow?.setTimeout === 'function'
-        ? browserWindow.setTimeout(() => controller.abort(), timeoutMs)
+        ? browserWindow.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
         : null;
       try {
         const response = await browserWindow.fetch(
-          buildCompanyApiUrl(state.query, state.offset),
+          buildCompanyApiUrl(state.query, state.cursor),
           companyFetchOptions(controller?.signal)
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -293,24 +249,13 @@
         if (requestVersion !== state.requestVersion) return;
         const rows = Array.isArray(payload?.rows) ? payload.rows : [];
         state.rows = reset ? rows : [...state.rows, ...rows];
-        state.offset += rows.length;
+        state.cursor = Math.max(0, Number(payload?.next_cursor) || 0);
         if (!state.query) state.total = Math.max(0, Number(payload?.total) || state.rows.length);
         state.hasMore = Boolean(payload?.has_more) && rows.length > 0;
         state.error = false;
-        state.connectionRequired = false;
       } catch {
         if (requestVersion !== state.requestVersion) return;
-        if (isLocalDirectoryRuntime(browserWindow)) {
-          setServiceUnavailable();
-          return;
-        }
-        const permissionState = await localNetworkPermissionState(browserWindow);
-        if (requestVersion !== state.requestVersion) return;
-        if (permissionState === 'prompt' || permissionState === 'denied') {
-          setConnectionRequired(permissionState);
-        } else {
-          setServiceUnavailable();
-        }
+        setServiceUnavailable();
       } finally {
         if (timeoutHandle !== null && typeof browserWindow?.clearTimeout === 'function') {
           browserWindow.clearTimeout(timeoutHandle);
@@ -327,23 +272,12 @@
       browserWindow.clearTimeout(searchTimer);
       searchTimer = browserWindow.setTimeout(() => loadPage({ reset: true }), 220);
     });
-    retryButton?.addEventListener('click', () => loadPage({ reset: true, userInitiated: true }));
+    retryButton?.addEventListener('click', () => loadPage({ reset: true }));
     frame.addEventListener('scroll', () => {
       if (state.loading || !state.hasMore) return;
       if (frame.scrollTop + frame.clientHeight >= frame.scrollHeight - 180) loadPage();
     });
     async function loadInitialPage() {
-      if (isLocalDirectoryRuntime(browserWindow)) {
-        await loadPage({ reset: true });
-        return;
-      }
-      const permissionState = await localNetworkPermissionState(browserWindow);
-      if (permissionState === 'prompt' || permissionState === 'denied') {
-        state.loading = false;
-        setConnectionRequired(permissionState);
-        renderRows();
-        return;
-      }
       await loadPage({ reset: true });
     }
 
@@ -362,17 +296,13 @@
   return {
     COMPANY_API_URL,
     DIRECTORY_PAGE_URL,
-    LOCAL_DATABASE_ORIGIN,
     PAGE_SIZE,
-    AUTO_CONNECT_TIMEOUT_MS,
-    USER_CONNECT_TIMEOUT_MS,
+    REQUEST_TIMEOUT_MS,
     buildCompanyApiUrl,
     companyFetchOptions,
     companyRowHtml,
     companyStatus,
     isTreated,
-    isLocalDirectoryRuntime,
-    localNetworkPermissionState,
     missingLabel,
     mount,
     mountDashboardLink,
