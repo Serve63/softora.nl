@@ -14,12 +14,47 @@ function snapshot(contentAt, messages, options = {}) {
   return {
     ok: true,
     contentAt,
+    contentVersion: options.contentVersion || '1',
     messages,
     origin: options.origin || 'live-api',
     degraded: options.degraded === true,
-    sync: { stale: options.degraded === true, contentAt },
+    sync: {
+      stale: options.degraded === true,
+      contentAt,
+      contentVersion: options.contentVersion || '1',
+    },
   };
 }
+
+test('legacy response zonder contentVersion kan tijdens rolling deploy nooit live heten', () => {
+  const legacy = snapshot('2026-08-09T19:29:00.000Z', [message('legacy')]);
+  delete legacy.contentVersion;
+  delete legacy.sync.contentVersion;
+  const normalized = freshness.normalizeSnapshot(legacy, { now: NOW });
+  assert.equal(normalized.complete, false);
+  assert.equal(normalized.contentVersion, '');
+});
+
+test('lagere databaseversie wordt ook met een nieuwere kloktijd afgewezen', () => {
+  const current = snapshot('2026-08-09T19:25:00.000Z', [message('current')], {
+    contentVersion: '12',
+  });
+  const incoming = snapshot('2026-08-09T19:29:00.000Z', [message('older-version')], {
+    contentVersion: '11',
+  });
+  assert.equal(freshness.decideSnapshotUpdate(current, incoming, { now: NOW }), 'reject');
+});
+
+test('hogere databaseversie wint altijd van oudere contentAt en klokdrift', () => {
+  const current = snapshot('2026-08-09T19:29:00.000Z', [message('version-12')], {
+    contentVersion: '12',
+  });
+  const incoming = snapshot('2026-08-09T19:25:00.000Z', [message('version-13')], {
+    contentVersion: '13',
+  });
+  assert.equal(freshness.decideSnapshotUpdate(current, incoming, { now: NOW }), 'replace');
+  assert.equal(freshness.selectSnapshot(current, incoming, { now: NOW }).contentVersion, '13');
+});
 
 test('snapshot zonder contentAt of ouder dan vijftien minuten wordt nooit vertrouwd', () => {
   assert.equal(freshness.normalizeSnapshot({ messages: [message('unknown')] }, { now: NOW }), null);

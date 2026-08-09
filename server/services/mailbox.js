@@ -28,7 +28,7 @@ const {
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
-const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list');
+const { createMailboxCampaignRuntime } = require('./mailbox-campaign-runtime');
 const {
   MAILBOX_MESSAGE_IMAGE_MAX_INDEX,
   decodeMailboxMessageImage,
@@ -611,14 +611,12 @@ function createMailboxService(deps = {}) {
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
       env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY
   );
-  const { listCampaignReplies, invalidateCampaignSnapshot } = createMailboxCampaignRepliesList({
-    mailboxCampaignRepliesService,
-    instantlyMailboxService,
-    filterVisibleMailboxMessages,
-    getUiStateValues, setUiStateValues, logger, mailboxCampaignSnapshotStore: deps.mailboxCampaignSnapshotStore,
-    normalizeString,
-    truncateText,
+  const campaignRuntime = createMailboxCampaignRuntime({
+    ...deps, mailboxCampaignRepliesService, instantlyMailboxService, filterVisibleMailboxMessages,
+    getUiStateValues, setUiStateValues, isSupabaseConfigured, getSupabaseClient, logger,
+    normalizeString, truncateText,
   });
+  const { listCampaignReplies, invalidateCampaignSnapshot } = campaignRuntime;
 
   const baseAccount = {
     email: normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser).toLowerCase(),
@@ -2639,6 +2637,7 @@ function createMailboxService(deps = {}) {
     getAccounts,
     getMessage,
     listCampaignReplies,
+    readCampaignSnapshotDegraded: campaignRuntime.readCampaignSnapshotDegraded,
     listMessages,
     listMessagesWithMeta,
     syncMailboxResponse, syncInstantlyMailboxResponse,

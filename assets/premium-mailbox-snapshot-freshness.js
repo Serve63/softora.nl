@@ -8,15 +8,22 @@
   });
   function normalizeText(value) { return String(value || '').trim().toLowerCase(); }
   function normalizeTimestamp(value) { const timestamp = Date.parse(String(value || '')); return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : ''; }
+  function normalizeContentVersion(value) {
+    const normalized = String(value == null ? '' : value).trim();
+    if (!/^\d+$/.test(normalized)) return '';
+    try { return BigInt(normalized).toString(); } catch (_) { return ''; }
+  }
   function getContentAt(snapshot) { const source = snapshot && typeof snapshot === 'object' ? snapshot : {}; return normalizeTimestamp(source.contentAt || source.sync?.contentAt); }
+  function getContentVersion(snapshot) { const source = snapshot && typeof snapshot === 'object' ? snapshot : {}; return normalizeContentVersion(source.contentVersion ?? source.sync?.contentVersion); }
   function isCompleteSnapshot(snapshot) {
     const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
-    return source.complete !== false && source.degraded !== true && source.sync?.stale !== true &&
+    return Boolean(getContentVersion(source)) && source.complete !== false && source.degraded !== true && source.sync?.stale !== true &&
       source.sync?.degraded !== true && source.sync?.complete !== false;
   }
   function normalizeSnapshot(snapshot, options = {}) {
     if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.messages)) return null;
     const contentAt = getContentAt(snapshot);
+    const contentVersion = getContentVersion(snapshot);
     if (!contentAt) return null;
     const now = Number(options.now == null ? Date.now() : options.now);
     const maxAgeMs = Math.max(0, Number(options.maxAgeMs ?? MAX_SNAPSHOT_AGE_MS));
@@ -28,10 +35,12 @@
       ...snapshot,
       origin,
       contentAt,
+      contentVersion,
       complete,
       sync: {
         ...(snapshot.sync && typeof snapshot.sync === 'object' ? snapshot.sync : {}),
         contentAt,
+        contentVersion,
         origin,
       },
     };
@@ -68,6 +77,11 @@
     if (!previous) return 'replace';
     const previousTime = Date.parse(previous.contentAt);
     const nextTime = Date.parse(next.contentAt);
+    if (previous.contentVersion && next.contentVersion) {
+      const versionOrder = BigInt(next.contentVersion) - BigInt(previous.contentVersion);
+      if (versionOrder < 0n) return 'reject';
+      if (versionOrder > 0n) return next.complete ? 'replace' : 'merge-additive';
+    }
     if (nextTime < previousTime) return 'reject';
     if (!next.complete) return nextTime >= previousTime ? 'merge-additive' : 'reject';
     if (nextTime > previousTime) return 'replace';
@@ -130,7 +144,10 @@
     const session = normalizeSnapshot(sessionSnapshot, { ...options, origin: 'session-cache' });
     if (!page) return session;
     if (!session) return page;
-    const pageIsCandidate = Date.parse(page.contentAt) >= Date.parse(session.contentAt);
+    const pageIsCandidate = page.contentVersion && session.contentVersion &&
+      BigInt(page.contentVersion) !== BigInt(session.contentVersion)
+      ? BigInt(page.contentVersion) > BigInt(session.contentVersion)
+      : Date.parse(page.contentAt) >= Date.parse(session.contentAt);
     const current = pageIsCandidate ? session : page;
     const incoming = pageIsCandidate ? page : session;
     const action = decideSnapshotAction(current, incoming, options);
@@ -155,11 +172,13 @@
     applyTombstones,
     decideSnapshotUpdate,
     getContentAt,
+    getContentVersion,
     getMessageIdentityKey,
     isCompleteSnapshot,
     mergeAdditiveMessages,
     mergeMessagesAdditively: mergeAdditiveMessages,
     mergeSnapshotMessagesAdditively,
+    normalizeContentVersion,
     normalizeSnapshot,
     sanitizeTombstones,
     selectSnapshot,
