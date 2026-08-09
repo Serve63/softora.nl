@@ -20,6 +20,7 @@
     { id: 'kantoorpand-in-haaren', title: 'Kantoorpand in Haaren' },
     { id: 'nieuwe-whoop', title: 'Nieuwe Whoop' },
     { id: 'nieuwe-fiets', title: 'Nieuwe fiets' },
+    { id: 'dertig-dagen-streak', title: '30 dagen streak' },
     { id: 'gezondheidscenter', title: 'Gezondheidscenter' },
     { id: 'serves-gezondheidsdossier', title: "Servé's gezondheidsdossier" },
     { id: 'ruben-zet-toto', title: 'Ruben zet toto' },
@@ -148,7 +149,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809c`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809d`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
