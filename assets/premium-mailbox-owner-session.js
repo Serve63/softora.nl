@@ -334,7 +334,9 @@
           const acceptedMessages = action === 'merge-additive'
             ? mergeMessagesAdditively(currentMessages, incoming.messages)
             : incoming.messages;
-          const messages = reconcileMessages(currentMessages, acceptedMessages);
+          const messages = action === 'merge-additive'
+            ? acceptedMessages
+            : reconcileMessages(currentMessages, acceptedMessages);
           const acceptedSync = {
             ...(incoming.sync || {}),
             ...(action === 'merge-additive' ? { degraded: true, stale: true } : {}),

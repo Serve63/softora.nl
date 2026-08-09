@@ -604,7 +604,7 @@ function createMailboxService(deps = {}) {
       dataOpsStore,
       mailboxSendProvenanceStore,
     }),
-    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||

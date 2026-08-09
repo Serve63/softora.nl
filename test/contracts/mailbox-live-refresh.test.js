@@ -274,6 +274,9 @@ test('refresh status is exclusive while active, successful, partial and failed',
           json: async () => ({ ok: true, complete: false, freshnessConfirmed: false }),
         };
       }
+      if (mode === 'skipped-sync' && url === '/api/mailbox/instantly/sync') {
+        return successfulResponse({ ok: true, results: [{ ok: true, skipped: true, reason: 'sync-in-progress' }] });
+      }
       if (mode === 'error') {
         return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
       }
@@ -303,6 +306,10 @@ test('refresh status is exclusive while active, successful, partial and failed',
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
 
   mode = 'partial-sync';
+  assert.equal(await controller.refresh(), false);
+  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
+
+  mode = 'skipped-sync';
   assert.equal(await controller.refresh(), false);
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
 

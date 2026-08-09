@@ -73,6 +73,37 @@ test('bootstrap en tabcache worden op contentAt gekozen en gedegradeerde data bl
   assert.deepEqual(selected.messages.map((item) => item.id), ['session', 'page']);
 });
 
+test('nieuwere degraded bootstrap kan een bevestigde verwijdering nooit terugbrengen', () => {
+  const deleted = message('inbox:42', 42);
+  const session = {
+    ...snapshot('2026-08-09T19:25:00.000Z', [deleted], { origin: 'session-cache' }),
+    tombstones: freshness.addTombstone([], deleted, '2026-08-09T19:26:00.000Z'),
+  };
+  const page = snapshot('2026-08-09T19:29:00.000Z', [], {
+    origin: 'server-bootstrap',
+    degraded: true,
+  });
+
+  assert.deepEqual(freshness.selectSnapshot(page, session, { now: NOW }).messages, []);
+});
+
+test('degraded duplicate bewaart bestaande velden en voegt alleen ontbrekende threadberichten toe', () => {
+  const current = [{
+    ...message('conversation', 44), unread: false,
+    threadMessages: [{ id: 't1', body: 'volledig' }, { id: 't2', body: 'blijft staan' }],
+  }];
+  const incoming = [{
+    ...message('conversation', 44), unread: true,
+    threadMessages: [{ id: 't1', body: 'afgekapt' }, { id: 't3', body: 'nieuw' }],
+  }];
+  const merged = freshness.mergeAdditiveMessages(current, incoming);
+
+  assert.equal(merged[0].unread, false);
+  assert.deepEqual(merged[0].threadMessages.map((item) => [item.id, item.body]), [
+    ['t1', 'volledig'], ['t3', 'nieuw'], ['t2', 'blijft staan'],
+  ]);
+});
+
 test('lokale verwijdering is een tombstone en verandert contentAt niet', () => {
   const contentAt = '2026-08-09T19:25:00.000Z';
   const deleted = message('delete', 42);
@@ -108,7 +139,11 @@ test('campaign cache bewaart huidige mails wanneer een nieuwere API-response deg
   const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
   const currentAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const incomingAt = new Date(Date.now() - 60 * 1000).toISOString();
-  let cached = snapshot(currentAt, [message('keep', 1)], { origin: 'session-cache' });
+  const restored = message('restored', 3);
+  let cached = {
+    ...snapshot(currentAt, [message('keep', 1), restored], { origin: 'session-cache' }),
+    tombstones: freshness.addTombstone([], restored, new Date(Date.now() - 90 * 1000).toISOString()),
+  };
   globalThis.document = { getElementById() { return null; } };
   globalThis.SoftoraPageBootstrapSession = {
     get() { return { authenticated: true, userId: 'freshness-test' }; },
@@ -131,6 +166,15 @@ test('campaign cache bewaart huidige mails wanneer een nieuwere API-response deg
     assert.equal(result.fromCache, true);
     assert.deepEqual(cached.messages.map((item) => item.id), ['new', 'keep']);
     assert.equal(cached.contentAt, incomingAt);
+    assert.equal(cached.tombstones.length, 1);
+
+    const completeAt = new Date().toISOString();
+    await campaign.load('outreach', (value) => value, async () => ({
+      ok: true,
+      json: async () => snapshot(completeAt, [message('new', 2), message('keep', 1), restored]),
+    }), { owner: 'serve', skipBootstrap: true });
+    assert.deepEqual(cached.messages.map((item) => item.id), ['new', 'keep', 'restored']);
+    assert.deepEqual(cached.tombstones, []);
   } finally {
     delete require.cache[modulePath];
     globalThis.document = previousDocument;
