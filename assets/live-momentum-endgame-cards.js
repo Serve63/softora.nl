@@ -47,6 +47,7 @@
     { id: 'professionele-fotoshoot-2028', title: 'Professionele fotoshoot', timeframe: 2028, imageId: 'professionele-fotoshoot' },
     { id: 'persoonlijke-handtekening-2028', title: 'Persoonlijke handtekening', timeframe: 2028, imageId: 'persoonlijke-handtekening' },
     { id: 'sponsorbord-nemelaer-2028', title: 'Sponsorbord bij Nemelaer', timeframe: 2028, imageId: 'sponsorbord-nemelaer' },
+    { id: 'vip-box-willem-2-2028', title: 'VIP-box Willem II', timeframe: 2028, imageId: 'vip-box-willem-2' },
     { id: 'instagram-post-2027', title: 'Jaarlijkse Instagram-post 2027', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
@@ -142,6 +143,7 @@
   function createCardArtwork(card) {
     const artwork = document.createElement('div');
     const image = document.createElement('img');
+    const imageId = card.imageId || card.id;
     const shade = document.createElement('div');
     const top = document.createElement('span');
     const title = document.createElement('strong');
@@ -149,13 +151,13 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809d`;
+    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260809e`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
     image.loading = 'lazy';
     image.decoding = 'async';
-    if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(card.id)) {
+    if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(imageId)) {
       artwork.classList.add('end-game-card-photo--edge-crop');
     }
     shade.className = 'end-game-card-photo-shade';
