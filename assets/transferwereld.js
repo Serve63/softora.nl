@@ -9,14 +9,9 @@
     return;
   }
 
-  const ROLE_LABELS = {
-    GK: 'Keeper', CB: 'Centrale verdediger', LB: 'Linksback', RB: 'Rechtsback',
-    DM: 'Controlerende middenvelder', CM: 'Centrale middenvelder', AM: 'Aanvallende middenvelder',
-    LW: 'Linksbuiten', RW: 'Rechtsbuiten', CF: 'Spits',
-  };
-  const ROLE_ORDER = Object.keys(ROLE_LABELS);
+  const ROLE_ORDER = ['GK', 'CB', 'LB', 'RB', 'DM', 'CM', 'AM', 'LW', 'RW', 'CF'];
   const scopeLeagues = Array.isArray(dataset.scopeLeagues) && dataset.scopeLeagues.length ? dataset.scopeLeagues : dataset.leagues;
-  const state = { transferLimit: 80, depthClub: dataset.clubs[0]?.name };
+  const state = { transferLimit: 80 };
 
   function formatMoney(value, compact = true) {
     if (!Number.isFinite(value) || value === 0) return '€0';
@@ -89,8 +84,6 @@
     return { ...club, spend, income, netSpend: spend - income, depth, impactScore, injuryBurden };
   });
 
-  const clubByName = new Map(clubs.map((club) => [normalize(club.name), club]));
-  const clubByTransfermarktId = new Map(clubs.map((club) => [Number(club.transfermarkt?.id), club]));
   const deals = window.TransferwereldDeals?.buildUniqueDeals(clubs) || [];
   const rumours = clubs.flatMap((club) => (club.rumours || []).map((rumour) => ({ ...rumour, club })))
     .sort((left, right) => right.probability - left.probability);
@@ -252,77 +245,6 @@
     }).join('');
   }
 
-  function setupDepth() {
-    const select = document.querySelector('#depth-club');
-    const coveredClubs = clubs.filter((club) => club.depth.available);
-    if (!coveredClubs.some((club) => club.name === state.depthClub)) state.depthClub = coveredClubs[0]?.name;
-    select.innerHTML = coveredClubs.map((club) => `<option value="${escapeHtml(club.name)}">${Number(club.rank) < 10000 ? `#${club.rank} ` : ''}${escapeHtml(club.name)}</option>`).join('');
-    select.addEventListener('change', () => {
-      state.depthClub = select.value;
-      renderDepthDetail();
-    });
-    const ranked = [...coveredClubs].sort((left, right) => right.depth.score - left.depth.score);
-    document.querySelector('#depth-leaderboard').innerHTML = ranked.map((club, index) => `<div class="mini-row"><span>${index + 1}</span><button type="button" data-depth-club="${escapeHtml(club.name)}">${escapeHtml(club.name)}</button><strong>${club.depth.score}%</strong></div>`).join('');
-    document.querySelectorAll('[data-depth-club]').forEach((button) => button.addEventListener('click', () => {
-      state.depthClub = button.dataset.depthClub;
-      select.value = state.depthClub;
-      renderDepthDetail();
-    }));
-    renderDepthDetail();
-  }
-
-  function renderDepthDetail() {
-    const club = clubs.find((item) => item.name === state.depthClub) || clubs[0];
-    const roles = ROLE_ORDER.map((role) => {
-      const players = club.depth.roles[role].slice(0, 2);
-      const good = players.length >= 2 && players[1].marketValueNumber >= club.depth.threshold;
-      return `<article class="role-card ${good ? 'good' : 'weak'}"><div class="role-head"><div><span class="role-code">${role}</span><small>${ROLE_LABELS[role]}</small></div><span class="role-status" title="${good ? 'Dubbel op niveau' : 'Nog niet dubbel op niveau'}"></span></div>${players.length ? players.map((player) => `<div class="role-player"><span>${escapeHtml(player.player)}</span><span>${formatMoney(player.marketValueNumber)}</span></div>`).join('') : '<small>Geen primaire speler</small>'}</article>`;
-    }).join('');
-    const coach = club.context?.coach?.name ? `Trainer ${escapeHtml(club.context.coach.name)}` : 'Trainer onbekend';
-    const ranking = Number(club.rank) > 0 && Number(club.rank) < 10000 ? `#${club.rank} wereldwijd` : escapeHtml(club.league);
-    document.querySelector('#depth-detail').innerHTML = `<div class="depth-summary"><div><p class="eyebrow">${ranking}</p><h3>${escapeHtml(club.name)}</h3><small>Drempel tweede speler: ${formatMoney(club.depth.threshold)} · ${coach} · ${club.context?.injuries?.length || 0} afwezig</small></div><div class="depth-score">${club.depth.score}<small>/100</small></div></div><div class="role-grid">${roles}</div>`;
-  }
-
-  function forecastScore(team, league) {
-    const club = clubByTransfermarktId.get(Number(team.transfermarktId)) || clubByName.get(normalize(team.name));
-    const base = team.rating * .68 + team.seasonAverageRating * .22 + team.lastWeekRating * .10;
-    const transferModifier = club ? Math.max(-2.5, Math.min(2.5, club.impactScore / 40)) : 0;
-    const depthModifier = club?.depth.available ? Math.max(-1.2, Math.min(1.2, (club.depth.score - 55) / 37.5)) : 0;
-    const progress = Math.min(1, (Number(team.played) || 0) / 12);
-    const standingScale = league.teams.length > 1 ? .5 - ((Number(team.standingPosition) || league.teams.length) - 1) / (league.teams.length - 1) : 0;
-    const standingModifier = standingScale * 2.4 * progress;
-    const injuryModifier = club ? -Math.min(1.8, club.injuryBurden * 7) : 0;
-    const recentMatches = Number(club?.context?.recentMatches) || 0;
-    const recentPpg = recentMatches ? Number(club.context.recentFormPoints) / recentMatches : 1.5;
-    const formModifier = recentMatches >= 3 ? Math.max(-.8, Math.min(.8, (recentPpg - 1.5) * .55)) : 0;
-    const fixtureModifier = club ? -Math.max(-.5, Math.min(.5, (Number(club.context?.fixtureDifficulty) || 0) / 12)) : 0;
-    const tenure = Number(club?.context?.coachTenureDays);
-    const coachModifier = Number.isFinite(tenure) ? (tenure < 60 ? -.25 : (tenure < 120 ? -.1 : (tenure > 730 ? .12 : 0))) : 0;
-    return {
-      score: base + transferModifier + depthModifier + standingModifier + injuryModifier + formModifier + fixtureModifier + coachModifier,
-      club,
-    };
-  }
-
-  function renderForecasts() {
-    document.querySelector('#forecast-grid').innerHTML = scopeLeagues.map((league) => {
-      const ranked = league.teams.map((team) => ({ ...team, ...forecastScore(team, league) })).sort((left, right) => right.score - left.score);
-      const maxScore = ranked[0]?.score || 0;
-      const weights = ranked.map((team) => Math.exp((team.score - maxScore) * .78));
-      const weightTotal = weights.reduce((total, value) => total + value, 0);
-      const rows = ranked.slice(0, 7).map((team, index) => {
-        const chance = Math.round(weights[index] / weightTotal * 100);
-        const context = [];
-        if (team.played > 0) context.push(`#${team.standingPosition} · ${team.points} pt/${team.played}`);
-        if (team.club?.context?.injuries?.length) context.push(`${team.club.context.injuries.length} afwezig`);
-        if (team.club?.context?.coach?.name) context.push(team.club.context.coach.name);
-        const displayName = team.club?.name || team.name;
-        return `<div class="forecast-row"><span class="forecast-rank">${index + 1}</span><strong><span>${escapeHtml(displayName)}</span>${context.length ? `<small>${escapeHtml(context.join(' · '))}</small>` : ''}</strong><span class="model">${team.score.toFixed(1)}</span><span class="chance">${index === 0 ? `${chance}% kampioen` : `${chance}%`}</span></div>`;
-      }).join('');
-      return `<article class="forecast-card"><div class="forecast-head"><h3>${escapeHtml(league.name)}</h3><span>${escapeHtml(league.country)} · ${league.teams.length} clubs</span></div>${rows}</article>`;
-    }).join('');
-  }
-
   function setupDialog() {
     const dialog = document.querySelector('#method-dialog');
     document.querySelector('#method-button').addEventListener('click', () => dialog.showModal());
@@ -342,7 +264,5 @@
   document.querySelector('#rumour-search').addEventListener('input', renderRumours);
   renderRumours();
   renderImpact();
-  setupDepth();
-  renderForecasts();
   setupDialog();
 })();

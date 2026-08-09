@@ -19,7 +19,7 @@ function loadDataset() {
   return buildScopedDataset(context.window.TRANSFERWERELD_DATA, context.window.TRANSFERWERELD_SCOPE_DATA);
 }
 
-test('transferwereld exposes all requested analysis tabs and defaults to fee sorting', () => {
+test('transferwereld exposes the five active analysis tabs and defaults to fee sorting', () => {
   const html = read('transfers.html');
   const tabNames = [
     'Alle transfers',
@@ -27,10 +27,9 @@ test('transferwereld exposes all requested analysis tabs and defaults to fee sor
     'Meeste verdiend',
     'Geruchten',
     'Versterkt / verzwakt',
-    'Selectiediepte',
-    'Competitieprognoses',
   ];
   tabNames.forEach((name) => assert.match(html, new RegExp(name.replace('/', '\\/'))));
+  assert.doesNotMatch(html, /tab-depth|tab-forecast|panel-depth|panel-forecast|Competitieprognoses/);
   assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.doesNotMatch(html, /id="transfer-filters"|id="transfer-summary"|id="transfer-sort"/);
@@ -126,7 +125,7 @@ test('transferwereld generated data is complete enough for the requested analysi
   assert.equal(data.meta.warnings, data.clubs.filter((club) => club.dataWarning).length);
 });
 
-test('deep forecast context covers every club and every competition table', () => {
+test('deep club context remains complete for the active analyses', () => {
   const data = loadDataset();
   assert.deepEqual({ ...data.meta.contextCoverage }, {
     injuries: data.clubs.length,
@@ -142,8 +141,6 @@ test('deep forecast context covers every club and every competition table', () =
   assert.ok(contextClubs.every((club) => club.context?.coach?.name), 'a context club is missing its manager');
   assert.ok(contextClubs.every((club) => Array.isArray(club.context?.injuries)), 'a context club is missing injury context');
   assert.ok(contextClubs.every((club) => Array.isArray(club.context?.nextFixtures)), 'a context club is missing fixture context');
-  const script = read('assets/transferwereld.js');
-  ['standingModifier', 'injuryModifier', 'formModifier', 'fixtureModifier', 'coachModifier'].forEach((factor) => assert.match(script, new RegExp(factor)));
 });
 
 test('transferwereld frontend applies the UEFA top ten scope to every analysis view', () => {
@@ -155,7 +152,7 @@ test('transferwereld frontend applies the UEFA top ten scope to every analysis v
   assert.match(script, /scopeLeagues/);
   assert.match(script, /const clubs = dataset\.clubs/);
   assert.match(script, /clubs\.flatMap\(\(club\)/);
-  assert.match(script, /scopeLeagues\.map\(\(league\)/);
+  assert.match(script, /scopeLeagues\.length/);
 });
 
 test('rumours render as compact comparable rows instead of oversized cards', () => {
@@ -165,6 +162,7 @@ test('rumours render as compact comparable rows instead of oversized cards', () 
   assert.match(html, /id="rumour-list" class="rumour-list"/);
   assert.match(script, /class="rumour-row"/);
   assert.match(css, /\.rumour-row \{[^}]*display: grid/);
+  assert.match(css, /\.rumour-list-head > span:nth-child\(n \+ 4\) \{ text-align: right; \}/);
   assert.doesNotMatch(script, /rumour-card/);
   assert.doesNotMatch(css, /\.rumour-card/);
 });

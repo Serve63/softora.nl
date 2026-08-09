@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/fonts.css">
-  <link rel="stylesheet" href="/assets/transferwereld.css?v=20260809c">
+  <link rel="stylesheet" href="/assets/transferwereld.css?v=20260809d">
 </head>
 <body>
   <section class="mobile-desktop-gate" aria-labelledby="desktop-only-title">
@@ -68,8 +68,6 @@
         <button id="tab-income" role="tab" aria-selected="false" aria-controls="panel-income" data-tab="income" tabindex="-1"><span>03</span> Meeste verdiend</button>
         <button id="tab-rumours" role="tab" aria-selected="false" aria-controls="panel-rumours" data-tab="rumours" tabindex="-1"><span>04</span> Geruchten</button>
         <button id="tab-impact" role="tab" aria-selected="false" aria-controls="panel-impact" data-tab="impact" tabindex="-1"><span>05</span> Versterkt / verzwakt</button>
-        <button id="tab-depth" role="tab" aria-selected="false" aria-controls="panel-depth" data-tab="depth" tabindex="-1"><span>06</span> Selectiediepte</button>
-        <button id="tab-forecast" role="tab" aria-selected="false" aria-controls="panel-forecast" data-tab="forecast" tabindex="-1"><span>07</span> Competitieprognoses</button>
       </div>
     </nav>
 
@@ -104,19 +102,6 @@
       <div id="impact-ranking" class="ranking-wrap"></div>
     </section>
 
-    <section class="panel" id="panel-depth" role="tabpanel" aria-labelledby="tab-depth" data-panel="depth" hidden>
-      <div class="section-head"><div><p class="eyebrow">Dubbele bezetting</p><h2>Twee topspelers voor elke positie</h2></div><p>Tien hoofdrollen, steeds de twee spelers met de hoogste marktwaarde. “Top” is relatief aan de totale selectiewaarde; alleen clubs met een controleerbare selectie van minstens zestien spelers worden gerangschikt.</p></div>
-      <div class="depth-layout">
-        <aside><label class="club-picker"><span>Bekijk club</span><select id="depth-club"></select></label><div id="depth-leaderboard" class="mini-leaderboard"></div></aside>
-        <div id="depth-detail" class="depth-detail"></div>
-      </div>
-    </section>
-
-    <section class="panel" id="panel-forecast" role="tabpanel" aria-labelledby="tab-forecast" data-panel="forecast" hidden>
-      <div class="section-head"><div><p class="eyebrow">Seizoensmodel 2026–27 · top 10 competities</p><h2>Verwachte top 7 per competitie</h2></div><p>Voorspelling voor elk van de tien competities, gebaseerd op Opta-kracht, actuele standen, transfers, selectiediepte, blessures, recente vorm, trainerstermijn en komende tegenstanders.</p></div>
-      <div class="forecast-note"><strong>Zo lees je dit</strong><span>De kampioenskans is de relatieve modelkans binnen de volledige competitie. Lopende competities verwerken punten en positie; bij competities die nog niet begonnen zijn wegen selectie en structurele clubkracht zwaarder.</span></div>
-      <div id="forecast-grid" class="forecast-grid"></div>
-    </section>
   </main>
 
   <footer>
@@ -132,7 +117,6 @@
       <article><strong>Clubselectie</strong><p>De scope bestaat uit alle clubs uit de hoogste divisies van de tien best gerangschikte landen in UEFA's vijfjaarscoëfficiënt: Engeland, Italië, Spanje, Duitsland, Frankrijk, Nederland, Portugal, België, Turkije en Tsjechië. Opta-ratings bepalen alleen de relatieve clubkracht in de analyses.</p></article>
       <article><strong>Transferimpact</strong><p>Netto-investering wordt afgezet tegen selectiewaarde en aangevuld met het verschil tussen inkomende en uitgaande bewegingen en de huidige dieptescore.</p></article>
       <article><strong>Selectiediepte</strong><p>Per hoofdpositie tellen de twee duurste spelers. De kwaliteitsdrempel is 1,8% van de totale selectiewaarde, met €1 miljoen als minimum. Alleen de primaire Transfermarkt-positie telt.</p></article>
-      <article><strong>Prognose</strong><p>De basis is 68% actuele Opta-rating, 22% seizoensgemiddelde en 10% recente rating. Begrensde correcties verwerken daarna stand, transferimpact, dubbele bezetting, blessurelast, laatste resultaten, trainerstermijn en zwaarte van de komende vijf duels.</p></article>
     </div>
     <p class="fineprint">Transfersommen, marktwaarden en geruchtkansen kunnen schattingen zijn. Een modelrang is analyse, geen feit of weddenschapsadvies.</p>
   </dialog>
@@ -141,6 +125,6 @@
   <script src="/assets/transferwereld-scope-data.js?v=20260809a"></script>
   <script src="/assets/transferwereld-scope.js?v=20260809b"></script>
   <script src="/assets/transferwereld-deals.js?v=20260809a"></script>
-  <script src="/assets/transferwereld.js?v=20260809c" defer></script>
+  <script src="/assets/transferwereld.js?v=20260809d" defer></script>
 </body>
 </html>

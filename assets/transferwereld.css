@@ -109,6 +109,7 @@ input::placeholder { color: #727b8c; }
 .rumour-list { border: 1px solid var(--line); background: var(--panel); }
 .rumour-list-head, .rumour-row { display: grid; grid-template-columns: 48px minmax(180px, .85fr) minmax(300px, 1.5fr) 90px 120px 88px; gap: 18px; align-items: center; }
 .rumour-list-head { min-height: 42px; padding: 8px 18px; border-bottom: 1px solid var(--line); color: #747e90; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.rumour-list-head > span:nth-child(n + 4) { text-align: right; }
 .rumour-row { min-height: 72px; padding: 11px 18px; border-bottom: 1px solid var(--line); transition: background .18s ease; }
 .rumour-row:last-child { border-bottom: 0; }
 .rumour-row:hover { background: var(--panel-2); }
