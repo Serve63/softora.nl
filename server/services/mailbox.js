@@ -611,12 +611,11 @@ function createMailboxService(deps = {}) {
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
       env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY
   );
-  const listCampaignReplies = createMailboxCampaignRepliesList({
+  const { listCampaignReplies, invalidateCampaignSnapshot } = createMailboxCampaignRepliesList({
     mailboxCampaignRepliesService,
     instantlyMailboxService,
     filterVisibleMailboxMessages,
-    setUiStateValues,
-    logger,
+    getUiStateValues, setUiStateValues, logger, mailboxCampaignSnapshotStore: deps.mailboxCampaignSnapshotStore,
     normalizeString,
     truncateText,
   });
@@ -2147,7 +2146,7 @@ function createMailboxService(deps = {}) {
     getSafeLimit,
     getAccounts,
     normalizeEmail,
-    normalizeFolder,
+    normalizeFolder, invalidateCampaignSnapshot,
     logger,
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
@@ -2447,12 +2446,13 @@ function createMailboxService(deps = {}) {
       });
     }
   }
+
   async function campaignRepliesResponse(req, res) {
     try {
       return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
         owner: normalizeString(req.query?.owner), persistSnapshot: req.premiumReadOnlyTokenFallback !== true,
-        refreshInstantly: req.premiumReadOnlyTokenFallback !== true && /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
+        refreshInstantly: false,
       }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);

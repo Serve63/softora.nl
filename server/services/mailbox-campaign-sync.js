@@ -227,6 +227,7 @@ function createMailboxSyncService({
   getAccounts,
   normalizeEmail,
   normalizeFolder,
+  invalidateCampaignSnapshot = async () => ({ ok: true }),
   logger = console,
   defaultFolders = ['inbox', 'sent'],
   defaultLimit = 50,
@@ -352,6 +353,18 @@ function createMailboxSyncService({
       });
       if (!saved || saved.ok === false) {
         throw saved?.error || new Error('Mailbox-index opslaan mislukt');
+      }
+      if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
+        const invalidation = await invalidateCampaignSnapshot({
+          source: 'mailbox-index-upsert',
+          accountEmail: account.email,
+          folder: normalizedFolder,
+        });
+        if (!invalidation || invalidation.ok === false) {
+          const error = new Error('Mailbox-snapshot invalidatie mislukt');
+          error.code = 'MAILBOX_SNAPSHOT_INVALIDATION_FAILED';
+          throw error;
+        }
       }
       const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
       await mailboxIndexStore.finishSync({
