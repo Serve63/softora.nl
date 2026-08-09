@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const freshness = require('../../assets/premium-mailbox-snapshot-freshness.js');
+const requestDeadline = require('../../assets/premium-mailbox-request-deadline.js');
 
 const NOW = Date.parse('2026-08-09T19:30:00.000Z');
 
@@ -181,4 +182,92 @@ test('campaign cache bewaart huidige mails wanneer een nieuwere API-response deg
     globalThis.SoftoraPageBootstrapSession = previousBootstrap;
     globalThis.SoftoraMailboxCampaignInbox = previousCampaign;
   }
+});
+
+test('campaign GET breekt hard af en valt terug zonder de refreshlus te blokkeren', async () => {
+  const previousDocument = globalThis.document;
+  const previousBootstrap = globalThis.SoftoraPageBootstrapSession;
+  const previousCampaign = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  let cached = snapshot(new Date().toISOString(), [message('cached', 1)], {
+    origin: 'session-cache',
+    degraded: true,
+  });
+  let requestedSignal = null;
+  let timeoutDelay = 0;
+  globalThis.document = { getElementById() { return null; } };
+  globalThis.SoftoraPageBootstrapSession = {
+    get() { return { authenticated: true, userId: 'timeout-test' }; },
+    cache: {
+      read() { return cached; },
+      write(_key, value) { cached = value; return true; },
+    },
+  };
+  delete require.cache[modulePath];
+  const campaign = require(modulePath);
+  const fetchNeverSettles = async (_url, init) => {
+    requestedSignal = init.signal;
+    return new Promise(() => {});
+  };
+  const timeoutOptions = {
+    owner: 'serve',
+    skipBootstrap: true,
+    setTimeout(handler, delay) {
+      timeoutDelay = delay;
+      queueMicrotask(handler);
+      return 1;
+    },
+    clearTimeout() {},
+  };
+  try {
+    const fallback = await campaign.load(
+      'outreach',
+      (value) => value,
+      fetchNeverSettles,
+      timeoutOptions
+    );
+    assert.equal(timeoutDelay, requestDeadline.DEFAULT_REQUEST_TIMEOUT_MS);
+    assert.equal(requestedSignal.aborted, true);
+    assert.equal(fallback.complete, false);
+    assert.equal(fallback.fromCache, true);
+    assert.deepEqual(fallback.messages.map((item) => item.id), ['cached']);
+
+    cached = null;
+    await assert.rejects(
+      campaign.load('outreach', (value) => value, fetchNeverSettles, timeoutOptions),
+      (error) => error.code === 'MAILBOX_CAMPAIGN_REPLIES_TIMEOUT'
+    );
+  } finally {
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraPageBootstrapSession = previousBootstrap;
+    globalThis.SoftoraMailboxCampaignInbox = previousCampaign;
+  }
+});
+
+test('auth- en accountinitialisatie gebruiken dezelfde harde achtseconden-grens', async () => {
+  let requestedUrl = '';
+  let requestedInit = null;
+  let timeoutDelay = 0;
+  await assert.rejects(
+    requestDeadline.requestInitJson('/api/auth/session', 'MAILBOX_AUTH_SESSION_TIMEOUT', {
+      request(url, init) {
+        requestedUrl = url;
+        requestedInit = init;
+        return new Promise(() => {});
+      },
+      setTimeout(handler, delay) {
+        timeoutDelay = delay;
+        queueMicrotask(handler);
+        return 1;
+      },
+      clearTimeout() {},
+    }),
+    (error) => error.code === 'MAILBOX_AUTH_SESSION_TIMEOUT'
+  );
+  assert.equal(requestedUrl, '/api/auth/session');
+  assert.equal(requestedInit.credentials, 'same-origin');
+  assert.equal(requestedInit.cache, 'no-store');
+  assert.equal(requestedInit.signal.aborted, true);
+  assert.equal(timeoutDelay, requestDeadline.DEFAULT_REQUEST_TIMEOUT_MS);
 });

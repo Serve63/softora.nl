@@ -6,6 +6,9 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
+  const requestDeadline = global.SoftoraMailboxRequestDeadline || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-request-deadline.js') : null
+  );
   const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v17';
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -1120,13 +1123,11 @@
       refreshInstantly: '0',
     });
     try {
-      const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-        ...(options && options.signal ? { signal: options.signal } : {}),
-      });
-      const data = await response.json().catch(() => ({}));
+      const { response, data } = await requestDeadline.requestCampaignReplies(
+        request,
+        `/api/mailbox/campaign-replies?${params.toString()}`,
+        options
+      );
       if (!response.ok || !data?.ok) {
         throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
       }
@@ -1135,7 +1136,7 @@
       }
       return normalizeLoadResult(data, normalizeMessage, false, owner);
     } catch (error) {
-      if (options?.signal?.aborted || error?.name === 'AbortError') throw error;
+      if (options?.signal?.aborted) throw error;
       const fallback = getSessionFallback(owner);
       if (fallback) return fallback;
       throw error;

@@ -442,6 +442,12 @@
       options.resetDetail?.();
     }
 
+    function cancelActive() {
+      session.cancel();
+      token = null;
+      setBusy(false);
+    }
+
     function ensureToken() {
       if (!token) token = session.begin(getScope());
       return token;
@@ -456,7 +462,7 @@
       return owner;
     }
 
-    return { ensureToken, getToken: () => token, isCurrent, load, reset, switchOwner };
+    return { cancelActive, ensureToken, getToken: () => token, isCurrent, load, reset, switchOwner };
   }
 
   const api = {
