@@ -370,11 +370,13 @@ test('premium admin api guard keeps token fallback blocked for unrelated admin r
   assert.equal(res.body.error, 'Adminstatus kon niet veilig worden bevestigd.');
 });
 
-test('premium admin api guard allows only mailbox body reads during temporary user hydration failure', async () => {
+test('premium admin api guard allows only exact mailbox GET routes during temporary user hydration failure', async () => {
   const allowedRequests = [
+    { method: 'GET', path: '/api/mailbox/accounts' },
+    { method: 'GET', path: '/api/mailbox/campaign-replies?owner=serve' },
     { method: 'GET', path: '/api/mailbox/message?account=serve%40softora.nl&id=inbox%3A1' },
     { method: 'GET', path: '/api/mailbox/message-image?account=serve%40softora.nl&id=inbox%3A1&index=0' },
-    { method: 'POST', path: '/api/mailbox/messages/bodies' },
+    { method: 'GET', path: '/api/mailbox/messages?account=serve%40softora.nl' },
   ];
   for (const request of allowedRequests) {
     const events = [];
@@ -416,6 +418,7 @@ test('premium admin api guard allows only mailbox body reads during temporary us
     await guard.requirePremiumAdminApiAccess(req, res, () => { nextCalled = true; });
     assert.equal(nextCalled, true, `${request.method} ${request.path}`);
     assert.equal(res.statusCode, null);
+    assert.equal(req.premiumReadOnlyTokenFallback, true);
     assert.equal(events.at(-1)?.reason, 'security_mailbox_readonly_token_fallback_allowed');
   }
 });
@@ -448,9 +451,18 @@ test('premium admin api guard never extends mailbox body fallback to writes or e
   const write = await run({ method: 'POST', path: '/api/mailbox/send' });
   assert.equal(write.nextCalled, false);
   assert.equal(write.res.statusCode, 403);
+  const bodyBatch = await run({ method: 'POST', path: '/api/mailbox/messages/bodies' });
+  assert.equal(bodyBatch.nextCalled, false);
+  assert.equal(bodyBatch.res.statusCode, 403);
   const readMutation = await run({ method: 'POST', path: '/api/mailbox/messages/read' });
   assert.equal(readMutation.nextCalled, false);
   assert.equal(readMutation.res.statusCode, 403);
+  const syncRead = await run({ method: 'GET', path: '/api/mailbox/sync' });
+  assert.equal(syncRead.nextCalled, false);
+  assert.equal(syncRead.res.statusCode, 403);
+  const nearMiss = await run({ method: 'GET', path: '/api/mailbox/messages/extra' });
+  assert.equal(nearMiss.nextCalled, false);
+  assert.equal(nearMiss.res.statusCode, 403);
   const expiredRead = await run({ method: 'GET', path: '/api/mailbox/message', expired: true });
   assert.equal(expiredRead.nextCalled, false);
   assert.equal(expiredRead.res.statusCode, 401);

@@ -23,6 +23,7 @@ function createMailboxCampaignRepliesList({
     refreshInstantly = false,
     includeSnapshotMessages = false,
     hydrateBodies = true,
+    persistSnapshot = true,
   } = {}) {
     const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies });
     const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
@@ -39,7 +40,7 @@ function createMailboxCampaignRepliesList({
       },
     };
     const serializedSnapshot = serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
-    if (serializedSnapshot) {
+    if (persistSnapshot && serializedSnapshot) {
       try {
         await setUiStateValues(
           MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
