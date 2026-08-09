@@ -1,0 +1,295 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const {
+  createMailboxSyncService,
+} = require('../../server/services/mailbox-campaign-sync');
+const {
+  getMailboxSyncResponseStatus,
+  summarizeMailboxSyncResults,
+} = require('../../server/services/mailbox-sync-runtime');
+
+function createAccount(email) {
+  return { email, imapConfigured: true, imapHost: 'imap.example.test' };
+}
+
+function createService(overrides = {}) {
+  const accounts = overrides.accounts || [createAccount('serve@softora.nl')];
+  const mailboxIndexStore = {
+    acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-token' }),
+    upsertMessages: async () => ({ ok: true, upserted: 0 }),
+    finishSync: async () => ({ ok: true }),
+    ...overrides.mailboxIndexStore,
+  };
+  return createMailboxSyncService({
+    mailboxIndexStore,
+    assertReadableAccount: (email) => accounts.find((account) => account.email === email) || createAccount(email),
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: overrides.fetchMessagesFromImap || (async () => []),
+    getSafeLimit: (value) => Number(value) || 4,
+    getAccounts: () => accounts,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    invalidateCampaignSnapshot: overrides.invalidateCampaignSnapshot,
+    logger: { info() {}, error() {} },
+  });
+}
+
+test('sync lock failures fail closed while an active lock is an explicit accepted outcome', async () => {
+  const lockFailure = createService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: false, locked: false, error: new Error('rpc unavailable') }),
+    },
+  });
+  const failed = await lockFailure.syncMailbox({ folders: ['inbox'] });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.complete, false);
+  assert.equal(failed.freshnessConfirmed, false);
+  assert.equal(failed.statusCode, 503);
+  assert.equal(failed.results[0].reason, 'lock_failed');
+
+  const activeLock = createService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: false, locked: true }),
+    },
+  });
+  const accepted = await activeLock.syncMailbox({ folders: ['inbox'] });
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.accepted, true);
+  assert.equal(accepted.complete, false);
+  assert.equal(accepted.freshnessConfirmed, false);
+  assert.equal(accepted.statusCode, 202);
+});
+
+test('mailbox sync runs no more than three accounts concurrently', async () => {
+  const accounts = Array.from({ length: 8 }, (_, index) => createAccount(`account${index}@softora.nl`));
+  let active = 0;
+  let maximumActive = 0;
+  const service = createService({
+    accounts,
+    fetchMessagesFromImap: async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return [];
+    },
+  });
+
+  const result = await service.syncMailbox({ folders: ['inbox'], maxConcurrentAccounts: 99 });
+  assert.equal(result.complete, true);
+  assert.equal(result.summary.succeeded, 8);
+  assert.equal(maximumActive, 3);
+});
+
+test('snapshot invalidation failure prevents freshness confirmation after an index upsert', async () => {
+  const finishCalls = [];
+  const service = createService({
+    mailboxIndexStore: {
+      upsertMessages: async () => ({ ok: true, upserted: 1 }),
+      finishSync: async (input) => {
+        finishCalls.push(input);
+        return { ok: true };
+      },
+    },
+    fetchMessagesFromImap: async () => [{ uid: 91, id: 'inbox:91' }],
+    invalidateCampaignSnapshot: async () => ({ ok: false }),
+  });
+
+  const result = await service.syncMailbox({ folders: ['inbox'], campaignOnly: true });
+  assert.equal(result.ok, false);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.statusCode, 503);
+  assert.equal(result.results[0].code, 'MAILBOX_SNAPSHOT_INVALIDATION_FAILED');
+  assert.match(String(finishCalls[0].error), /invalidatie mislukt/i);
+});
+
+test('a lost finish token is a hard sync failure', async () => {
+  const lockLostError = new Error('lock lost');
+  lockLostError.code = 'MAILBOX_SYNC_LOCK_LOST';
+  const service = createService({
+    mailboxIndexStore: {
+      finishSync: async () => ({ ok: false, lockLost: true, error: lockLostError }),
+    },
+  });
+
+  const result = await service.syncMailbox({ folders: ['inbox'] });
+  assert.equal(result.ok, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.results[0].lockLost, true);
+  assert.equal(result.results[0].code, 'MAILBOX_SYNC_LOCK_LOST');
+});
+
+test('run deadlines abort active folder work and report a total timeout as 504', async () => {
+  let aborted = false;
+  const service = createService({
+    fetchMessagesFromImap: async ({ signal }) => new Promise((resolve, reject) => {
+      const handleAbort = () => {
+        aborted = true;
+        reject(signal.reason);
+      };
+      if (signal.aborted) handleAbort();
+      else signal.addEventListener('abort', handleAbort, { once: true });
+    }),
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['inbox'],
+    deadlineAt: Date.now() + 20,
+    folderTimeoutMs: 10_000,
+  });
+  assert.equal(aborted, true);
+  assert.equal(result.ok, false);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.statusCode, 504);
+  assert.equal(result.summary.timedOut, 1);
+  assert.equal(result.results[0].code, 'MAILBOX_SYNC_RUN_TIMEOUT');
+});
+
+test('an already expired run deadline starts no lock or provider work', async () => {
+  let lockCalls = 0;
+  let providerCalls = 0;
+  const service = createService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => {
+        lockCalls += 1;
+        return { ok: true, lockToken: 'must-not-be-used' };
+      },
+    },
+    fetchMessagesFromImap: async () => {
+      providerCalls += 1;
+      return [];
+    },
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['inbox'],
+    deadlineAt: Date.now() - 1,
+  });
+  assert.equal(result.statusCode, 504);
+  assert.equal(lockCalls, 0);
+  assert.equal(providerCalls, 0);
+});
+
+test('HTTP sync contracts preserve accepted, partial, unavailable and timeout outcomes', () => {
+  assert.equal(getMailboxSyncResponseStatus({ ok: true, complete: true, statusCode: 200 }), 200);
+  assert.equal(getMailboxSyncResponseStatus({ ok: true, accepted: true, statusCode: 202 }), 202);
+  assert.equal(getMailboxSyncResponseStatus({ ok: false, complete: false, statusCode: 207 }), 207);
+  assert.equal(getMailboxSyncResponseStatus({ ok: false, statusCode: 503 }), 503);
+  assert.equal(getMailboxSyncResponseStatus({ ok: false, statusCode: 504 }), 504);
+});
+
+test('an empty IMAP target set can never claim complete freshness', () => {
+  const result = summarizeMailboxSyncResults([]);
+  assert.equal(result.ok, true);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.statusCode, 207);
+  assert.equal(result.summary.total, 0);
+});
+
+test('a 92-of-113 sync is reported honestly as partial without dropping successful accounts', async () => {
+  const accounts = Array.from({ length: 113 }, (_, index) => createAccount(`account${index}@softora.nl`));
+  const successfulAccounts = new Set(accounts.slice(0, 92).map((account) => account.email));
+  const service = createService({
+    accounts,
+    fetchMessagesFromImap: async ({ account }) => {
+      if (!successfulAccounts.has(account.email)) throw new Error('tijdelijke accountfout');
+      return [];
+    },
+  });
+
+  const result = await service.syncMailbox({ folders: ['inbox'] });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.statusCode, 207);
+  assert.deepEqual(result.summary, {
+    total: 113,
+    succeeded: 92,
+    locked: 0,
+    failed: 21,
+    timedOut: 0,
+    skipped: 0,
+  });
+});
+
+test('one timed-out account cannot block another account from being indexed', async () => {
+  const accounts = [createAccount('slow@softora.nl'), createAccount('healthy@softora.nl')];
+  const upsertedAccounts = [];
+  const service = createService({
+    accounts,
+    mailboxIndexStore: {
+      upsertMessages: async ({ accountEmail }) => {
+        upsertedAccounts.push(accountEmail);
+        return { ok: true, upserted: 1 };
+      },
+    },
+    fetchMessagesFromImap: async ({ account, signal }) => {
+      if (account.email === 'healthy@softora.nl') return [{ uid: 7, id: 'inbox:7' }];
+      return new Promise((resolve, reject) => {
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
+      });
+    },
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['inbox'],
+    deadlineAt: Date.now() + 25,
+    folderTimeoutMs: 10_000,
+  });
+
+  assert.deepEqual(upsertedAccounts, ['healthy@softora.nl']);
+  assert.equal(result.statusCode, 207);
+  assert.equal(result.summary.succeeded, 1);
+  assert.equal(result.summary.timedOut, 1);
+});
+
+test('deadline aborts an in-flight index write and prevents late invalidation or success', async () => {
+  let lateWrites = 0;
+  let invalidations = 0;
+  let successFinishes = 0;
+  const service = createService({
+    mailboxIndexStore: {
+      upsertMessages: ({ signal }) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          lateWrites += 1;
+          resolve({ ok: true, upserted: 1 });
+        }, 80);
+        const abort = () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        };
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
+      }),
+      finishSync: async (input) => {
+        if (!input.error) successFinishes += 1;
+        return { ok: true };
+      },
+    },
+    fetchMessagesFromImap: async () => [{ uid: 91, id: 'inbox:91' }],
+    invalidateCampaignSnapshot: async () => {
+      invalidations += 1;
+      return { ok: true };
+    },
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['inbox'],
+    campaignOnly: true,
+    deadlineAt: Date.now() + 20,
+    folderTimeoutMs: 10_000,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 90));
+
+  assert.equal(result.statusCode, 504);
+  assert.equal(lateWrites, 0);
+  assert.equal(invalidations, 0);
+  assert.equal(successFinishes, 0);
+});
