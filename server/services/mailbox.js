@@ -2238,7 +2238,7 @@ function createMailboxService(deps = {}) {
     const result = await listMessagesWithMeta(options);
     return result.messages;
   }
-  async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
+  async function getMessage({ accountEmail, folder = 'inbox', id = '', persistIndex = true }) {
     const normalizedFolder = normalizeString(folder).toLowerCase() === 'instantly' ? 'instantly' : normalizeFolder(folder);
     if (normalizedFolder === 'instantly') return getInstantlyMessage({ accountEmail, id });
     const account = assertReadableAccount(accountEmail);
@@ -2273,7 +2273,7 @@ function createMailboxService(deps = {}) {
       error.status = 404;
       throw error;
     }
-    if (canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
+    if (persistIndex && canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
       await mailboxIndexStore.upsertMessages({
         accountEmail: account.email,
         folder: normalizedFolder,
@@ -2451,8 +2451,8 @@ function createMailboxService(deps = {}) {
     try {
       return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
-        owner: normalizeString(req.query?.owner),
-        refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
+        owner: normalizeString(req.query?.owner), persistSnapshot: req.premiumReadOnlyTokenFallback !== true,
+        refreshInstantly: req.premiumReadOnlyTokenFallback !== true && /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
       }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);
@@ -2468,7 +2468,7 @@ function createMailboxService(deps = {}) {
       const message = await getMessage({
         accountEmail: req.query?.account,
         folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '',
+        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
       });
       return res.status(200).json({ ok: true, message });
     } catch (error) {
@@ -2491,7 +2491,7 @@ function createMailboxService(deps = {}) {
       const message = await getMessage({
         accountEmail: req.query?.account,
         folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '',
+        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
       });
       const image = decodeMailboxMessageImage(
         Array.isArray(message && message.bodyImages) ? message.bodyImages[imageIndex] : null
