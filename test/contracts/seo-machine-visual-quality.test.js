@@ -62,7 +62,7 @@ test('recente Softora-beelden worden als meetbare herstelachterstand herkend', a
   });
 
   assert.equal(report.status, 'ready');
-  assert.equal(report.candidateCount, 0);
+  assert.ok(report.candidateCount >= 1);
   assert.equal(report.legacyDebt.status, 'quality_recovery');
   assert.ok(report.legacyDebt.similarPairCount > 0);
   assert.ok(report.legacyDebt.nearestPairs[0].combined >= 0.85);

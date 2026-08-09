@@ -1008,6 +1008,44 @@ test('chatbot-vs-livechat gebruikt quality v2 als unieke beslispagina', () => {
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 });
 
+test('chatbot-CRM-koppeling gebruikt quality v2 met herstelroute en twee unieke beelden', () => {
+  const item = getSeoContentItem('blog', 'chatbot-crm-koppeling-leads-opvolgen', {
+    now: new Date('2026-08-09T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-08-09');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.targetMoneyPage, '/chatbot-laten-maken');
+  assert.ok(item.informationGain.includes('foutwachtrij'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualFamily, 'dark-operations-interface');
+  assert.equal(item.visualBrief.support.visualFamily, 'cobalt-transit-system-map');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.src, '/assets/seo-content/chatbot-crm-handoff-interface-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/chatbot-crm-foutafhandeling-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/chatbot-crm-koppeling-leads-opvolgen">/);
+  assert.match(html, /"dateModified":"2026-08-09"/);
+  assert.match(html, /Ontwerp de foutwachtrij vóór de succesroute live gaat/);
+  assert.match(html, /Wijs per gegeven één leidend systeem aan/);
+  assert.match(html, /href="\/chatbot-laten-maken">chatbot laten maken<\/a>/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM-scope<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-crm-integratie">CRM-integratie<\/a>/);
+  assert.match(html, /href="\/blog\/chatbot-kosten-mkb">kosten en koppelingen van de beoogde chatbot<\/a>/);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));
