@@ -71,6 +71,17 @@
   background: #f4f1ed;
 }
 
+@media (min-width: 901px) {
+  .company-directory-shell-page .sidebar {
+    top: 0 !important;
+    bottom: 0 !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+}
+
 .company-directory-page {
   min-width: 0;
   min-height: 100vh;
