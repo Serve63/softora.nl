@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260804c">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809b">
+  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260809a">
 </head>
 <body>
   <main class="app-shell">
@@ -152,6 +153,10 @@
         </div>
         <div class="location-summary" id="location-summary">CBS en PDOK data wordt geladen</div>
         <ol class="location-list" id="location-list"></ol>
+        <div id="planning-scroll-status" class="planning-scroll-status" data-state="loading" aria-live="polite">
+          <span class="planning-scroll-status__indicator" aria-hidden="true">↓</span>
+          <strong id="planning-scroll-status-label">Planning wordt geladen</strong>
+        </div>
       </aside>
 
       <div hidden aria-hidden="true">
@@ -178,7 +183,8 @@
 
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database.js?v=20260804a"></script>
-  <script src="/assets/kvk-database-total-found.js?v=20260809d"></script>
+  <script src="/assets/kvk-database-total-found.js?v=20260809e"></script>
+  <script src="/assets/kvk-database-planning.js?v=20260809a"></script>
   <script src="/assets/kvk-database-metrics.js?v=20260804d"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260804b"></script>
   <script src="/assets/kvk-database-control.js?v=20260804b"></script>
