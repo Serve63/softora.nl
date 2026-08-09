@@ -367,8 +367,11 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
 
 test('kvk database route keeps the canonical sidebar outside its scraper frame', () => {
   const pageSource = readRepoFile('premium-kvk-database-shell.html');
+  const dashboardSource = readRepoFile('premium-kvk-database.html');
+  const directoryContentSource = readRepoFile('premium-kvk-company-directory.html');
   const directoryShellSource = readRepoFile('premium-kvk-company-directory-shell.html');
   const directoryStyleSource = readRepoFile('assets/kvk-database-total-found.css');
+  const directoryScriptSource = readRepoFile('assets/kvk-database-total-found.js');
   const themeSource = readRepoFile('assets/personnel-theme.js');
 
   assert.match(pageSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
@@ -383,7 +386,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
@@ -391,6 +394,11 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
+  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
+  assert.match(directoryScriptSource, /params\.get\(SIDEBAR_CONTENT_PARAM\) === '1'/);
+  assert.match(directoryScriptSource, /browserWindow\.location\?\.assign\(directoryContentPageUrl\(category\)\)/);
+  assert.match(directoryContentSource, /href="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  assert.doesNotMatch(directoryContentSource, /target="_top"/);
 });
 
 test('premium dashboard keeps its first-paint boot overlay in the shell contract', () => {

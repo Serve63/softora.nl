@@ -66,18 +66,19 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
   assert.match(pageSource, /<h1 id="company-directory-title">Alle gevonden bedrijven<\/h1>/);
-  assert.match(pageSource, /href="\/kvk-database" target="_top"/);
+  assert.match(pageSource, /href="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  assert.doesNotMatch(pageSource, /target="_top"/);
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -121,6 +122,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.match(pageSource, /id="planning-search-input"/);
+  assert.match(pageSource, /id="planning-scroll-status"/);
+  assert.match(pageSource, /id="planning-scroll-status-label"/);
   assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
   assert.match(pageSource, /id="latest-luna-errors-table-frame"/);
   assert.ok(
@@ -131,7 +134,9 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.js\?v=20260809a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
@@ -151,6 +156,7 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
 
   assert.equal(totalFound.COMPANY_API_URL, '/api/kvk-database/company-directory');
   assert.equal(totalFound.DIRECTORY_PAGE_URL, '/kvk-database-bedrijven');
+  assert.equal(totalFound.DIRECTORY_CONTENT_PAGE_URL, '/premium-kvk-company-directory');
   assert.equal(totalFound.PAGE_SIZE, 100);
   assert.equal(totalFound.REQUEST_TIMEOUT_MS, 30000);
   assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /q=Caf%C3%A9\+%26\+Zoon/);
@@ -159,6 +165,10 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
   assert.equal(
     totalFound.directoryPageUrl('zonder-werkende-website'),
     '/kvk-database-bedrijven?categorie=zonder-werkende-website'
+  );
+  assert.equal(
+    totalFound.directoryContentPageUrl('zonder-werkende-website'),
+    '/premium-kvk-company-directory?softora_sidebar_content=1&categorie=zonder-werkende-website'
   );
   assert.deepEqual(totalFound.companyFetchOptions(), {
     cache: 'no-store',
@@ -192,6 +202,19 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
   assert.equal(assignedUrl, '/kvk-database-bedrijven');
   totalFound.navigateToDirectory({ location: { assign(url) { assignedUrl = url; } } }, 'controle');
   assert.equal(assignedUrl, '/kvk-database-bedrijven?categorie=controle');
+  const embeddedWindow = {
+    location: {
+      search: '?softora_sidebar_content=1',
+      assign(url) { assignedUrl = url; },
+    },
+  };
+  embeddedWindow.top = {};
+  assert.equal(totalFound.isSidebarContentFrame(embeddedWindow), true);
+  totalFound.navigateToDirectory(embeddedWindow, 'controle');
+  assert.equal(
+    assignedUrl,
+    '/premium-kvk-company-directory?softora_sidebar_content=1&categorie=controle'
+  );
   const untreatedHtml = totalFound.companyRowHtml({
     bedrijfsnaam: 'Nog te doen B.V.',
     kvk_nummer: '12345678',
@@ -308,6 +331,26 @@ test('kvk database planning merges current parallel route progress', () => {
   assert.match(scriptSource, /\.done/);
   assert.match(scriptSource, /contact_parallel_active_location_codes/);
   assert.match(scriptSource, /function getContactActiveCodes\(\)/);
+});
+
+test('kvk planning exposes the full scroll range and confirms only the real end', () => {
+  const planning = require('../../assets/kvk-database-planning.js');
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-planning.css'), 'utf8');
+
+  const locationChild = { classList: { contains: () => false } };
+  const emptyChild = { classList: { contains: (name) => name === 'location-empty' } };
+  assert.equal(planning.planningViewportState({ children: [], scrollTop: 0, clientHeight: 0, scrollHeight: 0 }), 'loading');
+  assert.equal(planning.planningViewportState({ children: [emptyChild], scrollTop: 0, clientHeight: 420, scrollHeight: 420 }), 'loading');
+  assert.equal(planning.planningViewportState({ children: [locationChild], scrollTop: 0, clientHeight: 420, scrollHeight: 900 }), 'more');
+  assert.equal(planning.planningViewportState({ children: [locationChild], scrollTop: 480, clientHeight: 420, scrollHeight: 900 }), 'end');
+  assert.equal(planning.planningViewportLabel('more'), 'Meer locaties hieronder');
+  assert.equal(planning.planningViewportLabel('end'), 'Einde planning bereikt');
+  assert.match(pageSource, /<ol class="location-list" id="location-list"><\/ol>[\s\S]*id="planning-scroll-status"/);
+  assert.match(styleSource, /\.planning-panel\s*\{[\s\S]*height:\s*clamp\(520px, 70vh, 760px\)/);
+  assert.match(styleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
+  assert.match(styleSource, /\.planning-scroll-status\[data-state="end"\]/);
+  assert.doesNotMatch(styleSource, /\.planning-panel\s*\{[^}]*height:\s*300px/s);
 });
 
 test('kvk database shows every new Searcher result and only material Controller corrections', () => {
