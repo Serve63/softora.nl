@@ -27,8 +27,8 @@ body::-webkit-scrollbar-thumb,
 }
 
 .planning-panel {
-  height: 300px;
-  min-height: 300px;
+  height: 250px;
+  min-height: 250px;
 }
 
 .planning-panel .location-list {
@@ -52,7 +52,7 @@ body::-webkit-scrollbar-thumb,
 
 @media (max-width: 760px) {
   .planning-panel {
-    height: 340px;
-    min-height: 340px;
+    height: 300px;
+    min-height: 300px;
   }
 }

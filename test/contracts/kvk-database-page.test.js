@@ -134,7 +134,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809c/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809d/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
@@ -339,7 +339,8 @@ test('kvk planning stays compact without a separate scroll-status footer', () =>
   assert.match(pageSource, /<ol class="location-list" id="location-list"><\/ol>/);
   assert.doesNotMatch(pageSource, /planning-scroll-status|Meer locaties hieronder|Einde planning bereikt/);
   assert.doesNotMatch(pageSource, /kvk-database-planning\.js/);
-  assert.match(styleSource, /\.planning-panel\s*\{\s*height:\s*300px;\s*min-height:\s*300px;/);
+  assert.match(styleSource, /\.planning-panel\s*\{\s*height:\s*250px;\s*min-height:\s*250px;/);
+  assert.match(styleSource, /@media \(max-width:\s*760px\)[\s\S]*height:\s*300px;[\s\S]*min-height:\s*300px;/);
   assert.doesNotMatch(styleSource, /\.planning-panel\s*\{[\s\S]*height:\s*clamp\(/);
   assert.match(styleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
   assert.doesNotMatch(styleSource, /planning-scroll-status/);
