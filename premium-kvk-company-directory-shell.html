@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
-  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809b">
+  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
   <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
 </head>
 <body class="company-directory-shell-page">
@@ -32,14 +32,14 @@
 
         <section class="company-directory__panel" aria-label="Volledige bedrijvenlijst">
           <div class="company-directory__toolbar">
-            <div class="company-directory__connection">
-              <span id="company-directory-source-status" class="total-found-source-status" aria-live="polite">Volledige landelijke lijst laden…</span>
-              <button id="company-directory-retry" class="company-directory__retry" type="button" hidden>Opnieuw laden</button>
-            </div>
             <label class="search-field company-directory__search">
               <span>Zoeken</span>
               <input id="company-directory-search" type="search" placeholder="Bedrijfsnaam, KVK, plaats of contactgegeven" autocomplete="off">
             </label>
+            <div class="company-directory__connection">
+              <span id="company-directory-source-status" class="total-found-source-status" aria-live="polite">Volledige landelijke lijst laden…</span>
+              <button id="company-directory-retry" class="company-directory__retry" type="button" hidden>Opnieuw laden</button>
+            </div>
           </div>
           <div id="company-directory-table-frame" class="table-frame company-directory__table-frame">
             <table>
