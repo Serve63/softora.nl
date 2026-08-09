@@ -11,6 +11,10 @@
   width: 100%;
   flex: 1 1 auto;
 }
+.end-game-card-photo--edge-crop .end-game-card-photo-image {
+  transform: scale(1.1);
+  transform-origin: center bottom;
+}
 .end-game-goal-track {
   align-items: center;
 }
