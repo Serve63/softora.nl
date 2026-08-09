@@ -39,6 +39,12 @@
     return [408, 425, 429, 500, 502, 503, 504].includes(Number(status));
   }
 
+  function isIncompleteRefreshPayload(value) {
+    if (!value || typeof value !== 'object') return false;
+    if (value.ok === false || value.complete === false || value.freshnessConfirmed === false || value.skipped === true) return true;
+    return Object.values(value).some(isIncompleteRefreshPayload);
+  }
+
   function createAbortError() {
     const error = new Error('Mailboxverversing geannuleerd.');
     error.name = 'AbortError';
@@ -250,8 +256,7 @@
         const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
         const rejected = settled.filter((entry) => entry.status === 'rejected');
         const partialPayload = fulfilled.some((entry) => (
-          entry?.data?.ok === false || entry?.data?.complete === false ||
-          entry?.data?.freshnessConfirmed === false || Number(entry?.response?.status) !== 200
+          isIncompleteRefreshPayload(entry?.data) || Number(entry?.response?.status) !== 200
         ));
         if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
 

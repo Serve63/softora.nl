@@ -191,13 +191,22 @@ test('een nieuwere degraded response voegt alleen toe en een complete nieuwere r
   const initialAt = new Date(Date.now() - 20 * 60_000).toISOString();
   const degradedAt = new Date(Date.now() - 60_000).toISOString();
   const completeAt = new Date(Date.now() - 10_000).toISOString();
-  let messages = [{ id: 'bestaand', accountEmail: 'serve@softora.nl', uid: 101, body: 'volledig', bodyLoaded: true }];
+  let messages = [{
+    id: 'bestaand', accountEmail: 'serve@softora.nl', uid: 101, body: 'volledig', bodyLoaded: true, unread: false,
+    threadMessages: [{ id: 't1', body: 'volledig' }, { id: 't2', body: 'blijft staan' }],
+  }];
   let sync = { contentAt: initialAt, origin: 'live-api' };
   const statuses = [];
   const results = [
     {
       origin: 'live-api', contentAt: degradedAt, complete: false, degraded: true,
-      messages: [{ id: 'nieuw', accountEmail: 'serve@softora.nl', uid: 102 }],
+      messages: [
+        { id: 'nieuw', accountEmail: 'serve@softora.nl', uid: 102 },
+        {
+          id: 'bestaand', accountEmail: 'serve@softora.nl', uid: 101, unread: true,
+          threadMessages: [{ id: 't1', body: 'afgekapt' }],
+        },
+      ],
       sync: { contentAt: degradedAt, origin: 'live-api', stale: true },
     },
     {
@@ -225,6 +234,8 @@ test('een nieuwere degraded response voegt alleen toe en een complete nieuwere r
 
   assert.equal(await view.load({ openLatest: false }), false);
   assert.deepEqual(messages.map((message) => message.id), ['nieuw', 'bestaand']);
+  assert.equal(messages[1].unread, false);
+  assert.deepEqual(messages[1].threadMessages.map((message) => message.id), ['t1', 't2']);
   assert.equal(statuses.at(-1), ownerSession.MAILBOX_STALE_STATUS);
   assert.equal(sync.stale, true);
 

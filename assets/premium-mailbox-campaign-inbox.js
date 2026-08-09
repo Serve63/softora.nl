@@ -873,9 +873,8 @@
     if (!snapshot) return null;
     return { ...snapshot, complete: false, degraded: true,
       sync: { ...snapshot.sync, stale: true, refreshRecommended: true },
-      messages: snapshotFreshness.applyTombstones(snapshot.messages, snapshot.tombstones, snapshot.contentAt) };
+      messages: snapshotFreshness.applyTombstones(snapshot.messages, snapshot.tombstones, snapshot.contentAt, { authoritative: false }) };
   }
-
   function writeSessionMailboxSnapshot(data, value) {
     const cache = global.SoftoraPageBootstrapSession?.cache;
     const owner = normalizeOwner(value == null ? activeOwner : value);
@@ -888,12 +887,12 @@
     const existing = readSessionMailboxSnapshot(owner);
     const action = existing ? snapshotFreshness.decideSnapshotUpdate(existing, incoming) : 'replace';
     if (action === 'reject') return false;
+    const tombstones = snapshotFreshness.sanitizeTombstones([...(existing?.tombstones || []), ...(incoming.tombstones || [])])
+      .filter((entry) => incoming.complete !== true || Date.parse(entry.hiddenAt) > Date.parse(incoming.contentAt));
     const sourceMessages = action === 'merge-additive'
-      ? snapshotFreshness.mergeAdditiveMessages(existing.messages, incoming.messages) : incoming.messages;
-    const tombstones = snapshotFreshness.sanitizeTombstones(
-      [...(existing?.tombstones || []), ...(incoming.tombstones || [])]
-    );
-    const messages = snapshotFreshness.applyTombstones(sourceMessages, tombstones, incoming.contentAt)
+      ? snapshotFreshness.mergeSnapshotMessagesAdditively(existing, incoming, tombstones)
+      : snapshotFreshness.applyTombstones(incoming.messages, tombstones, incoming.contentAt, { authoritative: incoming.complete });
+    const messages = sourceMessages
       .slice(0, 200).map((message) => {
       const source = message && typeof message === 'object' ? message : {};
       const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
@@ -1055,7 +1054,7 @@
     const result = {
       owner,
       messages: filterMessages(
-        snapshotFreshness.applyTombstones(snapshot.messages, snapshot.tombstones, snapshot.contentAt)
+        snapshotFreshness.applyTombstones(snapshot.messages, snapshot.tombstones, snapshot.contentAt, { authoritative: snapshot.complete })
           .map(normalizeMessage),
         owner
       ),

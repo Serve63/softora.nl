@@ -31,6 +31,7 @@ function createDefaultInstantlyMailboxService({
   getCustomerSourcesByEmails,
   getUiStateValues,
   setUiStateValues,
+  onMessagesUpserted,
   logger,
 }) {
   return createInstantlyMailboxService({
@@ -52,6 +53,7 @@ function createDefaultInstantlyMailboxService({
     getCustomerSourcesByEmails,
     getUiStateValues,
     setUiStateValues,
+    onMessagesUpserted,
     logger,
   });
 }

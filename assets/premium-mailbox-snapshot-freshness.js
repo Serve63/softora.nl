@@ -46,15 +46,19 @@
     return `${account}\n${folder}\n${uid > 0 ? `uid:${uid}` : `id:${id}`}`;
   }
   function mergeAdditiveMessages(currentMessages, incomingMessages) {
-    const merged = [];
-    const positions = new Map();
-    [...(Array.isArray(incomingMessages) ? incomingMessages : []), ...(Array.isArray(currentMessages) ? currentMessages : [])]
-      .forEach((message, index) => {
-        const key = getMessageIdentityKey(message) || `unkeyed:${index}:${normalizeText(message?.id)}`;
-        if (positions.has(key)) return;
-        positions.set(key, merged.length);
-        merged.push(message);
+    const current = Array.isArray(currentMessages) ? currentMessages : [];
+    const keyOf = (message) => getMessageIdentityKey(message) || (normalizeText(message?.id || message?.messageId) ? `id:${normalizeText(message?.id || message?.messageId)}` : '');
+    const currentByKey = new Map(current.map((message) => [keyOf(message), message]).filter(([key]) => key));
+    const seen = new Set();
+    const merged = (Array.isArray(incomingMessages) ? incomingMessages : []).map((message) => {
+      const key = keyOf(message);
+      if (!key || !currentByKey.has(key)) { if (key) seen.add(key); return message; }
+      seen.add(key);
+      const previous = currentByKey.get(key);
+      const threadMessages = mergeAdditiveMessages(previous?.threadMessages, message?.threadMessages);
+      return threadMessages.length ? { ...previous, threadMessages } : previous;
     });
+    current.forEach((message) => { const key = keyOf(message); if (!key || !seen.has(key)) merged.push(message); });
     return merged;
   }
   function decideSnapshotAction(current, incoming, options = {}) {
@@ -107,13 +111,19 @@
   function addTombstone(values, identity, hiddenAt = new Date().toISOString()) {
     return sanitizeTombstones([...(Array.isArray(values) ? values : []), { identity, hiddenAt }]);
   }
-  function applyTombstones(messages, values, contentAt) {
+  function applyTombstones(messages, values, contentAt, options = {}) {
     const baseTime = Date.parse(normalizeTimestamp(contentAt));
     if (!Number.isFinite(baseTime)) return [];
     const hidden = new Set(sanitizeTombstones(values)
-      .filter((value) => Date.parse(value.hiddenAt) > baseTime)
+      .filter((value) => options.authoritative === false || Date.parse(value.hiddenAt) > baseTime)
       .map((value) => getMessageIdentityKey(value.identity)));
     return (Array.isArray(messages) ? messages : []).filter((message) => !hidden.has(getMessageIdentityKey(message)));
+  }
+  function mergeSnapshotMessagesAdditively(current, incoming, tombstones) {
+    return mergeAdditiveMessages(
+      applyTombstones(current?.messages, tombstones, current?.contentAt, { authoritative: current?.complete }),
+      applyTombstones(incoming?.messages, tombstones, incoming?.contentAt, { authoritative: incoming?.complete })
+    );
   }
   function selectSnapshot(pageSnapshot, sessionSnapshot, options = {}) {
     const page = normalizeSnapshot(pageSnapshot, { ...options, origin: 'server-bootstrap' });
@@ -124,16 +134,19 @@
     const current = pageIsCandidate ? session : page;
     const incoming = pageIsCandidate ? page : session;
     const action = decideSnapshotAction(current, incoming, options);
-    const selected = action === 'reject'
+    const tombstones = sanitizeTombstones([...(page.tombstones || []), ...(session.tombstones || [])]);
+    let selected = action === 'reject'
       ? current
       : action === 'merge-additive'
-        ? { ...incoming, messages: mergeAdditiveMessages(current.messages, incoming.messages) }
+        ? { ...incoming, messages: mergeSnapshotMessagesAdditively(current, incoming, tombstones) }
         : incoming;
-    const tombstones = sanitizeTombstones([...(page.tombstones || []), ...(session.tombstones || [])]);
+    if (action !== 'merge-additive') selected = {
+      ...selected,
+      messages: applyTombstones(selected.messages, tombstones, selected.contentAt, { authoritative: selected.complete }),
+    };
     return {
       ...selected,
       tombstones,
-      messages: applyTombstones(selected.messages, tombstones, selected.contentAt),
     };
   }
   const api = {
@@ -146,6 +159,7 @@
     isCompleteSnapshot,
     mergeAdditiveMessages,
     mergeMessagesAdditively: mergeAdditiveMessages,
+    mergeSnapshotMessagesAdditively,
     normalizeSnapshot,
     sanitizeTombstones,
     selectSnapshot,
