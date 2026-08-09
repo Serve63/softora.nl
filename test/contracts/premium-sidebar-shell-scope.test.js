@@ -387,12 +387,24 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
     /\.company-directory-shell-page \.sidebar\s*\{[^}]*bottom:\s*0 !important;[^}]*height:\s*auto !important;[^}]*min-height:\s*0 !important;[^}]*max-height:\s*none !important;/s
+  );
+  assert.match(directoryStyleSource, /height:\s*calc\(100dvh - 48px\)/);
+  assert.match(directoryStyleSource, /margin:\s*24px auto/);
+  assert.match(
+    directoryStyleSource,
+    /\.dashboard-layout\[data-sidebar-shell="canonical"\] > main\.company-directory-shell__content\s*\{[^}]*height:\s*100dvh;[^}]*min-height:\s*0 !important;[^}]*padding:\s*0 !important;/s
+  );
+  assert.match(directoryStyleSource, /grid-template-columns:\s*minmax\(300px, 390px\) minmax\(0, 1fr\)/);
+  assert.ok(
+    directoryShellSource.indexOf('class="search-field company-directory__search"') <
+      directoryShellSource.indexOf('class="company-directory__connection"'),
+    'de zoekbalk hoort links voor de verbindingsstatus te staan'
   );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
