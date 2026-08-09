@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
@@ -333,6 +335,7 @@ test('zichtbare mailbox herstelt na een storing binnen vijftien seconden', async
     clearTimeout() {},
     setInterval: () => 1,
     clearInterval() {},
+    now: () => 1,
   });
 
   controller.start();
@@ -342,6 +345,50 @@ test('zichtbare mailbox herstelt na een storing binnen vijftien seconden', async
   assert.equal(timers.at(-1).delay, refreshModule.RECOVERY_REFRESH_INTERVAL_MS);
   assert.equal(refreshModule.RECOVERY_REFRESH_INTERVAL_MS, 15_000);
   controller.destroy();
+});
+
+test('zichtbare polling blijft aan de startcadans verankerd en stapelt geen cyclustijd op', async () => {
+  const timers = [];
+  let now = 1_000;
+  const controller = refreshModule.create({
+    autoStart: false,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async () => {
+      now = 21_000;
+      return successfulResponse();
+    },
+    loadMessages: async () => true,
+    now: () => now,
+    setTimeout(handler, delay) { timers.push({ handler, delay }); return timers.length; },
+    clearTimeout() {},
+  });
+
+  controller.start();
+  assert.equal(await controller.refresh(), true);
+  assert.equal(timers.at(-1).delay, refreshModule.VISIBLE_REFRESH_INTERVAL_MS - 20_000);
+  controller.destroy();
+});
+
+test('mailbox start de herstelcontroller ook wanneer de eerste lijstload faalt', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
+  const initStart = source.indexOf('(async function initMailboxAccount()');
+  assert.notEqual(initStart, -1);
+  const initSource = source.slice(initStart, source.indexOf('\n})();\n})();', initStart));
+  assert.match(
+    initSource,
+    /finally\s*\{\s*mailboxRefreshController\?\.start\?\.\(\);\s*window\.SoftoraMailboxBoot\?\.markReady/
+  );
+});
+
+test('mailbox begrenst initfallbacks en annuleert een lijstload bij BFCache-pauze', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
+  assert.match(source, /SoftoraMailboxRequestDeadline\.requestInitJson\('\/api\/auth\/session',\s*'MAILBOX_AUTH_SESSION_TIMEOUT'\)/);
+  assert.match(source, /SoftoraMailboxRequestDeadline\.requestInitJson\(\s*'\/api\/mailbox\/accounts',\s*'MAILBOX_ACCOUNTS_TIMEOUT'\s*\)/);
+  assert.match(
+    source,
+    /window\.addEventListener\('pagehide',[\s\S]*event\?\.persisted === true[\s\S]*mailboxOwnerView\?\.cancelActive\?\.\(\)/
+  );
 });
 
 test('visible, background, focus and reconnect scheduling keep refresh bounded', () => {
