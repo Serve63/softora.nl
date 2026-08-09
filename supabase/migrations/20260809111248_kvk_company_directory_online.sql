@@ -42,9 +42,6 @@ create table if not exists public.softora_kvk_company_directory_meta (
 create index if not exists softora_kvk_company_directory_generation_idx
   on public.softora_kvk_company_directory (sync_generation);
 
-create index if not exists softora_kvk_company_directory_source_updated_idx
-  on public.softora_kvk_company_directory (source_updated_at, source_company_id);
-
 alter table public.softora_kvk_company_directory enable row level security;
 alter table public.softora_kvk_company_directory_meta enable row level security;
 
