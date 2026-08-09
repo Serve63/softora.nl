@@ -146,7 +146,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804e`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809a`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
