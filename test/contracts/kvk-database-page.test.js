@@ -135,7 +135,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-planning\.js\?v=20260809a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
@@ -333,7 +333,7 @@ test('kvk database planning merges current parallel route progress', () => {
   assert.match(scriptSource, /function getContactActiveCodes\(\)/);
 });
 
-test('kvk planning exposes the full scroll range and confirms only the real end', () => {
+test('kvk planning stays compact while exposing the full scroll range and real end', () => {
   const planning = require('../../assets/kvk-database-planning.js');
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-planning.css'), 'utf8');
@@ -347,10 +347,10 @@ test('kvk planning exposes the full scroll range and confirms only the real end'
   assert.equal(planning.planningViewportLabel('more'), 'Meer locaties hieronder');
   assert.equal(planning.planningViewportLabel('end'), 'Einde planning bereikt');
   assert.match(pageSource, /<ol class="location-list" id="location-list"><\/ol>[\s\S]*id="planning-scroll-status"/);
-  assert.match(styleSource, /\.planning-panel\s*\{[\s\S]*height:\s*clamp\(520px, 70vh, 760px\)/);
+  assert.match(styleSource, /\.planning-panel\s*\{\s*height:\s*300px;\s*min-height:\s*300px;/);
+  assert.doesNotMatch(styleSource, /\.planning-panel\s*\{[\s\S]*height:\s*clamp\(/);
   assert.match(styleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
   assert.match(styleSource, /\.planning-scroll-status\[data-state="end"\]/);
-  assert.doesNotMatch(styleSource, /\.planning-panel\s*\{[^}]*height:\s*300px/s);
 });
 
 test('kvk database shows every new Searcher result and only material Controller corrections', () => {
