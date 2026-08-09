@@ -382,8 +382,8 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,

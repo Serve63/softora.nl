@@ -65,8 +65,8 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -76,8 +76,8 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -94,10 +94,22 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*tabindex=/);
   assert.match(pageSource, /<button id="companies-total-open"[^>]*aria-label="Bekijk alle bedrijven"[^>]*title="Bekijk alle bedrijven"/);
   assert.match(pageSource, /id="companies-total-open"[\s\S]*?<svg[^>]*aria-hidden="true"/);
+  for (const buttonId of [
+    'companies-treated-open',
+    'companies-successful-found-open',
+    'companies-usable-open',
+    'companies-with-website-open',
+    'companies-without-website-open',
+    'companies-control-open',
+    'companies-definitive-open',
+  ]) {
+    assert.match(pageSource, new RegExp(`id="${buttonId}"`));
+  }
   assert.doesNotMatch(pageSource, /BEKIJK ALLE BEDRIJVEN|Bekijk alle bedrijven →/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*aria-controls=/);
   assert.doesNotMatch(pageSource, /id="total-found-source-status"/);
   assert.doesNotMatch(pageSource, /data-collapsible="total-found"/);
+  assert.doesNotMatch(pageSource, /data-collapsible="(?:usable|with-website|without-website|unusable)"/);
   assert.doesNotMatch(pageSource, /<h2 id="table-title">Totaal Gevonden<\/h2>/);
   assert.doesNotMatch(pageSource, /aria-label="Totaal Gevonden inklappen"/);
   assert.match(pageSource, /<div hidden aria-hidden="true">[\s\S]*?id="main-table-frame"/);
@@ -119,8 +131,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809c/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809d/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
@@ -143,14 +155,19 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
   assert.equal(totalFound.REQUEST_TIMEOUT_MS, 30000);
   assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /q=Caf%C3%A9\+%26\+Zoon/);
   assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /after=200/);
+  assert.match(totalFound.buildCompanyApiUrl('', 0, 'controle'), /categorie=controle/);
+  assert.equal(
+    totalFound.directoryPageUrl('zonder-werkende-website'),
+    '/kvk-database-bedrijven?categorie=zonder-werkende-website'
+  );
   assert.deepEqual(totalFound.companyFetchOptions(), {
     cache: 'no-store',
     credentials: 'same-origin',
   });
   assert.match(scriptSource, /openButton\.addEventListener\('click', openDirectory\)/);
   assert.doesNotMatch(scriptSource, /card\.addEventListener/);
-  assert.match(styleSource, /\.stat-card-total-found__open\s*\{/);
-  assert.match(styleSource, /\.stat-card-total-found__open:focus-visible/);
+  assert.match(styleSource, /\.stat-card-directory__open\s*\{/);
+  assert.match(styleSource, /\.stat-card-directory__open:focus-visible/);
   assert.match(
     styleSource,
     /\.company-directory-shell-page \.sidebar\s*\{[^}]*bottom:\s*0 !important;[^}]*height:\s*auto !important;[^}]*min-height:\s*0 !important;[^}]*max-height:\s*none !important;/s
@@ -159,7 +176,7 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
   assert.match(styleSource, /\.company-directory\s*\{[^}]*--ink:\s*#252229;/s);
   assert.match(scriptSource, /Online bedrijvendatabase is tijdelijk niet bereikbaar\./);
   assert.doesNotMatch(styleSource, /content:\s*["']/);
-  assert.match(scriptSource, /targetWindow\?\.location\?\.assign\(DIRECTORY_PAGE_URL\)/);
+  assert.match(scriptSource, /targetWindow\?\.location\?\.assign\(directoryPageUrl\(category\)\)/);
   assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
   assert.match(scriptSource, /if \(!reset && \(state\.loading \|\| !state\.hasMore\)\) return;/);
   assert.match(scriptSource, /if \(!state\.query\) state\.total = Math\.max/);
@@ -173,6 +190,8 @@ test('totaal gevonden opent de productiepagina met de volledige online bedrijfsb
     top: { location: { assign(url) { assignedUrl = url; } } },
   });
   assert.equal(assignedUrl, '/kvk-database-bedrijven');
+  totalFound.navigateToDirectory({ location: { assign(url) { assignedUrl = url; } } }, 'controle');
+  assert.equal(assignedUrl, '/kvk-database-bedrijven?categorie=controle');
   const untreatedHtml = totalFound.companyRowHtml({
     bedrijfsnaam: 'Nog te doen B.V.',
     kvk_nummer: '12345678',
@@ -223,6 +242,9 @@ test('online bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkpro
     'company-directory-source-status',
     'company-directory-retry',
     'company-directory-total',
+    'company-directory-title',
+    'company-directory-intro',
+    'company-directory-total-label',
   ]) {
     elements.set(id, makeElement());
   }
@@ -231,16 +253,18 @@ test('online bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkpro
   const controller = totalFound.mountDirectory({
     AbortController,
     clearTimeout,
-    document: { getElementById(id) { return elements.get(id) || null; } },
+    document: { title: '', getElementById(id) { return elements.get(id) || null; } },
+    location: { search: '?categorie=controle' },
     setTimeout,
     async fetch(url, options) {
       fetchedOptions = options;
       assert.match(url, /^\/api\/kvk-database\/company-directory\?/);
+      assert.match(url, /categorie=controle/);
       return {
         ok: true,
         async json() {
           return {
-            total: 2_924_398,
+            total: 24_360,
             has_more: true,
             next_cursor: 123,
             rows: [{ bedrijfsnaam: 'Scouting St. Joris Haaren', kvk_nummer: '40217416' }],
@@ -253,10 +277,13 @@ test('online bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkpro
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(fetchedOptions.credentials, 'same-origin');
   assert.equal(controller.state.cursor, 123);
-  assert.equal(controller.state.total, 2_924_398);
+  assert.equal(controller.state.category, 'controle');
+  assert.equal(controller.state.total, 24_360);
   assert.equal(controller.state.rows.length, 1);
   assert.match(elements.get('company-directory-body').innerHTML, /Scouting St\. Joris Haaren/);
-  assert.equal(elements.get('company-directory-total').textContent, '2.924.398');
+  assert.equal(elements.get('company-directory-total').textContent, '24.360');
+  assert.equal(elements.get('company-directory-title').textContent, 'Bedrijven in controle');
+  assert.equal(elements.get('company-directory-total-label').textContent, 'Controle');
   assert.equal(elements.get('company-directory-retry').hidden, true);
   assert.equal(elements.get('company-directory-source-status').textContent, '');
   assert.equal(elements.get('company-directory-source-status').dataset.tone, 'ready');
@@ -438,8 +465,8 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.match(controlStyles, /\.database-fill-toggle__track/);
   assert.match(controlStyles, /translateX\(15px\)/);
   assert.match(controlStyles, /cursor: default/);
-  assert.match(pageSource, /stat-card stat-card-usable kvk-stat-card-enhanced[\s\S]*?<span>Mét Website<\/span>/);
-  assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website kvk-stat-card-enhanced/);
+  assert.match(pageSource, /stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced[\s\S]*?<span>Mét Website<\/span>/);
+  assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced/);
   assert.match(metricsStyles, /\.stat-card-without-website \.stat-main > span/);
   assert.match(metricsStyles, /white-space: nowrap/);
 });

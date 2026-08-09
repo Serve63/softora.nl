@@ -230,6 +230,44 @@ test('kvk database snapshot service keeps successful found across a usable reset
   assert.deepEqual(storedRow.payload.successfulFoundTracker, { total: 8, currentUsable: 2 });
 });
 
+test('kvk database snapshot service trusts an authoritative successful-found count from the source', async () => {
+  const snapshot = createSnapshot();
+  snapshot.state.successful_found = 7_123;
+  let storedRow = null;
+  const service = createKvkDatabaseSnapshotService({
+    kvkDatabaseSyncToken: 'secret-token',
+    fetchSupabaseRowByKeyViaRest: async () => ({
+      ok: true,
+      body: {
+        payload: {
+          snapshot: createSnapshot(),
+          successfulFoundTracker: { total: 99_999, currentUsable: 99_999 },
+        },
+      },
+    }),
+    upsertSupabaseRowViaRest: async (row) => {
+      storedRow = row;
+      return { ok: true };
+    },
+  });
+  const response = createJsonResponse();
+
+  await service.sendPostSnapshotResponse(
+    {
+      headers: { authorization: 'Bearer secret-token' },
+      body: { snapshot },
+    },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload.summary.successfulFound, 7_123);
+  assert.deepEqual(storedRow.payload.successfulFoundTracker, {
+    total: 7_123,
+    currentUsable: 6,
+  });
+});
+
 test('kvk database snapshot service never overwrites its cumulative counter when the prior read fails', async () => {
   let writes = 0;
   const service = createKvkDatabaseSnapshotService({
