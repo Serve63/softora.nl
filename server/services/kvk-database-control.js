@@ -20,6 +20,7 @@ function createKvkDatabaseControlService(deps = {}) {
     controlReadTimeoutMs = 15_000,
     controlWriteTimeoutMs = 30_000,
     workerStaleAfterMs = 150_000,
+    workerProgressStaleAfterMs = 30 * 60_000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
@@ -72,6 +73,9 @@ function createKvkDatabaseControlService(deps = {}) {
       workerState: 'offline',
       workerMessage: '',
       workerHeartbeatAt: '',
+      workerProgressAt: '',
+      queuePending: null,
+      queueHeadKvk: '',
       currentBatch: '',
       controlRevision: 0,
       updatedAt: '',
@@ -94,6 +98,9 @@ function createKvkDatabaseControlService(deps = {}) {
       workerState: WORKER_STATES.has(workerState) ? workerState : 'offline',
       workerMessage: truncateText(payload.workerMessage || '', 240),
       workerHeartbeatAt: normalizeString(payload.workerHeartbeatAt || ''),
+      workerProgressAt: normalizeString(payload.workerProgressAt || ''),
+      queuePending: typeof payload.queuePending === 'boolean' ? payload.queuePending : null,
+      queueHeadKvk: truncateText(payload.queueHeadKvk || '', 32),
       currentBatch: truncateText(payload.currentBatch || '', 160),
       controlRevision: Math.max(0, Number(payload.controlRevision || 0)),
       updatedAt: normalizeString(payload.updatedAt || ''),
@@ -123,15 +130,42 @@ function createKvkDatabaseControlService(deps = {}) {
         stale: true,
       };
     }
-    return { ...worker, stale: false };
+    if (worker.queuePending === false) {
+      return {
+        ...worker,
+        workerState: 'idle',
+        workerMessage: `${WORKER_LABELS[worker.workerKey]}: wachtrij leeg; wacht op nieuw werk.`,
+        stale: false,
+        stalled: false,
+      };
+    }
+    const progressAt = Date.parse(worker.workerProgressAt || '');
+    const progressAgeMs = Number.isFinite(progressAt)
+      ? Math.max(0, now().getTime() - progressAt)
+      : 0;
+    if (
+      worker.queuePending === true &&
+      worker.workerState === 'running' &&
+      Number.isFinite(progressAt) &&
+      progressAgeMs > workerProgressStaleAfterMs
+    ) {
+      return {
+        ...worker,
+        workerState: 'waiting',
+        workerMessage: `${WORKER_LABELS[worker.workerKey]}: heartbeat actief maar geen opgeslagen voortgang; continuiteitsbewaking moet hervatten.`,
+        stale: false,
+        stalled: true,
+      };
+    }
+    return { ...worker, stale: false, stalled: false };
   }
 
   function combinedWorkerState(workers, enabled) {
     const states = Object.values(workers).map((worker) => worker.workerState);
     if (states.includes('error')) return 'error';
     if (enabled && states.includes('starting')) return 'starting';
-    if (states.includes('running')) return 'running';
     if (states.includes('waiting')) return 'waiting';
+    if (states.includes('running')) return 'running';
     if (states.every((state) => state === 'idle')) return 'idle';
     return states.every((state) => state === 'offline') ? 'offline' : 'idle';
   }
@@ -302,6 +336,9 @@ function createKvkDatabaseControlService(deps = {}) {
       workerState,
       workerMessage: req?.body?.workerMessage || '',
       workerHeartbeatAt: updatedAt,
+      workerProgressAt: req?.body?.workerProgressAt || '',
+      queuePending: req?.body?.queuePending,
+      queueHeadKvk: req?.body?.queueHeadKvk || '',
       currentBatch: req?.body?.currentBatch || '',
       controlRevision: req?.body?.controlRevision ?? beforeReport.control.revision,
       updatedAt,
