@@ -14,6 +14,8 @@
 
   const COMPANY_API_URL = '/api/kvk-database/company-directory';
   const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
+  const DIRECTORY_CONTENT_PAGE_URL = '/premium-kvk-company-directory';
+  const SIDEBAR_CONTENT_PARAM = 'softora_sidebar_content';
   const PAGE_SIZE = 100;
   const REQUEST_TIMEOUT_MS = 30000;
   const DIRECTORY_CATEGORIES = Object.freeze({
@@ -184,6 +186,19 @@
       : `${DIRECTORY_PAGE_URL}?categorie=${encodeURIComponent(normalizedCategory)}`;
   }
 
+  function directoryContentPageUrl(category = 'all') {
+    const params = new URLSearchParams({ [SIDEBAR_CONTENT_PARAM]: '1' });
+    const normalizedCategory = normalizeDirectoryCategory(category);
+    if (normalizedCategory !== 'all') params.set('categorie', normalizedCategory);
+    return `${DIRECTORY_CONTENT_PAGE_URL}?${params.toString()}`;
+  }
+
+  function isSidebarContentFrame(browserWindow) {
+    if (!browserWindow?.top || browserWindow.top === browserWindow) return false;
+    const params = new URLSearchParams(String(browserWindow?.location?.search || ''));
+    return params.get(SIDEBAR_CONTENT_PARAM) === '1';
+  }
+
   function buildCompanyApiUrl(query, cursor, category = 'all') {
     const params = new URLSearchParams({
       q: String(query || '').trim(),
@@ -204,6 +219,10 @@
   }
 
   function navigateToDirectory(browserWindow, category = 'all') {
+    if (isSidebarContentFrame(browserWindow)) {
+      browserWindow.location?.assign(directoryContentPageUrl(category));
+      return;
+    }
     const targetWindow = browserWindow?.top && browserWindow.top !== browserWindow
       ? browserWindow.top
       : browserWindow;
@@ -385,6 +404,7 @@
     COMPANY_API_URL,
     DASHBOARD_DIRECTORY_BUTTONS,
     DIRECTORY_CATEGORIES,
+    DIRECTORY_CONTENT_PAGE_URL,
     DIRECTORY_PAGE_URL,
     PAGE_SIZE,
     REQUEST_TIMEOUT_MS,
@@ -392,7 +412,9 @@
     companyFetchOptions,
     companyRowHtml,
     companyStatus,
+    directoryContentPageUrl,
     directoryPageUrl,
+    isSidebarContentFrame,
     isTreated,
     missingLabel,
     mount,
