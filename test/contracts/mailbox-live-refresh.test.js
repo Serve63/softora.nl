@@ -37,6 +37,23 @@ function account(email) {
   };
 }
 
+function withSyncReadHealth(messages = []) {
+  const uids = messages.map((message) => Number(message?.uid) || 0).filter(Boolean);
+  Object.defineProperty(messages, 'syncReadHealth', {
+    value: {
+      uidValidity: 777,
+      folderMissing: false,
+      parseFailures: [],
+      selectedUids: uids,
+      yieldedUids: uids,
+      missingUids: [],
+      selectedCount: uids.length,
+      yieldedCount: uids.length,
+    },
+  });
+  return messages;
+}
+
 function responseRecorder() {
   return {
     statusCode: 200,
@@ -140,6 +157,7 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
   const service = createMailboxSyncService({
     mailboxIndexStore: {
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       finishSync: async () => ({ ok: true }),
       listMessageUidsForAccount: async () => [91, 92],
       listMatchingMessagesForAccounts: async () => { historyCalls += 1; return []; },
@@ -149,7 +167,10 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
     },
     assertReadableAccount: () => selected,
     canUseMailboxIndex: () => true,
-    fetchMessagesFromImap: async (input) => { fetches.push(input); return []; },
+    fetchMessagesFromImap: async (input) => {
+      fetches.push(input);
+      return withSyncReadHealth([]);
+    },
     getSafeLimit: (value) => Number(value) || 50,
     getAccounts: () => [selected],
     normalizeEmail: (value) => String(value || '').toLowerCase(),
@@ -157,21 +178,20 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
     logger: { error() {} },
   });
 
-  const result = await service.syncMailbox({
-    owner: 'serve',
-    folders: ['inbox'],
+  const result = await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: 'inbox',
     limit: 4,
     campaignOnly: true,
     incrementalOnly: true,
-    maxConcurrentAccounts: 3,
   });
 
   assert.equal(result.ok, true);
   assert.equal(historyCalls, 0);
   assert.deepEqual(fetches[0].indexedUids, [91, 92]);
   assert.equal(fetches[0].campaignHistory, false);
-  assert.equal(result.results[0].historyBackfill, false);
-  assert.equal(result.results[0].incrementalOnly, true);
+  assert.equal(result.historyBackfill, false);
+  assert.equal(result.incrementalOnly, true);
 });
 
 test('fast IMAP refresh drains a burst larger than four messages in one cycle', async () => {
@@ -180,6 +200,7 @@ test('fast IMAP refresh drains a burst larger than four messages in one cycle', 
   const service = createMailboxSyncService({
     mailboxIndexStore: {
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       finishSync: async () => ({ ok: true }),
       listMessageUidsForAccount: async () => [],
       upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
@@ -188,7 +209,9 @@ test('fast IMAP refresh drains a burst larger than four messages in one cycle', 
     canUseMailboxIndex: () => true,
     fetchMessagesFromImap: async (input) => {
       fetchInput = input;
-      return Array.from({ length: 8 }, (_item, index) => ({ uid: 100 + index }));
+      return withSyncReadHealth(
+        Array.from({ length: 8 }, (_item, index) => ({ uid: 100 + index }))
+      );
     },
     getSafeLimit: (value) => Math.min(100, Math.max(1, Number(value) || 50)),
     getAccounts: () => [selected],
@@ -197,13 +220,13 @@ test('fast IMAP refresh drains a burst larger than four messages in one cycle', 
     logger: { error() {} },
   });
 
-  const result = await service.syncMailbox({
-    owner: 'serve', folders: ['inbox'], limit: 4,
+  const result = await service.syncMailboxFolder({
+    accountEmail: selected.email, folder: 'inbox', limit: 4,
     campaignOnly: true, incrementalOnly: true, fastRefresh: true,
   });
 
   assert.equal(fetchInput.limit, CAMPAIGN_SYNC_FAST_FETCH_LIMIT + 1);
-  assert.equal(result.results[0].synced, 8);
+  assert.equal(result.synced, 8);
   assert.equal(result.complete, true);
 });
 

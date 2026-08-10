@@ -15,10 +15,30 @@ function createAccount(email) {
   return { email, imapConfigured: true, imapHost: 'imap.example.test' };
 }
 
+function withSyncReadHealth(messages = [], overrides = {}) {
+  const selectedUids = messages.map((message) => Number(message?.uid) || 0).filter(Boolean);
+  Object.defineProperty(messages, 'syncReadHealth', {
+    configurable: true,
+    value: {
+      uidValidity: 777,
+      folderMissing: false,
+      parseFailures: [],
+      selectedUids,
+      yieldedUids: selectedUids,
+      missingUids: [],
+      selectedCount: selectedUids.length,
+      yieldedCount: selectedUids.length,
+      ...overrides,
+    },
+  });
+  return messages;
+}
+
 function createService(overrides = {}) {
   const accounts = overrides.accounts || [createAccount('serve@softora.nl')];
   const mailboxIndexStore = {
     acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-token' }),
+    prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
     upsertMessages: async () => ({ ok: true, upserted: 0 }),
     finishSync: async () => ({ ok: true }),
     ...overrides.mailboxIndexStore,
@@ -27,7 +47,7 @@ function createService(overrides = {}) {
     mailboxIndexStore,
     assertReadableAccount: (email) => accounts.find((account) => account.email === email) || createAccount(email),
     canUseMailboxIndex: () => true,
-    fetchMessagesFromImap: overrides.fetchMessagesFromImap || (async () => []),
+    fetchMessagesFromImap: overrides.fetchMessagesFromImap || (async () => withSyncReadHealth([])),
     getSafeLimit: (value) => Number(value) || 4,
     getAccounts: () => accounts,
     normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
@@ -85,7 +105,7 @@ test('mailbox sync runs no more than three accounts concurrently', async () => {
       maximumActive = Math.max(maximumActive, active);
       await new Promise((resolve) => setTimeout(resolve, 5));
       active -= 1;
-      return [];
+      return withSyncReadHealth([]);
     },
   });
 
@@ -172,9 +192,9 @@ test('fast IMAP cap is complete at 20 and honestly partial at 21 or more', async
     },
     fetchMessagesFromImap: async ({ limit }) => {
       requestedLimits.push(limit);
-      return Array.from({ length: providerCount }, (_item, index) => ({
+      return withSyncReadHealth(Array.from({ length: providerCount }, (_item, index) => ({
         uid: index + 1, id: `inbox:${index + 1}`,
-      }));
+      })));
     },
   });
 
@@ -262,7 +282,7 @@ test('snapshot invalidation failure prevents freshness confirmation after an ind
         return { ok: true };
       },
     },
-    fetchMessagesFromImap: async () => [{ uid: 91, id: 'inbox:91' }],
+    fetchMessagesFromImap: async () => withSyncReadHealth([{ uid: 91, id: 'inbox:91' }]),
     invalidateCampaignSnapshot: async () => ({ ok: false }),
   });
 
@@ -304,7 +324,7 @@ test('an uncertain index write never finishes its lease or claims mailbox freshn
         return { ok: true };
       },
     },
-    fetchMessagesFromImap: async () => [{ uid: 91, id: 'inbox:91' }],
+    fetchMessagesFromImap: async () => withSyncReadHealth([{ uid: 91, id: 'inbox:91' }]),
   });
 
   const result = await service.syncMailbox({ folders: ['inbox'] });
@@ -357,7 +377,7 @@ test('an already expired run deadline starts no lock or provider work', async ()
     },
     fetchMessagesFromImap: async () => {
       providerCalls += 1;
-      return [];
+      return withSyncReadHealth([]);
     },
   });
 
@@ -394,7 +414,7 @@ test('a 92-of-113 sync is reported honestly as partial without dropping successf
     accounts,
     fetchMessagesFromImap: async ({ account }) => {
       if (!successfulAccounts.has(account.email)) throw new Error('tijdelijke accountfout');
-      return [];
+      return withSyncReadHealth([]);
     },
   });
 
@@ -426,7 +446,9 @@ test('one timed-out account cannot block another account from being indexed', as
       },
     },
     fetchMessagesFromImap: async ({ account, signal }) => {
-      if (account.email === 'healthy@softora.nl') return [{ uid: 7, id: 'inbox:7' }];
+      if (account.email === 'healthy@softora.nl') {
+        return withSyncReadHealth([{ uid: 7, id: 'inbox:7' }]);
+      }
       return new Promise((resolve, reject) => {
         const abort = () => reject(signal.reason);
         if (signal.aborted) abort();
@@ -470,7 +492,7 @@ test('deadline aborts an in-flight index write and prevents late invalidation or
         return { ok: true };
       },
     },
-    fetchMessagesFromImap: async () => [{ uid: 91, id: 'inbox:91' }],
+    fetchMessagesFromImap: async () => withSyncReadHealth([{ uid: 91, id: 'inbox:91' }]),
     invalidateCampaignSnapshot: async () => {
       invalidations += 1;
       return { ok: true };

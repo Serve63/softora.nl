@@ -12,6 +12,12 @@ const {
   normalizeMailboxAtomicCommitResult,
 } = require('./mailbox-index-atomic-commit');
 const { createMailboxSyncStateStore } = require('./mailbox-sync-runtime');
+const {
+  buildMailboxGenerationMessageKey,
+  normalizeMailboxUidValidity,
+  resolveMailboxBatchUidValidity,
+} = require('./mailbox-uid-validity');
+const { createMailboxUidValidityStore } = require('./mailbox-uid-validity-store');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -27,7 +33,7 @@ const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
-  'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,softora_read_at,starred,reply_dismissed_at,has_body,body_truncated,payload';
+  'message_key,account_email,folder,uid,uid_validity,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,softora_read_at,starred,reply_dismissed_at,has_body,body_truncated,payload';
 
 function createMailboxIndexStore(deps = {}) {
   const {
@@ -162,6 +168,7 @@ function createMailboxIndexStore(deps = {}) {
     tableName: MAILBOX_INDEX_TABLES.syncState,
     defaultLockTtlMs: SYNC_LOCK_TTL_MS,
   });
+  const { prepareUidValidity } = createMailboxUidValidityStore({ run, buildSyncKey, normalizeString });
 
   function parseUidFromMessage(message) {
     const uid = Number(message && message.uid);
@@ -199,8 +206,8 @@ function createMailboxIndexStore(deps = {}) {
     }));
   }
 
-  function buildMessageKey(accountEmail, folder, uid) {
-    return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}|${Number(uid) || 0}`;
+  function buildMessageKey(accountEmail, folder, uid, uidValidity = 0) {
+    return buildMailboxGenerationMessageKey(accountEmail, folder, uid, uidValidity);
   }
 
   function buildProviderMessageKey(provider, providerId) {
@@ -215,16 +222,20 @@ function createMailboxIndexStore(deps = {}) {
     return Math.max(1, digest.readUInt32BE(0) & 0x7fffffff);
   }
 
-  function buildMessageRow(message, accountEmail, folder, index = 0) {
+  function buildMessageRow(message, accountEmail, folder, index = 0, uidValidity = 0) {
     const normalizedFolder = normalizeFolder(folder || message?.folder);
     const uid = parseUidFromMessage(message);
+    const normalizedUidValidity = normalizeMailboxUidValidity(
+      uidValidity || message?.uidValidity
+    );
     const dateIso = parseDateIso(message && message.date);
     const body = trimBodyForStorage(message, index);
     return {
-      message_key: buildMessageKey(accountEmail, normalizedFolder, uid),
+      message_key: buildMessageKey(accountEmail, normalizedFolder, uid, normalizedUidValidity),
       account_email: normalizeEmail(accountEmail),
       folder: normalizedFolder,
       uid,
+      uid_validity: normalizedUidValidity || null,
       provider_id: normalizeString(message && message.id) || `${normalizedFolder}:${uid}`,
       message_id: normalizeString(message && message.messageId),
       in_reply_to: normalizeString(message && message.inReplyTo),
@@ -286,6 +297,7 @@ function createMailboxIndexStore(deps = {}) {
     const normalized = {
       id: normalizeString(row.provider_id) || `${folder}:${uid}`,
       uid,
+      uidValidity: normalizeMailboxUidValidity(row.uid_validity),
       folder,
       accountEmail: normalizeEmail(row.account_email),
       from: normalizeString(row.sender_name) || normalizeString(row.sender_email) || 'Onbekend',
@@ -954,16 +966,32 @@ function createMailboxIndexStore(deps = {}) {
 
   async function upsertMessages({
     accountEmail, folder = 'inbox', messages = [], signal, mutationId, requestKey,
+    syncLockToken = '', uidValidity = 0,
   } = {}) {
-    const rows = (Array.isArray(messages) ? messages : []).map(
-      (message, index) => buildMessageRow(message, accountEmail, folder, index)
+    const sourceMessages = Array.isArray(messages) ? messages : [];
+    const generation = resolveMailboxBatchUidValidity(sourceMessages, uidValidity);
+    if (!generation.ok) {
+      return { ok: false, unavailable: false, data: null, error: generation.error };
+    }
+    const normalizedUidValidity = generation.uidValidity;
+    const rows = sourceMessages.map(
+      (message, index) => buildMessageRow(
+        message, accountEmail, folder, index, normalizedUidValidity
+      )
     )
       .filter((row) => row.uid > 0);
-    if (!rows.length) return { ok: true, data: [], upserted: 0 };
     const atomicCommit = Boolean(normalizeString(mutationId) || normalizeString(requestKey));
+    if (!rows.length && !atomicCommit) return { ok: true, data: [], upserted: 0 };
     const result = await run('upsert-messages', (client) => atomicCommit
       ? createMailboxAtomicCommitQuery(client, {
-          mutationId, requestKey, rows, result: { source: 'imap-sync' },
+          mutationId,
+          requestKey,
+          rows,
+          result: {
+            source: 'imap-sync',
+            syncLockToken: normalizeString(syncLockToken),
+            uidValidity: normalizedUidValidity,
+          },
         })
       : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
           onConflict: 'message_key', defaultToNull: false,
@@ -1060,7 +1088,8 @@ function createMailboxIndexStore(deps = {}) {
         .from(MAILBOX_INDEX_TABLES.messages)
         .update({ deleted_at: null, updated_at: isoNow() })
         .eq('account_email', normalizeEmail(accountEmail))
-        .eq('folder', normalizedFolder);
+        .eq('folder', normalizedFolder)
+        .is('generation_superseded_at', null);
       if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
         return query.eq('uid', parsedUid).select('message_key');
       }
@@ -1136,6 +1165,7 @@ function createMailboxIndexStore(deps = {}) {
     markMessageDeleted,
     markMessageRead,
     markMessageReplyDismissed,
+    prepareUidValidity,
     restoreMessage,
     normalizeMessageRow,
     stableProviderUid,

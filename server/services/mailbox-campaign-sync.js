@@ -18,6 +18,7 @@ const {
   getAbortReason,
   summarizeMailboxSyncResults,
 } = require('./mailbox-sync-runtime');
+const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 10_000;
@@ -526,6 +527,37 @@ function createMailboxSyncService({
         // This checkpoint guarantees that a response arriving after our hard
         // deadline can never start a late Supabase write.
         mutationContext?.assertActive();
+        // A provider-side missing folder is already an explicit incomplete
+        // read. Do not let the absence of UIDVALIDITY mask that more precise
+        // failure, and never mutate/reset the durable generation from a read
+        // that did not actually open the target mailbox.
+        if (messages.syncReadHealth?.folderMissing === true) {
+          return { messages, saved: { ok: true, upserted: 0 } };
+        }
+        const uidValidity = normalizeMailboxUidValidity(messages.syncReadHealth?.uidValidity);
+        if (!uidValidity) {
+          const error = new Error('IMAP-provider gaf geen geldige UIDVALIDITY voor deze mailboxmap.');
+          error.code = 'MAILBOX_SYNC_UIDVALIDITY_UNAVAILABLE';
+          throw error;
+        }
+        if (!mutationContext) {
+          if (typeof mailboxIndexStore.prepareUidValidity !== 'function') {
+            const error = new Error('Duurzame UIDVALIDITY-voorbereiding is niet beschikbaar.');
+            error.code = 'MAILBOX_SYNC_UIDVALIDITY_STORE_UNAVAILABLE';
+            throw error;
+          }
+          const prepared = await mailboxIndexStore.prepareUidValidity({
+            accountEmail: account.email,
+            folder: normalizedFolder,
+            lockToken: lock.lockToken,
+            uidValidity,
+            signal: mutationSignal,
+          });
+          mutationContext?.assertActive();
+          if (!prepared?.ok) {
+            throw prepared?.error || new Error('UIDVALIDITY-voorbereiding is mislukt.');
+          }
+        }
         const saved = await mailboxIndexStore.upsertMessages({
           accountEmail: account.email,
           folder: normalizedFolder,
@@ -533,6 +565,8 @@ function createMailboxSyncService({
           signal: mutationSignal,
           mutationId: mutationContext?.mutationId,
           requestKey: mutationContext?.requestKey,
+          syncLockToken: lock.lockToken,
+          uidValidity,
         });
         mutationContext?.assertActive();
         if (!saved || saved.ok === false) {
