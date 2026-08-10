@@ -45,10 +45,12 @@
   function crestMarkup(club, name, className) {
     const shellClass = className === 'crest' ? 'crest-shell' : 'route-crest-shell';
     const initials = escapeHtml(crestInitials(name));
-    const badge = club?.badge
-      ? `<img class="${className}" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.remove()">`
+    const hasBadge = Boolean(club?.badge);
+    const fallback = `<span class="${className} ${className}-fallback"${hasBadge ? ' hidden' : ''}>${initials}</span>`;
+    const badge = hasBadge
+      ? `<img class="${className}" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.previousElementSibling.hidden=false;this.remove()">`
       : '';
-    return `<span class="${shellClass}" aria-hidden="true"><span class="${className} ${className}-fallback">${initials}</span>${badge}</span>`;
+    return `<span class="${shellClass}" aria-hidden="true">${fallback}${badge}</span>`;
   }
 
   function roleFor(position) {

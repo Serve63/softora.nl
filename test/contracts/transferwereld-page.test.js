@@ -37,6 +37,7 @@ test('transferwereld exposes the five active analysis tabs and defaults to fee s
   assert.match(html, /transferwereld-scope-data\.js\?v=20260810a/);
   assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
   assert.match(html, /transferwereld-deals\.js\?v=20260810a/);
+  assert.match(html, /transferwereld\.js\?v=20260810b/);
   assert.doesNotMatch(html, /id="transfer-direction"/);
   const script = read('assets/transferwereld.js');
   assert.match(script, /\[\.\.\.deals\]\.sort\(\(left, right\) => right\.feeValue - left\.feeValue \|\| left\.rank - right\.rank\)/);
@@ -106,11 +107,12 @@ test('transfermarkt club ids resolve translated and out-of-scope counterpart cre
   assert.equal(westHamDeal.sourceClub.badge, 'https://tmssl.akamaized.net//images/wappen/head/379.png?lm=1');
 });
 
-test('every crest render has a visible initials fallback if the image is unavailable', () => {
+test('crest fallbacks stay hidden behind real logos and appear only after image failure', () => {
   const script = read('assets/transferwereld.js');
   const css = read('assets/transferwereld.css');
   assert.match(script, /function crestMarkup/);
-  assert.match(script, /onerror="this\.remove\(\)"/);
+  assert.match(script, /hasBadge \? ' hidden' : ''/);
+  assert.match(script, /onerror="this\.previousElementSibling\.hidden=false;this\.remove\(\)"/);
   assert.doesNotMatch(script, /route-crest-placeholder/);
   assert.match(css, /\.crest-fallback, \.route-crest-fallback/);
 });
