@@ -11,6 +11,11 @@ const migrationPath = path.join(
   '../../supabase/migrations/20260810152657_mailbox_campaign_lineage_index.sql'
 );
 const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+const hardeningMigrationPath = path.join(
+  __dirname,
+  '../../supabase/migrations/20260810154015_harden_mailbox_campaign_lineage_replicas.sql'
+);
+const hardeningMigrationSql = fs.readFileSync(hardeningMigrationPath, 'utf8');
 
 const baseSchemaSql = `
   create role anon;
@@ -54,9 +59,16 @@ async function createBaseDatabase() {
   return db;
 }
 
-async function applyMigration(db) {
+async function applyFoundationMigration(db) {
   await db.exec('begin');
   await db.exec(migrationSql);
+  await db.exec('commit');
+}
+
+async function applyMigrations(db) {
+  await applyFoundationMigration(db);
+  await db.exec('begin');
+  await db.exec(hardeningMigrationSql);
   await db.exec('commit');
 }
 
@@ -75,7 +87,7 @@ test('real PostgreSQL executes bounded lineage across scale, deep context, recon
 }, async () => {
   const db = await createBaseDatabase();
   try {
-    await applyMigration(db);
+    await applyMigrations(db);
     await db.exec(`
       alter table public.softora_mailbox_messages
         disable trigger softora_refresh_mailbox_message_lineage;
@@ -496,6 +508,142 @@ test('real PostgreSQL executes bounded lineage across scale, deep context, recon
       preserved.rows[0].payload.automatedReplyEvidenceSource,
       /instantly:webhook:auto_reply_received/
     );
+  } finally {
+    await db.close();
+  }
+});
+
+test('real PostgreSQL keeps one exact label replica and fails closed on conflicting Message-ID reuse', {
+  timeout: 20_000,
+}, async () => {
+  const db = await createBaseDatabase();
+  try {
+    await applyFoundationMigration(db);
+    await db.exec(`
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        sender_email, recipients_text, subject, date, payload
+      ) values (
+        'sent:replica-root', 'serve290@gmail.com', 'sent', 1, 'sent:replica-root',
+        '<replica-root@softora.test>', 'serve290@gmail.com', 'salon@example.test',
+        'Kleine vraag over jullie website', '2026-08-07T08:00:00Z',
+        '{"originalCampaignOutbound":true,"direction":"sent"}'::jsonb
+      ), (
+        'coldmail:replica-root', 'serve290@gmail.com', 'coldmail', 2,
+        'coldmail:replica-root', '<replica-root@softora.test>',
+        'serve290@gmail.com', 'salon@example.test',
+        'Kleine vraag over jullie website', '2026-08-07T08:00:00Z', '{}'::jsonb
+      ), (
+        'inbox:replica-human', 'serve290@gmail.com', 'inbox', 3,
+        'inbox:replica-human', '<replica-human@example.test>',
+        'salon@example.test', 'serve290@gmail.com',
+        'Re: Kleine vraag over jullie website', '2026-08-07T09:00:00Z',
+        '{"direction":"received"}'::jsonb
+      ), (
+        'sent:replica-followup', 'serve290@gmail.com', 'sent', 4,
+        'sent:replica-followup', '<replica-followup@softora.test>',
+        'serve290@gmail.com', 'salon@example.test',
+        'Re: Kleine vraag over jullie website', '2026-08-07T09:10:00Z',
+        '{"direction":"sent"}'::jsonb
+      ), (
+        'inbox:replica-final', 'serve290@gmail.com', 'inbox', 5,
+        'inbox:replica-final', '<replica-final@example.test>',
+        'salon@example.test', 'serve290@gmail.com',
+        'Re: Kleine vraag over jullie website', '2026-08-07T09:20:00Z',
+        '{"direction":"received"}'::jsonb
+      ), (
+        'sent:conflict-root', 'serve290@gmail.com', 'sent', 6,
+        'sent:conflict-root', '<conflict-root@softora.test>',
+        'serve290@gmail.com', 'conflict@example.test',
+        'Kleine vraag over jullie website', '2026-08-07T10:00:00Z',
+        '{"originalCampaignOutbound":true,"direction":"sent"}'::jsonb
+      ), (
+        'coldmail:conflict-copy', 'serve290@gmail.com', 'coldmail', 7,
+        'coldmail:conflict-copy', '<conflict-root@softora.test>',
+        'serve290@gmail.com', 'conflict@example.test',
+        'Kleine vraag over jullie website', '2026-08-07T10:00:03Z', '{}'::jsonb
+      ), (
+        'inbox:conflict-child', 'serve290@gmail.com', 'inbox', 8,
+        'inbox:conflict-child', '<conflict-child@example.test>',
+        'conflict@example.test', 'serve290@gmail.com',
+        'Re: Kleine vraag over jullie website', '2026-08-07T10:10:00Z',
+        '{"direction":"received"}'::jsonb
+      );
+
+      update public.softora_mailbox_messages
+      set in_reply_to = '<replica-root@softora.test>',
+          references_text = '<replica-root@softora.test>'
+      where message_key = 'inbox:replica-human';
+      update public.softora_mailbox_messages
+      set in_reply_to = '<replica-human@example.test>',
+          references_text = '<replica-root@softora.test> <replica-human@example.test>'
+      where message_key = 'sent:replica-followup';
+      update public.softora_mailbox_messages
+      set in_reply_to = '<replica-followup@softora.test>',
+          references_text = '<replica-root@softora.test> <replica-human@example.test> <replica-followup@softora.test>'
+      where message_key = 'inbox:replica-final';
+      update public.softora_mailbox_messages
+      set in_reply_to = '<conflict-root@softora.test>',
+          references_text = '<conflict-root@softora.test>'
+      where message_key = 'inbox:conflict-child';
+    `);
+
+    const before = await db.query(`
+      select count(*)::int as count
+      from public.softora_mailbox_campaign_lineage_members
+      where message_key = 'inbox:replica-final'
+    `);
+    assert.equal(before.rows[0].count, 0, 'legacy resolver rejects even benign duplicate labels');
+
+    await db.exec('begin');
+    await db.exec(hardeningMigrationSql);
+    await db.exec('commit');
+
+    const canonical = await db.query(`
+      select public.softora_canonical_mailbox_message_key(
+        'serve290@gmail.com', '<replica-root@softora.test>'
+      ) as message_key
+    `);
+    assert.equal(canonical.rows[0].message_key, 'sent:replica-root');
+
+    const replicaMembers = await db.query(`
+      select message_key, parent_message_key, root_message_key, lineage_depth
+      from public.softora_mailbox_campaign_lineage_members
+      where root_message_key = 'sent:replica-root'
+      order by lineage_depth
+    `);
+    assert.deepEqual(replicaMembers.rows, [
+      {
+        message_key: 'sent:replica-root', parent_message_key: null,
+        root_message_key: 'sent:replica-root', lineage_depth: 0,
+      },
+      {
+        message_key: 'inbox:replica-human', parent_message_key: 'sent:replica-root',
+        root_message_key: 'sent:replica-root', lineage_depth: 1,
+      },
+      {
+        message_key: 'sent:replica-followup', parent_message_key: 'inbox:replica-human',
+        root_message_key: 'sent:replica-root', lineage_depth: 2,
+      },
+      {
+        message_key: 'inbox:replica-final', parent_message_key: 'sent:replica-followup',
+        root_message_key: 'sent:replica-root', lineage_depth: 3,
+      },
+    ]);
+
+    const rejectedConflict = await db.query(`
+      select
+        public.softora_canonical_mailbox_message_key(
+          'serve290@gmail.com', '<conflict-root@softora.test>'
+        ) as canonical_key,
+        count(members.message_key)::int as member_count
+      from public.softora_mailbox_campaign_lineage_members as members
+      where members.message_key in (
+        'sent:conflict-root', 'coldmail:conflict-copy', 'inbox:conflict-child'
+      )
+    `);
+    assert.equal(rejectedConflict.rows[0].canonical_key, null);
+    assert.equal(rejectedConflict.rows[0].member_count, 0);
   } finally {
     await db.close();
   }
