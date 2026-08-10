@@ -69,6 +69,21 @@ test('websitevideo tooling blijft lokaal en expliciet startbaar', () => {
   assert.ok(packageJson.dependencies['ffprobe-static']);
 });
 
+test('protected package metadata houdt de echte lokale mailbox-Postgrespoort vast', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const runner = readRepoFile('test/postgres/run-mailbox-postgres-locks.js');
+  const postgresTest = readRepoFile('test/postgres/mailbox-campaign-lock-order.postgres.test.js');
+  assert.equal(packageJson.scripts['test:mailbox-postgres-locks'],
+    'node test/postgres/run-mailbox-postgres-locks.js');
+  assert.equal(packageJson.devDependencies.pg, '8.23.0');
+  assert.match(runner, /MAILBOX_POSTGRES_ADMIN_URL/);
+  assert.match(runner, /localHosts/);
+  assert.match(runner, /create database/);
+  assert.match(runner, /drop database if exists/);
+  assert.match(postgresTest, /20260810012150_mailbox_send_provider_outcome_state\.sql/);
+  assert.match(postgresTest, /provenance_service_truncate/);
+});
+
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],
