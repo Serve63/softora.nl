@@ -32,7 +32,7 @@ const CAMPAIGN_SYNC_FAST_FETCH_LIMIT = 20;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
 const MAILBOX_SYNC_LOCK_RETRY_BASE_MS = 75;
 const MAILBOX_SYNC_LOCK_RETRY_MAX_MS = 500;
-const MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS = 25;
+const MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS = 30;
 
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -683,7 +683,7 @@ function createMailboxSyncService({
             kind: 'imap-sync',
             accountEmail: account.email,
             folder: normalizedFolder,
-            // A foreground refresh has a ten-second folder deadline. Keep its
+            // A foreground refresh has a fifteen-second folder deadline. Keep its
             // uncertainty lease only the required fifteen-second safety margin
             // beyond that deadline, so a successful recovery read can reap it
             // instead of showing a stale mailbox for two minutes.
