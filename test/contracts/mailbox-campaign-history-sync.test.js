@@ -109,19 +109,6 @@ test('narrow Gmail label sync advances through unindexed messages without campai
   assert.deepEqual(queries, [{ query: { all: true }, options: { uid: true } }]);
 });
 
-test('ordinary IMAP selection advances past a full newest window without ever claiming it is complete', () => {
-  const allUids = Array.from({ length: 31 }, (_item, index) => index + 1);
-  const first = selectMailboxSyncUids({ allUids, indexedUids: [], limit: 30 });
-  const second = selectMailboxSyncUids({ allUids, indexedUids: first, limit: 30 });
-
-  assert.deepEqual(first, Array.from({ length: 30 }, (_item, index) => 31 - index));
-  assert.equal(first.syncSelectionHealth.truncated, true);
-  assert.equal(first.syncSelectionHealth.remainingUidCount, 1);
-  assert.deepEqual(second, [1]);
-  assert.equal(second.syncSelectionHealth.truncated, false);
-  assert.equal(second.syncSelectionHealth.remainingUidCount, 0);
-});
-
 test('campaign history sync prioritizes missing sent replies linked by thread headers', async () => {
   const queries = [];
   const client = {

@@ -1,4 +1,4 @@
-const { attachMailboxSyncReadResult } = require('./mailbox-imap-message-parser');
+const { attachMailboxSyncReadHealth } = require('./mailbox-imap-message-parser');
 
 async function fetchSelectedMailboxMessages({
   account,
@@ -31,7 +31,11 @@ async function fetchSelectedMailboxMessages({
   const sorted = messages.sort((left, right) => (
     (Date.parse(right?.date) || 0) - (Date.parse(left?.date) || 0)
   ));
-  return attachMailboxSyncReadResult(sorted, { selectedUids, parseFailures });
+  return attachMailboxSyncReadHealth(sorted, {
+    parseFailures,
+    selectedCount: selectedUids.length,
+    folderMissing: false,
+  });
 }
 
 module.exports = { fetchSelectedMailboxMessages };
