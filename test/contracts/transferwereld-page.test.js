@@ -33,7 +33,7 @@ test('transferwereld exposes the five active analysis tabs and defaults to fee s
   assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.doesNotMatch(html, /id="transfer-filters"|id="transfer-summary"|id="transfer-sort"/);
-  assert.match(html, /transferwereld\.css\?v=20260810b/);
+  assert.match(html, /transferwereld\.css\?v=20260810c/);
   assert.match(html, /transferwereld-data\.js\?v=20260810a/);
   assert.match(html, /transferwereld-scope-data\.js\?v=20260810a/);
   assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
@@ -121,6 +121,8 @@ test('crest fallbacks stay hidden behind real logos and appear only after image 
   assert.match(script, /onerror="this\.previousElementSibling\.hidden=false;this\.remove\(\)"/);
   assert.doesNotMatch(script, /route-crest-placeholder/);
   assert.match(css, /\.crest-fallback, \.route-crest-fallback/);
+  assert.match(css, /\.crest-fallback\[hidden\], \.route-crest-fallback\[hidden\] \{ display: none; \}/);
+  assert.doesNotMatch(css, /\.crest-fallback, \.route-crest-fallback \{[^}]*border-radius/);
 });
 
 test('transferwereld shows a desktop-only notice below the desktop breakpoint', () => {

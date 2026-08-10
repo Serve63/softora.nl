@@ -74,7 +74,8 @@ input::placeholder { color: #727b8c; }
 .route-crest-shell { width: 31px; height: 31px; }
 .crest-shell > *, .route-crest-shell > * { grid-area: 1 / 1; }
 .crest { width: 38px; height: 38px; object-fit: contain; }
-.crest-fallback, .route-crest-fallback { display: grid; place-items: center; border: 1px solid #414a59; border-radius: 50%; background: #121824; color: #9ca6b8; font: 800 9px/1 Inter, sans-serif; letter-spacing: -.02em; }
+.crest-fallback, .route-crest-fallback { display: grid; place-items: center; color: #9ca6b8; font: 800 9px/1 Inter, sans-serif; letter-spacing: -.02em; }
+.crest-fallback[hidden], .route-crest-fallback[hidden] { display: none; }
 .club-cell strong, .player-cell strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .club-cell small, .player-cell small, .counterpart small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
 .deal-route { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 10px; align-items: center; min-width: 0; }
