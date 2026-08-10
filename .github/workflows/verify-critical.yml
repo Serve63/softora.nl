@@ -42,47 +42,29 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: 01 Quality lock
-        run: node scripts/check-quality-lock.js
-      - name: 02 Canonical frontend
-        run: node scripts/check-canonical-frontend.js
-      - name: 03 JS syntax
-        run: node scripts/check-js-syntax.js
-      - name: 04 Guaranteed test scope
-        run: node scripts/check-guaranteed-test-scope.js
-      - name: 05 Guardrails
-        run: node scripts/verify-guardrails.js
-      - name: 06 Static serving contract
-        run: node scripts/check-static-serving-contract.js
-      - name: 07 Critical tests
-        run: npm run test:critical
+      - name: 01 Agent guardrails
+        run: npm run check:guardrails
+      - name: 02 Repo hygiene
+        run: npm run check:repo-hygiene
+      - name: 03 Public data
+        run: npm run check:public-data
+      - name: 04 Dependency audit
+        run: npm run check:deps
+      - name: 05 Quality lock
+        run: npm run check:quality-lock
+      - name: 06 Contract tests
+        run: npm run test:contracts
         env:
           MAILBOX_POSTGRES_TEST_URL: postgresql://postgres:mailbox-ci-only@127.0.0.1:5432/softora_mailbox_lock_test_ci
           MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE: '1'
           MAILBOX_POSTGRES_TEST_CONTAINER_ID: ${{ job.services.postgres.id }}
-      - name: 08 Runtime contracts
-        run: node scripts/check-runtime-contracts.js
-      - name: 09 Active orders contract
-        run: node scripts/check-active-orders-contract.js
-      - name: 10 Brain
-        run: node scripts/check-brain.js
-      - name: 11 Brain quality
-        run: node scripts/check-brain-quality.js
-      - name: 12 No localization
-        run: node scripts/check-no-localization.js
-      - name: 13 External domains
-        run: node scripts/check-hardcoded-external-domains.js
-      - name: 14 Commitments backlog
-        run: node scripts/check-commitments-backlog.js
-      - name: 15 SEO canonical
-        run: node scripts/check-seo-canonical.js
-      - name: 16 Dashboard header
-        run: node scripts/check-dashboard-header-contract.js
-      - name: 17 Critical user routes
-        run: node scripts/check-critical-user-routes.js
-      - name: 18 First sale flow
-        run: node scripts/check-first-sale-flow.js
-      - name: 19 First sale launch
-        run: node scripts/check-first-sale-launch.js
-      - name: 20 Audit pack
-        run: node scripts/check-audit-pack.js
+      - name: 07 Smoke tests
+        run: npm run test:smoke
+      - name: 08 Postgres mailbox locks
+        run: npm run test:postgres:mailbox-locks
+        env:
+          MAILBOX_POSTGRES_TEST_URL: postgresql://postgres:mailbox-ci-only@127.0.0.1:5432/softora_mailbox_lock_test_ci
+          MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE: '1'
+          MAILBOX_POSTGRES_TEST_CONTAINER_ID: ${{ job.services.postgres.id }}
+      - name: 09 Secret scan
+        run: npm run check:secrets
