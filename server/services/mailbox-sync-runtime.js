@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
-const MAILBOX_SYNC_FAST_FOLDER_TIMEOUT_MS = 15_000;
-const MAILBOX_SYNC_FAST_RUN_TIMEOUT_MS = 45_000;
+const MAILBOX_SYNC_FAST_FOLDER_TIMEOUT_MS = 10_000;
+const MAILBOX_SYNC_FAST_RUN_TIMEOUT_MS = 22_000;
 const MAILBOX_SYNC_CRON_FOLDER_TIMEOUT_MS = 25_000;
 const MAILBOX_SYNC_CRON_RUN_TIMEOUT_MS = 300_000;
 const MAILBOX_SYNC_DEFAULT_FOLDER_TIMEOUT_MS = 25_000;
@@ -162,7 +162,6 @@ function createMailboxSyncStateStore({
     const lastSyncedAt = Number.isFinite(requestedSyncedThroughMs)
       ? new Date(Math.min(requestedSyncedThroughMs, finishedAtMs)).toISOString()
       : finishedAt;
-    const safeLastUid = Math.max(0, Number(lastUid) || 0);
     const patch = failed
       ? {
           status: 'error',
@@ -175,7 +174,7 @@ function createMailboxSyncStateStore({
           status: 'ok',
           last_error: truncateText(normalizeString(warning), 1000) || null,
           message_count: Math.max(0, Number(messageCount) || 0),
-          ...(safeLastUid > 0 ? { last_uid: safeLastUid } : {}),
+          last_uid: Math.max(0, Number(lastUid) || 0),
           last_synced_at: lastSyncedAt,
           lock_token: null,
           lock_expires_at: null,

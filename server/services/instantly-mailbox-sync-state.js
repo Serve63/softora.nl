@@ -2,15 +2,6 @@ const INSTANTLY_MAILBOX_SYNC_SCOPE = 'instantly_mailbox_sync';
 const INSTANTLY_SYNC_STATE_VERSION = 2;
 const MAX_SYNC_SEGMENTS = 1000;
 const MAX_QUARANTINE_ITEMS = 1000;
-const INSTANTLY_SYNC_STATE_READ_OPTIONS = Object.freeze({
-  uiStateReadTimeoutMs: 5_000,
-  preferSupabaseRestRead: true,
-  bypassReadFailureCooldown: true,
-  suppressReadFailureCooldown: true,
-  suppressReadFailureLog: true,
-  ignoreSupabaseRestFailureCooldown: true,
-  suppressSupabaseRestFailureCooldown: true,
-});
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -120,16 +111,13 @@ function assertDurableRead(result, createError) {
 
 async function readInstantlyOwnerSyncState({ owner, getUiStateValues, createError }) {
   const ownerScope = getOwnerSyncScope(owner);
-  const ownerResult = await getUiStateValues(ownerScope, INSTANTLY_SYNC_STATE_READ_OPTIONS);
+  const ownerResult = await getUiStateValues(ownerScope);
   const ownerValues = assertDurableRead(ownerResult, createError);
   if (normalizeText(ownerValues.state_json)) {
     return parseStoredState(ownerValues.state_json, createError);
   }
 
-  const legacyResult = await getUiStateValues(
-    INSTANTLY_MAILBOX_SYNC_SCOPE,
-    INSTANTLY_SYNC_STATE_READ_OPTIONS
-  );
+  const legacyResult = await getUiStateValues(INSTANTLY_MAILBOX_SYNC_SCOPE);
   const legacyValues = assertDurableRead(legacyResult, createError);
   const cursor = normalizeText(legacyValues[`cursor_${owner}`]);
   const minTimestamp = normalizeTimestamp(legacyValues[`min_timestamp_${owner}`]);

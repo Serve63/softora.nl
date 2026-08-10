@@ -32,7 +32,6 @@ const CAMPAIGN_SYNC_FAST_FETCH_LIMIT = 20;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
 const MAILBOX_SYNC_LOCK_RETRY_BASE_MS = 75;
 const MAILBOX_SYNC_LOCK_RETRY_MAX_MS = 500;
-const MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS = 30;
 
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -171,7 +170,6 @@ function getMailboxSyncFoldersForAccount({
   account,
   folders = [],
   campaignOnly = false,
-  incrementalOnly = false,
   normalizeFolder = (value) => String(value || '').trim().toLowerCase(),
 } = {}) {
   const normalizedFolders = (Array.isArray(folders) ? folders : [])
@@ -182,7 +180,7 @@ function getMailboxSyncFoldersForAccount({
       normalizedFolders.filter((folder) => folder !== CAMPAIGN_GMAIL_LABEL_FOLDER)
     ));
   }
-  if (campaignOnly && !incrementalOnly) {
+  if (campaignOnly) {
     normalizedFolders.push(CAMPAIGN_GMAIL_LABEL_FOLDER);
   }
   return Array.from(new Set(normalizedFolders));
@@ -450,19 +448,6 @@ function createMailboxSyncService({
         await waitForMailboxSyncLockRetry(retryDelayMs, folderDeadline.signal);
       }
       throwIfSyncAborted(folderDeadline.signal);
-      const incrementalSyncState =
-        fastRefresh && incrementalOnly && typeof mailboxIndexStore.getSyncState === 'function'
-          ? await mailboxIndexStore.getSyncState({
-              accountEmail: account.email,
-              folder: normalizedFolder,
-              signal: folderDeadline.signal,
-            })
-          : null;
-      throwIfSyncAborted(folderDeadline.signal);
-      let incrementalAfterUid = Math.max(0, Number(incrementalSyncState?.last_uid) || 0);
-      const incrementalUidValidity = normalizeMailboxUidValidity(
-        incrementalSyncState?.uid_validity
-      );
       const hydrateCampaignHistory = campaignOnly && !incrementalOnly;
       const oldestIndexedCampaignUid =
         hydrateCampaignHistory &&
@@ -485,9 +470,7 @@ function createMailboxSyncService({
         const uidSyncState = await mailboxIndexStore.listMessageUidSyncStateForAccount({
           accountEmail: account.email,
           folder: normalizedFolder,
-          since: fastRefresh && incrementalOnly && !incrementalAfterUid
-            ? ''
-            : CAMPAIGN_HISTORY_SINCE.toISOString(),
+          since: CAMPAIGN_HISTORY_SINCE.toISOString(),
           limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
           signal: folderDeadline.signal,
         });
@@ -503,25 +486,11 @@ function createMailboxSyncService({
         indexedUids = (await mailboxIndexStore.listMessageUidsForAccount({
           accountEmail: account.email,
           folder: normalizedFolder,
-          since: campaignOnly && !(fastRefresh && incrementalOnly && !incrementalAfterUid)
-            ? CAMPAIGN_HISTORY_SINCE.toISOString()
-            : '',
+          since: campaignOnly ? CAMPAIGN_HISTORY_SINCE.toISOString() : '',
           limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
           signal: folderDeadline.signal,
         })) || [];
         throwIfSyncAborted(folderDeadline.signal);
-      }
-      if (
-        fastRefresh && incrementalOnly && !incrementalAfterUid && indexedUids.length &&
-        Number.isFinite(Date.parse(String(incrementalSyncState?.last_synced_at || '')))
-      ) {
-        // Older runtimes could persist a successful sync timestamp while
-        // clearing last_uid on an empty round. Rebuild that live high-water
-        // from every active indexed generation row once, without turning old
-        // pre-campaign history gaps into an endless foreground backfill.
-        incrementalAfterUid = indexedUids.reduce(
-          (maximum, uid) => Math.max(maximum, Number(uid) || 0), 0
-        );
       }
       const indexedUidScanTruncated = indexedUids.length >= CAMPAIGN_SYNC_UID_SCAN_LIMIT;
       if (campaignOnly) {
@@ -604,8 +573,6 @@ function createMailboxSyncService({
           threadRecipientTerms,
           priorityUids: retryDueQuarantineUids,
           indexedUids,
-          incrementalAfterUid,
-          incrementalUidValidity,
           reconcileIntentIds: normalizedFolder === 'sent'
             ? smtpReconciliation.intents.map((intent) => intent.intentId)
             : [],
@@ -683,13 +650,7 @@ function createMailboxSyncService({
             kind: 'imap-sync',
             accountEmail: account.email,
             folder: normalizedFolder,
-            // A foreground refresh has a fifteen-second folder deadline. Keep its
-            // uncertainty lease only the required fifteen-second safety margin
-            // beyond that deadline, so a successful recovery read can reap it
-            // instead of showing a stale mailbox for two minutes.
-            leaseSeconds: fastRefresh
-              ? MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS
-              : campaignMutationLeaseSeconds,
+            leaseSeconds: campaignMutationLeaseSeconds,
             deadlineMs: Math.min(
               Number(campaignMutationDeadlineMs) || Number.POSITIVE_INFINITY,
               Math.max(1, folderDeadlineAt - Date.now())
@@ -782,10 +743,7 @@ function createMailboxSyncService({
         }
       }
       throwIfSyncAborted(folderDeadline.signal);
-      const lastUid = Math.max(
-        messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0),
-        Number(readHealth.frontierProviderNewestUid) || 0
-      );
+      const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
       const finish = await mailboxIndexStore.finishSync({
         accountEmail: account.email,
         folder: normalizedFolder,
@@ -919,7 +877,6 @@ function createMailboxSyncService({
             account,
             folders: requestedFolders,
             campaignOnly,
-            incrementalOnly,
             normalizeFolder,
           });
           for (const folder of folderList) {
@@ -1034,7 +991,6 @@ module.exports = {
   CAMPAIGN_SYNC_FAST_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
-  MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,

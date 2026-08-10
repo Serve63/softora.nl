@@ -71,18 +71,6 @@ function createMailboxCampaignRepliesList({
     };
   }
 
-  function markSnapshotPersistence(result, persisted) {
-    const reason = persisted?.ok ? null : persisted?.reason || 'campaign_snapshot_persist_failed';
-    return {
-      ...result,
-      sync: {
-        ...(result.sync || {}),
-        snapshotPersisted: persisted?.ok === true,
-        snapshotPersistReason: reason,
-      },
-    };
-  }
-
   async function listCampaignReplies({
     limit = 100,
     owner = '',
@@ -182,17 +170,10 @@ function createMailboxCampaignRepliesList({
           { savedAt: snapshotAt, contentAt: snapshotAt, contentVersion }
         );
         if (!persisted?.ok) {
-          const persistReason = persisted?.reason || 'campaign_snapshot_persist_failed';
-          if (persistReason === 'snapshot_state_unavailable') {
-            // The durable snapshot is only an outage fallback. A failed fallback
-            // write must not invalidate a DB-fenced, authoritative live response.
-            logger?.warn?.('[Mailbox][CampaignSnapshotPersist]', persistReason);
-            result = markSnapshotPersistence(result, persisted);
-          } else {
-            result = markResultDegraded(result, persistReason);
-          }
-        } else {
-          result = markSnapshotPersistence(result, persisted);
+          result = markResultDegraded(
+            result,
+            persisted?.reason || 'campaign_snapshot_persist_failed'
+          );
         }
       }
       return includeSnapshotMessages ? { ...result, snapshotMessages } : result;

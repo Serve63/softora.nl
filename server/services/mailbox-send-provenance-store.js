@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
 const MAILBOX_SEND_DISPATCH_LEASE_MS = 10 * 60 * 1000;
-const MAILBOX_SEND_PROVENANCE_TIMEOUT_MS = 5_000;
 
 function createCanonicalMailboxHash(parts = []) {
   const source = parts.map((value) => {
@@ -113,11 +112,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
     now = () => new Date(),
   } = deps;
   const normalizeEmail = (value) => normalizeString(value).toLowerCase();
-  const getClient = () => (isSupabaseConfigured() ? getSupabaseClient({
-    timeoutMs: MAILBOX_SEND_PROVENANCE_TIMEOUT_MS,
-    ignoreFailureCooldown: true,
-    suppressFailureCooldown: true,
-  }) : null);
+  const getClient = () => (isSupabaseConfigured() ? getSupabaseClient() : null);
 
   function requiredClient() {
     const client = getClient();

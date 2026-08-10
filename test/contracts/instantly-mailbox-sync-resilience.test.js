@@ -6,7 +6,6 @@ const {
   parseInstantlyEmailListResponse,
 } = require('../../server/services/instantly-mailbox-provider-api');
 const { buildRecentSyncResult } = require('../../server/services/instantly-mailbox-sync-cadence');
-const { readInstantlyOwnerSyncState } = require('../../server/services/instantly-mailbox-sync-state');
 
 function incoming(overrides = {}) {
   return {
@@ -117,29 +116,6 @@ test('Instantly email list parser rejects malformed HTTP 200 envelopes instead o
     parseInstantlyEmailListResponse({ items: [], next_starting_after: 'cursor-2' }),
     { items: [], nextCursor: 'cursor-2' }
   );
-});
-
-test('Instantly continuation leest duurzaam met een eigen ruime timeout zonder generieke cooldown', async () => {
-  const reads = [];
-  await readInstantlyOwnerSyncState({
-    owner: 'serve',
-    getUiStateValues: async (scope, options) => {
-      reads.push({ scope, options });
-      return { values: { state_json: '{"version":2,"segments":[],"quarantine":[]}' }, source: 'supabase' };
-    },
-  });
-
-  assert.equal(reads.length, 1);
-  assert.equal(reads[0].scope, 'instantly_mailbox_sync_serve');
-  assert.deepEqual(reads[0].options, {
-    uiStateReadTimeoutMs: 5000,
-    preferSupabaseRestRead: true,
-    bypassReadFailureCooldown: true,
-    suppressReadFailureCooldown: true,
-    suppressReadFailureLog: true,
-    ignoreSupabaseRestFailureCooldown: true,
-    suppressSupabaseRestFailureCooldown: true,
-  });
 });
 
 test('malformed provider success leaves the watermark and continuation untouched', async () => {

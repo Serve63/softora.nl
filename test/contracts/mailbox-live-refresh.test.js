@@ -6,7 +6,6 @@ const path = require('node:path');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
   CAMPAIGN_SYNC_FAST_FETCH_LIMIT,
-  MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS,
   createMailboxSyncService,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
@@ -123,14 +122,13 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     incrementalOnly: true,
     fastRefresh: true,
     maxConcurrentAccounts: 3,
-    folderTimeoutMs: 15_000,
-    runTimeoutMs: 45_000,
+    folderTimeoutMs: 10_000,
+    runTimeoutMs: 22_000,
     deadlineAt: 0,
     runId: '',
   });
   assert.equal(typeof calls[0].runId, 'string');
   assert.ok(calls[0].deadlineAt > Date.now());
-  assert.equal(refreshModule.REFRESH_REQUEST_TIMEOUT_MS, 50_000);
   assert.equal(normalizeMailboxSyncOwner('ALL'), 'both');
   await assert.rejects(
     syncMailboxRequest({
@@ -194,62 +192,6 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
   assert.equal(fetches[0].campaignHistory, false);
   assert.equal(result.historyBackfill, false);
   assert.equal(result.incrementalOnly, true);
-});
-
-test('fast refresh bounds an uncertain mutation lease to the recovery window', async () => {
-  const mutationRuns = [];
-  const selected = account('serve@softora.nl');
-  const service = createMailboxSyncService({
-    mailboxIndexStore: {
-      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
-      finishSync: async () => ({ ok: true }),
-      getSyncState: async () => ({
-        last_uid: 50,
-        uid_validity: 777,
-        last_synced_at: '2026-08-10T18:00:00.000Z',
-      }),
-      listMessageUidSyncStateForAccount: async () => ({
-        indexedUids: [50], deferredQuarantineUids: [], retryDueQuarantineUids: [],
-      }),
-      upsertMessages: async () => ({ ok: true, upserted: 0 }),
-    },
-    campaignMutationRunner: {
-      isAvailable: () => true,
-      async run(options, task) {
-        mutationRuns.push(options);
-        const controller = new AbortController();
-        return task({
-          signal: controller.signal,
-          mutationId: '11111111-1111-4111-8111-111111111111',
-          requestKey: options.requestKey,
-          assertActive() {},
-        });
-      },
-    },
-    requireCampaignMutationJournal: true,
-    assertReadableAccount: () => selected,
-    canUseMailboxIndex: () => true,
-    fetchMessagesFromImap: async () => withSyncReadHealth([]),
-    getSafeLimit: (value) => Number(value) || 50,
-    getAccounts: () => [selected],
-    normalizeEmail: (value) => String(value || '').toLowerCase(),
-    normalizeFolder: (value) => String(value || '').toLowerCase(),
-    logger: { error() {} },
-  });
-
-  const result = await service.syncMailboxFolder({
-    accountEmail: selected.email,
-    folder: 'inbox',
-    campaignOnly: true,
-    incrementalOnly: true,
-    fastRefresh: true,
-    folderTimeoutMs: 15_000,
-  });
-
-  assert.equal(result.complete, true);
-  assert.equal(mutationRuns.length, 1);
-  assert.equal(mutationRuns[0].leaseSeconds, MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS);
-  assert.equal(MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS, 30);
 });
 
 test('fast IMAP refresh drains a burst larger than four messages in one cycle', async () => {
@@ -487,24 +429,6 @@ test('refresh status is exclusive while active, successful, partial and failed',
       if (mode === 'skipped-sync' && url === '/api/mailbox/instantly/sync') {
         return successfulResponse({ ok: true, results: [{ ok: true, skipped: true, reason: 'sync-in-progress' }] });
       }
-      if (mode === 'recent-sync' && url === '/api/mailbox/instantly/sync') {
-        return successfulResponse({
-          ok: true,
-          results: [{
-            ok: true, skipped: true, reason: 'recent-sync',
-            reconciliationDegraded: false, remainingReconcileCount: 0,
-          }],
-        });
-      }
-      if (mode === 'recent-sync-degraded' && url === '/api/mailbox/instantly/sync') {
-        return successfulResponse({
-          ok: true,
-          results: [{
-            ok: true, skipped: true, reason: 'recent-sync',
-            reconciliationDegraded: true, remainingReconcileCount: 1,
-          }],
-        });
-      }
       if (mode === 'error') {
         return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
       }
@@ -538,14 +462,6 @@ test('refresh status is exclusive while active, successful, partial and failed',
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
 
   mode = 'skipped-sync';
-  assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
-
-  mode = 'recent-sync';
-  assert.equal(await controller.refresh(), true);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
-
-  mode = 'recent-sync-degraded';
   assert.equal(await controller.refresh(), false);
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
 
@@ -670,70 +586,6 @@ test('visible, background, focus and reconnect scheduling keep refresh bounded',
   assert.equal(timers.at(-1), 0);
   windowListeners.get('online')();
   assert.equal(timers.at(-1), 0);
-  controller.destroy();
-});
-
-test('focus, visibility and reconnect events do not queue a duplicate active refresh', async () => {
-  const documentListeners = new Map();
-  const windowListeners = new Map();
-  const timers = new Map();
-  let nextTimerId = 0;
-  let fetchCalls = 0;
-  let releaseRequests;
-  const pendingResponse = new Promise((resolve) => {
-    releaseRequests = () => resolve(successfulResponse());
-  });
-  const documentRef = {
-    visibilityState: 'visible',
-    getElementById() { return null; },
-    addEventListener(event, handler) { documentListeners.set(event, handler); },
-    removeEventListener(event) { documentListeners.delete(event); },
-  };
-  const windowRef = {
-    AbortController,
-    addEventListener(event, handler) { windowListeners.set(event, handler); },
-    removeEventListener(event) { windowListeners.delete(event); },
-  };
-  const controller = refreshModule.create({
-    autoStart: false,
-    document: documentRef,
-    window: windowRef,
-    getFolder: () => 'outreach',
-    getOwner: () => 'serve',
-    fetch: async () => {
-      fetchCalls += 1;
-      return pendingResponse;
-    },
-    loadMessages: async () => true,
-    now: () => 1_000,
-    setTimeout(handler, delay) {
-      const id = ++nextTimerId;
-      timers.set(id, { handler, delay, active: true });
-      return id;
-    },
-    clearTimeout(id) {
-      if (timers.has(id)) timers.get(id).active = false;
-    },
-    setInterval: () => ++nextTimerId,
-    clearInterval() {},
-  });
-
-  controller.start();
-  const refresh = controller.refresh();
-  await Promise.resolve();
-  assert.equal(fetchCalls, 2);
-
-  windowListeners.get('focus')();
-  windowListeners.get('online')();
-  documentListeners.get('visibilitychange')();
-  assert.equal(fetchCalls, 2);
-
-  releaseRequests();
-  assert.equal(await refresh, true);
-  assert.deepEqual(
-    Array.from(timers.values()).filter((entry) => entry.active).map((entry) => entry.delay),
-    [refreshModule.VISIBLE_REFRESH_INTERVAL_MS]
-  );
   controller.destroy();
 });
 

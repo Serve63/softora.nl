@@ -32,7 +32,7 @@ function createMailboxIndexUidSelection({
         (client) => {
           let query = client
             .from(tableName)
-            .select('uid,payload')
+            .select('uid,parse_status:payload->>parseStatus,parse_retry_at:payload->>parseRetryAt')
             .eq('account_email', normalizedAccount)
             .eq('folder', normalizedFolder)
             .is('deleted_at', null)

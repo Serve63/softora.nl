@@ -4547,16 +4547,6 @@ test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail c
   );
   assert.deepEqual(
     getMailboxSyncFoldersForAccount({
-      account: { email: 'servec321@gmail.com', imapHost: 'imap.gmail.com' },
-      folders: ['inbox'],
-      campaignOnly: true,
-      incrementalOnly: true,
-      normalizeFolder,
-    }),
-    ['inbox']
-  );
-  assert.deepEqual(
-    getMailboxSyncFoldersForAccount({
       account: { email: 'serve@softora.nl', imapHost: 'imap.strato.com' },
       folders: ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER],
       campaignOnly: true,
@@ -4564,90 +4554,6 @@ test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail c
     }),
     ['inbox', 'sent']
   );
-});
-
-test('fast live IMAP refresh requests only UIDs above the durable matching generation frontier', async () => {
-  const client = createFakeImapClient({
-    boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
-    messagesByMailbox: {
-      INBOX: [
-        { uid: 100, flags: [], internalDate: new Date(), source: Buffer.from('Subject: Oud\r\n\r\nOud') },
-        { uid: 101, flags: [], internalDate: new Date(), source: Buffer.from('Subject: Nieuw\r\n\r\nNieuw') },
-      ],
-    },
-  });
-  const upserts = [];
-  const finishes = [];
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl', imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl', imapPass: 'secret',
-    }]),
-    createImapClient: () => client,
-    setUiStateValues: async (_scope, values) => ({ values, source: 'supabase' }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      getSyncState: async () => ({ last_uid: 100, uid_validity: 777 }),
-      listMessageUidsForAccount: async () => [100],
-      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
-      upsertMessages: async (options) => {
-        upserts.push(options);
-        return { ok: true, upserted: options.messages.length };
-      },
-      finishSync: async (options) => { finishes.push(options); return { ok: true }; },
-    },
-  });
-
-  const result = await service.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
-    incrementalOnly: true, fastRefresh: true,
-  });
-
-  assert.equal(result.complete, true);
-  assert.deepEqual(client.searchQueries, [{ uid: '101:*' }]);
-  assert.deepEqual(upserts[0].messages.map((message) => message.uid), [101]);
-  assert.equal(finishes[0].lastUid, 101);
-});
-
-test('fast live IMAP refresh never trusts a frontier from another UIDVALIDITY generation', async () => {
-  const client = createFakeImapClient({
-    boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
-    messagesByMailbox: {
-      INBOX: [{ uid: 1, flags: [], internalDate: new Date(), source: Buffer.from('Subject: Nieuwe generatie\r\n\r\nBericht') }],
-    },
-  });
-  client.mailbox.uidValidity = 888;
-  const prepared = [];
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl', imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl', imapPass: 'secret',
-    }]),
-    createImapClient: () => client,
-    setUiStateValues: async (_scope, values) => ({ values, source: 'supabase' }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      getSyncState: async () => ({ last_uid: 100, uid_validity: 777 }),
-      listMessageUidsForAccount: async () => [100],
-      prepareUidValidity: async (options) => {
-        prepared.push(options);
-        return { ok: true, uidValidity: options.uidValidity };
-      },
-      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
-      finishSync: async () => ({ ok: true }),
-    },
-  });
-
-  const result = await service.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
-    incrementalOnly: true, fastRefresh: true,
-  });
-
-  assert.equal(result.complete, true);
-  assert.deepEqual(client.searchQueries, [{ all: true }]);
-  assert.equal(prepared[0].uidValidity, 888);
 });
 
 test('mailbox cron supplements normal folders with the Gmail campaign label', async () => {

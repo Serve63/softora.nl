@@ -4,7 +4,7 @@ const MAILBOX_CAMPAIGN_LINEAGE_MAX_ACCOUNTS = 12;
 const MAILBOX_CAMPAIGN_LINEAGE_MAX_DEPTH = 20;
 const MAILBOX_CAMPAIGN_LINEAGE_MAX_REPLIES = 200;
 const MAILBOX_CAMPAIGN_LINEAGE_MAX_RESULTS = 9000;
-const MAILBOX_CAMPAIGN_LINEAGE_DEFAULT_DEADLINE_MS = 8000;
+const MAILBOX_CAMPAIGN_LINEAGE_DEFAULT_DEADLINE_MS = 2500;
 const MAILBOX_CAMPAIGN_LINEAGE_MAX_DEADLINE_MS = 8000;
 
 function createLineageError(message, code) {
@@ -72,7 +72,7 @@ function createMailboxCampaignLineageLookup(deps = {}) {
     let result;
     try {
       result = await run('list-mailbox-campaign-lineage', (client) => {
-        let query = client.rpc('softora_find_mailbox_campaign_lineage_metadata', {
+        let query = client.rpc('softora_find_mailbox_campaign_lineage', {
           p_account_emails: normalizedAccounts,
           p_reply_limit: safeReplyLimit,
           p_max_depth: safeDepth,
@@ -87,7 +87,7 @@ function createMailboxCampaignLineageLookup(deps = {}) {
           query = query.abortSignal(abortController.signal);
         }
         return query;
-      }, { timeoutMs: safeDeadlineMs });
+      });
     } finally {
       if (abortTimer) clearTimeout(abortTimer);
     }
