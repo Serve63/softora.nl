@@ -11,6 +11,7 @@
     { id: 'black-gel-voorraad', title: 'Black Gel voorraad' },
     { id: 'tandenbleek-voorraad', title: 'Tandenbleek voorraad' },
     { id: 'vaste-parfum-voorraad', title: 'Vaste Parfum voorraad', imageId: 'eigen-parfum' },
+    { id: 'alle-formaten-scheermesjes', title: 'Alle formaten scheermesjes' },
     { id: 'gezichtsbeharing-naar-wens', title: 'Gezichtsbeharing naar wens' },
     { id: 'bestaanszekerheid-bedrijf', title: 'Bestaanszekerheid bedrijf' },
     { id: 'eigen-koophuis-kopen', title: 'Eigen koophuis kopen' },

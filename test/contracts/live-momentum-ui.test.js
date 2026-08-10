@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
-  '2030.png', '2035.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
+  '2030.png', '2035.png', 'alle-formaten-scheermesjes.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
   'dertig-dagen-streak.png',
   'eigen-automaat-rijden.png', 'eigen-boot.png', 'eigen-cinema.png', 'eigen-kantoor.png',
   'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
@@ -46,7 +46,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260810a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260810b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260810c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -406,6 +406,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'wereldkaart-bezochte-landen-2028', title: "Ruben's wereldkaart", timeframe: 2028, imageId: 'wereldkaart-bezochte-landen' \}/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
   assert.match(endGameCardsJs, /\{ id: 'vaste-parfum-voorraad', title: 'Vaste Parfum voorraad', imageId: 'eigen-parfum' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'alle-formaten-scheermesjes', title: 'Alle formaten scheermesjes' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -426,7 +427,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(!isFixed\) article\.append\(createCompletionOverlay\(\), createActions\(card, state\.completed\)\)/);
   assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
   [
-    'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Vaste Parfum voorraad', 'Gezichtsbeharing naar wens',
+    'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Vaste Parfum voorraad', 'Alle formaten scheermesjes', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'Ruben zet toto', "Ruben's World Watcher", "Ruben's vakantieradar", 'Ruben Romano',
