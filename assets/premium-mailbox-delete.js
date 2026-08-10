@@ -3,6 +3,13 @@
     return String(value || '').trim();
   }
 
+  function normalizeUidValidity(value) {
+    const normalized = Number(value);
+    return Number.isSafeInteger(normalized) && normalized > 0 && normalized <= 4294967295
+      ? normalized
+      : 0;
+  }
+
   function create(options = {}) {
     const hiddenMessageKeys = new Set();
 
@@ -10,8 +17,11 @@
       const account = normalize(options.getAccount?.(mail)).toLowerCase();
       const folder = normalize(options.getFolder?.(mail) || 'inbox').toLowerCase() || 'inbox';
       const uid = Number(mail && mail.uid) || 0;
+      const uidValidity = normalizeUidValidity(mail && mail.uidValidity);
       const id = normalize(options.getRequestId?.(mail) || mail && mail.id);
-      return `${account}|${folder}|${uid > 0 ? `uid:${uid}` : `id:${id}`}`;
+      return `${account}|${folder}|${folder !== 'instantly' && uid > 0
+        ? `uv:${uidValidity}|uid:${uid}`
+        : `id:${id}`}`;
     }
 
     function filterMessages(messages) {
@@ -45,11 +55,14 @@
         const account = normalize(options.getAccount?.(message) || message && message.accountEmail).toLowerCase();
         const folder = normalize(options.getFolder?.(message) || message && message.folder || 'inbox').toLowerCase() || 'inbox';
         const uid = Number(message && message.uid) || 0;
+        const uidValidity = normalizeUidValidity(message && message.uidValidity);
         const id = normalize(options.getRequestId?.(message) || message && message.id);
-        const key = `${account}|${folder}|${uid > 0 ? `uid:${uid}` : `id:${id}`}`;
+        const key = `${account}|${folder}|${folder !== 'instantly' && uid > 0
+          ? `uv:${uidValidity}|uid:${uid}`
+          : `id:${id}`}`;
         if (!account || (!uid && !id) || seen.has(key)) return null;
         seen.add(key);
-        return { account, folder, uid, id };
+        return { account, folder, uid, uidValidity, id };
       }).filter(Boolean);
     }
 
@@ -66,6 +79,7 @@
           account: root.account,
           id: root.id,
           uid: root.uid,
+          uidValidity: root.uidValidity,
           folder: root.folder,
           messages: targets,
         }),
