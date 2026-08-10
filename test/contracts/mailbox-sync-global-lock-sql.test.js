@@ -110,6 +110,7 @@ test('transactionele probe dekt cap, force, oude UPSERT, reclaim en stale finish
 });
 
 test('CI voert de getrackte lockmigratie en transactionele probe echt op PostgreSQL uit', () => {
+  assert.match(postgresTest, /create table public\.softora_mailbox_sync_state \(/);
   assert.match(postgresTest, /20260810100500_harden_mailbox_sync_global_locks\.sql/);
   assert.match(postgresTest, /mailbox-sync-global-lock-probe\.sql/);
   assert.match(
