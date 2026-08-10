@@ -201,7 +201,7 @@ async function syncMailboxRequest({
     force,
     campaignOnly,
     incrementalOnly,
-    maxConcurrentAccounts: fastRefresh ? 3 : 1,
+    maxConcurrentAccounts: fastRefresh ? 2 : 1,
   });
   if (
     String(method || '').toUpperCase() === 'GET' &&
