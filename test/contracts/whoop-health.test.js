@@ -22,30 +22,165 @@ function createResponseRecorder() {
   };
 }
 
-function createMemorySupabase() {
-  const tables = { softora_health_whoop_connections: [] };
+function createMemorySupabase(initialTables = {}) {
+  const tables = {
+    softora_health_whoop_connections: [],
+    softora_health_whoop_records: [],
+    softora_health_sync_runs: [],
+    softora_health_whoop_webhook_events: [],
+    ...structuredClone(initialTables),
+  };
+  let generatedId = 0;
+
   function from(tableName) {
-    const state = { filters: [], pending: null, mode: '' };
+    const state = {
+      action: 'select',
+      filters: [],
+      limit: null,
+      onConflict: '',
+      ignoreDuplicates: false,
+      order: null,
+      pending: null,
+      returning: false,
+    };
+
+    function matchingRows() {
+      let rows = (tables[tableName] || []).filter((row) => state.filters.every((filter) => filter(row)));
+      if (state.order) {
+        const { column, ascending } = state.order;
+        rows = [...rows].sort((left, right) => {
+          const compared = String(left[column] ?? '').localeCompare(String(right[column] ?? ''));
+          return ascending ? compared : -compared;
+        });
+      }
+      if (Number.isInteger(state.limit)) rows = rows.slice(0, state.limit);
+      return rows;
+    }
+
+    function execute() {
+      const rows = tables[tableName] || (tables[tableName] = []);
+      if (state.action === 'select') return { data: matchingRows().map((row) => ({ ...row })), error: null };
+
+      if (state.action === 'update') {
+        const updated = [];
+        rows.forEach((row) => {
+          if (!state.filters.every((filter) => filter(row))) return;
+          Object.assign(row, state.pending);
+          updated.push({ ...row });
+        });
+        return { data: state.returning ? updated : null, error: null };
+      }
+
+      if (state.action === 'insert') {
+        const values = (Array.isArray(state.pending) ? state.pending : [state.pending]).map((value) => ({
+          ...(tableName === 'softora_health_sync_runs' && !value.id ? { id: `run-${++generatedId}` } : {}),
+          ...value,
+        }));
+        rows.push(...values);
+        return { data: state.returning ? values.map((row) => ({ ...row })) : null, error: null };
+      }
+
+      if (state.action === 'upsert') {
+        const values = Array.isArray(state.pending) ? state.pending : [state.pending];
+        const conflictColumns = String(state.onConflict || '').split(',').filter(Boolean);
+        const stored = [];
+        values.forEach((value) => {
+          const index = conflictColumns.length
+            ? rows.findIndex((row) => conflictColumns.every((column) => row[column] === value[column]))
+            : -1;
+          if (index >= 0 && state.ignoreDuplicates) {
+            stored.push(rows[index]);
+            return;
+          }
+          if (index >= 0) rows[index] = { ...rows[index], ...value };
+          else rows.push({ ...value });
+          stored.push(index >= 0 ? rows[index] : rows[rows.length - 1]);
+        });
+        return { data: state.returning ? stored.map((row) => ({ ...row })) : null, error: null };
+      }
+
+      return { data: null, error: new Error(`unsupported ${state.action}`) };
+    }
+
     const builder = {
-      select() { state.mode = state.mode || 'select'; return builder; },
-      eq(column, value) { state.filters.push([column, value]); return builder; },
+      select() { state.returning = state.action !== 'select'; return builder; },
+      update(value) { state.action = 'update'; state.pending = { ...value }; return builder; },
+      insert(value) { state.action = 'insert'; state.pending = value; return builder; },
+      upsert(value, options = {}) {
+        state.action = 'upsert';
+        state.pending = value;
+        state.onConflict = options.onConflict || '';
+        state.ignoreDuplicates = Boolean(options.ignoreDuplicates);
+        return builder;
+      },
+      eq(column, value) { state.filters.push((row) => row[column] === value); return builder; },
+      in(column, values) { state.filters.push((row) => values.includes(row[column])); return builder; },
+      lte(column, value) { state.filters.push((row) => String(row[column] ?? '') <= String(value)); return builder; },
+      gte(column, value) { state.filters.push((row) => String(row[column] ?? '') >= String(value)); return builder; },
+      or(expression) {
+        const clauses = String(expression || '').split(',').map((clause) => clause.trim());
+        state.filters.push((row) => clauses.some((clause) => {
+          if (clause.endsWith('.is.null')) return row[clause.slice(0, -8)] == null;
+          const lessThanIndex = clause.indexOf('.lt.');
+          if (lessThanIndex > 0) {
+            const column = clause.slice(0, lessThanIndex);
+            return String(row[column] ?? '') < clause.slice(lessThanIndex + 4);
+          }
+          return false;
+        }));
+        return builder;
+      },
+      order(column, options = {}) { state.order = { column, ascending: options.ascending !== false }; return builder; },
+      limit(value) { state.limit = Number(value); return builder; },
       maybeSingle: async () => {
-        const row = (tables[tableName] || []).find((item) => state.filters.every(([key, value]) => item[key] === value));
-        return { data: row || null, error: null };
+        const result = execute();
+        return { data: Array.isArray(result.data) ? (result.data[0] || null) : null, error: result.error };
       },
-      upsert(value) { state.pending = { ...value }; state.mode = 'upsert'; return builder; },
       single: async () => {
-        if (state.mode !== 'upsert') return { data: null, error: new Error('unsupported') };
-        const rows = tables[tableName] || (tables[tableName] = []);
-        const index = rows.findIndex((item) => item.owner_key === state.pending.owner_key);
-        if (index >= 0) rows[index] = { ...rows[index], ...state.pending };
-        else rows.push(state.pending);
-        return { data: rows[index >= 0 ? index : rows.length - 1], error: null };
+        const result = execute();
+        return { data: Array.isArray(result.data) ? (result.data[0] || null) : null, error: result.error };
       },
+      then(resolve, reject) { return Promise.resolve(execute()).then(resolve, reject); },
     };
     return builder;
   }
   return { from, tables };
+}
+
+function encryptWhoopTokens(tokens, secret) {
+  const key = Buffer.from(secret, 'base64');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(tokens), 'utf8'), cipher.final()]);
+  return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), ciphertext.toString('base64url')].join('.');
+}
+
+function createJsonResponse(status, body) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  };
+}
+
+function createConnectedWhoopState(secret, overrides = {}) {
+  return {
+    owner_key: 'serve',
+    whoop_user_id: 23320184,
+    status: 'connected',
+    encrypted_tokens: encryptWhoopTokens({
+      access_token: 'access-old',
+      refresh_token: 'refresh-old',
+      expires_at: Date.now() - 1000,
+      scope: 'offline read:recovery',
+    }, secret),
+    last_synced_day: '2026-07-26',
+    token_refresh_lock_id: null,
+    token_refresh_lock_until: null,
+    sync_lock_id: null,
+    sync_lock_until: null,
+    ...overrides,
+  };
 }
 
 test('WHOOP OAuth authorization URL stores an eight-character single-use state', async () => {
@@ -71,9 +206,268 @@ test('WHOOP OAuth authorization URL stores an eight-character single-use state',
   assert.equal(supabase.tables.softora_health_whoop_connections[0].oauth_state_hash.length, 64);
 });
 
+test('WHOOP persists exchanged OAuth tokens before fallible profile enrichment', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const state = 'oauth-state';
+  const connection = createConnectedWhoopState(tokenEncryptionKey, {
+    status: 'refresh_uncertain',
+    oauth_state_hash: crypto.createHash('sha256').update(state).digest('hex'),
+    oauth_state_expires_at: new Date(Date.now() + 60000).toISOString(),
+    profile: { user_id: 23320184, first_name: 'Servé' },
+  });
+  const previousEncryptedTokens = connection.encrypted_tokens;
+  const supabase = createMemorySupabase({ softora_health_whoop_connections: [connection] });
+  const requestedUrls = [];
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+      if (String(url).includes('/oauth/oauth2/token')) {
+        return createJsonResponse(200, {
+          access_token: 'access-new', refresh_token: 'refresh-new', expires_in: 3600, scope: 'offline',
+        });
+      }
+      if (String(url).endsWith('/user/profile/basic')) {
+        return createJsonResponse(503, { error: 'profile_temporarily_unavailable' });
+      }
+      return createJsonResponse(200, { height_meter: 1.8 });
+    },
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const result = await service.completeAuthorization({ code: 'one-time-code', state });
+  const stored = supabase.tables.softora_health_whoop_connections[0];
+  assert.equal(result.ok, true);
+  assert.equal(result.profilePending, true);
+  assert.equal(stored.status, 'connected');
+  assert.notEqual(stored.encrypted_tokens, previousEncryptedTokens);
+  assert.equal(stored.oauth_state_hash, null);
+  assert.match(stored.last_sync_error, /profielmetadata wordt later bijgewerkt/);
+  assert.equal(requestedUrls.filter((url) => url.includes('/oauth/oauth2/token')).length, 1);
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events.length, 1);
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events[0].event_type, 'internal.backfill');
+});
+
 test('WHOOP day formatting follows Europe/Amsterdam around daylight saving time', () => {
   assert.equal(formatDay(new Date('2026-03-29T22:30:00Z')), '2026-03-30');
   assert.equal(formatDay(new Date('2026-10-25T22:30:00Z')), '2026-10-25');
+});
+
+test('WHOOP webhook signature uses timestamp plus raw body with the app secret', () => {
+  const secret = 'whoop-webhook-secret';
+  const timestamp = '1786352400123';
+  const rawBody = Buffer.from(JSON.stringify({
+    user_id: 23320184,
+    id: 'sleep-id',
+    type: 'recovery.updated',
+    trace_id: 'trace-id',
+  }));
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(Buffer.concat([Buffer.from(timestamp), rawBody]))
+    .digest('base64');
+  const service = createWhoopHealthService({
+    config: {
+      clientId: 'whoop-client',
+      clientSecret: secret,
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback',
+      tokenEncryptionKey: crypto.randomBytes(32).toString('base64'),
+    },
+  });
+
+  assert.equal(service.verifyWebhookSignature({ rawBody, timestamp, signature }), true);
+  assert.equal(service.verifyWebhookSignature({ rawBody, timestamp, signature: 'invalid' }), false);
+});
+
+test('WHOOP refresh never replays a rotating token after an ambiguous 5xx', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey)],
+  });
+  let tokenCalls = 0;
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => {
+      assert.equal(String(url), 'https://api.prod.whoop.com/oauth/oauth2/token');
+      tokenCalls += 1;
+      return createJsonResponse(502, { error: 'bad_gateway' });
+    },
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  await assert.rejects(service.sync({ mode: 'daily', targetDay: '2026-08-10' }), /bad_gateway/);
+  assert.equal(tokenCalls, 1);
+  const connection = supabase.tables.softora_health_whoop_connections[0];
+  assert.equal(connection.status, 'refresh_uncertain');
+  assert.equal(connection.last_sync_status, 'failed');
+  assert.match(connection.last_sync_error, /bad_gateway/);
+  assert.equal(connection.token_refresh_lock_id, null);
+  assert.equal(connection.sync_lock_id, null);
+  assert.equal(supabase.tables.softora_health_sync_runs[0].status, 'failed');
+
+  const status = await service.getStatus();
+  assert.equal(status.connected, false);
+  assert.equal(status.needsReauthorization, true);
+  assert.equal(status.reauthorizationReason, 'refresh_outcome_unknown');
+});
+
+test('WHOOP invalid_grant requires reauthorization but malformed requests do not', async () => {
+  for (const scenario of [
+    { providerError: 'invalid_grant', expectedStatus: 'reauthorization_required' },
+    { providerError: 'invalid_request', expectedStatus: 'connected' },
+  ]) {
+    const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+    const supabase = createMemorySupabase({
+      softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey)],
+    });
+    let tokenCalls = 0;
+    const service = createWhoopHealthService({
+      getSupabaseClient: () => supabase,
+      fetchImpl: async () => {
+        tokenCalls += 1;
+        return createJsonResponse(400, {
+          error: scenario.providerError,
+          error_description: scenario.providerError === 'invalid_grant'
+            ? 'The refresh token is invalid or revoked'
+            : 'The OAuth request is malformed',
+        });
+      },
+      now: () => new Date('2026-08-10T08:00:00.000Z'),
+      config: {
+        clientId: 'whoop-client', clientSecret: 'whoop-secret',
+        redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+      },
+    });
+
+    await assert.rejects(service.sync({ mode: 'manual', targetDay: '2026-08-10' }));
+    assert.equal(tokenCalls, 1);
+    assert.equal(supabase.tables.softora_health_whoop_connections[0].status, scenario.expectedStatus);
+    assert.equal(supabase.tables.softora_health_whoop_connections[0].last_sync_status, 'failed');
+  }
+});
+
+test('WHOOP serializes concurrent syncs and rotates the refresh token once', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const connection = createConnectedWhoopState(tokenEncryptionKey);
+  const previousEncryptedTokens = connection.encrypted_tokens;
+  const supabase = createMemorySupabase({ softora_health_whoop_connections: [connection] });
+  let tokenCalls = 0;
+  let dataCalls = 0;
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/oauth/oauth2/token')) {
+      tokenCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return createJsonResponse(200, {
+        access_token: 'access-new', refresh_token: 'refresh-new', expires_in: 3600, scope: 'offline',
+      });
+    }
+    dataCalls += 1;
+    return createJsonResponse(200, { records: [], next_token: '' });
+  };
+  const deps = {
+    getSupabaseClient: () => supabase,
+    fetchImpl,
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  };
+  const first = createWhoopHealthService(deps);
+  const second = createWhoopHealthService(deps);
+
+  const results = await Promise.all([
+    first.sync({ mode: 'manual', targetDay: '2026-08-10' }),
+    second.sync({ mode: 'reconcile', targetDay: '2026-08-10' }),
+  ]);
+
+  assert.equal(tokenCalls, 1);
+  assert.equal(dataCalls, 4);
+  assert.equal(results.filter((result) => result.reason === 'sync_in_progress').length, 1);
+  assert.equal(supabase.tables.softora_health_sync_runs.length, 1);
+  assert.notEqual(supabase.tables.softora_health_whoop_connections[0].encrypted_tokens, previousEncryptedTokens);
+});
+
+test('WHOOP backfill starts after the last completed day and remains bounded', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: Date.now() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+    })],
+  });
+  const requestedUrls = [];
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => {
+      requestedUrls.push(new URL(String(url)));
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  await service.sync({ mode: 'backfill', targetDay: '2026-08-10' });
+  assert.equal(requestedUrls.length, 4);
+  requestedUrls.forEach((url) => {
+    assert.equal(url.searchParams.get('start'), '2026-07-27T00:00:00.000Z');
+    assert.equal(url.searchParams.get('end'), '2026-08-12T00:00:00.000Z');
+  });
+});
+
+test('WHOOP webhook workers atomically claim one event across concurrent invocations', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const nowIso = '2026-08-10T08:00:00.000Z';
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: Date.now() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+    })],
+    softora_health_whoop_webhook_events: [{
+      trace_id: 'trace-atomic', whoop_user_id: 23320184, resource_id: 'recovery-1',
+      event_type: 'recovery.updated', status: 'pending', attempts: 0,
+      next_attempt_at: nowIso, received_at: nowIso,
+    }],
+  });
+  let dataCalls = 0;
+  const deps = {
+    getSupabaseClient: () => supabase,
+    fetchImpl: async () => {
+      dataCalls += 1;
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
+    now: () => new Date(nowIso),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  };
+
+  const results = await Promise.all([
+    createWhoopHealthService(deps).processWebhookQueue({ limit: 5 }),
+    createWhoopHealthService(deps).processWebhookQueue({ limit: 5 }),
+  ]);
+
+  assert.equal(results.reduce((sum, result) => sum + result.processed, 0), 1);
+  assert.equal(dataCalls, 4);
+  assert.equal(supabase.tables.softora_health_sync_runs.length, 1);
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events[0].status, 'processed');
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events[0].attempts, 1);
 });
 
 test('Google health sheet service replaces the five managed data ranges', async () => {
@@ -122,6 +516,10 @@ test('WHOOP routes keep cron public-secret protected and dashboard admin-only', 
   };
   const service = {
     sync: async () => ({ ok: true, targetDay: '2026-07-15' }),
+    syncTodayFallback: async () => ({ ok: true, targetDay: '2026-08-10' }),
+    reconcileToday: async () => ({ ok: true, targetDay: '2026-08-10' }),
+    processWebhookQueue: async () => ({ ok: true, processed: 0 }),
+    acceptWebhook: async () => ({ ok: true, accepted: true }),
     getStatus: async () => ({ connected: true }),
     getDashboard: async () => ({ records: [] }),
     createAuthorizationUrl: async () => 'https://api.prod.whoop.com/oauth/oauth2/auth',
@@ -140,6 +538,16 @@ test('WHOOP routes keep cron public-secret protected and dashboard admin-only', 
   await cronHandlers[0]({ headers: { authorization: 'Bearer cron-secret' } }, allowed);
   assert.equal(allowed.body.ok, true);
 
+  const reconcileHandlers = routes.get.get('/api/health/whoop/reconcile');
+  const reconcile = createResponseRecorder();
+  await reconcileHandlers[0]({ headers: { authorization: 'Bearer cron-secret' } }, reconcile);
+  assert.equal(reconcile.body.ok, true);
+
+  const workerHandlers = routes.get.get('/api/health/whoop/webhook-worker');
+  const worker = createResponseRecorder();
+  await workerHandlers[0]({ headers: { authorization: 'Bearer cron-secret' } }, worker);
+  assert.equal(worker.body.ok, true);
+
   const statusHandlers = routes.get.get('/api/health/whoop/status');
   assert.equal(statusHandlers[0], requireAdmin);
   const status = createResponseRecorder();
@@ -147,11 +555,32 @@ test('WHOOP routes keep cron public-secret protected and dashboard admin-only', 
   assert.equal(status.body.connected, true);
 });
 
-test('WHOOP cron runs at both UTC hours that can represent 08:00 Europe/Amsterdam', () => {
+test('WHOOP cron is event-first with reconciliation and a same-day noon fallback', () => {
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../../vercel.json'), 'utf8'));
   assert.ok(vercelConfig.crons.some((cron) =>
+    cron.path === '/api/health/whoop/webhook-worker' && cron.schedule === '* * * * *'
+  ));
+  assert.ok(vercelConfig.crons.some((cron) =>
+    cron.path === '/api/health/whoop/reconcile' && cron.schedule === '*/15 3-11 * * *'
+  ));
+  assert.ok(vercelConfig.crons.some((cron) =>
+    cron.path === '/api/health/whoop/daily-sync' && cron.schedule === '0 10,11 * * *'
+  ));
+  assert.ok(!vercelConfig.crons.some((cron) =>
     cron.path === '/api/health/whoop/daily-sync' && cron.schedule === '0 6,7 * * *'
   ));
+});
+
+test('WHOOP migrations permit hardened connection, sync and queue states', () => {
+  const migration = fs.readFileSync(path.join(
+    __dirname,
+    '../../supabase/migrations/20260810140540_harden_whoop_rotation_and_queue_claims.sql'
+  ), 'utf8');
+  assert.match(migration, /add column if not exists sync_lock_id text/);
+  assert.match(migration, /'reauthorization_required',[\s\S]*'refresh_uncertain'/);
+  assert.match(migration, /'daily', 'backfill', 'manual', 'webhook', 'reconcile'/);
+  assert.match(migration, /'pending', 'processing', 'retry', 'processed', 'dead'/);
+  assert.match(migration, /check \(attempts >= 0\)/);
 });
 
 test('health dossier has no manual WHOOP or spreadsheet controls', () => {
