@@ -6,6 +6,7 @@ const path = require('node:path');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
   CAMPAIGN_SYNC_FAST_FETCH_LIMIT,
+  MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS,
   createMailboxSyncService,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
@@ -192,6 +193,62 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
   assert.equal(fetches[0].campaignHistory, false);
   assert.equal(result.historyBackfill, false);
   assert.equal(result.incrementalOnly, true);
+});
+
+test('fast refresh bounds an uncertain mutation lease to the recovery window', async () => {
+  const mutationRuns = [];
+  const selected = account('serve@softora.nl');
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      finishSync: async () => ({ ok: true }),
+      getSyncState: async () => ({
+        last_uid: 50,
+        uid_validity: 777,
+        last_synced_at: '2026-08-10T18:00:00.000Z',
+      }),
+      listMessageUidSyncStateForAccount: async () => ({
+        indexedUids: [50], deferredQuarantineUids: [], retryDueQuarantineUids: [],
+      }),
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+    },
+    campaignMutationRunner: {
+      isAvailable: () => true,
+      async run(options, task) {
+        mutationRuns.push(options);
+        const controller = new AbortController();
+        return task({
+          signal: controller.signal,
+          mutationId: '11111111-1111-4111-8111-111111111111',
+          requestKey: options.requestKey,
+          assertActive() {},
+        });
+      },
+    },
+    requireCampaignMutationJournal: true,
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => withSyncReadHealth([]),
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: 'inbox',
+    campaignOnly: true,
+    incrementalOnly: true,
+    fastRefresh: true,
+    folderTimeoutMs: 10_000,
+  });
+
+  assert.equal(result.complete, true);
+  assert.equal(mutationRuns.length, 1);
+  assert.equal(mutationRuns[0].leaseSeconds, MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS);
+  assert.equal(MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS, 25);
 });
 
 test('fast IMAP refresh drains a burst larger than four messages in one cycle', async () => {
