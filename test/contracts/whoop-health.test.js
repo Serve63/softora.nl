@@ -5,7 +5,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { createGoogleHealthSheetService } = require('../../server/services/google-health-sheet');
-const { createWhoopHealthService, formatDay } = require('../../server/services/whoop-health');
+const {
+  createWhoopHealthService,
+  formatDay,
+  verifyWhoopWebhookSignature,
+} = require('../../server/services/whoop-health');
 const {
   registerWhoopHealthProtectedRoutes,
   registerWhoopHealthPublicRoutes,
@@ -71,6 +75,25 @@ test('WHOOP OAuth authorization URL stores an eight-character single-use state',
   assert.equal(supabase.tables.softora_health_whoop_connections[0].oauth_state_hash.length, 64);
 });
 
+test('WHOOP webhook signature validates timestamp plus exact raw body', () => {
+  const clientSecret = 'whoop-secret';
+  const nowMs = 1786350000000;
+  const timestamp = String(nowMs);
+  const rawBody = Buffer.from(JSON.stringify({
+    user_id: 23320184,
+    id: '123e4567-e89b-12d3-a456-426614174000',
+    type: 'recovery.updated',
+    trace_id: 'trace-1',
+  }));
+  const signature = crypto.createHmac('sha256', clientSecret)
+    .update(Buffer.concat([Buffer.from(timestamp), rawBody]))
+    .digest('base64');
+
+  assert.equal(verifyWhoopWebhookSignature({ rawBody, signature, timestamp, clientSecret, nowMs }), true);
+  assert.equal(verifyWhoopWebhookSignature({ rawBody: Buffer.from('{}'), signature, timestamp, clientSecret, nowMs }), false);
+  assert.equal(verifyWhoopWebhookSignature({ rawBody, signature, timestamp, clientSecret, nowMs: nowMs + 10 * 60 * 1000 }), false);
+});
+
 test('WHOOP day formatting follows Europe/Amsterdam around daylight saving time', () => {
   assert.equal(formatDay(new Date('2026-03-29T22:30:00Z')), '2026-03-30');
   assert.equal(formatDay(new Date('2026-10-25T22:30:00Z')), '2026-10-25');
@@ -126,12 +149,16 @@ test('WHOOP routes keep cron public-secret protected and dashboard admin-only', 
     getDashboard: async () => ({ records: [] }),
     createAuthorizationUrl: async () => 'https://api.prod.whoop.com/oauth/oauth2/auth',
     completeAuthorization: async () => ({ ok: true }),
+    repairGap: async () => ({ ok: true, skipped: true }),
+    processWebhookEvents: async () => ({ ok: true, processed: 0 }),
+    verifyWebhookRequest: () => true,
+    enqueueWebhookEvent: async () => ({ ok: true }),
   };
   const requireAdmin = (_req, _res, next) => next();
   registerWhoopHealthPublicRoutes(app, { service, cronSecret: 'cron-secret' });
   registerWhoopHealthProtectedRoutes(app, { service, requirePremiumAdminApiAccess: requireAdmin });
 
-  const cronHandlers = routes.get.get('/api/health/whoop/daily-sync');
+  const cronHandlers = routes.get.get('/api/health/whoop/reconcile');
   const denied = createResponseRecorder();
   await cronHandlers[0]({ headers: {} }, denied);
   assert.equal(denied.statusCode, 401);
@@ -147,11 +174,15 @@ test('WHOOP routes keep cron public-secret protected and dashboard admin-only', 
   assert.equal(status.body.connected, true);
 });
 
-test('WHOOP cron runs at both UTC hours that can represent 08:00 Europe/Amsterdam', () => {
+test('WHOOP cron processes recovery events continuously and reconciles at local noon', () => {
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../../vercel.json'), 'utf8'));
   assert.ok(vercelConfig.crons.some((cron) =>
-    cron.path === '/api/health/whoop/daily-sync' && cron.schedule === '0 6,7 * * *'
+    cron.path === '/api/health/whoop/process-events' && cron.schedule === '* * * * *'
   ));
+  assert.ok(vercelConfig.crons.some((cron) =>
+    cron.path === '/api/health/whoop/reconcile' && cron.schedule === '0 10,11 * * *'
+  ));
+  assert.ok(!vercelConfig.crons.some((cron) => cron.path === '/api/health/whoop/daily-sync'));
 });
 
 test('health dossier has no manual WHOOP or spreadsheet controls', () => {
