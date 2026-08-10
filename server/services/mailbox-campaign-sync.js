@@ -11,6 +11,8 @@ const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
 const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
+const INCREMENTAL_LOCK_RETRY_ATTEMPTS = 12;
+const INCREMENTAL_LOCK_RETRY_DELAY_MS = 500;
 
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -116,6 +118,10 @@ async function mapWithConcurrency(items, concurrency, worker) {
     }
   }));
   return results;
+}
+
+function isMailboxSyncCapacityError(error) {
+  return String(error?.message || error || '').includes('MAILBOX_SYNC_GLOBAL_CAP_REACHED');
 }
 
 function isGmailImapAccount(account = {}) {
@@ -227,6 +233,7 @@ function createMailboxSyncService({
   getAccounts,
   normalizeEmail,
   normalizeFolder,
+  waitForIncrementalLockRetry = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
   logger = console,
   defaultFolders = ['inbox', 'sent'],
   defaultLimit = 50,
@@ -244,13 +251,31 @@ function createMailboxSyncService({
     if (!canUseMailboxIndex()) {
       return { ok: false, skipped: true, reason: 'mailbox_index_unavailable' };
     }
-    const lock = await mailboxIndexStore.acquireSyncLock({
+    let lock = await mailboxIndexStore.acquireSyncLock({
       accountEmail: account.email,
       folder: normalizedFolder,
       force,
     });
+    if (incrementalOnly) {
+      for (let attempt = 1; attempt < INCREMENTAL_LOCK_RETRY_ATTEMPTS && !lock.ok; attempt += 1) {
+        const retryableContention = lock.locked || isMailboxSyncCapacityError(lock.error);
+        if (!retryableContention) break;
+        await waitForIncrementalLockRetry(INCREMENTAL_LOCK_RETRY_DELAY_MS);
+        lock = await mailboxIndexStore.acquireSyncLock({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+          force,
+        });
+      }
+    }
     if (!lock.ok) {
-      return { ok: true, skipped: true, reason: lock.locked ? 'locked' : 'lock_failed' };
+      const retryableContention = lock.locked || isMailboxSyncCapacityError(lock.error);
+      return {
+        ok: incrementalOnly && retryableContention ? false : true,
+        skipped: true,
+        reason: lock.locked ? 'locked' : 'lock_failed',
+        ...(incrementalOnly && retryableContention ? { retryable: true } : {}),
+      };
     }
 
     try {
@@ -457,12 +482,15 @@ module.exports = {
   CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+  INCREMENTAL_LOCK_RETRY_ATTEMPTS,
+  INCREMENTAL_LOCK_RETRY_DELAY_MS,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,
   getMailboxSyncFoldersForAccount,
   isRequestFlagEnabled,
   isGmailImapAccount,
+  isMailboxSyncCapacityError,
   mapWithConcurrency,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,

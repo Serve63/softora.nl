@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
   createMailboxSyncService,
+  INCREMENTAL_LOCK_RETRY_ATTEMPTS,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
   syncMailboxRequest,
@@ -157,6 +158,98 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
   assert.equal(fetches[0].campaignHistory, false);
   assert.equal(result.results[0].historyBackfill, false);
   assert.equal(result.results[0].incrementalOnly, true);
+});
+
+test('incremental refresh waits for transient mailbox lock contention instead of silently skipping', async () => {
+  const selected = account('serve@softora.nl');
+  const waits = [];
+  let lockAttempts = 0;
+  let fetches = 0;
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => {
+        lockAttempts += 1;
+        if (lockAttempts < 3) {
+          return {
+            ok: false,
+            locked: false,
+            error: new Error('MAILBOX_SYNC_GLOBAL_CAP_REACHED'),
+          };
+        }
+        return { ok: true, lockToken: 'lock-after-contention' };
+      },
+      finishSync: async () => ({ ok: true }),
+      listMessageUidsForAccount: async () => [],
+      upsertMessages: async () => ({ ok: true, upserted: 1 }),
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => {
+      fetches += 1;
+      return [{ uid: 93 }];
+    },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    waitForIncrementalLockRetry: async (delayMs) => waits.push(delayMs),
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailbox({
+    owner: 'serve',
+    folders: ['inbox'],
+    limit: 4,
+    campaignOnly: true,
+    incrementalOnly: true,
+    maxConcurrentAccounts: 3,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(lockAttempts, 3);
+  assert.deepEqual(waits, [500, 500]);
+  assert.equal(fetches, 1);
+});
+
+test('incremental refresh reports persistent lock contention as retryable and incomplete', async () => {
+  const selected = account('serve@softora.nl');
+  let lockAttempts = 0;
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => {
+        lockAttempts += 1;
+        return { ok: false, locked: true };
+      },
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => {
+      throw new Error('provider fetch must not run without a lock');
+    },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    waitForIncrementalLockRetry: async () => {},
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailbox({
+    owner: 'serve',
+    folders: ['inbox'],
+    limit: 4,
+    campaignOnly: true,
+    incrementalOnly: true,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(lockAttempts, INCREMENTAL_LOCK_RETRY_ATTEMPTS);
+  assert.deepEqual(result.results[0], {
+    ok: false,
+    skipped: true,
+    reason: 'locked',
+    retryable: true,
+  });
 });
 
 test('Instantly fast refresh supports exact owners and both owners without mixing', async () => {
@@ -365,5 +458,76 @@ test('visible, background, focus and reconnect scheduling keep refresh bounded',
   assert.equal(timers.at(-1), 0);
   windowListeners.get('online')();
   assert.equal(timers.at(-1), 0);
+  controller.destroy();
+});
+
+test('BFCache return resumes one immediate mailbox refresh instead of leaving the page stale', async () => {
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const timeouts = new Map();
+  const intervals = new Map();
+  const requestSignals = [];
+  let nextTimerId = 0;
+  const documentRef = {
+    visibilityState: 'visible',
+    getElementById() { return null; },
+    addEventListener(event, handler) { documentListeners.set(event, handler); },
+    removeEventListener(event, handler) {
+      if (documentListeners.get(event) === handler) documentListeners.delete(event);
+    },
+  };
+  const windowRef = {
+    addEventListener(event, handler) { windowListeners.set(event, handler); },
+    removeEventListener(event, handler) {
+      if (windowListeners.get(event) === handler) windowListeners.delete(event);
+    },
+  };
+  const controller = refreshModule.create({
+    autoStart: false,
+    document: documentRef,
+    window: windowRef,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: (_url, init) => new Promise((_resolve, reject) => {
+      requestSignals.push(init.signal);
+      init.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    }),
+    setTimeout(handler, delay) {
+      const id = ++nextTimerId;
+      timeouts.set(id, { handler, delay, active: true });
+      return id;
+    },
+    clearTimeout(id) {
+      if (timeouts.has(id)) timeouts.get(id).active = false;
+    },
+    setInterval(handler, delay) {
+      const id = ++nextTimerId;
+      intervals.set(id, { handler, delay, active: true });
+      return id;
+    },
+    clearInterval(id) {
+      if (intervals.has(id)) intervals.get(id).active = false;
+    },
+  });
+
+  controller.start();
+  const refresh = controller.refresh();
+  await Promise.resolve();
+  assert.equal(requestSignals.length, 2);
+  windowListeners.get('pagehide')({ persisted: true });
+  assert.equal(requestSignals.every((signal) => signal.aborted), true);
+  assert.equal(await refresh, false);
+  assert.equal(Array.from(timeouts.values()).some((entry) => entry.active), false);
+
+  windowListeners.get('pageshow')({ persisted: true });
+  assert.deepEqual(
+    Array.from(timeouts.values()).filter((entry) => entry.active).map((entry) => entry.delay),
+    [0]
+  );
+  assert.equal(Array.from(intervals.values()).filter((entry) => entry.active).length, 1);
   controller.destroy();
 });

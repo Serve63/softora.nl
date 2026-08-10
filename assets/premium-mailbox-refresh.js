@@ -75,6 +75,7 @@
     let refreshQueued = false;
     let started = false;
     let destroyed = false;
+    let paused = false;
     let refreshTimer = 0;
     let refreshAgeTimer = 0;
     let activeController = null;
@@ -143,7 +144,7 @@
     }
 
     function scheduleNext(delayMs = getNextDelay()) {
-      if (!started || destroyed || typeof scheduleTimeout !== 'function') return;
+      if (!started || destroyed || paused || typeof scheduleTimeout !== 'function') return;
       clearRefreshTimer();
       refreshTimer = scheduleTimeout(() => {
         refreshTimer = 0;
@@ -227,7 +228,7 @@
     }
 
     async function refresh({ manual = false } = {}) {
-      if (destroyed) return false;
+      if (destroyed || paused) return false;
       if (refreshInFlight) {
         refreshQueued = true;
         return false;
@@ -286,7 +287,7 @@
         if (scopeKey === getScopeKey(getScope())) setRefreshing(false);
         refreshInFlight = false;
         activeController = null;
-        if (!destroyed) {
+        if (!destroyed && !paused) {
           if (refreshQueued) {
             refreshQueued = false;
             scheduleNext(0);
@@ -298,7 +299,7 @@
     }
 
     function requestImmediateRefresh() {
-      if (!started || destroyed) return;
+      if (!started || destroyed || paused) return;
       if (refreshInFlight) {
         refreshQueued = true;
         return;
@@ -320,16 +321,47 @@
       requestImmediateRefresh();
     }
 
+    function startRefreshAgeTimer() {
+      if (refreshAgeTimer || typeof scheduleInterval !== 'function') return;
+      refreshAgeTimer = scheduleInterval(updateRefreshAge, REFRESH_AGE_UPDATE_INTERVAL_MS);
+    }
+
+    function stopRefreshAgeTimer() {
+      if (refreshAgeTimer) cancelInterval?.(refreshAgeTimer);
+      refreshAgeTimer = 0;
+    }
+
+    function handlePageHide(event) {
+      if (event?.persisted === true) {
+        paused = true;
+        refreshQueued = false;
+        activeController?.abort?.();
+        clearRefreshTimer();
+        stopRefreshAgeTimer();
+        setRefreshing(false);
+        return;
+      }
+      destroy();
+    }
+
+    function handlePageShow(event) {
+      if (event?.persisted !== true || destroyed || !started) return;
+      paused = false;
+      startRefreshAgeTimer();
+      updateRefreshAge();
+      requestImmediateRefresh();
+    }
+
     function start() {
       if (started || destroyed) return;
       started = true;
-      if (typeof scheduleInterval === 'function') {
-        refreshAgeTimer = scheduleInterval(updateRefreshAge, REFRESH_AGE_UPDATE_INTERVAL_MS);
-      }
+      paused = false;
+      startRefreshAgeTimer();
       documentRef?.addEventListener?.('visibilitychange', handleVisibilityChange);
       windowRef?.addEventListener?.('focus', requestImmediateRefresh);
       windowRef?.addEventListener?.('online', requestImmediateRefresh);
-      windowRef?.addEventListener?.('pagehide', destroy, { once: true });
+      windowRef?.addEventListener?.('pagehide', handlePageHide);
+      windowRef?.addEventListener?.('pageshow', handlePageShow);
       updateRefreshAge();
       scheduleNext(0);
     }
@@ -337,13 +369,15 @@
     function destroy() {
       if (destroyed) return;
       destroyed = true;
+      paused = false;
       activeController?.abort?.();
       clearRefreshTimer();
-      if (refreshAgeTimer) cancelInterval?.(refreshAgeTimer);
-      refreshAgeTimer = 0;
+      stopRefreshAgeTimer();
       documentRef?.removeEventListener?.('visibilitychange', handleVisibilityChange);
       windowRef?.removeEventListener?.('focus', requestImmediateRefresh);
       windowRef?.removeEventListener?.('online', requestImmediateRefresh);
+      windowRef?.removeEventListener?.('pagehide', handlePageHide);
+      windowRef?.removeEventListener?.('pageshow', handlePageShow);
     }
 
     if (button) button.addEventListener('click', () => void refresh({ manual: true }));

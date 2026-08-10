@@ -118,7 +118,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806f/);
-  assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h/);
@@ -3022,7 +3022,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
+  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810a/);
   assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806f/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
