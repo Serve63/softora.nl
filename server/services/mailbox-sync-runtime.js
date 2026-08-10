@@ -122,16 +122,7 @@ function createMailboxSyncStateStore({
     if (row?.acquired === true && normalizeString(row.claimed_lock_token) === lockToken) {
       return { ok: true, locked: false, syncKey, lockToken, lockExpiresAt: row.lock_expires_at || null };
     }
-    if (row?.locked === true) {
-      const lockExpiresAt = normalizeString(row.lock_expires_at) || null;
-      return {
-        ok: false,
-        locked: true,
-        syncKey,
-        lockExpiresAt,
-        lockReason: lockExpiresAt ? 'active_target' : 'global_capacity',
-      };
-    }
+    if (row?.locked === true) return { ok: false, locked: true, syncKey };
     const error = new Error('Mailbox-lockclaim gaf geen geldige uitkomst.');
     error.code = 'MAILBOX_SYNC_LOCK_CLAIM_FAILED';
     return { ok: false, locked: false, syncKey, error };

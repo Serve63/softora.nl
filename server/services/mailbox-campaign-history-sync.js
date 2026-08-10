@@ -109,23 +109,8 @@ function selectMailboxSyncUids({
     .reverse();
   const unindexedAll = normalizedAll.filter((uid) => !indexedUidSet.has(uid));
   const unindexedCampaign = normalizedCampaign.filter((uid) => !indexedUidSet.has(uid));
-  const attachSelectionHealth = (selectedUids) => {
-    const selected = Array.isArray(selectedUids) ? selectedUids : [];
-    const selectedSet = new Set(selected);
-    const remainingUidCount = unindexedAll.filter((uid) => !selectedSet.has(uid)).length;
-    Object.defineProperty(selected, 'syncSelectionHealth', {
-      value: Object.freeze({
-        providerUidCount: normalizedAll.length,
-        indexedUidCount: indexedUidSet.size,
-        unindexedUidCount: unindexedAll.length,
-        remainingUidCount,
-        truncated: remainingUidCount > 0,
-      }),
-    });
-    return selected;
-  };
   if (!unindexedCampaign.length && !missingPriorityUids.length) {
-    return attachSelectionHealth(unindexedAll.slice(-safeLimit).reverse());
+    return unindexedAll.slice(-safeLimit).reverse();
   }
 
   const beforeUid = Number(oldestIndexedCampaignUid) || Number.POSITIVE_INFINITY;
@@ -143,7 +128,7 @@ function selectMailboxSyncUids({
   missingPriorityUids.forEach(addUid);
   olderCampaignUids.slice().reverse().forEach(addUid);
   unindexedAll.slice().reverse().forEach(addUid);
-  return attachSelectionHealth(selected);
+  return selected;
 }
 
 async function resolveMailboxSyncUids({

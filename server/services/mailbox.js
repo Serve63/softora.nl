@@ -8,7 +8,7 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
-const { attachMailboxSyncReadResult, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
+const { attachMailboxSyncReadHealth, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
 const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
@@ -1964,7 +1964,7 @@ function createMailboxService(deps = {}) {
     try {
       await client.connect();
       const mailboxName = await resolveMailboxName(client, normalizedFolder);
-      if (!mailboxName) return attachMailboxSyncReadResult([], { folderMissing: true });
+      if (!mailboxName) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: true });
       const lock = await client.getMailboxLock(mailboxName);
       try {
         let selectedUids = Array.isArray(uids) && uids.length
@@ -1982,7 +1982,7 @@ function createMailboxService(deps = {}) {
             folder: normalizedFolder,
           });
         }
-        if (!selectedUids.length) return attachMailboxSyncReadResult([], { selectedUids });
+        if (!selectedUids.length) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: false });
         return await fetchSelectedMailboxMessages({
           account,
           client,

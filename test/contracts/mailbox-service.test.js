@@ -3874,11 +3874,7 @@ test('campaign mailbox sync skips configured accounts outside the campaign', asy
       listMessages: async () => [],
       acquireSyncLock: async ({ accountEmail }) => {
         requestedAccounts.push(accountEmail);
-        return {
-          ok: false,
-          locked: true,
-          lockExpiresAt: new Date(Date.now() + 30_000).toISOString(),
-        };
+        return { ok: false, locked: true };
       },
     },
   });
@@ -3936,11 +3932,7 @@ test('mailbox cron supplements normal folders with the Gmail campaign label', as
       listMessages: async () => [],
       acquireSyncLock: async ({ folder }) => {
         requestedFolders.push(folder);
-        return {
-          ok: false,
-          locked: true,
-          lockExpiresAt: new Date(Date.now() + 30_000).toISOString(),
-        };
+        return { ok: false, locked: true };
       },
     },
   });
@@ -4370,7 +4362,7 @@ test('campaign Gmail label sync records a failure and succeeds on the next force
   assert.equal(finished[1].error, undefined);
 });
 
-test('mailbox cron sync indexes a lightweight sent batch and reports the remaining backlog', async () => {
+test('mailbox cron sync indexes a lightweight sent batch by default', async () => {
   const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
     uid: index + 1,
     flags: ['\\Seen'],
@@ -4420,12 +4412,8 @@ test('mailbox cron sync indexes a lightweight sent batch and reports the remaini
     response
   );
 
-  assert.equal(response.statusCode, 207);
+  assert.equal(response.statusCode, 200);
   assert.equal(response.body.ok, true);
-  assert.equal(response.body.complete, false);
-  assert.equal(response.body.freshnessConfirmed, false);
-  assert.equal(response.body.results[0].code, 'MAILBOX_SYNC_SELECTION_TRUNCATED');
-  assert.equal(response.body.results[0].remainingUidCount, 90);
   assert.deepEqual(upsertedCounts, [30]);
   assert.equal(response.body.results[0].synced, 30);
 });
@@ -4498,9 +4486,7 @@ test('campaign mailbox sync combines newest mail with missing historical convers
     response
   );
 
-  assert.equal(response.statusCode, 207);
-  assert.equal(response.body.complete, false);
-  assert.equal(response.body.results[0].code, 'MAILBOX_SYNC_SELECTION_TRUNCATED');
+  assert.equal(response.statusCode, 200);
   const { signal: oldestLookupSignal, ...oldestLookupInput } = oldestLookup;
   assert.deepEqual(oldestLookupInput, {
     accountEmail: 'serve290@gmail.com',
@@ -4607,9 +4593,7 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
     response
   );
 
-  assert.equal(response.statusCode, 207);
-  assert.equal(response.body.complete, false);
-  assert.equal(response.body.results[0].code, 'MAILBOX_SYNC_SELECTION_TRUNCATED');
+  assert.equal(response.statusCode, 200);
   assert.deepEqual(historyScanRequests, [
     { folder: 'inbox', limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT },
   ]);
