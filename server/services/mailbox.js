@@ -14,6 +14,7 @@ const { assertMailboxClientUidValidity, normalizeMailboxUidValidity, requireMail
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
+const { createMailboxWebdesignOutboundGuard } = require('./mailbox-webdesign-outbound-guard');
 const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, resolveReplyIdentity, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
@@ -1342,101 +1343,14 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  function buildMailboxWebdesignGuardConflictError(identity, conflict) {
-    const sender = normalizeEmail(conflict && conflict.sender_email);
-    const provider = normalizeString(conflict && conflict.provider).toLowerCase();
-    const target =
-      normalizeEmail(identity && identity.recipientEmail) ||
-      normalizeString(identity && identity.recipientCompany) ||
-      'deze ontvanger';
-    const source = provider === 'instantly'
-      ? 'Instantly'
-      : sender
-        ? sender
-        : 'de centrale outbound duplicate-guard';
-    return buildMailboxWebdesignGuardError(
-      `Webdesignmail geblokkeerd: ${target} is al eerder vastgezet via ${source}.`,
-      'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFLICT',
-      409,
-      { conflict }
-    );
-  }
-
-  function isCompleteOutboundGuardReservation(result) {
-    const actualCount = Number(result && result.count);
-    const expectedCount = Number(result && result.expectedCount);
-    if (!result || result.ok !== true) return false;
-    if (!Number.isFinite(actualCount) || actualCount <= 0) return false;
-    return !(Number.isFinite(expectedCount) && expectedCount > 0 && actualCount < expectedCount);
-  }
-
-  async function reserveMailboxWebdesignOutboundRecipient(identity, { accountEmail, subject } = {}) {
-    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard ontbreekt; webdesignmail niet verzonden.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_UNAVAILABLE',
-        503
-      );
-    }
-    const reservation = await outboundRecipientGuardStore.reserveRecipients([identity], {
-      provider: 'softora',
-      channel: 'mailbox',
-      senderEmail: accountEmail,
-      source: 'softora-mailbox-webdesign-pre-send',
-      actor: 'premium-mailbox-send',
-      status: 'reserved',
-      permanent: true,
-      payload: {
-        subject,
-        manualMailboxSend: true,
-      },
-    });
-    if (reservation && reservation.conflict) {
-      throw buildMailboxWebdesignGuardConflictError(identity, reservation.conflict);
-    }
-    if (!isCompleteOutboundGuardReservation(reservation)) {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard kon niet reserveren; webdesignmail niet verzonden.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_FAILED',
-        502
-      );
-    }
-    return reservation;
-  }
-
-  async function confirmMailboxWebdesignOutboundRecipient(reservationId, sentItem = {}) {
-    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard kan niet permanent worden bevestigd na SMTP-acceptatie.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
-        502
-      );
-    }
-    if (!reservationId) {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard mist een reservering na SMTP-acceptatie.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
-        502
-      );
-    }
-    const confirmation = await outboundRecipientGuardStore.confirmReservation(reservationId, {
-      status: 'sent',
-      permanent: true,
-      payload: {
-        messageId: sentItem.messageId,
-        email: sentItem.email,
-        subject: sentItem.subject,
-        manualMailboxSend: true,
-      },
-    });
-    if (!confirmation || confirmation.ok !== true || Number(confirmation.count || 0) <= 0) {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard bevestigde geen bestaande reservering na SMTP-acceptatie.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
-        502
-      );
-    }
-  }
+  const {
+    confirm: confirmMailboxWebdesignOutboundRecipient,
+    release: releaseMailboxWebdesignOutboundRecipient,
+    reserve: reserveMailboxWebdesignOutboundRecipient,
+  } = createMailboxWebdesignOutboundGuard({
+    buildError: buildMailboxWebdesignGuardError, normalizeEmail, normalizeString,
+    outboundRecipientGuardStore,
+  });
 
   function getPhotoMetaForRow(row, index, photoMap, photoByIdentity) {
     const id = getCustomerId(row, index);
@@ -1987,6 +1901,7 @@ function createMailboxService(deps = {}) {
       id: `${folder}:${message.uid}`,
       uid: message.uid,
       folder,
+      accountEmail: account.email,
       from: fromText,
       email: parsedFromEmail || account.email,
       to: addressText(parsed.to?.value),
@@ -2015,6 +1930,8 @@ function createMailboxService(deps = {}) {
       softoraSendIntentId: parsedHeaderText(parsed, 'x-softora-send-intent-id'),
       softoraSendMode: parsedHeaderText(parsed, 'x-softora-send-mode').toLowerCase(),
       softoraReplyTargetMessageId: parsedHeaderText(parsed, 'x-softora-reply-target-message-id'),
+      softoraRecipientFingerprint: parsedHeaderText(parsed, 'x-softora-recipient-fingerprint'),
+      softoraPayloadFingerprint: parsedHeaderText(parsed, 'x-softora-payload-fingerprint'),
       softoraThreadProvenanceKnown: Boolean(parsedHeaderText(parsed, 'x-softora-send-intent-id')),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
@@ -2049,7 +1966,7 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, deadlineAt = 0, ...historySyncOptions }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, reconcileIntentIds = [], signal, deadlineAt = 0, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
     const client = createClient(account, getMailboxImapSyncTimeouts({ signal, deadlineAt }));
@@ -2074,6 +1991,22 @@ function createMailboxService(deps = {}) {
             logger,
             accountEmail: account.email,
             folder: normalizedFolder,
+          });
+        }
+        const selectionHealth = selectedUids.syncSelectionHealth;
+        for (const intentId of Array.from(new Set(reconcileIntentIds.map(normalizeString).filter(Boolean))).slice(0, 25)) {
+          abortScope.throwIfAborted();
+          const matches = await client.search({ header: { 'x-softora-send-intent-id': intentId } }, { uid: true });
+          abortScope.throwIfAborted();
+          selectedUids.push(...(Array.isArray(matches) ? matches : []));
+        }
+        selectedUids = Array.from(new Set(selectedUids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)));
+        // Deduplication must not erase the provider-selection health attached by
+        // resolveMailboxSyncUids. Losing it would falsely label a truncated
+        // backlog as complete after adding SMTP reconciliation candidates.
+        if (selectionHealth) {
+          Object.defineProperty(selectedUids, 'syncSelectionHealth', {
+            value: selectionHealth,
           });
         }
         if (!selectedUids.length) return attachMailboxSyncReadResult([], { selectedUids, uidValidity });
@@ -2148,6 +2081,8 @@ function createMailboxService(deps = {}) {
     getAccounts,
     normalizeEmail,
     normalizeFolder, invalidateCampaignSnapshot, ...campaignRuntime.syncOptions,
+    mailboxSendProvenanceStore, confirmMailboxWebdesignOutboundRecipient,
+    releaseMailboxWebdesignOutboundRecipient,
     logger,
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
@@ -2299,7 +2234,8 @@ function createMailboxService(deps = {}) {
     composeSendDependencies: {
       getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
-      confirmMailboxWebdesignOutboundRecipient, appendSentMessage, createImapClient, nodemailer,
+      confirmMailboxWebdesignOutboundRecipient, releaseMailboxWebdesignOutboundRecipient,
+      appendSentMessage, createImapClient, nodemailer,
       webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
     },
     getAccount, instantlyMailboxService, mailboxComposeThreadContext,

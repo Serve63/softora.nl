@@ -173,6 +173,8 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
     softoraSendIntentId: '',
     softoraSendMode: '',
     softoraReplyTargetMessageId: '',
+    softoraRecipientFingerprint: '',
+    softoraPayloadFingerprint: '',
     softoraThreadProvenanceKnown: false,
   });
 
