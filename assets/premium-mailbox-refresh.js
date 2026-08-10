@@ -319,17 +319,21 @@
       }
     }
 
-    function requestImmediateRefresh() {
+    function requestImmediateRefresh({ queueIfBusy = true } = {}) {
       if (!started || destroyed || paused) return;
       if (refreshInFlight) {
-        refreshQueued = true;
+        if (queueIfBusy) refreshQueued = true;
         return;
       }
       scheduleNext(0);
     }
 
+    function requestAmbientRefresh() {
+      requestImmediateRefresh({ queueIfBusy: false });
+    }
+
     function handleVisibilityChange() {
-      if (documentRef?.visibilityState === 'visible') requestImmediateRefresh();
+      if (documentRef?.visibilityState === 'visible') requestAmbientRefresh();
       else scheduleNext(HIDDEN_REFRESH_INTERVAL_MS);
     }
 
@@ -379,8 +383,8 @@
       paused = false;
       startRefreshAgeTimer();
       documentRef?.addEventListener?.('visibilitychange', handleVisibilityChange);
-      windowRef?.addEventListener?.('focus', requestImmediateRefresh);
-      windowRef?.addEventListener?.('online', requestImmediateRefresh);
+      windowRef?.addEventListener?.('focus', requestAmbientRefresh);
+      windowRef?.addEventListener?.('online', requestAmbientRefresh);
       windowRef?.addEventListener?.('pagehide', handlePageHide);
       windowRef?.addEventListener?.('pageshow', handlePageShow);
       updateRefreshAge();
@@ -395,8 +399,8 @@
       clearRefreshTimer();
       stopRefreshAgeTimer();
       documentRef?.removeEventListener?.('visibilitychange', handleVisibilityChange);
-      windowRef?.removeEventListener?.('focus', requestImmediateRefresh);
-      windowRef?.removeEventListener?.('online', requestImmediateRefresh);
+      windowRef?.removeEventListener?.('focus', requestAmbientRefresh);
+      windowRef?.removeEventListener?.('online', requestAmbientRefresh);
       windowRef?.removeEventListener?.('pagehide', handlePageHide);
       windowRef?.removeEventListener?.('pageshow', handlePageShow);
       button?.removeEventListener?.('click', handleButtonClick);

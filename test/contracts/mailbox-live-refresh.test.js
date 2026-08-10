@@ -589,6 +589,70 @@ test('visible, background, focus and reconnect scheduling keep refresh bounded',
   controller.destroy();
 });
 
+test('focus, visibility and reconnect events do not queue a duplicate active refresh', async () => {
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const timers = new Map();
+  let nextTimerId = 0;
+  let fetchCalls = 0;
+  let releaseRequests;
+  const pendingResponse = new Promise((resolve) => {
+    releaseRequests = () => resolve(successfulResponse());
+  });
+  const documentRef = {
+    visibilityState: 'visible',
+    getElementById() { return null; },
+    addEventListener(event, handler) { documentListeners.set(event, handler); },
+    removeEventListener(event) { documentListeners.delete(event); },
+  };
+  const windowRef = {
+    AbortController,
+    addEventListener(event, handler) { windowListeners.set(event, handler); },
+    removeEventListener(event) { windowListeners.delete(event); },
+  };
+  const controller = refreshModule.create({
+    autoStart: false,
+    document: documentRef,
+    window: windowRef,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async () => {
+      fetchCalls += 1;
+      return pendingResponse;
+    },
+    loadMessages: async () => true,
+    now: () => 1_000,
+    setTimeout(handler, delay) {
+      const id = ++nextTimerId;
+      timers.set(id, { handler, delay, active: true });
+      return id;
+    },
+    clearTimeout(id) {
+      if (timers.has(id)) timers.get(id).active = false;
+    },
+    setInterval: () => ++nextTimerId,
+    clearInterval() {},
+  });
+
+  controller.start();
+  const refresh = controller.refresh();
+  await Promise.resolve();
+  assert.equal(fetchCalls, 2);
+
+  windowListeners.get('focus')();
+  windowListeners.get('online')();
+  documentListeners.get('visibilitychange')();
+  assert.equal(fetchCalls, 2);
+
+  releaseRequests();
+  assert.equal(await refresh, true);
+  assert.deepEqual(
+    Array.from(timers.values()).filter((entry) => entry.active).map((entry) => entry.delay),
+    [refreshModule.VISIBLE_REFRESH_INTERVAL_MS]
+  );
+  controller.destroy();
+});
+
 test('BFCache pauzeert en annuleert zonder destroy en hervat met exact één verversing', async () => {
   const documentListeners = new Map();
   const windowListeners = new Map();
