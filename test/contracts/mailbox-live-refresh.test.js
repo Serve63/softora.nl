@@ -301,7 +301,7 @@ test('scope change cancels stale owner refresh before it can overwrite the list'
 
   const refresh = controller.refresh();
   await Promise.resolve();
-  assert.equal(pending.length, 2);
+  assert.equal(pending.length, 1);
   owner = 'martijn';
   controller.scopeChanged();
   pending.forEach(({ resolve }) => resolve(successfulResponse()));
@@ -334,9 +334,50 @@ test('temporary provider failures retry once and then update the list in place',
   assert.equal(await controller.refresh(), true);
   assert.equal(attempts.get('/api/mailbox/sync'), 2);
   assert.equal(attempts.get('/api/mailbox/instantly/sync'), 2);
-  assert.equal(loads.length, 1);
-  assert.equal(loads[0].skipPageBootstrap, true);
-  assert.equal(loads[0].preserveOnError, true);
+  assert.equal(loads.length, 2);
+  loads.forEach((options) => {
+    assert.equal(options.skipProviderRefresh, true);
+    assert.equal(options.skipPageBootstrap, true);
+    assert.equal(options.preserveOnError, true);
+  });
+  controller.destroy();
+});
+
+test('outreach refresh toont IMAP-mail voordat de Instantly-provider start', async () => {
+  const events = [];
+  let finishImap;
+  let finishInstantly;
+  const controller = refreshModule.create({
+    autoStart: false,
+    getFolder: () => 'outreach',
+    getOwner: () => 'both',
+    fetch: (url) => {
+      events.push(`start:${url}`);
+      return new Promise((resolve) => {
+        if (url === '/api/mailbox/sync') finishImap = () => resolve(successfulResponse());
+        else finishInstantly = () => resolve(successfulResponse());
+      });
+    },
+    loadMessages: async () => { events.push('list:updated'); return true; },
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  const refresh = controller.refresh();
+  await Promise.resolve();
+  assert.deepEqual(events, ['start:/api/mailbox/sync']);
+
+  finishImap();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events, [
+    'start:/api/mailbox/sync',
+    'list:updated',
+    'start:/api/mailbox/instantly/sync',
+  ]);
+
+  finishInstantly();
+  assert.equal(await refresh, true);
+  assert.equal(events.at(-1), 'list:updated');
   controller.destroy();
 });
 
@@ -517,7 +558,7 @@ test('BFCache return resumes one immediate mailbox refresh instead of leaving th
   controller.start();
   const refresh = controller.refresh();
   await Promise.resolve();
-  assert.equal(requestSignals.length, 2);
+  assert.equal(requestSignals.length, 1);
   windowListeners.get('pagehide')({ persisted: true });
   assert.equal(requestSignals.every((signal) => signal.aborted), true);
   assert.equal(await refresh, false);

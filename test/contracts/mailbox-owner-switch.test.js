@@ -67,10 +67,12 @@ test('bootstrapverversing hervat exact het actieve gesprek en ruimt een verdwene
     let activeMail = 'altiflex-thread';
     let opened = 0;
     let reset = 0;
+    const refreshInstantly = [];
     const view = ownerSession.createView({
       getScope: () => ({ owner: 'serve', folder: 'outreach' }),
       campaignInbox: {
-        async load() {
+        async load(_folder, _normalize, _fetch, options) {
+          refreshInstantly.push(options.refreshInstantly);
           calls += 1;
           return calls === 1
             ? { fromBootstrap: true, messages: [{ id: 'altiflex-thread', owner: 'serve' }], sync: {} }
@@ -93,14 +95,26 @@ test('bootstrapverversing hervat exact het actieve gesprek en ruimt een verdwene
 
     await view.load();
     await new Promise((resolve) => setImmediate(resolve));
-    return { activeMail, calls, opened, reset };
+    return { activeMail, calls, opened, refreshInstantly, reset };
   }
 
   const retained = await runScenario([{ id: 'altiflex-thread', owner: 'serve' }]);
-  assert.deepEqual(retained, { activeMail: 'altiflex-thread', calls: 2, opened: 1, reset: 0 });
+  assert.deepEqual(retained, {
+    activeMail: 'altiflex-thread',
+    calls: 2,
+    opened: 1,
+    refreshInstantly: [true, false],
+    reset: 0,
+  });
 
   const removed = await runScenario([]);
-  assert.deepEqual(removed, { activeMail: null, calls: 2, opened: 0, reset: 1 });
+  assert.deepEqual(removed, {
+    activeMail: null,
+    calls: 2,
+    opened: 0,
+    refreshInstantly: [true, false],
+    reset: 1,
+  });
 });
 
 test('tijdelijke indexfout bewaart de huidige mailbox en hervat afgebroken detailhydratie', async () => {
@@ -218,6 +232,7 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   assert.equal(composeClosed, 1);
   assert.equal(pending.has('martijn'), true);
   assert.notEqual(requestedOptions.get('martijn').skipBootstrap, true);
+  assert.equal(requestedOptions.get('martijn').refreshInstantly, false);
 
   pending.get('serve')({ messages: [{ id: 'stale', owner: 'serve' }], sync: {} });
   assert.equal(await staleServeLoad, false);

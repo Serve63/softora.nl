@@ -235,6 +235,7 @@
             void load({
               skipPageBootstrap: true,
               skipBackgroundSync: true,
+              skipProviderRefresh: true,
               openLatest: false,
               preserveOnError: true,
               reuseActiveToken: true,
@@ -327,7 +328,7 @@
       reset();
       options.closeMenu?.();
       options.updateAccountUi?.();
-      void load({ openLatest: false });
+      void load({ openLatest: false, skipProviderRefresh: true });
       return owner;
     }
 
