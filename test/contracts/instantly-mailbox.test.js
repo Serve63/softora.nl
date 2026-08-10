@@ -1558,7 +1558,7 @@ test('Instantly conversation listing hides seasonal closure auto-replies', async
   assert.deepEqual(await service.listOwnerConversations('serve'), []);
 });
 
-test('Instantly raw is_auto_reply false is known-human while missing evidence stays unknown and visible', async () => {
+test('Instantly raw is_auto_reply false blijft menselijk terwijl ondubbelzinnige automatische tekst zonder flag wordt gefilterd', async () => {
   const { service, store } = buildService();
   const sent = service.normalizeInstantlyMessage(incoming({
     id: 'known-human-sent',
@@ -1589,7 +1589,7 @@ test('Instantly raw is_auto_reply false is known-human while missing evidence st
   assert.equal(unknownText.automatedReplyEvidenceKnown, false);
   const conversations = await service.listOwnerConversations('serve');
   assert.equal(conversations.length, 1);
-  assert.equal(conversations[0].providerMessageId, 'unknown-auto-looking-reply');
+  assert.equal(conversations[0].providerMessageId, 'known-human-reply');
 });
 
 test('reply uses the exact stored account/thread and rejects cross-owner, recipient and attachment drift', async () => {

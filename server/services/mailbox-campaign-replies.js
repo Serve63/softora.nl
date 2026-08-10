@@ -940,16 +940,34 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ...getMessageReferenceLookupValues(lineageCandidates.map((message) => ({ inReplyTo: message?.inReplyTo || message?.references }))),
       ...getMessageReferenceLookupValues(campaignMessages),
     ])).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
-    const candidateParentMessagesResult = hasDurableLineageIndex
-      ? completeSentCampaignMessages
-      : candidateParentMessageIds.length &&
-          typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
-        ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
-            accountEmails: campaignMailboxAccounts,
-            folder: 'sent',
-            messageIds: candidateParentMessageIds,
-          }).catch(() => [])
-        : [];
+    const loadedParentMessageIds = new Set(
+      (Array.isArray(completeSentCampaignMessages) ? completeSentCampaignMessages : [])
+        .map((message) => normalizeMessageId(message && message.messageId))
+        .filter(Boolean)
+    );
+    const durableReferencedParentMessageIds = getMessageReferenceLookupValues(
+      campaignMessages.map((message) => ({
+        inReplyTo: message && message.inReplyTo,
+        references: message && message.references,
+      }))
+    );
+    const missingCandidateParentMessageIds = hasDurableLineageIndex
+      ? durableReferencedParentMessageIds.filter((messageId) => !loadedParentMessageIds.has(normalizeMessageId(messageId)))
+      : candidateParentMessageIds;
+    const exactCandidateParentMessages = missingCandidateParentMessageIds.length &&
+        typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
+      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
+          accountEmails: campaignMailboxAccounts,
+          folder: 'sent',
+          messageIds: missingCandidateParentMessageIds,
+        }).catch(() => [])
+      : [];
+    const candidateParentMessagesResult = dedupeCampaignMessages([
+      ...(hasDurableLineageIndex && Array.isArray(completeSentCampaignMessages)
+        ? completeSentCampaignMessages
+        : []),
+      ...(Array.isArray(exactCandidateParentMessages) ? exactCandidateParentMessages : []),
+    ]);
     const allowedCampaignAccounts = new Set(campaignMailboxAccounts.map(normalizeEmail));
 
     const replies = campaignMessages
