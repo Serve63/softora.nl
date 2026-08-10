@@ -255,6 +255,73 @@ test('fast refresh forwards the durable UID frontier and advances it only after 
   assert.equal(finishes[0].lastUid, 101);
 });
 
+test('fast refresh rebuilds a legacy zero cursor from all active indexed UIDs', async () => {
+  const fetches = [];
+  const finishes = [];
+  let indexedSince = 'not-called';
+  const service = createService({
+    mailboxIndexStore: {
+      getSyncState: async () => ({
+        last_uid: 0,
+        uid_validity: 777,
+        last_synced_at: '2026-08-10T13:15:51.012Z',
+      }),
+      listMessageUidSyncStateForAccount: async (options) => {
+        indexedSince = options.since;
+        return {
+          indexedUids: [30, 50],
+          deferredQuarantineUids: [],
+          retryDueQuarantineUids: [],
+        };
+      },
+      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
+      finishSync: async (options) => { finishes.push(options); return { ok: true }; },
+    },
+    fetchMessagesFromImap: async (options) => {
+      fetches.push(options);
+      return withSyncReadHealth([], {
+        frontierMode: true,
+        frontierAfterUid: 50,
+        frontierProviderNewestUid: 50,
+      });
+    },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, fastRefresh: true,
+  });
+
+  assert.equal(result.complete, true);
+  assert.equal(indexedSince, '');
+  assert.equal(fetches[0].incrementalAfterUid, 50);
+  assert.equal(fetches[0].incrementalUidValidity, 777);
+  assert.equal(finishes[0].lastUid, 50);
+});
+
+test('fast refresh never invents a zero cursor without a prior successful sync', async () => {
+  const fetches = [];
+  const service = createService({
+    mailboxIndexStore: {
+      getSyncState: async () => ({ last_uid: 0, uid_validity: 777, last_synced_at: null }),
+      listMessageUidSyncStateForAccount: async () => ({
+        indexedUids: [50], deferredQuarantineUids: [], retryDueQuarantineUids: [],
+      }),
+    },
+    fetchMessagesFromImap: async (options) => {
+      fetches.push(options);
+      return withSyncReadHealth([]);
+    },
+  });
+
+  await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, fastRefresh: true,
+  });
+
+  assert.equal(fetches[0].incrementalAfterUid, 0);
+});
+
 test('successful empty sync preserves an existing durable UID high-water mark', async () => {
   const updates = [];
   const store = require('../../server/services/mailbox-sync-runtime').createMailboxSyncStateStore({

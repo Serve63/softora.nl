@@ -458,7 +458,7 @@ function createMailboxSyncService({
             })
           : null;
       throwIfSyncAborted(folderDeadline.signal);
-      const incrementalAfterUid = Math.max(0, Number(incrementalSyncState?.last_uid) || 0);
+      let incrementalAfterUid = Math.max(0, Number(incrementalSyncState?.last_uid) || 0);
       const incrementalUidValidity = normalizeMailboxUidValidity(
         incrementalSyncState?.uid_validity
       );
@@ -484,7 +484,9 @@ function createMailboxSyncService({
         const uidSyncState = await mailboxIndexStore.listMessageUidSyncStateForAccount({
           accountEmail: account.email,
           folder: normalizedFolder,
-          since: CAMPAIGN_HISTORY_SINCE.toISOString(),
+          since: fastRefresh && incrementalOnly && !incrementalAfterUid
+            ? ''
+            : CAMPAIGN_HISTORY_SINCE.toISOString(),
           limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
           signal: folderDeadline.signal,
         });
@@ -500,11 +502,25 @@ function createMailboxSyncService({
         indexedUids = (await mailboxIndexStore.listMessageUidsForAccount({
           accountEmail: account.email,
           folder: normalizedFolder,
-          since: campaignOnly ? CAMPAIGN_HISTORY_SINCE.toISOString() : '',
+          since: campaignOnly && !(fastRefresh && incrementalOnly && !incrementalAfterUid)
+            ? CAMPAIGN_HISTORY_SINCE.toISOString()
+            : '',
           limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
           signal: folderDeadline.signal,
         })) || [];
         throwIfSyncAborted(folderDeadline.signal);
+      }
+      if (
+        fastRefresh && incrementalOnly && !incrementalAfterUid && indexedUids.length &&
+        Number.isFinite(Date.parse(String(incrementalSyncState?.last_synced_at || '')))
+      ) {
+        // Older runtimes could persist a successful sync timestamp while
+        // clearing last_uid on an empty round. Rebuild that live high-water
+        // from every active indexed generation row once, without turning old
+        // pre-campaign history gaps into an endless foreground backfill.
+        incrementalAfterUid = indexedUids.reduce(
+          (maximum, uid) => Math.max(maximum, Number(uid) || 0), 0
+        );
       }
       const indexedUidScanTruncated = indexedUids.length >= CAMPAIGN_SYNC_UID_SCAN_LIMIT;
       if (campaignOnly) {
