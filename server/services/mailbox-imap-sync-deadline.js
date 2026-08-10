@@ -38,18 +38,22 @@ function createMailboxImapSyncSession({ client, signal } = {}) {
   }
   return {
     async run(operation) {
+      let result;
       try {
         throwIfAborted();
-        return await operation(client);
+        result = await operation(client);
+        throwIfAborted();
       } catch (error) {
         throwIfAborted();
         throw error;
       } finally {
-        if (signal) signal.removeEventListener('abort', close);
         try {
           if (!signal?.aborted && client?.usable) await client.logout();
         } catch (_) {}
+        if (signal) signal.removeEventListener('abort', close);
       }
+      throwIfAborted();
+      return result;
     },
   };
 }

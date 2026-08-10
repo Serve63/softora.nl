@@ -53,12 +53,27 @@ function createMailboxCampaignMutationRunner(deps = {}) {
       throw error;
     }
     const controller = createAbortController();
+    const parentSignal = options.signal;
     const startedAtMs = Number(now());
     const deadlineAtMs = startedAtMs + deadlineMs;
     let timedOut = false;
     let timeoutError = null;
     let rejectDeadline;
     const deadlinePromise = new Promise((_resolve, reject) => { rejectDeadline = reject; });
+    const getAbortError = () => controller.signal.reason instanceof Error
+      ? controller.signal.reason
+      : timeoutError || createMutationDeadlineError();
+    const abortFromParent = () => {
+      const error = parentSignal?.reason instanceof Error
+        ? parentSignal.reason
+        : createMutationDeadlineError('Mailboxmutatie is door de bovenliggende sync geannuleerd.');
+      if (!controller.signal.aborted) controller.abort(error);
+      rejectDeadline(error);
+    };
+    if (parentSignal) {
+      if (parentSignal.aborted) abortFromParent();
+      else parentSignal.addEventListener('abort', abortFromParent, { once: true });
+    }
     const timer = setTimer(() => {
       timedOut = true;
       timeoutError = createMutationDeadlineError();
@@ -72,10 +87,11 @@ function createMailboxCampaignMutationRunner(deps = {}) {
           timedOut = true;
           controller.abort(timeoutError);
         }
-        throw timeoutError || createMutationDeadlineError();
+        throw getAbortError();
       }
     }
     const lifecycle = (async () => {
+      assertActive();
       const mutation = await mailboxCampaignConsistencyStore.beginMutation({
         mutationId: options.mutationId,
         requestKey: options.requestKey,
@@ -104,7 +120,7 @@ function createMailboxCampaignMutationRunner(deps = {}) {
       } catch (error) {
         taskError = error;
       }
-      if (controller.signal.aborted) throw taskError || timeoutError || createMutationDeadlineError();
+      if (controller.signal.aborted) throw taskError || getAbortError();
       if (taskError?.leaveMutationPending === true) throw taskError;
       try {
         await mailboxCampaignConsistencyStore.completeMutation({
@@ -134,6 +150,7 @@ function createMailboxCampaignMutationRunner(deps = {}) {
       return await Promise.race([lifecycle, deadlinePromise]);
     } finally {
       clearTimer(timer);
+      parentSignal?.removeEventListener?.('abort', abortFromParent);
     }
   }
   return { isAvailable, run };

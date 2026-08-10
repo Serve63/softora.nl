@@ -102,7 +102,7 @@ function createMailboxIndexStore(deps = {}) {
     logSoftIndexError('circuit-open', failureCooldownReason);
   }
 
-  async function run(label, operation, { mutationSignal = null } = {}) {
+  async function run(label, operation, { mutationSignal = null, signal = null, mutation = false } = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
     if (isFailureCooldownActive()) {
@@ -110,13 +110,19 @@ function createMailboxIndexStore(deps = {}) {
     }
     try {
       const result = await executeMailboxIndexQuery(operation(client), {
-        label, timeoutMs: mailboxIndexQueryTimeoutMs, mutationSignal,
+        label,
+        timeoutMs: mailboxIndexQueryTimeoutMs,
+        mutationSignal: mutationSignal || (mutation ? signal : null),
+        signal: mutation ? null : signal,
       });
       if (result && result.error) throw result.error;
       failureCooldownUntilMs = 0;
       failureCooldownReason = '';
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
+      if ((mutationSignal || signal)?.aborted) {
+        return { ok: false, unavailable: false, data: null, error };
+      }
       if (!isUnavailableError(error)) {
         if (isSoftIndexError(error)) {
           openFailureCooldown(error);
@@ -427,6 +433,7 @@ function createMailboxIndexStore(deps = {}) {
     accountEmails = [],
     limit = 500,
     includeBody = true,
+    signal,
   } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const normalizedAccounts = Array.from(
@@ -446,7 +453,7 @@ function createMailboxIndexStore(deps = {}) {
         .is('deleted_at', null)
         .order('date', { ascending: false })
         .limit(safeLimit)
-    );
+    , { signal });
     if (!result.ok) return null;
     return (result.data || []).map((row) => normalizeMessageRow(row, { includeBody }));
   }
@@ -454,6 +461,7 @@ function createMailboxIndexStore(deps = {}) {
   async function listProviderActiveConversationAuditMessages({
     provider,
     accountEmails = [],
+    signal,
   } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const normalizedAccounts = Array.from(
@@ -479,7 +487,7 @@ function createMailboxIndexStore(deps = {}) {
             .is('deleted_at', null)
             .order('date', { ascending: false })
             .range(offset, offset + MAILBOX_INDEX_PAGE_SIZE - 1)
-      );
+      , { signal });
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
       page.forEach((row) => {
@@ -513,7 +521,7 @@ function createMailboxIndexStore(deps = {}) {
             .contains('payload', { originalCampaignOutbound: true })
             .is('deleted_at', null)
             .order('date', { ascending: false })
-      );
+      , { signal });
       if (!result.ok) return null;
       (Array.isArray(result.data) ? result.data : []).forEach((row) => {
         const messageKey = normalizeString(row && row.message_key);
@@ -528,7 +536,7 @@ function createMailboxIndexStore(deps = {}) {
       ));
   }
 
-  async function getProviderMessage({ provider, providerMessageId, accountEmail } = {}) {
+  async function getProviderMessage({ provider, providerMessageId, accountEmail, signal } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const rawProviderMessageId = normalizeString(providerMessageId);
     const normalizedProviderMessageId = rawProviderMessageId.startsWith(`${normalizedProvider}:`)
@@ -546,7 +554,7 @@ function createMailboxIndexStore(deps = {}) {
         .is('deleted_at', null)
         .limit(1)
         .maybeSingle()
-    );
+    , { signal });
     if (!result.ok || !result.data) return null;
     return normalizeMessageRow(result.data, { includeBody: true });
   }
@@ -1055,7 +1063,7 @@ function createMailboxIndexStore(deps = {}) {
     return { ok: false, unavailable: false, data: [], error };
   }
 
-  async function getSyncState({ accountEmail, folder = 'inbox' }) {
+  async function getSyncState({ accountEmail, folder = 'inbox', signal } = {}) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const result = await run('get-sync-state', (client) =>
       client
@@ -1064,14 +1072,14 @@ function createMailboxIndexStore(deps = {}) {
         .eq('sync_key', syncKey)
         .limit(1)
         .maybeSingle()
-    );
+    , { signal });
     if (!result.ok) return null;
     return result.data || null;
   }
 
-  async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS }) {
+  async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS, signal } = {}) {
     const syncKey = buildSyncKey(accountEmail, folder);
-    const current = await getSyncState({ accountEmail, folder });
+    const current = await getSyncState({ accountEmail, folder, signal });
     const currentLockExpiresAt = Date.parse(normalizeString(current && current.lock_expires_at));
     if (!force && Number.isFinite(currentLockExpiresAt) && currentLockExpiresAt > now().getTime()) {
       return { ok: false, locked: true, syncKey };
@@ -1094,12 +1102,12 @@ function createMailboxIndexStore(deps = {}) {
         },
         { onConflict: 'sync_key' }
       )
-    );
+    , { signal, mutation: true });
     if (!result.ok) return { ok: false, locked: false, syncKey, error: result.error };
     return { ok: true, locked: false, syncKey, lockToken };
   }
 
-  async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '' }) {
+  async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '', signal } = {}) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const failed = Boolean(normalizeString(error));
     const patch = {
@@ -1118,7 +1126,7 @@ function createMailboxIndexStore(deps = {}) {
         .update(patch)
         .eq('sync_key', syncKey)
         .eq('lock_token', normalizeString(lockToken))
-    );
+    , { signal, mutation: true });
   }
 
   function isSyncStateStale(state, maxAgeMs) {

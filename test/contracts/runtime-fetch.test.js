@@ -124,3 +124,25 @@ test('runtime fetch helpers leave existing OpenAI context headers untouched', as
   assert.equal(capturedHeaders['OpenAI-Organization'], 'org_softora');
   assert.equal(capturedHeaders['OpenAI-Project'], 'proj_existing');
 });
+
+test('runtime fetch helpers propagate caller abort to the active downstream request', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  const controller = new AbortController();
+  let downstreamSignal = null;
+  global.fetch = async (_url, options = {}) => {
+    downstreamSignal = options.signal;
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+    });
+  };
+  const running = fetchJsonWithTimeout(
+    'https://softora.test/abort', { signal: controller.signal }, 10_000
+  );
+  const reason = Object.assign(new Error('caller stopped'), { code: 'CALLER_ABORTED' });
+  controller.abort(reason);
+
+  await assert.rejects(running, (error) => error === reason);
+  assert.equal(downstreamSignal.aborted, true);
+  assert.equal(downstreamSignal.reason, reason);
+});

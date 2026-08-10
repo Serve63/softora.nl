@@ -935,6 +935,46 @@ test('mailbox index Instantly-upsert koppelt dezelfde harde abortsignal aan Post
   assert.equal(attachedSignal.aborted, false);
 });
 
+test('Instantly provider-read koppelt caller abort aan de actieve PostgREST-query', async () => {
+  const controller = new AbortController();
+  let attachedSignal = null;
+  const query = {
+    select() { return this; },
+    eq() { return this; },
+    in() { return this; },
+    is() { return this; },
+    order() { return this; },
+    limit() { return this; },
+    abortSignal(signal) {
+      attachedSignal = signal;
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => query }),
+    mailboxIndexFailureCooldownMs: 0,
+    logger: { error() {}, info() {} },
+  });
+  const running = store.listProviderMessages({
+    provider: 'instantly',
+    accountEmails: ['serve@websoftora.com'],
+    signal: controller.signal,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const reason = Object.assign(new Error('owner deadline'), {
+    code: 'INSTANTLY_SYNC_OWNER_TIMEOUT', timedOut: true,
+  });
+  controller.abort(reason);
+
+  assert.equal(await running, null);
+  assert.ok(attachedSignal);
+  assert.equal(attachedSignal.aborted, true);
+  assert.equal(attachedSignal.reason, reason);
+});
+
 test('late niet-cooperatieve campaign writes settelen vóór journal-completion en onzekere abort blijft pending', async () => {
   function deferredWrite({ rejectOnAbort = false } = {}) {
     let resolveWrite;
