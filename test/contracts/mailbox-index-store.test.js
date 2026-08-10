@@ -896,6 +896,44 @@ test('mailbox index campaign-upsert koppelt de harde abortsignal aan PostgREST',
   assert.equal(rpcCall.args.p_rows[0].message_key, 'serve@softora.nl|inbox|42');
 });
 
+test('non-campaign syncwrite gebruikt abortbare PostgREST zonder atomische campaign-RPC', async () => {
+  const controller = new AbortController();
+  let attachedSignal = null;
+  let rpcCalls = 0;
+  let upsertCalls = 0;
+  const query = {
+    abortSignal(signal) {
+      attachedSignal = signal;
+      return Promise.resolve({ data: [], error: null });
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      rpc() { rpcCalls += 1; return query; },
+      from() {
+        return {
+          upsert() { upsertCalls += 1; return query; },
+        };
+      },
+    }),
+  });
+
+  const result = await store.upsertMessages({
+    accountEmail: 'beheer@example.test',
+    folder: 'inbox',
+    signal: controller.signal,
+    messages: [{ id: 'inbox:7', uid: 7, date: '2026-08-09T20:00:00.000Z' }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.upserted, 1);
+  assert.equal(rpcCalls, 0);
+  assert.equal(upsertCalls, 1);
+  assert.ok(attachedSignal);
+  assert.notEqual(attachedSignal, controller.signal);
+});
+
 test('mailbox index Instantly-upsert koppelt dezelfde harde abortsignal aan PostgREST', async () => {
   const controller = new AbortController();
   let attachedSignal = null;
@@ -973,6 +1011,56 @@ test('Instantly provider-read koppelt caller abort aan de actieve PostgREST-quer
   assert.ok(attachedSignal);
   assert.equal(attachedSignal.aborted, true);
   assert.equal(attachedSignal.reason, reason);
+});
+
+test('alle campaign history pre-reads dragen de folderdeadline naar PostgREST', async () => {
+  const controller = new AbortController();
+  const attachedSignals = [];
+  const createQuery = () => {
+    const query = {
+      select() { return this; },
+      in() { return this; },
+      eq() { return this; },
+      ilike() { return this; },
+      is() { return this; },
+      gte() { return this; },
+      order() { return this; },
+      range() { return this; },
+      limit() { return this; },
+      abortSignal(signal) {
+        attachedSignals.push(signal);
+        return Promise.resolve({ data: [], error: null });
+      },
+    };
+    return query;
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => createQuery() }),
+  });
+
+  await store.listAllMessagesForAccounts({
+    accountEmails: ['serve@softora.nl'], folder: 'inbox', limit: 1,
+    signal: controller.signal,
+  });
+  await store.listMatchingMessagesForAccounts({
+    accountEmails: ['serve@softora.nl'], folder: 'inbox', subjectTerms: ['kleine vraag'],
+    limit: 1, signal: controller.signal,
+  });
+  await store.listMessageUidsForAccount({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', limit: 1,
+    signal: controller.signal,
+  });
+  await store.getOldestMatchingMessageUid({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', subjectTerms: ['kleine vraag'],
+    signal: controller.signal,
+  });
+
+  assert.equal(attachedSignals.length, 4);
+  attachedSignals.forEach((signal) => {
+    assert.notEqual(signal, controller.signal);
+    assert.equal(signal.aborted, false);
+  });
 });
 
 test('late niet-cooperatieve campaign writes settelen vóór journal-completion en onzekere abort blijft pending', async () => {

@@ -416,14 +416,15 @@ function createMailboxIndexStore(deps = {}) {
       .map((message) => buildProviderMessageRow({ ...message, provider: normalizedProvider }))
       .filter(Boolean);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) => signal
+    const atomicCommit = Boolean(normalizeString(mutationId) || normalizeString(requestKey));
+    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) => atomicCommit
       ? createMailboxAtomicCommitQuery(client, {
           mutationId, requestKey, rows, result: { provider: normalizedProvider },
         })
       : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
           onConflict: 'message_key', defaultToNull: false,
         }), { mutationSignal: signal });
-    return signal
+    return atomicCommit
       ? normalizeMailboxAtomicCommitResult(result, rows.length)
       : (result.ok ? { ...result, upserted: rows.length } : result);
   }
@@ -595,7 +596,7 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row));
   }
 
-  async function listAllMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = null }) {
+  async function listAllMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = null, signal } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
     );
@@ -616,7 +617,7 @@ function createMailboxIndexStore(deps = {}) {
           .is('deleted_at', null)
           .order('date', { ascending: false })
           .order('message_key', { ascending: false })
-          .range(offset, offset + pageSize - 1)
+          .range(offset, offset + pageSize - 1), { signal }
       );
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
@@ -627,10 +628,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function listMatchingMessagesForAccounts({
-    accountEmails = [],
-    folder = 'inbox',
-    subjectTerms = [],
-    limit = 1000,
+    accountEmails = [], folder = 'inbox', subjectTerms = [], limit = 1000, signal,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -658,7 +656,8 @@ function createMailboxIndexStore(deps = {}) {
               .is('deleted_at', null)
               .order('date', { ascending: false })
               .order('message_key', { ascending: false })
-              .range(offset, offset + pageSize - 1)
+              .range(offset, offset + pageSize - 1),
+          { signal }
         );
         if (!result.ok) return null;
         const page = Array.isArray(result.data) ? result.data : [];
@@ -713,10 +712,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function listMessageUidsForAccount({
-    accountEmail,
-    folder = 'inbox',
-    since = '',
-    limit = 5000,
+    accountEmail, folder = 'inbox', since = '', limit = 5000, signal,
   } = {}) {
     const normalizedAccount = normalizeEmail(accountEmail);
     if (!normalizedAccount) return [];
@@ -737,7 +733,8 @@ function createMailboxIndexStore(deps = {}) {
             .order('uid', { ascending: false });
           if (normalizeString(since)) query = query.gte('date', normalizeString(since));
           return query.range(offset, offset + pageSize - 1);
-        }
+        },
+        { signal }
       );
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
@@ -912,9 +909,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function getOldestMatchingMessageUid({
-    accountEmail,
-    folder = 'inbox',
-    subjectTerms = [],
+    accountEmail, folder = 'inbox', subjectTerms = [], signal,
   } = {}) {
     const terms = Array.from(
       new Set(
@@ -935,7 +930,8 @@ function createMailboxIndexStore(deps = {}) {
           .eq('folder', normalizeFolder(folder))
           .ilike('subject', `%${term}%`)
           .order('uid', { ascending: true })
-          .limit(1)
+          .limit(1),
+        { signal }
       );
       if (!result.ok) return 0;
       const uid = Number(result.data?.[0]?.uid) || 0;
@@ -952,14 +948,15 @@ function createMailboxIndexStore(deps = {}) {
     )
       .filter((row) => row.uid > 0);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run('upsert-messages', (client) => signal
+    const atomicCommit = Boolean(normalizeString(mutationId) || normalizeString(requestKey));
+    const result = await run('upsert-messages', (client) => atomicCommit
       ? createMailboxAtomicCommitQuery(client, {
           mutationId, requestKey, rows, result: { source: 'imap-sync' },
         })
       : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
           onConflict: 'message_key', defaultToNull: false,
         }), { mutationSignal: signal });
-    return signal
+    return atomicCommit
       ? normalizeMailboxAtomicCommitResult(result, rows.length)
       : (result.ok ? { ...result, upserted: rows.length } : result);
   }
