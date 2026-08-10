@@ -123,7 +123,7 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     incrementalOnly: true,
     fastRefresh: true,
     maxConcurrentAccounts: 3,
-    folderTimeoutMs: 10_000,
+    folderTimeoutMs: 15_000,
     runTimeoutMs: 22_000,
     deadlineAt: 0,
     runId: '',
@@ -242,13 +242,13 @@ test('fast refresh bounds an uncertain mutation lease to the recovery window', a
     campaignOnly: true,
     incrementalOnly: true,
     fastRefresh: true,
-    folderTimeoutMs: 10_000,
+    folderTimeoutMs: 15_000,
   });
 
   assert.equal(result.complete, true);
   assert.equal(mutationRuns.length, 1);
   assert.equal(mutationRuns[0].leaseSeconds, MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS);
-  assert.equal(MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS, 25);
+  assert.equal(MAILBOX_SYNC_FAST_MUTATION_LEASE_SECONDS, 30);
 });
 
 test('fast IMAP refresh drains a burst larger than four messages in one cycle', async () => {
