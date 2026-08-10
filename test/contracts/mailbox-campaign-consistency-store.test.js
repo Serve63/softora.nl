@@ -173,6 +173,31 @@ test('getFence rapporteert pending en atomair gereapte mutaties zonder ready te 
   });
 });
 
+test('consistentie-RPC gebruikt een eigen ruimere timeout zonder generieke cooldown', async () => {
+  const policies = [];
+  const { client } = createRpcClient(() => ({
+    data: [{
+      content_version: '91', pending_count: '0', ready: true,
+      reaped_count: '0', checked_at: '2026-08-09T21:40:00.000Z',
+    }],
+    error: null,
+  }));
+  const store = createStore(client, {
+    getSupabaseClient: (policy) => {
+      policies.push(policy);
+      return client;
+    },
+  });
+
+  await store.getFence();
+
+  assert.deepEqual(policies, [{
+    timeoutMs: 5000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
+});
+
 test('getFence weigert een tegenstrijdige database-response fail-closed', async () => {
   const { client } = createRpcClient(() => ({
     data: [{

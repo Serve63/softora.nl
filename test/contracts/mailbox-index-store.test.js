@@ -2456,6 +2456,40 @@ test('mailbox index store logs Supabase timeouts as soft index errors', async ()
   );
 });
 
+test('mailbox index gebruikt zijn eigen ruimere Supabase timeout en cooldownbeleid', async () => {
+  const clientPolicies = [];
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (policy) => {
+      clientPolicies.push(policy);
+      return {
+        from() {
+          return {
+            select() {
+              return {
+                eq() { return this; },
+                limit() { return this; },
+                async maybeSingle() { return { data: null, error: null }; },
+              };
+            },
+          };
+        },
+      };
+    },
+  });
+
+  const state = await store.getSyncState({
+    accountEmail: 'info@softora.nl', folder: 'inbox',
+  });
+
+  assert.equal(state, null);
+  assert.deepEqual(clientPolicies, [{
+    timeoutMs: 5000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
+});
+
 test('mailbox index store timeboxes hanging Supabase index reads', async () => {
   const loggerErrors = [];
   const loggerInfos = [];
