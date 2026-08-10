@@ -19,6 +19,11 @@ const {
   summarizeMailboxSyncResults,
 } = require('./mailbox-sync-runtime');
 const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
+const {
+  prepareSmtpSendReconciliation,
+  reconcileSmtpSendIntents,
+  smtpReconciliationHealth,
+} = require('./mailbox-smtp-send-reconciliation');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 10_000;
@@ -295,6 +300,9 @@ function createMailboxSyncService({
   requireCampaignMutationJournal = false,
   campaignMutationLeaseSeconds,
   campaignMutationDeadlineMs,
+  mailboxSendProvenanceStore = null,
+  confirmMailboxWebdesignOutboundRecipient,
+  releaseMailboxWebdesignOutboundRecipient,
   logger = console,
   defaultFolders = ['inbox', 'sent'],
   defaultLimit = 50,
@@ -331,10 +339,38 @@ function createMailboxSyncService({
     });
     let lock = null;
     let upserted = 0;
+    let smtpReconciliation = {
+      checked: false,
+      degraded: false,
+      intents: [],
+      reapedUndispatched: 0,
+    };
+    const addSmtpHealth = (result) => {
+      const health = smtpReconciliationHealth(smtpReconciliation);
+      const partial = health.smtpReconciliationDegraded;
+      return {
+        ...result,
+        ...(partial ? {
+          complete: false,
+          freshnessConfirmed: false,
+          partial: true,
+          degraded: true,
+          statusCode: Number(result?.statusCode) === 200 ? 207 : result?.statusCode,
+        } : {}),
+        ...health,
+      };
+    };
     try {
       throwIfSyncAborted(folderDeadline.signal);
+      smtpReconciliation = await prepareSmtpSendReconciliation({
+        store: mailboxSendProvenanceStore,
+        accountEmail: account.email,
+        releaseOutboundGuard: releaseMailboxWebdesignOutboundRecipient,
+        logger,
+      });
+      throwIfSyncAborted(folderDeadline.signal);
       if (!canUseMailboxIndex()) {
-        return {
+        return addSmtpHealth({
           ok: false,
           complete: false,
           freshnessConfirmed: false,
@@ -344,7 +380,7 @@ function createMailboxSyncService({
           account: account.email,
           folder: normalizedFolder,
           runId,
-        };
+        });
       }
       let lockAttempts = 0;
       while (true) {
@@ -358,7 +394,7 @@ function createMailboxSyncService({
         });
         if (lock.ok) break;
         if (!lock.locked) {
-          return {
+          return addSmtpHealth({
             ok: false,
             complete: false,
             freshnessConfirmed: false,
@@ -370,14 +406,14 @@ function createMailboxSyncService({
             runId,
             lockAttempts,
             error: String(lock.error?.message || 'Mailbox-lock claim mislukt'),
-          };
+          });
         }
         if (lock.lockReason === 'active_target' || lock.lockExpiresAt) {
           const retryAfterMs = Math.max(
             1,
             Math.min(300_000, Date.parse(lock.lockExpiresAt || '') - Date.now() || 1)
           );
-          return {
+          return addSmtpHealth({
             ok: true,
             complete: false,
             freshnessConfirmed: false,
@@ -392,7 +428,7 @@ function createMailboxSyncService({
             folder: normalizedFolder,
             runId,
             lockAttempts,
-          };
+          });
         }
         const retryDelayMs = Math.min(
           MAILBOX_SYNC_LOCK_RETRY_MAX_MS,
@@ -537,6 +573,9 @@ function createMailboxSyncService({
           threadRecipientTerms,
           priorityUids: retryDueQuarantineUids,
           indexedUids,
+          reconcileIntentIds: normalizedFolder === 'sent'
+            ? smtpReconciliation.intents.map((intent) => intent.intentId)
+            : [],
           signal: mutationSignal,
           deadlineAt: folderDeadlineAt,
           runId,
@@ -673,6 +712,21 @@ function createMailboxSyncService({
         code: 'MAILBOX_SYNC_QUARANTINE_PENDING',
         error: `Mailbox parse-herpoging wacht op UID(s): ${pendingQuarantineUids.join(', ')}.`,
       });
+      if (normalizedFolder === 'sent' && smtpReconciliation.intents.length) {
+        smtpReconciliation = await reconcileSmtpSendIntents({
+          state: smtpReconciliation,
+          messages,
+          store: mailboxSendProvenanceStore,
+          confirmOutboundGuard: confirmMailboxWebdesignOutboundRecipient,
+          logger,
+        });
+      }
+      const smtpHealth = smtpReconciliationHealth(smtpReconciliation);
+      if (smtpHealth.smtpReconciliationDegraded) degradedReasons.push({
+        reason: 'smtp_reconciliation_pending',
+        code: 'MAILBOX_SYNC_SMTP_RECONCILIATION_PENDING',
+        error: 'SMTP-verzendstatus kon nog niet volledig duurzaam worden bevestigd.',
+      });
       const incomplete = degradedReasons.length > 0;
       if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
         const invalidation = await invalidateCampaignSnapshot({
@@ -702,7 +756,7 @@ function createMailboxSyncService({
       if (!finish || finish.ok === false) {
         throw finish?.error || new Error('Mailbox-sync lock bij afronding verloren');
       }
-      return {
+      return addSmtpHealth({
         ok: true,
         complete: !incomplete,
         freshnessConfirmed: !incomplete,
@@ -745,7 +799,8 @@ function createMailboxSyncService({
         lockAttempts,
         durationMs: Date.now() - startedAt,
         runId,
-      };
+        reconciledSmtpSends: smtpReconciliation.reconciled || 0,
+      });
     } catch (error) {
       const uncertainWrite = error?.leaveMutationPending === true;
       // A cancelled mutation can have reached Postgres even when the client no
@@ -897,6 +952,11 @@ function createMailboxSyncService({
     }
     const results = accountResults.flat();
     const outcome = summarizeMailboxSyncResults(results);
+    const partial = results.some((result) => result?.partial === true || result?.degraded === true);
+    if (partial) {
+      outcome.partial = true;
+      outcome.degraded = true;
+    }
     if (!results.length) {
       outcome.ok = false;
       outcome.degraded = true;
