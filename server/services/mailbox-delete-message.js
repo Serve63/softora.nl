@@ -1,3 +1,9 @@
+const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  removeMailboxCampaignSnapshotMessage,
+} = require('./mailbox-campaign-snapshot');
+
 const MAX_CONVERSATION_MESSAGES = 100;
 
 function createMailboxVisibilityService(deps = {}) {
@@ -107,14 +113,45 @@ function createMailboxVisibilityService(deps = {}) {
     }
   }
 
+  async function removeTargetsFromCampaignSnapshot(targets) {
+    if (typeof getUiStateValues !== 'function' || typeof setUiStateValues !== 'function') return false;
+    try {
+      const current = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE);
+      const rawValue = current?.values?.[MAILBOX_CAMPAIGN_SNAPSHOT_KEY] || '';
+      let serialized = rawValue;
+      let changed = false;
+      targets.forEach((target) => {
+        const result = removeMailboxCampaignSnapshotMessage(serialized, {
+          accountEmail: target.account.email,
+          folder: target.messageRef.folder,
+          id: target.id,
+          uid: target.messageRef.uid,
+        });
+        serialized = result.serialized;
+        changed = changed || result.changed;
+      });
+      if (!changed) return false;
+      await setUiStateValues(
+        MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+        { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serialized },
+        { source: 'mailbox-view-hide', actor: targets[0].account.email }
+      );
+      return true;
+    } catch (error) {
+      logger.warn('[Mailbox][HideSnapshot]', error?.message || error);
+      return false;
+    }
+  }
+
   async function hideConversation(input) {
     const targets = normalizeTargets(input);
     await updateIndex(targets, true);
+    const snapshotUpdated = await removeTargetsFromCampaignSnapshot(targets);
     return {
       hidden: true,
       sourceMailboxMutated: false,
       messageCount: targets.length,
-      snapshotUpdated: false,
+      snapshotUpdated,
     };
   }
 

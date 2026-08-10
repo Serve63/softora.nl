@@ -490,7 +490,6 @@ function buildServerAppFeatureWiringRuntimeContext({
         getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
         getUiStateValues: dataOpsAwareUiStateGetter,
         setUiStateValues: dataOpsAwareUiStateSetter,
-        compareAndSwapUiStateValues: uiSeoRuntime.compareAndSwapUiStateValues,
         openAiApiBaseUrl: envConfig.OPENAI_API_BASE_URL,
         openAiModel: shared.normalizeString(env.MAILBOX_REWRITE_OPENAI_MODEL || env.OPENAI_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'),
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,

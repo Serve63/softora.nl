@@ -99,16 +99,6 @@
     }
   }
 
-  function getRequestDeadlineApi() {
-    if (global.SoftoraMailboxRequestDeadline) return global.SoftoraMailboxRequestDeadline;
-    if (typeof module === 'undefined' || !module.exports) return null;
-    try {
-      return require('./premium-mailbox-request-deadline.js');
-    } catch (_) {
-      return null;
-    }
-  }
-
   function getSnapshotContentAt(snapshot) {
     const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
     const value = source.contentAt || source.sync?.contentAt;
@@ -376,26 +366,16 @@
           }
           return action === 'replace' && incoming.complete !== false && campaignResult.fromCache !== true;
         }
-        const deadlineApi = options.requestDeadline || getRequestDeadlineApi();
-        if (typeof deadlineApi?.requestJsonWithDeadline !== 'function') {
-          throw new Error('Mailboxdeadline ontbreekt.');
-        }
-        const { response, data } = await deadlineApi.requestJsonWithDeadline({
-          request: options.fetch,
-          url: `/api/mailbox/messages?account=${encodeURIComponent(scope.account)}&folder=${encodeURIComponent(scope.folder)}&limit=50`,
-          init: {
+        const response = await options.fetch(
+          `/api/mailbox/messages?account=${encodeURIComponent(scope.account)}&folder=${encodeURIComponent(scope.folder)}&limit=50`,
+          {
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { Accept: 'application/json' },
-          },
-          signal: candidate.signal,
-          timeoutMs: options.listRequestTimeoutMs,
-          timeoutMessage: 'Mailboxlijst laden duurde te lang.',
-          timeoutCode: 'MAILBOX_MESSAGES_TIMEOUT',
-          AbortController: options.AbortController,
-          setTimeout: options.setTimeout,
-          clearTimeout: options.clearTimeout,
-        });
+            ...(candidate.signal ? { signal: candidate.signal } : {}),
+          }
+        );
+        const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.ok) {
           throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
         }

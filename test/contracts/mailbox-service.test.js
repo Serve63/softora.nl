@@ -502,18 +502,8 @@ test('selected owner response stays isolated while durable snapshot retains both
         : [{ email: 'martijn-sender@example.org' }],
       listOwnerConversations: async (owner) => messagesByOwner[owner],
     },
-    mailboxCampaignConsistencyStore: {
-      isAvailable: () => true,
-      getFence: async () => ({ contentVersion: '12', pendingCount: 0, ready: true }),
-    },
-    getUiStateValues: async () => ({
-      values: {},
-      source: 'supabase',
-      revision: 0,
-    }),
-    compareAndSwapUiStateValues: async (_scope, values) => {
+    setUiStateValues: async (_scope, values) => {
       savedSnapshot = values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY];
-      return { ok: true, revision: 1 };
     },
   });
   const res = createResponseRecorder();
@@ -537,7 +527,6 @@ test('mailbox read-only auth fallback kan geen durable snapshot of provider-refr
   const service = createMailboxService({
     mailboxCampaignRepliesService: { listReplies: async () => [] },
     mailboxCampaignSnapshotStore: {
-      getFence: async () => ({ contentVersion: '12', pendingCount: 0, ready: true }),
       persist: async (...args) => { persists.push(args); return { ok: true }; },
       readDegraded: async () => null,
       invalidate: async () => ({ ok: true }),
@@ -2757,6 +2746,14 @@ test('mailbox service handelt een antwoordherinnering pas na een geslaagde leesa
 
 test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder bronmailmutatie', async () => {
   const persistenceCalls = [];
+  let savedSnapshot = '';
+  const initialSnapshot = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [
+      { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+    ],
+  });
   let imapClientCreations = 0;
   const service = createMailboxService({
     mailConfig: {},
@@ -2785,6 +2782,14 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
         return { ok: true };
       },
     },
+    getUiStateValues: async (scope) => {
+      persistenceCalls.push(['snapshot-read', scope]);
+      return { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: initialSnapshot } };
+    },
+    setUiStateValues: async (scope, values, meta) => {
+      persistenceCalls.push(['snapshot-write', scope, meta]);
+      savedSnapshot = values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY];
+    },
   });
   const res = createResponseRecorder();
 
@@ -2808,7 +2813,7 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     hidden: true,
     sourceMailboxMutated: false,
     messageCount: 2,
-    snapshotUpdated: false,
+    snapshotUpdated: true,
   });
   assert.equal(imapClientCreations, 0);
   assert.deepEqual(persistenceCalls, [
@@ -2824,7 +2829,16 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
       folder: 'sent',
       uid: 7,
     }],
+    ['snapshot-read', MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE],
+    ['snapshot-write', MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
+      source: 'mailbox-view-hide',
+      actor: 'serve@softora.nl',
+    }],
   ]);
+  assert.deepEqual(
+    parseMailboxCampaignSnapshot(savedSnapshot).messages.map((message) => message.uid),
+    [43]
+  );
 
   const restoreRes = createResponseRecorder();
   await service.restoreConversationResponse(
@@ -3318,18 +3332,9 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   let snapshotWrite = null;
   const service = createMailboxService({
     logger: { error() {} },
-    mailboxCampaignConsistencyStore: {
-      isAvailable: () => true,
-      getFence: async () => ({ contentVersion: '12', pendingCount: 0, ready: true }),
-    },
-    getUiStateValues: async () => ({
-      values: {},
-      source: 'supabase',
-      revision: 0,
-    }),
-    compareAndSwapUiStateValues: async (scope, values, meta) => {
+    setUiStateValues: async (scope, values, meta) => {
       snapshotWrite = { scope, values, meta };
-      return { ok: true, revision: 1 };
+      return { values };
     },
     mailboxIndexStore: {
       listMessagesForAccounts: async () => [
@@ -3477,10 +3482,10 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   ]);
   assert.equal(customerLookup.bypassReadFailureCooldown, true);
   assert.deepEqual(hydratedReplyIds, ['inbox:91', 'inbox:42', 'inbox:77']);
-  assert.equal(snapshotWrite.scope, MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE);
+  assert.equal(snapshotWrite.scope, 'premium_mailbox_campaign_snapshot');
   assert.equal(snapshotWrite.meta.source, 'mailbox-campaign-replies');
   const persistedSnapshot = JSON.parse(
-    snapshotWrite.values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]
+    snapshotWrite.values.softora_mailbox_campaign_snapshot_v2
   );
   assert.equal(persistedSnapshot.messages[0].from, 'Marie-José');
   assert.equal(persistedSnapshot.messages[1].from, 'Studio Noord');

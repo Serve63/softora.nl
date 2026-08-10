@@ -249,48 +249,6 @@ test('temporary provider failures retry once and then update the list in place',
   controller.destroy();
 });
 
-test('provider auth failures never block the read-only mailbox list recovery', async () => {
-  const ageLabel = {
-    textContent: '',
-    attributes: {},
-    setAttribute(name, value) { this.attributes[name] = value; },
-  };
-  const providerCalls = [];
-  const loads = [];
-  const controller = refreshModule.create({
-    autoStart: false,
-    ageLabel,
-    getFolder: () => 'outreach',
-    getOwner: () => 'serve',
-    fetch: async (url) => {
-      providerCalls.push(url);
-      return {
-        ok: false,
-        status: 403,
-        json: async () => ({ error: 'auth hydration unavailable' }),
-      };
-    },
-    loadMessages: async (options) => {
-      loads.push(options);
-      return true;
-    },
-    setTimeout: () => 1,
-    clearTimeout() {},
-  });
-
-  assert.equal(await controller.refresh(), false);
-  assert.deepEqual(providerCalls.sort(), [
-    '/api/mailbox/instantly/sync',
-    '/api/mailbox/sync',
-  ]);
-  assert.equal(loads.length, 1);
-  assert.equal(loads[0].skipProviderRefresh, true);
-  assert.equal(loads[0].preserveOnError, true);
-  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
-  assert.match(ageLabel.attributes.title, /Niet alle mailboxproviders/);
-  controller.destroy();
-});
-
 test('refresh status is exclusive while active, successful, partial and failed', async () => {
   const ageLabel = {
     textContent: '',
@@ -326,7 +284,7 @@ test('refresh status is exclusive while active, successful, partial and failed',
       }
       return successfulResponse();
     },
-    loadMessages: async () => mode !== 'read-error',
+    loadMessages: async () => true,
     setTimeout: () => 1,
     clearTimeout() {},
   });
@@ -358,12 +316,6 @@ test('refresh status is exclusive while active, successful, partial and failed',
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
 
   mode = 'error';
-  assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
-  assert.doesNotMatch(ageLabel.textContent, /gecontroleerd|geleden/);
-  assert.match(ageLabel.attributes.title, /Niet alle mailboxproviders/);
-
-  mode = 'read-error';
   assert.equal(await controller.refresh(), false);
   assert.equal(ageLabel.textContent, 'Niet live · herstellen…');
   assert.doesNotMatch(ageLabel.textContent, /gecontroleerd|geleden/);
