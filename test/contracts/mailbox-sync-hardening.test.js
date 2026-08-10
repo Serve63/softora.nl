@@ -8,6 +8,7 @@ const {
   getMailboxSyncResponseStatus,
   summarizeMailboxSyncResults,
 } = require('../../server/services/mailbox-sync-runtime');
+const { createMailboxImapSyncSession } = require('../../server/services/mailbox-imap-sync-deadline');
 
 function createAccount(email) {
   return { email, imapConfigured: true, imapHost: 'imap.example.test' };
@@ -82,6 +83,47 @@ test('mailbox sync runs no more than three accounts concurrently', async () => {
   assert.equal(maximumActive, 3);
 });
 
+test('fast IMAP cap is complete at 20 and honestly partial at 21 or more', async () => {
+  const requestedLimits = [];
+  const finishCalls = [];
+  let providerCount = 20;
+  const service = createService({
+    mailboxIndexStore: {
+      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
+      finishSync: async (options) => { finishCalls.push(options); return { ok: true }; },
+    },
+    fetchMessagesFromImap: async ({ limit }) => {
+      requestedLimits.push(limit);
+      return Array.from({ length: providerCount }, (_item, index) => ({
+        uid: index + 1, id: `inbox:${index + 1}`,
+      }));
+    },
+  });
+
+  const twenty = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, fastRefresh: true,
+  });
+  providerCount = 21;
+  const twentyOne = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, fastRefresh: true,
+  });
+
+  assert.deepEqual(requestedLimits, [21, 21]);
+  assert.equal(twenty.complete, true);
+  assert.equal(twenty.freshnessConfirmed, true);
+  assert.equal(twentyOne.ok, true);
+  assert.equal(twentyOne.complete, false);
+  assert.equal(twentyOne.freshnessConfirmed, false);
+  assert.equal(twentyOne.partial, true);
+  assert.equal(twentyOne.truncated, true);
+  assert.equal(twentyOne.code, 'MAILBOX_SYNC_FETCH_TRUNCATED');
+  assert.equal(twentyOne.upserted, 21);
+  assert.equal(finishCalls[0].error, undefined);
+  assert.match(finishCalls[1].error, /fetchlimiet/i);
+});
+
 test('snapshot invalidation failure prevents freshness confirmation after an index upsert', async () => {
   const finishCalls = [];
   const service = createService({
@@ -119,6 +161,33 @@ test('a lost finish token is a hard sync failure', async () => {
   assert.equal(result.freshnessConfirmed, false);
   assert.equal(result.results[0].lockLost, true);
   assert.equal(result.results[0].code, 'MAILBOX_SYNC_LOCK_LOST');
+});
+
+test('an uncertain index write never finishes its lease or claims mailbox freshness', async () => {
+  const finishCalls = [];
+  const unknownOutcome = new Error('database-uitkomst onbekend');
+  unknownOutcome.code = 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN';
+  unknownOutcome.leaveMutationPending = true;
+  const service = createService({
+    mailboxIndexStore: {
+      upsertMessages: async () => ({ ok: false, error: unknownOutcome }),
+      finishSync: async (input) => {
+        finishCalls.push(input);
+        return { ok: true };
+      },
+    },
+    fetchMessagesFromImap: async () => [{ uid: 91, id: 'inbox:91' }],
+  });
+
+  const result = await service.syncMailbox({ folders: ['inbox'] });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.statusCode, 503);
+  assert.equal(result.results[0].uncertain, true);
+  assert.equal(result.results[0].code, 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN');
+  assert.deepEqual(finishCalls, []);
 });
 
 test('run deadlines abort active folder work and report a total timeout as 504', async () => {
@@ -292,4 +361,37 @@ test('deadline aborts an in-flight index write and prevents late invalidation or
   assert.equal(lateWrites, 0);
   assert.equal(invalidations, 0);
   assert.equal(successFinishes, 0);
+});
+
+test('IMAP abort listener stays active while logout is still pending', async () => {
+  const controller = new AbortController();
+  let closeCalls = 0;
+  let rejectLogout;
+  let startLogout;
+  const logoutStarted = new Promise((resolve) => { startLogout = resolve; });
+  const client = {
+    usable: true,
+    close() {
+      closeCalls += 1;
+      this.usable = false;
+      rejectLogout?.(new Error('socket closed'));
+    },
+    async logout() {
+      startLogout();
+      return new Promise((_resolve, reject) => { rejectLogout = reject; });
+    },
+  };
+  const session = createMailboxImapSyncSession({ client, signal: controller.signal });
+  const running = session.run(async () => 'done');
+  await logoutStarted;
+  const reason = Object.assign(new Error('logout deadline'), {
+    code: 'MAILBOX_SYNC_FOLDER_TIMEOUT', timedOut: true,
+  });
+  controller.abort(reason);
+
+  await assert.rejects(Promise.race([
+    running,
+    new Promise((_resolve, reject) => setTimeout(() => reject(new Error('logout bleef hangen')), 50)),
+  ]), (error) => error === reason);
+  assert.equal(closeCalls, 1);
 });

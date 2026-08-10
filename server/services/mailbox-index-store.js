@@ -11,6 +11,7 @@ const {
   createMailboxAtomicCommitQuery,
   normalizeMailboxAtomicCommitResult,
 } = require('./mailbox-index-atomic-commit');
+const { createMailboxSyncStateStore } = require('./mailbox-sync-runtime');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -102,7 +103,7 @@ function createMailboxIndexStore(deps = {}) {
     logSoftIndexError('circuit-open', failureCooldownReason);
   }
 
-  async function run(label, operation, { mutationSignal = null } = {}) {
+  async function run(label, operation, { mutationSignal = null, signal = null, mutation = false } = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
     if (isFailureCooldownActive()) {
@@ -110,13 +111,19 @@ function createMailboxIndexStore(deps = {}) {
     }
     try {
       const result = await executeMailboxIndexQuery(operation(client), {
-        label, timeoutMs: mailboxIndexQueryTimeoutMs, mutationSignal,
+        label,
+        timeoutMs: mailboxIndexQueryTimeoutMs,
+        mutationSignal: mutationSignal || (mutation ? signal : null),
+        signal: mutation ? null : signal,
       });
       if (result && result.error) throw result.error;
       failureCooldownUntilMs = 0;
       failureCooldownReason = '';
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
+      if ((mutationSignal || signal)?.aborted) {
+        return { ok: false, unavailable: false, data: null, error };
+      }
       if (!isUnavailableError(error)) {
         if (isSoftIndexError(error)) {
           openFailureCooldown(error);
@@ -144,6 +151,17 @@ function createMailboxIndexStore(deps = {}) {
   function buildSyncKey(accountEmail, folder) {
     return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}`;
   }
+
+  const { acquireSyncLock, finishSync } = createMailboxSyncStateStore({
+    run,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeString,
+    truncateText,
+    now,
+    tableName: MAILBOX_INDEX_TABLES.syncState,
+    defaultLockTtlMs: SYNC_LOCK_TTL_MS,
+  });
 
   function parseUidFromMessage(message) {
     const uid = Number(message && message.uid);
@@ -410,14 +428,15 @@ function createMailboxIndexStore(deps = {}) {
       .map((message) => buildProviderMessageRow({ ...message, provider: normalizedProvider }))
       .filter(Boolean);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) => signal
+    const atomicCommit = Boolean(normalizeString(mutationId) || normalizeString(requestKey));
+    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) => atomicCommit
       ? createMailboxAtomicCommitQuery(client, {
           mutationId, requestKey, rows, result: { provider: normalizedProvider },
         })
       : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
           onConflict: 'message_key', defaultToNull: false,
         }), { mutationSignal: signal });
-    return signal
+    return atomicCommit
       ? normalizeMailboxAtomicCommitResult(result, rows.length)
       : (result.ok ? { ...result, upserted: rows.length } : result);
   }
@@ -427,6 +446,7 @@ function createMailboxIndexStore(deps = {}) {
     accountEmails = [],
     limit = 500,
     includeBody = true,
+    signal,
   } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const normalizedAccounts = Array.from(
@@ -446,7 +466,7 @@ function createMailboxIndexStore(deps = {}) {
         .is('deleted_at', null)
         .order('date', { ascending: false })
         .limit(safeLimit)
-    );
+    , { signal });
     if (!result.ok) return null;
     return (result.data || []).map((row) => normalizeMessageRow(row, { includeBody }));
   }
@@ -454,6 +474,7 @@ function createMailboxIndexStore(deps = {}) {
   async function listProviderActiveConversationAuditMessages({
     provider,
     accountEmails = [],
+    signal,
   } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const normalizedAccounts = Array.from(
@@ -479,7 +500,7 @@ function createMailboxIndexStore(deps = {}) {
             .is('deleted_at', null)
             .order('date', { ascending: false })
             .range(offset, offset + MAILBOX_INDEX_PAGE_SIZE - 1)
-      );
+      , { signal });
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
       page.forEach((row) => {
@@ -513,7 +534,7 @@ function createMailboxIndexStore(deps = {}) {
             .contains('payload', { originalCampaignOutbound: true })
             .is('deleted_at', null)
             .order('date', { ascending: false })
-      );
+      , { signal });
       if (!result.ok) return null;
       (Array.isArray(result.data) ? result.data : []).forEach((row) => {
         const messageKey = normalizeString(row && row.message_key);
@@ -528,7 +549,7 @@ function createMailboxIndexStore(deps = {}) {
       ));
   }
 
-  async function getProviderMessage({ provider, providerMessageId, accountEmail } = {}) {
+  async function getProviderMessage({ provider, providerMessageId, accountEmail, signal } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const rawProviderMessageId = normalizeString(providerMessageId);
     const normalizedProviderMessageId = rawProviderMessageId.startsWith(`${normalizedProvider}:`)
@@ -546,7 +567,7 @@ function createMailboxIndexStore(deps = {}) {
         .is('deleted_at', null)
         .limit(1)
         .maybeSingle()
-    );
+    , { signal });
     if (!result.ok || !result.data) return null;
     return normalizeMessageRow(result.data, { includeBody: true });
   }
@@ -587,7 +608,7 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row));
   }
 
-  async function listAllMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = null }) {
+  async function listAllMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = null, signal } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
     );
@@ -608,7 +629,7 @@ function createMailboxIndexStore(deps = {}) {
           .is('deleted_at', null)
           .order('date', { ascending: false })
           .order('message_key', { ascending: false })
-          .range(offset, offset + pageSize - 1)
+          .range(offset, offset + pageSize - 1), { signal }
       );
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
@@ -619,10 +640,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function listMatchingMessagesForAccounts({
-    accountEmails = [],
-    folder = 'inbox',
-    subjectTerms = [],
-    limit = 1000,
+    accountEmails = [], folder = 'inbox', subjectTerms = [], limit = 1000, signal,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -650,7 +668,8 @@ function createMailboxIndexStore(deps = {}) {
               .is('deleted_at', null)
               .order('date', { ascending: false })
               .order('message_key', { ascending: false })
-              .range(offset, offset + pageSize - 1)
+              .range(offset, offset + pageSize - 1),
+          { signal }
         );
         if (!result.ok) return null;
         const page = Array.isArray(result.data) ? result.data : [];
@@ -705,10 +724,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function listMessageUidsForAccount({
-    accountEmail,
-    folder = 'inbox',
-    since = '',
-    limit = 5000,
+    accountEmail, folder = 'inbox', since = '', limit = 5000, signal,
   } = {}) {
     const normalizedAccount = normalizeEmail(accountEmail);
     if (!normalizedAccount) return [];
@@ -729,7 +745,8 @@ function createMailboxIndexStore(deps = {}) {
             .order('uid', { ascending: false });
           if (normalizeString(since)) query = query.gte('date', normalizeString(since));
           return query.range(offset, offset + pageSize - 1);
-        }
+        },
+        { signal }
       );
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
@@ -904,9 +921,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function getOldestMatchingMessageUid({
-    accountEmail,
-    folder = 'inbox',
-    subjectTerms = [],
+    accountEmail, folder = 'inbox', subjectTerms = [], signal,
   } = {}) {
     const terms = Array.from(
       new Set(
@@ -927,7 +942,8 @@ function createMailboxIndexStore(deps = {}) {
           .eq('folder', normalizeFolder(folder))
           .ilike('subject', `%${term}%`)
           .order('uid', { ascending: true })
-          .limit(1)
+          .limit(1),
+        { signal }
       );
       if (!result.ok) return 0;
       const uid = Number(result.data?.[0]?.uid) || 0;
@@ -944,14 +960,15 @@ function createMailboxIndexStore(deps = {}) {
     )
       .filter((row) => row.uid > 0);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run('upsert-messages', (client) => signal
+    const atomicCommit = Boolean(normalizeString(mutationId) || normalizeString(requestKey));
+    const result = await run('upsert-messages', (client) => atomicCommit
       ? createMailboxAtomicCommitQuery(client, {
           mutationId, requestKey, rows, result: { source: 'imap-sync' },
         })
       : client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
           onConflict: 'message_key', defaultToNull: false,
         }), { mutationSignal: signal });
-    return signal
+    return atomicCommit
       ? normalizeMailboxAtomicCommitResult(result, rows.length)
       : (result.ok ? { ...result, upserted: rows.length } : result);
   }
@@ -1055,7 +1072,7 @@ function createMailboxIndexStore(deps = {}) {
     return { ok: false, unavailable: false, data: [], error };
   }
 
-  async function getSyncState({ accountEmail, folder = 'inbox' }) {
+  async function getSyncState({ accountEmail, folder = 'inbox', signal } = {}) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const result = await run('get-sync-state', (client) =>
       client
@@ -1064,61 +1081,9 @@ function createMailboxIndexStore(deps = {}) {
         .eq('sync_key', syncKey)
         .limit(1)
         .maybeSingle()
-    );
+    , { signal });
     if (!result.ok) return null;
     return result.data || null;
-  }
-
-  async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS }) {
-    const syncKey = buildSyncKey(accountEmail, folder);
-    const current = await getSyncState({ accountEmail, folder });
-    const currentLockExpiresAt = Date.parse(normalizeString(current && current.lock_expires_at));
-    if (!force && Number.isFinite(currentLockExpiresAt) && currentLockExpiresAt > now().getTime()) {
-      return { ok: false, locked: true, syncKey };
-    }
-
-    const lockToken = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-    const startedAt = isoNow();
-    const lockExpiresAt = new Date(now().getTime() + Math.max(10_000, Number(lockTtlMs) || SYNC_LOCK_TTL_MS)).toISOString();
-    const result = await run('acquire-sync-lock', (client) =>
-      client.from(MAILBOX_INDEX_TABLES.syncState).upsert(
-        {
-          sync_key: syncKey,
-          account_email: normalizeEmail(accountEmail),
-          folder: normalizeFolder(folder),
-          status: 'syncing',
-          sync_started_at: startedAt,
-          lock_token: lockToken,
-          lock_expires_at: lockExpiresAt,
-          updated_at: startedAt,
-        },
-        { onConflict: 'sync_key' }
-      )
-    );
-    if (!result.ok) return { ok: false, locked: false, syncKey, error: result.error };
-    return { ok: true, locked: false, syncKey, lockToken };
-  }
-
-  async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '' }) {
-    const syncKey = buildSyncKey(accountEmail, folder);
-    const failed = Boolean(normalizeString(error));
-    const patch = {
-      status: failed ? 'error' : 'ok',
-      last_error: failed ? truncateText(normalizeString(error), 1000) : null,
-      message_count: Math.max(0, Number(messageCount) || 0),
-      last_uid: Math.max(0, Number(lastUid) || 0),
-      lock_token: null,
-      lock_expires_at: null,
-      updated_at: isoNow(),
-    };
-    if (!failed) patch.last_synced_at = isoNow();
-    return run('finish-sync', (client) =>
-      client
-        .from(MAILBOX_INDEX_TABLES.syncState)
-        .update(patch)
-        .eq('sync_key', syncKey)
-        .eq('lock_token', normalizeString(lockToken))
-    );
   }
 
   function isSyncStateStale(state, maxAgeMs) {

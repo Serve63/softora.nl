@@ -8,6 +8,7 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
+const { attachMailboxSyncReadHealth, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
@@ -2017,6 +2018,10 @@ function createMailboxService(deps = {}) {
     };
   }
 
+  const imapMessageParser = createMailboxImapMessageParser({ parseMailSource, normalizeString,
+    sanitizeDisplayText: sanitizeMailboxDisplayText, buildBodyImages: buildMailboxBodyImages,
+    toClientMessage, logger });
+
   function getSafeLimit(limit, max = 100) {
     return Math.max(1, Math.min(max, Number(limit) || DEFAULT_SYNC_LIMIT));
   }
@@ -2044,7 +2049,7 @@ function createMailboxService(deps = {}) {
     try {
       await client.connect();
       const mailboxName = await resolveMailboxName(client, normalizedFolder);
-      if (!mailboxName) return [];
+      if (!mailboxName) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: true });
       const lock = await client.getMailboxLock(mailboxName);
       try {
         let selectedUids = Array.isArray(uids) && uids.length
@@ -2062,31 +2067,24 @@ function createMailboxService(deps = {}) {
             folder: normalizedFolder,
           });
         }
-        if (!selectedUids.length) return [];
-        const records = [];
+        if (!selectedUids.length) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: false });
+        const messages = [];
+        const parseFailures = [];
         for await (const message of client.fetch(
           selectedUids,
           { uid: true, flags: true, internalDate: true, source: true },
           { uid: true }
         )) {
-          const parsed = await parseMailSource(message.source);
-          const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
-          const primaryBodyImages = buildMailboxBodyImages(parsed);
-          records.push({
-            key: `${normalizedFolder}:${message.uid}`,
-            message,
-            parsed,
-            text,
-            primaryBodyImages,
-          });
+          abortScope.throwIfAborted();
+          const parsed = await imapMessageParser.parseMessage({ message, account,
+            folder: normalizedFolder, signal, deadlineAt });
+          if (parsed.ok) messages.push(parsed.message);
+          else parseFailures.push(parsed);
         }
-        const messages = records.map((record) =>
-          toClientMessage(record.parsed, record.message, normalizedFolder, account, {
-            text: record.text,
-            primaryBodyImages: record.primaryBodyImages,
-          })
-        );
-        return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sorted = messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return attachMailboxSyncReadHealth(sorted, {
+          parseFailures, selectedCount: selectedUids.length, folderMissing: false,
+        });
       } finally {
         lock.release();
       }

@@ -165,6 +165,43 @@ test('een onzekere databasewrite blijft pending en wordt niet als failed voltooi
   assert.equal(completes, 0);
 });
 
+test('bovenliggende folderabort annuleert mutationtaak en kan nooit completed worden', async () => {
+  const parent = new AbortController();
+  let completes = 0;
+  let taskSignal = null;
+  const runner = createMailboxCampaignMutationRunner({
+    mailboxCampaignConsistencyStore: {
+      isAvailable: () => true,
+      beginMutation: async () => ({
+        mutationId: '11111111-1111-4111-8111-111111111111',
+        status: 'pending',
+        replayed: false,
+      }),
+      completeMutation: async () => { completes += 1; },
+    },
+  });
+  const running = runner.run({
+    requestKey: 'imap-sync:parent-abort',
+    kind: 'imap-sync',
+    signal: parent.signal,
+  }, ({ signal }) => {
+    taskSignal = signal;
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const reason = Object.assign(new Error('folder timeout'), {
+    code: 'MAILBOX_SYNC_FOLDER_TIMEOUT', timedOut: true,
+  });
+  parent.abort(reason);
+
+  await assert.rejects(running, (error) => error === reason);
+  assert.equal(taskSignal.aborted, true);
+  assert.equal(taskSignal.reason, reason);
+  assert.equal(completes, 0);
+});
+
 test('ongeldige deadline kan nooit tegen lease-expiry aanlopen', async () => {
   let began = false;
   const runner = createMailboxCampaignMutationRunner({

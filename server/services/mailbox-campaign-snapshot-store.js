@@ -61,6 +61,38 @@ function compareContentVersions(left, right) {
   return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1;
 }
 
+function createSnapshotInvalidationTimeoutError() {
+  const error = new Error('Mailbox-snapshot invalidatie overschreed de syncdeadline.');
+  error.code = 'MAILBOX_SYNC_FOLDER_TIMEOUT';
+  error.status = 504;
+  error.timedOut = true;
+  return error;
+}
+
+async function awaitSnapshotInvalidation(promise, { signal, deadlineAt = 0 } = {}) {
+  if (signal?.aborted) throw signal.reason instanceof Error
+    ? signal.reason : createSnapshotInvalidationTimeoutError();
+  const remainingMs = Number(deadlineAt) > 0 ? Number(deadlineAt) - Date.now() : 0;
+  if (Number(deadlineAt) > 0 && remainingMs <= 0) throw createSnapshotInvalidationTimeoutError();
+  let timer = null;
+  let abortHandler = null;
+  const stops = [];
+  if (signal) stops.push(new Promise((_resolve, reject) => {
+    abortHandler = () => reject(signal.reason instanceof Error
+      ? signal.reason : createSnapshotInvalidationTimeoutError());
+    signal.addEventListener('abort', abortHandler, { once: true });
+  }));
+  if (remainingMs > 0) stops.push(new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(createSnapshotInvalidationTimeoutError()), remainingMs);
+  }));
+  try {
+    return await Promise.race([Promise.resolve(promise), ...stops]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (abortHandler) signal.removeEventListener('abort', abortHandler);
+  }
+}
+
 function createMailboxCampaignSnapshotStore(deps = {}) {
   const {
     getUiStateValues = async () => null,
@@ -217,22 +249,25 @@ function createMailboxCampaignSnapshotStore(deps = {}) {
   // runtime. All v3 authority decisions use content_version and the DB fence.
   async function invalidate(options = {}) {
     const invalidatedAt = parseMailboxCampaignSnapshotInvalidatedAt(options.at) || now().toISOString();
-    if (!localInvalidatedAt || Date.parse(invalidatedAt) > Date.parse(localInvalidatedAt)) {
-      localInvalidatedAt = invalidatedAt;
-    }
     try {
-      const saved = await setUiStateValues(
+      const saved = await awaitSnapshotInvalidation(setUiStateValues(
         MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE,
         { [MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY]: invalidatedAt },
         {
           source: normalizeText(options.source) || 'mailbox-index-upsert',
           actor: normalizeText(options.actor) || 'Mailbox index',
+          signal: options.signal,
+          deadlineAt: options.deadlineAt,
         }
-      );
+      ), options);
+      if (saved && (!localInvalidatedAt || Date.parse(invalidatedAt) > Date.parse(localInvalidatedAt))) {
+        localInvalidatedAt = invalidatedAt;
+      }
       return saved
         ? { ok: true, invalidatedAt }
         : { ok: false, invalidatedAt, reason: 'write_failed' };
     } catch (error) {
+      if (options.signal?.aborted || error?.timedOut === true) throw error;
       logger.warn?.('[Mailbox][CampaignSnapshotInvalidation]', error?.message || error);
       return { ok: false, invalidatedAt, reason: 'write_failed', error };
     }
