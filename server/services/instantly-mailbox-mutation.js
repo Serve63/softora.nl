@@ -23,7 +23,8 @@ function createInstantlyMailboxMutationWriter({
   onMessagesUpserted = async () => ({ ok: true }),
   getCampaignMutationRunner = () => null,
   requireMutationJournal = false,
-  createMutationRequestKey = () => `instantly-upsert:${crypto.randomUUID()}`,
+  createMutationRequestKey = (options = {}) => String(options.requestKey || '').trim()
+    || `instantly-upsert:${crypto.randomUUID()}`,
 } = {}) {
   async function runMutationLifecycle(options = {}, task) {
     const mutationRunner = getCampaignMutationRunner?.();

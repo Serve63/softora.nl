@@ -123,7 +123,7 @@ test('aggregate mailbox selection is canonicalized to the exact sender account o
   assert.equal(result.senderName, 'Servé Creusen');
 });
 
-test('Instantly reply requires the exact provider thread and new message does not become a reply', async () => {
+test('Instantly reply requires the exact provider thread and rejects new messages before reservation', async () => {
   const resolver = createResolver(null);
   const reply = await resolver.resolve({
     accountEmail: 'serve@softora.nl',
@@ -141,7 +141,7 @@ test('Instantly reply requires the exact provider thread and new message does no
   assert.equal(reply.providerThreadId, 'provider-thread-1');
   assert.equal(reply.replyTargetMessageId, 'provider-message-1');
 
-  const fresh = await resolver.resolve({
+  await assert.rejects(() => resolver.resolve({
     accountEmail: 'serve@softora.nl',
     recipientEmail: 'lead@example.nl',
     provider: 'instantly',
@@ -153,8 +153,15 @@ test('Instantly reply requires the exact provider thread and new message does no
       providerThreadId: 'provider-thread-1',
       context: { conversationId: 'conversation:instantly:provider-thread-1' },
     },
-  });
-  assert.equal(fresh.mode, 'new-message');
-  assert.equal(fresh.providerThreadId, '');
-  assert.equal(fresh.replyTargetMessageId, '');
+  }), { code: 'INSTANTLY_NEW_MESSAGE_UNSUPPORTED', status: 409 });
+});
+
+test('compose weigert client-verzonnen providers vóór enige verzendcontext', async () => {
+  const resolver = createResolver(null);
+  for (const provider of ['foo', 'bar']) {
+    await assert.rejects(() => resolver.resolve({
+      accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', provider,
+      body: { owner: 'serve', mode: 'new-message', idempotencyKey: `invalid-${provider}`, context: {} },
+    }), { code: 'MAILBOX_SEND_PROVIDER_INVALID', status: 400 });
+  }
 });
