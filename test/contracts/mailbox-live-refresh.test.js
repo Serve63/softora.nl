@@ -124,12 +124,13 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     fastRefresh: true,
     maxConcurrentAccounts: 3,
     folderTimeoutMs: 15_000,
-    runTimeoutMs: 22_000,
+    runTimeoutMs: 45_000,
     deadlineAt: 0,
     runId: '',
   });
   assert.equal(typeof calls[0].runId, 'string');
   assert.ok(calls[0].deadlineAt > Date.now());
+  assert.equal(refreshModule.REFRESH_REQUEST_TIMEOUT_MS, 50_000);
   assert.equal(normalizeMailboxSyncOwner('ALL'), 'both');
   await assert.rejects(
     syncMailboxRequest({
