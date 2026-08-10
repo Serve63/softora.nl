@@ -2,9 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const databaseUrl = String(process.env.MAILBOX_POSTGRES_TEST_URL || '').trim();
 const destructiveAllowed = process.env.MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE === '1';
+const postgresContainerId = String(process.env.MAILBOX_POSTGRES_TEST_CONTAINER_ID || '').trim();
 
 if (!databaseUrl) {
   test('echte PostgreSQL mailbox-lockordertest vereist MAILBOX_POSTGRES_TEST_URL', {
@@ -25,6 +27,37 @@ if (!databaseUrl) {
     '../../supabase/migrations/20260809235914_mailbox_campaign_atomic_message_commit.sql'
   ), 'utf8');
   const clients = new Set();
+
+  function applyTrackedSql(sql) {
+    const databaseName = decodeURIComponent(parsedUrl.pathname.slice(1));
+    const username = decodeURIComponent(parsedUrl.username || 'postgres');
+    const password = decodeURIComponent(parsedUrl.password || '');
+    let command = 'psql';
+    let args = [
+      '-v', 'ON_ERROR_STOP=1', '-h', parsedUrl.hostname,
+      '-p', parsedUrl.port || '5432', '-U', username, '-d', databaseName,
+    ];
+    if (postgresContainerId) {
+      if (!/^[a-f0-9]{12,64}$/i.test(postgresContainerId)) {
+        throw new Error('Ongeldig PostgreSQL-servicecontainer-id voor mailbox-lockordertest.');
+      }
+      command = 'docker';
+      args = [
+        'exec', '-i', '-e', `PGPASSWORD=${password}`, postgresContainerId,
+        'psql', '-v', 'ON_ERROR_STOP=1', '-U', username, '-d', databaseName,
+      ];
+    }
+    const result = spawnSync(command, args, {
+      input: sql,
+      encoding: 'utf8',
+      env: { ...process.env, PGPASSWORD: password },
+      maxBuffer: 1024 * 1024,
+    });
+    if (result.error || result.status !== 0) {
+      const detail = String(result.stderr || result.error?.message || 'onbekende fout').trim();
+      throw new Error(`Kon getrackte mailboxmigratie niet toepassen in testdatabase: ${detail}`);
+    }
+  }
 
   async function connect() {
     const client = new Client({ connectionString: databaseUrl });
@@ -87,9 +120,8 @@ if (!databaseUrl) {
     assert.equal(early, marker, `${label} blokkeerde niet op de gedeelde state-lock`);
   }
 
-  test.before(async () => {
-    const admin = await connect();
-    await admin.query(`
+  test.before(() => {
+    const bootstrapSql = `
       drop schema public cascade;
       create schema public;
       do $$
@@ -111,11 +143,8 @@ if (!databaseUrl) {
         updated_at timestamptz not null default now(), deleted_at timestamptz,
         unique (account_email, folder, uid)
       );
-    `);
-    // lgtm[js/sql-query-built-from-user-controlled-sources] Repo-tracked migration; the harness refuses every non-dedicated test database above.
-    await admin.query(foundation);
-    // lgtm[js/sql-query-built-from-user-controlled-sources] Repo-tracked migration; the harness refuses every non-dedicated test database above.
-    await admin.query(forwardMigration);
+    `;
+    applyTrackedSql(`${bootstrapSql}\n${foundation}\n${forwardMigration}`);
   });
 
   test.after(async () => {
@@ -388,8 +417,7 @@ if (!databaseUrl) {
 
   test('forward migration kan veilig opnieuw draaien zonder constraint- of datadrift', async () => {
     const client = await connect();
-    // lgtm[js/sql-query-built-from-user-controlled-sources] Idempotency rerun of the same repo-tracked migration in the dedicated test database.
-    await client.query(forwardMigration);
+    applyTrackedSql(forwardMigration);
     const constraintCount = (await client.query(`
       select count(*)::integer as count
       from pg_constraint

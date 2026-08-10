@@ -47,3 +47,4 @@ jobs:
         env:
           MAILBOX_POSTGRES_TEST_URL: postgresql://postgres:mailbox-ci-only@127.0.0.1:5432/softora_mailbox_lock_test_ci
           MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE: '1'
+          MAILBOX_POSTGRES_TEST_CONTAINER_ID: ${{ job.services.postgres.id }}
