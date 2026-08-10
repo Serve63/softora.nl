@@ -101,8 +101,11 @@ test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => 
   assert.ok(source.indexOf('assets/premium-health-dossier.css?v=20260716a') < asideEnd);
   assert.ok(source.indexOf('assets/premium-health-dossier.js?v=20260716a') > asideEnd);
   assert.match(source, /data-health-dossier/);
-  assert.match(readRepoFile('assets/premium-health-dossier.js'), /\/api\/health\/whoop\/status/);
-  assert.match(readRepoFile('assets/premium-health-dossier.js'), /mode:\s*mode \|\| 'manual'/);
+  const healthScript = readRepoFile('assets/premium-health-dossier.js');
+  assert.match(healthScript, /\/api\/health\/whoop\/status/);
+  assert.match(healthScript, /status\.needsReauthorization/);
+  assert.match(healthScript, /\/api\/health\/whoop\/authorize/);
+  assert.doesNotMatch(healthScript, /\/api\/health\/whoop\/sync/);
 });
 
 test('gezondheidsdossier blijft bereikbaar zonder item in de premium-sidebar', () => {

@@ -148,6 +148,11 @@ test('request security context exempts safe methods and webhook paths', () => {
     originalUrl: '/api/instantly/webhook',
     headers: { 'content-type': 'application/json' },
   });
+  const whoopWebhookReq = createRequest({
+    method: 'POST',
+    originalUrl: '/api/health/whoop/webhook',
+    headers: { 'content-type': 'application/json' },
+  });
   const kvkSnapshotSyncReq = createRequest({
     method: 'POST',
     originalUrl: '/api/kvk-database/snapshot',
@@ -167,6 +172,7 @@ test('request security context exempts safe methods and webhook paths', () => {
   assert.equal(context.isSameOriginApiRequest(retellFunctionReq), true);
   assert.equal(context.isSameOriginApiRequest(coldmailUnsubscribeReq), true);
   assert.equal(context.isSameOriginApiRequest(instantlyWebhookReq), true);
+  assert.equal(context.isSameOriginApiRequest(whoopWebhookReq), true);
   assert.equal(context.isSameOriginApiRequest(kvkSnapshotSyncReq), true);
   assert.equal(context.isSameOriginApiRequest(mountedRetellAvailabilityReq), true);
   assert.equal(context.isSameOriginApiRequest(namespacedRetellAvailabilityReq), true);

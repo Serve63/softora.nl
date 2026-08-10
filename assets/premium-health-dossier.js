@@ -159,7 +159,9 @@
     setText('[data-health-last-sync]', formatDate(status.lastSyncCompletedAt, true));
     setText('[data-health-last-day]', status.lastSyncedDay);
     if (!status.configured) setStatus('error', 'WHOOP-app is nog niet volledig geconfigureerd.');
-    else if (status.needsReauthorization) setStatus('error', 'WHOOP-toegang is verlopen en wordt opnieuw gekoppeld.');
+    else if (status.needsReauthorization && status.reauthorizationReason === 'refresh_outcome_unknown') {
+      setStatus('error', 'WHOOP kon een tokenvernieuwing niet veilig bevestigen en wordt zonder token-replay opnieuw gekoppeld.');
+    } else if (status.needsReauthorization) setStatus('error', 'WHOOP heeft de toegang geweigerd en wordt opnieuw gekoppeld.');
     else if (!status.connected) setStatus('', 'WHOOP is nog niet gekoppeld.');
     else if (status.lastSyncError) setStatus('error', 'WHOOP is gekoppeld, maar de laatste sync gaf: ' + status.lastSyncError);
     else setStatus('connected', 'WHOOP gekoppeld · je recovery wordt zodra WHOOP hem berekent automatisch bijgewerkt; 12:00 is het vangnet.');
