@@ -92,6 +92,15 @@ function createStore(initialMessages = []) {
 function buildService(overrides = {}) {
   const store = overrides.store || createStore();
   const requests = [];
+  const syncUiState = new Map();
+  const getUiStateValues = overrides.getUiStateValues || (async (scope) => ({
+    values: { ...(syncUiState.get(scope) || {}) },
+    source: 'supabase',
+  }));
+  const setUiStateValues = overrides.setUiStateValues || (async (scope, values) => {
+    syncUiState.set(scope, { ...(values || {}) });
+    return { values: { ...(values || {}) }, source: 'supabase' };
+  });
   const service = createInstantlyMailboxService({
     config: {
       enabled: true,
@@ -110,8 +119,8 @@ function buildService(overrides = {}) {
     },
     mailboxIndexStore: store,
     getCustomerSourcesByEmails: overrides.getCustomerSourcesByEmails,
-    getUiStateValues: overrides.getUiStateValues,
-    setUiStateValues: overrides.setUiStateValues,
+    getUiStateValues,
+    setUiStateValues,
     onMessagesUpserted: overrides.onMessagesUpserted,
     getCampaignMutationRunner: overrides.getCampaignMutationRunner,
     requireMutationJournal: overrides.requireMutationJournal,
@@ -1798,14 +1807,18 @@ test('standaard mailboxintegratie verplicht de mutation journal voor Instantly-w
   assert.equal(journalRuns, 1);
 });
 
-test('bounded polling persists its cursor and resumes the next cycle without duplicate loss', async () => {
-  let values = {};
+test('bounded polling always scans the fresh head and resumes its durable backlog without duplicate loss', async () => {
+  const states = new Map();
   const listQueries = [];
   const { service, store } = buildService({
-    config: { maxPages: 1 },
-    getUiStateValues: async () => ({ values }),
-    setUiStateValues: async (_scope, patch) => {
-      values = { ...values, ...patch };
+    config: { maxPages: 3 },
+    getUiStateValues: async (scope) => ({
+      values: { ...(states.get(scope) || {}) },
+      source: 'supabase',
+    }),
+    setUiStateValues: async (scope, patch) => {
+      states.set(scope, { ...(patch || {}) });
+      return { values: { ...(patch || {}) }, source: 'supabase' };
     },
     fetchJsonWithTimeout: async (url) => {
       const params = new URL(url).searchParams;
@@ -1813,11 +1826,24 @@ test('bounded polling persists its cursor and resumes the next cycle without dup
         return { response: { ok: true, status: 200 }, data: { items: [] } };
       }
       listQueries.push(Object.fromEntries(params.entries()));
+      const cursor = params.get('starting_after') || '';
+      const idByCursor = {
+        '': listQueries.length === 1 ? 'page-one' : 'fresh-head',
+        'cursor-page-two': 'page-two',
+        'cursor-page-three': 'page-three',
+        'cursor-page-four': 'page-four',
+      };
+      const nextByCursor = {
+        '': listQueries.length === 1 ? 'cursor-page-two' : '',
+        'cursor-page-two': 'cursor-page-three',
+        'cursor-page-three': 'cursor-page-four',
+        'cursor-page-four': '',
+      };
       return {
         response: { ok: true, status: 200 },
         data: {
-          items: [incoming({ id: params.get('starting_after') ? 'page-two' : 'page-one' })],
-          next_starting_after: params.get('starting_after') ? '' : 'cursor-page-two',
+          items: [incoming({ id: idByCursor[cursor] })],
+          next_starting_after: nextByCursor[cursor],
         },
       };
     },
@@ -1825,13 +1851,17 @@ test('bounded polling persists its cursor and resumes the next cycle without dup
 
   const first = await service.syncOwner('serve');
   assert.equal(first.partial, true);
-  assert.equal(values.cursor_serve, 'cursor-page-two');
+  const firstState = JSON.parse(states.get('instantly_mailbox_sync_serve').state_json);
+  assert.equal(firstState.segments[0].cursor, 'cursor-page-four');
   await service.syncOwner('serve');
-  assert.equal(listQueries[1].starting_after, 'cursor-page-two');
-  assert.equal(values.cursor_serve, '');
+  assert.equal(listQueries[3].starting_after, undefined);
+  assert.equal(listQueries[3].max_timestamp_created, '2026-07-25T12:00:00.000Z');
+  assert.equal(listQueries[4].starting_after, 'cursor-page-four');
+  const secondState = JSON.parse(states.get('instantly_mailbox_sync_serve').state_json);
+  assert.deepEqual(secondState.segments, []);
   assert.deepEqual(
     store.rows.map((message) => message.providerMessageId).sort(),
-    ['page-one', 'page-two']
+    ['fresh-head', 'page-four', 'page-one', 'page-three', 'page-two']
   );
 });
 
