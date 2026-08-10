@@ -11,6 +11,7 @@ const {
   createMailboxAtomicCommitQuery,
   normalizeMailboxAtomicCommitResult,
 } = require('./mailbox-index-atomic-commit');
+const { createMailboxSyncStateStore } = require('./mailbox-sync-runtime');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -150,6 +151,17 @@ function createMailboxIndexStore(deps = {}) {
   function buildSyncKey(accountEmail, folder) {
     return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}`;
   }
+
+  const { acquireSyncLock, finishSync } = createMailboxSyncStateStore({
+    run,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeString,
+    truncateText,
+    now,
+    tableName: MAILBOX_INDEX_TABLES.syncState,
+    defaultLockTtlMs: SYNC_LOCK_TTL_MS,
+  });
 
   function parseUidFromMessage(message) {
     const uid = Number(message && message.uid);
@@ -1072,58 +1084,6 @@ function createMailboxIndexStore(deps = {}) {
     , { signal });
     if (!result.ok) return null;
     return result.data || null;
-  }
-
-  async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS, signal } = {}) {
-    const syncKey = buildSyncKey(accountEmail, folder);
-    const current = await getSyncState({ accountEmail, folder, signal });
-    const currentLockExpiresAt = Date.parse(normalizeString(current && current.lock_expires_at));
-    if (!force && Number.isFinite(currentLockExpiresAt) && currentLockExpiresAt > now().getTime()) {
-      return { ok: false, locked: true, syncKey };
-    }
-
-    const lockToken = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-    const startedAt = isoNow();
-    const lockExpiresAt = new Date(now().getTime() + Math.max(10_000, Number(lockTtlMs) || SYNC_LOCK_TTL_MS)).toISOString();
-    const result = await run('acquire-sync-lock', (client) =>
-      client.from(MAILBOX_INDEX_TABLES.syncState).upsert(
-        {
-          sync_key: syncKey,
-          account_email: normalizeEmail(accountEmail),
-          folder: normalizeFolder(folder),
-          status: 'syncing',
-          sync_started_at: startedAt,
-          lock_token: lockToken,
-          lock_expires_at: lockExpiresAt,
-          updated_at: startedAt,
-        },
-        { onConflict: 'sync_key' }
-      )
-    , { signal, mutation: true });
-    if (!result.ok) return { ok: false, locked: false, syncKey, error: result.error };
-    return { ok: true, locked: false, syncKey, lockToken };
-  }
-
-  async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '', signal } = {}) {
-    const syncKey = buildSyncKey(accountEmail, folder);
-    const failed = Boolean(normalizeString(error));
-    const patch = {
-      status: failed ? 'error' : 'ok',
-      last_error: failed ? truncateText(normalizeString(error), 1000) : null,
-      message_count: Math.max(0, Number(messageCount) || 0),
-      last_uid: Math.max(0, Number(lastUid) || 0),
-      lock_token: null,
-      lock_expires_at: null,
-      updated_at: isoNow(),
-    };
-    if (!failed) patch.last_synced_at = isoNow();
-    return run('finish-sync', (client) =>
-      client
-        .from(MAILBOX_INDEX_TABLES.syncState)
-        .update(patch)
-        .eq('sync_key', syncKey)
-        .eq('lock_token', normalizeString(lockToken))
-    , { signal, mutation: true });
   }
 
   function isSyncStateStale(state, maxAgeMs) {
