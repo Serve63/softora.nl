@@ -76,8 +76,12 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/health/whoop/daily-sync",
-      "schedule": "0 6,7 * * *"
+      "path": "/api/health/whoop/process-events",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/health/whoop/reconcile",
+      "schedule": "0 10,11 * * *"
     },
     {
       "path": "/api/google-ads/daily-run",
