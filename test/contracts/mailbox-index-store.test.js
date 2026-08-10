@@ -2081,7 +2081,17 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
     lockToken: first.lockToken,
     messageCount: 2,
     lastUid: 42,
+    warning: 'INSTANTLY_ITEMS_QUARANTINED:1',
+    syncedThroughAt: '2026-05-20T11:58:00.000Z',
   });
+  assert.equal(
+    client.stateRows.get('info@softora.nl|inbox').last_synced_at,
+    '2026-05-20T11:58:00.000Z'
+  );
+  assert.equal(
+    client.stateRows.get('info@softora.nl|inbox').last_error,
+    'INSTANTLY_ITEMS_QUARANTINED:1'
+  );
 
   const third = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
   assert.equal(third.ok, true);
