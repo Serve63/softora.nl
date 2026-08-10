@@ -2058,7 +2058,11 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
 
   assert.equal(first.ok, true);
   assert.equal(second.locked, true);
+  assert.equal(second.lockExpiresAt, first.lockExpiresAt);
+  assert.equal(second.lockReason, 'active_target');
   assert.equal(forced.locked, true);
+  assert.equal(forced.lockExpiresAt, first.lockExpiresAt);
+  assert.equal(forced.lockReason, 'active_target');
   assert.equal(client.rpcCalls.length, 3);
   assert.equal(client.rpcCalls[0].name, 'softora_claim_mailbox_sync_lock');
   assert.equal(client.rpcCalls[0].args.p_sync_key, 'info@softora.nl|inbox');

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   createMailboxSyncService,
 } = require('../../server/services/mailbox-campaign-sync');
+const { selectMailboxSyncUids } = require('../../server/services/mailbox-campaign-history-sync');
 const {
   getMailboxSyncResponseStatus,
   summarizeMailboxSyncResults,
@@ -49,9 +50,17 @@ test('sync lock failures fail closed while an active lock is an explicit accepte
   assert.equal(failed.statusCode, 503);
   assert.equal(failed.results[0].reason, 'lock_failed');
 
+  let activeLockClaims = 0;
   const activeLock = createService({
     mailboxIndexStore: {
-      acquireSyncLock: async () => ({ ok: false, locked: true }),
+      acquireSyncLock: async () => {
+        activeLockClaims += 1;
+        return {
+          ok: false,
+          locked: true,
+          lockExpiresAt: new Date(Date.now() + 30_000).toISOString(),
+        };
+      },
     },
   });
   const accepted = await activeLock.syncMailbox({ folders: ['inbox'] });
@@ -60,6 +69,9 @@ test('sync lock failures fail closed while an active lock is an explicit accepte
   assert.equal(accepted.complete, false);
   assert.equal(accepted.freshnessConfirmed, false);
   assert.equal(accepted.statusCode, 202);
+  assert.equal(accepted.results[0].lockReason, 'active_target');
+  assert.ok(accepted.results[0].retryAfterMs > 0);
+  assert.equal(activeLockClaims, 1);
 });
 
 test('mailbox sync runs no more than three accounts concurrently', async () => {
@@ -81,6 +93,72 @@ test('mailbox sync runs no more than three accounts concurrently', async () => {
   assert.equal(result.complete, true);
   assert.equal(result.summary.succeeded, 8);
   assert.equal(maximumActive, 3);
+});
+
+test('globale lease-cap zet accounts in een begrensde retryqueue zonder starvation', async () => {
+  const accounts = Array.from({ length: 8 }, (_, index) => createAccount(`fair${index}@softora.nl`));
+  let activeLeases = 2;
+  let maximumActiveLeases = activeLeases;
+  let claimCalls = 0;
+  const service = createService({
+    accounts,
+    mailboxIndexStore: {
+      acquireSyncLock: async ({ accountEmail }) => {
+        claimCalls += 1;
+        if (activeLeases >= 3) return { ok: false, locked: true, lockExpiresAt: null };
+        activeLeases += 1;
+        maximumActiveLeases = Math.max(maximumActiveLeases, activeLeases);
+        return { ok: true, lockToken: `lock:${accountEmail}` };
+      },
+      finishSync: async () => {
+        activeLeases -= 1;
+        return { ok: true };
+      },
+    },
+    fetchMessagesFromImap: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return [];
+    },
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['inbox'],
+    deadlineAt: Date.now() + 5_000,
+    folderTimeoutMs: 5_000,
+  });
+
+  assert.equal(result.complete, true);
+  assert.equal(result.summary.succeeded, 8);
+  assert.equal(result.summary.locked, 0);
+  assert.ok(claimCalls > accounts.length);
+  assert.equal(maximumActiveLeases, 3);
+  assert.equal(activeLeases, 2);
+});
+
+test('blijvend volle globale lease-cap eindigt eerlijk als timeout met retrymetadata', async () => {
+  const service = createService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({
+        ok: false,
+        locked: true,
+        lockExpiresAt: null,
+        lockReason: 'global_capacity',
+      }),
+    },
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['inbox'],
+    deadlineAt: Date.now() + 100,
+    folderTimeoutMs: 5_000,
+  });
+
+  assert.equal(result.statusCode, 504);
+  assert.equal(result.complete, false);
+  assert.equal(result.results[0].code, 'MAILBOX_SYNC_GLOBAL_CAP_TIMEOUT');
+  assert.equal(result.results[0].lockReason, 'global_capacity');
+  assert.ok(result.results[0].retryAfterMs > 0);
+  assert.ok(result.results[0].lockAttempts >= 2);
 });
 
 test('fast IMAP cap is complete at 20 and honestly partial at 21 or more', async () => {
@@ -122,6 +200,56 @@ test('fast IMAP cap is complete at 20 and honestly partial at 21 or more', async
   assert.equal(twentyOne.upserted, 21);
   assert.equal(finishCalls[0].error, undefined);
   assert.match(finishCalls[1].error, /fetchlimiet/i);
+});
+
+test('ordinary IMAP sync verwerkt 31 berichten over twee runs en noemt de eerste nooit vers', async () => {
+  const allUids = Array.from({ length: 31 }, (_item, index) => index + 1);
+  const indexed = new Set();
+  const indexedUidReads = [];
+  const service = createService({
+    mailboxIndexStore: {
+      listMessageUidsForAccount: async () => {
+        const current = Array.from(indexed);
+        indexedUidReads.push(current);
+        return current;
+      },
+      upsertMessages: async ({ messages }) => {
+        messages.forEach((message) => indexed.add(message.uid));
+        return { ok: true, upserted: messages.length };
+      },
+    },
+    fetchMessagesFromImap: async ({ indexedUids, limit }) => {
+      const selected = selectMailboxSyncUids({ allUids, indexedUids, limit });
+      const messages = selected.map((uid) => ({ uid, id: `inbox:${uid}` }));
+      Object.defineProperty(messages, 'syncReadHealth', {
+        value: {
+          parseFailures: [],
+          selectedCount: selected.length,
+          folderMissing: false,
+          ...selected.syncSelectionHealth,
+          selectionTruncated: selected.syncSelectionHealth.truncated,
+        },
+      });
+      return messages;
+    },
+  });
+
+  const first = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', limit: 30,
+  });
+  const second = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', limit: 30,
+  });
+
+  assert.equal(first.complete, false);
+  assert.equal(first.freshnessConfirmed, false);
+  assert.equal(first.code, 'MAILBOX_SYNC_SELECTION_TRUNCATED');
+  assert.equal(first.remainingUidCount, 1);
+  assert.equal(second.complete, true);
+  assert.equal(second.freshnessConfirmed, true);
+  assert.equal(second.synced, 1);
+  assert.equal(indexed.size, 31);
+  assert.deepEqual(indexedUidReads.map((uids) => uids.length), [0, 30]);
 });
 
 test('snapshot invalidation failure prevents freshness confirmation after an index upsert', async () => {
