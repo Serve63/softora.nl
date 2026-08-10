@@ -33,10 +33,10 @@ as $$
         lower(btrim(coalesce(messages.sender_email, ''))),
         lower(btrim(coalesce(messages.recipients_text, ''))),
         lower(btrim(coalesce(messages.subject, ''))),
-        messages.date,
         public.softora_normalize_mailbox_message_id(messages.in_reply_to),
         lower(btrim(coalesce(messages.references_text, '')))
-      )::text as replica_signature,
+      )::text as envelope_signature,
+      messages.date as message_date,
       case
         when public.softora_is_mailbox_campaign_root(
           messages.folder,
@@ -64,7 +64,9 @@ as $$
         = public.softora_normalize_mailbox_message_id(p_message_id)
   ), resolved as (
     select
-      count(distinct candidates.replica_signature) as signature_count,
+      count(distinct candidates.envelope_signature) as signature_count,
+      min(candidates.message_date) as earliest_message_date,
+      max(candidates.message_date) as latest_message_date,
       (
         array_agg(
           candidates.message_key
@@ -77,7 +79,9 @@ as $$
     from candidates
   )
   select case
-    when resolved.signature_count = 1 then resolved.canonical_message_key
+    when resolved.signature_count = 1
+      and resolved.latest_message_date - resolved.earliest_message_date <= interval '1 minute'
+      then resolved.canonical_message_key
     else null
   end
   from resolved;

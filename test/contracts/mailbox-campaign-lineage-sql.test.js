@@ -39,8 +39,9 @@ test('mailbox lineage replica hardening parses with the real PostgreSQL parser',
 test('mailbox lineage canonicalizes exact provider replicas and rejects Message-ID conflicts', () => {
   const sql = read(hardeningMigrationPath);
   assert.match(sql, /create or replace function public\.softora_canonical_mailbox_message_key/);
-  assert.match(sql, /count\(distinct candidates\.replica_signature\) as signature_count/);
-  assert.match(sql, /when resolved\.signature_count = 1 then resolved\.canonical_message_key/);
+  assert.match(sql, /count\(distinct candidates\.envelope_signature\) as signature_count/);
+  assert.match(sql, /latest_message_date - resolved\.earliest_message_date <= interval '1 minute'/);
+  assert.match(sql, /then resolved\.canonical_message_key/);
   assert.match(sql, /public\.softora_is_mailbox_campaign_root\([\s\S]*then 0/);
   assert.match(sql, /when lower\(btrim\(messages\.folder\)\) = 'sent' then 1/);
   assert.match(sql, /or child\.message_key = public\.softora_canonical_mailbox_message_key/);

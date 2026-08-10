@@ -532,7 +532,7 @@ test('real PostgreSQL keeps one exact label replica and fails closed on conflict
         'coldmail:replica-root', 'serve290@gmail.com', 'coldmail', 2,
         'coldmail:replica-root', '<replica-root@softora.test>',
         'serve290@gmail.com', 'salon@example.test',
-        'Kleine vraag over jullie website', '2026-08-07T08:00:00Z', '{}'::jsonb
+        'Kleine vraag over jullie website', '2026-08-07T08:00:06Z', '{}'::jsonb
       ), (
         'inbox:replica-human', 'serve290@gmail.com', 'inbox', 3,
         'inbox:replica-human', '<replica-human@example.test>',
@@ -560,7 +560,7 @@ test('real PostgreSQL keeps one exact label replica and fails closed on conflict
       ), (
         'coldmail:conflict-copy', 'serve290@gmail.com', 'coldmail', 7,
         'coldmail:conflict-copy', '<conflict-root@softora.test>',
-        'serve290@gmail.com', 'conflict@example.test',
+        'serve290@gmail.com', 'different-recipient@example.test',
         'Kleine vraag over jullie website', '2026-08-07T10:00:03Z', '{}'::jsonb
       ), (
         'inbox:conflict-child', 'serve290@gmail.com', 'inbox', 8,
