@@ -95,14 +95,15 @@ input::placeholder { color: #727b8c; }
 .load-more:hover { border-color: var(--acid); color: var(--acid); }
 
 .ranking-wrap { border-top: 1px solid var(--line); }
-.ranking-row { --width: 0%; position: relative; display: grid; grid-template-columns: 64px minmax(230px, 1fr) minmax(220px, 1.25fr) 160px 140px; gap: 20px; align-items: center; min-height: 88px; padding: 12px 18px; border-bottom: 1px solid var(--line); overflow: hidden; }
+.ranking-row { --width: 0%; position: relative; display: grid; grid-template-columns: 64px minmax(230px, 1fr) minmax(220px, 1.25fr) 180px; gap: 20px; align-items: center; min-height: 88px; padding: 12px 18px; border-bottom: 1px solid var(--line); overflow: hidden; }
 .ranking-row::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--width); background: linear-gradient(90deg, rgba(185,255,102,.10), transparent); pointer-events: none; }
 .ranking-row > * { position: relative; }
 .ranking-row .position { color: var(--acid); font: 800 23px/1 Oswald, sans-serif; }
 .ranking-row .bar { height: 5px; background: #202736; }
 .ranking-row .bar i { display: block; height: 100%; width: var(--width); background: var(--acid); }
 .ranking-row .amount { text-align: right; font: 900 22px/1 Oswald, sans-serif; }
-.ranking-row .substat { color: var(--muted); font-size: 11px; text-align: right; }
+.ranking-row.impact-row { grid-template-columns: 64px minmax(230px, 1fr) minmax(220px, 1.25fr) 160px 140px; }
+.ranking-row .impact-summary { color: var(--muted); font-size: 11px; text-align: right; }
 .ranking-row.negative .position, .ranking-row.negative .amount { color: var(--red); }
 .ranking-row.negative::before { background: linear-gradient(90deg, rgba(255,93,93,.12), transparent); }
 
@@ -194,7 +195,8 @@ dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(6px); }
   .transfer-row { grid-template-columns: 44px minmax(180px, .75fr) minmax(360px, 1.5fr) 110px; }
   .transfer-row .deal-type { display: none; }
   .ranking-row { grid-template-columns: 50px minmax(220px, 1fr) 1fr 120px; }
-  .ranking-row .substat { display: none; }
+  .ranking-row.impact-row { grid-template-columns: 50px minmax(220px, 1fr) 1fr 120px; }
+  .ranking-row .impact-summary { display: none; }
   .rumour-list-head, .rumour-row { grid-template-columns: 38px minmax(160px, .8fr) minmax(250px, 1.4fr) 70px 100px 68px; gap: 12px; padding-inline: 12px; }
   .role-grid { grid-template-columns: repeat(2, 1fr); }
   .role-card:nth-child(5n) { border-right: 1px solid var(--line); }
@@ -220,7 +222,7 @@ dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(6px); }
   .transfer-row .deal-route, .transfer-row .deal-type { display: none; }
   .player-cell strong { white-space: normal; }
   .ranking-row { grid-template-columns: 38px 1fr auto; gap: 10px; min-height: 78px; padding-inline: 8px; }
-  .ranking-row .bar, .ranking-row .substat { display: none; }
+  .ranking-row .bar, .ranking-row .impact-summary { display: none; }
   .depth-layout { grid-template-columns: 1fr; }
   .depth-layout aside { position: static; }
   .mini-leaderboard { max-height: 260px; }

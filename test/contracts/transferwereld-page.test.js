@@ -33,15 +33,21 @@ test('transferwereld exposes the five active analysis tabs and defaults to fee s
   assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.doesNotMatch(html, /id="transfer-filters"|id="transfer-summary"|id="transfer-sort"/);
+  assert.match(html, /transferwereld\.css\?v=20260810b/);
   assert.match(html, /transferwereld-data\.js\?v=20260810a/);
   assert.match(html, /transferwereld-scope-data\.js\?v=20260810a/);
   assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
   assert.match(html, /transferwereld-deals\.js\?v=20260810a/);
-  assert.match(html, /transferwereld\.js\?v=20260810b/);
+  assert.match(html, /transferwereld\.js\?v=20260810c/);
+  assert.doesNotMatch(html, /De bevestigde deals, geldstromen, geruchten en selectiekracht/);
+  assert.doesNotMatch(html, /Gerapporteerde transfersommen per club opgeteld/);
   assert.doesNotMatch(html, /id="transfer-direction"/);
   const script = read('assets/transferwereld.js');
   assert.match(script, /\[\.\.\.deals\]\.sort\(\(left, right\) => right\.feeValue - left\.feeValue \|\| left\.rank - right\.rank\)/);
-  assert.match(script, /secondaryKey === 'income' \? 'verdiend' : 'uitgegeven'/);
+  assert.match(script, /function renderMoneyRanking\(target, key\)/);
+  assert.doesNotMatch(script, /secondaryKey|class="substat"/);
+  const css = read('assets/transferwereld.css');
+  assert.doesNotMatch(css, /\.ranking-row \.substat/);
 });
 
 test('mirrored incoming and outgoing records render as one club-to-club deal', () => {

@@ -202,7 +202,7 @@
     document.querySelector('#transfer-more').hidden = visible.length >= filtered.length;
   }
 
-  function renderMoneyRanking(target, key, secondaryKey) {
+  function renderMoneyRanking(target, key) {
     const sorted = [...clubs].sort((left, right) => right[key] - left[key]);
     const max = Math.max(...sorted.map((club) => club[key]), 1);
     document.querySelector(target).innerHTML = sorted.map((club, index) => `
@@ -211,7 +211,6 @@
         ${clubCell(club)}
         <div class="bar" aria-hidden="true"><i style="--width:${(club[key] / max * 100).toFixed(1)}%"></i></div>
         <div class="amount">${formatMoney(club[key])}</div>
-        <div class="substat">${secondaryKey === 'income' ? 'verdiend' : 'uitgegeven'} ${formatMoney(club[secondaryKey])}</div>
       </article>`).join('');
   }
 
@@ -250,12 +249,12 @@
     const max = Math.max(...sorted.map((club) => Math.abs(club.impactScore)), 1);
     document.querySelector('#impact-ranking').innerHTML = sorted.map((club, index) => {
       const negative = club.impactScore < -7;
-      return `<article class="ranking-row ${negative ? 'negative' : ''}" style="--width:${Math.abs(club.impactScore) / max * 100}%">
+      return `<article class="ranking-row impact-row ${negative ? 'negative' : ''}" style="--width:${Math.abs(club.impactScore) / max * 100}%">
         <span class="position">${String(index + 1).padStart(2, '0')}</span>
         ${clubCell(club)}
         <div class="bar"><i style="--width:${Math.abs(club.impactScore) / max * 100}%;background:${negative ? 'var(--red)' : 'var(--acid)'}"></i></div>
         <div class="amount">${club.impactScore > 0 ? '+' : ''}${club.impactScore}</div>
-        <div class="substat">${impactLabel(club.impactScore)} · netto ${formatMoney(club.netSpend)} · ${club.context?.injuries?.length || 0} afwezig</div>
+        <div class="impact-summary">${impactLabel(club.impactScore)} · netto ${formatMoney(club.netSpend)} · ${club.context?.injuries?.length || 0} afwezig</div>
       </article>`;
     }).join('');
   }
@@ -273,8 +272,8 @@
   setupTabs();
   setupTransferList();
   renderTransfers();
-  renderMoneyRanking('#spend-ranking', 'spend', 'income');
-  renderMoneyRanking('#income-ranking', 'income', 'spend');
+  renderMoneyRanking('#spend-ranking', 'spend');
+  renderMoneyRanking('#income-ranking', 'income');
   document.querySelector('#rumour-probability').addEventListener('input', renderRumours);
   document.querySelector('#rumour-search').addEventListener('input', renderRumours);
   renderRumours();
