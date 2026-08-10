@@ -17,6 +17,111 @@ const {
   shouldShowCampaignConversation,
 } = require('../../server/services/mailbox-campaign-replies');
 
+test('durable lineage keeps a newly discovered transitive reply visible in one bounded read', async () => {
+  const root = {
+    id: 'sent:root', folder: 'sent', accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl', to: 'lead@example.test',
+    subject: 'Kleine vraag over jullie website', date: '2026-08-01T08:00:00.000Z',
+    messageId: '<root@softora.test>', originalCampaignOutbound: true,
+    campaignLineageEvidenceKnown: true, campaignLineageDepth: 0,
+    campaignLineageRootMessageId: 'root@softora.test',
+    campaignLineageEvidence: 'exact-same-account-message-id-ancestry',
+  };
+  const sentDescendant = {
+    id: 'sent:manual', folder: 'sent', accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl', to: 'lead@example.test',
+    subject: 'Even terugkomend op je vraag', date: '2026-08-02T08:00:00.000Z',
+    messageId: '<manual@softora.test>', inReplyTo: root.messageId,
+    references: root.messageId,
+    campaignLineageEvidenceKnown: true, campaignLineageDepth: 1,
+    campaignLineageRootMessageId: 'root@softora.test',
+    campaignLineageEvidence: 'exact-same-account-message-id-ancestry',
+  };
+  const changedSubjectReply = {
+    id: 'inbox:changed', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    email: 'lead@example.test', to: 'serve@softora.nl',
+    subject: 'Los onderwerp maar exact antwoord', preview: 'Ja, stuur de preview maar.',
+    date: '2026-08-03T08:00:00.000Z', messageId: '<reply@example.test>',
+    inReplyTo: sentDescendant.messageId,
+    references: `${root.messageId} ${sentDescendant.messageId}`,
+    campaignLineageEvidenceKnown: true, campaignLineageDepth: 2,
+    campaignLineageRootMessageId: 'root@softora.test',
+    campaignLineageEvidence: 'exact-same-account-message-id-ancestry',
+  };
+  const sentAfterReply = {
+    id: 'sent:after-reply', folder: 'sent', accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl', to: 'lead@example.test',
+    subject: 'Re: Los onderwerp maar exact antwoord', preview: 'Dank, ik stuur hem vandaag.',
+    date: '2026-08-04T08:00:00.000Z', messageId: '<after-reply@softora.test>',
+    inReplyTo: changedSubjectReply.messageId,
+    references: `${root.messageId} ${sentDescendant.messageId} ${changedSubjectReply.messageId}`,
+    campaignLineageEvidenceKnown: true, campaignLineageDepth: 3,
+    campaignLineageRootMessageId: 'root@softora.test',
+    campaignLineageEvidence: 'exact-same-account-message-id-ancestry',
+  };
+  const calls = { lineage: 0, recent: 0, matching: 0, legacy: 0 };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listCampaignLineageMessages: async ({ replyLimit, maxDepth, maxResults, deadlineMs }) => {
+        calls.lineage += 1;
+        assert.equal(replyLimit, 200);
+        assert.equal(maxDepth, 20);
+        assert.equal(maxResults, 9000);
+        assert.equal(deadlineMs, 2500);
+        return [changedSubjectReply, sentAfterReply, sentDescendant, root];
+      },
+      listMessagesForAccounts: async () => { calls.recent += 1; return []; },
+      listMatchingMessagesForAccounts: async () => {
+        calls.matching += 1;
+        throw new Error('duurzame lineage mag geen groeiende subject-historyscan starten');
+      },
+      listMessagesByMessageIdsForAccounts: async () => {
+        calls.legacy += 1;
+        throw new Error('legacy per-ID lookup mag niet draaien');
+      },
+      listMessagesReferencingMessageIdsForAccounts: async () => {
+        calls.legacy += 1;
+        throw new Error('legacy reference lookup mag niet draaien');
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].id, 'inbox:changed');
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), [
+    'sent:after-reply',
+    'sent:manual',
+    'sent:root',
+  ]);
+  assert.deepEqual(calls, { lineage: 1, recent: 2, matching: 0, legacy: 0 });
+});
+
+test('durable lineage fails closed before a partial context can replace the mailbox', async () => {
+  let recentReads = 0;
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listCampaignLineageMessages: async () => [{
+        id: 'inbox:partial',
+        folder: 'inbox',
+        accountEmail: 'serve@softora.nl',
+        campaignLineageContextTruncated: true,
+      }],
+      listMessagesForAccounts: async () => { recentReads += 1; return []; },
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  await assert.rejects(
+    service.listReplies({ limit: 100, owner: 'serve' }),
+    { code: 'MAILBOX_CAMPAIGN_LINEAGE_UNAVAILABLE', status: 503 }
+  );
+  assert.equal(recentReads, 0);
+});
+
 test('campaign mailbox applies the selected owner before limiting older conversations', async () => {
   const serveAccounts = [
     'serve@softora.nl',
@@ -706,110 +811,39 @@ test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een an
   assert.equal(conversations[0].latestOutboundAt, '2026-06-10T08:00:00.000Z');
 });
 
-test('campaign mailbox recognizes strong automatic reply signals without hiding normal replies', () => {
+test('campaign mailbox hides only source-proven automatic replies and keeps unknown text visible', () => {
   assert.equal(isAutomatedCampaignReply({
     subject: 'zomersluiting Re: Kleine vraag over jullie website',
-    preview: 'Beste mailer, Tot 1 juli is impressioni gesloten. Daarna helpen we u graag weer!',
-    body: 'Beste mailer,\n\nTot 1 juli is impressioni gesloten.\nDaarna helpen we u graag weer!',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Vraag over jullie zomersluiting',
-    preview: 'Kun je vertellen wanneer jullie deze zomer gesloten zijn?',
-  }), false);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Afwezigheidmelding Re: Kleine vraag over jullie website',
-    preview: 'Vanaf 2 juli tot en met 3 augustus 2026 is ons kantoor gesloten.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: Kleine vraag over jullie website',
-    preview: 'Dit is een automatisch bericht van onze website.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: Kleine vraag over jullie website',
-    preview: 'Dit is een automatisch email van info@sushidetoren.com.',
-    body: 'We hebben uw email in goede orde ontvangen en proberen uw email binnen 24 uur te beantwoorden.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Automatisch antwoorden: Nieuw webdesign gemaakt!',
-    preview: 'Hartelijk dank voor je email.',
-    body: 'Ik streef er naar om deze binnen 2 werkdagen te beantwoorden.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
-    preview: '##- Please type your reply above this line -##',
-    body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'We hebben jouw vraag met als onderwerp - Kleine vraag over jullie website ontvangen.',
-    preview: 'Hartelijk dank voor je bericht. Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
-    body: 'Van 24 juli t/m 5 augustus is de Typetuin gesloten. In deze periode beantwoorden wij geen e-mails.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: [Serviceaanvraag ontvangen] Kleine vraag over jullie website',
-    preview: 'Dank voor het ontwerp. Kun je de preview doorsturen?',
-    body: [
-      'Dank voor het ontwerp. Kun je de preview doorsturen?',
-      '',
-      'On Tue, 29 Jul 2026, helpdesknl@sbsupply.eu wrote:',
-      'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
-    ].join('\n'),
-  }), false);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: We hebben jouw vraag met als onderwerp - Kleine vraag over jullie website ontvangen.',
-    preview: 'Dank voor je mail. We bekijken het ontwerp graag.',
-    body: [
-      'Dank voor je mail. We bekijken het ontwerp graag.',
-      '',
-      'Op di 4 aug 2026 schreef Support De Typetuin:',
-      'Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
-    ].join('\n'),
-  }), false);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Vraag over automatisch antwoorden in Gmail',
-    preview: 'Kun je uitleggen hoe ik dit zelf instel?',
-  }), false);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: Kleine vraag over jullie website',
-    preview: 'Dank voor je mail. De automatische e-mail op onze website werkt inderdaad nog niet goed.',
-  }), false);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: Kleine vraag over jullie website',
-    preview: 'Dank voor je ontwerp. Wij werken al met een andere partij en hebben geen interesse.',
-  }), false);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Bedankt voor je bericht! Re: Kleine vraag over jullie website',
-    preview: 'Bedankt voor je bericht! We streven ernaar jouw mail de eerstvolgende werkdag te beantwoorden.',
-    body: 'Bedankt voor je bericht! We streven ernaar jouw mail de eerstvolgende werkdag te beantwoorden. Op woensdag wordt de mail beperkt gelezen.',
-  }), true);
+    body: 'Beste mailer, tot 1 juli zijn wij gesloten.',
+    automatedReplyEvidence: true,
+  }), false, 'een los pre-genormaliseerd vlaggetje zonder bronbewijs blijft zichtbaar');
   assert.equal(isAutomatedCampaignReply({
     subject: 'Out of the office Re: Kleine vraag over jullie website',
-    preview: 'I am currently out of the office. For urgent matters contact my colleague.',
-    body: 'I am currently out of the office until 12 August. For urgent matters contact info@example.nl.',
     autoSubmitted: 'auto-replied',
   }), true);
   assert.equal(isAutomatedCampaignReply({
     subject: 'Automatisch antwoord: Re: Kleine vraag over jullie website',
-    body: 'Ik ben momenteel afwezig. Voor dringende zaken kun je mijn collega bellen.',
-    precedence: 'auto_reply',
+    precedence: 'bulk',
   }), true);
   assert.equal(isAutomatedCampaignReply({
-    subject: 'Niet aanwezig Re: Kleine vraag over jullie website',
-    body: 'Momenteel heb ik vakantie, daardoor zal ik mijn mail minder vaak lezen en beantwoorden. Dringende vragen probeer ik zo snel mogelijk op te pakken.',
-  }), true);
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Whatsapp Re: Kleine vraag over jullie website',
-    body: 'Welkom bij Neelis Stikwerken. Als u een foto met de globale maten naar whatsapp stuurt, dan krijgt u van mij zo snel mogelijk een richtprijs.',
+    subject: 'Automatisch antwoord: Re: Kleine vraag over jullie website',
+    autoResponseSuppress: 'All',
   }), true);
   assert.equal(isAutomatedCampaignReply({
     subject: 'Bedankt voor je bericht',
-    preview: 'Het ontwerp ziet er goed uit. Kun je mij vertellen wat een nieuwe website ongeveer kost?',
-    body: 'Het ontwerp ziet er goed uit. Kun je mij vertellen wat een nieuwe website ongeveer kost?',
+    body: 'Het ontwerp ziet er goed uit; wat kost een nieuwe website?',
     autoSubmitted: 'no',
   }), false);
   assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: Kleine vraag over jullie website',
-    body: 'Ik heb momenteel vakantie, maar ik bekeek je ontwerp en wil graag weten wat een nieuwe website kost.',
+    subject: 'Vraag over automatisch antwoorden in Gmail',
+    body: 'Kun je uitleggen hoe ik dit zelf instel?',
   }), false);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Automatisch antwoord: Re: Kleine vraag over jullie website',
+    automatedReplyEvidenceKnown: true,
+    automatedReplyEvidence: false,
+    automatedReplyEvidenceSource: 'instantly:is_auto_reply',
+  }), false, 'providerbewijs dat is_auto_reply false is houdt het menselijke antwoord zichtbaar');
 });
 
 test('campaign mailbox koppelt een unieke nabije automatische reactie zonder RFC-referenties fail-closed', () => {
@@ -826,6 +860,7 @@ test('campaign mailbox koppelt een unieke nabije automatische reactie zonder RFC
     messageId: '<auto-reply@festivalcement.nl>',
     inReplyTo: '',
     references: '',
+    autoSubmitted: 'auto-generated',
   };
   const sent = {
     id: 'sent:festival-cement',
@@ -885,6 +920,7 @@ test('campaign reply service excludes duplicates and automatic replies before cu
           preview: 'Vanaf 2 juli tot en met 3 augustus 2026 is ons kantoor gesloten.',
           date: '2026-07-22T01:00:00.000Z',
           messageId: '<automatic-reply@example.nl>',
+          autoSubmitted: 'auto-replied',
         },
         {
           id: 'inbox:4',
@@ -894,6 +930,7 @@ test('campaign reply service excludes duplicates and automatic replies before cu
           preview: 'Beste lezer, wij hebben een nieuw e-mailadres. Dit bericht...',
           date: '2026-07-21T01:00:00.000Z',
           messageId: '<body-only-automatic-reply@example.nl>',
+          autoResponseSuppress: 'All',
         },
       ],
       hydrateMessageBodies: async ({ messages }) => messages.map((message) => (
@@ -927,7 +964,7 @@ test('campaign reply service excludes duplicates and automatic replies before cu
 
   const replies = await service.listReplies({ limit: 100 });
 
-  assert.deepEqual(lookedUpEmails.sort(), ['human@example.nl', 'leergeld@example.nl']);
+  assert.deepEqual(lookedUpEmails.sort(), ['human@example.nl']);
   assert.deepEqual(replies.map((message) => message.id), ['inbox:3']);
 });
 
@@ -1107,8 +1144,8 @@ test('campaign reply lineage blijft dicht voor onbekende ouders andere accounts 
     { ...base, id: 'inbox:unknown', email: 'unknown@example.test', messageId: '<unknown@example.test>', inReplyTo: '<missing-parent@softora.test>' },
     { ...base, id: 'inbox:invoice', email: 'invoice@example.test', messageId: '<invoice@example.test>', inReplyTo: nonCampaignParent.messageId },
     { ...base, id: 'inbox:loose', email: 'loose@example.test', messageId: '<loose@example.test>', inReplyTo: '' },
-    { ...base, id: 'inbox:auto', email: 'auto@example.test', messageId: '<auto@example.test>', inReplyTo: validParent.messageId, autoSubmitted: 'auto-replied', automatedReplyEvidence: true },
-    { ...base, id: 'inbox:bounce', email: 'mailer-daemon@example.test', messageId: '<bounce@example.test>', inReplyTo: validParent.messageId, subject: 'Delivery Status Notification (Failure)', automatedReplyEvidence: true },
+    { ...base, id: 'inbox:auto', email: 'auto@example.test', messageId: '<auto@example.test>', inReplyTo: validParent.messageId, autoSubmitted: 'auto-replied' },
+    { ...base, id: 'inbox:bounce', email: 'mailer-daemon@example.test', messageId: '<bounce@example.test>', inReplyTo: validParent.messageId, subject: 'Delivery Status Notification (Failure)', autoSubmitted: 'auto-generated' },
   ];
   let requestedMessageIds = [];
   let lookedUpEmails = [];
