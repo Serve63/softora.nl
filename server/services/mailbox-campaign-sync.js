@@ -516,8 +516,9 @@ function createMailboxSyncService({
       const readHealth = messages.syncReadHealth || {};
       const parseFailures = Array.isArray(readHealth.parseFailures) ? readHealth.parseFailures : [];
       const selectedCount = Math.max(messages.length, Number(readHealth.selectedCount) || 0);
+      const folderMissing = readHealth.folderMissing === true;
       const fastFetchCapReached = fastRefresh && selectedCount > CAMPAIGN_SYNC_FAST_FETCH_LIMIT;
-      const incomplete = fastFetchCapReached || parseFailures.length > 0;
+      const incomplete = folderMissing || fastFetchCapReached || parseFailures.length > 0;
       if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
         const invalidation = await invalidateCampaignSnapshot({
           source: 'mailbox-index-upsert',
@@ -540,9 +541,11 @@ function createMailboxSyncService({
         lockToken: lock.lockToken,
         messageCount: messages.length,
         lastUid,
-        ...(incomplete ? { error: fastFetchCapReached
-          ? 'Mailbox fast-refresh fetchlimiet bereikt.'
-          : `Mailbox parsefouten: ${parseFailures.map((failure) => `${failure.uid}:${failure.code}`).join(', ')}` } : {}),
+        ...(incomplete ? { error: folderMissing
+          ? 'Mailboxmap ontbreekt bij de IMAP-provider.'
+          : fastFetchCapReached
+            ? 'Mailbox fast-refresh fetchlimiet bereikt.'
+            : `Mailbox parsefouten: ${parseFailures.map((failure) => `${failure.uid}:${failure.code}`).join(', ')}` } : {}),
         signal: folderDeadline.signal,
       });
       if (!finish || finish.ok === false) {
@@ -557,16 +560,21 @@ function createMailboxSyncService({
         degraded: incomplete,
         statusCode: incomplete ? 207 : 200,
         ...(incomplete ? {
-          reason: fastFetchCapReached ? 'fetch_cap_reached' : 'message_parse_failed',
-          code: fastFetchCapReached
-            ? 'MAILBOX_SYNC_FETCH_TRUNCATED'
-            : 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL',
+          reason: folderMissing
+            ? 'folder_missing'
+            : fastFetchCapReached ? 'fetch_cap_reached' : 'message_parse_failed',
+          code: folderMissing
+            ? 'MAILBOX_SYNC_FOLDER_MISSING'
+            : fastFetchCapReached
+              ? 'MAILBOX_SYNC_FETCH_TRUNCATED'
+              : 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL',
         } : {}),
         account: account.email,
         folder: normalizedFolder,
         synced: messages.length,
         upserted,
         failedMessageCount: parseFailures.length,
+        folderMissing,
         failedUids: parseFailures.map((failure) => failure.uid),
         parseFailures,
         historyBackfill: Boolean(campaignOnly && !incrementalOnly),

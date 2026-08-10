@@ -14,6 +14,12 @@ function getSourceBytes(source) {
   return Number(source?.length) || 0;
 }
 
+function attachMailboxSyncReadHealth(messages, health = {}) {
+  const source = Array.isArray(messages) ? messages : [];
+  Object.defineProperty(source, 'syncReadHealth', { value: Object.freeze({ ...health }) });
+  return source;
+}
+
 function createMailboxImapMessageParser({
   parseMailSource,
   normalizeString,
@@ -105,5 +111,6 @@ function createMailboxImapMessageParser({
 module.exports = {
   MAILBOX_IMAP_PARSE_TIMEOUT_MS,
   MAILBOX_IMAP_SOURCE_MAX_BYTES,
+  attachMailboxSyncReadHealth,
   createMailboxImapMessageParser,
 };

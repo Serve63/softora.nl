@@ -2503,6 +2503,43 @@ test('mailbox service returns an empty list when an optional folder is missing',
   assert.deepEqual(client.lockedMailboxes, []);
 });
 
+test('mailbox sync noemt een ontbrekende providermap nooit compleet of vers', async () => {
+  const finishCalls = [];
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    createImapClient: () => createFakeImapClient({
+      boxes: [{ path: 'INBOX' }],
+      messagesByMailbox: { INBOX: [] },
+    }),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'missing-folder-lock' }),
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+      finishSync: async (options) => { finishCalls.push(options); return { ok: true }; },
+    },
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'sent', force: true,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.partial, true);
+  assert.equal(result.folderMissing, true);
+  assert.equal(result.reason, 'folder_missing');
+  assert.equal(result.code, 'MAILBOX_SYNC_FOLDER_MISSING');
+  assert.match(finishCalls[0].error, /mailboxmap ontbreekt/i);
+});
+
 test('mailbox service derives imap settings from smtp settings when possible', async () => {
   const service = createMailboxService({
     mailConfig: {
