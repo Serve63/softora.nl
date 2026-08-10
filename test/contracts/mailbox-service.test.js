@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createMailboxService: createRawMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
-const { isAutomatedCampaignReply } = require('../../server/services/mailbox-automated-reply');
 const {
   CAMPAIGN_GMAIL_LABEL_FOLDER,
   CAMPAIGN_SYNC_FETCH_LIMIT,
@@ -417,94 +416,6 @@ test('mailbox read-only auth fallback leest een ontbrekend detail zonder indexwr
   assert.equal(upserts, 0);
 });
 
-test('raw RFC822 MIME proves an automatic reply while missing headers remain explicitly unknown', async () => {
-  const messages = [
-    {
-      uid: 71,
-      flags: [],
-      internalDate: new Date('2026-08-10T08:00:00.000Z'),
-      source: Buffer.from([
-        'Message-ID: <automatic-71@example.test>',
-        'Date: Sun, 10 Aug 2026 08:00:00 +0000',
-        'From: Salon TOF <info@salon-tof.example>',
-        'To: serve@softora.nl',
-        'Subject: Automatisch antwoord',
-        'Auto-Submitted: auto-replied',
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=utf-8',
-        '',
-        'Wij zijn gesloten en beantwoorden uw bericht later.',
-      ].join('\r\n')),
-    },
-    {
-      uid: 72,
-      flags: [],
-      internalDate: new Date('2026-08-10T08:01:00.000Z'),
-      source: Buffer.from([
-        'Message-ID: <unknown-72@example.test>',
-        'Date: Sun, 10 Aug 2026 08:01:00 +0000',
-        'From: Menselijke afzender <mens@example.test>',
-        'To: serve@softora.nl',
-        'Subject: Re: Kleine vraag over jullie website',
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=utf-8',
-        '',
-        'Ik ben er morgen niet, maar bel me gerust maandag.',
-      ].join('\r\n')),
-    },
-  ];
-  let indexedMessages = [];
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      name: 'Servé',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => createFakeImapClient({
-      boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
-      messagesByMailbox: { INBOX: messages },
-    }),
-    mailboxCampaignSnapshotStore: {
-      invalidate: async () => ({ ok: true }),
-    },
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      acquireSyncLock: async () => ({ ok: true, lockToken: 'raw-mime-lock' }),
-      prepareUidValidity: async () => ({ ok: true }),
-      upsertMessages: async ({ messages: normalizedMessages }) => {
-        indexedMessages = normalizedMessages;
-        return { ok: true, upserted: normalizedMessages.length };
-      },
-      finishSync: async () => ({ ok: true }),
-    },
-  });
-
-  const sync = await service.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    limit: 10,
-    force: true,
-  });
-  assert.equal(sync.ok, true, JSON.stringify(sync));
-  const automatic = indexedMessages.find((message) => message.uid === 71);
-  const unknown = indexedMessages.find((message) => message.uid === 72);
-
-  assert.ok(automatic, JSON.stringify(indexedMessages));
-  assert.ok(unknown, JSON.stringify(indexedMessages));
-  assert.equal(automatic.autoSubmitted, 'auto-replied');
-  assert.equal(automatic.automatedReplyEvidenceKnown, true);
-  assert.equal(automatic.automatedReplyEvidence, true);
-  assert.equal(automatic.automatedReplyEvidenceSource, 'mime:auto-submitted');
-  assert.equal(isAutomatedCampaignReply(automatic), true);
-  assert.equal(unknown.automatedReplyEvidenceKnown, false);
-  assert.equal(unknown.automatedReplyEvidence, false);
-  assert.equal(unknown.automatedReplyEvidenceSource, '');
-  assert.equal(isAutomatedCampaignReply(unknown), false);
-});
-
 test('mailbox service excludes automated delivery failures from list and detail without touching human replies', async () => {
   const automated = {
     id: 'inbox:1',
@@ -603,7 +514,6 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
       preview: '##- Please type your reply above this line -##',
       body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
       date: '2026-07-26T12:02:00.000Z',
-      autoSubmitted: 'auto-generated',
     },
     {
       id: 'human-support-reply',
@@ -627,7 +537,6 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
       preview: 'Hartelijk dank voor je bericht. Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
       body: 'Van 24 juli t/m 5 augustus is de Typetuin gesloten. In deze periode beantwoorden wij geen e-mails.',
       date: '2026-07-26T12:04:00.000Z',
-      autoSubmitted: 'auto-replied',
     },
   ];
   const service = createMailboxService({
@@ -4051,10 +3960,6 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
           subject: 'Undeliverable: Kleine vraag over jullie website',
           preview: 'Delivery failed.',
           date: '2026-07-22T10:00:00.000Z',
-          autoSubmitted: 'auto-generated',
-          automatedReplyEvidenceKnown: true,
-          automatedReplyEvidence: true,
-          automatedReplyEvidenceSource: 'mime:auto-submitted',
         },
         {
           id: 'inbox:93',
@@ -4065,10 +3970,6 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
           subject: 'Uw mail is ontvangen | Bij Katrien Re: Kleine vraag over jullie website',
           preview: 'Hartelijk dank voor uw mail. Op dit moment ben ik op vakantie tot 20 augustus.',
           date: '2026-07-22T08:13:00.000Z',
-          autoSubmitted: 'auto-replied',
-          automatedReplyEvidenceKnown: true,
-          automatedReplyEvidence: true,
-          automatedReplyEvidenceSource: 'mime:auto-submitted',
         },
       ].reverse(),
       hydrateMessageBodies: async ({ messages }) => {

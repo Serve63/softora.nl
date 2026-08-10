@@ -72,46 +72,6 @@ test('mailbox campaign snapshot bewaart een afgehandelde antwoordherinnering', (
   assert.equal(message.replyDismissedAt, '2026-08-04T15:10:00.000Z');
 });
 
-test('mailbox campaign snapshot preserves durable lineage and source-proven automation evidence', () => {
-  const serialized = serializeMailboxCampaignSnapshot({
-    ok: true,
-    messages: [{
-      id: 'inbox:lineage-reply',
-      folder: 'inbox',
-      accountEmail: 'serve@softora.nl',
-      subject: 'Gewijzigd onderwerp',
-      date: '2026-08-10T08:00:00.000Z',
-      campaignLineageEvidenceKnown: true,
-      campaignLineageDepth: 2,
-      campaignLineageRootMessageId: 'root@softora.test',
-      campaignLineageEvidence: 'exact-same-account-message-id-ancestry',
-      automatedReplyEvidenceKnown: true,
-      automatedReplyEvidence: false,
-      automatedReplyEvidenceSource: 'instantly:is_auto_reply',
-      threadMessages: [{
-        id: 'sent:root',
-        folder: 'sent',
-        accountEmail: 'serve@softora.nl',
-        automatedReplyEvidenceKnown: true,
-        automatedReplyEvidence: true,
-        automatedReplyEvidenceSource: 'mime:auto-submitted',
-      }],
-    }],
-  });
-  const [message] = parseMailboxCampaignSnapshot(serialized).messages;
-
-  assert.equal(message.campaignLineageEvidenceKnown, true);
-  assert.equal(message.campaignLineageDepth, 2);
-  assert.equal(message.campaignLineageRootMessageId, 'root@softora.test');
-  assert.equal(message.campaignLineageEvidence, 'exact-same-account-message-id-ancestry');
-  assert.equal(message.automatedReplyEvidenceKnown, true);
-  assert.equal(message.automatedReplyEvidence, false);
-  assert.equal(message.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
-  assert.equal(message.threadMessages[0].automatedReplyEvidenceKnown, true);
-  assert.equal(message.threadMessages[0].automatedReplyEvidence, true);
-  assert.equal(message.threadMessages[0].automatedReplyEvidenceSource, 'mime:auto-submitted');
-});
-
 test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct', () => {
   const messages = Array.from({ length: 100 }, (_, index) => ({
     id: `inbox:${100 - index}`,

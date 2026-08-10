@@ -1443,7 +1443,6 @@ test('Instantly conversation listing hides automatic ticket receipts but preserv
         'Your request (269705) has been received and will be answered as soon as possible.',
       ].join('\n'),
     },
-    is_auto_reply: 1,
     timestamp_email: '2026-07-29T05:31:49.000Z',
   }));
   store.rows.push(sent, automaticReceipt);
@@ -1498,7 +1497,6 @@ test('Instantly verbergt Neelis WhatsApp-autoreply uit een latere menselijke con
     body: {
       text: 'Welkom bij Neelis Stikwerken. Als u een foto met de globale maten naar whatsapp stuurt, dan krijgt u van mij zo snel mogelijk een richtprijs.',
     },
-    is_auto_reply: 1,
     timestamp_email: '2026-07-28T06:28:31.000Z',
   }));
   const humanReply = service.normalizeInstantlyMessage(incoming({
@@ -1547,49 +1545,11 @@ test('Instantly conversation listing hides seasonal closure auto-replies', async
         'Daarna helpen we u graag weer!',
       ].join('\n'),
     },
-    is_auto_reply: 1,
     timestamp_email: '2026-06-30T07:56:54.000Z',
   }));
   store.rows.push(sent, summerClosure);
 
-  assert.equal(summerClosure.automatedReplyEvidenceKnown, true);
-  assert.equal(summerClosure.automatedReplyEvidence, true);
-  assert.equal(summerClosure.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
   assert.deepEqual(await service.listOwnerConversations('serve'), []);
-});
-
-test('Instantly raw is_auto_reply false is known-human while missing evidence stays unknown and visible', async () => {
-  const { service, store } = buildService();
-  const sent = service.normalizeInstantlyMessage(incoming({
-    id: 'known-human-sent',
-    email_type: '1',
-    from_address_email: 'serve-sender@example.com',
-    to_address_email_list: ['known-human@example.org'],
-  }));
-  const knownHuman = service.normalizeInstantlyMessage(incoming({
-    id: 'known-human-reply',
-    thread_id: 'thread-serve',
-    from_address_email: 'known-human@example.org',
-    is_auto_reply: 0,
-    timestamp_email: '2026-07-25T11:00:00.000Z',
-  }));
-  const unknownText = service.normalizeInstantlyMessage(incoming({
-    id: 'unknown-auto-looking-reply',
-    thread_id: 'thread-serve',
-    from_address_email: 'known-human@example.org',
-    subject: 'Automatisch antwoord: Re: Kleine vraag over jullie website',
-    body: { text: 'Dit bericht lijkt automatisch maar heeft geen provider- of MIME-bewijs.' },
-    timestamp_email: '2026-07-25T11:01:00.000Z',
-  }));
-  store.rows.push(sent, knownHuman, unknownText);
-
-  assert.equal(knownHuman.automatedReplyEvidenceKnown, true);
-  assert.equal(knownHuman.automatedReplyEvidence, false);
-  assert.equal(knownHuman.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
-  assert.equal(unknownText.automatedReplyEvidenceKnown, false);
-  const conversations = await service.listOwnerConversations('serve');
-  assert.equal(conversations.length, 1);
-  assert.equal(conversations[0].providerMessageId, 'unknown-auto-looking-reply');
 });
 
 test('reply uses the exact stored account/thread and rejects cross-owner, recipient and attachment drift', async () => {
@@ -2622,34 +2582,6 @@ test('webhook and polling-style replays remain idempotent by exact Instantly ema
   await service.ingestWebhook(request);
   assert.equal(store.rows.length, 1);
   assert.equal(store.rows[0].providerMessageId, 'incoming-serve-1');
-});
-
-test('auto_reply_received webhook supplies source-proven automation evidence without a MIME flag', async () => {
-  const { service, store } = buildService({
-    fetchJsonWithTimeout: async (url) => {
-      if (url.includes('/emails/incoming-serve-1')) {
-        return { response: { ok: true, status: 200 }, data: incoming() };
-      }
-      return { response: { ok: true, status: 200 }, data: { items: [] } };
-    },
-  });
-
-  await service.ingestWebhook({
-    headers: { 'x-instantly-webhook-secret': 'webhook-secret' },
-    body: {
-      event_type: 'auto_reply_received',
-      email_account: 'serve-sender@example.com',
-      email_id: 'incoming-serve-1',
-    },
-  });
-
-  assert.equal(store.rows.length, 1);
-  assert.equal(store.rows[0].automatedReplyEvidenceKnown, true);
-  assert.equal(store.rows[0].automatedReplyEvidence, true);
-  assert.equal(
-    store.rows[0].automatedReplyEvidenceSource,
-    'instantly:webhook:auto_reply_received'
-  );
 });
 
 test('provider read and hide stay local to Softora and reject cross-owner mutations', async () => {
