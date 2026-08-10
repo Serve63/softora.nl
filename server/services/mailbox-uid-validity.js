@@ -14,6 +14,46 @@ function normalizeMailboxUidValidity(value) {
     : 0;
 }
 
+function createMailboxUidValidityError(code, message, status = 409) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  return error;
+}
+
+function requireMailboxUidValidity(value) {
+  const uidValidity = normalizeMailboxUidValidity(value);
+  if (!uidValidity) {
+    throw createMailboxUidValidityError(
+      'MAILBOX_UIDVALIDITY_REQUIRED',
+      'De mailboxactie mist de exacte UIDVALIDITY-generatie; ververs de mailbox en probeer opnieuw.'
+    );
+  }
+  return uidValidity;
+}
+
+function assertMailboxClientUidValidity(client, requestedValue) {
+  const requested = requireMailboxUidValidity(requestedValue);
+  const current = normalizeMailboxUidValidity(client?.mailbox?.uidValidity);
+  if (!current) {
+    throw createMailboxUidValidityError(
+      'MAILBOX_UIDVALIDITY_UNAVAILABLE',
+      'De actuele UIDVALIDITY-generatie kon niet veilig worden vastgesteld.',
+      503
+    );
+  }
+  if (current !== requested) {
+    const error = createMailboxUidValidityError(
+      'MAILBOX_UIDVALIDITY_STALE',
+      'Dit mailboxbericht hoort bij een verouderde UIDVALIDITY-generatie; ververs de mailbox.'
+    );
+    error.requestedUidValidity = requested;
+    error.currentUidValidity = current;
+    throw error;
+  }
+  return current;
+}
+
 function buildMailboxGenerationMessageKey(accountEmail, folder, uid, uidValidity) {
   const normalizedEmail = String(accountEmail || '').trim().toLowerCase();
   const normalizedFolder = String(folder || 'inbox').trim().toLowerCase() || 'inbox';
@@ -43,7 +83,10 @@ function resolveMailboxBatchUidValidity(messages = [], requestedValue = 0) {
 
 module.exports = {
   MAILBOX_UIDVALIDITY_MAX,
+  assertMailboxClientUidValidity,
   buildMailboxGenerationMessageKey,
+  createMailboxUidValidityError,
   normalizeMailboxUidValidity,
+  requireMailboxUidValidity,
   resolveMailboxBatchUidValidity,
 };
