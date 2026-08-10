@@ -159,32 +159,28 @@
     setText('[data-health-last-sync]', formatDate(status.lastSyncCompletedAt, true));
     setText('[data-health-last-day]', status.lastSyncedDay);
     if (!status.configured) setStatus('error', 'WHOOP-app is nog niet volledig geconfigureerd.');
-    else if (!status.connected) setStatus('', 'Koppel je WHOOP één keer; daarna loopt de import dagelijks automatisch om 08:00.');
+    else if (status.needsReauthorization) setStatus('error', 'WHOOP-toegang is verlopen en wordt opnieuw gekoppeld.');
+    else if (!status.connected) setStatus('', 'WHOOP is nog niet gekoppeld.');
     else if (status.lastSyncError) setStatus('error', 'WHOOP is gekoppeld, maar de laatste sync gaf: ' + status.lastSyncError);
-    else setStatus('connected', 'WHOOP gekoppeld · de data van gisteren wordt dagelijks om 08:00 bijgewerkt.');
+    else setStatus('connected', 'WHOOP gekoppeld · je recovery wordt zodra WHOOP hem berekent automatisch bijgewerkt; 12:00 is het vangnet.');
     if (status.connected) renderData(await request('/api/health/whoop/data?days=90'));
     return status;
   }
 
-  async function sync(mode) {
-    setStatus('', mode === 'backfill' ? 'Volledige WHOOP-geschiedenis wordt ingeladen…' : 'WHOOP-data wordt bijgewerkt…');
-    try {
-      var result = await request('/api/health/whoop/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: mode || 'manual' })
-      });
-      setStatus('connected', 'Bijgewerkt: ' + (result.records || 0) + ' WHOOP-records verwerkt en naar de spreadsheet geschreven.');
-      await load();
-    } catch (error) {
-      setStatus('error', error.message);
-    }
+  async function startReauthorization() {
+    setStatus('', 'WHOOP-toegang wordt veilig vernieuwd…');
+    var result = await request('/api/health/whoop/authorize');
+    if (!result.authorizationUrl) throw new Error('WHOOP gaf geen autorisatielink terug.');
+    window.location.assign(result.authorizationUrl);
   }
 
   var params = new URLSearchParams(window.location.search);
   var whoopResult = params.get('whoop');
   load().then(function (status) {
-    if (whoopResult === 'connected' && status.connected) return sync('backfill');
+    if (status.needsReauthorization && whoopResult !== 'error') return startReauthorization();
+    if (whoopResult === 'connected' && status.connected) {
+      setStatus('connected', 'WHOOP opnieuw gekoppeld · gemiste dagen worden automatisch ingehaald.');
+    }
     if (whoopResult === 'error') setStatus('error', params.get('message') || 'WHOOP-koppeling afgebroken.');
   }).catch(function (error) {
     setStatus('error', error.message);
