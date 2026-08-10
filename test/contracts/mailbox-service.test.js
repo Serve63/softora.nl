@@ -98,6 +98,7 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   const fetchOptions = [];
   return {
     usable: true,
+    mailbox: { uidValidity: 777 },
     lockedMailboxes: [],
     appendedMessages,
     movedMessages,
@@ -154,6 +155,25 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
       this.usable = false;
     },
   };
+}
+
+function withSyncReadHealth(messages = [], overrides = {}) {
+  const selectedUids = messages.map((message) => Number(message?.uid) || 0).filter(Boolean);
+  Object.defineProperty(messages, 'syncReadHealth', {
+    configurable: true,
+    value: {
+      uidValidity: 777,
+      folderMissing: false,
+      parseFailures: [],
+      selectedUids,
+      yieldedUids: selectedUids,
+      missingUids: [],
+      selectedCount: selectedUids.length,
+      yieldedCount: selectedUids.length,
+      ...overrides,
+    },
+  });
+  return messages;
 }
 
 function createOutboundGuardStore(calls = [], overrides = {}) {
@@ -2245,8 +2265,7 @@ test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink ui
   assert.equal(message.body.toLowerCase().includes('<script'), false);
   assert.equal(message.webdesignLinkEvidenceKnown, true);
   assert.equal(message.webdesignLinkUrl, exactUrl);
-  assert.equal(upserts.length, 1);
-  assert.equal(upserts[0].messages[0].webdesignLinkUrl, exactUrl);
+  assert.equal(upserts.length, 0);
 });
 
 test('mailbox service exposes hidden coldmail opt-out links for clickable mail previews', async () => {
@@ -3429,7 +3448,7 @@ test('mailbox live fallback breekt een hangende IMAP-read hard af op de lijstdea
   assert.equal(closeCalls, 1);
 });
 
-test('mailbox list response returns stale indexed messages immediately without live IMAP', async () => {
+test('mailbox list response marks an error-status index stale without blocking on live IMAP', async () => {
   let imapCalls = 0;
   const service = createMailboxService({
     logger: { error() {} },
@@ -3461,9 +3480,9 @@ test('mailbox list response returns stale indexed messages immediately without l
       ],
       getSyncState: async () => ({
         last_synced_at: '2026-05-20T11:00:00.000Z',
-        status: 'ok',
+        status: 'error',
       }),
-      isSyncStateStale: () => true,
+      isSyncStateStale: () => false,
     },
     createImapClient: () => {
       imapCalls += 1;
@@ -3481,6 +3500,7 @@ test('mailbox list response returns stale indexed messages immediately without l
   assert.equal(res.body.messages.length, 1);
   assert.equal(res.body.messages[0].subject, 'Cached mail');
   assert.equal(res.body.sync.source, 'index');
+  assert.equal(res.body.sync.status, 'error');
   assert.equal(res.body.sync.stale, true);
   assert.equal(res.body.sync.refreshRecommended, true);
   assert.equal(res.body.sync.warming, false);
@@ -3822,7 +3842,7 @@ test('signed-token mailbox detail and image fallback never upsert the mailbox in
   }, normalDetailResponse);
 
   assert.equal(normalDetailResponse.statusCode, 200);
-  assert.equal(upserts, 1);
+  assert.equal(upserts, 0);
 });
 
 test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
@@ -4129,6 +4149,7 @@ test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gma
       isAvailable: () => true,
       listMessages: async () => [],
       acquireSyncLock: async () => ({ ok: true, lockToken: 'gmail-label-lock' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       listMessageUidsForAccount: async () => [],
       upsertMessages: async (options) => {
         upserts.push(options);
@@ -4216,7 +4237,7 @@ test('campaign mailbox sync journaliseert IMAP-read en abortbare indexwrite in �
     canUseMailboxIndex: () => true,
     fetchMessagesFromImap: async (options) => {
       fetchSignal = options.signal;
-      return [{ uid: 91, id: 'inbox:91' }];
+      return withSyncReadHealth([{ uid: 91, id: 'inbox:91' }]);
     },
     getSafeLimit: (limit) => limit,
     getAccounts: () => [],
@@ -4258,6 +4279,8 @@ test('campaign mailbox sync journaliseert IMAP-read en abortbare indexwrite in �
   assert.equal(writes[0].signal, controller.signal);
   assert.equal(writes[0].mutationId, '55555555-5555-4555-8555-555555555555');
   assert.equal(writes[0].requestKey, runnerOptions.requestKey);
+  assert.equal(writes[0].syncLockToken, 'journal-lock');
+  assert.equal(writes[0].uidValidity, 777);
   assert.equal(activeChecks, 2);
 });
 
@@ -4388,6 +4411,7 @@ test('één poison MIME quarantaint alleen die UID en laat latere gezonde replie
       isAvailable: () => true,
       listMessages: async () => [],
       acquireSyncLock: async () => ({ ok: true, lockToken: `poison-lock-${finishes.length}` }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       listMessageUidsForAccount: async () => [],
       upsertMessages: async (options) => {
         upserts.push(options.messages.map((message) => message.uid));
@@ -4407,7 +4431,7 @@ test('één poison MIME quarantaint alleen die UID en laat latere gezonde replie
     incrementalOnly: true, fastRefresh: true, force: true,
   });
 
-  assert.deepEqual(upserts.map((uids) => uids.slice().sort()), [[1, 3], [1, 3]]);
+  assert.deepEqual(upserts.map((uids) => uids.slice().sort()), [[1, 2, 3], [1, 2, 3]]);
   assert.deepEqual(first.failedUids, [2]);
   assert.equal(first.failedMessageCount, 1);
   assert.equal(first.partial, true);
@@ -4417,6 +4441,212 @@ test('één poison MIME quarantaint alleen die UID en laat latere gezonde replie
   assert.equal(second.partial, true);
   assert.equal(parsedUids.filter((uid) => uid === 2).length, 1);
   assert.match(finishes[0].error, /2:MIME_CORRUPT/);
+  assert.equal(Object.prototype.hasOwnProperty.call(finishes[0], 'messageCount'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(finishes[0], 'lastUid'), false);
+});
+
+test('een tijdens fetch verdwenen geselecteerde UID blijft expliciet partial en kan geen cursor afronden', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
+    messagesByMailbox: {
+      INBOX: [{
+        uid: 101,
+        flags: [],
+        internalDate: new Date('2026-08-09T20:01:00.000Z'),
+        source: Buffer.from('uid:101'),
+      }],
+    },
+  });
+  client.search = async (query, options) => {
+    client.searchQueries.push(query);
+    client.searchOptions.push(options);
+    return [101, 102];
+  };
+  const upserts = [];
+  const finishes = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    createImapClient: () => client,
+    setUiStateValues: async () => ({ source: 'supabase' }),
+    parseMailSource: async () => ({
+      messageId: '<uid-101@example.test>',
+      subject: 'Re: Kleine vraag',
+      text: 'Gezonde reply 101',
+      from: { value: [{ address: 'klant@example.test', name: 'Klant' }] },
+      to: { value: [{ address: 'serve@softora.nl', name: 'Servé' }] },
+      date: new Date('2026-08-09T20:01:00.000Z'),
+      attachments: [],
+    }),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'expunge-lock' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
+      listMessageUidsForAccount: async () => [],
+      upsertMessages: async (options) => {
+        upserts.push(options);
+        return { ok: true, upserted: options.messages.length };
+      },
+      finishSync: async (options) => {
+        finishes.push(options);
+        return { ok: true };
+      },
+    },
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    campaignOnly: true,
+    incrementalOnly: true,
+    force: true,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.partial, true);
+  assert.equal(result.complete, false);
+  assert.equal(result.freshnessConfirmed, false);
+  assert.equal(result.code, 'MAILBOX_SYNC_FETCH_INCOMPLETE');
+  assert.deepEqual(result.selectedUids.slice().sort((a, b) => a - b), [101, 102]);
+  assert.deepEqual(result.yieldedUids, [101]);
+  assert.deepEqual(result.missingUids, [102]);
+  assert.deepEqual(upserts[0].messages.map((message) => message.uid), [101]);
+  assert.match(finishes[0].error, /102/);
+  assert.equal(Object.prototype.hasOwnProperty.call(finishes[0], 'messageCount'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(finishes[0], 'lastUid'), false);
+});
+
+test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere gezonde refetch vervangt hem', async () => {
+  const indexed = new Map();
+  const finishes = [];
+  let lockSequence = 0;
+  const mailboxIndexStore = {
+    isAvailable: () => true,
+    listMessages: async () => Array.from(indexed.values()),
+    acquireSyncLock: async () => ({ ok: true, lockToken: `quarantine-lock-${++lockSequence}` }),
+    prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
+    listMessageUidsForAccount: async () => [],
+    upsertMessages: async ({ messages }) => {
+      messages.forEach((message) => indexed.set(message.uid, { ...message }));
+      return { ok: true, upserted: messages.length };
+    },
+    finishSync: async (options) => {
+      finishes.push(options);
+      return { ok: true };
+    },
+  };
+  const accountConfig = JSON.stringify([{
+    email: 'serve@softora.nl',
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+  }]);
+  const metadata = {
+    subject: 'Belangrijke aanvraag',
+    from: [{ name: 'Klant', address: 'klant@example.test' }],
+    to: [{ name: 'Servé', address: 'serve@softora.nl' }],
+    date: new Date('2026-08-09T20:42:00.000Z'),
+    messageId: '<oversized-42@example.test>',
+  };
+  const oversizedClient = createFakeImapClient({
+    boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
+    messagesByMailbox: {
+      INBOX: [
+        {
+          uid: 42,
+          flags: [],
+          internalDate: metadata.date,
+          envelope: metadata,
+          source: Buffer.alloc(15 * 1024 * 1024 + 1),
+        },
+        {
+          uid: 43,
+          flags: [],
+          internalDate: new Date('2026-08-09T20:43:00.000Z'),
+          source: Buffer.from('uid:43'),
+        },
+      ],
+    },
+  });
+  const parseMailSource = async (source) => {
+    const uid = Number(String(source).split(':')[1]);
+    return {
+      messageId: `<healthy-${uid}@example.test>`,
+      subject: uid === 42 ? 'Belangrijke aanvraag hersteld' : 'Gezonde buurmail',
+      text: `Gezonde inhoud ${uid}`,
+      from: { value: [{ address: 'klant@example.test', name: 'Klant' }] },
+      to: { value: [{ address: 'serve@softora.nl', name: 'Servé' }] },
+      date: new Date(`2026-08-09T20:${uid}:00.000Z`),
+      attachments: [],
+    };
+  };
+  const firstService = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: accountConfig,
+    createImapClient: () => oversizedClient,
+    setUiStateValues: async () => ({ source: 'supabase' }),
+    parseMailSource,
+    mailboxIndexStore,
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  const first = await firstService.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, force: true,
+  });
+  const placeholder = indexed.get(42);
+  assert.equal(first.partial, true);
+  assert.equal(first.code, 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL');
+  assert.equal(placeholder.parseStatus, 'quarantined');
+  assert.equal(placeholder.parseErrorCode, 'MAILBOX_MESSAGE_SOURCE_TOO_LARGE');
+  assert.equal(placeholder.subject, 'Belangrijke aanvraag');
+  assert.equal(placeholder.from, 'Klant <klant@example.test>');
+  assert.equal(placeholder.email, 'klant@example.test');
+  assert.equal(placeholder.date, '2026-08-09T20:42:00.000Z');
+  assert.equal(placeholder.providerMetadataEvidenceKnown, true);
+  assert.equal(placeholder.bodyUnavailable, true);
+  assert.equal(indexed.get(43).body, 'Gezonde inhoud 43');
+
+  const recoveredClient = createFakeImapClient({
+    boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
+    messagesByMailbox: {
+      INBOX: [{
+        uid: 42,
+        flags: [],
+        internalDate: metadata.date,
+        envelope: metadata,
+        source: Buffer.from('uid:42'),
+      }],
+    },
+  });
+  const recoveredService = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: accountConfig,
+    createImapClient: () => recoveredClient,
+    setUiStateValues: async () => ({ source: 'supabase' }),
+    parseMailSource,
+    mailboxIndexStore,
+    logger: { info() {}, warn() {}, error() {} },
+  });
+  const recovered = await recoveredService.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, force: true,
+  });
+
+  assert.equal(recovered.complete, true);
+  assert.equal(recovered.freshnessConfirmed, true);
+  assert.equal(indexed.get(42).subject, 'Belangrijke aanvraag hersteld');
+  assert.equal(indexed.get(42).body, 'Gezonde inhoud 42');
+  assert.equal(indexed.get(42).parseStatus, undefined);
+  assert.equal(indexed.get(42).bodyUnavailable, undefined);
+  assert.equal(finishes.length, 2);
 });
 
 test('campaign cron kan zonder verplichte mutation journal geen fetch of upsert starten', async () => {
@@ -4460,6 +4690,7 @@ test('campaign Gmail label sync records a failure and succeeds on the next force
   const service = createMailboxSyncService({
     mailboxIndexStore: {
       acquireSyncLock: async () => ({ ok: true, lockToken: `lock-${attempts + 1}` }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       listMessageUidsForAccount: async () => [],
       upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
       finishSync: async (options) => {
@@ -4479,7 +4710,7 @@ test('campaign Gmail label sync records a failure and succeeds on the next force
       assert.equal(campaignHistory, false);
       assert.deepEqual(indexedUids, []);
       if (attempts === 1) throw new Error('tijdelijke Gmail IMAP-fout');
-      return [{ uid: 91, id: 'coldmail:91' }];
+      return withSyncReadHealth([{ uid: 91, id: 'coldmail:91' }]);
     },
     getSafeLimit: (limit) => limit,
     getAccounts: () => [],
@@ -4545,6 +4776,7 @@ test('mailbox cron sync indexes a lightweight sent batch and reports the remaini
       isAvailable: () => true,
       listMessages: async () => [],
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-1' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       upsertMessages: async ({ messages }) => {
         upsertedCounts.push(messages.length);
         return { ok: true, upserted: messages.length };
@@ -4606,6 +4838,7 @@ test('campaign mailbox sync combines newest mail with missing historical convers
       isAvailable: () => true,
       listMessages: async () => [],
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-history' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       getOldestMatchingMessageUid: async (options) => {
         oldestLookup = options;
         return 91;
@@ -4654,7 +4887,7 @@ test('campaign mailbox sync combines newest mail with missing historical convers
   assert.deepEqual(client.searchOptions, [{ uid: true }, { uid: true }, { uid: true }]);
   assert.deepEqual(client.fetchOptions, [
     {
-      query: { uid: true, flags: true, internalDate: true, source: true },
+      query: { uid: true, flags: true, internalDate: true, envelope: true, source: true },
       options: { uid: true },
     },
   ]);
@@ -4722,6 +4955,7 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
         }];
       },
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-targeted-history' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
       getOldestMatchingMessageUid: async () => 91,
       upsertMessages: async ({ messages }) => {
         upsertedUids = messages.map((message) => message.uid);
