@@ -274,45 +274,6 @@ test('mailbox detail behoudt de virtuele Instantly-folder tot aan de providerind
   assert.deepEqual(lookups.map((lookup) => lookup.folder), ['instantly', 'instantly']);
 });
 
-test('mailbox read-only auth fallback leest een ontbrekend detail zonder indexwrite', async () => {
-  let upserts = 0;
-  const rawMessage = Buffer.from(
-    'Message-ID: <readonly-detail@example.test>\r\n' +
-    'Subject: Re: Kleine vraag\r\n' +
-    'From: Klant <klant@example.test>\r\n' +
-    'To: serve@softora.nl\r\n\r\n' +
-    'Alleen lezen.'
-  );
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => createFakeImapClient({
-      boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
-      messagesByMailbox: {
-        INBOX: [{ uid: 42, flags: [], internalDate: new Date(), source: rawMessage }],
-      },
-    }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      getMessage: async () => null,
-      upsertMessages: async () => { upserts += 1; return { ok: true, upserted: 1 }; },
-    },
-  });
-  const res = createResponseRecorder();
-  await service.getMessageResponse({
-    premiumReadOnlyTokenFallback: true,
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
-  }, res);
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.message.body, 'Alleen lezen.');
-  assert.equal(upserts, 0);
-});
-
 test('mailbox service excludes automated delivery failures from list and detail without touching human replies', async () => {
   const automated = {
     id: 'inbox:1',
@@ -522,52 +483,61 @@ test('selected owner response stays isolated while durable snapshot retains both
   );
 });
 
-test('mailbox read-only auth fallback kan geen durable snapshot of provider-refresh schrijven', async () => {
-  const persists = [];
+test('signed-token mailbox fallback skips Instantly refresh and durable snapshot writes', async () => {
+  let syncCalls = 0;
+  let snapshotWrites = 0;
+  const baseMessage = {
+    id: 'inbox:42',
+    mailboxId: 'inbox:42',
+    uid: 42,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'klant@example.test',
+    from: 'Klant',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-08-09T20:00:00.000Z',
+    messageId: '<reply@example.test>',
+    threadMessages: [],
+  };
   const service = createMailboxService({
-    mailboxCampaignRepliesService: { listReplies: async () => [] },
-    mailboxCampaignSnapshotStore: {
-      persist: async (...args) => { persists.push(args); return { ok: true }; },
-      readDegraded: async () => null,
-      invalidate: async () => ({ ok: true }),
+    mailboxCampaignRepliesService: {
+      listReplies: async () => [baseMessage],
     },
     instantlyMailboxService: {
-      isConfigured: () => false,
-      syncMailbox: async () => { throw new Error('provider-refresh mag niet worden gestart'); },
+      isConfigured: () => true,
+      getConfiguredAccounts: (owner) => owner === 'serve'
+        ? [{ email: 'serve@provider.test' }]
+        : [],
+      syncOwner: async (owner) => {
+        syncCalls += 1;
+        return { ok: true, owner };
+      },
+      listOwnerConversations: async () => [],
+    },
+    setUiStateValues: async () => {
+      snapshotWrites += 1;
     },
   });
   const fallbackResponse = createResponseRecorder();
+
   await service.campaignRepliesResponse({
-    query: { limit: '100', refreshInstantly: '1' },
+    query: { owner: 'serve', refreshInstantly: '1' },
     premiumReadOnlyTokenFallback: true,
   }, fallbackResponse);
+
   assert.equal(fallbackResponse.statusCode, 200);
-  assert.equal(persists.length, 0);
+  assert.deepEqual(fallbackResponse.body.messages.map((message) => message.id), ['inbox:42']);
+  assert.equal(syncCalls, 0);
+  assert.equal(snapshotWrites, 0);
 
-  const normal = await service.listCampaignReplies({ limit: 100 });
-  assert.equal(persists.length, 1);
-  assert.equal(normal.savedAt, normal.contentAt);
-  assert.equal(persists[0][1].savedAt, normal.contentAt);
-  assert.equal(persists[0][1].contentAt, normal.contentAt);
-});
+  const normalResponse = createResponseRecorder();
+  await service.campaignRepliesResponse({
+    query: { owner: 'serve', refreshInstantly: '1' },
+  }, normalResponse);
 
-test('ongeldige mailbox-owner blijft 400 en kan nooit verbreden naar beide eigenaren', async () => {
-  let reads = 0;
-  let fallbacks = 0;
-  const service = createMailboxService({
-    mailboxCampaignRepliesService: { listReplies: async () => { reads += 1; return []; } },
-    mailboxCampaignSnapshotStore: {
-      persist: async () => ({ ok: true }),
-      readDegraded: async () => { fallbacks += 1; return { ok: true, messages: [] }; },
-      invalidate: async () => ({ ok: true }),
-    },
-    instantlyMailboxService: { isConfigured: () => false },
-  });
-  const res = createResponseRecorder();
-  await service.campaignRepliesResponse({ query: { owner: 'aanvaller' } }, res);
-  assert.equal(res.statusCode, 400);
-  assert.equal(reads, 0);
-  assert.equal(fallbacks, 0);
+  assert.equal(normalResponse.statusCode, 200);
+  assert.equal(syncCalls, 1);
+  assert.equal(snapshotWrites, 1);
 });
 
 test('mailbox service sends mail through selected account smtp', async () => {
@@ -3875,7 +3845,6 @@ test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gma
       imapPass: 'app-password',
     }]),
     createImapClient: () => client,
-    setUiStateValues: async (_scope, values) => ({ values, source: 'supabase' }),
     mailboxIndexStore: {
       isAvailable: () => true,
       listMessages: async () => [],

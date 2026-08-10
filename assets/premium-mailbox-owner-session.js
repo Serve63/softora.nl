@@ -1,8 +1,6 @@
 (function (global) {
   'use strict';
 
-  const MAILBOX_STALE_STATUS = 'Mailbox niet live · getoonde gegevens zijn verouderd · nieuwe berichten kunnen ontbreken';
-
   function normalize(value) {
     return String(value || '').trim().toLowerCase();
   }
@@ -88,90 +86,6 @@
     });
   }
 
-  function getSnapshotFreshnessApi() {
-    if (global.PremiumMailboxSnapshotFreshness) return global.PremiumMailboxSnapshotFreshness;
-    if (global.SoftoraMailboxSnapshotFreshness) return global.SoftoraMailboxSnapshotFreshness;
-    if (typeof module === 'undefined' || !module.exports) return null;
-    try {
-      return require('./premium-mailbox-snapshot-freshness.js');
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function getSnapshotContentAt(snapshot) {
-    const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
-    const value = source.contentAt || source.sync?.contentAt;
-    return Number.isFinite(Date.parse(String(value || ''))) ? String(value) : '';
-  }
-
-  function isDegradedSnapshot(snapshot) {
-    const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
-    return source.complete === false || source.degraded === true || source.sync?.stale === true ||
-      source.sync?.degraded === true;
-  }
-
-  function toSnapshot(result, messages, fallbackOrigin = 'live-api') {
-    const source = result && typeof result === 'object' ? result : {};
-    const sync = source.sync && typeof source.sync === 'object' ? source.sync : {};
-    const origin = String(source.origin || sync.origin || fallbackOrigin || 'live-api').trim() || 'live-api';
-    const contentAt = getSnapshotContentAt(source);
-    const complete = source.complete === false ? false : !isDegradedSnapshot(source);
-    return {
-      ...source,
-      messages: Array.isArray(messages) ? messages : [],
-      origin,
-      contentAt,
-      complete,
-      sync: { ...sync, origin, ...(contentAt ? { contentAt } : {}) },
-    };
-  }
-
-  function decideSnapshotUpdate(current, incoming) {
-    const currentContentAt = getSnapshotContentAt(current);
-    const incomingContentAt = getSnapshotContentAt(incoming);
-    if (!incomingContentAt) {
-      return currentContentAt ? 'reject' : 'replace';
-    }
-    const api = getSnapshotFreshnessApi();
-    if (typeof api?.decideSnapshotUpdate === 'function') {
-      const decision = api.decideSnapshotUpdate({ current, incoming });
-      const action = typeof decision === 'string' ? decision : decision?.action;
-      if (action === 'replace' || action === 'merge-additive' || action === 'reject') return action;
-    }
-    if (!currentContentAt || !Array.isArray(current?.messages) || !current.messages.length) {
-      return incoming.complete === false ? 'merge-additive' : 'replace';
-    }
-    const currentTime = Date.parse(currentContentAt);
-    const incomingTime = Date.parse(incomingContentAt);
-    if (incomingTime < currentTime) return 'reject';
-    if (incoming.complete === false) return 'merge-additive';
-    return incomingTime > currentTime ? 'replace' : 'reject';
-  }
-
-  function mergeMessagesAdditively(currentMessages, incomingMessages) {
-    const api = getSnapshotFreshnessApi();
-    const merge = api?.mergeMessagesAdditively || api?.mergeAdditiveMessages;
-    const incomingKeys = new Set((Array.isArray(incomingMessages) ? incomingMessages : [])
-      .map(getMessageKey).filter(Boolean));
-    const merged = typeof merge === 'function'
-      ? merge(currentMessages, incomingMessages)
-      : [
-          ...(Array.isArray(incomingMessages) ? incomingMessages : []),
-          ...(Array.isArray(currentMessages) ? currentMessages : [])
-            .filter((message) => !incomingKeys.has(getMessageKey(message))),
-        ];
-    const seen = new Set();
-    return (Array.isArray(merged) ? merged : []).filter((message) => {
-      const key = getMessageKey(message);
-      if (!key || !seen.has(key)) {
-        if (key) seen.add(key);
-        return true;
-      }
-      return false;
-    });
-  }
-
   function create(options = {}) {
     const AbortControllerImpl = options.AbortController || global.AbortController;
     let generation = 0;
@@ -236,7 +150,6 @@
   function createView(options = {}) {
     const session = create({ AbortController: options.AbortController });
     let token = null;
-    let committedSnapshot = null;
     const getScope = () => normalizeScope(options.getScope?.());
     const isCurrent = (candidate = token) => session.isCurrent(candidate, getScope());
     const setBusy = (busy) => options.getListElement?.()?.setAttribute?.('aria-busy', String(Boolean(busy)));
@@ -304,56 +217,19 @@
         );
         if (!isCurrent(candidate)) return false;
         if (campaignResult) {
+          options.setSync?.(campaignResult.sync);
           const ownerMessages = options.campaignInbox.filterMessages(campaignResult.messages, scope.owner);
-          const currentMessages = options.getMessages?.() || [];
-          const currentSnapshot = committedSnapshot
-            ? { ...committedSnapshot, messages: currentMessages }
-            : toSnapshot({ sync: options.getSync?.() }, currentMessages, 'live-api');
-          const incoming = toSnapshot(
-            campaignResult,
-            options.filterDeleted?.(ownerMessages) || [],
-            campaignResult.fromBootstrap ? 'server-bootstrap' : campaignResult.fromCache ? 'session-cache' : 'live-api'
+          const messages = reconcileMessages(
+            options.getMessages?.() || [],
+            options.filterDeleted?.(ownerMessages) || []
           );
-          const action = decideSnapshotUpdate(currentSnapshot, incoming);
-          if (action === 'reject') {
-            if (isDegradedSnapshot(incoming) || incoming.origin === 'live-api') {
-              options.setStatus?.(MAILBOX_STALE_STATUS);
-            }
-            setBusy(false);
-            if (campaignResult.fromBootstrap && isCurrent(candidate)) {
-              void load({
-                skipPageBootstrap: true,
-                skipBackgroundSync: true,
-                openLatest: false,
-                preserveOnError: true,
-                reuseActiveToken: true,
-              });
-            }
-            return false;
-          }
-          const acceptedMessages = action === 'merge-additive'
-            ? mergeMessagesAdditively(currentMessages, incoming.messages)
-            : incoming.messages;
-          const messages = action === 'merge-additive'
-            ? acceptedMessages
-            : reconcileMessages(currentMessages, acceptedMessages);
-          const acceptedSync = {
-            ...(incoming.sync || {}),
-            ...(action === 'merge-additive' ? { degraded: true, stale: true } : {}),
-          };
           const activeId = options.getActiveMail?.();
           if (campaignResult.fromCache) releaseTransientLoadingState(messages);
-          options.setSync?.(acceptedSync);
           options.setMessages?.(messages);
-          committedSnapshot = { ...incoming, messages, sync: acceptedSync, complete: action === 'replace' && incoming.complete !== false };
           options.prewarm?.(messages);
           options.renderList?.({ openLatest: loadOptions.openLatest !== false });
           keepConversationOpen(messages, activeId, loadOptions);
-          options.setStatus?.(
-            action === 'merge-additive' || isDegradedSnapshot(incoming)
-              ? MAILBOX_STALE_STATUS
-              : ''
-          );
+          options.setStatus?.('');
           setBusy(false);
           if (campaignResult.fromBootstrap && isCurrent(candidate)) {
             void load({
@@ -364,7 +240,7 @@
               reuseActiveToken: true,
             });
           }
-          return action === 'replace' && incoming.complete !== false && campaignResult.fromCache !== true;
+          return campaignResult.fromCache !== true;
         }
         const response = await options.fetch(
           `/api/mailbox/messages?account=${encodeURIComponent(scope.account)}&folder=${encodeURIComponent(scope.folder)}&limit=50`,
@@ -411,7 +287,7 @@
           );
           if (activeMessage) options.openMail?.(activeMessage.id, { skipReadPersist: true });
           else keepConversationOpen(currentMessages, activeId, { openLatest: false });
-          options.setStatus?.(MAILBOX_STALE_STATUS);
+          options.setStatus?.('');
           setBusy(false);
           return false;
         }
@@ -431,7 +307,6 @@
     function reset() {
       session.cancel();
       token = null;
-      committedSnapshot = null;
       options.closeCompose?.();
       options.setActiveMail?.(null);
       options.setMessages?.([]);
@@ -465,17 +340,7 @@
     return { cancelActive, ensureToken, getToken: () => token, isCurrent, load, reset, switchOwner };
   }
 
-  const api = {
-    MAILBOX_STALE_STATUS,
-    create,
-    createView,
-    decideSnapshotUpdate,
-    isAbortError,
-    mergeMessagesAdditively,
-    normalizeScope,
-    reconcileMessages,
-    sameScope,
-  };
+  const api = { create, createView, isAbortError, normalizeScope, reconcileMessages, sameScope };
   global.SoftoraMailboxOwnerSession = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

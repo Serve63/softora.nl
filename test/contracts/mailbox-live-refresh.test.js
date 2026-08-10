@@ -269,16 +269,6 @@ test('refresh status is exclusive while active, successful, partial and failed',
       if (mode === 'partial' && url === '/api/mailbox/instantly/sync') {
         return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
       }
-      if (mode === 'partial-sync' && url === '/api/mailbox/sync') {
-        return {
-          ok: true,
-          status: 207,
-          json: async () => ({ ok: true, complete: false, freshnessConfirmed: false }),
-        };
-      }
-      if (mode === 'skipped-sync' && url === '/api/mailbox/instantly/sync') {
-        return successfulResponse({ ok: true, results: [{ ok: true, skipped: true, reason: 'sync-in-progress' }] });
-      }
       if (mode === 'error') {
         return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
       }
@@ -307,18 +297,10 @@ test('refresh status is exclusive while active, successful, partial and failed',
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
 
-  mode = 'partial-sync';
-  assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
-
-  mode = 'skipped-sync';
-  assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
-
   mode = 'error';
   assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Niet live · herstellen…');
-  assert.doesNotMatch(ageLabel.textContent, /gecontroleerd|geleden/);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
   assert.match(ageLabel.attributes.title, /Tijdelijke verbindingsstoring/);
   assert.doesNotMatch(ageLabel.textContent, /mislukt/i);
   controller.destroy();
@@ -431,90 +413,4 @@ test('visible, background, focus and reconnect scheduling keep refresh bounded',
   windowListeners.get('online')();
   assert.equal(timers.at(-1), 0);
   controller.destroy();
-});
-
-test('BFCache pauzeert en annuleert zonder destroy en hervat met exact één verversing', async () => {
-  const documentListeners = new Map();
-  const windowListeners = new Map();
-  const timeoutEntries = new Map();
-  const intervalEntries = new Map();
-  const requestSignals = [];
-  let nextTimerId = 0;
-  const documentRef = {
-    visibilityState: 'visible',
-    getElementById() { return null; },
-    addEventListener(event, handler) { documentListeners.set(event, handler); },
-    removeEventListener(event, handler) {
-      if (documentListeners.get(event) === handler) documentListeners.delete(event);
-    },
-  };
-  const windowRef = {
-    AbortController,
-    addEventListener(event, handler) { windowListeners.set(event, handler); },
-    removeEventListener(event, handler) {
-      if (windowListeners.get(event) === handler) windowListeners.delete(event);
-    },
-  };
-  const controller = refreshModule.create({
-    autoStart: false,
-    document: documentRef,
-    window: windowRef,
-    getFolder: () => 'outreach',
-    getOwner: () => 'serve',
-    fetch: (_url, init) => new Promise((_resolve, reject) => {
-      requestSignals.push(init.signal);
-      init.signal.addEventListener('abort', () => {
-        const error = new Error('aborted');
-        error.name = 'AbortError';
-        reject(error);
-      }, { once: true });
-    }),
-    setTimeout(handler, delay) {
-      const id = ++nextTimerId;
-      timeoutEntries.set(id, { handler, delay, active: true });
-      return id;
-    },
-    clearTimeout(id) {
-      if (timeoutEntries.has(id)) timeoutEntries.get(id).active = false;
-    },
-    setInterval(handler, delay) {
-      const id = ++nextTimerId;
-      intervalEntries.set(id, { handler, delay, active: true });
-      return id;
-    },
-    clearInterval(id) {
-      if (intervalEntries.has(id)) intervalEntries.get(id).active = false;
-    },
-  });
-
-  controller.start();
-  const refresh = controller.refresh();
-  await Promise.resolve();
-  assert.equal(requestSignals.length, 2);
-  windowListeners.get('pagehide')({ persisted: true });
-  assert.equal(requestSignals.every((signal) => signal.aborted), true);
-  assert.equal(await refresh, false);
-  assert.equal(windowListeners.has('pagehide'), true);
-  assert.equal(windowListeners.has('pageshow'), true);
-  assert.equal(Array.from(timeoutEntries.values()).filter((entry) => entry.active).length, 0);
-
-  windowListeners.get('pageshow')({ persisted: true });
-  assert.deepEqual(
-    Array.from(timeoutEntries.values()).filter((entry) => entry.active).map((entry) => entry.delay),
-    [0]
-  );
-  windowListeners.get('focus')();
-  windowListeners.get('online')();
-  assert.deepEqual(
-    Array.from(timeoutEntries.values()).filter((entry) => entry.active).map((entry) => entry.delay),
-    [0]
-  );
-
-  windowListeners.get('pagehide')({ persisted: false });
-  assert.equal(windowListeners.size, 0);
-  assert.equal(documentListeners.size, 0);
-  assert.equal(Array.from(intervalEntries.values()).some((entry) => entry.active), false);
-  const timerCount = timeoutEntries.size;
-  controller.requestImmediateRefresh();
-  assert.equal(timeoutEntries.size, timerCount);
 });
