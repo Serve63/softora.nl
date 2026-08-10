@@ -76,8 +76,16 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/health/whoop/webhook-worker",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/health/whoop/reconcile",
+      "schedule": "*/15 3-11 * * *"
+    },
+    {
       "path": "/api/health/whoop/daily-sync",
-      "schedule": "0 6,7 * * *"
+      "schedule": "0 10,11 * * *"
     },
     {
       "path": "/api/google-ads/daily-run",
