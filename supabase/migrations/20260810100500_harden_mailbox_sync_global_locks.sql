@@ -1,3 +1,4 @@
+-- Sequenced after the atomic mailbox message commit foundation.
 -- mailbox-sync-lock-hardening:start
 -- Serialize every mailbox lease transition across instances. The fixed
 -- transaction advisory lock makes the active-count check one global decision.

@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const migrationPath = path.resolve(
   __dirname,
-  '../../supabase/migrations/20260810023429_harden_mailbox_sync_global_locks.sql'
+  '../../supabase/migrations/20260810100500_harden_mailbox_sync_global_locks.sql'
 );
 const schemaPath = path.resolve(__dirname, '../../supabase/data-ops-schema.sql');
 const probePath = path.resolve(__dirname, '../../supabase/mailbox-sync-global-lock-probe.sql');
