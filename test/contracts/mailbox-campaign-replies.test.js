@@ -882,6 +882,132 @@ test('campaign reply service excludes duplicates and automatic replies before cu
   assert.deepEqual(replies.map((message) => message.id), ['inbox:3']);
 });
 
+test('campaign reply service houdt gewijzigde onderwerpregels van een alternatief adres zichtbaar via exacte Sent-lineage', async () => {
+  const parent = {
+    id: 'sent:8042',
+    uid: 8042,
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    from: 'Servé Creusen',
+    email: 'serve@softora.nl',
+    to: 'Contact <contact@voorbeeldbedrijf.test>',
+    subject: 'Kleine vraag over jullie website',
+    preview: 'Goedendag, ik heb een nieuw webdesign gemaakt.',
+    date: '2026-08-01T09:00:00.000Z',
+    messageId: '<campaign-8042@softora.test>',
+    originalCampaignOutbound: true,
+  };
+  const incoming = {
+    id: 'inbox:9104',
+    uid: 9104,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Directie Voorbeeld Holding',
+    email: 'directie@voorbeeldholding.test',
+    to: 'serve@softora.nl',
+    subject: 'Even terugkomend op je bericht',
+    preview: 'Bel mij hierover maar even.',
+    date: '2026-08-04T14:04:04.000Z',
+    messageId: '<reply-9104@voorbeeldholding.test>',
+    inReplyTo: parent.messageId,
+    references: `<older-thread@voorbeeldbedrijf.test> ${parent.messageId}`,
+  };
+  let targetedLookup = null;
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
+      listMatchingMessagesForAccounts: async () => [],
+      listMessagesByMessageIdsForAccounts: async (options) => {
+        targetedLookup = options;
+        return [parent];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'serve' });
+
+  assert.ok(targetedLookup.messageIds.includes(parent.messageId));
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].id, incoming.id);
+  assert.equal(replies[0].campaign.customerId, '');
+  assert.equal(replies[0].outreach, null);
+  assert.equal(replies[0].threadCorrelationEvidence, 'exact-same-account-sent-campaign-parent');
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), [parent.id]);
+});
+
+test('campaign reply lineage blijft dicht voor onbekende ouders andere accounts niet-campagnemail en automaten', async () => {
+  const validParent = {
+    id: 'sent:valid', folder: 'sent', accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl', subject: 'Kleine vraag over jullie website',
+    date: '2026-08-01T09:00:00.000Z', messageId: '<valid-parent@softora.test>',
+    originalCampaignOutbound: true,
+  };
+  const crossAccountParent = {
+    ...validParent,
+    id: 'sent:other-owner',
+    accountEmail: 'martijn@softora.nl',
+    email: 'martijn@softora.nl',
+    messageId: '<other-owner-parent@softora.test>',
+  };
+  const nonCampaignParent = {
+    ...validParent,
+    id: 'sent:invoice',
+    subject: 'Factuur augustus',
+    messageId: '<invoice-parent@softora.test>',
+    originalCampaignOutbound: false,
+  };
+  const base = {
+    folder: 'inbox', accountEmail: 'serve@softora.nl', to: 'serve@softora.nl',
+    subject: 'Ander onderwerp', preview: 'Los bericht.', date: '2026-08-04T15:00:00.000Z',
+  };
+  const incoming = [
+    { ...base, id: 'inbox:cross', email: 'cross@example.test', messageId: '<cross@example.test>', inReplyTo: crossAccountParent.messageId },
+    { ...base, id: 'inbox:unknown', email: 'unknown@example.test', messageId: '<unknown@example.test>', inReplyTo: '<missing-parent@softora.test>' },
+    { ...base, id: 'inbox:invoice', email: 'invoice@example.test', messageId: '<invoice@example.test>', inReplyTo: nonCampaignParent.messageId },
+    { ...base, id: 'inbox:loose', email: 'loose@example.test', messageId: '<loose@example.test>', inReplyTo: '' },
+    { ...base, id: 'inbox:auto', email: 'auto@example.test', messageId: '<auto@example.test>', inReplyTo: validParent.messageId, autoSubmitted: 'auto-replied', automatedReplyEvidence: true },
+    { ...base, id: 'inbox:bounce', email: 'mailer-daemon@example.test', messageId: '<bounce@example.test>', inReplyTo: validParent.messageId, subject: 'Delivery Status Notification (Failure)', automatedReplyEvidence: true },
+  ];
+  let requestedMessageIds = [];
+  let lookedUpEmails = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? incoming : [],
+      listMatchingMessagesForAccounts: async () => [],
+      listMessagesByMessageIdsForAccounts: async ({ messageIds }) => {
+        requestedMessageIds = messageIds;
+        const normalized = new Set(messageIds.map((value) => String(value).replace(/^<+|>+$/g, '')));
+        return [validParent, crossAccountParent, nonCampaignParent].filter((message) => (
+          normalized.has(String(message.messageId).replace(/^<+|>+$/g, ''))
+        ));
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async ({ emails }) => {
+        lookedUpEmails = emails;
+        return [];
+      },
+    },
+  });
+
+  const result = await service.listRepliesWithSnapshot({
+    limit: 100,
+    owner: 'serve',
+    snapshotLimit: 100,
+  });
+
+  assert.deepEqual(result.messages, []);
+  assert.deepEqual(result.snapshotMessages, []);
+  assert.ok(requestedMessageIds.includes(crossAccountParent.messageId));
+  assert.ok(requestedMessageIds.includes(nonCampaignParent.messageId));
+  assert.equal(requestedMessageIds.includes(validParent.messageId), false);
+  assert.equal(lookedUpEmails.includes('auto@example.test'), false);
+  assert.equal(lookedUpEmails.includes('mailer-daemon@example.test'), false);
+});
+
 test('campaign reply service koppelt een later verzonden antwoord aan dezelfde ontvangen mail', async () => {
   const requestedFolders = [];
   const requestedLimits = {};

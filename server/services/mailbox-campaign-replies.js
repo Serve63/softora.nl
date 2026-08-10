@@ -670,6 +670,20 @@ function isCampaignReplySubject(message) {
   );
 }
 
+function getExactSentCampaignParent(message, sentMessages, allowedAccounts) {
+  if (!message || getMailboxMessageDirection(message) === 'sent' || isAutomatedCampaignReply(message)) return null;
+  const account = normalizeEmail(message.accountEmail);
+  const referenceIds = new Set(getMessageReferenceIds(message));
+  if (!account || !allowedAccounts?.has(account) || !referenceIds.size) return null;
+  return (Array.isArray(sentMessages) ? sentMessages : []).find((parent) => (
+    getMailboxMessageDirection(parent) === 'sent' &&
+    normalizeText(parent && parent.folder).toLowerCase() === 'sent' &&
+    normalizeEmail(parent && parent.accountEmail) === account &&
+    referenceIds.has(normalizeMessageId(parent && parent.messageId)) &&
+    (parent?.originalCampaignOutbound === true || isCampaignReplySubject(parent))
+  )) || null;
+}
+
 function dedupeCampaignMessages(messages) {
   const messagesByIdentity = new Map();
   (Array.isArray(messages) ? messages : []).forEach((rawMessage) => {
@@ -951,17 +965,41 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
+    const lineageCandidates = campaignMessages.filter((message) => (
+      !campaignCustomerByEmail.has(normalizeEmail(message && message.email)) &&
+      !isCampaignReplySubject(message) &&
+      !hasCampaignLabelProvenance(message)
+    ));
+    const candidateParentMessageIds = Array.from(new Set([
+      ...getMessageReferenceLookupValues(lineageCandidates.map((message) => ({ inReplyTo: message?.inReplyTo || message?.references }))),
+      ...getMessageReferenceLookupValues(campaignMessages),
+    ])).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
+    const candidateParentMessagesResult = candidateParentMessageIds.length &&
+      typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
+      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
+          accountEmails: campaignMailboxAccounts,
+          folder: 'sent',
+          messageIds: candidateParentMessageIds,
+        }).catch(() => [])
+      : [];
+    const allowedCampaignAccounts = new Set(campaignMailboxAccounts.map(normalizeEmail));
+
     const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
-        if (
-          !customer &&
-          !isCampaignReplySubject(message) &&
-          !hasCampaignLabelProvenance(message)
-        ) {
+        const hasDirectCampaignEvidence = Boolean(
+          customer || isCampaignReplySubject(message) || hasCampaignLabelProvenance(message)
+        );
+        const exactParent = hasDirectCampaignEvidence
+          ? null
+          : getExactSentCampaignParent(message, candidateParentMessagesResult, allowedCampaignAccounts);
+        if (!hasDirectCampaignEvidence && !exactParent) {
           return null;
         }
-        return buildCampaignReply(message, customer || null);
+        const provenMessage = exactParent
+          ? { ...message, threadCorrelationEvidence: 'exact-same-account-sent-campaign-parent' }
+          : message;
+        return buildCampaignReply(provenMessage, customer || null);
       })
       .filter(Boolean);
 
@@ -985,14 +1023,13 @@ function createMailboxCampaignRepliesService(deps = {}) {
               limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
             })
     ).catch(() => []);
-    const parentMessageIds = getMessageReferenceLookupValues(replies);
-    const targetedParentMessagesResult = parentMessageIds.length &&
-      typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
-      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
-          accountEmails: campaignMailboxAccounts,
-          folder: 'sent',
-          messageIds: parentMessageIds,
-        }).catch(() => [])
+    const acceptedParentMessageIds = new Set(
+      getMessageReferenceLookupValues(replies).map(normalizeMessageId)
+    );
+    const targetedParentMessagesResult = Array.isArray(candidateParentMessagesResult)
+      ? candidateParentMessagesResult.filter((message) => (
+          acceptedParentMessageIds.has(normalizeMessageId(message && message.messageId))
+        ))
       : [];
     const targetedSentDescendantsResult = await listExactSentDescendants({
       mailboxIndexStore,
