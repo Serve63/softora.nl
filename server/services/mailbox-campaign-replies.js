@@ -39,6 +39,7 @@ const {
 } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
+const { loadMailboxCampaignMessageSources } = require('./mailbox-campaign-message-sources');
 const {
   CAMPAIGN_EXACT_PARENT_EVIDENCE,
   getExactSentCampaignParent,
@@ -400,7 +401,10 @@ function createConversationDisjointSet(messages) {
     if (!account) return;
     const messageId = normalizeMessageId(message && message.messageId);
     const referenceIds = getMessageReferenceIds(message);
-    const nodes = [messageId, ...referenceIds]
+    const lineageRootMessageId = message && message.campaignLineageEvidenceKnown === true
+      ? normalizeMessageId(message.campaignLineageRootMessageId)
+      : '';
+    const nodes = [messageId, ...referenceIds, lineageRootMessageId]
       .filter(Boolean)
       .map((value) => `${account}|${value}`);
     if (!nodes.length) return;
@@ -416,11 +420,14 @@ function getCampaignConversationId(message, disjointSet) {
   if (!account) return getMessageIdentity(message);
   const messageId = normalizeMessageId(message && message.messageId);
   const referenceIds = getMessageReferenceIds(message);
-  const node = [messageId, ...referenceIds].find(Boolean);
+  const lineageRootMessageId = message && message.campaignLineageEvidenceKnown === true
+    ? normalizeMessageId(message.campaignLineageRootMessageId)
+    : '';
+  const node = [messageId, ...referenceIds, lineageRootMessageId].find(Boolean);
   if (node) {
     const resolved = disjointSet && typeof disjointSet.find === 'function'
       ? disjointSet.find(`${account}|${node}`)
-      : `${account}|${referenceIds[0] || messageId}`;
+      : `${account}|${lineageRootMessageId || referenceIds[0] || messageId}`;
     return resolved ? `conversation:${resolved}` : '';
   }
   const mailboxId = normalizeText(message && (message.mailboxId || message.id));
@@ -713,6 +720,16 @@ function shouldShowCampaignMessage(message) {
     : true;
 }
 
+function hasCampaignLineageProvenance(message) {
+  return Boolean(
+    message &&
+    message.campaignLineageEvidenceKnown === true &&
+    Number(message.campaignLineageDepth) > 0 &&
+    normalizeMessageId(message.campaignLineageRootMessageId) &&
+    message.campaignLineageEvidence === 'exact-same-account-message-id-ancestry'
+  );
+}
+
 async function listMessagesAcrossFolders({
   mailboxIndexStore,
   method,
@@ -848,36 +865,26 @@ function createMailboxCampaignRepliesService(deps = {}) {
       error.status = 503;
       throw error;
     }
-    const recentMessages = await listMessagesAcrossFolders({
+    const {
+      hasDurableLineageIndex,
+      recentMessages,
+      matchingMessages,
+      completeSentCampaignMessages,
+      exactLineageReplies,
+    } = await loadMailboxCampaignMessageSources({
       mailboxIndexStore,
-      method: 'listMessagesForAccounts',
-      options: {
-        accountEmails: campaignMailboxAccounts,
-        limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
-      },
+      accountEmails: campaignMailboxAccounts,
+      subjectTerms: CAMPAIGN_SUBJECT_TERMS,
+      replyLimit: CAMPAIGN_REPLY_LIMIT,
+      recentLimit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+      matchingLimit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+      sentLimit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+      maxDepth: CAMPAIGN_SENT_DESCENDANT_MAX_DEPTH,
+      listMessagesAcrossFolders,
     });
-    const matchingMessages = typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
-      ? await listMessagesAcrossFolders({
-          mailboxIndexStore,
-          method: 'listMatchingMessagesForAccounts',
-          options: {
-            accountEmails: campaignMailboxAccounts,
-            subjectTerms: CAMPAIGN_SUBJECT_TERMS,
-            limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
-          },
-        })
-      : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-        ? await listMessagesAcrossFolders({
-            mailboxIndexStore,
-            method: 'listAllMessagesForAccounts',
-            options: {
-              accountEmails: campaignMailboxAccounts,
-              limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
-            },
-          })
-        : [];
-    const messages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
-      ? dedupeCampaignMessages([...recentMessages, ...matchingMessages])
+    const messages = [recentMessages, matchingMessages, completeSentCampaignMessages, exactLineageReplies]
+      .every(Array.isArray)
+      ? dedupeCampaignMessages([...recentMessages, ...matchingMessages, ...exactLineageReplies])
       : null;
     if (!Array.isArray(messages)) {
       const error = new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.');
@@ -933,21 +940,26 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ...getMessageReferenceLookupValues(lineageCandidates.map((message) => ({ inReplyTo: message?.inReplyTo || message?.references }))),
       ...getMessageReferenceLookupValues(campaignMessages),
     ])).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
-    const candidateParentMessagesResult = candidateParentMessageIds.length &&
-      typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
-      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
-          accountEmails: campaignMailboxAccounts,
-          folder: 'sent',
-          messageIds: candidateParentMessageIds,
-        }).catch(() => [])
-      : [];
+    const candidateParentMessagesResult = hasDurableLineageIndex
+      ? completeSentCampaignMessages
+      : candidateParentMessageIds.length &&
+          typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
+        ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
+            accountEmails: campaignMailboxAccounts,
+            folder: 'sent',
+            messageIds: candidateParentMessageIds,
+          }).catch(() => [])
+        : [];
     const allowedCampaignAccounts = new Set(campaignMailboxAccounts.map(normalizeEmail));
 
     const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
         const hasDirectCampaignEvidence = Boolean(
-          customer || isCampaignReplySubject(message) || hasCampaignLabelProvenance(message)
+          customer ||
+          isCampaignReplySubject(message) ||
+          hasCampaignLabelProvenance(message) ||
+          hasCampaignLineageProvenance(message)
         );
         const exactParent = hasDirectCampaignEvidence
           ? null
@@ -966,40 +978,23 @@ function createMailboxCampaignRepliesService(deps = {}) {
       })
       .filter(Boolean);
 
-    const sentMessagesResult = await (
-      typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
-        ? mailboxIndexStore.listMatchingMessagesForAccounts({
-            accountEmails: campaignMailboxAccounts,
-            folder: 'sent',
-            subjectTerms: CAMPAIGN_SUBJECT_TERMS,
-            limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-          })
-        : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-          ? mailboxIndexStore.listAllMessagesForAccounts({
-              accountEmails: campaignMailboxAccounts,
-              folder: 'sent',
-              limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-            })
-          : mailboxIndexStore.listMessagesForAccounts({
-              accountEmails: campaignMailboxAccounts,
-              folder: 'sent',
-              limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-            })
-    ).catch(() => []);
+    const sentMessagesResult = completeSentCampaignMessages;
     const acceptedParentMessageIds = new Set(replies.flatMap(getMessageReferenceIds));
     const targetedParentMessagesResult = Array.isArray(candidateParentMessagesResult)
       ? candidateParentMessagesResult.filter((message) => (
           acceptedParentMessageIds.has(normalizeMessageId(message && message.messageId))
         ))
       : [];
-    const targetedSentDescendantsResult = await listExactSentDescendants({
-      mailboxIndexStore,
-      seedMessages: [
-        ...replies,
-        ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
-      ],
-      allowedAccountEmails: campaignMailboxAccounts,
-    });
+    const targetedSentDescendantsResult = hasDurableLineageIndex
+      ? []
+      : await listExactSentDescendants({
+          mailboxIndexStore,
+          seedMessages: [
+            ...replies,
+            ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
+          ],
+          allowedAccountEmails: campaignMailboxAccounts,
+        });
     const acceptedSendIntents = mailboxSendProvenanceStore &&
       typeof mailboxSendProvenanceStore.listAcceptedMessages === 'function'
       ? await mailboxSendProvenanceStore.listAcceptedMessages({

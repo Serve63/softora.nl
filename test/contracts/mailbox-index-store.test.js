@@ -168,7 +168,9 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
     autoSubmitted: '',
     precedence: '',
     autoResponseSuppress: '',
+    automatedReplyEvidenceKnown: false,
     automatedReplyEvidence: false,
+    automatedReplyEvidenceSource: '',
     softoraConversationId: '',
     softoraSendIntentId: '',
     softoraSendMode: '',
@@ -198,6 +200,45 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
 
   const detailMessage = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(detailMessage.body, 'Volledige tekst');
+});
+
+test('mailbox index preserves known-human provider evidence and infers legacy MIME provenance', () => {
+  const store = createMailboxIndexStore();
+  const providerRow = store.buildProviderMessageRow({
+    provider: 'instantly',
+    providerMessageId: 'known-human-provider-1',
+    providerAccountEmail: 'serve@websoftora.com',
+    providerOwner: 'serve',
+    email: 'lead@example.test',
+    to: 'serve@websoftora.com',
+    subject: 'Automatisch antwoord: maar provider zegt menselijk',
+    date: '2026-08-10T08:00:00.000Z',
+    automatedReplyEvidenceKnown: true,
+    automatedReplyEvidence: false,
+    automatedReplyEvidenceSource: 'instantly:is_auto_reply',
+  });
+
+  assert.equal(providerRow.payload.automatedReplyEvidenceKnown, true);
+  assert.equal(providerRow.payload.automatedReplyEvidence, false);
+  assert.equal(providerRow.payload.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
+  const knownHuman = store.normalizeMessageRow(providerRow);
+  assert.equal(knownHuman.automatedReplyEvidenceKnown, true);
+  assert.equal(knownHuman.automatedReplyEvidence, false);
+  assert.equal(knownHuman.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
+
+  const legacyMime = store.normalizeMessageRow({
+    ...providerRow,
+    provider_id: '',
+    folder: 'inbox',
+    uid: 42,
+    payload: {
+      source: 'imap-sync',
+      autoSubmitted: 'auto-replied',
+    },
+  });
+  assert.equal(legacyMime.automatedReplyEvidenceKnown, true);
+  assert.equal(legacyMime.automatedReplyEvidence, true);
+  assert.equal(legacyMime.automatedReplyEvidenceSource, 'mime:auto-submitted');
 });
 
 test('mailbox index store preserves durable Softora thread provenance from MIME headers', () => {

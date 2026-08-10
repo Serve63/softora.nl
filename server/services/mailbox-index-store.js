@@ -9,6 +9,8 @@ const {
   createMailboxCampaignLineageLookup,
 } = require('../repositories/mailbox-campaign-lineage-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
+const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
+const { createMailboxProviderMessageRowBuilder } = require('./mailbox-provider-message-row');
 const { executeMailboxIndexQuery } = require('./mailbox-index-query-timeout');
 const {
   createMailboxAtomicCommitQuery,
@@ -297,7 +299,12 @@ function createMailboxIndexStore(deps = {}) {
         autoSubmitted: truncateText(normalizeString(message && message.autoSubmitted), 200),
         precedence: truncateText(normalizeString(message && message.precedence), 120),
         autoResponseSuppress: truncateText(normalizeString(message && message.autoResponseSuppress), 200),
+        automatedReplyEvidenceKnown: message && message.automatedReplyEvidenceKnown === true,
         automatedReplyEvidence: message && message.automatedReplyEvidence === true,
+        automatedReplyEvidenceSource: truncateText(
+          normalizeString(message && message.automatedReplyEvidenceSource),
+          240
+        ),
         softoraConversationId: truncateText(normalizeString(message && message.softoraConversationId), 2000),
         softoraSendIntentId: truncateText(normalizeString(message && message.softoraSendIntentId), 500),
         softoraSendMode: truncateText(normalizeString(message && message.softoraSendMode).toLowerCase(), 40),
@@ -325,6 +332,14 @@ function createMailboxIndexStore(deps = {}) {
     const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
     const softoraReadAt = normalizeString(row.softora_read_at);
     const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');
+    const inferredAutomatedReplyEvidence = buildAutomatedReplyEvidence({
+      autoSubmitted: payload.autoSubmitted,
+      precedence: payload.precedence,
+      autoResponseSuppress: payload.autoResponseSuppress,
+    });
+    const hasStoredAutomatedReplyContract =
+      payload.automatedReplyEvidenceKnown === true &&
+      Boolean(normalizeString(payload.automatedReplyEvidenceSource));
     const normalized = {
       id: normalizeString(row.provider_id) || `${folder}:${uid}`,
       uid,
@@ -343,7 +358,14 @@ function createMailboxIndexStore(deps = {}) {
       autoSubmitted: normalizeString(payload.autoSubmitted),
       precedence: normalizeString(payload.precedence),
       autoResponseSuppress: normalizeString(payload.autoResponseSuppress),
-      automatedReplyEvidence: payload.automatedReplyEvidence === true,
+      automatedReplyEvidenceKnown: hasStoredAutomatedReplyContract ||
+        inferredAutomatedReplyEvidence.automatedReplyEvidenceKnown,
+      automatedReplyEvidence: hasStoredAutomatedReplyContract
+        ? payload.automatedReplyEvidence === true
+        : inferredAutomatedReplyEvidence.automatedReplyEvidence,
+      automatedReplyEvidenceSource: hasStoredAutomatedReplyContract
+        ? normalizeString(payload.automatedReplyEvidenceSource)
+        : inferredAutomatedReplyEvidence.automatedReplyEvidenceSource,
       softoraConversationId: normalizeString(payload.softoraConversationId),
       softoraSendIntentId: normalizeString(payload.softoraSendIntentId),
       softoraSendMode: normalizeString(payload.softoraSendMode).toLowerCase(),
@@ -407,69 +429,17 @@ function createMailboxIndexStore(deps = {}) {
     return normalized;
   }
 
-  function buildProviderMessageRow(message = {}) {
-    const provider = normalizeString(message.provider).toLowerCase();
-    const providerId = normalizeString(message.providerMessageId || message.id);
-    const accountEmail = normalizeEmail(message.accountEmail || message.providerAccountEmail);
-    const owner = normalizeString(message.providerOwner).toLowerCase();
-    if (!provider || !providerId || !accountEmail || !owner) return null;
-    const uid = stableProviderUid(provider, providerId);
-    const body = trimBodyForStorage(message, 0);
-    const dateIso = parseDateIso(message.date || message.receivedAt);
-    return {
-      message_key: buildProviderMessageKey(provider, providerId),
-      account_email: accountEmail,
-      folder: provider,
-      uid,
-      provider_id: `${provider}:${providerId}`,
-      message_id: normalizeString(message.messageId),
-      in_reply_to: normalizeString(message.inReplyTo),
-      references_text: normalizeString(message.references),
-      sender_name: truncateText(normalizeString(message.from), 240),
-      sender_email: truncateText(normalizeEmail(message.email), 320),
-      recipients_text: truncateText(normalizeString(message.to), 1000),
-      subject: truncateText(normalizeString(message.subject) || '(Geen onderwerp)', 500),
-      preview: truncateText(normalizeString(message.preview), 500),
-      body_text: body.text,
-      body_truncated: body.truncated,
-      has_body: body.hasBody,
-      date: dateIso,
-      internal_date: dateIso,
-      unread: Boolean(message.unread),
-      starred: Boolean(message.starred),
-      payload: {
-        source: provider,
-        provider,
-        providerMessageId: providerId,
-        providerThreadId: truncateText(normalizeString(message.providerThreadId), 500),
-        providerCampaignId: truncateText(normalizeString(message.providerCampaignId), 500),
-        providerAccountEmail: accountEmail,
-        providerOwner: owner,
-        direction: normalizeString(message.folder || message.direction).toLowerCase() === 'sent'
-          ? 'sent'
-          : 'received',
-        recipientRoutingEvidenceKnown: message.recipientRoutingEvidenceKnown === true,
-        toDisplay: truncateText(normalizeString(message.toDisplay || message.to), 2000),
-        cc: truncateText(normalizeString(message.cc), 2000),
-        bcc: truncateText(normalizeString(message.bcc), 2000),
-        deliveredTo: truncateText(normalizeString(message.deliveredTo), 1000),
-        attachments: normalizeAttachments(message.attachments),
-        autoSubmitted: truncateText(normalizeString(message.autoSubmitted), 200),
-        precedence: truncateText(normalizeString(message.precedence), 120),
-        autoResponseSuppress: truncateText(normalizeString(message.autoResponseSuppress), 200),
-        automatedReplyEvidence: message.automatedReplyEvidence === true,
-        attachmentSource: provider,
-        originalCampaignOutbound: message.originalCampaignOutbound === true,
-        providerBodyHtmlEvidenceKnown: message.providerBodyHtmlEvidenceKnown === true,
-        providerRichBodyAvailable: message.providerRichBodyAvailable === true,
-        providerOriginalBodyEvidenceKnown: message.providerOriginalBodyEvidenceKnown === true,
-        providerOriginalBodyAvailable: message.providerOriginalBodyAvailable === true,
-        webdesignLinkEvidenceKnown: message.webdesignLinkEvidenceKnown === true,
-        webdesignLinkUrl: truncateText(normalizeString(message.webdesignLinkUrl), 4000),
-      },
-      updated_at: isoNow(),
-    };
-  }
+  const buildProviderMessageRow = createMailboxProviderMessageRowBuilder({
+    normalizeString,
+    normalizeEmail,
+    truncateText,
+    stableProviderUid,
+    trimBodyForStorage,
+    parseDateIso,
+    buildProviderMessageKey,
+    normalizeAttachments,
+    isoNow,
+  });
 
   async function upsertProviderMessages({
     provider, messages = [], signal, mutationId, requestKey,

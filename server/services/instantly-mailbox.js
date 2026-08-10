@@ -371,6 +371,9 @@ function createInstantlyMailboxService(deps = {}) {
         autoSubmitted: rawMessage.auto_submitted || rawMessage.autoSubmitted,
         precedence: rawMessage.precedence,
         autoResponseSuppress: rawMessage.x_auto_response_suppress || rawMessage.auto_response_suppress,
+        providerAutoReply: rawMessage.is_auto_reply,
+        providerAutoReplyKnown: Object.prototype.hasOwnProperty.call(rawMessage, 'is_auto_reply'),
+        providerEventType: rawMessage.__softoraWebhookEventType,
       }),
       indexed: true,
     };
@@ -885,9 +888,10 @@ function createInstantlyMailboxService(deps = {}) {
         const rawMessage = await apiRequest(`emails/${encodeURIComponent(providerMessageId)}`, {
           signal: mutationContext?.signal,
         });
-        const normalizedMessage = normalizeInstantlyMessage(
-          rawMessage?.email || rawMessage?.data || rawMessage
-        );
+        const normalizedMessage = normalizeInstantlyMessage({
+          ...(rawMessage?.email || rawMessage?.data || rawMessage),
+          __softoraWebhookEventType: eventType,
+        });
         if (!normalizedMessage || normalizedMessage.providerOwner !== accountRecord.owner) {
           throw createInstantlyMailboxError(
             'Webhook-bericht kon niet aan het exacte Instantly-account worden gekoppeld.',

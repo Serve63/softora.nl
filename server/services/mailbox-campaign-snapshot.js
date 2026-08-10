@@ -277,7 +277,17 @@ function sanitizeThreadMessage(value, options = {}) {
     ...(source.autoSubmitted ? { autoSubmitted: text(source.autoSubmitted, 200) } : {}),
     ...(source.precedence ? { precedence: text(source.precedence, 200) } : {}),
     ...(source.autoResponseSuppress ? { autoResponseSuppress: text(source.autoResponseSuppress, 500) } : {}),
-    ...(source.automatedReplyEvidence === true ? { automatedReplyEvidence: true } : {}),
+    ...(source.automatedReplyEvidenceKnown === true
+      ? {
+          automatedReplyEvidenceKnown: true,
+          automatedReplyEvidence: source.automatedReplyEvidence === true,
+        }
+      : source.automatedReplyEvidence === true
+        ? { automatedReplyEvidence: true }
+        : {}),
+    ...(source.automatedReplyEvidenceSource
+      ? { automatedReplyEvidenceSource: text(source.automatedReplyEvidenceSource, 240) }
+      : {}),
     unread: Boolean(source.unread),
     readAt: text(source.readAt, 100),
     replyDismissedAt: text(source.replyDismissedAt, 100),
@@ -350,7 +360,21 @@ function sanitizeMessage(value, options = {}) {
     ...(source.autoSubmitted ? { autoSubmitted: text(source.autoSubmitted, 200) } : {}),
     ...(source.precedence ? { precedence: text(source.precedence, 200) } : {}),
     ...(source.autoResponseSuppress ? { autoResponseSuppress: text(source.autoResponseSuppress, 500) } : {}),
-    ...(source.automatedReplyEvidence === true ? { automatedReplyEvidence: true } : {}),
+    ...(source.automatedReplyEvidenceKnown === true
+      ? {
+          automatedReplyEvidenceKnown: true,
+          automatedReplyEvidence: source.automatedReplyEvidence === true,
+        }
+      : source.automatedReplyEvidence === true
+        ? { automatedReplyEvidence: true }
+        : {}),
+    ...(source.automatedReplyEvidenceSource
+      ? { automatedReplyEvidenceSource: text(source.automatedReplyEvidenceSource, 240) }
+      : {}),
+    campaignLineageEvidenceKnown: source.campaignLineageEvidenceKnown === true,
+    campaignLineageDepth: Math.max(0, Math.min(20, Number(source.campaignLineageDepth) || 0)),
+    campaignLineageRootMessageId: text(source.campaignLineageRootMessageId, 1000),
+    campaignLineageEvidence: text(source.campaignLineageEvidence, 160),
     conversationId: text(source.conversationId, 2000),
     softoraConversationId: text(source.softoraConversationId, 2000),
     softoraSendIntentId: text(source.softoraSendIntentId, 500),
