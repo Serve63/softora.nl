@@ -604,6 +604,7 @@ function createMailboxSyncService({
       upserted = Math.max(0, Number(saved.upserted) || 0);
       const readHealth = messages.syncReadHealth || {};
       const parseFailures = Array.isArray(readHealth.parseFailures) ? readHealth.parseFailures : [];
+      const missingUids = Array.isArray(readHealth.missingUids) ? readHealth.missingUids : [];
       const selectedCount = Math.max(messages.length, Number(readHealth.selectedCount) || 0);
       const folderMissing = readHealth.folderMissing === true;
       const fastFetchCapReached = fastRefresh && selectedCount > CAMPAIGN_SYNC_FAST_FETCH_LIMIT;
@@ -628,6 +629,11 @@ function createMailboxSyncService({
         reason: 'selection_truncated',
         code: 'MAILBOX_SYNC_SELECTION_TRUNCATED',
         error: `Mailbox heeft nog ${Math.max(1, Number(readHealth.remainingUidCount) || 0)} niet-geïndexeerde berichten.`,
+      });
+      if (missingUids.length) degradedReasons.push({
+        reason: 'provider_fetch_incomplete',
+        code: 'MAILBOX_SYNC_FETCH_INCOMPLETE',
+        error: `Mailbox provider leverde geselecteerde UID(s) niet: ${missingUids.join(', ')}.`,
       });
       if (parseFailures.length) degradedReasons.push({
         reason: 'message_parse_failed',
@@ -655,9 +661,9 @@ function createMailboxSyncService({
         accountEmail: account.email,
         folder: normalizedFolder,
         lockToken: lock.lockToken,
-        messageCount: messages.length,
-        lastUid,
-        ...(incomplete ? { error: degradedReasons.map((entry) => entry.error).join(' ') } : {}),
+        ...(incomplete
+          ? { error: degradedReasons.map((entry) => entry.error).join(' ') }
+          : { messageCount: messages.length, lastUid }),
         signal: folderDeadline.signal,
       });
       if (!finish || finish.ok === false) {
@@ -686,6 +692,9 @@ function createMailboxSyncService({
         remainingUidCount: Math.max(0, Number(readHealth.remainingUidCount) || 0),
         indexedUidScanTruncated,
         failedUids: parseFailures.map((failure) => failure.uid),
+        selectedUids: Array.isArray(readHealth.selectedUids) ? readHealth.selectedUids : [],
+        yieldedUids: Array.isArray(readHealth.yieldedUids) ? readHealth.yieldedUids : [],
+        missingUids,
         parseFailures,
         historyBackfill: Boolean(campaignOnly && !incrementalOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,

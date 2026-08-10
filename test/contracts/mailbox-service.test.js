@@ -4431,7 +4431,7 @@ test('één poison MIME quarantaint alleen die UID en laat latere gezonde replie
     incrementalOnly: true, fastRefresh: true, force: true,
   });
 
-  assert.deepEqual(upserts.map((uids) => uids.slice().sort()), [[1, 3], [1, 3]]);
+  assert.deepEqual(upserts.map((uids) => uids.slice().sort()), [[1, 2, 3], [1, 2, 3]]);
   assert.deepEqual(first.failedUids, [2]);
   assert.equal(first.failedMessageCount, 1);
   assert.equal(first.partial, true);
@@ -4887,7 +4887,7 @@ test('campaign mailbox sync combines newest mail with missing historical convers
   assert.deepEqual(client.searchOptions, [{ uid: true }, { uid: true }, { uid: true }]);
   assert.deepEqual(client.fetchOptions, [
     {
-      query: { uid: true, flags: true, internalDate: true, source: true },
+      query: { uid: true, flags: true, internalDate: true, envelope: true, source: true },
       options: { uid: true },
     },
   ]);

@@ -137,7 +137,7 @@ test('globale lease-cap zet accounts in een begrensde retryqueue zonder starvati
     },
     fetchMessagesFromImap: async () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
-      return [];
+      return withSyncReadHealth([]);
     },
   });
 
@@ -243,8 +243,13 @@ test('ordinary IMAP sync verwerkt 31 berichten over twee runs en noemt de eerste
       const messages = selected.map((uid) => ({ uid, id: `inbox:${uid}` }));
       Object.defineProperty(messages, 'syncReadHealth', {
         value: {
+          uidValidity: 777,
           parseFailures: [],
+          selectedUids: selected,
+          yieldedUids: selected,
+          missingUids: [],
           selectedCount: selected.length,
+          yieldedCount: selected.length,
           folderMissing: false,
           ...selected.syncSelectionHealth,
           selectionTruncated: selected.syncSelectionHealth.truncated,
