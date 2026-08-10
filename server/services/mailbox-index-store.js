@@ -39,6 +39,7 @@ const BODY_RETENTION_DAYS = 90;
 const BODY_RETENTION_NEWEST_COUNT = 500;
 const BODY_MAX_CHARS = 200 * 1024;
 const SYNC_LOCK_TTL_MS = 90_000;
+const MAILBOX_INDEX_DEFAULT_QUERY_TIMEOUT_MS = 5_000;
 const MAILBOX_INDEX_PAGE_SIZE = 1000;
 const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
@@ -53,15 +54,15 @@ function createMailboxIndexStore(deps = {}) {
     now = () => new Date(),
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
-    mailboxIndexQueryTimeoutMs = 2500,
+    mailboxIndexQueryTimeoutMs = MAILBOX_INDEX_DEFAULT_QUERY_TIMEOUT_MS,
     mailboxIndexFailureCooldownMs = 60_000,
   } = deps;
   let failureCooldownUntilMs = 0;
   let failureCooldownReason = '';
 
-  function getClient() {
+  function getClient(options = {}) {
     if (!isSupabaseConfigured()) return null;
-    return getSupabaseClient();
+    return getSupabaseClient(options);
   }
 
   function isAvailable() {
@@ -125,7 +126,17 @@ function createMailboxIndexStore(deps = {}) {
     mutation = false,
     timeoutMs = mailboxIndexQueryTimeoutMs,
   } = {}) {
-    const client = getClient();
+    const boundedTimeoutMs = Math.max(
+      250,
+      Math.min(30_000, Number(timeoutMs) || mailboxIndexQueryTimeoutMs)
+    );
+    const client = getClient({
+      timeoutMs: boundedTimeoutMs,
+      // Mailbox-index operations already have their own bounded circuit breaker.
+      // They must not inherit a broad cooldown opened by an unrelated UI-state read.
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
     if (isFailureCooldownActive()) {
       return { ok: false, unavailable: false, data: null, error: createFailureCooldownError() };
@@ -133,10 +144,7 @@ function createMailboxIndexStore(deps = {}) {
     try {
       const result = await executeMailboxIndexQuery(operation(client), {
         label,
-        timeoutMs: Math.max(
-          250,
-          Math.min(30_000, Number(timeoutMs) || mailboxIndexQueryTimeoutMs)
-        ),
+        timeoutMs: boundedTimeoutMs,
         mutationSignal: mutationSignal || (mutation ? signal : null),
         signal: mutation ? null : signal,
       });
