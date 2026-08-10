@@ -76,6 +76,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   const messages = Array.from({ length: 100 }, (_, index) => ({
     id: `inbox:${100 - index}`,
     uid: 100 - index,
+    uidValidity: 222,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     from: `Bedrijf ${index}`,
@@ -100,6 +101,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     threadMessages: index === 0 ? [{
       id: 'sent:201',
       uid: 201,
+      uidValidity: 222,
       folder: 'sent',
       accountEmail: 'serve@softora.nl',
       from: 'Servé Creusen',
@@ -133,6 +135,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.deepEqual(parsed.messages[0].threadMessages, [{
     id: 'sent:201',
     uid: 201,
+    uidValidity: 222,
     folder: 'sent',
     accountEmail: 'serve@softora.nl',
     from: 'Servé Creusen',
@@ -171,12 +174,12 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     bodyImagesTruncated: false,
     bodyImages: [{
       alt: 'Verzonden ontwerp',
-      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=sent&id=sent%3A201&index=0',
+      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=sent&id=sent%3A201&uidValidity=222&index=0',
     }],
   }]);
   assert.deepEqual(parsed.messages[0].bodyImages, [{
     alt: 'Ontwerp',
-    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A100&index=0',
+    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A100&uidValidity=222&index=0',
   }]);
   assert.equal(parsed.messages[0].bodyImagesTruncated, false);
   assert.equal(parsed.messages.at(-1).body, '');
@@ -404,15 +407,17 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
   assert.ok(parsed.messages.some((message) => message.id === 'serve:199'));
 });
 
-test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threaddata', () => {
-  const legacySnapshot = JSON.stringify({
-    version: 16,
+test('mailbox campaign snapshot herstelt laatste activiteit uit generatievaste threaddata', () => {
+  const generationSnapshot = JSON.stringify({
+    version: 17,
     contentVersion: '1',
     savedAt: '2026-07-23T15:00:00.000Z',
     contentAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{
       id: 'martijn@softora.nl|inbox|23',
+      uid: 23,
+      uidValidity: 222,
       folder: 'inbox',
       accountEmail: 'martijn@softora.nl',
       email: 'rruyters@road2value.com',
@@ -421,11 +426,15 @@ test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threadda
       conversationId: 'conversation:martijn@softora.nl|contact:rruyters@road2value.com',
       threadMessages: [{
         id: 'martijn@softora.nl|sent|111',
+        uid: 111,
+        uidValidity: 222,
         folder: 'sent',
         accountEmail: 'martijn@softora.nl',
         date: '2026-06-16T12:31:32.000Z',
       }, {
         id: 'martijn@softora.nl|sent|149',
+        uid: 149,
+        uidValidity: 222,
         folder: 'sent',
         accountEmail: 'martijn@softora.nl',
         date: '2026-06-23T11:32:58.000Z',
@@ -436,7 +445,7 @@ test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threadda
       stale: false,
     },
   });
-  const [message] = parseMailboxCampaignSnapshot(legacySnapshot).messages;
+  const [message] = parseMailboxCampaignSnapshot(generationSnapshot).messages;
 
   assert.equal(message.receivedAt, '2026-06-15T13:58:18.000Z');
   assert.equal(message.activityAt, '2026-06-15T13:58:18.000Z');
@@ -481,6 +490,8 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
     ok: true,
     messages: [{
       id: 'inbox:1',
+      uid: 1,
+      uidValidity: 222,
       folder: 'inbox',
       accountEmail: 'serve@softora.nl',
       body: 'Bericht met afbeeldingen',
@@ -495,12 +506,12 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
   assert.deepEqual(message.bodyImages, [
     {
       alt: 'Klein ontwerp',
-      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=0',
+      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&uidValidity=222&index=0',
       owner: 'sent-campaign',
     },
     {
       alt: 'Grote mockup',
-      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=1',
+      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&uidValidity=222&index=1',
     },
   ]);
   assert.equal(message.bodyImagesTruncated, false);
@@ -539,6 +550,7 @@ test('mailbox campaign snapshot bewaart een authoritative lege lijst en weigert 
     []
   );
   assert.equal(parseMailboxCampaignSnapshot('{kapot'), null);
+  assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 16, messages: [] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 10, messages: [{ id: 'stale-mhc' }] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 2, messages: [] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 3, messages: [{}] })), null);

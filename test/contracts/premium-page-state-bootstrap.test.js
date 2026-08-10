@@ -206,6 +206,7 @@ test('mailbox-bootstrap levert sessie en berichten direct mee en hergebruikt het
             id: 'inbox:reply-1',
             folder: 'inbox',
             accountEmail: 'serve@softora.nl',
+            uidValidity: '98765',
             from: 'Studio Noord',
             body: 'Bericht met direct beschikbare afbeelding',
             bodyImages: [{
@@ -238,7 +239,7 @@ test('mailbox-bootstrap levert sessie en berichten direct mee en hergebruikt het
   assert.equal(first.mailbox.sync.stale, true);
   assert.deepEqual(first.mailbox.messages[0].bodyImages, [{
     alt: 'Ontwerp',
-    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3Areply-1&index=0',
+    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3Areply-1&uidValidity=98765&index=0',
   }]);
   assert.equal(first.mailbox.messages[0].bodyImagesTruncated, false);
   assert.equal(first.session.email, 'serve@softora.nl');

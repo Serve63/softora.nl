@@ -157,6 +157,7 @@
       time: mail.time,
       folder: mail.folder || options.activeFolder || 'inbox',
       uid: Number(mail.uid || 0) || 0,
+      uidValidity: Number(mail.uidValidity || 0) || 0,
       mailboxId: String(mail.mailboxId || mail.id || '').trim(),
       messageId: String(mail.messageId || '').trim(),
       inReplyTo: String(mail.inReplyTo || '').trim(),
