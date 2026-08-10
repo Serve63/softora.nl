@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-04",
+  "updatedAt": "2026-08-10",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -834,7 +834,9 @@
     },
     {
       "id": "chatbot-proposal-022",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-10",
+      "shippedPath": "/blog/chatbot-offerte-vergelijken",
       "path": "/blog/chatbot-offerte-vergelijken",
       "contentType": "blog",
       "cluster": "ai-contact",
@@ -848,13 +850,13 @@
         {
           "type": "current-serp",
           "source": "Nederlandse SERP voor chatbot leverancier kiezen en chatbot offerte vergelijken",
-          "observedAt": "2026-08-04",
-          "detail": "Actuele resultaten behandelen prijsmodellen, complexiteit, implementatie, kennisbank, koppelingen en beheer, maar leggen die onderdelen zelden als een leveranciersneutrale bewijs- en acceptatiematrix naast elkaar. AICG benoemt expliciet dat kostencomponenten nodig zijn om offertes transparant te vergelijken."
+          "observedAt": "2026-08-10",
+          "detail": "Actuele resultaten van Nederlandse chatbotaanbieders behandelen eigen prijsmodellen, kennisbanken, koppelingen, menselijke escalatie en beheer, maar leggen twee voorstellen niet op een gelijke leveranciersneutrale bewijs- en acceptatiematrix. De SERP wordt gedomineerd door aanbieders en kostengidsen in plaats van een onafhankelijke offertemethode."
         },
         {
           "type": "primary-source",
           "source": "Microsoft Learn implementatiechecklist en gezamenlijke oproep van AP en ACM",
-          "observedAt": "2026-08-04",
+          "observedAt": "2026-08-10",
           "detail": "Microsoft benoemt kennisgovernance, integraties, kanalen en betrouwbaar gedrag als implementatievragen; AP en ACM benadrukken transparantie en bereikbaarheid van menselijk contact. Deze controlepunten ondersteunen een praktische offertevergelijking zonder leveranciersranglijst."
         }
       ],
@@ -864,7 +866,7 @@
         "Functielijsten zonder eigenaarschap, menselijk overdrachtspad of exit-afspraken"
       ],
       "overlap": {
-        "checkedAt": "2026-08-04",
+        "checkedAt": "2026-08-10",
         "closestPaths": [
           "/blog/chatbot-kosten-mkb",
           "/blog/chatbot-laten-maken-wanneer-zinvol",
@@ -919,7 +921,96 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Verifieer actuele buyer questions en werk een leveranciersneutrale scorekaart uit zonder ranglijst of ongecontroleerde prijsclaims."
+      "nextAction": "Wacht op indexatie en beoordeel op 2026-08-24, 2026-09-07 en 2026-10-05 de niet-branded ontdekking, doorklik naar /chatbot-laten-maken en bruikbaarheid van de vier beslispoorten."
+    },
+    {
+      "id": "chatbot-acceptance-023",
+      "status": "ready",
+      "path": "/kennisbank/chatbot-acceptatietest-opstellen",
+      "contentType": "kennisbank",
+      "cluster": "ai-contact",
+      "primaryQuery": "chatbot acceptatietest opstellen",
+      "intent": "Een toetsbare acceptatieset voor chatbotantwoorden, acties, uitzonderingen en menselijke overdracht opstellen",
+      "intentClass": "risk",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/chatbot-laten-maken",
+      "clusterRole": "Diepe go-no-go-gids voor het testen en accepteren van een zakelijke chatbot na selectie en vóór livegang",
+      "demandEvidence": [
+        {
+          "type": "current-serp",
+          "source": "Nederlandse SERP voor chatbot implementatie checklist, chatbot acceptatietest en chatbot testen voor livegang",
+          "observedAt": "2026-08-10",
+          "detail": "Actuele resultaten behandelen implementatie, CRM-overdracht, kosten en algemene testchecklists, maar een systeemneutrale opzet voor bronbewijs, gedragsvarianten, verboden acties, foutpaden, menselijke overdracht en een expliciet go-no-go-besluit is beperkt zichtbaar."
+        },
+        {
+          "type": "primary-source",
+          "source": "Microsoft Learn implementation checklist en agent evaluation checklist",
+          "observedAt": "2026-08-10",
+          "detail": "Microsoft benoemt gevalideerde kennis, deterministische tools, foutafhandeling, human approval, kanaalgedrag en evaluatiesets als afzonderlijke controlevragen. Dat ondersteunt een concrete acceptatietaak voor MKB-proceseigenaren zonder platformspecifieke productranglijst."
+        }
+      ],
+      "competitorPatterns": [
+        "Algemene implementatiechecklists zonder verwacht resultaat en bewijs per scenario",
+        "Demo- of accuracyscores zonder verboden acties, foutpaden en menselijke overdracht",
+        "Technische tests zonder proceseigenaar, herstelronde en expliciet go-no-go-besluit"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-10",
+        "closestPaths": [
+          "/blog/chatbot-offerte-vergelijken",
+          "/blog/chatbot-crm-koppeling-leads-opvolgen",
+          "/kennisbank/wat-is-chatbot-overdracht"
+        ],
+        "decision": "distinct",
+        "rationale": "De offertemethode vraagt om acceptatiebewijs, de CRM-gids test één overdrachtsketen en de kennisbank definieert menselijke overdracht. Deze kandidaat leert een proceseigenaar zelf een volledige, reproduceerbare testset, bevindingclassificatie, hertest en go-no-go-besluit opstellen."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.2,
+      "brief": {
+        "title": "Chatbot acceptatietest opstellen vóór livegang",
+        "metaDescription": "Maak een chatbot-acceptatietest voor bronbewijs, antwoordgedrag, verboden acties, koppelingen, foutpaden en menselijke overdracht.",
+        "h1": "Hoe stel je een chatbot acceptatietest op?",
+        "outline": [
+          "Vertaal de klanttaak naar reproduceerbare scenario's",
+          "Test bronbewijs en toegestane antwoordvariatie",
+          "Controleer verboden acties en foutpaden",
+          "Bewijs menselijke overdracht en gekoppelde uitkomsten",
+          "Classificeer bevindingen, hertest en neem een go-no-go-besluit"
+        ],
+        "buyerQuestions": [
+          "Welke testvragen horen in een chatbot-acceptatieset?",
+          "Wanneer is een afwijkend antwoord nog acceptabel?",
+          "Welke bevindingen blokkeren livegang?"
+        ],
+        "incomingLinks": [
+          "/blog/chatbot-offerte-vergelijken",
+          "/blog/chatbot-crm-koppeling-leads-opvolgen"
+        ],
+        "outgoingLinks": [
+          "/chatbot-laten-maken",
+          "/kennisbank/wat-is-chatbot-overdracht"
+        ],
+        "conversionPath": "Van een eigen acceptatieset naar een afgebakend gesprek over chatbotgrenzen, bewijs, herstel en gecontroleerde livegang.",
+        "claimRisk": "Geen foutloze werking, volledige dekking of juridisch geldige acceptatie beloven; testdekking en menselijke beslissers expliciet begrenzen.",
+        "visualConcepts": [
+          "Testmatrix met scenario, bron, verwachte reactie, verboden actie en bewijs",
+          "Go-no-go-route voor bevinding, eigenaar, herstel, hertest en besluit"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Valideer actuele vraagvarianten en bouw een systeemneutrale acceptatiematrix met bronbewijs, gedragsgrens, integratie-uitkomst en menselijke eigenaar."
     },
     {
       "id": "chatbot-implementation-010",

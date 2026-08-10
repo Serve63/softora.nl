@@ -161,7 +161,16 @@ const CHATBOT_KOSTEN_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Vergelijk chatbotvoorstellen op dezelfde bewijsstukken',
       paragraphs: Object.freeze([
-        'Geef leveranciers dezelfde klanttaken, bronnen, routes, integraties, overdrachtsregels en uitsluitingen. Vraag vervolgens om een scenario-overzicht, datastroom, verantwoordelijkheden, acceptatieplan en beheerafspraken. Een voorstel met meer AI-functies is niet automatisch beter; een voorstel dat het gekozen gesprek controleerbaar uitvoert en veilig stopt, is beter vergelijkbaar.',
+        Object.freeze({
+          text:
+            'Geef leveranciers dezelfde klanttaken, bronnen, routes, integraties, overdrachtsregels en uitsluitingen. Gebruik daarna de scorekaart om chatbot-offertes op dezelfde scope, bewijsstukken, verantwoordelijkheden, acceptatie en beheer te vergelijken. Een voorstel met meer AI-functies is niet automatisch beter; een voorstel dat het gekozen gesprek controleerbaar uitvoert en begrensd stopt, is beter vergelijkbaar.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'chatbot-offertes op dezelfde scope',
+              href: '/blog/chatbot-offerte-vergelijken',
+            }),
+          ]),
+        }),
         'Laat ieder voorstel ook aangeven wie eigenaar blijft van broncontent, gespreksroutes, configuratie, loggegevens en koppelingen. Vraag hoe wijzigingen worden aangevraagd, welke controle vóór publicatie plaatsvindt en welke export beschikbaar is wanneer de samenwerking stopt. Zet aannames, meerwerkregels en afhankelijkheden naast de prijs. Noteer bovendien welke medewerker fouten mag herstellen en hoe snel een kritieke route kan worden uitgezet. Zo vergelijk je niet alleen de eerste oplevering, maar ook de bestuurbaarheid van de chatbot nadat bezoekers ermee werken.',
         Object.freeze({
           text:
@@ -214,6 +223,11 @@ const CHATBOT_KOSTEN_CONTENT_ITEM = Object.freeze({
     Object.freeze({ label: 'Chatbot of livechat', href: '/vergelijkingen/chatbot-vs-livechat' }),
     Object.freeze({ label: 'Chatbot en CRM koppelen', href: '/blog/chatbot-crm-koppeling-leads-opvolgen' }),
     Object.freeze({ label: 'Wat is chatbot overdracht?', href: '/kennisbank/wat-is-chatbot-overdracht' }),
+    Object.freeze({
+      label: 'Chatbot-offertes vergelijken',
+      href: '/blog/chatbot-offerte-vergelijken',
+      availableFrom: '2026-08-10',
+    }),
     Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
   ]),
 });
