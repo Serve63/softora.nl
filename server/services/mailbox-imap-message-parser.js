@@ -1,7 +1,6 @@
 const MAILBOX_IMAP_PARSE_TIMEOUT_MS = 2500;
 const MAILBOX_IMAP_QUARANTINE_TTL_MS = 15 * 60 * 1000;
 const MAILBOX_IMAP_SOURCE_MAX_BYTES = 15 * 1024 * 1024;
-const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
 
 function createParseError(message, code) {
   const error = new Error(message);
@@ -22,22 +21,12 @@ function attachMailboxSyncReadHealth(messages, health = {}) {
 }
 
 function attachMailboxSyncReadResult(messages, {
-  selectedUids = [],
-  yieldedUids = [],
-  missingUids = [],
-  parseFailures = [],
-  folderMissing = false,
-  uidValidity = 0,
+  selectedUids = [], parseFailures = [], folderMissing = false,
 } = {}) {
   const selectionHealth = selectedUids.syncSelectionHealth || {};
   return attachMailboxSyncReadHealth(messages, {
     parseFailures,
-    selectedUids: selectedUids.slice(),
-    yieldedUids: yieldedUids.slice(),
-    missingUids: missingUids.slice(),
     selectedCount: selectedUids.length,
-    yieldedCount: yieldedUids.length,
-    uidValidity: normalizeMailboxUidValidity(uidValidity),
     folderMissing,
     ...selectionHealth,
     selectionTruncated: selectionHealth.truncated === true,
@@ -98,14 +87,10 @@ function createMailboxImapMessageParser({
     return { ok: false, uid, code, reason, quarantined: true };
   }
 
-  async function parseMessage({
-    message, account, folder, signal, deadlineAt = 0, uidValidity = 0,
-  } = {}) {
+  async function parseMessage({ message, account, folder, signal, deadlineAt = 0 } = {}) {
     throwIfAborted(signal);
     const uid = Number(message?.uid) || 0;
-    const key = `${String(account?.email || '').toLowerCase()}|${folder}|uv:${
-      normalizeMailboxUidValidity(uidValidity) || 'unknown'
-    }|${uid}`;
+    const key = `${String(account?.email || '').toLowerCase()}|${folder}|${uid}`;
     const cached = quarantine.get(key);
     if (cached && cached.until > now()) {
       return { ok: false, uid, code: cached.code, reason: cached.reason, quarantined: true, cached: true };

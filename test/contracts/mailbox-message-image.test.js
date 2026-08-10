@@ -10,14 +10,13 @@ const {
 test('mailbox image URL is compact, stable and bound to the original message', () => {
   const url = buildMailboxMessageImageUrl({
     id: 'inbox:42',
-    uidValidity: 222,
     folder: 'inbox',
     accountEmail: 'SERVE@SOFTORA.NL',
   }, 1);
 
   assert.equal(
     url,
-    '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A42&uidValidity=222&index=1'
+    '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A42&index=1'
   );
   assert.equal(isMailboxMessageImageUrl(url), true);
   assert.equal(isMailboxMessageImageUrl('javascript:alert(1)'), false);

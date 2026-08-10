@@ -13,7 +13,7 @@ function createMailboxAtomicCommitQuery(client, {
 } = {}) {
   const normalizedMutationId = String(mutationId || '').trim().toLowerCase();
   const normalizedRequestKey = String(requestKey || '').trim();
-  if (!normalizedMutationId || !normalizedRequestKey || !Array.isArray(rows)) {
+  if (!normalizedMutationId || !normalizedRequestKey || !Array.isArray(rows) || !rows.length) {
     throw createAtomicCommitError(
       'Atomische mailboxwrite mist mutation identity of rijen.', 'MAILBOX_INDEX_ATOMIC_COMMIT_INVALID'
     );

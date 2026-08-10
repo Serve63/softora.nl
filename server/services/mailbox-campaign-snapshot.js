@@ -9,7 +9,7 @@ const { resolveConversationActivity } = require('./mailbox-conversation-activity
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v3';
 const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE = 'premium_mailbox_campaign_snapshot_invalidation';
 const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY = 'softora_mailbox_campaign_snapshot_invalidated_at_v1';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 17;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 16;
 const POSTGRES_BIGINT_MAX = 9223372036854775807n;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
@@ -27,13 +27,6 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
-}
-
-function sanitizeUidValidity(value) {
-  const normalized = Number(value);
-  return Number.isSafeInteger(normalized) && normalized > 0 && normalized <= 4_294_967_295
-    ? normalized
-    : 0;
 }
 
 function normalizeMailboxCampaignContentVersion(value) {
@@ -246,7 +239,6 @@ function sanitizeThreadMessage(value, options = {}) {
     ...sanitizeProviderProvenance(source),
     id: text(source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
-    uidValidity: sanitizeUidValidity(source.uidValidity),
     folder: text(source.folder || 'sent', 50).toLowerCase() || 'sent',
     accountEmail: text(source.accountEmail, 320).toLowerCase(),
     from: text(source.from, 500),
@@ -321,7 +313,6 @@ function sanitizeMessage(value, options = {}) {
     id: text(source.id, 500),
     mailboxId: text(source.mailboxId || source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
-    uidValidity: sanitizeUidValidity(source.uidValidity),
     folder: text(source.folder || 'inbox', 50).toLowerCase() || 'inbox',
     accountEmail: text(source.accountEmail, 320).toLowerCase(),
     from: text(source.from, 500),

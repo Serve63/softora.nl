@@ -9,8 +9,6 @@ const {
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
 const { attachMailboxSyncReadResult, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
-const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
-const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
@@ -1972,7 +1970,6 @@ function createMailboxService(deps = {}) {
       if (!mailboxName) return attachMailboxSyncReadResult([], { folderMissing: true });
       const lock = await client.getMailboxLock(mailboxName);
       try {
-        const uidValidity = normalizeMailboxUidValidity(client?.mailbox?.uidValidity);
         let selectedUids = Array.isArray(uids) && uids.length
           ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
           : null;
@@ -1988,18 +1985,22 @@ function createMailboxService(deps = {}) {
             folder: normalizedFolder,
           });
         }
-        if (!selectedUids.length) return attachMailboxSyncReadResult([], { selectedUids, uidValidity });
-        return await fetchSelectedMailboxMessages({
-          account,
-          client,
-          deadlineAt,
-          folder: normalizedFolder,
-          parseMessage: imapMessageParser.parseMessage,
+        if (!selectedUids.length) return attachMailboxSyncReadResult([], { selectedUids });
+        const messages = [];
+        const parseFailures = [];
+        for await (const message of client.fetch(
           selectedUids,
-          signal,
-          throwIfAborted: abortScope.throwIfAborted,
-          uidValidity,
-        });
+          { uid: true, flags: true, internalDate: true, source: true },
+          { uid: true }
+        )) {
+          abortScope.throwIfAborted();
+          const parsed = await imapMessageParser.parseMessage({ message, account,
+            folder: normalizedFolder, signal, deadlineAt });
+          if (parsed.ok) messages.push(parsed.message);
+          else parseFailures.push(parsed);
+        }
+        const sorted = messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return attachMailboxSyncReadResult(sorted, { selectedUids, parseFailures });
       } finally {
         lock.release();
       }
@@ -2041,7 +2042,6 @@ function createMailboxService(deps = {}) {
       indexed: true,
       stale:
         !state ||
-        state.status !== 'ok' ||
         (typeof mailboxIndexStore.isSyncStateStale === 'function' &&
           mailboxIndexStore.isSyncStateStale(state, mailboxIndexStaleMs)),
       lastSyncedAt: state?.last_synced_at || null,
@@ -2173,9 +2173,13 @@ function createMailboxService(deps = {}) {
       error.status = 404;
       throw error;
     }
-    // A detail read has no folder-sync lease. Persisting it could race a
-    // UIDVALIDITY reset and resurrect an old UID generation, so only the
-    // leased mailbox sync is allowed to write IMAP index rows.
+    if (persistIndex && canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
+      await mailboxIndexStore.upsertMessages({
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        messages: [live],
+      }).catch((error) => logger.error('[Mailbox][MessageIndex]', error?.message || error));
+    }
     return assertMailboxMessageVisible(live);
   }
 

@@ -154,25 +154,6 @@ test('lokale verwijdering is een tombstone en verandert contentAt niet', () => {
   );
 });
 
-test('tombstone voor UID 42 in generatie 111 verbergt UID 42 in generatie 222 nooit', () => {
-  const oldGeneration = { ...message('inbox:42', 42), uidValidity: 111 };
-  const currentGeneration = { ...message('inbox:42', 42), uidValidity: 222 };
-  const tombstones = freshness.addTombstone(
-    [],
-    oldGeneration,
-    '2026-08-09T19:26:00.000Z'
-  );
-
-  assert.deepEqual(
-    freshness.applyTombstones(
-      [oldGeneration, currentGeneration],
-      tombstones,
-      '2026-08-09T19:25:00.000Z'
-    ),
-    [currentGeneration]
-  );
-});
-
 test('Instantly tombstones gebruiken de storagefolder en blijven exact', () => {
   const stored = {
     id: 'instantly:reply-1',

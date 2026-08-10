@@ -18,7 +18,6 @@ const {
   getAbortReason,
   summarizeMailboxSyncResults,
 } = require('./mailbox-sync-runtime');
-const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 10_000;
@@ -527,37 +526,6 @@ function createMailboxSyncService({
         // This checkpoint guarantees that a response arriving after our hard
         // deadline can never start a late Supabase write.
         mutationContext?.assertActive();
-        // A provider-side missing folder is already an explicit incomplete
-        // read. Do not let the absence of UIDVALIDITY mask that more precise
-        // failure, and never mutate/reset the durable generation from a read
-        // that did not actually open the target mailbox.
-        if (messages.syncReadHealth?.folderMissing === true) {
-          return { messages, saved: { ok: true, upserted: 0 } };
-        }
-        const uidValidity = normalizeMailboxUidValidity(messages.syncReadHealth?.uidValidity);
-        if (!uidValidity) {
-          const error = new Error('IMAP-provider gaf geen geldige UIDVALIDITY voor deze mailboxmap.');
-          error.code = 'MAILBOX_SYNC_UIDVALIDITY_UNAVAILABLE';
-          throw error;
-        }
-        if (!mutationContext) {
-          if (typeof mailboxIndexStore.prepareUidValidity !== 'function') {
-            const error = new Error('Duurzame UIDVALIDITY-voorbereiding is niet beschikbaar.');
-            error.code = 'MAILBOX_SYNC_UIDVALIDITY_STORE_UNAVAILABLE';
-            throw error;
-          }
-          const prepared = await mailboxIndexStore.prepareUidValidity({
-            accountEmail: account.email,
-            folder: normalizedFolder,
-            lockToken: lock.lockToken,
-            uidValidity,
-            signal: mutationSignal,
-          });
-          mutationContext?.assertActive();
-          if (!prepared?.ok) {
-            throw prepared?.error || new Error('UIDVALIDITY-voorbereiding is mislukt.');
-          }
-        }
         const saved = await mailboxIndexStore.upsertMessages({
           accountEmail: account.email,
           folder: normalizedFolder,
@@ -565,8 +533,6 @@ function createMailboxSyncService({
           signal: mutationSignal,
           mutationId: mutationContext?.mutationId,
           requestKey: mutationContext?.requestKey,
-          syncLockToken: lock.lockToken,
-          uidValidity,
         });
         mutationContext?.assertActive();
         if (!saved || saved.ok === false) {
@@ -604,7 +570,6 @@ function createMailboxSyncService({
       upserted = Math.max(0, Number(saved.upserted) || 0);
       const readHealth = messages.syncReadHealth || {};
       const parseFailures = Array.isArray(readHealth.parseFailures) ? readHealth.parseFailures : [];
-      const missingUids = Array.isArray(readHealth.missingUids) ? readHealth.missingUids : [];
       const selectedCount = Math.max(messages.length, Number(readHealth.selectedCount) || 0);
       const folderMissing = readHealth.folderMissing === true;
       const fastFetchCapReached = fastRefresh && selectedCount > CAMPAIGN_SYNC_FAST_FETCH_LIMIT;
@@ -629,11 +594,6 @@ function createMailboxSyncService({
         reason: 'selection_truncated',
         code: 'MAILBOX_SYNC_SELECTION_TRUNCATED',
         error: `Mailbox heeft nog ${Math.max(1, Number(readHealth.remainingUidCount) || 0)} niet-geïndexeerde berichten.`,
-      });
-      if (missingUids.length) degradedReasons.push({
-        reason: 'provider_fetch_incomplete',
-        code: 'MAILBOX_SYNC_FETCH_INCOMPLETE',
-        error: `Mailbox provider leverde geselecteerde UID(s) niet: ${missingUids.join(', ')}.`,
       });
       if (parseFailures.length) degradedReasons.push({
         reason: 'message_parse_failed',
@@ -661,9 +621,9 @@ function createMailboxSyncService({
         accountEmail: account.email,
         folder: normalizedFolder,
         lockToken: lock.lockToken,
-        ...(incomplete
-          ? { error: degradedReasons.map((entry) => entry.error).join(' ') }
-          : { messageCount: messages.length, lastUid }),
+        messageCount: messages.length,
+        lastUid,
+        ...(incomplete ? { error: degradedReasons.map((entry) => entry.error).join(' ') } : {}),
         signal: folderDeadline.signal,
       });
       if (!finish || finish.ok === false) {
@@ -692,9 +652,6 @@ function createMailboxSyncService({
         remainingUidCount: Math.max(0, Number(readHealth.remainingUidCount) || 0),
         indexedUidScanTruncated,
         failedUids: parseFailures.map((failure) => failure.uid),
-        selectedUids: Array.isArray(readHealth.selectedUids) ? readHealth.selectedUids : [],
-        yieldedUids: Array.isArray(readHealth.yieldedUids) ? readHealth.yieldedUids : [],
-        missingUids,
         parseFailures,
         historyBackfill: Boolean(campaignOnly && !incrementalOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,

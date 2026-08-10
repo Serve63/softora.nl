@@ -117,19 +117,14 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260809a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810a/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-request-deadline\.js\?v=20260809a/);
-  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-message-identity\.js\?v=20260810a/);
+  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
-  assert.match(readPage(), /assets\/premium-mailbox-snapshot-freshness\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-compose-controller\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-delete\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260810b/);
+  assert.match(readPage(), /assets\/premium-mailbox-snapshot-freshness\.js\?v=20260810a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -1163,7 +1158,6 @@ test('mailbox hydrateert een Instantly-threadbericht via providerfolder zonder I
         folder: 'instantly',
         id: 'instantly:sent-1',
         uid: 0,
-        uidValidity: 0,
       }]);
       return {
         ok: true,
@@ -1172,7 +1166,6 @@ test('mailbox hydrateert een Instantly-threadbericht via providerfolder zonder I
           messages: [{
             id: 'instantly:sent-1',
             uid: 0,
-            uidValidity: 0,
             folder: 'instantly',
             accountEmail: 'serve@websoftora.com',
             body: 'Volledige exacte Instantly-mail.',
@@ -1433,7 +1426,6 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
     threadMessages: [{
       id: 'sent:247',
       uid: 247,
-      uidValidity: 777,
       folder: 'sent',
       accountEmail: 'serve@softora.nl',
       body: plainBody,
@@ -1463,7 +1455,6 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
             messages: [{
               id: 'sent:247',
               uid: 247,
-              uidValidity: 777,
               folder: 'sent',
               accountEmail: 'serve@softora.nl',
               body: plainBody,
@@ -1500,7 +1491,7 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
 
   assert.deepEqual(requests, [
     '/api/mailbox/messages/bodies',
-    '/api/mailbox/message?account=serve%40softora.nl&folder=sent&id=sent%3A247&uidValidity=777',
+    '/api/mailbox/message?account=serve%40softora.nl&folder=sent&id=sent%3A247',
   ]);
   assert.equal(mail.threadMessages[0].body, linkedBody);
   assert.equal(mail.threadMessages[0].webdesignLinkUrl, exactUrl);
@@ -2938,11 +2929,11 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260810b/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260809a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-request-deadline\.js\?v=20260809a/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260810b/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -3035,7 +3026,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260810b/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260809a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3516,29 +3507,6 @@ test('coldmail berichten met hetzelfde IMAP-id blijven per mailboxaccount uniek'
   );
 });
 
-test('coldmail UI-id blijft uniek wanneer UID 42 in een nieuwe UIDVALIDITY-generatie terugkomt', () => {
-  const oldGeneration = campaignInboxModule.decorateMessage(
-    { id: 'inbox:42', uid: 42, uidValidity: 111, folder: 'inbox' },
-    {
-      id: 'inbox:42', uid: 42, uidValidity: 111, folder: 'inbox',
-      accountEmail: 'serve@softora.nl', date: '2026-08-09T08:00:00.000Z',
-    }
-  );
-  const currentGeneration = campaignInboxModule.decorateMessage(
-    { id: 'inbox:42', uid: 42, uidValidity: 222, folder: 'inbox' },
-    {
-      id: 'inbox:42', uid: 42, uidValidity: 222, folder: 'inbox',
-      accountEmail: 'serve@softora.nl', date: '2026-08-10T08:00:00.000Z',
-    }
-  );
-
-  assert.equal(oldGeneration.id, 'serve@softora.nl|inbox|uv:111|uid:42');
-  assert.equal(currentGeneration.id, 'serve@softora.nl|inbox|uv:222|uid:42');
-  assert.notEqual(oldGeneration.id, currentGeneration.id);
-  assert.equal(campaignInboxModule.getRequestId(oldGeneration), 'inbox:42');
-  assert.equal(campaignInboxModule.getRequestId(currentGeneration), 'inbox:42');
-});
-
 test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als standaard', () => {
   assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'serve@softora.nl' }), 'serve');
   assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'martijn@softora.nl' }), 'martijn');
@@ -3875,7 +3843,6 @@ test('premium mailbox kan vanuit de mailcontext een voorgestelde reactie schrijv
   assert.match(composeControllerSource, /account: replyAccount,/);
   assert.match(composeControllerSource, /senderProfile,/);
   assert.match(composeControllerSource, /context: buildRewriteContext\(\)/);
-  assert.match(composeControllerSource, /uidValidity: Number\(contextAtSend\?\.uidValidity \|\| 0\) \|\| 0/);
   assert.match(composeControllerSource, /action === 'rewrite-compose'[\s\S]*void rewrite\(\)/);
   assert.match(composeControllerSource, /function setReplyContext\(mail\) \{[\s\S]*options\.compose\.buildReplyContext/);
   assert.match(composeControllerSource, /function reply\(mail\) \{[\s\S]*setReplyContext\(mail\);/);
@@ -3917,8 +3884,6 @@ test('voorgestelde reactie is per composevenster maar één keer beschikbaar', (
 test('voorgestelde reactie geeft ontvangen én oorspronkelijke verzonden mail als context mee', () => {
   const context = composeModule.buildReplyContext({
     id: 'inbox:salon-tof',
-    uid: 42,
-    uidValidity: 222,
     from: 'Salon TOF',
     email: 'info@salontof.nl',
     subject: 'Re: Kleine vraag',
@@ -3951,8 +3916,6 @@ test('voorgestelde reactie geeft ontvangen én oorspronkelijke verzonden mail al
   assert.equal(context.originalSentMail.body, 'Ik heb een fris webdesign voor je gemaakt.');
   assert.equal(context.accountEmail, 'serve@softora.nl');
   assert.equal(context.mode, 'reply');
-  assert.equal(context.uid, 42);
-  assert.equal(context.uidValidity, 222);
 });
 
 test('nieuw bericht vanuit BCC-context gebruikt de bewezen afzender en echte ontvanger zonder antwoordprompt', () => {
@@ -4400,38 +4363,6 @@ test('gelezen status is eigenaargebonden en synchroniseert bevestigd tussen tabs
   assert.equal(martijn.unread, true);
 });
 
-test('gelezen status van UID 42 in generatie 111 raakt UID 42 in generatie 222 nooit', async () => {
-  const requests = [];
-  const controller = readModule.create({
-    fetch: async (_url, options) => {
-      requests.push(JSON.parse(options.body));
-      return { ok: true, json: async () => ({ ok: true, result: { unread: false } }) };
-    },
-    getAccount: (mail) => mail.accountEmail,
-    getFolder: (mail) => mail.folder,
-    getOwner: (mail) => mail.owner,
-    getRequestId: (mail) => mail.id,
-  });
-  const oldGeneration = {
-    id: 'inbox:42',
-    uid: 42,
-    uidValidity: 111,
-    folder: 'inbox',
-    accountEmail: 'serve@softora.nl',
-    owner: 'serve',
-    unread: true,
-  };
-  const currentGeneration = { ...oldGeneration, uidValidity: 222, unread: true };
-
-  assert.equal((await controller.markRead(oldGeneration, { render() {} })).ok, true);
-  controller.reconcile(currentGeneration);
-
-  assert.equal(oldGeneration.unread, false);
-  assert.equal(currentGeneration.unread, true);
-  assert.equal(requests[0].uid, 42);
-  assert.equal(requests[0].uidValidity, 111);
-});
-
 test('premium mailbox verbergt alleen in Softora, biedt herstel en raakt geen bronmail-API', async () => {
   const scriptSource = readScript();
   const deleteSource = readDeleteScript();
@@ -4446,7 +4377,7 @@ test('premium mailbox verbergt alleen in Softora, biedt herstel en raakt geen br
   assert.match(deleteSource, /hiddenMessageKeys\.add\(messageKey\);[\s\S]*hooks\.optimistic/);
   assert.match(deleteSource, /requestVisibility\(mail, 'hide'\)/);
   assert.match(deleteSource, /requestVisibility\(mail, 'restore'\)/);
-  assert.doesNotMatch(deleteSource, /\/api\/mailbox\/messages\/delete|\/api\/instantly|messageMove|\\\\Deleted|archive/i);
+  assert.doesNotMatch(deleteSource, /\/api\/mailbox\/messages\/delete|messageMove|\\\\Deleted|archive|instantly/i);
   assert.match(scriptSource, /label: 'Ongedaan maken'/);
   assert.match(scriptSource, /case 'delete-mail':[\s\S]*void deleteMail\(id\);/);
 
@@ -4456,13 +4387,11 @@ test('premium mailbox verbergt alleen in Softora, biedt herstel en raakt geen br
   const deleted = {
     id: 'inbox:42',
     uid: 42,
-    uidValidity: 222,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
-    threadMessages: [{ id: 'sent:7', uid: 7, uidValidity: 222, folder: 'sent', accountEmail: 'serve@softora.nl' }],
+    threadMessages: [{ id: 'sent:7', uid: 7, folder: 'sent', accountEmail: 'serve@softora.nl' }],
   };
-  const kept = { id: 'inbox:43', uid: 43, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl' };
-  const recycledUid = { ...deleted, uidValidity: 333, threadMessages: [] };
+  const kept = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' };
   const controller = deleteModule.create({
     dialogs: { confirm: async () => true },
     fetch: async (url, options) => {
@@ -4482,21 +4411,21 @@ test('premium mailbox verbergt alleen in Softora, biedt herstel en raakt geen br
 
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(events, ['optimistic']);
-  assert.deepEqual(controller.filterMessages([deleted, recycledUid, kept]), [recycledUid, kept]);
+  assert.deepEqual(controller.filterMessages([deleted, kept]), [kept]);
 
   resolveRequest({ ok: true, json: async () => ({ ok: true }) });
   assert.equal((await removal).ok, true);
   assert.deepEqual(events, ['optimistic', 'cache']);
-  assert.deepEqual(controller.filterMessages([deleted, recycledUid, kept]), [recycledUid, kept]);
+  assert.deepEqual(controller.filterMessages([deleted, kept]), [kept]);
   assert.equal(requests[0][0], '/api/mailbox/messages/hide');
   assert.deepEqual(requests[0][1].messages, [
-    { account: 'serve@softora.nl', folder: 'inbox', uid: 42, uidValidity: 222, id: 'inbox:42' },
-    { account: 'serve@softora.nl', folder: 'sent', uid: 7, uidValidity: 222, id: 'sent:7' },
+    { account: 'serve@softora.nl', folder: 'inbox', uid: 42, id: 'inbox:42' },
+    { account: 'serve@softora.nl', folder: 'sent', uid: 7, id: 'sent:7' },
   ]);
 
   assert.equal((await controller.restore(deleted)).ok, true);
   assert.equal(requests[1][0], '/api/mailbox/messages/restore');
-  assert.deepEqual(controller.filterMessages([deleted, recycledUid, kept]), [deleted, recycledUid, kept]);
+  assert.deepEqual(controller.filterMessages([deleted, kept]), [deleted, kept]);
 });
 
 test('premium mailbox gebruikt de nette dialoog ook wanneer die pas na de mailboxscripts initialiseert', async () => {
@@ -5328,38 +5257,6 @@ test('verse mailboxlijst behoudt de reeds gehydrateerde actieve body en objectre
   assert.equal(messages[0].bodyLoaded, true);
 });
 
-test('mailboxreconciliatie neemt nooit body-state over tussen twee UIDVALIDITY-generaties', () => {
-  const oldGeneration = {
-    id: 'serve@softora.nl|inbox|uv:111|uid:42',
-    mailboxId: 'inbox:42',
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    uid: 42,
-    uidValidity: 111,
-    body: 'Body uit generatie 111',
-    bodyLoaded: true,
-  };
-  const currentGeneration = {
-    id: 'serve@softora.nl|inbox|uv:222|uid:42',
-    mailboxId: 'inbox:42',
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    uid: 42,
-    uidValidity: 222,
-    body: '',
-    bodyLoaded: false,
-  };
-
-  const [reconciled] = ownerSessionModule.reconcileMessages(
-    [oldGeneration],
-    [currentGeneration]
-  );
-
-  assert.strictEqual(reconciled, currentGeneration);
-  assert.equal(reconciled.body, '');
-  assert.equal(reconciled.bodyLoaded, false);
-});
-
 test('threadbody-spinner eindigt eveneens binnen het gedeelde laadbudget', async () => {
   let calls = 0;
   const mailbox = loadMailboxHelpersForTest({
@@ -6172,7 +6069,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v18:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v17:usr_serve:serve');
         return {
           ok: true,
           contentAt: new Date().toISOString(),
@@ -6264,8 +6161,8 @@ test('mailbox kiest page en tabcache op contentAt en bewaart verwijdering als to
     ok: true,
     contentAt: cacheContentAt,
     messages: [
-      { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl' },
-      { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
     ],
     sync: { source: 'tab-session-cache' },
   };
@@ -6278,7 +6175,7 @@ test('mailbox kiest page en tabcache op contentAt en bewaart verwijdering als to
             ok: true,
             contentAt: pageContentAt,
             messages: [
-              { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+              { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
             ],
           },
         }),
@@ -6305,7 +6202,6 @@ test('mailbox kiest page en tabcache op contentAt en bewaart verwijdering als to
     assert.equal(freshCampaignInboxModule.removeCachedMessage({
       mailboxId: 'inbox:42',
       uid: 42,
-      uidValidity: 222,
       folder: 'inbox',
       accountEmail: 'serve@softora.nl',
     }), true);
@@ -6334,8 +6230,8 @@ test('mailbox deelt een bevestigde verwijdering direct met andere open tabs', ()
     ok: true,
     contentAt: new Date(Date.now() - 60 * 1000).toISOString(),
     messages: [
-      { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl' },
-      { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
     ],
   };
   class FakeBroadcastChannel {
@@ -6389,7 +6285,6 @@ test('mailbox deelt een bevestigde verwijdering direct met andere open tabs', ()
     assert.equal(freshCampaignInboxModule.publishMessageDeletion({
       mailboxId: 'inbox:42',
       uid: 42,
-      uidValidity: 222,
       folder: 'inbox',
       accountEmail: 'serve@softora.nl',
     }), true);
@@ -6398,7 +6293,6 @@ test('mailbox deelt een bevestigde verwijdering direct met andere open tabs', ()
       accountEmail: 'serve@softora.nl',
       folder: 'inbox',
       uid: 42,
-      uidValidity: 222,
       id: 'inbox:42',
     }]);
   } finally {

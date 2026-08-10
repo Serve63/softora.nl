@@ -1376,7 +1376,6 @@ grant execute on function public.softora_queue_company_website_video(text, text,
 grant execute on function public.softora_claim_company_website_video(text, integer) to service_role;
 revoke all on function public.softora_queue_company_website_video(text, text, text, boolean) from public, anon, authenticated;
 revoke all on function public.softora_claim_company_website_video(text, integer) from public, anon, authenticated;
-
 -- mailbox-uidvalidity-generation:start
 alter table public.softora_mailbox_messages
   add column if not exists uid_validity bigint;

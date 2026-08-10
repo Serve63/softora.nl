@@ -312,7 +312,6 @@
               id: String(contextAtSend?.mailboxId || contextAtSend?.id || '').trim(),
               folder: String(contextAtSend?.folder || '').trim().toLowerCase(),
               uid: Number(contextAtSend?.uid || 0) || 0,
-              uidValidity: Number(contextAtSend?.uidValidity || 0) || 0,
               messageId: String(contextAtSend?.messageId || '').trim(),
               references: String(contextAtSend?.references || '').trim(),
             },
