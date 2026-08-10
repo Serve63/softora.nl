@@ -658,8 +658,12 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
       calls.push(['is', column, value]);
       return query;
     },
+    select(columns) {
+      calls.push(['select', columns]);
+      return query;
+    },
     then(resolve) {
-      resolve({ data: [], error: null });
+      resolve({ data: [{ message_key: 'serve@softora.nl|inbox|uv:222|42' }], error: null });
     },
   };
   const store = createMailboxIndexStore({
@@ -677,6 +681,7 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'INBOX',
     id: 'inbox:42',
+    uidValidity: 222,
   });
 
   assert.equal(result.ok, true);
@@ -689,8 +694,50 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
-    ['is', 'deleted_at', null],
+    ['eq', 'uid_validity', 222],
     ['eq', 'uid', 42],
+    ['is', 'generation_superseded_at', null],
+    ['is', 'deleted_at', null],
+    ['select', 'message_key,softora_read_at'],
+  ]);
+});
+
+test('mailbox index store preflight een verborgen actie exact binnen dezelfde UIDVALIDITY-generatie', async () => {
+  const calls = [];
+  const query = {
+    select(columns) { calls.push(['select', columns]); return query; },
+    limit(value) { calls.push(['limit', value]); return query; },
+    eq(column, value) { calls.push(['eq', column, value]); return query; },
+    is(column, value) { calls.push(['is', column, value]); return query; },
+    async maybeSingle() {
+      return {
+        data: {
+          message_key: 'serve@softora.nl|inbox|uv:222|42',
+          account_email: 'serve@softora.nl', folder: 'inbox', uid: 42, uid_validity: 222,
+          provider_id: 'inbox:42', payload: {}, deleted_at: '2026-08-10T10:00:00.000Z',
+        },
+        error: null,
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => query }),
+  });
+
+  const message = await store.getMessageForAction({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', uid: 42, uidValidity: 222,
+  });
+
+  assert.equal(message.uidValidity, 222);
+  assert.deepEqual(calls.filter((call) => call[0] === 'eq'), [
+    ['eq', 'account_email', 'serve@softora.nl'],
+    ['eq', 'folder', 'inbox'],
+    ['eq', 'uid_validity', 222],
+    ['eq', 'uid', 42],
+  ]);
+  assert.deepEqual(calls.filter((call) => call[0] === 'is'), [
+    ['is', 'generation_superseded_at', null],
   ]);
 });
 
@@ -716,6 +763,7 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'INBOX',
     id: 'inbox:42',
+    uidValidity: 222,
   });
 
   assert.equal(result.ok, true);
@@ -730,8 +778,10 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
-    ['is', 'deleted_at', null],
+    ['eq', 'uid_validity', 222],
     ['eq', 'uid', 42],
+    ['is', 'generation_superseded_at', null],
+    ['is', 'deleted_at', null],
     ['select', 'message_key,reply_dismissed_at'],
   ]);
 });
@@ -740,6 +790,7 @@ test('mailbox index store meldt het als een tombstone geen bericht raakt', async
   const query = {
     update() { return query; },
     eq() { return query; },
+    is() { return query; },
     select() { return query; },
     then(resolve) { resolve({ data: [], error: null }); },
   };
@@ -752,10 +803,11 @@ test('mailbox index store meldt het als een tombstone geen bericht raakt', async
     accountEmail: 'serve@softora.nl',
     folder: 'inbox',
     uid: 42,
+    uidValidity: 111,
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error.code, 'MAILBOX_INDEX_MESSAGE_NOT_FOUND');
+  assert.equal(result.error.code, 'MAILBOX_UIDVALIDITY_STALE');
 });
 
 test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder sync-resurrectie', async () => {
@@ -767,6 +819,10 @@ test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder syn
     },
     eq(column, value) {
       calls.push(['eq', column, value]);
+      return query;
+    },
+    is(column, value) {
+      calls.push(['is', column, value]);
       return query;
     },
     select(columns) {
@@ -792,6 +848,7 @@ test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder syn
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'INBOX',
     id: 'inbox:42',
+    uidValidity: 222,
   });
 
   assert.equal(result.ok, true);
@@ -803,7 +860,9 @@ test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder syn
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
+    ['eq', 'uid_validity', 222],
     ['eq', 'uid', 42],
+    ['is', 'generation_superseded_at', null],
     ['select', 'message_key'],
   ]);
 });
@@ -846,6 +905,7 @@ test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'INBOX',
     id: 'inbox:42',
+    uidValidity: 222,
   });
 
   assert.equal(result.ok, true);
@@ -857,8 +917,9 @@ test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
-    ['is', 'generation_superseded_at', null],
+    ['eq', 'uid_validity', 222],
     ['eq', 'uid', 42],
+    ['is', 'generation_superseded_at', null],
     ['select', 'message_key'],
   ]);
 });
@@ -2247,6 +2308,14 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
 
   const third = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
   assert.equal(third.ok, true);
+  const released = await store.releaseSyncLock({
+    accountEmail: 'info@softora.nl', folder: 'inbox', lockToken: third.lockToken,
+  });
+  assert.equal(released.ok, true);
+  assert.equal(client.stateRows.get('info@softora.nl|inbox').status, 'idle');
+  assert.equal(client.stateRows.get('info@softora.nl|inbox').lock_token, null);
+  const fourth = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
+  assert.equal(fourth.ok, true);
 });
 
 test('mailbox index lockclaim faalt gesloten als de database-RPC ontbreekt', async () => {

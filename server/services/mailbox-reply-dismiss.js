@@ -4,16 +4,22 @@ function createMailboxReplyDismissService(deps = {}) {
     mailboxIndexStore,
   } = deps;
 
-  async function dismiss({ accountEmail, id, folder, uid }) {
+  async function dismiss({ accountEmail, id, folder, uid, uidValidity }) {
     if (!canUseMailboxIndex() || typeof mailboxIndexStore?.markMessageReplyDismissed !== 'function') {
       const error = new Error('Softora-mailboxindex is niet beschikbaar; de antwoordherinnering blijft staan.');
       error.status = 503;
       throw error;
     }
-    const result = await mailboxIndexStore.markMessageReplyDismissed({ accountEmail, id, folder, uid });
+    const result = await mailboxIndexStore.markMessageReplyDismissed({
+      accountEmail,
+      id,
+      folder,
+      uid,
+      uidValidity,
+    });
     if (result?.ok !== true) {
       const error = new Error(result?.error?.message || 'Antwoordherinnering kon niet duurzaam worden afgehandeld.');
-      error.status = result?.unavailable ? 503 : 404;
+      error.status = result?.error?.status || (result?.unavailable ? 503 : 404);
       error.code = result?.error?.code || 'MAILBOX_REPLY_DISMISS_FAILED';
       throw error;
     }

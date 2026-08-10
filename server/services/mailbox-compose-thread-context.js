@@ -78,10 +78,17 @@ function createMailboxComposeThreadContext(deps = {}) {
     }
     const folder = normalizeText(context.folder || 'inbox').toLowerCase();
     const id = normalizeText(context.id || context.uid);
+    const uidValidity = Number(context.uidValidity) || 0;
     if (!id || folder === 'sent') {
       throw inputError('Selecteer een echt ontvangen bericht om te beantwoorden.', 'MAILBOX_REPLY_TARGET_INVALID', 409);
     }
-    const stored = await mailboxIndexStore.getMessage({ accountEmail: account, folder, id });
+    const stored = await mailboxIndexStore.getMessage({
+      accountEmail: account,
+      folder,
+      id,
+      uid: Number(context.uid) || 0,
+      uidValidity,
+    });
     const storedMessageId = normalizeMessageId(stored && stored.messageId);
     const clientMessageId = normalizeMessageId(context.messageId);
     const targetMismatch = !stored || !storedMessageId || (clientMessageId && clientMessageId !== storedMessageId) ||

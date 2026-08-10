@@ -1,4 +1,8 @@
 const MAX_CONVERSATION_MESSAGES = 100;
+const { resolveMailboxName } = require('./mailbox-sent-copy');
+const {
+  createMailboxUidValidityActionGuard,
+} = require('./mailbox-uid-validity-action-guard');
 
 function createMailboxVisibilityService(deps = {}) {
   const {
@@ -6,12 +10,19 @@ function createMailboxVisibilityService(deps = {}) {
     getProviderAccount = () => null,
     assertTargetAuthorized = async () => null,
     parseMessageReference,
+    createClient,
+    resolveMailboxName: resolveMailboxNameForAction = resolveMailboxName,
     canUseMailboxIndex,
     mailboxIndexStore,
     getUiStateValues,
     setUiStateValues,
     logger = console,
   } = deps;
+  const uidValidityGuard = createMailboxUidValidityActionGuard({
+    createClient,
+    mailboxIndexStore,
+    resolveMailboxName: resolveMailboxNameForAction,
+  });
 
   function createStatusError(message, status = 503) {
     const error = new Error(message);
@@ -35,11 +46,18 @@ function createMailboxVisibilityService(deps = {}) {
       const id = source.id || source.messageId;
       const messageRef = requestedFolder === 'instantly'
         ? { folder: 'instantly', uid: 0 }
-        : parseMessageReference({ id, folder: source.folder, uid: source.uid });
+        : parseMessageReference({
+            id,
+            folder: source.folder,
+            uid: source.uid,
+            uidValidity: source.uidValidity,
+          });
       if (requestedFolder === 'instantly' && !/^instantly:[^:\s]+$/.test(String(id || ''))) {
         throw createStatusError('Instantly-bericht niet gevonden.', 400);
       }
-      const key = `${account.email}|${messageRef.folder}|${messageRef.uid || id}`;
+      const key = messageRef.uid > 0
+        ? `${account.email}|${messageRef.folder}|${messageRef.uidValidity}|${messageRef.uid}`
+        : `${account.email}|${messageRef.folder}|${id}`;
       if (seen.has(key)) return;
       seen.add(key);
       targets.push({
@@ -64,47 +82,69 @@ function createMailboxVisibilityService(deps = {}) {
     if (typeof operation !== 'function') {
       throw createStatusError('Softora-mailboxweergave kan deze actie nog niet duurzaam opslaan.');
     }
-    const completed = [];
-    try {
-      for (const target of targets) {
-        await assertTargetAuthorized(target);
-        const result = await operation.call(mailboxIndexStore, {
+    for (const target of targets) await assertTargetAuthorized(target);
+    await uidValidityGuard.withCurrentUidValidities(targets, async () => {
+      const imapTargets = targets.filter((target) => target.messageRef.folder !== 'instantly');
+      if (imapTargets.length && typeof mailboxIndexStore.getMessageForAction !== 'function') {
+        throw createStatusError('Softora-mailboxindex kan de volledige actie niet vooraf valideren.');
+      }
+      for (const target of imapTargets) {
+        const existing = await mailboxIndexStore.getMessageForAction({
           accountEmail: target.account.email,
           id: target.id,
           folder: target.messageRef.folder,
           uid: target.messageRef.uid,
+          uidValidity: target.messageRef.uidValidity,
         });
-        if (result?.ok !== true) {
-          const error = createStatusError(
-            result?.error?.message ||
-              (hidden
-                ? 'Gesprek kon niet in Softora worden verborgen.'
-                : 'Gesprek kon niet in Softora worden hersteld.'),
-            result?.unavailable ? 503 : 404
-          );
-          error.code = result?.error?.code || 'MAILBOX_VISIBILITY_UPDATE_FAILED';
+        if (!existing) {
+          const error = createStatusError('Het mailboxbericht bestaat niet meer in deze UIDVALIDITY-generatie.', 409);
+          error.code = 'MAILBOX_UIDVALIDITY_STALE';
           throw error;
         }
-        completed.push(target);
       }
-    } catch (error) {
-      const rollback = hidden
-        ? mailboxIndexStore.restoreMessage
-        : mailboxIndexStore.markMessageDeleted;
-      if (typeof rollback === 'function') {
-        for (const target of completed.reverse()) {
-          await rollback.call(mailboxIndexStore, {
+      const completed = [];
+      try {
+        for (const target of targets) {
+          const result = await operation.call(mailboxIndexStore, {
             accountEmail: target.account.email,
             id: target.id,
             folder: target.messageRef.folder,
             uid: target.messageRef.uid,
-          }).catch((rollbackError) => {
-            logger.error('[Mailbox][VisibilityRollback]', rollbackError?.message || rollbackError);
+            uidValidity: target.messageRef.uidValidity,
           });
+          if (result?.ok !== true) {
+            const error = createStatusError(
+              result?.error?.message ||
+                (hidden
+                  ? 'Gesprek kon niet in Softora worden verborgen.'
+                  : 'Gesprek kon niet in Softora worden hersteld.'),
+              result?.error?.status || (result?.unavailable ? 503 : 404)
+            );
+            error.code = result?.error?.code || 'MAILBOX_VISIBILITY_UPDATE_FAILED';
+            throw error;
+          }
+          completed.push(target);
         }
+      } catch (error) {
+        const rollback = hidden
+          ? mailboxIndexStore.restoreMessage
+          : mailboxIndexStore.markMessageDeleted;
+        if (typeof rollback === 'function') {
+          for (const target of completed.reverse()) {
+            await rollback.call(mailboxIndexStore, {
+              accountEmail: target.account.email,
+              id: target.id,
+              folder: target.messageRef.folder,
+              uid: target.messageRef.uid,
+              uidValidity: target.messageRef.uidValidity,
+            }).catch((rollbackError) => {
+              logger.error('[Mailbox][VisibilityRollback]', rollbackError?.message || rollbackError);
+            });
+          }
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   async function hideConversation(input) {
