@@ -21,13 +21,41 @@ begin
   end if;
 
   insert into public.softora_mailbox_messages (
-    message_key, account_email, folder, uid, provider_id, subject, date,
-    unread, softora_read_at, deleted_at
+    message_key, account_email, folder, uid, provider_id, message_id,
+    subject, date, unread, payload
+  ) values (
+    v_account || '|sent|1', v_account, 'sent', 1, 'sent:1',
+    '<uidvalidity-probe-root@softora.internal>',
+    'Kleine vraag over jullie website', clock_timestamp(), false,
+    '{"direction":"sent","originalCampaignOutbound":true}'::jsonb
+  );
+
+  insert into public.softora_mailbox_messages (
+    message_key, account_email, folder, uid, provider_id, message_id,
+    in_reply_to, references_text, subject, date, unread, softora_read_at,
+    deleted_at, payload
   ) values
     (v_sync_key || '|42', v_account, v_folder, 42, 'inbox:42',
-      'Legacy gelezen bericht', clock_timestamp(), false, v_old_read_at, null),
+      '<uidvalidity-probe-reply@softora.internal>',
+      '<uidvalidity-probe-root@softora.internal>',
+      '<uidvalidity-probe-root@softora.internal>',
+      'Re: Kleine vraag over jullie website', clock_timestamp(), false,
+      v_old_read_at, null, '{"direction":"received"}'::jsonb),
     (v_sync_key || '|43', v_account, v_folder, 43, 'inbox:43',
-      'Legacy verborgen bericht', clock_timestamp(), false, null, clock_timestamp());
+      '<uidvalidity-probe-hidden@softora.internal>', null, null,
+      'Legacy verborgen bericht', clock_timestamp(), false, null,
+      clock_timestamp(), '{}'::jsonb);
+
+  if not exists (
+    select 1 from public.softora_mailbox_message_lineage_edges
+    where child_message_key = v_sync_key || '|42'
+  ) or not exists (
+    select 1 from public.softora_mailbox_campaign_lineage_members
+    where message_key = v_sync_key || '|42'
+      and parent_message_key = v_account || '|sent|1'
+  ) then
+    raise exception 'UIDVALIDITY_PROBE_LINEAGE_SETUP_FAILED';
+  end if;
 
   select * into strict v_prepare
   from public.softora_prepare_mailbox_uid_validity(
@@ -54,6 +82,25 @@ begin
       and generation_superseded_at is null
   ) then
     raise exception 'UIDVALIDITY_PROBE_LEGACY_STATE_NOT_PRESERVED';
+  end if;
+  if exists (
+    select 1 from public.softora_mailbox_message_lineage_edges
+    where child_message_key = v_sync_key || '|42'
+  ) or exists (
+    select 1 from public.softora_mailbox_campaign_lineage_members
+    where message_key = v_sync_key || '|42'
+  ) or not exists (
+    select 1 from public.softora_mailbox_message_lineage_edges
+    where child_message_key = v_sync_key || '|uv:111|42'
+  ) or not exists (
+    select 1 from public.softora_mailbox_campaign_lineage_members
+    where message_key = v_sync_key || '|uv:111|42'
+      and parent_message_key = v_account || '|sent|1'
+  ) or not exists (
+    select 1 from public.softora_mailbox_campaign_lineage_discoveries
+    where message_key = v_sync_key || '|uv:111|42'
+  ) then
+    raise exception 'UIDVALIDITY_PROBE_LINEAGE_NOT_CASCADED';
   end if;
 
   -- A still-warm old runtime may insert the legacy key after first adoption.
@@ -124,7 +171,8 @@ begin
   end if;
   if exists (
     select 1 from public.softora_mailbox_messages
-    where account_email = v_account and generation_superseded_at is null
+    where account_email = v_account and folder = v_folder
+      and generation_superseded_at is null
   ) or not exists (
     select 1 from public.softora_mailbox_sync_state
     where sync_key = v_sync_key and uid_validity = 222

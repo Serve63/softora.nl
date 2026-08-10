@@ -31,7 +31,7 @@ async function loadMailboxCampaignMessageSources({
         replyLimit,
         maxDepth,
         maxResults: CAMPAIGN_LINEAGE_CONTEXT_LIMIT,
-        deadlineMs: 2500,
+        deadlineMs: 8000,
       })
     : [];
   if (

@@ -67,7 +67,7 @@ test('durable lineage keeps a newly discovered transitive reply visible in one b
         assert.equal(replyLimit, 200);
         assert.equal(maxDepth, 20);
         assert.equal(maxResults, 9000);
-        assert.equal(deadlineMs, 2500);
+        assert.equal(deadlineMs, 8000);
         return [changedSubjectReply, sentAfterReply, sentDescendant, root];
       },
       listMessagesForAccounts: async () => { calls.recent += 1; return []; },

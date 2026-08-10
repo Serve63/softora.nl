@@ -119,7 +119,12 @@ function createMailboxIndexStore(deps = {}) {
     logSoftIndexError('circuit-open', failureCooldownReason);
   }
 
-  async function run(label, operation, { mutationSignal = null, signal = null, mutation = false } = {}) {
+  async function run(label, operation, {
+    mutationSignal = null,
+    signal = null,
+    mutation = false,
+    timeoutMs = mailboxIndexQueryTimeoutMs,
+  } = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
     if (isFailureCooldownActive()) {
@@ -128,7 +133,10 @@ function createMailboxIndexStore(deps = {}) {
     try {
       const result = await executeMailboxIndexQuery(operation(client), {
         label,
-        timeoutMs: mailboxIndexQueryTimeoutMs,
+        timeoutMs: Math.max(
+          250,
+          Math.min(30_000, Number(timeoutMs) || mailboxIndexQueryTimeoutMs)
+        ),
         mutationSignal: mutationSignal || (mutation ? signal : null),
         signal: mutation ? null : signal,
       });
