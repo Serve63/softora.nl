@@ -330,9 +330,10 @@ async function syncInstantlyMailboxResponse({
     const syncOptions = fastRefresh
       ? { minIntervalMs: INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS }
       : {};
-    const results = await Promise.all(owners.map((owner) => (
-      instantlyMailboxService.syncOwner(owner, syncOptions)
-    )));
+    const results = [];
+    for (const owner of owners) {
+      results.push(await instantlyMailboxService.syncOwner(owner, syncOptions));
+    }
     return res.status(200).json({
       ok: results.every((result) => result?.ok !== false),
       owners,

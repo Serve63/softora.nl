@@ -96,7 +96,7 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     force: false,
     campaignOnly: true,
     incrementalOnly: true,
-    maxConcurrentAccounts: 3,
+    maxConcurrentAccounts: 2,
   }]);
   assert.equal(normalizeMailboxSyncOwner('ALL'), 'both');
   await assert.rejects(
@@ -254,9 +254,18 @@ test('incremental refresh reports persistent lock contention as retryable and in
 
 test('Instantly fast refresh supports exact owners and both owners without mixing', async () => {
   const calls = [];
+  let activeSyncs = 0;
+  let peakActiveSyncs = 0;
   const service = {
     getStatus: () => ({ configured: true, missing: [] }),
-    syncOwner: async (owner, options) => { calls.push({ owner, options }); return { ok: true, owner }; },
+    syncOwner: async (owner, options) => {
+      calls.push({ owner, options });
+      activeSyncs += 1;
+      peakActiveSyncs = Math.max(peakActiveSyncs, activeSyncs);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeSyncs -= 1;
+      return { ok: true, owner };
+    },
   };
   const response = responseRecorder();
   await syncInstantlyMailboxResponse({
@@ -271,6 +280,7 @@ test('Instantly fast refresh supports exact owners and both owners without mixin
     { owner: 'serve', options: { minIntervalMs: 3 * 60 * 1000 } },
     { owner: 'martijn', options: { minIntervalMs: 3 * 60 * 1000 } },
   ]);
+  assert.equal(peakActiveSyncs, 1);
   assert.deepEqual(response.body.owners, ['serve', 'martijn']);
 
   const rejected = responseRecorder();
@@ -439,6 +449,7 @@ test('refresh status is exclusive while active, successful, partial and failed',
 });
 
 test('zichtbare mailbox herstelt na een storing binnen vijftien seconden', async () => {
+  assert.equal(refreshModule.REFRESH_REQUEST_TIMEOUT_MS, 75_000);
   const timers = [];
   const controller = refreshModule.create({
     autoStart: false,
