@@ -137,17 +137,7 @@ function createMailboxSyncStateStore({
     return { ok: false, locked: false, syncKey, error };
   }
 
-  async function finishSync({
-    accountEmail,
-    folder = 'inbox',
-    lockToken = '',
-    messageCount = 0,
-    lastUid = 0,
-    error = '',
-    warning = '',
-    syncedThroughAt = '',
-    signal,
-  }) {
+  async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '', signal }) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const normalizedLockToken = normalizeString(lockToken);
     if (!normalizedLockToken) {
@@ -157,11 +147,6 @@ function createMailboxSyncStateStore({
     }
     const failed = Boolean(normalizeString(error));
     const finishedAt = isoNow();
-    const requestedSyncedThroughMs = Date.parse(normalizeString(syncedThroughAt));
-    const finishedAtMs = Date.parse(finishedAt);
-    const lastSyncedAt = Number.isFinite(requestedSyncedThroughMs)
-      ? new Date(Math.min(requestedSyncedThroughMs, finishedAtMs)).toISOString()
-      : finishedAt;
     const patch = failed
       ? {
           status: 'error',
@@ -172,10 +157,10 @@ function createMailboxSyncStateStore({
         }
       : {
           status: 'ok',
-          last_error: truncateText(normalizeString(warning), 1000) || null,
+          last_error: null,
           message_count: Math.max(0, Number(messageCount) || 0),
           last_uid: Math.max(0, Number(lastUid) || 0),
-          last_synced_at: lastSyncedAt,
+          last_synced_at: finishedAt,
           lock_token: null,
           lock_expires_at: null,
           updated_at: finishedAt,

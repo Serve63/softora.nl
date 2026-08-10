@@ -9,7 +9,6 @@ function buildRecentSyncResult({
   const lastSyncedAt = Date.parse(String(state?.last_synced_at || '').trim());
   if (
     boundedIntervalMs <= 0 ||
-    String(state?.last_error || '').trim() ||
     !Number.isFinite(lastSyncedAt) ||
     Number(nowMs) - lastSyncedAt >= boundedIntervalMs
   ) return null;

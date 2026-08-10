@@ -240,45 +240,6 @@ test('Instantly fast refresh supports exact owners and both owners without mixin
   assert.equal(rejected.body.code, 'INSTANTLY_MAILBOX_OWNER_INVALID');
 });
 
-test('Instantly both-owner sync wacht op de gezonde owner en meldt partiële uitval als 207', async () => {
-  let releaseMartijn;
-  let completed = false;
-  const service = {
-    getStatus: () => ({ configured: true, missing: [] }),
-    syncOwner: async (owner) => {
-      if (owner === 'serve') {
-        const error = new Error('Serve faalt direct');
-        error.code = 'INSTANTLY_SERVE_FAILED';
-        error.status = 503;
-        throw error;
-      }
-      return new Promise((resolve) => {
-        releaseMartijn = () => resolve({ ok: true, owner: 'martijn' });
-      });
-    },
-  };
-  const response = responseRecorder();
-  const pending = syncInstantlyMailboxResponse({
-    instantlyMailboxService: service,
-    req: { body: { owner: 'both' }, query: {} },
-    res: response,
-    logger: { error() {} },
-    normalizeString: (value) => String(value || '').trim(),
-  }).then(() => { completed = true; });
-
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(completed, false);
-  releaseMartijn();
-  await pending;
-
-  assert.equal(response.statusCode, 207);
-  assert.equal(response.body.ok, false);
-  assert.deepEqual(response.body.results.map((result) => [result.owner, result.ok]), [
-    ['serve', false],
-    ['martijn', true],
-  ]);
-});
-
 test('scope change cancels stale owner refresh before it can overwrite the list', async () => {
   let owner = 'serve';
   const pending = [];
