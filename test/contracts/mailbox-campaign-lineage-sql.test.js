@@ -14,6 +14,10 @@ const migrationPath = path.join(
   repoRoot,
   'supabase/migrations/20260810152657_mailbox_campaign_lineage_index.sql'
 );
+const hardeningMigrationPath = path.join(
+  repoRoot,
+  'supabase/migrations/20260810154015_harden_mailbox_campaign_lineage_replicas.sql'
+);
 const schemaPath = path.join(repoRoot, 'supabase/data-ops-schema.sql');
 
 function read(filePath) {
@@ -24,6 +28,27 @@ test('mailbox lineage migration parses with the real PostgreSQL parser', async (
   const parsed = await parse(read(migrationPath));
   assert.ok(Array.isArray(parsed.stmts));
   assert.ok(parsed.stmts.length > 40, 'volledige migratie moet als losse statements parsen');
+});
+
+test('mailbox lineage replica hardening parses with the real PostgreSQL parser', async () => {
+  const parsed = await parse(read(hardeningMigrationPath));
+  assert.ok(Array.isArray(parsed.stmts));
+  assert.equal(parsed.stmts.length, 8, 'hardeningmigratie moet volledig parsen');
+});
+
+test('mailbox lineage canonicalizes exact provider replicas and rejects Message-ID conflicts', () => {
+  const sql = read(hardeningMigrationPath);
+  assert.match(sql, /create or replace function public\.softora_canonical_mailbox_message_key/);
+  assert.match(sql, /count\(distinct candidates\.envelope_signature\) as signature_count/);
+  assert.match(sql, /latest_message_date - resolved\.earliest_message_date <= interval '1 minute'/);
+  assert.match(sql, /then resolved\.canonical_message_key/);
+  assert.match(sql, /public\.softora_is_mailbox_campaign_root\([\s\S]*then 0/);
+  assert.match(sql, /when lower\(btrim\(messages\.folder\)\) = 'sent' then 1/);
+  assert.match(sql, /or child\.message_key = public\.softora_canonical_mailbox_message_key/);
+  assert.match(sql, /lock table public\.softora_mailbox_messages in share row exclusive mode/);
+  assert.match(sql, /delete from public\.softora_mailbox_campaign_lineage_members/);
+  assert.match(sql, /softora_mailbox_campaign_lineage_discovery_root_idx/);
+  assert.match(sql, /softora_mailbox_campaign_lineage_member_root_idx/);
 });
 
 test('mailbox lineage SQL materializes unlimited exact ancestry with a durable discovery watermark', () => {
@@ -133,6 +158,16 @@ test('fresh data-ops bootstrap contains byte-equivalent additive mailbox lineage
   assert.equal(block[1].trim(), migration);
 });
 
+test('fresh data-ops bootstrap contains byte-equivalent mailbox replica hardening SQL', () => {
+  const migration = read(hardeningMigrationPath).split('\n').slice(5).join('\n').trim();
+  const schema = read(schemaPath);
+  const block = schema.match(
+    /-- mailbox-campaign-lineage-replica-hardening:start\n([\s\S]*?)\n-- mailbox-campaign-lineage-replica-hardening:end/
+  );
+  assert.ok(block, 'data-ops-schema mist mailbox lineage replica-hardening');
+  assert.equal(block[1].trim(), migration);
+});
+
 test('mailbox lineage release order is migration first and rollback is application first', () => {
   const sql = read(migrationPath);
   assert.match(sql, /Deploy order \(fail closed\): apply this migration/);
@@ -140,5 +175,9 @@ test('mailbox lineage release order is migration first and rollback is applicati
   assert.ok(
     path.basename(migrationPath).startsWith('20260810152657_'),
     'lineage migration moet na de bestaande mailbox- en send-outcome-migraties draaien'
+  );
+  assert.ok(
+    path.basename(hardeningMigrationPath).startsWith('20260810154015_'),
+    'replica-hardening moet na de duurzame lineage-foundation draaien'
   );
 });
