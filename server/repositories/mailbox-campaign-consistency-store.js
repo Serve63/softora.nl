@@ -105,9 +105,25 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
     return client;
   }
 
-  async function callRpc(rpcName, args) {
+  async function callRpc(rpcName, args, options = {}) {
     try {
-      const response = await getClient().rpc(rpcName, args);
+      let request = getClient().rpc(rpcName, args);
+      if (options.signal) {
+        if (options.signal.aborted) {
+          throw createConsistencyError(
+            `Mailbox-campagneconsistentie-RPC ${rpcName} is geannuleerd.`,
+            'MAILBOX_CAMPAIGN_CONSISTENCY_ABORTED'
+          );
+        }
+        if (!request || typeof request.abortSignal !== 'function') {
+          throw createConsistencyError(
+            `Mailbox-campagneconsistentie-RPC ${rpcName} ondersteunt geen harde annulering.`,
+            'MAILBOX_CAMPAIGN_CONSISTENCY_ABORT_UNAVAILABLE'
+          );
+        }
+        request = request.abortSignal(options.signal);
+      }
+      const response = await request;
       if (response && response.error) throw response.error;
       return firstRow(response && response.data, rpcName);
     } catch (error) {
@@ -173,6 +189,7 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
     accountEmail = '',
     folder = '',
     leaseSeconds = 120,
+    signal,
   } = {}) {
     const normalizedMutationId = normalizeUuid(mutationId);
     const normalizedRequestKey = normalizeBoundedText(requestKey, 'requestKey', 200);
@@ -188,7 +205,7 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
       }),
       p_folder: normalizeBoundedText(folder, 'folder', 80, { optional: true, lower: true }),
       p_lease_seconds: normalizedLease,
-    });
+    }, { signal });
     const mutation = normalizeMutationRow(row, { includeRequestKey: true });
     if (mutation.requestKey !== normalizedRequestKey
       || (!mutation.replayed && mutation.mutationId !== normalizedMutationId)
@@ -198,7 +215,7 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
     return mutation;
   }
 
-  async function completeMutation({ mutationId, requestKey, result = {} } = {}) {
+  async function completeMutation({ mutationId, requestKey, result = {}, signal } = {}) {
     const normalizedMutationId = normalizeUuid(mutationId);
     const normalizedRequestKey = normalizeBoundedText(requestKey, 'requestKey', 200);
     let serializedResult;
@@ -212,7 +229,7 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
       p_mutation_id: normalizedMutationId,
       p_request_key: normalizedRequestKey,
       p_result: JSON.parse(serializedResult),
-    });
+    }, { signal });
     const mutation = normalizeMutationRow(row);
     if (mutation.mutationId !== normalizedMutationId || mutation.status === 'pending') {
       responseInvalid('Complete-RPC gaf een conflicterende mutation identity terug.');

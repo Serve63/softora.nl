@@ -32,6 +32,7 @@ function createDefaultInstantlyMailboxService({
   getUiStateValues,
   setUiStateValues,
   onMessagesUpserted,
+  getCampaignMutationRunner,
   logger,
 }) {
   return createInstantlyMailboxService({
@@ -54,6 +55,8 @@ function createDefaultInstantlyMailboxService({
     getUiStateValues,
     setUiStateValues,
     onMessagesUpserted,
+    getCampaignMutationRunner,
+    requireMutationJournal: true,
     logger,
   });
 }

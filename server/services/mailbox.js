@@ -7,6 +7,7 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
+const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
@@ -604,7 +605,7 @@ function createMailboxService(deps = {}) {
       dataOpsStore,
       mailboxSendProvenanceStore,
     }),
-    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), logger }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), getCampaignMutationRunner: () => campaignRuntime?.syncOptions?.campaignMutationRunner, logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
@@ -2035,10 +2036,11 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, ...historySyncOptions }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
     const client = createClient(account);
+    const abortScope = createMailboxImapAbortScope(client, signal);
     try {
       await client.connect();
       const mailboxName = await resolveMailboxName(client, normalizedFolder);
@@ -2089,9 +2091,7 @@ function createMailboxService(deps = {}) {
         lock.release();
       }
     } finally {
-      try {
-        if (client.usable) await client.logout();
-      } catch (_) {}
+      await abortScope.dispose();
     }
   }
 
@@ -2144,7 +2144,7 @@ function createMailboxService(deps = {}) {
     getSafeLimit,
     getAccounts,
     normalizeEmail,
-    normalizeFolder, invalidateCampaignSnapshot,
+    normalizeFolder, invalidateCampaignSnapshot, ...campaignRuntime.syncOptions,
     logger,
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
