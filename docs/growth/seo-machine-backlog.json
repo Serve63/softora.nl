@@ -837,6 +837,7 @@
       "status": "shipped",
       "shippedAt": "2026-08-10",
       "shippedPath": "/blog/chatbot-offerte-vergelijken",
+      "shippedPr": 1504,
       "path": "/blog/chatbot-offerte-vergelijken",
       "contentType": "blog",
       "cluster": "ai-contact",
