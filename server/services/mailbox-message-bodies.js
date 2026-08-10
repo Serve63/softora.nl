@@ -1,4 +1,5 @@
 const MAX_MAILBOX_BODY_BATCH_SIZE = 20;
+const { requireMailboxUidValidity } = require('./mailbox-uid-validity');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -109,6 +110,7 @@ function createMailboxMessageBodiesService({
       return {
         id: id || `${folder}:${uid}`,
         uid,
+        uidValidity: requireMailboxUidValidity(message && message.uidValidity),
         folder,
         accountEmail: account.email,
       };
@@ -123,6 +125,7 @@ function createMailboxMessageBodiesService({
     return hydrated.map((message) => ({
       id: normalizeText(message && message.id),
       uid: Number(message && message.uid) || 0,
+      uidValidity: Number(message && message.uidValidity) || 0,
       folder: normalizeMessageFolder(message && message.folder),
       accountEmail: normalizeText(message && message.accountEmail).toLowerCase(),
       resolved: message && message.bodyResolved === true,
