@@ -68,8 +68,6 @@ test('campaign replies koppelt één stabiele DB-contentversie aan response en d
   assert.equal(result.sync.consistency.authoritative, true);
   assert.equal(result.sync.consistency.beforeContentVersion, '12');
   assert.equal(result.sync.consistency.currentContentVersion, '12');
-  assert.equal(result.sync.snapshotPersisted, true);
-  assert.equal(result.sync.snapshotPersistReason, null);
   assert.equal(persists.length, 1);
   assert.equal(persists[0][0].contentVersion, '12');
   assert.equal(persists[0][1].contentVersion, '12');
@@ -126,20 +124,6 @@ test('persist-race degradeert de response ook na een aanvankelijk stabiele read'
   assert.equal(persists.length, 1);
   assert.equal(result.degraded, true);
   assert.equal(result.sync.degradedReason, 'consistency_changed_after_write');
-});
-
-test('onbeschikbare fallback-snapshot maakt een autoritatieve live read niet stale', async () => {
-  const { listCampaignReplies, persists } = createCoordinator({
-    persist: async () => ({ ok: false, reason: 'snapshot_state_unavailable' }),
-  });
-  const result = await listCampaignReplies();
-  assert.equal(persists.length, 1);
-  assert.equal(result.degraded, false);
-  assert.equal(result.sync.stale, false);
-  assert.equal(result.sync.refreshRecommended, false);
-  assert.equal(result.sync.consistency.authoritative, true);
-  assert.equal(result.sync.snapshotPersisted, false);
-  assert.equal(result.sync.snapshotPersistReason, 'snapshot_state_unavailable');
 });
 
 test('CRM-waarschuwing behoudt replies maar verhindert een autoritatieve snapshotclaim', async () => {

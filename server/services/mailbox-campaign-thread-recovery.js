@@ -60,39 +60,6 @@ function normalizeQuotedMatchText(value) {
     .toLowerCase();
 }
 
-function normalizeQuotedIdentityText(value) {
-  return String(value || '')
-    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function rebuildDirectQuotedBody(lines) {
-  const paragraphs = [];
-  let paragraph = [];
-  const flush = () => {
-    if (!paragraph.length) return;
-    paragraphs.push(paragraph.join(' ').replace(/\s+/g, ' ').trim());
-    paragraph = [];
-  };
-  (Array.isArray(lines) ? lines : []).forEach((rawLine) => {
-    const line = String(rawLine || '')
-      .replace(/^\s*(?:>\s*)+/, '')
-      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-      .trim();
-    if (!line) {
-      flush();
-      return;
-    }
-    paragraph.push(line);
-  });
-  flush();
-  return paragraphs.filter(Boolean).join('\n\n').trim();
-}
-
 function extractQuotedRecipientEmails(value, extractEmailAddresses) {
   const parsed = findStructuredQuoteStart(value);
   if (parsed.index < 0) return [];
@@ -122,130 +89,11 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
     getMessageIdentity,
     getMessageReferenceIds,
     getMessageTimestamp,
-    getOutboundSenderIdentity,
-    isOriginalCampaignOutboundMessage,
     normalizeEmail,
     normalizeMessageId,
     normalizeText,
     resolveConversationActivity,
   } = helpers;
-
-  function extractDirectQuotedOriginal(message) {
-    const body = normalizeText(message && message.body);
-    const accountEmail = normalizeEmail(message && message.accountEmail);
-    const senderIdentity = typeof getOutboundSenderIdentity === 'function'
-      ? getOutboundSenderIdentity(accountEmail)
-      : null;
-    if (!body || !accountEmail || !senderIdentity?.name) return null;
-
-    const parsed = findStructuredQuoteStart(body);
-    if (parsed.index < 0) return null;
-    const header = cleanQuotedHeaderLine(parsed.lines[parsed.index]);
-    const directReplyHeader = /^(?:op\s.+\b(?:schreef(?:\s+[^:\n]+)?|heeft\s+.+\s+geschreven)|on\s.+\bwrote)\s*:?$/i.test(header);
-    const normalizedHeader = normalizeQuotedIdentityText(header);
-    const normalizedSenderName = normalizeQuotedIdentityText(senderIdentity.name);
-    if (!directReplyHeader || !normalizedHeader.includes(normalizedSenderName)) return null;
-    if (!parsed.lines.slice(parsed.index + 1).some((line) => /^\s*>/.test(String(line || '')))) return null;
-
-    const authored = parsed.lines.slice(0, parsed.index).join('\n').trim();
-    const quotedBody = rebuildDirectQuotedBody(parsed.lines.slice(parsed.index + 1));
-    if (normalizeQuotedMatchText(authored).length < 2 || normalizeQuotedMatchText(quotedBody).length < 80) {
-      return null;
-    }
-    return { body: quotedBody, header };
-  }
-
-  function attachDirectQuotedOriginalSentMessages(conversations) {
-    return (Array.isArray(conversations) ? conversations : []).map((conversation) => {
-      const accountEmail = normalizeEmail(conversation && conversation.accountEmail);
-      const canonicalSubject = getCanonicalCampaignSubject(conversation && conversation.subject);
-      const messages = [
-        conversation,
-        ...(Array.isArray(conversation && conversation.threadMessages)
-          ? conversation.threadMessages
-          : []),
-      ];
-      if (
-        !accountEmail ||
-        !canonicalSubject ||
-        messages.some((message) => (
-          getMailboxMessageDirection(message) === 'sent' &&
-          message && message.originalCampaignOutbound === true
-        ))
-      ) return conversation;
-
-      const recoveredByProof = new Map();
-      messages
-        .filter((message) => getMailboxMessageDirection(message) !== 'sent')
-        .forEach((message) => {
-          const rawInReplyTo = normalizeText(message && message.inReplyTo);
-          const parentMessageIds = rawInReplyTo
-            ? getMessageReferenceIds({ inReplyTo: rawInReplyTo })
-            : [];
-          if (parentMessageIds.length !== 1) return;
-          const extracted = extractDirectQuotedOriginal(message);
-          if (!extracted) return;
-          const isOriginal = typeof isOriginalCampaignOutboundMessage === 'function' &&
-            isOriginalCampaignOutboundMessage({
-              folder: 'sent',
-              subject: canonicalSubject,
-              body: extracted.body,
-            });
-          if (!isOriginal) return;
-          const proofKey = `${parentMessageIds[0]}|${normalizeQuotedMatchText(extracted.body)}`;
-          if (!recoveredByProof.has(proofKey)) {
-            recoveredByProof.set(proofKey, {
-              parentMessageId: parentMessageIds[0],
-              body: extracted.body,
-            });
-          }
-        });
-      if (recoveredByProof.size !== 1) return conversation;
-
-      const recovered = Array.from(recoveredByProof.values())[0];
-      const senderIdentity = getOutboundSenderIdentity(accountEmail);
-      const counterpartyEmail = normalizeEmail(conversation && conversation.email);
-      const syntheticParent = {
-        id: `quoted-parent:${recovered.parentMessageId}`,
-        mailboxId: `quoted-parent:${recovered.parentMessageId}`,
-        folder: 'sent',
-        storageFolder: 'sent',
-        direction: 'sent',
-        accountEmail,
-        from: normalizeText(senderIdentity && senderIdentity.name),
-        email: accountEmail,
-        to: counterpartyEmail,
-        toDisplay: counterpartyEmail,
-        recipientRoutingEvidenceKnown: Boolean(counterpartyEmail),
-        subject: canonicalSubject,
-        body: recovered.body,
-        preview: recovered.body,
-        messageId: `<${recovered.parentMessageId}>`,
-        hasBody: true,
-        bodyLoaded: true,
-        bodyResolved: true,
-        bodyTruncated: false,
-        unread: false,
-        originalCampaignOutbound: true,
-        syntheticFromQuotedReply: true,
-        threadCorrelationEvidence: 'exact-in-reply-to-owned-sender-and-quoted-campaign-body',
-      };
-      const primaryIdentity = getMessageIdentity(conversation);
-      const threadMessages = dedupeCampaignMessages([
-        ...(Array.isArray(conversation.threadMessages) ? conversation.threadMessages : []),
-        syntheticParent,
-      ])
-        .filter((message) => getMessageIdentity(message) !== primaryIdentity)
-        .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
-      const activity = resolveConversationActivity({ ...conversation, threadMessages });
-      return {
-        ...conversation,
-        latestInboundAt: activity.latestInboundAt,
-        latestOutboundAt: activity.latestOutboundAt,
-        threadMessages,
-      };
-    });
-  }
 
   function canMergeProvenConversationSegments(groupedConversations) {
     if (groupedConversations.length < 2) return true;
@@ -496,32 +344,20 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
         }).catch(() => [])
       : [];
     const recovered = attachQuotedOriginalSentMessages(recoveryCandidates, sentCandidates);
-    const recoveredByIdentity = new Map(recovered.map((conversation) => [
-      getMessageIdentity(conversation),
-      conversation,
-    ]));
-    const directRecoveryBases = hydrated.map((conversation) => (
-      recoveredByIdentity.get(getMessageIdentity(conversation)) || conversation
-    ));
-    const recoveredWithDirectQuotes = attachDirectQuotedOriginalSentMessages(directRecoveryBases)
-      .filter((conversation, index) => (
-        recoveredByIdentity.has(getMessageIdentity(hydrated[index])) ||
-        conversation !== directRecoveryBases[index]
-      ));
     const hydratedByIdentity = new Map(hydrated.map((message) => [
       getMessageIdentity(message),
       message,
     ]));
-    recoveredWithDirectQuotes.forEach((conversation) => {
+    recovered.forEach((conversation) => {
       hydratedByIdentity.set(getMessageIdentity(conversation), conversation);
     });
-    const finalRecoveredByIdentity = new Map(recoveredWithDirectQuotes.map((conversation) => [
+    const recoveredByIdentity = new Map(recovered.map((conversation) => [
       getMessageIdentity(conversation),
       conversation,
     ]));
     return {
       conversations: source.map((conversation) => (
-        finalRecoveredByIdentity.get(getMessageIdentity(conversation)) || conversation
+        recoveredByIdentity.get(getMessageIdentity(conversation)) || conversation
       )),
       hydratedByIdentity,
     };
@@ -529,7 +365,6 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
 
   return {
     attachQuotedOriginalSentMessages,
-    attachDirectQuotedOriginalSentMessages,
     attachTargetedUnthreadedSentMessages,
     buildAcceptedProvenanceMessage,
     canMergeProvenConversationSegments,

@@ -67,7 +67,7 @@ test('durable lineage keeps a newly discovered transitive reply visible in one b
         assert.equal(replyLimit, 200);
         assert.equal(maxDepth, 20);
         assert.equal(maxResults, 9000);
-        assert.equal(deadlineMs, 8000);
+        assert.equal(deadlineMs, 2500);
         return [changedSubjectReply, sentAfterReply, sentDescendant, root];
       },
       listMessagesForAccounts: async () => { calls.recent += 1; return []; },
@@ -98,151 +98,6 @@ test('durable lineage keeps a newly discovered transitive reply visible in one b
     'sent:root',
   ]);
   assert.deepEqual(calls, { lineage: 1, recent: 2, matching: 0, legacy: 0 });
-});
-
-test('durable lineage vult een ontbrekende exacte Sent-ouder gericht aan voor de paarse threadkaart', async () => {
-  const parent = {
-    id: 'sent:romca', folder: 'sent', accountEmail: 'serve@softora.nl',
-    email: 'serve@softora.nl', to: 'info@romca-packing.nl',
-    subject: 'Kleine vraag over jullie website', date: '2026-08-10T13:18:00.000Z',
-    messageId: '<a8892282-972b-7062-52eb-486a275d02a7@softora.nl>',
-    body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website romca-packing.nl tegen.',
-    originalCampaignOutbound: true,
-  };
-  const incoming = {
-    id: 'inbox:romca', folder: 'inbox', accountEmail: 'serve@softora.nl',
-    from: 'Romca Packing', email: 'info@romca-packing.nl', to: 'serve@softora.nl',
-    subject: 'Re: Kleine vraag over jullie website', date: '2026-08-10T19:51:00.000Z',
-    messageId: '<romca-reply@mail.gmail.com>', inReplyTo: parent.messageId,
-    references: parent.messageId, body: 'Hallo serve,\n\nMooi, maar we hebben pas een nieuwe website.',
-  };
-  let requestedMessageIds = [];
-  const service = createMailboxCampaignRepliesService({
-    mailboxIndexStore: {
-      listCampaignLineageMessages: async () => [incoming],
-      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
-      listMessagesByMessageIdsForAccounts: async ({ messageIds }) => {
-        requestedMessageIds = messageIds;
-        return [parent];
-      },
-      hydrateMessageBodies: async ({ messages }) => messages,
-    },
-    dataOpsStore: { listCustomersByEmails: async () => [] },
-  });
-
-  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
-
-  assert.ok(requestedMessageIds.some((value) => String(value).includes('a8892282-972b-7062')));
-  assert.equal(replies.length, 1);
-  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), [parent.id]);
-  assert.equal(replies[0].threadMessages[0].body, parent.body);
-});
-
-test('durable lineage herstelt Romca fail-closed uit de exacte Gmail-quote als de Sent-ouder ontbreekt', async () => {
-  const parentMessageId = '<a8892282-972b-7062-52eb-486a275d02a7@softora.nl>';
-  const incoming = {
-    id: 'inbox:113', uid: 113, folder: 'inbox', accountEmail: 'serve@softora.nl',
-    from: 'Romca Packing', email: 'info@romca-packing.nl', to: 'serve@softora.nl',
-    subject: 'Re: Kleine vraag over jullie website', date: '2026-08-10T19:51:09.000Z',
-    messageId: '<romca-reply@mail.gmail.com>', inReplyTo: parentMessageId,
-    references: parentMessageId,
-    body: [
-      'Hallo serve,',
-      '',
-      'Mooi, maar we hebben pas een nieuwe website.',
-      '',
-      'Groetjes',
-      'Carla',
-      '',
-      'Levering volgens gedeponeerde verkoopvoorwaarden.',
-      'Romca Packing B.V.',
-      '',
-      'Op ma 10 aug 2026 om 15:18 schreef Servé Creusen',
-      '',
-      '> Goedendag,',
-      '>',
-      '> Afgelopen week kwam ik jullie website romca\u2060-\u2060packing\u2060.\u2060nl tegen.',
-      '>',
-      '> Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat',
-      '> leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
-      '>',
-      '> Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke',
-      '> mening 😁',
-      '>',
-      '> Met vriendelijke groet,',
-      '> Servé Creusen',
-    ].join('\n'),
-  };
-  let exactParentLookups = 0;
-  const service = createMailboxCampaignRepliesService({
-    mailboxIndexStore: {
-      listCampaignLineageMessages: async () => [incoming],
-      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
-      listMessagesByMessageIdsForAccounts: async () => {
-        exactParentLookups += 1;
-        return [];
-      },
-      hydrateMessageBodies: async ({ messages }) => messages,
-    },
-    dataOpsStore: {
-      listCustomersByEmails: async () => [{
-        id: 'romca', bedrijf: 'Romca-Packing B.V.', email: 'info@romca-packing.nl',
-        campaignType: 'webdesign', lastColdmailProvider: 'softora',
-      }],
-    },
-  });
-
-  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
-
-  assert.equal(exactParentLookups, 1);
-  assert.equal(replies.length, 1);
-  assert.equal(replies[0].threadMessages.length, 1);
-  assert.equal(replies[0].threadMessages[0].id, 'quoted-parent:a8892282-972b-7062-52eb-486a275d02a7@softora.nl');
-  assert.equal(replies[0].threadMessages[0].messageId, parentMessageId);
-  assert.equal(replies[0].threadMessages[0].folder, 'sent');
-  assert.equal(replies[0].threadMessages[0].originalCampaignOutbound, true);
-  assert.equal(
-    replies[0].threadMessages[0].threadCorrelationEvidence,
-    'exact-in-reply-to-owned-sender-and-quoted-campaign-body'
-  );
-  assert.match(replies[0].threadMessages[0].body, /Afgelopen week kwam ik jullie website romca-packing\.nl tegen\./);
-  assert.doesNotMatch(replies[0].threadMessages[0].body, /^>/m);
-});
-
-test('ontbrekende Sent-ouder wordt niet uit een quote van een andere afzender verzonnen', async () => {
-  const incoming = {
-    id: 'inbox:foreign-quote', folder: 'inbox', accountEmail: 'serve@softora.nl',
-    from: 'Voorbeeld', email: 'info@example.nl', to: 'serve@softora.nl',
-    subject: 'Re: Kleine vraag over jullie website', date: '2026-08-10T19:51:09.000Z',
-    messageId: '<foreign-reply@example.nl>', inReplyTo: '<missing-parent@softora.nl>',
-    body: [
-      'Dit is mijn echte antwoord.',
-      '',
-      'Op ma 10 aug 2026 om 15:18 schreef Iemand Anders',
-      '> Goedendag,',
-      '> Afgelopen week kwam ik jullie website example.nl tegen.',
-      '> Uit enthousiasme heb ik een fris webdesign gemaakt.',
-    ].join('\n'),
-  };
-  const service = createMailboxCampaignRepliesService({
-    mailboxIndexStore: {
-      listCampaignLineageMessages: async () => [incoming],
-      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
-      listMessagesByMessageIdsForAccounts: async () => [],
-      hydrateMessageBodies: async ({ messages }) => messages,
-    },
-    dataOpsStore: {
-      listCustomersByEmails: async () => [{
-        id: 'example', bedrijf: 'Voorbeeld', email: 'info@example.nl',
-        campaignType: 'webdesign', lastColdmailProvider: 'softora',
-      }],
-    },
-  });
-
-  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
-
-  assert.equal(replies.length, 1);
-  assert.deepEqual(replies[0].threadMessages, []);
 });
 
 test('durable lineage fails closed before a partial context can replace the mailbox', async () => {
@@ -956,7 +811,7 @@ test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een an
   assert.equal(conversations[0].latestOutboundAt, '2026-06-10T08:00:00.000Z');
 });
 
-test('campaign mailbox gebruikt bronbewijs plus smalle automatische fallback en houdt menselijke replies zichtbaar', () => {
+test('campaign mailbox hides only source-proven automatic replies and keeps unknown text visible', () => {
   assert.equal(isAutomatedCampaignReply({
     subject: 'zomersluiting Re: Kleine vraag over jullie website',
     body: 'Beste mailer, tot 1 juli zijn wij gesloten.',
@@ -989,24 +844,6 @@ test('campaign mailbox gebruikt bronbewijs plus smalle automatische fallback en 
     automatedReplyEvidence: false,
     automatedReplyEvidenceSource: 'instantly:is_auto_reply',
   }), false, 'providerbewijs dat is_auto_reply false is houdt het menselijke antwoord zichtbaar');
-
-  assert.equal(isAutomatedCampaignReply({
-    subject: 'Re: Kleine vraag over jullie website',
-    body: 'Hartelijk dank voor uw bericht. In verband met vakantie zijn wij afwezig. Mails worden in de tussentijd niet gelezen.',
-  }), true, 'een ondubbelzinnig vakantieantwoord blijft gefilterd wanneer technische headers ontbreken');
-  assert.equal(isAutomatedCampaignReply({
-    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
-    preview: '##- Please type your reply above this line -##',
-    body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk door ons supportteam in behandeling genomen.',
-    autoSubmitted: 'no',
-  }), true, 'een ondubbelzinnige ticketbevestiging blijft zonder providerflag gefilterd');
-  assert.equal(isAutomatedCampaignReply({
-    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
-    body: 'Uw aanvraag (269705) is ontvangen. Ik heb het ontwerp bekeken en wil graag bellen.',
-    automatedReplyEvidenceKnown: true,
-    automatedReplyEvidence: false,
-    automatedReplyEvidenceSource: 'instantly:is_auto_reply',
-  }), false, 'expliciet providerbewijs dat een antwoord menselijk is blijft leidend');
 });
 
 test('campaign mailbox koppelt een unieke nabije automatische reactie zonder RFC-referenties fail-closed', () => {

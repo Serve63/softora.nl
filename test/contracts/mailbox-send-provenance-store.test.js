@@ -115,27 +115,6 @@ test('mailbox send provenance fails closed when durable storage is unavailable',
   ));
 });
 
-test('mailbox provenance gebruikt een eigen ruime Supabase timeout zonder generieke cooldown', async () => {
-  const policies = [];
-  const client = createFakeSupabase();
-  const store = createMailboxSendProvenanceStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: (policy) => {
-      policies.push(policy);
-      return client;
-    },
-    logger: { error() {} },
-  });
-
-  await store.listAcceptedMessages({ accountEmails: ['serve@softora.nl'] });
-
-  assert.deepEqual(policies, [{
-    timeoutMs: 5000,
-    ignoreFailureCooldown: true,
-    suppressFailureCooldown: true,
-  }]);
-});
-
 test('Instantly reply-identiteit blokkeert een nieuwe browserkey maar laat een echte volgende reply toe', async () => {
   const client = createFakeSupabase();
   const store = createMailboxSendProvenanceStore({

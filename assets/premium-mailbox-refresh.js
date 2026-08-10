@@ -4,7 +4,7 @@
   const VISIBLE_REFRESH_INTERVAL_MS = 60 * 1000;
   const HIDDEN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
   const REFRESH_AGE_UPDATE_INTERVAL_MS = 1000;
-  const REFRESH_REQUEST_TIMEOUT_MS = 50 * 1000;
+  const REFRESH_REQUEST_TIMEOUT_MS = 25 * 1000;
   const REFRESH_MAX_ATTEMPTS = 2;
   const REFRESH_RETRY_BASE_DELAY_MS = 500;
   const RECOVERY_REFRESH_INTERVAL_MS = 15 * 1000;
@@ -41,13 +41,7 @@
 
   function isIncompleteRefreshPayload(value) {
     if (!value || typeof value !== 'object') return false;
-    const healthyRecentSync = value.skipped === true && String(value.reason || '') === 'recent-sync' &&
-      value.ok !== false && value.reconciliationDegraded !== true &&
-      !(Number.isFinite(Number(value.remainingReconcileCount)) && Number(value.remainingReconcileCount) > 0);
-    if (
-      value.ok === false || value.complete === false || value.freshnessConfirmed === false ||
-      (value.skipped === true && !healthyRecentSync)
-    ) return true;
+    if (value.ok === false || value.complete === false || value.freshnessConfirmed === false || value.skipped === true) return true;
     return Object.values(value).some(isIncompleteRefreshPayload);
   }
 
@@ -325,21 +319,17 @@
       }
     }
 
-    function requestImmediateRefresh({ queueIfBusy = true } = {}) {
+    function requestImmediateRefresh() {
       if (!started || destroyed || paused) return;
       if (refreshInFlight) {
-        if (queueIfBusy) refreshQueued = true;
+        refreshQueued = true;
         return;
       }
       scheduleNext(0);
     }
 
-    function requestAmbientRefresh() {
-      requestImmediateRefresh({ queueIfBusy: false });
-    }
-
     function handleVisibilityChange() {
-      if (documentRef?.visibilityState === 'visible') requestAmbientRefresh();
+      if (documentRef?.visibilityState === 'visible') requestImmediateRefresh();
       else scheduleNext(HIDDEN_REFRESH_INTERVAL_MS);
     }
 
@@ -389,8 +379,8 @@
       paused = false;
       startRefreshAgeTimer();
       documentRef?.addEventListener?.('visibilitychange', handleVisibilityChange);
-      windowRef?.addEventListener?.('focus', requestAmbientRefresh);
-      windowRef?.addEventListener?.('online', requestAmbientRefresh);
+      windowRef?.addEventListener?.('focus', requestImmediateRefresh);
+      windowRef?.addEventListener?.('online', requestImmediateRefresh);
       windowRef?.addEventListener?.('pagehide', handlePageHide);
       windowRef?.addEventListener?.('pageshow', handlePageShow);
       updateRefreshAge();
@@ -405,8 +395,8 @@
       clearRefreshTimer();
       stopRefreshAgeTimer();
       documentRef?.removeEventListener?.('visibilitychange', handleVisibilityChange);
-      windowRef?.removeEventListener?.('focus', requestAmbientRefresh);
-      windowRef?.removeEventListener?.('online', requestAmbientRefresh);
+      windowRef?.removeEventListener?.('focus', requestImmediateRefresh);
+      windowRef?.removeEventListener?.('online', requestImmediateRefresh);
       windowRef?.removeEventListener?.('pagehide', handlePageHide);
       windowRef?.removeEventListener?.('pageshow', handlePageShow);
       button?.removeEventListener?.('click', handleButtonClick);

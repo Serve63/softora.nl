@@ -9,7 +9,6 @@ const MAILBOX_CAMPAIGN_CONSISTENCY_RPCS = Object.freeze({
 const MUTATION_STATUSES = new Set(['pending', 'completed', 'abandoned']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POSTGRES_BIGINT_MAX = 9223372036854775807n;
-const MAILBOX_CAMPAIGN_CONSISTENCY_TIMEOUT_MS = 5_000;
 
 function createConsistencyError(message, code, cause = null) {
   const error = new Error(message);
@@ -96,13 +95,7 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
   }
 
   function getClient() {
-    const client = isSupabaseConfigured() ? getSupabaseClient({
-      timeoutMs: MAILBOX_CAMPAIGN_CONSISTENCY_TIMEOUT_MS,
-      // The mailbox journal is already bounded by its own mutation deadline.
-      // Never inherit a broad cooldown opened by an unrelated state read.
-      ignoreFailureCooldown: true,
-      suppressFailureCooldown: true,
-    }) : null;
+    const client = isSupabaseConfigured() ? getSupabaseClient() : null;
     if (!client || typeof client.rpc !== 'function') {
       throw createConsistencyError(
         'Mailbox-campagneconsistentie is niet duurzaam beschikbaar.',
@@ -274,13 +267,7 @@ function createMailboxCampaignConsistencyStore(deps = {}) {
     beginMutation,
     completeMutation,
     getFence,
-    isAvailable: () => {
-      try {
-        return Boolean(getClient()?.rpc);
-      } catch (_error) {
-        return false;
-      }
-    },
+    isAvailable: () => Boolean(isSupabaseConfigured() && getSupabaseClient()?.rpc),
   };
 }
 
