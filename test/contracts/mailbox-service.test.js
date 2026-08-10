@@ -12,6 +12,10 @@ const {
 } = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 const {
+  createMailboxPayloadFingerprint,
+  createMailboxRecipientFingerprint,
+} = require('../../server/services/mailbox-send-provenance-store');
+const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   parseMailboxCampaignSnapshot,
@@ -33,6 +37,13 @@ function createMailboxService(deps = {}) {
       intents.set(payload.idempotencyKey, intent);
       return { created: true, intent };
     },
+    markDispatchStarted: async (intentId) => {
+      const intent = Array.from(intents.values()).find((candidate) => candidate.intentId === intentId) || {};
+      const started = { ...intent, intentId, status: 'prepared', dispatchState: 'started', reconcileRequired: true };
+      if (intent.idempotencyKey) intents.set(intent.idempotencyKey, started);
+      return started;
+    },
+    markUnknown: async (intentId) => ({ intentId, status: 'unknown', dispatchState: 'started' }),
     accept: async (intentId, payload) => {
       const intent = Array.from(intents.values()).find((candidate) => candidate.intentId === intentId) || {};
       const accepted = { ...intent, ...payload, intentId, status: 'accepted' };
@@ -41,6 +52,9 @@ function createMailboxService(deps = {}) {
     },
     fail: async () => null,
     listAcceptedMessages: async () => [],
+    listReconcileRequired: async () => [],
+    listExpiredUndispatched: async () => [],
+    abandonUndispatched: async () => ({ abandoned: false }),
   };
   const mailboxComposeThreadContext = deps.mailboxComposeThreadContext || {
     resolve: async ({ body = {}, accountEmail, recipientEmail, provider }) => ({
@@ -256,6 +270,12 @@ function createOutboundGuardStore(calls = [], overrides = {}) {
       if (overrides.confirmError) throw overrides.confirmError;
       if (overrides.confirmResult) return overrides.confirmResult;
       return { ok: true, count: 4 };
+    },
+    releaseReservation: async (reservationId) => {
+      calls.push({ type: 'release', reservationId });
+      if (overrides.releaseError) throw overrides.releaseError;
+      if (overrides.releaseResult) return overrides.releaseResult;
+      return { ok: true };
     },
   };
 }
@@ -1305,7 +1325,7 @@ test('mailbox service refuses manual webdesign sends when the central guard is u
   assert.equal(sent.length, 0);
 });
 
-test('mailbox service fails webdesign sends when central guard confirm updates no rows after SMTP accept', async () => {
+test('mailbox service houdt SMTP-acceptatie leidend wanneer guard-confirm lokaal geen rij vindt', async () => {
   const sent = [];
   const guardCalls = [];
   const service = createMailboxService({
@@ -1331,23 +1351,18 @@ test('mailbox service fails webdesign sends when central guard confirm updates n
     }),
   });
 
-  await assert.rejects(
-    () =>
-      service.sendMessage({
-        accountEmail: 'serve@softora.nl',
-        to: 'info@confirm-empty.example',
-        subject: 'Kleine vraag over jullie website',
-        text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor confirm-empty.example.',
-      }),
-    (error) => {
-      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED');
-      assert.equal(error.status, 502);
-      assert.match(error.message, /bevestigde geen bestaande reservering/);
-      return true;
-    }
-  );
+  const result = await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'info@confirm-empty.example',
+    subject: 'Kleine vraag over jullie website',
+    text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor confirm-empty.example.',
+  });
 
   assert.equal(sent.length, 1);
+  assert.deepEqual(result.accepted, ['info@confirm-empty.example']);
+  assert.equal(result.providerOutcomeUnknown, false);
+  assert.equal(result.storageDegraded, true);
+  assert.equal(result.reconcileRequired, true);
   assert.deepEqual(guardCalls.map((call) => call.type), ['reserve', 'confirm']);
 });
 
@@ -5393,4 +5408,92 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
       { to: 'vangestelsteigerbouw.nl' },
     ],
   });
+});
+
+test('scheduled Sent-sync zoekt een oude SMTP intent exact op header en accepteert pas na index-upsert', async () => {
+  const smtpIntent = {
+    intentId: 'send:old-exact', status: 'prepared', reconcileRequired: true,
+    accountEmail: 'serve@softora.nl', recipientEmail: 'klant@example.nl', owner: 'serve',
+    mode: 'reply', conversationId: 'conversation:old', replyTargetMessageId: '<incoming@example.nl>',
+    messageId: '<planned-old@softora.nl>', subject: 'Re: Oude vraag', body: 'Exact oud antwoord',
+    cc: 'cc@example.nl', bcc: 'bcc@example.nl', createdAt: '2026-08-10T10:00:00.000Z',
+    outboundGuardRequired: false,
+  };
+  const fingerprint = createMailboxRecipientFingerprint({
+    to: smtpIntent.recipientEmail, cc: smtpIntent.cc, bcc: smtpIntent.bcc,
+  });
+  smtpIntent.payloadFingerprint = createMailboxPayloadFingerprint(smtpIntent);
+  const messages = new Map([
+    [1, {
+      uid: 1, flags: ['\\Seen'], internalDate: new Date('2026-08-10T10:01:00.000Z'),
+      source: Buffer.from([
+        'Message-ID: <planned-old@softora.nl>', 'Date: Mon, 10 Aug 2026 12:01:00 +0200',
+        'From: Servé <serve@softora.nl>', 'To: klant@example.nl', 'Cc: cc@example.nl',
+        'Subject: Re: Oude vraag', 'X-Softora-Send-Intent-Id: send:old-exact',
+        'X-Softora-Send-Mode: reply', 'X-Softora-Conversation-Id: conversation:old',
+        'X-Softora-Reply-Target-Message-Id: <incoming@example.nl>',
+        `X-Softora-Recipient-Fingerprint: ${fingerprint}`,
+        `X-Softora-Payload-Fingerprint: ${smtpIntent.payloadFingerprint}`, '', 'Exact oud antwoord',
+      ].join('\r\n')),
+    }],
+    [100, {
+      uid: 100, flags: ['\\Seen'], internalDate: new Date('2026-08-10T11:00:00.000Z'),
+      source: Buffer.from('Message-ID: <recent@softora.nl>\r\nSubject: Recent\r\n\r\nRecent'),
+    }],
+  ]);
+  const searches = [];
+  const client = {
+    usable: true, mailbox: { uidValidity: 777 },
+    async connect() {}, async list() { return [{ path: 'Sent', specialUse: '\\Sent' }]; },
+    async getMailboxLock() { return { release() {} }; },
+    async search(query) {
+      searches.push(query);
+      return query?.header?.['x-softora-send-intent-id'] ? [1] : [100];
+    },
+    fetch(uids) {
+      return (async function* fetchMessages() {
+        for (const uid of uids) if (messages.has(uid)) yield messages.get(uid);
+      })();
+    },
+    async logout() { this.usable = false; },
+  };
+  const events = [];
+  const store = {
+    listAcceptedMessages: async () => [],
+    listReconcileRequired: async ({ provider }) => {
+      assert.equal(provider, 'smtp');
+      return [smtpIntent];
+    },
+    accept: async (intentId) => { events.push(`accept:${intentId}`); },
+  };
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl', name: 'Servé', imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl', imapPass: 'secret',
+    }]),
+    createImapClient: () => client,
+    mailboxSendProvenanceStore: store,
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'smtp-exact-lock' }),
+      prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
+      upsertMessages: async ({ messages: synced }) => {
+        events.push(`upsert:${synced.map((message) => message.uid).join(',')}`);
+        return { ok: true, upserted: synced.length };
+      },
+      finishSync: async () => ({ ok: true }),
+    },
+    logger: { error() {}, warn() {} },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'sent', force: true,
+  });
+  assert.deepEqual(searches.at(-1), { header: { 'x-softora-send-intent-id': smtpIntent.intentId } });
+  assert.match(events[0], /^upsert:.*1/);
+  assert.equal(events[1], `accept:${smtpIntent.intentId}`);
+  assert.equal(result.reconciledSmtpSends, 1);
+  assert.equal(result.remainingSmtpReconcileCount, 0);
 });
