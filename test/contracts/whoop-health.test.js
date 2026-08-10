@@ -206,6 +206,52 @@ test('WHOOP OAuth authorization URL stores an eight-character single-use state',
   assert.equal(supabase.tables.softora_health_whoop_connections[0].oauth_state_hash.length, 64);
 });
 
+test('WHOOP persists exchanged OAuth tokens before fallible profile enrichment', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const state = 'oauth-state';
+  const connection = createConnectedWhoopState(tokenEncryptionKey, {
+    status: 'refresh_uncertain',
+    oauth_state_hash: crypto.createHash('sha256').update(state).digest('hex'),
+    oauth_state_expires_at: new Date(Date.now() + 60000).toISOString(),
+    profile: { user_id: 23320184, first_name: 'Servé' },
+  });
+  const previousEncryptedTokens = connection.encrypted_tokens;
+  const supabase = createMemorySupabase({ softora_health_whoop_connections: [connection] });
+  const requestedUrls = [];
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+      if (String(url).includes('/oauth/oauth2/token')) {
+        return createJsonResponse(200, {
+          access_token: 'access-new', refresh_token: 'refresh-new', expires_in: 3600, scope: 'offline',
+        });
+      }
+      if (String(url).endsWith('/user/profile/basic')) {
+        return createJsonResponse(503, { error: 'profile_temporarily_unavailable' });
+      }
+      return createJsonResponse(200, { height_meter: 1.8 });
+    },
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const result = await service.completeAuthorization({ code: 'one-time-code', state });
+  const stored = supabase.tables.softora_health_whoop_connections[0];
+  assert.equal(result.ok, true);
+  assert.equal(result.profilePending, true);
+  assert.equal(stored.status, 'connected');
+  assert.notEqual(stored.encrypted_tokens, previousEncryptedTokens);
+  assert.equal(stored.oauth_state_hash, null);
+  assert.match(stored.last_sync_error, /profielmetadata wordt later bijgewerkt/);
+  assert.equal(requestedUrls.filter((url) => url.includes('/oauth/oauth2/token')).length, 1);
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events.length, 1);
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events[0].event_type, 'internal.backfill');
+});
+
 test('WHOOP day formatting follows Europe/Amsterdam around daylight saving time', () => {
   assert.equal(formatDay(new Date('2026-03-29T22:30:00Z')), '2026-03-30');
   assert.equal(formatDay(new Date('2026-10-25T22:30:00Z')), '2026-10-25');

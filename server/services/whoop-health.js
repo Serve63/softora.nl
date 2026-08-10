@@ -7,6 +7,7 @@ const WHOOP_AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const WHOOP_WEBHOOK_TABLE = 'softora_health_whoop_webhook_events';
 const TOKEN_REQUEST_TIMEOUT_MS = 15000;
+const API_REQUEST_TIMEOUT_MS = 20000;
 const TOKEN_REFRESH_LOCK_MS = 60000;
 const SYNC_LOCK_MS = 15 * 60 * 1000;
 const WEBHOOK_CLAIM_MS = 15 * 60 * 1000;
@@ -281,10 +282,21 @@ function createWhoopHealthService(deps = {}) {
   }
 
   async function whoopRequest(path, token) {
-    const response = await fetchImpl(`${WHOOP_API_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-    });
-    const data = await response.json().catch(() => ({}));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+    let response;
+    let data;
+    try {
+      response = await fetchImpl(`${WHOOP_API_BASE}${path}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      data = await response.json().catch(() => ({}));
+    } catch (error) {
+      throw new Error(`WHOOP API-netwerkfout: ${String(error.message || error)}`);
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!response.ok) throw new Error(data.message || data.error || `WHOOP API-fout (${response.status})`);
     return data;
   }
@@ -380,18 +392,36 @@ function createWhoopHealthService(deps = {}) {
       client_secret: clientSecret, redirect_uri: redirectUri,
     });
     const tokens = normalizeTokens(tokenData);
-    const profile = await whoopRequest('/user/profile/basic', tokens.access_token);
-    const bodyMeasurement = await whoopRequest('/user/measurement/body', tokens.access_token);
     await patchConnection({
-      whoop_user_id: Number(profile.user_id), status: 'connected', encrypted_tokens: encryptTokens(tokens),
-      scopes: String(tokens.scope || '').split(/\s+/).filter(Boolean), profile,
-      body_measurement: bodyMeasurement, connected_at: now().toISOString(), oauth_state_hash: null,
+      status: 'connected', encrypted_tokens: encryptTokens(tokens),
+      scopes: String(tokens.scope || '').split(/\s+/).filter(Boolean),
+      connected_at: now().toISOString(), oauth_state_hash: null,
       oauth_state_expires_at: null, last_sync_error: null,
       token_refresh_lock_id: null, token_refresh_lock_until: null,
       sync_lock_id: null, sync_lock_until: null,
     });
-    await enqueueInternalBackfill(profile.user_id);
-    return { ok: true, userId: Number(profile.user_id) };
+
+    let profile = connection.profile || {};
+    let bodyMeasurement = connection.body_measurement || {};
+    let metadataError = '';
+    try {
+      [profile, bodyMeasurement] = await Promise.all([
+        whoopRequest('/user/profile/basic', tokens.access_token),
+        whoopRequest('/user/measurement/body', tokens.access_token),
+      ]);
+    } catch (error) {
+      metadataError = `WHOOP opnieuw gekoppeld; profielmetadata wordt later bijgewerkt: ${String(error.message || error)}`
+        .slice(0, 1000);
+    }
+    const userId = Number(profile.user_id || connection.whoop_user_id || 0);
+    await patchConnection({
+      whoop_user_id: userId,
+      profile,
+      body_measurement: bodyMeasurement,
+      last_sync_error: metadataError || null,
+    });
+    await enqueueInternalBackfill(userId);
+    return { ok: true, userId, profilePending: Boolean(metadataError) };
   }
 
   async function getSheetSnapshot() {
@@ -521,11 +551,15 @@ function createWhoopHealthService(deps = {}) {
       await updateSyncRun(run.id, {
         sheet_status: sheetStatus, error: sheetResult.error || null,
       });
+      const syncedRecord = records.find((record) => Number(record.whoop_user_id || 0) > 0);
       await patchConnection({
         last_sync_completed_at: completedAt,
         last_sync_status: 'completed',
         last_sync_error: sheetResult.error || null,
         last_synced_day: targetDay,
+        ...(syncedRecord
+          ? { whoop_user_id: Number(syncedRecord.whoop_user_id) }
+          : {}),
       });
       return { ok: true, targetDay, records: records.length, sheet: sheetResult };
     } catch (error) {
