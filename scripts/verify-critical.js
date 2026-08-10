@@ -10,6 +10,7 @@ const steps = [
   ['run', 'check:quality-lock'],
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],
+  ['run', 'test:postgres:mailbox-locks'],
   ['run', 'check:secrets'],
 ];
 

@@ -523,6 +523,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['check:deps'], 'npm audit --omit=dev');
   assert.equal(packageJson.scripts['check:public-data'], 'node scripts/check-public-data-exposure.js');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
+  assert.equal(
+    packageJson.scripts['test:postgres:mailbox-locks'],
+    'node --test test/postgres/mailbox-campaign-lock-order.postgres.test.js'
+  );
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
   assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
   assert.equal(packageJson.scripts['check:live-production-version:wait'], 'node scripts/wait-live-production-version.js');
@@ -544,6 +548,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.dependencies.mailparser, '^3.9.14');
   assert.equal(packageJson.dependencies.htmlparser2, '^10.1.0');
   assert.equal(packageJson.dependencies.sharp, '^0.35.3');
+  assert.equal(packageJson.devDependencies.pg, '8.23.0');
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.3');
   assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.2');
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.3');
@@ -562,6 +567,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(verifyCriticalSource, /\['run', 'check:public-data'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:deps'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
+  assert.match(verifyCriticalSource, /\['run', 'test:postgres:mailbox-locks'\]/);
   assert.match(publicDataSource, /MAX_EMBEDDED_JSON_BYTES/);
   assert.match(publicDataSource, /BLOCKED_DATA_EXTENSIONS/);
   assert.match(publicDataSource, /git', \['ls-files', '-z'\]/);
@@ -602,6 +608,13 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(liveWorkflowSource, /node-version:\s*22/);
   assert.match(guardrailWorkflowSource, /node-version:\s*22/);
   assert.match(verifyWorkflowSource, /node-version:\s*22/);
+  assert.match(
+    verifyWorkflowSource,
+    /image:\s*postgres:17\.6-alpine@sha256:[0-9a-f]{64}/
+  );
+  assert.match(verifyWorkflowSource, /POSTGRES_DB:\s*softora_mailbox_lock_test_ci/);
+  assert.match(verifyWorkflowSource, /MAILBOX_POSTGRES_TEST_URL:/);
+  assert.match(verifyWorkflowSource, /MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE:\s*'1'/);
   [liveWorkflowSource, guardrailWorkflowSource, verifyWorkflowSource, repoHygieneWorkflowSource].forEach(
     (workflowSource) => assert.match(workflowSource, /uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./)
   );

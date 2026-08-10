@@ -14,6 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      postgres:
+        image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: mailbox-ci-only
+          POSTGRES_DB: softora_mailbox_lock_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d softora_mailbox_lock_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,3 +44,6 @@ jobs:
 
       - name: Verify critical flows
         run: npm run verify:critical
+        env:
+          MAILBOX_POSTGRES_TEST_URL: postgresql://postgres:mailbox-ci-only@127.0.0.1:5432/softora_mailbox_lock_test_ci
+          MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE: '1'
