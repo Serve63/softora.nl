@@ -45,7 +45,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260810a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260809g" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260810a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -398,6 +398,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*'\+5KG Spiermassa'/);
   assert.match(endGameCardsJs, /title:\s*"Servé's gezondheidsdossier"/);
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
+  assert.match(endGameCardsJs, /\{ id: 'world-watcher', title: "Ruben's World Watcher" \}/);
+  assert.match(endGameCardsJs, /\{ id: 'wereldkaart-bezochte-landen-2028', title: "Ruben's wereldkaart", timeframe: 2028, imageId: 'wereldkaart-bezochte-landen' \}/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
   assert.match(endGameCardsJs, /\{ id: 'vaste-parfum-voorraad', title: 'Vaste Parfum voorraad', imageId: 'eigen-parfum' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
@@ -423,11 +425,11 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Vaste Parfum voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
-    "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Ruben Romano',
+    "Servé's gezondheidsdossier", 'Ruben zet toto', "Ruben's World Watcher", 'Ruben Romano',
     'Ruben’s Company', 'Ruben’s Trading System', 'Jurisalem af', 'Gewenst lang kapsel', 'Gewenste kledingkast',
     'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
-    'Wereldkaart met bezochte landen', 'Professionele fotoshoot', 'Persoonlijke handtekening',
+    "Ruben's wereldkaart", 'Professionele fotoshoot', 'Persoonlijke handtekening',
     'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
     'Lijpe Instagram feed', '3 posts · 6 slides', 'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
