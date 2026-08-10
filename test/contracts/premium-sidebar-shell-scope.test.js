@@ -99,7 +99,7 @@ test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => 
 
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-health-dossier.css?v=20260716a') < asideEnd);
-  assert.ok(source.indexOf('assets/premium-health-dossier.js?v=20260716a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-health-dossier.js?v=20260810a') > asideEnd);
   assert.match(source, /data-health-dossier/);
   const healthScript = readRepoFile('assets/premium-health-dossier.js');
   assert.match(healthScript, /\/api\/health\/whoop\/status/);
