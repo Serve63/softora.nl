@@ -138,6 +138,113 @@ test('durable lineage vult een ontbrekende exacte Sent-ouder gericht aan voor de
   assert.equal(replies[0].threadMessages[0].body, parent.body);
 });
 
+test('durable lineage herstelt Romca fail-closed uit de exacte Gmail-quote als de Sent-ouder ontbreekt', async () => {
+  const parentMessageId = '<a8892282-972b-7062-52eb-486a275d02a7@softora.nl>';
+  const incoming = {
+    id: 'inbox:113', uid: 113, folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Romca Packing', email: 'info@romca-packing.nl', to: 'serve@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website', date: '2026-08-10T19:51:09.000Z',
+    messageId: '<romca-reply@mail.gmail.com>', inReplyTo: parentMessageId,
+    references: parentMessageId,
+    body: [
+      'Hallo serve,',
+      '',
+      'Mooi, maar we hebben pas een nieuwe website.',
+      '',
+      'Groetjes',
+      'Carla',
+      '',
+      'Levering volgens gedeponeerde verkoopvoorwaarden.',
+      'Romca Packing B.V.',
+      '',
+      'Op ma 10 aug 2026 om 15:18 schreef Servé Creusen',
+      '',
+      '> Goedendag,',
+      '>',
+      '> Afgelopen week kwam ik jullie website romca\u2060-\u2060packing\u2060.\u2060nl tegen.',
+      '>',
+      '> Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat',
+      '> leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
+      '>',
+      '> Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke',
+      '> mening 😁',
+      '>',
+      '> Met vriendelijke groet,',
+      '> Servé Creusen',
+    ].join('\n'),
+  };
+  let exactParentLookups = 0;
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listCampaignLineageMessages: async () => [incoming],
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
+      listMessagesByMessageIdsForAccounts: async () => {
+        exactParentLookups += 1;
+        return [];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'romca', bedrijf: 'Romca-Packing B.V.', email: 'info@romca-packing.nl',
+        campaignType: 'webdesign', lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
+
+  assert.equal(exactParentLookups, 1);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].threadMessages.length, 1);
+  assert.equal(replies[0].threadMessages[0].id, 'quoted-parent:a8892282-972b-7062-52eb-486a275d02a7@softora.nl');
+  assert.equal(replies[0].threadMessages[0].messageId, parentMessageId);
+  assert.equal(replies[0].threadMessages[0].folder, 'sent');
+  assert.equal(replies[0].threadMessages[0].originalCampaignOutbound, true);
+  assert.equal(
+    replies[0].threadMessages[0].threadCorrelationEvidence,
+    'exact-in-reply-to-owned-sender-and-quoted-campaign-body'
+  );
+  assert.match(replies[0].threadMessages[0].body, /Afgelopen week kwam ik jullie website romca-packing\.nl tegen\./);
+  assert.doesNotMatch(replies[0].threadMessages[0].body, /^>/m);
+});
+
+test('ontbrekende Sent-ouder wordt niet uit een quote van een andere afzender verzonnen', async () => {
+  const incoming = {
+    id: 'inbox:foreign-quote', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Voorbeeld', email: 'info@example.nl', to: 'serve@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website', date: '2026-08-10T19:51:09.000Z',
+    messageId: '<foreign-reply@example.nl>', inReplyTo: '<missing-parent@softora.nl>',
+    body: [
+      'Dit is mijn echte antwoord.',
+      '',
+      'Op ma 10 aug 2026 om 15:18 schreef Iemand Anders',
+      '> Goedendag,',
+      '> Afgelopen week kwam ik jullie website example.nl tegen.',
+      '> Uit enthousiasme heb ik een fris webdesign gemaakt.',
+    ].join('\n'),
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listCampaignLineageMessages: async () => [incoming],
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
+      listMessagesByMessageIdsForAccounts: async () => [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'example', bedrijf: 'Voorbeeld', email: 'info@example.nl',
+        campaignType: 'webdesign', lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
+
+  assert.equal(replies.length, 1);
+  assert.deepEqual(replies[0].threadMessages, []);
+});
+
 test('durable lineage fails closed before a partial context can replace the mailbox', async () => {
   let recentReads = 0;
   const service = createMailboxCampaignRepliesService({

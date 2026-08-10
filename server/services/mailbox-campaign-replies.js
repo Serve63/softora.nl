@@ -37,6 +37,9 @@ const {
 const {
   getOutboundSenderIdentity,
 } = require('./outbound-sender-identity');
+const {
+  isOriginalCampaignOutboundMessage,
+} = require('./mailbox-image-ownership');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
 const { loadMailboxCampaignMessageSources } = require('./mailbox-campaign-message-sources');
@@ -453,6 +456,8 @@ const {
   getMessageIdentity,
   getMessageReferenceIds,
   getMessageTimestamp,
+  getOutboundSenderIdentity,
+  isOriginalCampaignOutboundMessage,
   normalizeEmail,
   normalizeMessageId,
   normalizeText,
