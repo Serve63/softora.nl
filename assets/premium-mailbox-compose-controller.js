@@ -2,8 +2,10 @@
   function create(options = {}) {
     const documentRef = options.document || global.document;
     const acceptedSends = new Map();
+    const pendingSendKeys = new Map();
     let replyContext = null;
     let replyOwner = '';
+    let newMessageSendKey = '';
 
     function normalize(value) {
       return String(value || '').trim().toLowerCase();
@@ -108,6 +110,9 @@
             getAccount: options.campaignInbox.getAccount,
           })
         : null;
+      if (replyContext && pendingSendKeys.has(replyContext.id)) {
+        replyContext.sendIdempotencyKey = pendingSendKeys.get(replyContext.id);
+      }
       replyOwner = mail ? resolveOwnerForMail(mail) : '';
     }
 
@@ -144,6 +149,7 @@
     function open(optionsOverride = {}) {
       if (!optionsOverride.keepContext) {
         setReplyContext(null);
+        newMessageSendKey = '';
         options.compose.resetOptionalFields();
       }
       options.compose.reset(Boolean(replyContext && replyContext.mode !== 'new-message'));
@@ -155,6 +161,7 @@
       documentRef?.getElementById('compose-overlay')?.classList.remove('open');
       options.composeWindow?.reset?.();
       setReplyContext(null);
+      newMessageSendKey = '';
       options.compose.reset(false);
       options.compose.resetOptionalFields();
       ['c-to', 'c-subject', 'c-body'].forEach((id) => {
@@ -286,12 +293,14 @@
         assertReplyOwner(account);
         const sendOwner = replyOwner;
         const sendMode = contextAtSend?.mode === 'reply' ? 'reply' : 'new-message';
-        const idempotencyKey = String(contextAtSend?.sendIdempotencyKey || '').trim() || global.crypto?.randomUUID?.() || [
+        const idempotencyKey = String(contextAtSend?.sendIdempotencyKey || newMessageSendKey).trim() || global.crypto?.randomUUID?.() || [
           'mailbox-send',
           Date.now(),
           Math.random().toString(36).slice(2),
         ].join(':');
         if (replyContext) replyContext.sendIdempotencyKey = idempotencyKey;
+        else newMessageSendKey = idempotencyKey;
+        if (contextAtSend?.id) pendingSendKeys.set(contextAtSend.id, idempotencyKey);
         const provider = String(replyContext && replyContext.provider || '').trim().toLowerCase();
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
@@ -333,9 +342,32 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.ok) {
+          if (contextAtSend?.id && response.status !== 202) pendingSendKeys.delete(contextAtSend.id);
+          if (!contextAtSend && response.status !== 202) newMessageSendKey = '';
           throw new Error(data?.detail || data?.error || 'Mail verzenden mislukt');
         }
         const result = data?.result && typeof data.result === 'object' ? data.result : {};
+        if (result.providerOutcomeUnknown || result.processing) {
+          options.toast('Verzending wordt gecontroleerd; stuur dit antwoord niet opnieuw.');
+          return;
+        }
+        if (contextAtSend?.id) pendingSendKeys.delete(contextAtSend.id);
+        if (!contextAtSend) newMessageSendKey = '';
+        const acceptedRecipients = (Array.isArray(result.accepted) ? result.accepted : [])
+          .map((value) => normalize(value && typeof value === 'object' ? value.address || value.email : value))
+          .filter(Boolean);
+        const primaryAccepted = provider === 'instantly' || !Array.isArray(result.accepted) ||
+          acceptedRecipients.includes(normalize(to));
+        const deliveryDegraded = result.deliveryDegraded === true ||
+          (Array.isArray(result.rejected) && result.rejected.length > 0);
+        const storageDegraded = result.storageDegraded === true || result.reconcileRequired === true;
+        if (!primaryAccepted) {
+          close();
+          options.toast(
+            'Mail deels verzonden, maar de hoofdontvanger is geweigerd; CC/BCC kan al ontvangen hebben. Stuur niet opnieuw zonder controle.'
+          );
+          return;
+        }
         const acceptedAt = new Date().toISOString();
         const messageId = String(result.messageId || '').trim();
         const providerMessageId = String(result.providerMessageId || '').trim();
@@ -389,7 +421,13 @@
           message: sentMessage,
         });
         close();
-        options.toast('✓ Mail verzonden');
+        if (deliveryDegraded) {
+          options.toast('Mail aan de hoofdontvanger verzonden; één of meer CC/BCC-adressen zijn geweigerd.');
+        } else if (storageDegraded) {
+          options.toast('Mail door de provider geaccepteerd; lokale verwerking wordt gecontroleerd.');
+        } else {
+          options.toast('✓ Mail verzonden');
+        }
       } catch (error) {
         options.toast(String(error?.message || error || 'Mail verzenden mislukt'));
       } finally {

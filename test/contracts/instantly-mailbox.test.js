@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const {
   createInstantlyMailboxService,
+  isDefinitiveInstantlyReplyRejection,
   normalizeAccountOwnership,
 } = require('../../server/services/instantly-mailbox');
 const {
@@ -21,8 +22,13 @@ const {
 const {
   createDefaultInstantlyMailboxService,
   mergeCampaignReplies,
+  sendMailboxMessage,
   syncInstantlyMailboxResponse,
 } = require('../../server/services/mailbox-instantly-integration');
+const { createMailboxComposeRuntime } = require('../../server/services/mailbox-compose-runtime');
+const {
+  createMailboxSendIdentityKey,
+} = require('../../server/services/mailbox-send-provenance-store');
 const {
   createMailboxCampaignMutationRunner,
 } = require('../../server/services/mailbox-campaign-mutation-runner');
@@ -31,7 +37,7 @@ function createStore(initialMessages = []) {
   const rows = initialMessages.slice();
   const syncStates = new Map();
   return {
-    rows,
+    rows, syncStates,
     async getSyncState({ accountEmail, folder }) {
       return syncStates.get(`${accountEmail}|${folder}`) || null;
     },
@@ -122,10 +128,12 @@ function buildService(overrides = {}) {
     getUiStateValues,
     setUiStateValues,
     onMessagesUpserted: overrides.onMessagesUpserted,
+    mailboxSendProvenanceStore: overrides.mailboxSendProvenanceStore,
     getCampaignMutationRunner: overrides.getCampaignMutationRunner,
     requireMutationJournal: overrides.requireMutationJournal,
     createMutationRequestKey: overrides.createMutationRequestKey,
     now: () => new Date('2026-07-25T12:00:00.000Z'),
+    logger: overrides.logger || { error() {}, warn() {} },
     fetchJsonWithTimeout: async (url, options) => {
       requests.push({ url, options });
       if (overrides.fetchJsonWithTimeout) {
@@ -152,6 +160,76 @@ function incoming(overrides = {}) {
     timestamp_email: '2026-07-25T11:00:00.000Z',
     ...overrides,
   };
+}
+
+function replyInput(overrides = {}) {
+  return {
+    owner: 'serve', accountEmail: 'serve-sender@example.com',
+    providerMessageId: 'incoming-serve-1', providerThreadId: 'thread-serve',
+    to: 'prospect@example.org', subject: 'Re: Kleine vraag', text: 'Dank voor je reactie.',
+    ...overrides,
+  };
+}
+
+function replyRunner(events = []) {
+  return {
+    isAvailable: () => true,
+    async run(options, task) {
+      events.push(`journal:${options.accountEmail}:${options.requestKey}`);
+      return task({
+        accountEmail: options.accountEmail,
+        mutationId: '71111111-1111-4111-8111-111111111111',
+        requestKey: options.requestKey,
+        signal: new AbortController().signal,
+        assertActive() {},
+      });
+    },
+  };
+}
+
+function sentReplyResponse(options, id = 'sent-reply-outcome-1') {
+  return {
+    response: { ok: true, status: 200 },
+    data: {
+      id, subject: 'Re: Kleine vraag', body: { text: JSON.parse(options.body).body.text },
+      timestamp_created: '2026-07-25T12:00:00.000Z',
+    },
+  };
+}
+
+function reconcileIntent(overrides = {}) {
+  const intent = {
+    intentId: 'send:reconcile-1', idempotencyKey: 'reconcile-key-1',
+    owner: 'serve', accountEmail: 'serve-sender@example.com', recipientEmail: 'prospect@example.org',
+    mode: 'reply', conversationId: 'instantly:thread-serve',
+    replyTargetMessageId: 'incoming-serve-1', references: 'incoming-serve-1',
+    provider: 'instantly', providerThreadId: 'thread-serve',
+    subject: 'Re: Kleine vraag', body: 'Dank voor je reactie.', cc: '', bcc: '',
+    status: 'unknown', storageDegraded: true, reconcileRequired: true,
+    createdAt: '2026-07-20T12:00:00.000Z',
+    ...overrides,
+  };
+  return { ...intent, sendIdentityKey: createMailboxSendIdentityKey(intent) };
+}
+
+function reconciledProviderReply(overrides = {}) {
+  return incoming({
+    id: 'sent-reconciled-1', email_type: 'sent',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    subject: 'Re: Kleine vraag', body: { text: 'Dank voor je reactie.' },
+    timestamp_email: '2026-07-20T12:01:00.000Z',
+    timestamp_created: '2026-07-20T12:01:00.000Z',
+    ...overrides,
+  });
+}
+
+function reconciledProviderTarget(overrides = {}) {
+  return incoming({
+    timestamp_email: '2026-07-20T11:00:00.000Z',
+    timestamp_created: '2026-07-20T11:00:00.000Z',
+    ...overrides,
+  });
 }
 
 test('Instantly account ownership is exact and rejects incomplete entries', () => {
@@ -1545,6 +1623,503 @@ test('reply uses the exact stored account/thread and rejects cross-owner, recipi
   assert.equal(payload.cc_address_email_list, 'collega@example.org');
   assert.equal(payload.bcc_address_email_list, '');
   assert.equal(store.rows.some((message) => message.providerMessageId === 'sent-reply-1'), true);
+});
+
+test('Instantly reply stopt vóór provider-send wanneer de verplichte mutation journal ontbreekt', async () => {
+  let providerSends = 0;
+  const { service, store } = buildService({
+    requireMutationJournal: true,
+    getCampaignMutationRunner: () => ({ isAvailable: () => false }),
+    fetchJsonWithTimeout: async () => {
+      providerSends += 1;
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+
+  await assert.rejects(service.reply(replyInput()), {
+    code: 'INSTANTLY_MUTATION_JOURNAL_UNAVAILABLE',
+  });
+  assert.equal(providerSends, 0);
+});
+
+test('Instantly reply behandelt alleen bewezen provider-rejecties als retrybaar no-effect', async (t) => {
+  assert.equal(isDefinitiveInstantlyReplyRejection({ status: 400, providerStatus: 409 }), false);
+  assert.equal(isDefinitiveInstantlyReplyRejection({ status: 502, providerStatus: 400 }), true);
+  for (const providerStatus of [408, 409, 425, 429]) {
+    await t.test(`provider ${providerStatus} blijft unknown`, async () => {
+      const { service, store } = buildService({
+        requireMutationJournal: true, getCampaignMutationRunner: () => replyRunner(),
+        fetchJsonWithTimeout: async () => ({
+          response: { ok: false, status: providerStatus }, data: { message: `provider ${providerStatus}` },
+        }),
+      });
+      store.rows.push(service.normalizeInstantlyMessage(incoming()));
+      const result = await service.reply(replyInput({ mutationRequestKey: `unknown-${providerStatus}` }));
+      assert.equal(result.providerOutcomeUnknown, true);
+      assert.equal(result.processing, true);
+      assert.equal(result.reconcileRequired, true);
+    });
+  }
+  for (const providerStatus of [400, 401, 403, 404, 422]) {
+    await t.test(`provider ${providerStatus} is definitief no-effect`, async () => {
+      const { service, store } = buildService({
+        requireMutationJournal: true, getCampaignMutationRunner: () => replyRunner(),
+        fetchJsonWithTimeout: async () => ({
+          response: { ok: false, status: providerStatus }, data: { message: `provider ${providerStatus}` },
+        }),
+      });
+      store.rows.push(service.normalizeInstantlyMessage(incoming()));
+      await assert.rejects(service.reply(replyInput({ mutationRequestKey: `rejected-${providerStatus}` })),
+        (error) => error.providerStatus === providerStatus && error.providerRejected === true &&
+          error.noExternalEffect === true && error.providerOutcomeUnknown !== true);
+    });
+  }
+});
+
+test('provider-acceptatie met lokale storefout blijft één geaccepteerde send en vereist reconcile', async () => {
+  let providerSends = 0;
+  let acceptedPayload = null;
+  let failed = 0;
+  const store = createStore();
+  store.upsertProviderMessages = async () => ({ ok: false, error: new Error('store down') });
+  const { service } = buildService({
+    store, requireMutationJournal: true,
+    getCampaignMutationRunner: () => replyRunner(),
+    fetchJsonWithTimeout: async (_url, options) => {
+      providerSends += 1;
+      return sentReplyResponse(options, 'sent-store-degraded');
+    },
+  });
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+  const threadProvenance = {
+    intentId: 'send:store-degraded', idempotencyKey: 'store-degraded-key',
+    owner: 'serve', accountEmail: 'serve-sender@example.com', recipientEmail: 'prospect@example.org',
+    mode: 'reply', conversationId: 'instantly:thread-serve',
+    replyTargetMessageId: 'incoming-serve-1', references: 'incoming-serve-1',
+    provider: 'instantly', providerThreadId: 'thread-serve',
+  };
+  const result = await sendMailboxMessage({
+    body: { ...replyInput(), account: 'serve-sender@example.com', body: 'Dank voor je reactie.', provider: 'instantly' },
+    instantlyMailboxService: service, normalizeString: (value) => String(value || '').trim(),
+    threadProvenance,
+    mailboxSendProvenanceStore: {
+      reserve: async () => ({ created: true, intent: { ...threadProvenance, status: 'prepared' } }),
+      markDispatchStarted: async (intentId) => ({ intentId, status: 'prepared', dispatchState: 'started' }),
+      accept: async (intentId, payload) => {
+        acceptedPayload = { intentId, ...payload };
+        return { intentId, status: 'accepted' };
+      },
+      fail: async () => { failed += 1; },
+    },
+    logger: { error() {} },
+  });
+
+  assert.equal(providerSends, 1);
+  assert.equal(result.providerMessageId, 'sent-store-degraded');
+  assert.equal(result.storageDegraded, true);
+  assert.equal(result.reconcileRequired, true);
+  assert.equal(acceptedPayload.storageDegraded, true);
+  assert.equal(acceptedPayload.reconcileRequired, true);
+  assert.equal(failed, 0);
+});
+
+test('Instantly pre-provider validatiefouten maken provenance retrybaar failed zonder unknown-lock', async (t) => {
+  for (const scenario of [
+    { label: 'recipient drift', body: { to: 'ander@example.org' }, code: 'INSTANTLY_REPLY_RECIPIENT_MISMATCH' },
+    { label: 'attachment drift', body: { attachments: [{ filename: 'bestand.pdf' }] }, code: 'INSTANTLY_ATTACHMENTS_UNSUPPORTED' },
+  ]) {
+    await t.test(scenario.label, async () => {
+      let providerSends = 0;
+      let dispatchStarts = 0;
+      let failed = 0;
+      let unknown = 0;
+      const store = createStore();
+      const { service } = buildService({
+        store, requireMutationJournal: true, getCampaignMutationRunner: () => replyRunner(),
+        fetchJsonWithTimeout: async () => {
+          providerSends += 1;
+          return { response: { ok: true, status: 200 }, data: {} };
+        },
+      });
+      store.rows.push(service.normalizeInstantlyMessage(incoming()));
+      const threadProvenance = {
+        intentId: `send:prevalidation:${scenario.label}`, idempotencyKey: `key:${scenario.label}`,
+        owner: 'serve', accountEmail: 'serve-sender@example.com', recipientEmail: 'prospect@example.org',
+        mode: 'reply', conversationId: 'instantly:thread-serve',
+        replyTargetMessageId: 'incoming-serve-1', references: 'incoming-serve-1',
+        provider: 'instantly', providerThreadId: 'thread-serve',
+      };
+      await assert.rejects(() => sendMailboxMessage({
+        body: {
+          ...replyInput(), account: 'serve-sender@example.com', body: 'Dank voor je reactie.',
+          provider: 'instantly', ...scenario.body,
+        },
+        instantlyMailboxService: service, normalizeString: (value) => String(value || '').trim(),
+        threadProvenance,
+        mailboxSendProvenanceStore: {
+          reserve: async () => ({ created: true, intent: { ...threadProvenance, status: 'prepared' } }),
+          markDispatchStarted: async () => { dispatchStarts += 1; },
+          fail: async () => { failed += 1; },
+          markUnknown: async () => { unknown += 1; },
+        },
+      }), { code: scenario.code });
+      assert.equal(providerSends, 0);
+      assert.equal(dispatchStarts, 0);
+      assert.equal(failed, 1);
+      assert.equal(unknown, 0);
+    });
+  }
+});
+
+test('onbekende provideruitkomst blijft na reload en nieuwe key 202 zonder tweede provider-send', async () => {
+  let providerSends = 0;
+  let failed = 0;
+  const activeByIdentity = new Map();
+  const store = createStore();
+  const { service } = buildService({
+    store, requireMutationJournal: true,
+    getCampaignMutationRunner: () => replyRunner(),
+    fetchJsonWithTimeout: async () => {
+      providerSends += 1;
+      throw Object.assign(new Error('network timeout after request'), { name: 'AbortError' });
+    },
+  });
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+  const provenance = (suffix) => ({
+    intentId: `send:provider-unknown-${suffix}`, idempotencyKey: `provider-unknown-key-${suffix}`,
+    owner: 'serve', accountEmail: 'serve-sender@example.com', recipientEmail: 'prospect@example.org',
+    mode: 'reply', conversationId: 'instantly:thread-serve',
+    replyTargetMessageId: 'incoming-serve-1', references: 'incoming-serve-1',
+    provider: 'instantly', providerThreadId: 'thread-serve',
+  });
+  const mailboxSendProvenanceStore = {
+    async reserve(payload) {
+      const identity = createMailboxSendIdentityKey(payload);
+      if (activeByIdentity.has(identity)) return { created: false, intent: activeByIdentity.get(identity) };
+      const intent = {
+        ...payload, sendIdentityKey: identity, status: 'prepared',
+        createdAt: '2026-07-25T12:00:00.000Z', reconcileRequired: false,
+      };
+      activeByIdentity.set(identity, intent);
+      return { created: true, intent };
+    },
+    async markUnknown(intentId) {
+      const entry = Array.from(activeByIdentity.entries()).find(([, value]) => value.intentId === intentId);
+      const intent = {
+        ...entry[1], status: 'unknown', providerOutcomeUnknown: true,
+        storageDegraded: true, reconcileRequired: true,
+      };
+      activeByIdentity.set(entry[0], intent);
+      return intent;
+    },
+    async markDispatchStarted(intentId) {
+      const entry = Array.from(activeByIdentity.entries()).find(([, value]) => value.intentId === intentId);
+      const intent = { ...entry[1], dispatchState: 'started', reconcileRequired: true };
+      activeByIdentity.set(entry[0], intent);
+      return intent;
+    },
+    async accept() { throw new Error('unknown outcome may not be accepted'); },
+    async fail() { failed += 1; },
+  };
+  const createRuntime = (threadProvenance) => createMailboxComposeRuntime({
+    composeSendDependencies: {}, instantlyMailboxService: service, mailboxSendProvenanceStore,
+    logger: { error() {} }, normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    mailboxComposeThreadContext: { resolve: async () => threadProvenance },
+  });
+  const response = () => ({
+    statusCode: 0, body: null,
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+  });
+  const request = (threadProvenance, overrides = {}) => ({ body: {
+    ...replyInput(), account: 'serve-sender@example.com', body: 'Dank voor je reactie.',
+    provider: 'instantly', idempotencyKey: threadProvenance.idempotencyKey, ...overrides,
+  } });
+  const firstProvenance = provenance('first');
+  const first = response();
+  await createRuntime(firstProvenance).sendMessageResponse(request(firstProvenance), first);
+  const reloadedProvenance = provenance('after-reload');
+  const repeated = response();
+  await createRuntime(reloadedProvenance).sendMessageResponse(request(reloadedProvenance, {
+    subject: 'Re: Kleine vraag - aangepast', body: 'Aangepaste inhoud na reload.',
+    cc: 'nieuw@example.org',
+  }), repeated);
+
+  assert.equal(first.statusCode, 202);
+  assert.equal(first.body.result.providerOutcomeUnknown, true);
+  assert.equal(repeated.statusCode, 202);
+  assert.equal(repeated.body.result.idempotentReplay, true);
+  assert.equal(Array.from(activeByIdentity.values())[0].status, 'unknown');
+  assert.equal(activeByIdentity.size, 1);
+  assert.equal(providerSends, 1);
+  assert.equal(failed, 0);
+});
+
+test('reconciler vindt een exact geaccepteerde reply buiten de normale overlap en voorkomt resend', async () => {
+  let intent = reconcileIntent();
+  const store = createStore();
+  store.syncStates.set('instantly-serve@softora.internal|instantly', {
+    last_synced_at: '2026-07-25T11:59:00.000Z',
+  });
+  const requestedMinTimestamps = [];
+  const providerReplies = reconciledProviderReply();
+  const provenanceStore = {
+    async listReconcileRequired() { return [intent]; },
+    async accept(intentId, payload) {
+      intent = {
+        ...intent, ...payload, intentId, status: 'accepted',
+        storageDegraded: false, reconcileRequired: false,
+      };
+      return intent;
+    },
+    async reserve(payload) {
+      assert.equal(createMailboxSendIdentityKey(payload), intent.sendIdentityKey);
+      return { created: false, intent };
+    },
+  };
+  const { service, requests } = buildService({
+    store, mailboxSendProvenanceStore: provenanceStore,
+    fetchJsonWithTimeout: async (url) => {
+      const query = new URL(url).searchParams;
+      if (query.get('search') === 'thread:thread-serve') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { items: [reconciledProviderTarget(), providerReplies] },
+        };
+      }
+      const minTimestamp = query.get('min_timestamp_created');
+      requestedMinTimestamps.push(minTimestamp);
+      return {
+        response: { ok: true, status: 200 },
+        data: { items: Date.parse(minTimestamp) <= Date.parse(providerReplies.timestamp_created) ? [providerReplies] : [] },
+      };
+    },
+  });
+
+  const sync = await service.syncOwner('serve', { minIntervalMs: 3 * 60 * 1000 });
+  assert.equal(requestedMinTimestamps[0], '2026-07-20T11:58:00.000Z');
+  assert.equal(sync.reconciled, 1);
+  assert.equal(sync.remainingReconcileCount, 0);
+  assert.equal(sync.reconciliationDegraded, false);
+  assert.equal(sync.partial, false);
+  assert.equal(intent.status, 'accepted');
+  assert.equal(intent.providerMessageId, 'sent-reconciled-1');
+  assert.equal('in_reply_to' in providerReplies, false);
+
+  const replayProvenance = { ...intent, intentId: 'send:reloaded', idempotencyKey: 'new-browser-key' };
+  const replay = await sendMailboxMessage({
+    body: {
+      ...replyInput(), account: intent.accountEmail,
+      subject: 'Re: gewijzigd na acceptatie', body: 'Gewijzigde inhoud na acceptatie.',
+      cc: 'nieuw@example.org',
+      provider: 'instantly', idempotencyKey: replayProvenance.idempotencyKey,
+    },
+    instantlyMailboxService: service, normalizeString: (value) => String(value || '').trim(),
+    threadProvenance: replayProvenance, mailboxSendProvenanceStore: provenanceStore,
+  });
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(replay.providerMessageId, 'sent-reconciled-1');
+  assert.equal(requests.some(({ url }) => url.endsWith('/emails/reply')), false);
+});
+
+test('reconciler houdt unknown geblokkeerd zonder exacte providerproof', async () => {
+  const intent = reconcileIntent();
+  const { service } = buildService({
+    mailboxSendProvenanceStore: {
+      async listReconcileRequired() { return [intent]; },
+      async accept() { throw new Error('een mismatch mag niet accepteren'); },
+    },
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: { items: [
+        reconciledProviderTarget(),
+        reconciledProviderReply({ body: { text: 'Andere inhoud.' } }),
+      ] },
+    }),
+  });
+
+  const sync = await service.syncOwner('serve');
+  assert.equal(sync.reconciled, 0);
+  assert.equal(sync.remainingReconcileCount, 1);
+  assert.equal(sync.reconciliationDegraded, false);
+  assert.equal(sync.partial, true);
+  assert.equal(intent.status, 'unknown');
+});
+
+test('reconciler weigert ontbrekende, ambigue of te late doelproof', async (t) => {
+  const cases = [
+    ['doelrij ontbreekt', [reconciledProviderReply()]],
+    ['twee sent matches', [
+      reconciledProviderTarget(), reconciledProviderReply(),
+      reconciledProviderReply({ id: 'sent-reconciled-2' }),
+    ]],
+    ['doelrij is later dan sent', [
+      reconciledProviderTarget({
+        timestamp_email: '2026-07-20T12:02:00.000Z',
+        timestamp_created: '2026-07-20T12:02:00.000Z',
+      }),
+      reconciledProviderReply(),
+    ]],
+  ];
+  for (const [label, items] of cases) {
+    await t.test(label, async () => {
+      let accepted = 0;
+      const { service } = buildService({
+        mailboxSendProvenanceStore: {
+          async listReconcileRequired() { return [reconcileIntent()]; },
+          async accept() { accepted += 1; },
+        },
+        fetchJsonWithTimeout: async () => ({
+          response: { ok: true, status: 200 }, data: { items },
+        }),
+      });
+      const sync = await service.syncOwner('serve');
+      assert.equal(sync.reconciled, 0);
+      assert.equal(sync.remainingReconcileCount, 1);
+      assert.equal(sync.partial, true);
+      assert.equal(accepted, 0);
+    });
+  }
+});
+
+test('reconcilethread-hydration blijft binnen twintig Email-list requests per sync', async () => {
+  let providerRequests = 0;
+  const intents = Array.from({ length: 25 }, (_, index) => reconcileIntent({
+    intentId: `send:budget-${index}`, idempotencyKey: `budget-key-${index}`,
+    providerThreadId: `thread-budget-${index}`, replyTargetMessageId: `incoming-budget-${index}`,
+  }));
+  const { service } = buildService({
+    config: { maxPages: 1 },
+    mailboxSendProvenanceStore: {
+      async listReconcileRequired() { return intents; },
+      async accept() { throw new Error('lege providerresultaten mogen niet accepteren'); },
+    },
+    fetchJsonWithTimeout: async () => {
+      providerRequests += 1;
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+  const sync = await service.syncOwner('serve');
+  assert.equal(providerRequests, 20);
+  assert.equal(sync.providerRequestBudgetExhausted, true);
+  assert.equal(sync.remainingReconcileCount, 25);
+  assert.equal(sync.partial, true);
+});
+
+test('reconciler meldt list- en acceptfouten als gedeeltelijke gedegradeerde sync', async (t) => {
+  await t.test('listfout', async () => {
+    const { service } = buildService({
+      mailboxSendProvenanceStore: {
+        async listReconcileRequired() { throw new Error('provenance list down'); },
+      },
+    });
+    const sync = await service.syncOwner('serve');
+    assert.equal(sync.reconciliationChecked, false);
+    assert.equal(sync.reconciliationDegraded, true);
+    assert.equal(sync.remainingReconcileCount, null);
+    assert.equal(sync.partial, true);
+  });
+  await t.test('acceptfout', async () => {
+    const intent = reconcileIntent();
+    const { service } = buildService({
+      mailboxSendProvenanceStore: {
+        async listReconcileRequired() { return [intent]; },
+        async accept() { throw new Error('provenance accept down'); },
+      },
+      fetchJsonWithTimeout: async () => ({
+        response: { ok: true, status: 200 },
+        data: { items: [reconciledProviderTarget(), reconciledProviderReply()] },
+      }),
+    });
+    const sync = await service.syncOwner('serve');
+    assert.equal(sync.reconciliationChecked, true);
+    assert.equal(sync.reconciliationDegraded, true);
+    assert.equal(sync.remainingReconcileCount, 1);
+    assert.equal(sync.partial, true);
+  });
+});
+
+test('sync-lock en ontbrekende reconciler kunnen open provideruitkomsten niet als fresh maskeren', async (t) => {
+  await t.test('lopende sync met pending intent', async () => {
+    const store = createStore();
+    store.acquireSyncLock = async () => ({
+      ok: false,
+      locked: true,
+      lockReason: 'active_target',
+      lockExpiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    const { service } = buildService({
+      store,
+      mailboxSendProvenanceStore: {
+        async listReconcileRequired() { return [reconcileIntent()]; },
+      },
+    });
+    const sync = await service.syncOwner('serve');
+    assert.equal(sync.reason, 'sync-in-progress');
+    assert.equal(sync.reconciliationChecked, true);
+    assert.equal(sync.reconciliationDegraded, false);
+    assert.equal(sync.remainingReconcileCount, 1);
+    assert.equal(sync.partial, true);
+  });
+  await t.test('lopende sync na reconcile-listfout', async () => {
+    const store = createStore();
+    store.acquireSyncLock = async () => ({
+      ok: false,
+      locked: true,
+      lockReason: 'active_target',
+      lockExpiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    const { service } = buildService({
+      store,
+      mailboxSendProvenanceStore: {
+        async listReconcileRequired() { throw new Error('list down'); },
+      },
+    });
+    const sync = await service.syncOwner('serve');
+    assert.equal(sync.reconciliationChecked, false);
+    assert.equal(sync.reconciliationDegraded, true);
+    assert.equal(sync.remainingReconcileCount, null);
+    assert.equal(sync.partial, true);
+  });
+  await t.test('beschikbare store zonder reconciler', async () => {
+    const { service } = buildService({ mailboxSendProvenanceStore: { isAvailable: () => true } });
+    const sync = await service.syncOwner('serve');
+    assert.equal(sync.reconciliationChecked, false);
+    assert.equal(sync.reconciliationDegraded, true);
+    assert.equal(sync.remainingReconcileCount, null);
+    assert.equal(sync.partial, true);
+  });
+});
+
+test('normale Instantly-acceptatie journaliseert vóór provider-send en slaat daarna exact op', async () => {
+  const events = [];
+  const store = createStore();
+  const baseUpsert = store.upsertProviderMessages.bind(store);
+  store.upsertProviderMessages = async (options) => {
+    events.push('store');
+    return baseUpsert(options);
+  };
+  const { service } = buildService({
+    store, requireMutationJournal: true,
+    getCampaignMutationRunner: () => replyRunner(events),
+    fetchJsonWithTimeout: async (_url, options) => {
+      events.push('provider-send');
+      return sentReplyResponse(options, 'sent-normal-accepted');
+    },
+  });
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+
+  const result = await service.reply(replyInput({ mutationRequestKey: 'instantly-reply:normal' }));
+  assert.deepEqual(events, [
+    'journal:serve-sender@example.com:instantly-reply:normal',
+    'provider-send',
+    'store',
+  ]);
+  assert.equal(result.providerMessageId, 'sent-normal-accepted');
+  assert.equal(result.storageDegraded, false);
+  assert.equal(result.reconcileRequired, false);
 });
 
 test('official Instantly lifecycle fields retain direction, unread state and attachments', () => {

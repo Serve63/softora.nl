@@ -160,6 +160,8 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     softoraSendIntentId: '',
     softoraSendMode: '',
     softoraReplyTargetMessageId: '',
+    softoraRecipientFingerprint: '',
+    softoraPayloadFingerprint: '',
     softoraThreadProvenanceKnown: false,
     unread: false,
     readAt: '',

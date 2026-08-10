@@ -84,6 +84,14 @@ test('protected package metadata houdt de echte lokale mailbox-Postgrespoort vas
   assert.match(postgresTest, /provenance_service_truncate/);
 });
 
+test('mailbox PostgreSQL-verificatie blijft dev-only en exact reproduceerbaar', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  assert.equal(packageJson.devDependencies['@electric-sql/pglite'], '0.5.4');
+  assert.equal(packageJson.devDependencies['pgsql-parser'], '18.2.6');
+  assert.equal(packageJson.dependencies['@electric-sql/pglite'], undefined);
+  assert.equal(packageJson.dependencies['pgsql-parser'], undefined);
+});
+
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],

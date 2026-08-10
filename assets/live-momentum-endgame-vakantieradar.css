@@ -1,0 +1,3 @@
+.end-game-card-slot[data-end-game-card-id="rubens-vakantieradar"] .end-game-card-photo-shade {
+  background: linear-gradient(180deg, rgba(8, 12, 12, .96) 0%, rgba(8, 12, 12, .62) 27%, rgba(8, 12, 12, .28) 52%, rgba(8, 12, 12, .78) 76%, rgba(8, 12, 12, .97) 100%);
+}
