@@ -50,62 +50,17 @@
   }
 
   function isAutomatedCampaignReply(mail) {
-    const subject = normalizeClassifierText(mail && mail.subject);
-    const content = normalizeClassifierText([
-      mail && mail.preview ? stripQuotedReply(mail.preview) : '',
-      mail && mail.body ? stripQuotedReply(mail.body) : '',
-    ].filter(Boolean).join(' '));
+    const evidenceSource = String(mail && mail.automatedReplyEvidenceSource || '').trim();
+    if (mail && mail.automatedReplyEvidenceKnown === true && evidenceSource) {
+      return mail.automatedReplyEvidence === true;
+    }
     const autoSubmitted = normalizeClassifierText(mail && mail.autoSubmitted);
     const precedence = normalizeClassifierText(mail && mail.precedence);
     const autoResponseSuppress = normalizeClassifierText(mail && mail.autoResponseSuppress);
-    const provenAutomaticHeader = Boolean(
-      mail && mail.automatedReplyEvidence === true ||
+    return Boolean(
       (autoSubmitted && autoSubmitted !== 'no') ||
       /^(?:auto_reply|auto-reply|bulk|junk|list)$/.test(precedence) ||
-      autoResponseSuppress
-    );
-    const automatedSubjectPatterns = [
-      /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
-      /^(?:(?:re|fw|fwd)\s*:\s*)*(?:zomer|winter|vakantie|kerst|feestdagen?|bouwvak)[ -]?sluiting\b/,
-      /\bautomatisch antwoord\b/,
-      /\bautomatische (?:e-?mail|mail|reactie|ontvangstbevestiging)\b/,
-      /\bontvangstbevestiging\b/,
-      /\bautomatic (?:reply|response)\b/,
-      /\bauto[ -]?reply\b/,
-      /\bout[ -]?of[ -]?office\b/,
-      /\bafwezigheid(?:sbericht|melding)?\b/,
-      /^(?:niet aanwezig|afwezig)(?:\s+tot\b[^:\n]{0,80})?\s+(?:(?:re|fw|fwd)\s*:\s*)+/,
-      /\bdelivery status notification\b/,
-      /\bmail delivery (?:failure|failed)\b/,
-      /^email received\b/,
-      /^bericht ontvangen\b/,
-      /\buw mail is ontvangen\b/,
-      /^bedankt voor (?:je|jouw|uw) (?:mail|bericht)!?\s+(?:re|fw|fwd)\s*:/,
-    ];
-    const automatedContentPatterns = [
-      /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
-      /\bdit is (?:een )?automatisch(?:e)? (?:e-?mail|mail|bericht|antwoord|reactie|ontvangstbevestiging)\b/,
-      /\bthis is an automated (?:e-?mail|mail|message|reply|response)\b/,
-      /\bwe would like to acknowledge that we have received your request\b/,
-      /\bis ons kantoor gesloten\b/,
-      /\bop dit moment ben ik op vakantie\b/,
-      /\bberichten worden (?:in deze periode )?niet gelezen\b/,
-      /\bplease type your reply above this line\b/,
-      /\buw aanvraag\s*\([^)]{1,40}\)\s+is ontvangen\b/,
-      /\byour request\s*\([^)]{1,40}\)\s+has been received\b/,
-      /\bwij streven ernaar om (?:je|jouw|uw) (?:vraag|bericht|e-?mail|mail) binnen \d+\s+(?:werk)?dag(?:en)? te beantwoorden\b/,
-      /\bin deze periode beantwoorden wij geen (?:e-?mails?|mails?|berichten)\b/,
-      /\b(?:we|wij) streven ernaar (?:jouw|je|uw) (?:e-?mail|mail|bericht) (?:de )?(?:eerstvolgende|volgende) werkdag te beantwoorden\b/,
-      /\b(?:bedankt|dank) voor (?:je|jouw|uw) bericht\b[\s\S]{0,220}\b(?:eerstvolgende werkdag|zo snel mogelijk) te beantwoorden\b/,
-      /\b(?:ik ben|wij zijn|ons kantoor is) (?:momenteel|op dit moment|tijdelijk)?\s*(?:afwezig|gesloten|niet aanwezig)\b/,
-      /\b(?:momenteel|op dit moment)\s+(?:heb ik|hebben wij)\s+vakantie\b[\s\S]{0,240}\b(?:e-?mail|mail)\b[\s\S]{0,160}\b(?:minder vaak|niet|beperkt)\b/,
-      /\bwelkom bij\b[\s\S]{0,240}\bals u\b[\s\S]{0,180}\bnaar whatsapp stuurt\b[\s\S]{0,180}\b(?:richtprijs|offerte)\b/,
-      /\b(?:i am|we are) (?:currently )?out of (?:the )?office\b/,
-    ];
-    return (
-      provenAutomaticHeader ||
-      automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
-      automatedContentPatterns.some((pattern) => pattern.test(content))
+      (autoResponseSuppress && !/^(?:0|false|no|none|off)$/.test(autoResponseSuppress))
     );
   }
 
