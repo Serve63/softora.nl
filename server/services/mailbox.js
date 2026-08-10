@@ -24,9 +24,7 @@ const {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   createMailboxCampaignRepliesService,
 } = require('./mailbox-campaign-replies');
-const {
-  resolveMailboxSyncUids,
-} = require('./mailbox-campaign-history-sync');
+const { resolveMailboxImapUidSelection } = require('./mailbox-live-incremental-frontier');
 const {
   createMailboxSyncService,
   syncMailboxRequest,
@@ -1966,7 +1964,7 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, reconcileIntentIds = [], signal, deadlineAt = 0, ...historySyncOptions }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, incrementalAfterUid = 0, incrementalUidValidity = 0, reconcileIntentIds = [], signal, deadlineAt = 0, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
     const client = createClient(account, getMailboxImapSyncTimeouts({ signal, deadlineAt }));
@@ -1982,12 +1980,14 @@ function createMailboxService(deps = {}) {
           ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
           : null;
         if (!selectedUids) {
-          selectedUids = await resolveMailboxSyncUids({
+          selectedUids = await resolveMailboxImapUidSelection({
             client,
             limit: safeLimit,
             campaignHistory,
             oldestIndexedCampaignUid,
-            ...historySyncOptions,
+            incrementalAfterUid, incrementalUidValidity,
+            liveUidValidity: uidValidity,
+            historySyncOptions,
             logger,
             accountEmail: account.email,
             folder: normalizedFolder,
@@ -2002,7 +2002,7 @@ function createMailboxService(deps = {}) {
         }
         selectedUids = Array.from(new Set(selectedUids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)));
         // Deduplication must not erase the provider-selection health attached by
-        // resolveMailboxSyncUids. Losing it would falsely label a truncated
+        // the UID-selection helper. Losing it would falsely label a truncated
         // backlog as complete after adding SMTP reconciliation candidates.
         if (selectionHealth) {
           Object.defineProperty(selectedUids, 'syncSelectionHealth', {
