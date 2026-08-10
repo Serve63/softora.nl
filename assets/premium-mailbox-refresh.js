@@ -134,20 +134,12 @@
       refreshTimer = 0;
     }
 
-    function getNextDelay(cycleStartedAt = null) {
+    function getNextDelay() {
       const hidden = documentRef?.visibilityState === 'hidden';
       const baseDelay = hidden ? HIDDEN_REFRESH_INTERVAL_MS : VISIBLE_REFRESH_INTERVAL_MS;
-      const cadence = !failureCount
-        ? baseDelay
-        : Math.min(
-            baseDelay,
-            (hidden ? VISIBLE_REFRESH_INTERVAL_MS : RECOVERY_REFRESH_INTERVAL_MS) *
-              Math.pow(2, Math.min(2, failureCount - 1))
-          );
-      if (cycleStartedAt === null || cycleStartedAt === undefined || !Number.isFinite(Number(cycleStartedAt))) {
-        return cadence;
-      }
-      return Math.max(0, cadence - Math.max(0, getNow() - Number(cycleStartedAt)));
+      if (!failureCount) return baseDelay;
+      const recoveryBaseDelay = hidden ? VISIBLE_REFRESH_INTERVAL_MS : RECOVERY_REFRESH_INTERVAL_MS;
+      return Math.min(baseDelay, recoveryBaseDelay * Math.pow(2, Math.min(2, failureCount - 1)));
     }
 
     function scheduleNext(delayMs = getNextDelay()) {
@@ -243,7 +235,6 @@
       const scope = getScope();
       const scopeKey = getScopeKey(scope);
       const state = getFreshness(scope);
-      const cycleStartedAt = getNow();
       clearRefreshTimer();
       refreshInFlight = true;
       state.status = 'checking';
@@ -300,7 +291,7 @@
             refreshQueued = false;
             scheduleNext(0);
           } else {
-            scheduleNext(getNextDelay(cycleStartedAt));
+            scheduleNext();
           }
         }
       }

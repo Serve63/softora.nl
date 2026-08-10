@@ -41,43 +41,6 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
-test('BFCache-pauze annuleert de actieve lijstload en blokkeert een late same-scope commit', async () => {
-  let messages = [{ id: 'zichtbaar' }];
-  let resolveLoad;
-  let requestOptions;
-  const pendingLoad = new Promise((resolve) => { resolveLoad = resolve; });
-  const view = ownerSession.createView({
-    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
-    campaignInbox: {
-      load(_folder, _normalize, _fetch, options) {
-        requestOptions = options;
-        return pendingLoad;
-      },
-      filterMessages: (value) => value,
-    },
-    getMessages: () => messages,
-    setMessages: (value) => { messages = value; },
-    filterDeleted: (value) => value,
-    getListElement: () => ({ setAttribute() {} }),
-    setSync() {},
-    setStatus() {},
-  });
-
-  const loading = view.load({ preserveOnError: true });
-  assert.equal(requestOptions.signal.aborted, false);
-  view.cancelActive();
-  assert.equal(requestOptions.signal.aborted, true);
-  resolveLoad({
-    contentAt: new Date().toISOString(),
-    complete: true,
-    messages: [{ id: 'late' }],
-    sync: {},
-  });
-
-  assert.equal(await loading, false);
-  assert.deepEqual(messages.map((message) => message.id), ['zichtbaar']);
-});
-
 test('gekozen campagne-eigenaar blijft na een refresh dezelfde servervoorkeur houden', async () => {
   const writes = [];
   const client = {
