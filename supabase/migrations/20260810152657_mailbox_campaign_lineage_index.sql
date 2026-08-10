@@ -6,7 +6,8 @@
 create table if not exists public.softora_mailbox_message_lineage_edges (
   account_email text not null,
   child_message_key text not null
-    references public.softora_mailbox_messages (message_key) on delete cascade,
+    references public.softora_mailbox_messages (message_key)
+    on update cascade on delete cascade,
   child_message_id text,
   parent_message_id text not null,
   created_at timestamptz not null default now(),
@@ -18,7 +19,8 @@ create table if not exists public.softora_mailbox_message_lineage_edges (
 
 create table if not exists public.softora_mailbox_campaign_lineage_roots (
   message_key text primary key
-    references public.softora_mailbox_messages (message_key) on delete cascade,
+    references public.softora_mailbox_messages (message_key)
+    on update cascade on delete cascade,
   account_email text not null,
   message_id text not null,
   message_date timestamptz not null,
@@ -30,9 +32,11 @@ create table if not exists public.softora_mailbox_campaign_lineage_roots (
 
 create table if not exists public.softora_mailbox_campaign_lineage_discoveries (
   message_key text not null
-    references public.softora_mailbox_messages (message_key) on delete cascade,
+    references public.softora_mailbox_messages (message_key)
+    on update cascade on delete cascade,
   root_message_key text not null
-    references public.softora_mailbox_messages (message_key) on delete cascade,
+    references public.softora_mailbox_messages (message_key)
+    on update cascade on delete cascade,
   account_email text not null,
   first_discovered_at timestamptz not null default clock_timestamp(),
   last_confirmed_at timestamptz not null default clock_timestamp(),
@@ -44,14 +48,16 @@ create table if not exists public.softora_mailbox_campaign_lineage_discoveries (
 
 create table if not exists public.softora_mailbox_campaign_lineage_members (
   message_key text primary key
-    references public.softora_mailbox_messages (message_key) on delete cascade,
+    references public.softora_mailbox_messages (message_key)
+    on update cascade on delete cascade,
   account_email text not null,
   message_id text,
   parent_message_key text
     references public.softora_mailbox_campaign_lineage_members (message_key)
-    on delete cascade deferrable initially deferred,
+    on update cascade on delete cascade deferrable initially deferred,
   root_message_key text not null
-    references public.softora_mailbox_messages (message_key) on delete cascade,
+    references public.softora_mailbox_messages (message_key)
+    on update cascade on delete cascade,
   root_message_id text not null,
   lineage_depth integer not null,
   message_date timestamptz not null,

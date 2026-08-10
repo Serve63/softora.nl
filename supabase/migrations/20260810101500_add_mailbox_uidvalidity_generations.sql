@@ -395,7 +395,7 @@ begin
             else false end) is not true
           or candidate.row_data->>'message_key' is distinct from
             v_mutation.account_email || '|' || v_mutation.folder || '|uv:'
-            || v_uid_validity::text || '|' || candidate.row_data->>'uid'
+            || v_uid_validity::text || '|' || (candidate.row_data->>'uid')
       ) then
         raise exception using errcode = '22023',
           message = 'MAILBOX_UIDVALIDITY_ROW_MISMATCH';

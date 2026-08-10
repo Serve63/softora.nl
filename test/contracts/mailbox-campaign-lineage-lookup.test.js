@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  MAILBOX_CAMPAIGN_LINEAGE_DEFAULT_DEADLINE_MS,
   createMailboxCampaignLineageLookup,
 } = require('../../server/repositories/mailbox-campaign-lineage-lookup');
 
@@ -19,10 +20,10 @@ function createLookup(rows, calls = []) {
       providerThreadId: row.payload?.providerThreadId || '',
       providerAccountEmail: row.payload?.providerAccountEmail || '',
     }),
-    run: async (label, operation) => {
+    run: async (label, operation, runOptions = {}) => {
       const client = {
         rpc: async (name, args) => {
-          calls.push({ label, name, args });
+          calls.push({ label, name, args, runOptions });
           return { data: rows, error: null };
         },
       };
@@ -63,7 +64,8 @@ test('campaign lineage lookup uses exactly one bounded RPC and preserves exact p
   });
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, 'softora_find_mailbox_campaign_lineage');
+  assert.equal(calls[0].name, 'softora_find_mailbox_campaign_lineage_metadata');
+  assert.deepEqual(calls[0].runOptions, { timeoutMs: 2000 });
   assert.deepEqual(calls[0].args, {
     p_account_emails: ['serve@softora.nl'],
     p_reply_limit: 200,
@@ -85,6 +87,10 @@ test('campaign lineage lookup uses exactly one bounded RPC and preserves exact p
   assert.equal(rows[0].campaignLineageSelectionSource, 'lineage-discovered');
   assert.equal(rows[0].campaignLineageHasMore, true);
   assert.equal(rows[0].campaignLineageContextTruncated, false);
+});
+
+test('campaign lineage lookup gives the bounded metadata response enough network time', () => {
+  assert.equal(MAILBOX_CAMPAIGN_LINEAGE_DEFAULT_DEADLINE_MS, 8000);
 });
 
 test('4500 historical descendants cannot hide a newly proven old-date reply', async () => {

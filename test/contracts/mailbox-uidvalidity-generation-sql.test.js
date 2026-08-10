@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { parse } = require('pgsql-parser');
 
 const root = path.resolve(__dirname, '../..');
 const migrationPath = path.join(
@@ -13,6 +14,10 @@ const probePath = path.join(root, 'supabase/mailbox-uidvalidity-generation-probe
 const identityAdoptionMigrationPath = path.join(
   root,
   'supabase/migrations/20260810130000_allow_mailbox_uid_generation_adoption.sql'
+);
+const atomicCommitFixMigrationPath = path.join(
+  root,
+  'supabase/migrations/20260810173000_fix_mailbox_uidvalidity_atomic_commit.sql'
 );
 
 function read(filePath) {
@@ -129,6 +134,46 @@ test('directe voorbereiding en atomische campaign commit bewijzen de exacte acti
   assert.match(sql, /result = \(coalesce\(p_result, '\{\}'::jsonb\) - 'syncLockToken'\)/i);
 });
 
+test('atomische UID-validatie houdt JSON-extractie buiten tekstconcatenatie', () => {
+  const migration = read(atomicCommitFixMigrationPath);
+  const generationSql = block(read(migrationPath));
+  const schemaSql = block(read(schemaPath));
+  const safeExtraction = /\|\| v_uid_validity::text \|\| '\|' \|\| \(candidate\.row_data->>'uid'\)/i;
+  const unsafeExtraction = /\|\| v_uid_validity::text \|\| '\|' \|\| candidate\.row_data->>'uid'/i;
+  for (const sql of [migration, generationSql, schemaSql]) {
+    assert.match(sql, safeExtraction);
+    assert.doesNotMatch(sql, unsafeExtraction);
+  }
+});
+
+test('atomische UIDVALIDITY-hotfix parseert volledig als PostgreSQL', async () => {
+  const parsed = await parse(read(atomicCommitFixMigrationPath));
+  assert.ok(Array.isArray(parsed.stmts));
+  assert.equal(parsed.stmts.length, 17);
+});
+
+test('UID-generatieadoptie laat alle duurzame lineage-sleutels atomisch meeschuiven', () => {
+  const migration = read(atomicCommitFixMigrationPath);
+  for (const constraint of [
+    'softora_mailbox_message_lineage_edges_child_message_key_fkey',
+    'softora_mailbox_campaign_lineage_roots_message_key_fkey',
+    'softora_mailbox_campaign_lineage_discoveries_message_key_fkey',
+    'softora_mailbox_campaign_lineage_discover_root_message_key_fkey',
+    'softora_mailbox_campaign_lineage_members_message_key_fkey',
+    'softora_mailbox_campaign_lineage_member_parent_message_key_fkey',
+    'softora_mailbox_campaign_lineage_members_root_message_key_fkey',
+  ]) {
+    assert.match(
+      migration,
+      new RegExp(`${constraint}[\\s\\S]*?on update cascade on delete cascade`, 'i')
+    );
+  }
+  assert.match(
+    migration,
+    /softora_mailbox_campaign_lineage_member_parent_message_key_fkey[\s\S]*?deferrable initially deferred/i
+  );
+});
+
 test('UIDVALIDITY RPCs zijn service-role-only en de probe dekt adoptie, reset en state-isolatie', () => {
   const sql = block(read(migrationPath));
   const probe = read(probePath);
@@ -142,6 +187,8 @@ test('UIDVALIDITY RPCs zijn service-role-only en de probe dekt adoptie, reset en
     assert.match(sql, new RegExp(`grant execute on function public\\.${escapedSignature}[\\s\\S]*to service_role`, 'i'));
   }
   assert.match(probe, /UIDVALIDITY_PROBE_LEGACY_ADOPTION_FAILED/);
+  assert.match(probe, /UIDVALIDITY_PROBE_LINEAGE_SETUP_FAILED/);
+  assert.match(probe, /UIDVALIDITY_PROBE_LINEAGE_NOT_CASCADED/);
   assert.match(probe, /UIDVALIDITY_PROBE_ROLLING_WRITER_DUPLICATED_STATE/);
   assert.match(probe, /UIDVALIDITY_PROBE_RESET_NOT_DETECTED/);
   assert.match(probe, /UIDVALIDITY_PROBE_POST_RESET_LEGACY_WRITE_ACCEPTED/);

@@ -18,6 +18,10 @@ const hardeningMigrationPath = path.join(
   repoRoot,
   'supabase/migrations/20260810154015_harden_mailbox_campaign_lineage_replicas.sql'
 );
+const metadataMigrationPath = path.join(
+  repoRoot,
+  'supabase/migrations/20260810174000_add_mailbox_lineage_metadata_reader.sql'
+);
 const schemaPath = path.join(repoRoot, 'supabase/data-ops-schema.sql');
 
 function read(filePath) {
@@ -34,6 +38,17 @@ test('mailbox lineage replica hardening parses with the real PostgreSQL parser',
   const parsed = await parse(read(hardeningMigrationPath));
   assert.ok(Array.isArray(parsed.stmts));
   assert.equal(parsed.stmts.length, 8, 'hardeningmigratie moet volledig parsen');
+});
+
+test('mailbox lineage metadata reader parses and excludes eager body text', async () => {
+  const sql = read(metadataMigrationPath);
+  const parsed = await parse(sql);
+  assert.ok(Array.isArray(parsed.stmts));
+  assert.equal(parsed.stmts.length, 3);
+  assert.match(sql, /lineage\.message - 'body_text' as message/i);
+  assert.match(sql, /from public\.softora_find_mailbox_campaign_lineage\(/i);
+  assert.match(sql, /p_deadline_ms integer default 8000/i);
+  assert.doesNotMatch(sql, /grant execute[\s\S]*to (?:public|anon|authenticated)/i);
 });
 
 test('mailbox lineage canonicalizes exact provider replicas and rejects Message-ID conflicts', () => {
@@ -165,6 +180,16 @@ test('fresh data-ops bootstrap contains byte-equivalent mailbox replica hardenin
     /-- mailbox-campaign-lineage-replica-hardening:start\n([\s\S]*?)\n-- mailbox-campaign-lineage-replica-hardening:end/
   );
   assert.ok(block, 'data-ops-schema mist mailbox lineage replica-hardening');
+  assert.equal(block[1].trim(), migration);
+});
+
+test('fresh data-ops bootstrap contains the exact metadata-only lineage reader', () => {
+  const migration = read(metadataMigrationPath).split('\n').slice(5).join('\n').trim();
+  const schema = read(schemaPath);
+  const block = schema.match(
+    /-- mailbox-campaign-lineage-metadata-reader:start\n([\s\S]*?)\n-- mailbox-campaign-lineage-metadata-reader:end/
+  );
+  assert.ok(block, 'data-ops-schema mist metadata-only lineage reader');
   assert.equal(block[1].trim(), migration);
 });
 
