@@ -1784,7 +1784,14 @@ begin
         v_mutation.account_email, v_mutation.folder, v_uid_validity,
         v_sync_lock_token
       );
-    elsif not found or v_sync.uid_validity is not null then
+    -- A warm pre-UIDVALIDITY runtime is safe to coerce only while this folder
+    -- has never experienced a real generation reset. The BEFORE INSERT row
+    -- trigger rewrites those legacy keys to the adopted current generation.
+    -- After the first reset, generation-less provider data is ambiguous.
+    elsif not found or (
+      v_sync.uid_validity is not null
+      and v_sync.uid_validity_reset_at is not null
+    ) then
       raise exception using errcode = '55000',
         message = 'MAILBOX_UIDVALIDITY_REQUIRED';
     end if;

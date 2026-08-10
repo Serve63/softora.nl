@@ -94,6 +94,10 @@ test('directe voorbereiding en atomische campaign commit bewijzen de exacte acti
   assert.match(sql, /p_result->>'syncLockToken'/i);
   assert.match(sql, /p_result->>'uidValidity'/i);
   assert.match(sql, /MAILBOX_UIDVALIDITY_ROW_MISMATCH/i);
+  assert.match(
+    atomicSql,
+    /warm pre-UIDVALIDITY runtime is safe to coerce[\s\S]*v_sync\.uid_validity_reset_at is not null[\s\S]*MAILBOX_UIDVALIDITY_REQUIRED/i
+  );
   assert.match(sql, /jsonb_array_length\(p_rows\) > 2000/i);
   assert.match(sql, /result = \(coalesce\(p_result, '\{\}'::jsonb\) - 'syncLockToken'\)/i);
 });
