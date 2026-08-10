@@ -23,10 +23,6 @@ const {
 } = require('./instantly-mailbox-provider-api');
 const { createInstantlyMailboxSyncRunner } = require('./instantly-mailbox-sync-runner');
 const { INSTANTLY_MAILBOX_SYNC_SCOPE } = require('./instantly-mailbox-sync-state');
-const {
-  createInstantlyMailboxReply,
-  isDefinitiveInstantlyReplyRejection,
-} = require('./instantly-mailbox-reply');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -141,7 +137,6 @@ function createInstantlyMailboxService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     onMessagesUpserted = async () => ({ ok: true }),
-    mailboxSendProvenanceStore = null,
     getCampaignMutationRunner = () => null, requireMutationJournal = false, createMutationRequestKey,
     now = () => new Date(),
     logger = console,
@@ -312,10 +307,6 @@ function createInstantlyMailboxService(deps = {}) {
       rawMessage.created_at,
       now()
     ).toISOString();
-    const providerCreatedAt = parseDate(
-      rawMessage.timestamp_created || rawMessage.created_at,
-      new Date(date)
-    ).toISOString();
     const providerThreadId = normalizeText(rawMessage.thread_id);
     const lifecycleType = normalizeText(
       rawMessage.ue_type || rawMessage.email_type || rawMessage.type
@@ -326,7 +317,6 @@ function createInstantlyMailboxService(deps = {}) {
       providerMessageId,
       providerThreadId,
       providerCampaignId: normalizeText(rawMessage.campaign_id),
-      providerCreatedAt,
       providerAccountEmail: account.email,
       providerOwner: account.owner,
       accountEmail: account.email,
@@ -606,7 +596,7 @@ function createInstantlyMailboxService(deps = {}) {
     return `instantly-${owner}@softora.internal`;
   }
 
-  async function auditThreadCandidates({ accounts, owner, threadCandidates, maxHydrations }) {
+  async function auditThreadCandidates({ accounts, owner, threadCandidates }) {
     const indexed = await mailboxIndexStore.listProviderMessages({
       provider: 'instantly',
       accountEmails: accounts.map((account) => account.email),
@@ -640,17 +630,7 @@ function createInstantlyMailboxService(deps = {}) {
         ));
       })
       .slice(0, normalizedConfig.richBodyAuditLimit);
-    const hydrationLimit = Math.max(
-      0,
-      Math.min(
-        pendingThreadHydrations.length,
-        Number.isFinite(Number(maxHydrations))
-          ? Number(maxHydrations)
-          : normalizedConfig.richBodyAuditLimit
-      )
-    );
-    const selectedHydrations = pendingThreadHydrations.slice(0, hydrationLimit);
-    for (const [key, candidate] of selectedHydrations) {
+    for (const [key, candidate] of pendingThreadHydrations) {
       const indexedMessages = indexedThreadMessages.get(key) || [];
       const hydrated = await hydrateThread({
         threadId: candidate.providerThreadId,
@@ -660,15 +640,10 @@ function createInstantlyMailboxService(deps = {}) {
       });
       stored += Number(hydrated?.stored) || 0;
     }
-    return {
-      stored,
-      requestsUsed: selectedHydrations.length,
-      providerRequestBudgetExhausted: pendingThreadHydrations.length > selectedHydrations.length,
-    };
+    return stored;
   }
 
   const syncOwner = createInstantlyMailboxSyncRunner({
-    accountOwnership,
     apiRequest,
     assertConfigured,
     assertOwner,
@@ -678,11 +653,9 @@ function createInstantlyMailboxService(deps = {}) {
     getSyncStateKey,
     getUiStateValues,
     mailboxIndexStore,
-    mailboxSendProvenanceStore,
     normalizeInstantlyMessage,
     normalizedConfig,
     now,
-    logger,
     setUiStateValues,
     throwStoreFailure: throwInstantlyStoreFailure,
     upsertMessages: upsertInstantlyMessages,
@@ -829,20 +802,114 @@ function createInstantlyMailboxService(deps = {}) {
     return stored;
   }
 
-  const reply = createInstantlyMailboxReply({
-    apiRequest,
-    assertConfigured,
-    assertOwner,
-    assertStoredMessageOwnership,
-    buildAcceptedSentMessage,
-    createError: createInstantlyMailboxError,
-    extractAddress,
-    extractAddressList,
-    logger,
-    normalizeMessage: normalizeInstantlyMessage,
-    throwStoreFailure: throwInstantlyStoreFailure,
-    upsertMessages: upsertInstantlyMessages,
-  });
+  function normalizeRecipientInput(value, label) {
+    const addresses = extractAddressList(value);
+    const supplied = Array.isArray(value)
+      ? value.filter((item) => normalizeText(item)).length
+      : normalizeText(value)
+        ? String(value).split(/[,;]/).filter((item) => normalizeText(item)).length
+        : 0;
+    if (addresses.length !== supplied) {
+      throw createInstantlyMailboxError(
+        `Controleer de e-mailadressen bij ${label}.`,
+        'INSTANTLY_RECIPIENT_INVALID',
+        400
+      );
+    }
+    return addresses;
+  }
+
+  async function reply({
+    owner,
+    accountEmail,
+    providerMessageId,
+    providerThreadId,
+    subject,
+    text,
+    to,
+    cc,
+    bcc,
+    attachments,
+  } = {}) {
+    const selectedOwner = assertOwner(owner);
+    assertConfigured();
+    if (Array.isArray(attachments) && attachments.length) {
+      throw createInstantlyMailboxError(
+        'Instantly ondersteunt via deze API geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.',
+        'INSTANTLY_ATTACHMENTS_UNSUPPORTED',
+        400
+      );
+    }
+    const account = normalizeEmail(accountEmail);
+    const stored = await assertStoredMessageOwnership({
+      owner: selectedOwner,
+      accountEmail: account,
+      providerMessageId,
+      providerThreadId,
+    });
+    const expectedRecipient = stored.folder === 'sent'
+      ? extractAddress(stored.to)
+      : normalizeEmail(stored.email);
+    if (!expectedRecipient || normalizeEmail(to) !== expectedRecipient) {
+      throw createInstantlyMailboxError(
+        'De ontvanger wijkt af van de bewezen Instantly-thread.',
+        'INSTANTLY_REPLY_RECIPIENT_MISMATCH',
+        409
+      );
+    }
+    const cleanSubject = normalizeText(subject).slice(0, 240);
+    const cleanText = normalizeText(text);
+    if (!cleanSubject || !cleanText) {
+      throw createInstantlyMailboxError(
+        'Onderwerp en bericht zijn verplicht.',
+        'INSTANTLY_REPLY_CONTENT_REQUIRED',
+        400
+      );
+    }
+    const ccAddresses = normalizeRecipientInput(cc, 'CC');
+    const bccAddresses = normalizeRecipientInput(bcc, 'BCC');
+    const response = await apiRequest('emails/reply', {
+      method: 'POST',
+      body: {
+        eaccount: account,
+        reply_to_uuid: stored.providerMessageId,
+        subject: cleanSubject,
+        body: { text: cleanText },
+        cc_address_email_list: ccAddresses.join(','),
+        bcc_address_email_list: bccAddresses.join(','),
+      },
+    });
+    const rawSent = response?.email || response?.data || response;
+    const normalizedSent = normalizeInstantlyMessage({
+      ...rawSent,
+      eaccount: account,
+      from_address_email: account,
+      email_type: 'sent',
+      in_reply_to: normalizeText(rawSent?.in_reply_to || stored.providerMessageId),
+      thread_id: normalizeText(rawSent?.thread_id || stored.providerThreadId),
+      campaign_id: normalizeText(rawSent?.campaign_id || stored.providerCampaignId),
+    });
+    if (normalizedSent) {
+      const upsert = await upsertInstantlyMessages([normalizedSent]);
+      if (!upsert?.ok) {
+        logger.error('[InstantlyMailbox][ReplyStore]', 'Verzonden antwoord kon niet lokaal worden opgeslagen.');
+      }
+    }
+    return {
+      provider: 'instantly',
+      providerMessageId: normalizeText(normalizedSent?.providerMessageId || rawSent?.id),
+      providerThreadId: normalizeText(normalizedSent?.providerThreadId || stored.providerThreadId),
+      accountEmail: account,
+      owner: selectedOwner,
+      sentMessage: buildAcceptedSentMessage(normalizedSent, {
+        body: cleanText,
+        subject: cleanSubject,
+        to: expectedRecipient,
+        cc: ccAddresses.join(', '),
+        bcc: bccAddresses.join(', '),
+      }),
+    };
+  }
 
   async function ingestWebhook(req) {
     if (!normalizedConfig.enabled) return { ok: true, skipped: true, reason: 'disabled' };
@@ -953,7 +1020,6 @@ module.exports = {
   INSTANTLY_MAILBOX_SYNC_SCOPE,
   createInstantlyMailboxError,
   createInstantlyMailboxService,
-  isDefinitiveInstantlyReplyRejection,
   extractAddressList,
   normalizeAccountOwnership,
   normalizeCampaignOwnership,

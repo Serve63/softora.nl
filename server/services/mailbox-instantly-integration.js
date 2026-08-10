@@ -33,7 +33,6 @@ function createDefaultInstantlyMailboxService({
   setUiStateValues,
   onMessagesUpserted,
   getCampaignMutationRunner,
-  mailboxSendProvenanceStore,
   logger,
 }) {
   return createInstantlyMailboxService({
@@ -56,7 +55,6 @@ function createDefaultInstantlyMailboxService({
     getUiStateValues,
     setUiStateValues,
     onMessagesUpserted,
-    mailboxSendProvenanceStore,
     getCampaignMutationRunner,
     requireMutationJournal: true,
     logger,
@@ -431,9 +429,8 @@ async function sendMailboxMessage({
   normalizeString,
   threadProvenance,
   mailboxSendProvenanceStore,
-  logger = console,
 }) {
-  if (normalizeString(threadProvenance?.provider).toLowerCase() !== 'instantly') {
+  if (normalizeString(body.provider).toLowerCase() !== 'instantly') {
     return sendMessage({
       accountEmail: body.account,
       to: body.to,
@@ -476,29 +473,16 @@ async function sendMailboxMessage({
         accountEmail: reservation.intent.accountEmail,
         owner: reservation.intent.owner,
         intentId: reservation.intent.intentId,
-        storageDegraded: reservation.intent.storageDegraded === true,
-        reconcileRequired: reservation.intent.reconcileRequired === true,
-        providerOutcomeUnknown: false,
         idempotentReplay: true,
-      };
-    }
-    if (['prepared', 'unknown'].includes(reservation.intent.status)) {
-      return {
-        provider: 'instantly', providerMessageId: '',
-        providerThreadId: reservation.intent.providerThreadId,
-        accountEmail: reservation.intent.accountEmail, owner: reservation.intent.owner,
-        intentId: reservation.intent.intentId, processing: true, providerOutcomeUnknown: true,
-        storageDegraded: true, reconcileRequired: true, idempotentReplay: true,
       };
     }
     const error = new Error('Dit Instantly-antwoord wordt al veilig verwerkt.');
     error.status = 409;
-    error.code = 'MAILBOX_SEND_PREVIOUSLY_FAILED';
+    error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
     throw error;
   }
-  let result;
   try {
-    result = await instantlyMailboxService.reply({
+    const result = await instantlyMailboxService.reply({
       owner: body.owner,
       accountEmail: body.account,
       providerMessageId: body.providerMessageId,
@@ -509,73 +493,28 @@ async function sendMailboxMessage({
       subject: body.subject,
       text: body.body || body.text || '',
       attachments: body.attachments,
-      mutationRequestKey: `instantly-reply:${threadProvenance.intentId}`,
-      onProviderRequestStarting: async () => {
-        if (typeof mailboxSendProvenanceStore.markDispatchStarted !== 'function') {
-          const error = new Error('De duurzame providerstartregistratie ontbreekt.');
-          error.status = 503;
-          error.code = 'MAILBOX_SEND_DISPATCH_START_UNAVAILABLE';
-          throw error;
-        }
-        await mailboxSendProvenanceStore.markDispatchStarted(threadProvenance.intentId);
-      },
     });
-  } catch (error) {
-    if (error?.noExternalEffect === true || error?.providerRejected === true) {
-      await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-      throw error;
-    }
-    result = {
-      provider: 'instantly', providerMessageId: '',
-      providerThreadId: body.providerThreadId, accountEmail: body.account, owner: body.owner,
-      processing: true, providerOutcomeUnknown: true,
-      storageDegraded: true, reconcileRequired: true,
-    };
-  }
-  if (result?.providerOutcomeUnknown === true) {
-    try {
-      await mailboxSendProvenanceStore.markUnknown?.(
-        threadProvenance.intentId,
-        'Instantly-provideruitkomst onbekend; niet opnieuw verzenden'
-      );
-    } catch (error) {
-      logger.error('[Mailbox][InstantlySendUnknown]', error?.message || error);
-    }
-    return { ...result, intentId: threadProvenance.intentId };
-  }
-  let accepted;
-  try {
-    accepted = await mailboxSendProvenanceStore.accept(threadProvenance.intentId, {
+    const accepted = await mailboxSendProvenanceStore.accept(threadProvenance.intentId, {
       messageId: result.sentMessage?.messageId,
       providerMessageId: result.providerMessageId,
       providerThreadId: result.providerThreadId,
       acceptedAt: result.sentMessage?.receivedAt || new Date().toISOString(),
-      storageDegraded: result.storageDegraded === true,
-      reconcileRequired: result.reconcileRequired === true,
     });
+    return {
+      ...result,
+      intentId: accepted.intentId,
+      sentMessage: {
+        ...(result.sentMessage || {}),
+        conversationId: threadProvenance.conversationId,
+        softoraSendIntentId: threadProvenance.intentId,
+        softoraSendMode: 'reply',
+        softoraReplyTargetMessageId: threadProvenance.replyTargetMessageId,
+      },
+    };
   } catch (error) {
-    logger.error('[Mailbox][InstantlyAcceptProvenance]', error?.message || error);
-    try {
-      const preserved = await mailboxSendProvenanceStore.markUnknown?.(
-        threadProvenance.intentId,
-        'Instantly accepteerde de send, maar lokale acceptatieopslag moet worden gereconcilieerd'
-      );
-      if (preserved?.status === 'accepted') accepted = preserved;
-    } catch (markError) {
-      logger.error('[Mailbox][InstantlyAcceptUnknown]', markError?.message || markError);
-    }
+    await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+    throw error;
   }
-  return {
-    ...result, intentId: accepted?.intentId || threadProvenance.intentId,
-    provenanceDegraded: !accepted,
-    storageDegraded: result.storageDegraded === true || !accepted,
-    reconcileRequired: result.reconcileRequired === true || !accepted,
-    sentMessage: {
-      ...(result.sentMessage || {}), conversationId: threadProvenance.conversationId,
-      softoraSendIntentId: threadProvenance.intentId, softoraSendMode: 'reply',
-      softoraReplyTargetMessageId: threadProvenance.replyTargetMessageId,
-    },
-  };
 }
 
 module.exports = {

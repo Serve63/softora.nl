@@ -1,17 +1,7 @@
-const crypto = require('crypto');
 const {
   MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION,
   renderMailboxComposeEmailHtml,
 } = require('./mailbox-compose-email-renderer');
-const {
-  DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS,
-  DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS,
-  DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS,
-} = require('../config/coldmail-campaign');
-const {
-  createMailboxPayloadFingerprint,
-  createMailboxRecipientFingerprint,
-} = require('./mailbox-send-provenance-store');
 
 const MAX_COMPOSE_ATTACHMENTS = 5;
 const MAX_COMPOSE_ATTACHMENT_BYTES = 4 * 1024 * 1024;
@@ -20,35 +10,6 @@ const COMPOSE_ATTACHMENT_EXTENSIONS = new Set([
   'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
   'ppt', 'pptx', 'txt', 'webp', 'xls', 'xlsx',
 ]);
-
-function fingerprintComposeAttachments(attachments = []) {
-  if (!attachments.length) return '';
-  const normalizedAttachments = attachments.map((attachment) => ({
-    filename: String(attachment?.filename || ''), contentType: String(attachment?.contentType || ''),
-    disposition: String(attachment?.contentDisposition || ''), cid: String(attachment?.cid || ''),
-    content: crypto.createHash('sha256').update(Buffer.isBuffer(attachment?.content)
-      ? attachment.content : Buffer.from(String(attachment?.content || ''))).digest('hex'),
-  }));
-  return crypto.createHash('sha256').update(JSON.stringify(normalizedAttachments)).digest('hex');
-}
-
-function fingerprintComposePayload({ subject, body, cc, bcc, attachments = [] }) {
-  return createMailboxPayloadFingerprint({
-    subject, body, cc: [...cc].sort().join(', '), bcc: [...bcc].sort().join(', '),
-    attachmentsFingerprint: fingerprintComposeAttachments(attachments),
-  });
-}
-
-function isDefinitiveSmtpNoExternalEffect(error = {}) {
-  const responseCode = Number(error.responseCode);
-  return responseCode >= 400 && responseCode <= 599;
-}
-
-function normalizeSmtpRecipients(values, normalizeEmail) {
-  return (Array.isArray(values) ? values : []).map((value) =>
-    normalizeEmail(value && typeof value === 'object' ? value.address || value.email : value)
-  ).filter(Boolean);
-}
 
 function createMailboxComposeSend(deps = {}) {
   const {
@@ -61,7 +22,6 @@ function createMailboxComposeSend(deps = {}) {
     buildMailboxWebdesignSendParts,
     reserveMailboxWebdesignOutboundRecipient,
     confirmMailboxWebdesignOutboundRecipient,
-    releaseMailboxWebdesignOutboundRecipient,
     appendSentMessage,
     createImapClient,
     nodemailer,
@@ -190,6 +150,12 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       throw error;
     }
+    const transporter = createTransport({
+      host: account.smtpHost,
+      port: account.smtpPort,
+      secure: account.smtpSecure,
+      auth: { user: account.smtpUser, pass: account.smtpPass },
+    });
     const normalizedText = normalizeString(text);
     if (!threadProvenance || !mailboxSendProvenanceStore) {
       const error = new Error('De duurzame threadcontext ontbreekt; verzending is veilig gestopt.');
@@ -231,16 +197,12 @@ function createMailboxComposeSend(deps = {}) {
       ...explicitAttachments,
     ];
     if (outboundAttachments.length) mail.attachments = outboundAttachments;
-    const attachmentsFingerprint = fingerprintComposeAttachments(outboundAttachments);
-    const payloadFingerprint = createMailboxPayloadFingerprint({
-      subject: cleanSubject, body: webdesignParts?.text || normalizedText,
-      cc: normalizedCc.join(', '), bcc: normalizedBcc.join(', '), attachmentsFingerprint,
-    });
-    const recipientFingerprint = createMailboxRecipientFingerprint({
-      to: normalizedTo, cc: normalizedCc, bcc: normalizedBcc,
-    });
-    mail.headers['X-Softora-Recipient-Fingerprint'] = recipientFingerprint;
-    mail.headers['X-Softora-Payload-Fingerprint'] = payloadFingerprint;
+    const outboundReservation = webdesignParts
+      ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
+          accountEmail: account.email,
+          subject: cleanSubject,
+        })
+      : null;
     const provenanceReservation = await mailboxSendProvenanceStore.reserve({
       ...threadProvenance,
       accountEmail: account.email,
@@ -250,24 +212,17 @@ function createMailboxComposeSend(deps = {}) {
       body: webdesignParts?.text || normalizedText,
       cc: normalizedCc.join(', '),
       bcc: normalizedBcc.join(', '),
-      payloadFingerprint,
-      attachmentsFingerprint,
-      outboundGuardRequired: Boolean(webdesignParts),
     });
     if (!provenanceReservation.created) {
       if (provenanceReservation.intent.status === 'accepted') {
         const accepted = provenanceReservation.intent;
         return {
           messageId: accepted.messageId,
-          accepted: accepted.accepted?.length ? accepted.accepted : [normalizedTo],
-          rejected: accepted.rejected || [],
-          sentCopySaved: !accepted.sentReconcileRequired,
+          accepted: [normalizedTo],
+          rejected: [],
+          sentCopySaved: true,
           intentId: accepted.intentId,
           idempotentReplay: true,
-          degraded: accepted.storageDegraded === true || accepted.rejected?.length > 0,
-          deliveryDegraded: accepted.rejected?.length > 0,
-          storageDegraded: accepted.storageDegraded === true,
-          reconcileRequired: accepted.reconcileRequired === true,
           sentMessage: {
             id: `accepted-sent:${accepted.messageId || accepted.intentId}`,
             mailboxId: `accepted-sent:${accepted.messageId || accepted.intentId}`,
@@ -293,16 +248,8 @@ function createMailboxComposeSend(deps = {}) {
             unread: false,
             conversationId: accepted.conversationId,
             softoraSendIntentId: accepted.intentId,
-            softoraPayloadFingerprint: accepted.payloadFingerprint,
             softoraSendMode: accepted.mode,
           },
-        };
-      }
-      if (['prepared', 'unknown'].includes(provenanceReservation.intent.status)) {
-        return {
-          intentId: provenanceReservation.intent.intentId,
-          processing: true, providerOutcomeUnknown: true, storageDegraded: true,
-          reconcileRequired: true, idempotentReplay: true,
         };
       }
       const error = new Error('Deze verzending wordt al veilig verwerkt; wacht op bevestiging voordat je opnieuw probeert.');
@@ -310,152 +257,48 @@ function createMailboxComposeSend(deps = {}) {
       error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
       throw error;
     }
-    let outboundReservation = null;
-    try {
-      outboundReservation = webdesignParts
-        ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
-            accountEmail: account.email, subject: cleanSubject,
-            reservationId: threadProvenance.intentId,
-          })
-        : null;
-    } catch (error) {
-      await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-      throw error;
-    }
-    const releaseDefinitiveGuard = async () => {
-      if (!webdesignParts || !outboundReservation) return;
-      if (typeof releaseMailboxWebdesignOutboundRecipient !== 'function') {
-        const error = new Error('De gereserveerde outbound-guard kon niet veilig worden vrijgegeven.');
-        error.status = 503;
-        error.code = 'MAILBOX_OUTBOUND_GUARD_RELEASE_UNAVAILABLE';
-        throw error;
-      }
-      await releaseMailboxWebdesignOutboundRecipient(
-        outboundReservation.reservationId || threadProvenance.intentId
-      );
-    };
-    let transporter;
-    try {
-      transporter = createTransport({
-        host: account.smtpHost, port: account.smtpPort, secure: account.smtpSecure,
-        auth: { user: account.smtpUser, pass: account.smtpPass },
-        connectionTimeout: DEFAULT_COLDMAIL_SMTP_CONNECTION_TIMEOUT_MS,
-        greetingTimeout: DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS,
-        socketTimeout: DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS,
-      });
-      if (typeof mailboxSendProvenanceStore.markDispatchStarted !== 'function') {
-        const error = new Error('De duurzame providerstartregistratie ontbreekt.');
-        error.status = 503;
-        error.code = 'MAILBOX_SEND_DISPATCH_START_UNAVAILABLE';
-        throw error;
-      }
-      await mailboxSendProvenanceStore.markDispatchStarted(threadProvenance.intentId);
-    } catch (error) {
-      try {
-        await releaseDefinitiveGuard();
-      } catch (releaseError) {
-        logger.error('[Mailbox][GuardReleaseBeforeDispatch]', releaseError?.message || releaseError);
-        await mailboxSendProvenanceStore.fail(threadProvenance.intentId, releaseError);
-        throw releaseError;
-      }
-      await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-      throw error;
-    }
     let info;
     try {
       info = await transporter.sendMail(mail);
     } catch (error) {
-      if (isDefinitiveSmtpNoExternalEffect(error)) {
-        try {
-          await releaseDefinitiveGuard();
-        } catch (releaseError) {
-          logger.error('[Mailbox][GuardReleaseRejected]', releaseError?.message || releaseError);
-          await mailboxSendProvenanceStore.fail(threadProvenance.intentId, releaseError);
-          throw releaseError;
-        }
-        await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-        throw error;
-      }
-      await mailboxSendProvenanceStore.markUnknown?.(threadProvenance.intentId, error).catch((storeError) =>
-        logger.error('[Mailbox][SmtpUnknownStore]', storeError?.message || storeError));
-      return {
-        intentId: threadProvenance.intentId, processing: true, providerOutcomeUnknown: true,
-        storageDegraded: true, reconcileRequired: true,
-      };
+      await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+      throw error;
     }
-    const accepted = normalizeSmtpRecipients(info?.accepted, normalizeEmail);
-    const rejected = normalizeSmtpRecipients(info?.rejected, normalizeEmail);
-    const expectedRecipients = Array.from(new Set([normalizedTo, ...normalizedCc, ...normalizedBcc]));
-    if (!accepted.length) {
-      const error = new Error(rejected.length === expectedRecipients.length
-        ? 'SMTP heeft alle ontvangers definitief geweigerd.'
-        : 'De SMTP-uitkomst kon niet definitief worden vastgesteld.');
-      error.status = 502;
-      error.code = rejected.length === expectedRecipients.length
-        ? 'MAILBOX_SMTP_RECIPIENTS_REJECTED' : 'MAILBOX_SMTP_OUTCOME_UNKNOWN';
-      if (rejected.length === expectedRecipients.length) {
-        try {
-          await releaseDefinitiveGuard();
-        } catch (releaseError) {
-          logger.error('[Mailbox][GuardReleaseAllRejected]', releaseError?.message || releaseError);
-          await mailboxSendProvenanceStore.fail(threadProvenance.intentId, releaseError);
-          throw releaseError;
-        }
-        await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-        throw error;
-      }
-      await mailboxSendProvenanceStore.markUnknown?.(threadProvenance.intentId, error)
-        .catch((storeError) => logger.error('[Mailbox][SmtpUnknownStore]', storeError?.message || storeError));
-      return { intentId: threadProvenance.intentId, processing: true, providerOutcomeUnknown: true,
-        storageDegraded: true, reconcileRequired: true };
+    if (webdesignParts) {
+      await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
+        messageId: normalizeString(info?.messageId || ''),
+        email: normalizedTo,
+        subject: cleanSubject,
+      });
     }
     const sentAt = now();
-    const messageId = normalizeString(info?.messageId || threadProvenance.messageId);
-    const [guardResult, sentCopyResult] = await Promise.allSettled([
-      webdesignParts ? confirmMailboxWebdesignOutboundRecipient(
-        outboundReservation?.reservationId || threadProvenance.intentId,
-        { messageId, email: normalizedTo, subject: cleanSubject }
-      ) : true,
-      appendSentMessage({ account, createImapClient, nodemailer, mail, messageId, sentAt, logger }),
-    ]);
-    if (guardResult.status === 'rejected') logger.error('[Mailbox][GuardConfirm]', guardResult.reason?.message || guardResult.reason);
-    if (sentCopyResult.status === 'rejected') logger.error('[Mailbox][SentCopy]', sentCopyResult.reason?.message || sentCopyResult.reason);
-    const guardPending = Boolean(webdesignParts && guardResult.status !== 'fulfilled');
-    const sentCopySaved = sentCopyResult.status === 'fulfilled' && sentCopyResult.value === true;
-    const sentPending = !sentCopySaved;
-    let provenanceAccepted = true;
-    try {
-      await acceptProvenanceWithRetry(threadProvenance.intentId, {
-        messageId, acceptedAt: sentAt.toISOString(), accepted, rejected,
-        storageDegraded: guardPending || sentPending,
-        reconcileRequired: guardPending || sentPending,
-        outboundGuardReconcileRequired: guardPending,
-        sentReconcileRequired: sentPending,
-      });
-    } catch (error) {
-      provenanceAccepted = false;
-      logger.error('[Mailbox][SmtpAcceptStore]', error?.message || error);
-      const preserved = await mailboxSendProvenanceStore.markUnknown?.(threadProvenance.intentId, error)
-        .catch((storeError) => {
-          logger.error('[Mailbox][SmtpUnknownStore]', storeError?.message || storeError);
-          return null;
-        });
-      if (preserved?.status === 'accepted') provenanceAccepted = true;
-    }
-    const storageDegraded = guardPending || sentPending || !provenanceAccepted;
-    const deliveryDegraded = rejected.length > 0 || accepted.length < expectedRecipients.length;
+    const acceptedProvenance = await acceptProvenanceWithRetry(threadProvenance.intentId, {
+      messageId: normalizeString(info?.messageId || threadProvenance.messageId),
+      acceptedAt: sentAt.toISOString(),
+    });
+    const sentCopySaved = await appendSentMessage({
+      account,
+      createImapClient,
+      nodemailer,
+      mail,
+      messageId: normalizeString(info?.messageId || ''),
+      sentAt,
+      logger,
+    });
     return {
-      messageId, accepted, rejected, sentCopySaved, intentId: threadProvenance.intentId,
-      degraded: deliveryDegraded || storageDegraded, deliveryDegraded, storageDegraded,
-      reconcileRequired: storageDegraded, providerOutcomeUnknown: false,
+      messageId: normalizeString(info?.messageId || ''),
+      accepted: Array.isArray(info?.accepted) ? info.accepted : [],
+      rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+      sentCopySaved,
+      intentId: acceptedProvenance.intentId,
       sentMessage: {
-        id: `accepted-sent:${messageId || sentAt.toISOString()}`,
-        mailboxId: `accepted-sent:${messageId || sentAt.toISOString()}`,
+        id: `accepted-sent:${normalizeString(info?.messageId || sentAt.toISOString())}`,
+        mailboxId: `accepted-sent:${normalizeString(info?.messageId || sentAt.toISOString())}`,
         folder: 'sent',
         storageFolder: 'sent',
         direction: 'sent',
         accountEmail: account.email,
-        messageId,
+        messageId: normalizeString(info?.messageId || threadProvenance.messageId),
         from: account.name || account.email,
         email: account.email,
         to: normalizedTo,
@@ -473,7 +316,6 @@ function createMailboxComposeSend(deps = {}) {
         unread: false,
         conversationId: threadProvenance.conversationId,
         softoraSendIntentId: threadProvenance.intentId,
-        softoraPayloadFingerprint: payloadFingerprint,
         softoraSendMode: threadProvenance.mode,
         softoraReplyTargetMessageId: threadProvenance.replyTargetMessageId,
       },
@@ -487,7 +329,4 @@ module.exports = {
   MAX_COMPOSE_ATTACHMENTS,
   MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES,
   createMailboxComposeSend,
-  fingerprintComposeAttachments,
-  fingerprintComposePayload,
-  isDefinitiveSmtpNoExternalEffect,
 };

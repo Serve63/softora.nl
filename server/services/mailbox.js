@@ -615,7 +615,7 @@ function createMailboxService(deps = {}) {
       mailboxSendProvenanceStore,
       logger,
     }),
-    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), getCampaignMutationRunner: () => campaignRuntime?.syncOptions?.campaignMutationRunner, mailboxSendProvenanceStore, logger }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), getCampaignMutationRunner: () => campaignRuntime?.syncOptions?.campaignMutationRunner, logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
@@ -1901,7 +1901,6 @@ function createMailboxService(deps = {}) {
       id: `${folder}:${message.uid}`,
       uid: message.uid,
       folder,
-      accountEmail: account.email,
       from: fromText,
       email: parsedFromEmail || account.email,
       to: addressText(parsed.to?.value),
@@ -1930,8 +1929,6 @@ function createMailboxService(deps = {}) {
       softoraSendIntentId: parsedHeaderText(parsed, 'x-softora-send-intent-id'),
       softoraSendMode: parsedHeaderText(parsed, 'x-softora-send-mode').toLowerCase(),
       softoraReplyTargetMessageId: parsedHeaderText(parsed, 'x-softora-reply-target-message-id'),
-      softoraRecipientFingerprint: parsedHeaderText(parsed, 'x-softora-recipient-fingerprint'),
-      softoraPayloadFingerprint: parsedHeaderText(parsed, 'x-softora-payload-fingerprint'),
       softoraThreadProvenanceKnown: Boolean(parsedHeaderText(parsed, 'x-softora-send-intent-id')),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
@@ -1966,7 +1963,7 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, reconcileIntentIds = [], signal, deadlineAt = 0, ...historySyncOptions }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, deadlineAt = 0, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
     const client = createClient(account, getMailboxImapSyncTimeouts({ signal, deadlineAt }));
@@ -1991,22 +1988,6 @@ function createMailboxService(deps = {}) {
             logger,
             accountEmail: account.email,
             folder: normalizedFolder,
-          });
-        }
-        const selectionHealth = selectedUids.syncSelectionHealth;
-        for (const intentId of Array.from(new Set(reconcileIntentIds.map(normalizeString).filter(Boolean))).slice(0, 25)) {
-          abortScope.throwIfAborted();
-          const matches = await client.search({ header: { 'x-softora-send-intent-id': intentId } }, { uid: true });
-          abortScope.throwIfAborted();
-          selectedUids.push(...(Array.isArray(matches) ? matches : []));
-        }
-        selectedUids = Array.from(new Set(selectedUids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)));
-        // Deduplication must not erase the provider-selection health attached by
-        // resolveMailboxSyncUids. Losing it would falsely label a truncated
-        // backlog as complete after adding SMTP reconciliation candidates.
-        if (selectionHealth) {
-          Object.defineProperty(selectedUids, 'syncSelectionHealth', {
-            value: selectionHealth,
           });
         }
         if (!selectedUids.length) return attachMailboxSyncReadResult([], { selectedUids, uidValidity });
@@ -2081,8 +2062,6 @@ function createMailboxService(deps = {}) {
     getAccounts,
     normalizeEmail,
     normalizeFolder, invalidateCampaignSnapshot, ...campaignRuntime.syncOptions,
-    mailboxSendProvenanceStore, confirmMailboxWebdesignOutboundRecipient,
-    releaseMailboxWebdesignOutboundRecipient,
     logger,
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
@@ -2234,8 +2213,7 @@ function createMailboxService(deps = {}) {
     composeSendDependencies: {
       getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
-      confirmMailboxWebdesignOutboundRecipient, releaseMailboxWebdesignOutboundRecipient,
-      appendSentMessage, createImapClient, nodemailer,
+      confirmMailboxWebdesignOutboundRecipient, appendSentMessage, createImapClient, nodemailer,
       webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
     },
     getAccount, instantlyMailboxService, mailboxComposeThreadContext,

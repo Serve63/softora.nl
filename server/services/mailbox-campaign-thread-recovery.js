@@ -143,7 +143,6 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
       conversationId: normalizeText(intent.conversationId),
       softoraConversationId: normalizeText(intent.conversationId),
       softoraSendIntentId: normalizeText(intent.intentId),
-      softoraPayloadFingerprint: normalizeText(intent.payloadFingerprint),
       softoraSendMode: normalizeText(intent.mode),
       softoraReplyTargetMessageId: normalizeText(intent.replyTargetMessageId),
       softoraThreadProvenanceKnown: true,
