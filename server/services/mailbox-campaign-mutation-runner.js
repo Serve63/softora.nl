@@ -65,7 +65,6 @@ function createMailboxCampaignMutationRunner(deps = {}) {
       controller.abort(timeoutError);
       rejectDeadline(timeoutError);
     }, deadlineMs);
-    timer?.unref?.();
     function assertActive() {
       if (timedOut || controller.signal.aborted || Number(now()) >= deadlineAtMs) {
         if (!controller.signal.aborted) {

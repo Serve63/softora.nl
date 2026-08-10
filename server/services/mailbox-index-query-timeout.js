@@ -65,7 +65,6 @@ async function executeMailboxIndexQuery(query, {
     timedOut = true;
     controller.abort(createMailboxIndexTimeoutError(label, boundedTimeoutMs));
   }, boundedTimeoutMs);
-  timer?.unref?.();
   let request;
   try {
     request = attachMutationAbortSignal(query, controller.signal, label);
