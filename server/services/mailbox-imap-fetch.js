@@ -1,41 +1,38 @@
-const { attachMailboxSyncReadHealth } = require('./mailbox-imap-message-parser');
-
 async function fetchSelectedMailboxMessages({
   account,
+  buildMailboxBodyImages,
   client,
-  deadlineAt,
   folder,
-  parseMessage,
+  normalizeString,
+  parseMailSource,
+  sanitizeMailboxDisplayText,
   selectedUids = [],
-  signal,
-  throwIfAborted = () => {},
+  toClientMessage,
 } = {}) {
-  const messages = [];
-  const parseFailures = [];
+  const records = [];
   for await (const message of client.fetch(
     selectedUids,
     { uid: true, flags: true, internalDate: true, source: true },
     { uid: true }
   )) {
-    throwIfAborted();
-    const parsed = await parseMessage({
+    const parsed = await parseMailSource(message.source);
+    const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
+    const primaryBodyImages = buildMailboxBodyImages(parsed);
+    records.push({
       message,
-      account,
-      folder,
-      signal,
-      deadlineAt,
+      parsed,
+      text,
+      primaryBodyImages,
     });
-    if (parsed.ok) messages.push(parsed.message);
-    else parseFailures.push(parsed);
   }
-  const sorted = messages.sort((left, right) => (
-    (Date.parse(right?.date) || 0) - (Date.parse(left?.date) || 0)
+  const messages = records.map((record) => toClientMessage(
+    record.parsed,
+    record.message,
+    folder,
+    account,
+    { text: record.text, primaryBodyImages: record.primaryBodyImages }
   ));
-  return attachMailboxSyncReadHealth(sorted, {
-    parseFailures,
-    selectedCount: selectedUids.length,
-    folderMissing: false,
-  });
+  return messages.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
 }
 
 module.exports = { fetchSelectedMailboxMessages };

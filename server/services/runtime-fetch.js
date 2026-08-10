@@ -1,24 +1,8 @@
 const { withOpenAiContextHeaders } = require('./openai-request-context');
 
-function createRuntimeFetchController(parentSignal, timeoutMs) {
-  const controller = new AbortController();
-  const abortFromParent = () => controller.abort(parentSignal?.reason);
-  if (parentSignal) {
-    if (parentSignal.aborted) abortFromParent();
-    else parentSignal.addEventListener('abort', abortFromParent, { once: true });
-  }
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  return {
-    signal: controller.signal,
-    cleanup() {
-      clearTimeout(timeout);
-      parentSignal?.removeEventListener?.('abort', abortFromParent);
-    },
-  };
-}
-
 async function fetchJsonWithTimeout(url, options, timeoutMs = 15000) {
-  const controller = createRuntimeFetchController(options?.signal, timeoutMs);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(
@@ -38,12 +22,13 @@ async function fetchJsonWithTimeout(url, options, timeoutMs = 15000) {
 
     return { response, data };
   } finally {
-    controller.cleanup();
+    clearTimeout(timeout);
   }
 }
 
 async function fetchTextWithTimeout(url, options, timeoutMs = 15000) {
-  const controller = createRuntimeFetchController(options?.signal, timeoutMs);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(
@@ -53,12 +38,13 @@ async function fetchTextWithTimeout(url, options, timeoutMs = 15000) {
     const text = await response.text();
     return { response, text };
   } finally {
-    controller.cleanup();
+    clearTimeout(timeout);
   }
 }
 
 async function fetchBinaryWithTimeout(url, options, timeoutMs = 15000) {
-  const controller = createRuntimeFetchController(options?.signal, timeoutMs);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(
@@ -68,7 +54,7 @@ async function fetchBinaryWithTimeout(url, options, timeoutMs = 15000) {
     const bytes = Buffer.from(await response.arrayBuffer());
     return { response, bytes };
   } finally {
-    controller.cleanup();
+    clearTimeout(timeout);
   }
 }
 

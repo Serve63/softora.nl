@@ -8,7 +8,6 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
-const { attachMailboxSyncReadHealth, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
 const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
@@ -29,7 +28,6 @@ const {
   createMailboxSyncService,
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
-const { getMailboxImapSyncTimeouts, getMailboxSyncResponseStatus } = require('./mailbox-imap-sync-deadline');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
@@ -858,9 +856,11 @@ function createMailboxService(deps = {}) {
       return account;
     });
   }
+
   function getAccounts() {
     return buildAccounts();
   }
+
   function getAccount(email) {
     return getAccounts().find((account) => account.email === normalizeEmail(email)) || null;
   }
@@ -889,7 +889,7 @@ function createMailboxService(deps = {}) {
     return { folder, uid };
   }
 
-  function createClient(account, options = {}) {
+  function createClient(account) {
     return createImapClient({
       host: account.imapHost,
       port: account.imapPort,
@@ -899,7 +899,6 @@ function createMailboxService(deps = {}) {
         pass: account.imapPass,
       },
       logger: false,
-      ...options,
     });
   }
 
@@ -1933,10 +1932,6 @@ function createMailboxService(deps = {}) {
     };
   }
 
-  const imapMessageParser = createMailboxImapMessageParser({ parseMailSource, normalizeString,
-    sanitizeDisplayText: sanitizeMailboxDisplayText, buildBodyImages: buildMailboxBodyImages,
-    toClientMessage, logger });
-
   function getSafeLimit(limit, max = 100) {
     return Math.max(1, Math.min(max, Number(limit) || DEFAULT_SYNC_LIMIT));
   }
@@ -1956,15 +1951,15 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, deadlineAt = 0, ...historySyncOptions }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
-    const client = createClient(account, getMailboxImapSyncTimeouts({ signal, deadlineAt }));
+    const client = createClient(account);
     const abortScope = createMailboxImapAbortScope(client, signal);
     try {
       await client.connect();
       const mailboxName = await resolveMailboxName(client, normalizedFolder);
-      if (!mailboxName) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: true });
+      if (!mailboxName) return [];
       const lock = await client.getMailboxLock(mailboxName);
       try {
         let selectedUids = Array.isArray(uids) && uids.length
@@ -1982,16 +1977,17 @@ function createMailboxService(deps = {}) {
             folder: normalizedFolder,
           });
         }
-        if (!selectedUids.length) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: false });
+        if (!selectedUids.length) return [];
         return await fetchSelectedMailboxMessages({
           account,
+          buildMailboxBodyImages,
           client,
-          deadlineAt,
           folder: normalizedFolder,
-          parseMessage: imapMessageParser.parseMessage,
+          normalizeString,
+          parseMailSource,
+          sanitizeMailboxDisplayText,
           selectedUids,
-          signal,
-          throwIfAborted: abortScope.throwIfAborted,
+          toClientMessage,
         });
       } finally {
         lock.release();
@@ -2425,7 +2421,7 @@ function createMailboxService(deps = {}) {
         defaultLimit: DEFAULT_SYNC_LIMIT,
         cronLimit: CRON_SYNC_LIMIT,
       });
-      return res.status(getMailboxSyncResponseStatus(result)).json(result);
+      return res.status(result.ok ? 200 : 207).json(result);
     } catch (error) {
       logger.error('[Mailbox][SyncResponse]', error?.message || error);
       return res.status(error.status || 500).json({
