@@ -23,6 +23,10 @@ function block(source) {
   return match[0];
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 test('UIDVALIDITY-migratie en data-ops-schema bevatten exact hetzelfde generatiecontract', () => {
   assert.equal(block(read(schemaPath)), block(read(migrationPath)));
 });
@@ -110,8 +114,9 @@ test('UIDVALIDITY RPCs zijn service-role-only en de probe dekt adoptie, reset en
     'softora_apply_mailbox_uid_validity(text, text, bigint, text)',
     'softora_prepare_mailbox_uid_validity(text, text, bigint)',
   ]) {
-    assert.match(sql, new RegExp(`revoke all on function public\\.${signature.replace(/[()]/g, '\\$&')}[\\s\\S]*from public, anon, authenticated, service_role`, 'i'));
-    assert.match(sql, new RegExp(`grant execute on function public\\.${signature.replace(/[()]/g, '\\$&')}[\\s\\S]*to service_role`, 'i'));
+    const escapedSignature = escapeRegExp(signature);
+    assert.match(sql, new RegExp(`revoke all on function public\\.${escapedSignature}[\\s\\S]*from public, anon, authenticated, service_role`, 'i'));
+    assert.match(sql, new RegExp(`grant execute on function public\\.${escapedSignature}[\\s\\S]*to service_role`, 'i'));
   }
   assert.match(probe, /UIDVALIDITY_PROBE_LEGACY_ADOPTION_FAILED/);
   assert.match(probe, /UIDVALIDITY_PROBE_ROLLING_WRITER_DUPLICATED_STATE/);
