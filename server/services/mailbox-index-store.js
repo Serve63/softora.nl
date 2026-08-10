@@ -23,6 +23,7 @@ const {
   createMailboxActionNotFoundResult,
   resolveMailboxMessageActionReference,
 } = require('./mailbox-message-action-reference');
+const { createMailboxIndexUidSelection } = require('./mailbox-index-uid-selection');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -174,6 +175,18 @@ function createMailboxIndexStore(deps = {}) {
     defaultLockTtlMs: SYNC_LOCK_TTL_MS,
   });
   const { prepareUidValidity } = createMailboxUidValidityStore({ run, buildSyncKey, normalizeString });
+  const {
+    listMessageUidSyncStateForAccount,
+    listMessageUidsForAccount,
+  } = createMailboxIndexUidSelection({
+    run,
+    tableName: MAILBOX_INDEX_TABLES.messages,
+    pageSize: MAILBOX_INDEX_PAGE_SIZE,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeString,
+    now,
+  });
 
   function parseUidFromMessage(message) {
     const uid = Number(message && message.uid);
@@ -287,6 +300,14 @@ function createMailboxIndexStore(deps = {}) {
         softoraSendMode: truncateText(normalizeString(message && message.softoraSendMode).toLowerCase(), 40),
         softoraReplyTargetMessageId: truncateText(normalizeString(message && message.softoraReplyTargetMessageId), 1000),
         softoraThreadProvenanceKnown: message && message.softoraThreadProvenanceKnown === true,
+        ...(normalizeString(message && message.parseStatus) ? {
+          parseStatus: truncateText(normalizeString(message.parseStatus), 80),
+          parseErrorCode: truncateText(normalizeString(message.parseErrorCode), 120),
+          parseErrorReason: truncateText(normalizeString(message.parseErrorReason), 240),
+          parseRetryAt: truncateText(normalizeString(message.parseRetryAt), 80),
+          bodyUnavailable: message.bodyUnavailable === true,
+          providerMetadataEvidenceKnown: message.providerMetadataEvidenceKnown === true,
+        } : {}),
       },
       updated_at: isoNow(),
     };
@@ -323,6 +344,12 @@ function createMailboxIndexStore(deps = {}) {
       softoraSendMode: normalizeString(payload.softoraSendMode).toLowerCase(),
       softoraReplyTargetMessageId: normalizeString(payload.softoraReplyTargetMessageId),
       softoraThreadProvenanceKnown: payload.softoraThreadProvenanceKnown === true,
+      parseStatus: normalizeString(payload.parseStatus),
+      parseErrorCode: normalizeString(payload.parseErrorCode),
+      parseErrorReason: normalizeString(payload.parseErrorReason),
+      parseRetryAt: normalizeString(payload.parseRetryAt),
+      bodyUnavailable: payload.bodyUnavailable === true,
+      providerMetadataEvidenceKnown: payload.providerMetadataEvidenceKnown === true,
       subject: normalizeString(row.subject) || '(Geen onderwerp)',
       preview: normalizeString(row.preview),
       body: includeBody ? normalizeString(row.body_text) : '',
@@ -740,41 +767,6 @@ function createMailboxIndexStore(deps = {}) {
       .map((row) => normalizeMessageRow(row));
   }
 
-  async function listMessageUidsForAccount({
-    accountEmail, folder = 'inbox', since = '', limit = 5000, signal,
-  } = {}) {
-    const normalizedAccount = normalizeEmail(accountEmail);
-    if (!normalizedAccount) return [];
-    const normalizedFolder = normalizeFolder(folder);
-    const safeLimit = Math.max(1, Math.min(10_000, Math.floor(Number(limit) || 5000)));
-    const rows = [];
-    for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
-      const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
-      const result = await run(
-        `list-message-uids-for-account:${normalizedFolder}:${offset}`,
-        (client) => {
-          let query = client
-            .from(MAILBOX_INDEX_TABLES.messages)
-            .select('uid')
-            .eq('account_email', normalizedAccount)
-            .eq('folder', normalizedFolder)
-            .is('deleted_at', null)
-            .order('uid', { ascending: false });
-          if (normalizeString(since)) query = query.gte('date', normalizeString(since));
-          return query.range(offset, offset + pageSize - 1);
-        },
-        { signal }
-      );
-      if (!result.ok) return null;
-      const page = Array.isArray(result.data) ? result.data : [];
-      rows.push(...page);
-      if (page.length < pageSize) break;
-    }
-    return Array.from(
-      new Set(rows.map((row) => Number(row && row.uid)).filter((uid) => Number.isSafeInteger(uid) && uid > 0))
-    );
-  }
-
   async function hydrateMessageBodies({ messages = [] } = {}) {
     const source = Array.isArray(messages) ? messages : [];
     const messageKeys = Array.from(
@@ -1158,6 +1150,7 @@ function createMailboxIndexStore(deps = {}) {
     listSentCandidatesForQuotedReplies,
     listMessagesReferencingMessageIdsForAccounts,
     listUnthreadedSentCandidatesForConversations,
+    listMessageUidSyncStateForAccount,
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,

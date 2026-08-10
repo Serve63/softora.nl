@@ -153,6 +153,7 @@ async function resolveMailboxSyncUids({
   oldestIndexedCampaignUid = 0,
   threadReferenceIds = [],
   threadRecipientTerms = [],
+  priorityUids = [],
   indexedUids = [],
   logger = console,
   accountEmail = '',
@@ -162,6 +163,7 @@ async function resolveMailboxSyncUids({
   if (!campaignHistory) {
     return selectMailboxSyncUids({
       allUids,
+      priorityUids,
       indexedUids,
       limit,
     });
@@ -199,7 +201,7 @@ async function resolveMailboxSyncUids({
   return selectMailboxSyncUids({
     allUids,
     campaignUids,
-    priorityUids: threadReplyUids,
+    priorityUids: [...normalizeUidList(priorityUids), ...threadReplyUids],
     indexedUids,
     oldestIndexedCampaignUid,
     limit,
