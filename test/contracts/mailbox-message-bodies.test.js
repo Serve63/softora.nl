@@ -78,10 +78,12 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
       account: 'SERVE@SOFTORA.NL',
       folder: 'SENT',
       id: 'sent:42',
+      uidValidity: 222,
     }, {
       account: 'serve@softora.nl',
       folder: 'inbox',
       uid: 43,
+      uidValidity: 222,
       id: 'inbox:43',
     }],
   });
@@ -89,6 +91,7 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
   assert.deepEqual(messages, [{
     id: 'sent:42',
     uid: 42,
+    uidValidity: 222,
     folder: 'sent',
     accountEmail: 'serve@softora.nl',
     resolved: true,
@@ -110,6 +113,7 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
   }, {
     id: 'inbox:43',
     uid: 43,
+    uidValidity: 222,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     resolved: true,
@@ -184,6 +188,12 @@ test('mailbox body batch weigert onbegrensde, ongeldige en onbevoegde requests',
     }),
     (error) => error && error.status === 400
   );
+  await assert.rejects(
+    service.getMessageBodies({
+      messages: [{ account: 'serve@softora.nl', id: 'inbox:42' }],
+    }),
+    (error) => error && error.status === 409 && error.code === 'MAILBOX_UIDVALIDITY_REQUIRED'
+  );
 });
 
 test('mailbox body batch hydrateert Instantly via exact provideraccount en provider-id', async () => {
@@ -200,6 +210,7 @@ test('mailbox body batch hydrateert Instantly via exact provideraccount en provi
   assert.deepEqual(messages, [{
     id: 'instantly:abc-123',
     uid: 0,
+    uidValidity: 0,
     folder: 'instantly',
     accountEmail: 'serve@websoftora.com',
     resolved: true,

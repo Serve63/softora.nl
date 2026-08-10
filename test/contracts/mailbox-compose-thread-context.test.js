@@ -5,11 +5,14 @@ const {
   createMailboxComposeThreadContext,
 } = require('../../server/services/mailbox-compose-thread-context');
 
-function createResolver(message) {
+function createResolver(message, onLookup = () => {}) {
   let sequence = 0;
   return createMailboxComposeThreadContext({
     mailboxIndexStore: {
-      getMessage: async () => message,
+      getMessage: async (input) => {
+        onLookup(input);
+        return message;
+      },
     },
     getOwnerIdentity: (email) => ({
       profileKey: email === 'martijn@softora.nl' ? 'martijn' : 'serve',
@@ -20,6 +23,7 @@ function createResolver(message) {
 }
 
 test('mailbox reply context is resolved from the exact stored message and builds RFC headers', async () => {
+  let lookup = null;
   const resolver = createResolver({
     id: 'inbox:25',
     uid: 25,
@@ -29,7 +33,7 @@ test('mailbox reply context is resolved from the exact stored message and builds
     messageId: '<blue-inbound@example.nl>',
     inReplyTo: '<blue-original@example.nl>',
     references: '<blue-original@example.nl>',
-  });
+  }, (input) => { lookup = input; });
   const result = await resolver.resolve({
     accountEmail: 'martijn@softora.nl',
     recipientEmail: 'info@blue-monkey.nl',
@@ -39,6 +43,8 @@ test('mailbox reply context is resolved from the exact stored message and builds
       idempotencyKey: 'blue-reply-1',
       context: {
         id: 'inbox:25',
+        uid: 25,
+        uidValidity: 222,
         folder: 'inbox',
         messageId: '<blue-inbound@example.nl>',
         conversationId: 'conversation:martijn@softora.nl|blue',
@@ -50,6 +56,13 @@ test('mailbox reply context is resolved from the exact stored message and builds
   assert.equal(result.references, '<blue-original@example.nl> <blue-inbound@example.nl>');
   assert.equal(result.owner, 'martijn');
   assert.equal(result.mode, 'reply');
+  assert.deepEqual(lookup, {
+    accountEmail: 'martijn@softora.nl',
+    folder: 'inbox',
+    id: 'inbox:25',
+    uid: 25,
+    uidValidity: 222,
+  });
 });
 
 test('mailbox reply context fails closed across owners accounts and recipients', async () => {
