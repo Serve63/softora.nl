@@ -4547,6 +4547,16 @@ test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail c
   );
   assert.deepEqual(
     getMailboxSyncFoldersForAccount({
+      account: { email: 'servec321@gmail.com', imapHost: 'imap.gmail.com' },
+      folders: ['inbox'],
+      campaignOnly: true,
+      incrementalOnly: true,
+      normalizeFolder,
+    }),
+    ['inbox']
+  );
+  assert.deepEqual(
+    getMailboxSyncFoldersForAccount({
       account: { email: 'serve@softora.nl', imapHost: 'imap.strato.com' },
       folders: ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER],
       campaignOnly: true,

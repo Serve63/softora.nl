@@ -170,6 +170,7 @@ function getMailboxSyncFoldersForAccount({
   account,
   folders = [],
   campaignOnly = false,
+  incrementalOnly = false,
   normalizeFolder = (value) => String(value || '').trim().toLowerCase(),
 } = {}) {
   const normalizedFolders = (Array.isArray(folders) ? folders : [])
@@ -180,7 +181,7 @@ function getMailboxSyncFoldersForAccount({
       normalizedFolders.filter((folder) => folder !== CAMPAIGN_GMAIL_LABEL_FOLDER)
     ));
   }
-  if (campaignOnly) {
+  if (campaignOnly && !incrementalOnly) {
     normalizedFolders.push(CAMPAIGN_GMAIL_LABEL_FOLDER);
   }
   return Array.from(new Set(normalizedFolders));
@@ -877,6 +878,7 @@ function createMailboxSyncService({
             account,
             folders: requestedFolders,
             campaignOnly,
+            incrementalOnly,
             normalizeFolder,
           });
           for (const folder of folderList) {

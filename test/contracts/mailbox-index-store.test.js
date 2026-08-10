@@ -510,7 +510,7 @@ test('mailbox index store laat een duurzame Softora-leesactie voorgaan op provid
   assert.equal(opened.readAt, '2026-08-05T15:59:00.000Z');
 });
 
-test('mailbox index store joins exact active Instantly threads without a broad body scan', async () => {
+test('mailbox index store joins exact active Instantly threads without PostgREST JSON-path operators', async () => {
   const calls = [];
   const rowBuilder = createMailboxIndexStore({
     now: () => new Date('2026-07-26T16:00:00.000Z'),
@@ -569,10 +569,17 @@ test('mailbox index store joins exact active Instantly threads without a broad b
         range(from, to) {
           calls.push(['range', from, to]);
           return Promise.resolve({
-            data: [{
-              account_email: 'serve-sender@example.com',
-              provider_thread_id: 'provider-active-thread',
-            }],
+            data: queryState.columns === 'account_email,payload'
+              ? [{
+                  account_email: 'serve-sender@example.com',
+                  payload: {
+                    direction: 'received',
+                    providerThreadId: 'provider-active-thread',
+                  },
+                }]
+              : queryState.columns.startsWith('message_key,account_email,folder,')
+                ? [activeOutboundRow]
+                : [],
             error: null,
           });
         },
@@ -604,17 +611,16 @@ test('mailbox index store joins exact active Instantly threads without a broad b
   assert.equal(
     calls.some((call) => (
       call[0] === 'select' &&
-      call[2] === 'account_email,provider_thread_id:payload->>providerThreadId'
+      call[2] === 'account_email,payload'
     )),
     true
   );
   assert.equal(
     calls.some((call) => (
-      call[0] === 'in' &&
-      call[1] === 'payload->>providerThreadId' &&
-      call[2][0] === 'provider-active-thread'
+      (call[0] === 'select' || call[0] === 'eq' || call[0] === 'in') &&
+      call.slice(1).join(' ').includes('payload->')
     )),
-    true
+    false
   );
   assert.equal(
     calls.some((call) => (
@@ -2100,11 +2106,11 @@ test('mailbox index store stelt quarantaines alleen uit tot hun duurzame retrymo
           calls.push(['range', from, to]);
           return Promise.resolve({
             data: [
-              { uid: 44, parse_status: 'quarantined', parse_retry_at: null },
-              { uid: 43, parse_status: null, parse_retry_at: null },
-              { uid: 43, parse_status: 'quarantined', parse_retry_at: '2026-08-10T11:59:59.999Z' },
-              { uid: 42, parse_status: 'quarantined', parse_retry_at: '2026-08-10T12:15:00.000Z' },
-              { uid: 41, parse_status: null, parse_retry_at: null },
+              { uid: 44, payload: { parseStatus: 'quarantined' } },
+              { uid: 43, payload: {} },
+              { uid: 43, payload: { parseStatus: 'quarantined', parseRetryAt: '2026-08-10T11:59:59.999Z' } },
+              { uid: 42, payload: { parseStatus: 'quarantined', parseRetryAt: '2026-08-10T12:15:00.000Z' } },
+              { uid: 41, payload: {} },
             ],
             error: null,
           });
@@ -2138,7 +2144,7 @@ test('mailbox index store stelt quarantaines alleen uit tot hun duurzame retrymo
   }), [42, 41]);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',
-    'uid,parse_status:payload->>parseStatus,parse_retry_at:payload->>parseRetryAt',
+    'uid,payload',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'gte'), [
     'gte',
