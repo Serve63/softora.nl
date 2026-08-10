@@ -9,6 +9,7 @@ const {
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
 const { attachMailboxSyncReadResult, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
+const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
@@ -1986,21 +1987,16 @@ function createMailboxService(deps = {}) {
           });
         }
         if (!selectedUids.length) return attachMailboxSyncReadResult([], { selectedUids });
-        const messages = [];
-        const parseFailures = [];
-        for await (const message of client.fetch(
+        return await fetchSelectedMailboxMessages({
+          account,
+          client,
+          deadlineAt,
+          folder: normalizedFolder,
+          parseMessage: imapMessageParser.parseMessage,
           selectedUids,
-          { uid: true, flags: true, internalDate: true, source: true },
-          { uid: true }
-        )) {
-          abortScope.throwIfAborted();
-          const parsed = await imapMessageParser.parseMessage({ message, account,
-            folder: normalizedFolder, signal, deadlineAt });
-          if (parsed.ok) messages.push(parsed.message);
-          else parseFailures.push(parsed);
-        }
-        const sorted = messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        return attachMailboxSyncReadResult(sorted, { selectedUids, parseFailures });
+          signal,
+          throwIfAborted: abortScope.throwIfAborted,
+        });
       } finally {
         lock.release();
       }
