@@ -1,9 +1,6 @@
 const { resolveMailboxName } = require('./mailbox-sent-copy');
 const { markInstantlyMessageRead } = require('./mailbox-instantly-integration');
 const { createMailboxReplyDismissService } = require('./mailbox-reply-dismiss');
-const {
-  createMailboxUidValidityActionGuard,
-} = require('./mailbox-uid-validity-action-guard');
 
 function createMailboxReadMessageService(deps = {}) {
   const {
@@ -12,7 +9,6 @@ function createMailboxReadMessageService(deps = {}) {
     getAccount,
     parseMessageReference,
     createClient,
-    resolveMailboxName: resolveMailboxNameForAction = resolveMailboxName,
     instantlyMailboxService,
     getUiStateValues,
     setUiStateValues,
@@ -25,15 +21,8 @@ function createMailboxReadMessageService(deps = {}) {
     setUiStateValues,
     logger,
   });
-  const uidValidityGuard = createMailboxUidValidityActionGuard({
-    createClient,
-    mailboxIndexStore,
-    resolveMailboxName: resolveMailboxNameForAction,
-  });
 
-  async function markMessageRead({
-    accountEmail, id, folder, uid, uidValidity, owner, dismissReply = false,
-  }) {
+  async function markMessageRead({ accountEmail, id, folder, uid, owner, dismissReply = false }) {
     const instantlyResult = await markInstantlyMessageRead({
       input: { accountEmail, id, folder, uid, owner },
       instantlyMailboxService,
@@ -61,51 +50,49 @@ function createMailboxReadMessageService(deps = {}) {
       error.status = 503;
       throw error;
     }
-    const messageRef = parseMessageReference({ id, folder, uid, uidValidity });
+    const messageRef = parseMessageReference({ id, folder, uid });
     const result = {
       account: account.email,
       folder: messageRef.folder,
       uid: messageRef.uid,
-      uidValidity: messageRef.uidValidity,
       unread: false,
     };
-    return uidValidityGuard.withCurrentUidValidity({
-      account,
-      folder: messageRef.folder,
-      uidValidity: messageRef.uidValidity,
-    }, async (client) => {
-      if (dismissReply) {
+    let readAt = '';
+    if (canUseMailboxIndex() && typeof mailboxIndexStore.markMessageRead === 'function') {
+      const indexResult = await mailboxIndexStore.markMessageRead({
+        accountEmail: account.email,
+        id,
+        folder: messageRef.folder,
+        uid: messageRef.uid,
+      }).catch((error) => {
+        logger.error('[Mailbox][MarkReadIndex]', error?.message || error);
+        return null;
+      });
+      readAt = indexResult?.readAt || '';
+    }
+    const client = createClient(account);
+    try {
+      await client.connect();
+      const mailboxName = await resolveMailboxName(client, messageRef.folder);
+      const lock = await client.getMailboxLock(mailboxName);
+      try {
+        await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
+        if (!dismissReply) return result;
         const dismissed = await mailboxReplyDismiss.dismiss({
           accountEmail: account.email,
           id,
           folder: messageRef.folder,
           uid: messageRef.uid,
-          uidValidity: messageRef.uidValidity,
         });
-        await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
         return { ...result, ...dismissed };
+      } finally {
+        lock.release();
       }
-      if (canUseMailboxIndex() && typeof mailboxIndexStore.markMessageRead === 'function') {
-        const indexResult = await mailboxIndexStore.markMessageRead({
-          accountEmail: account.email,
-          id,
-          folder: messageRef.folder,
-          uid: messageRef.uid,
-          uidValidity: messageRef.uidValidity,
-        }).catch((error) => {
-          logger.error('[Mailbox][MarkReadIndex]', error?.message || error);
-          return null;
-        });
-        if (
-          indexResult?.ok === false &&
-          ['MAILBOX_UIDVALIDITY_REQUIRED', 'MAILBOX_UIDVALIDITY_STALE'].includes(indexResult.error?.code)
-        ) {
-          throw indexResult.error;
-        }
-      }
-      await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
-      return result;
-    });
+    } finally {
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+    }
   }
 
   return { markMessageRead };

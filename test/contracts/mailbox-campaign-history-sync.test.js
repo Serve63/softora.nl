@@ -62,32 +62,6 @@ test('campaign history sync bounds each run and imports the newest missing targe
   assert.ok(selected.indexOf(199) < selected.indexOf(187));
 });
 
-test('incremental sync geeft een due quarantine voorrang zonder gezonde indexrijen over te slaan', async () => {
-  const fetches = [];
-  const client = {
-    async search() { return [39, 40, 41, 42]; },
-  };
-  const selected = await resolveMailboxSyncUids({
-    client,
-    limit: 2,
-    campaignHistory: false,
-    indexedUids: [39, 40, 41],
-    priorityUids: [40],
-  });
-  fetches.push(...selected);
-
-  assert.deepEqual(fetches, [42]);
-
-  const retrySelected = await resolveMailboxSyncUids({
-    client,
-    limit: 2,
-    campaignHistory: false,
-    indexedUids: [39, 41],
-    priorityUids: [40],
-  });
-  assert.deepEqual(retrySelected, [42, 40]);
-});
-
 test('campaign history sync searches both coldmail subjects from campaign start', async () => {
   const queries = [];
   const options = [];

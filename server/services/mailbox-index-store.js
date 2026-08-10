@@ -18,12 +18,6 @@ const {
   resolveMailboxBatchUidValidity,
 } = require('./mailbox-uid-validity');
 const { createMailboxUidValidityStore } = require('./mailbox-uid-validity-store');
-const {
-  applyMailboxMessageActionReference,
-  createMailboxActionNotFoundResult,
-  resolveMailboxMessageActionReference,
-} = require('./mailbox-message-action-reference');
-const { createMailboxIndexUidSelection } = require('./mailbox-index-uid-selection');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -164,7 +158,7 @@ function createMailboxIndexStore(deps = {}) {
     return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}`;
   }
 
-  const { acquireSyncLock, checkpointSync, finishSync, releaseSyncLock } = createMailboxSyncStateStore({
+  const { acquireSyncLock, finishSync } = createMailboxSyncStateStore({
     run,
     normalizeEmail,
     normalizeFolder,
@@ -175,18 +169,6 @@ function createMailboxIndexStore(deps = {}) {
     defaultLockTtlMs: SYNC_LOCK_TTL_MS,
   });
   const { prepareUidValidity } = createMailboxUidValidityStore({ run, buildSyncKey, normalizeString });
-  const {
-    listMessageUidSyncStateForAccount,
-    listMessageUidsForAccount,
-  } = createMailboxIndexUidSelection({
-    run,
-    tableName: MAILBOX_INDEX_TABLES.messages,
-    pageSize: MAILBOX_INDEX_PAGE_SIZE,
-    normalizeEmail,
-    normalizeFolder,
-    normalizeString,
-    now,
-  });
 
   function parseUidFromMessage(message) {
     const uid = Number(message && message.uid);
@@ -300,14 +282,6 @@ function createMailboxIndexStore(deps = {}) {
         softoraSendMode: truncateText(normalizeString(message && message.softoraSendMode).toLowerCase(), 40),
         softoraReplyTargetMessageId: truncateText(normalizeString(message && message.softoraReplyTargetMessageId), 1000),
         softoraThreadProvenanceKnown: message && message.softoraThreadProvenanceKnown === true,
-        ...(normalizeString(message && message.parseStatus) ? {
-          parseStatus: truncateText(normalizeString(message.parseStatus), 80),
-          parseErrorCode: truncateText(normalizeString(message.parseErrorCode), 120),
-          parseErrorReason: truncateText(normalizeString(message.parseErrorReason), 240),
-          parseRetryAt: truncateText(normalizeString(message.parseRetryAt), 80),
-          bodyUnavailable: message.bodyUnavailable === true,
-          providerMetadataEvidenceKnown: message.providerMetadataEvidenceKnown === true,
-        } : {}),
       },
       updated_at: isoNow(),
     };
@@ -344,12 +318,6 @@ function createMailboxIndexStore(deps = {}) {
       softoraSendMode: normalizeString(payload.softoraSendMode).toLowerCase(),
       softoraReplyTargetMessageId: normalizeString(payload.softoraReplyTargetMessageId),
       softoraThreadProvenanceKnown: payload.softoraThreadProvenanceKnown === true,
-      parseStatus: normalizeString(payload.parseStatus),
-      parseErrorCode: normalizeString(payload.parseErrorCode),
-      parseErrorReason: normalizeString(payload.parseErrorReason),
-      parseRetryAt: normalizeString(payload.parseRetryAt),
-      bodyUnavailable: payload.bodyUnavailable === true,
-      providerMetadataEvidenceKnown: payload.providerMetadataEvidenceKnown === true,
       subject: normalizeString(row.subject) || '(Geen onderwerp)',
       preview: normalizeString(row.preview),
       body: includeBody ? normalizeString(row.body_text) : '',
@@ -767,6 +735,41 @@ function createMailboxIndexStore(deps = {}) {
       .map((row) => normalizeMessageRow(row));
   }
 
+  async function listMessageUidsForAccount({
+    accountEmail, folder = 'inbox', since = '', limit = 5000, signal,
+  } = {}) {
+    const normalizedAccount = normalizeEmail(accountEmail);
+    if (!normalizedAccount) return [];
+    const normalizedFolder = normalizeFolder(folder);
+    const safeLimit = Math.max(1, Math.min(10_000, Math.floor(Number(limit) || 5000)));
+    const rows = [];
+    for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
+      const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
+      const result = await run(
+        `list-message-uids-for-account:${normalizedFolder}:${offset}`,
+        (client) => {
+          let query = client
+            .from(MAILBOX_INDEX_TABLES.messages)
+            .select('uid')
+            .eq('account_email', normalizedAccount)
+            .eq('folder', normalizedFolder)
+            .is('deleted_at', null)
+            .order('uid', { ascending: false });
+          if (normalizeString(since)) query = query.gte('date', normalizeString(since));
+          return query.range(offset, offset + pageSize - 1);
+        },
+        { signal }
+      );
+      if (!result.ok) return null;
+      const page = Array.isArray(result.data) ? result.data : [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return Array.from(
+      new Set(rows.map((row) => Number(row && row.uid)).filter((uid) => Number.isSafeInteger(uid) && uid > 0))
+    );
+  }
+
   async function hydrateMessageBodies({ messages = [] } = {}) {
     const source = Array.isArray(messages) ? messages : [];
     const messageKeys = Array.from(
@@ -775,12 +778,7 @@ function createMailboxIndexStore(deps = {}) {
           .map((message) => {
             const uid = Number(message && message.uid) || 0;
             if (!uid) return '';
-            return buildMessageKey(
-              message.accountEmail,
-              message.folder,
-              uid,
-              message.uidValidity
-            );
+            return buildMessageKey(message.accountEmail, message.folder, uid);
           })
           .filter(Boolean)
       )
@@ -832,7 +830,7 @@ function createMailboxIndexStore(deps = {}) {
       const uid = Number(message && message.uid) || 0;
       const folder = normalizeFolder(message && message.folder);
       const messageKey = uid && folder !== 'instantly'
-        ? buildMessageKey(message.accountEmail, folder, uid, message.uidValidity)
+        ? buildMessageKey(message.accountEmail, folder, uid)
         : '';
       const providerIdentity = folder === 'instantly'
         ? `${normalizeEmail(message && message.accountEmail)}|${normalizeString(message && message.id)}`
@@ -877,21 +875,21 @@ function createMailboxIndexStore(deps = {}) {
     });
   }
 
-  async function getMessage({ accountEmail, folder = 'inbox', id = '', uid = 0, uidValidity = 0, includeDeleted = false }) {
-    let reference;
-    try {
-      reference = resolveMailboxMessageActionReference({ accountEmail, folder, id, uid, uidValidity }, { normalizeEmail, normalizeFolder, normalizeString });
-    } catch (error) {
-      if (error.code === 'MAILBOX_UIDVALIDITY_REQUIRED') return null;
-      throw error;
-    }
+  async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const uid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
     const query = (client) => {
       const base = client
         .from(MAILBOX_INDEX_TABLES.messages)
         .select('*')
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null)
         .limit(1);
-      return applyMailboxMessageActionReference(base, reference, { activeOnly: includeDeleted !== true })
-        .maybeSingle();
+      if (Number.isFinite(uid) && uid > 0) return base.eq('uid', uid).maybeSingle();
+      return base.eq('provider_id', normalizeString(id)).maybeSingle();
     };
     const result = await run('get-message', query);
     if (!result.ok || !result.data) return null;
@@ -1003,94 +1001,104 @@ function createMailboxIndexStore(deps = {}) {
       : (result.ok ? { ...result, upserted: rows.length } : result);
   }
 
-  async function markMessageRead({ accountEmail, folder = 'inbox', id = '', uid = 0, uidValidity = 0 }) {
-    let reference;
-    try {
-      reference = resolveMailboxMessageActionReference({ accountEmail, folder, id, uid, uidValidity }, { normalizeEmail, normalizeFolder, normalizeString });
-    } catch (error) {
-      return { ok: false, unavailable: false, data: [], error, readAt: '' };
-    }
+  async function markMessageRead({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     const readAt = isoNow();
     const result = await run('mark-message-read', (client) => {
-      const query = applyMailboxMessageActionReference(client
+      const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ unread: false, softora_read_at: readAt, updated_at: readAt }), reference, {
-        activeOnly: true,
-      });
-      return query.select('message_key,softora_read_at');
+        .update({ unread: false, softora_read_at: readAt, updated_at: readAt })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) return query.eq('uid', parsedUid);
+      return query.eq('provider_id', normalizedId);
     });
-    if (!result.ok) return { ...result, readAt: '' };
-    if (!Array.isArray(result.data) || !result.data.length) {
-      return { ...createMailboxActionNotFoundResult(reference, 'Mailboxbericht ontbreekt in de duurzame index.'), readAt: '' };
-    }
-    return { ...result, readAt };
+    return { ...result, readAt: result.ok ? readAt : '' };
   }
 
-  async function markMessageReplyDismissed({ accountEmail, folder = 'inbox', id = '', uid = 0, uidValidity = 0 }) {
-    let reference;
-    try {
-      reference = resolveMailboxMessageActionReference({ accountEmail, folder, id, uid, uidValidity }, { normalizeEmail, normalizeFolder, normalizeString });
-    } catch (error) {
-      return { ok: false, unavailable: false, data: [], error, dismissedAt: '' };
-    }
+  async function markMessageReplyDismissed({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     const dismissedAt = isoNow();
     const result = await run('mark-message-reply-dismissed', (client) => {
-      const query = applyMailboxMessageActionReference(client
+      const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
         .update({
           unread: false,
           softora_read_at: dismissedAt,
           reply_dismissed_at: dismissedAt,
           updated_at: dismissedAt,
-        }), reference, { activeOnly: true });
-      return query.select('message_key,reply_dismissed_at');
+        })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
+        return query.eq('uid', parsedUid).select('message_key,reply_dismissed_at');
+      }
+      return query.eq('provider_id', normalizedId).select('message_key,reply_dismissed_at');
     });
     if (!result.ok || (Array.isArray(result.data) && result.data.length)) {
       return { ...result, dismissedAt };
     }
-    return {
-      ...createMailboxActionNotFoundResult(reference, 'Mailboxbericht ontbreekt in de duurzame index.'),
-      dismissedAt: '',
-    };
+    const error = new Error('Mailboxbericht ontbreekt in de duurzame index.');
+    error.code = 'MAILBOX_INDEX_MESSAGE_NOT_FOUND';
+    return { ok: false, unavailable: false, data: result.data, error, dismissedAt: '' };
   }
 
-  async function markMessageDeleted({ accountEmail, folder = 'inbox', id = '', uid = 0, uidValidity = 0 }) {
-    let reference;
-    try {
-      reference = resolveMailboxMessageActionReference({ accountEmail, folder, id, uid, uidValidity }, { normalizeEmail, normalizeFolder, normalizeString });
-    } catch (error) {
-      return { ok: false, unavailable: false, data: [], error };
-    }
+  async function markMessageDeleted({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     const result = await run('mark-message-deleted', (client) => {
       const deletedAt = isoNow();
-      const query = applyMailboxMessageActionReference(client
+      const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ deleted_at: deletedAt, updated_at: deletedAt }), reference);
-      return query.select('message_key');
+        .update({ deleted_at: deletedAt, updated_at: deletedAt })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
+        return query.eq('uid', parsedUid).select('message_key');
+      }
+      return query.eq('provider_id', normalizedId).select('message_key');
     });
     if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
-    return createMailboxActionNotFoundResult(reference, 'Mailboxbericht ontbreekt in de duurzame index.');
+    const error = new Error('Mailboxbericht ontbreekt in de duurzame index.');
+    error.code = 'MAILBOX_INDEX_MESSAGE_NOT_FOUND';
+    return { ok: false, unavailable: false, data: [], error };
   }
 
-  async function restoreMessage({ accountEmail, folder = 'inbox', id = '', uid = 0, uidValidity = 0 }) {
-    let reference;
-    try {
-      reference = resolveMailboxMessageActionReference({ accountEmail, folder, id, uid, uidValidity }, { normalizeEmail, normalizeFolder, normalizeString });
-    } catch (error) {
-      return { ok: false, unavailable: false, data: [], error };
-    }
+  async function restoreMessage({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     const result = await run('restore-message', (client) => {
-      const query = applyMailboxMessageActionReference(client
+      const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ deleted_at: null, updated_at: isoNow() }), reference);
-      return query.select('message_key');
+        .update({ deleted_at: null, updated_at: isoNow() })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('generation_superseded_at', null);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
+        return query.eq('uid', parsedUid).select('message_key');
+      }
+      return query.eq('provider_id', normalizedId).select('message_key');
     });
     if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
-    return createMailboxActionNotFoundResult(
-      reference,
-      'Verborgen Softora-mailboxbericht is niet gevonden.',
-      'MAILBOX_INDEX_HIDDEN_MESSAGE_NOT_FOUND'
-    );
+    const error = new Error('Verborgen Softora-mailboxbericht is niet gevonden.');
+    error.code = 'MAILBOX_INDEX_HIDDEN_MESSAGE_NOT_FOUND';
+    return { ok: false, unavailable: false, data: [], error };
   }
 
   async function getSyncState({ accountEmail, folder = 'inbox', signal } = {}) {
@@ -1137,7 +1145,6 @@ function createMailboxIndexStore(deps = {}) {
     buildSyncKey,
     finishSync,
     getMessage,
-    getMessageForAction: (input) => getMessage({ ...input, includeDeleted: true }),
     getProviderMessage,
     getOldestMatchingMessageUid,
     getSyncState,
@@ -1150,7 +1157,6 @@ function createMailboxIndexStore(deps = {}) {
     listSentCandidatesForQuotedReplies,
     listMessagesReferencingMessageIdsForAccounts,
     listUnthreadedSentCandidatesForConversations,
-    listMessageUidSyncStateForAccount,
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,
@@ -1159,7 +1165,8 @@ function createMailboxIndexStore(deps = {}) {
     markMessageDeleted,
     markMessageRead,
     markMessageReplyDismissed,
-    prepareUidValidity, releaseSyncLock, restoreMessage,
+    prepareUidValidity,
+    restoreMessage,
     normalizeMessageRow,
     stableProviderUid,
     upsertMessages,

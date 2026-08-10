@@ -60,7 +60,6 @@ function buildMailboxImapQuarantineMessage({ message, account, folder, failure }
     parseStatus: 'quarantined',
     parseErrorCode: errorCode,
     parseErrorReason: errorReason,
-    parseRetryAt: safeDate(failure?.retryAt),
     providerMetadataEvidenceKnown: Boolean(
       internalDate || from.length || to.length || normalizeText(envelope.subject) || normalizeText(envelope.messageId)
     ),

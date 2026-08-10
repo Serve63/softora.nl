@@ -544,41 +544,6 @@ test('mailbox campaign snapshot verwijdert alleen de exact gekozen mail', () => 
   ]);
 });
 
-test('mailbox campaign snapshot muteert alleen UID 42 binnen de exacte UIDVALIDITY-generatie', () => {
-  const serialized = serializeMailboxCampaignSnapshot({
-    ok: true,
-    messages: [
-      {
-        id: 'inbox:42', uid: 42, uidValidity: 111, folder: 'inbox',
-        accountEmail: 'serve@softora.nl', subject: 'Oude generatie', unread: true,
-      },
-      {
-        id: 'inbox:42', uid: 42, uidValidity: 222, folder: 'inbox',
-        accountEmail: 'serve@softora.nl', subject: 'Nieuwe generatie', unread: true,
-      },
-    ],
-  });
-  const identity = {
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    uid: 42,
-    uidValidity: 111,
-  };
-  const read = markMailboxCampaignSnapshotRead(serialized, identity, {
-    readAt: '2026-08-10T09:00:00.000Z',
-  });
-  const readMessages = parseMailboxCampaignSnapshot(read.serialized).messages;
-
-  assert.equal(readMessages.find((message) => message.uidValidity === 111).unread, false);
-  assert.equal(readMessages.find((message) => message.uidValidity === 222).unread, true);
-
-  const removed = removeMailboxCampaignSnapshotMessage(read.serialized, identity);
-  const remaining = parseMailboxCampaignSnapshot(removed.serialized).messages;
-  assert.deepEqual(remaining.map((message) => [message.uidValidity, message.subject]), [
-    [222, 'Nieuwe generatie'],
-  ]);
-});
-
 test('mailbox campaign snapshot bewaart een authoritative lege lijst en weigert ongeldige data', () => {
   assert.deepEqual(
     parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot({ ok: true, messages: [] })).messages,
