@@ -51,6 +51,17 @@ function createMailboxComposeThreadContext(deps = {}) {
   async function resolve({ body = {}, accountEmail, recipientEmail, provider = 'smtp' } = {}) {
     const mode = normalizeText(body.mode || 'new-message').toLowerCase();
     if (!['reply', 'new-message'].includes(mode)) throw inputError('Ongeldige verzendmodus.', 'MAILBOX_SEND_MODE_INVALID');
+    const selectedProvider = normalizeText(provider || 'smtp').toLowerCase();
+    if (!['smtp', 'instantly'].includes(selectedProvider)) {
+      throw inputError('Onbekende mailboxprovider.', 'MAILBOX_SEND_PROVIDER_INVALID');
+    }
+    if (selectedProvider === 'instantly' && mode !== 'reply') {
+      throw inputError(
+        'Instantly ondersteunt hier alleen een bewezen antwoord in de bestaande thread.',
+        'INSTANTLY_NEW_MESSAGE_UNSUPPORTED',
+        409
+      );
+    }
     const account = normalizeEmail(accountEmail);
     const recipient = normalizeEmail(recipientEmail);
     const { owner, senderName } = resolveOwner(account, body.owner);
@@ -58,14 +69,17 @@ function createMailboxComposeThreadContext(deps = {}) {
     const conversationId = normalizeText(context.conversationId).slice(0, 2000);
     const idempotencyKey = normalizeText(body.idempotencyKey).slice(0, 240);
     if (!idempotencyKey) throw inputError('Een veilige verzend-ID ontbreekt.', 'MAILBOX_SEND_IDEMPOTENCY_REQUIRED');
-    const base = baseContext({ account, recipient, owner, senderName, mode, conversationId, idempotencyKey, provider });
+    const base = baseContext({
+      account, recipient, owner, senderName, mode, conversationId,
+      idempotencyKey, provider: selectedProvider,
+    });
     if (mode === 'new-message') {
       return { ...base, providerThreadId: '', replyTargetMessageId: '', references: '' };
     }
     if (!conversationId) {
       throw inputError('De gekozen conversatie mist een exacte thread-ID.', 'MAILBOX_REPLY_CONVERSATION_REQUIRED', 409);
     }
-    if (normalizeText(provider).toLowerCase() === 'instantly') {
+    if (selectedProvider === 'instantly') {
       const providerMessageId = normalizeText(body.providerMessageId);
       const providerThreadId = normalizeText(body.providerThreadId);
       if (!providerMessageId || !providerThreadId) {
