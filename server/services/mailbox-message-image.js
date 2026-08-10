@@ -2,6 +2,7 @@ const MAILBOX_MESSAGE_IMAGE_PATH = '/api/mailbox/message-image';
 const MAILBOX_MESSAGE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const MAILBOX_MESSAGE_IMAGE_MAX_INDEX = 15;
 const IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=\s]+)$/i;
+const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
 
 function text(value) {
   return String(value || '').trim();
@@ -15,13 +16,24 @@ function isMailboxMessageImageUrl(value) {
 function buildMailboxMessageImageUrl(message, imageIndex) {
   const source = message && typeof message === 'object' && !Array.isArray(message) ? message : {};
   const account = text(source.accountEmail).toLowerCase();
-  const folder = text(source.folder || 'inbox').toLowerCase() || 'inbox';
+  const folder = text(source.storageFolder || source.folder || 'inbox').toLowerCase() || 'inbox';
   const id = text(source.mailboxId || source.id);
+  const uidValidity = normalizeMailboxUidValidity(source.uidValidity);
   const index = Number(imageIndex);
-  if (!account || !id || !Number.isInteger(index) || index < 0 || index > MAILBOX_MESSAGE_IMAGE_MAX_INDEX) {
+  if (
+    !account || !id ||
+    (folder !== 'instantly' && !uidValidity) ||
+    !Number.isInteger(index) || index < 0 || index > MAILBOX_MESSAGE_IMAGE_MAX_INDEX
+  ) {
     return '';
   }
-  const params = new URLSearchParams({ account, folder, id, index: String(index) });
+  const params = new URLSearchParams({
+    account,
+    folder,
+    id,
+    ...(uidValidity ? { uidValidity: String(uidValidity) } : {}),
+    index: String(index),
+  });
   return `${MAILBOX_MESSAGE_IMAGE_PATH}?${params.toString()}`;
 }
 

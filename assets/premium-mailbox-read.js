@@ -1,10 +1,17 @@
 (function (global) {
   'use strict';
 
-  const READ_STATE_CHANNEL = 'softora_mailbox_read_state_v2';
+  const READ_STATE_CHANNEL = 'softora_mailbox_read_state_v3';
 
   function normalize(value) {
     return String(value || '').trim().toLowerCase();
+  }
+
+  function normalizeUidValidity(value) {
+    const normalized = Number(value);
+    return Number.isSafeInteger(normalized) && normalized > 0 && normalized <= 4294967295
+      ? normalized
+      : 0;
   }
 
   function create(options = {}) {
@@ -18,13 +25,20 @@
       const account = normalize(options.getAccount?.(mail) || mail.accountEmail);
       const folder = normalize(options.getFolder?.(mail) || mail.storageFolder || mail.folder || 'inbox');
       const owner = normalize(options.getOwner?.(mail) || mail.providerOwner);
+      const uid = Number(mail.uid) || 0;
+      const uidValidity = normalizeUidValidity(mail.uidValidity);
       if (!id || !account) return null;
-      return { owner, account, folder, id };
+      return { owner, account, folder, id, uid, uidValidity };
     }
 
     function getIdentityKey(identity) {
       const source = identity && typeof identity === 'object' ? identity : {};
-      return [normalize(source.owner), normalize(source.account), normalize(source.folder), String(source.id || '').trim()].join('|');
+      const folder = normalize(source.folder);
+      const uid = Number(source.uid) || 0;
+      const identityPart = folder !== 'instantly' && uid > 0
+        ? `uv:${normalizeUidValidity(source.uidValidity)}|uid:${uid}`
+        : `id:${String(source.id || '').trim()}`;
+      return [normalize(source.owner), normalize(source.account), folder, identityPart].join('|');
     }
 
     function applyConfirmedState(mail) {
@@ -78,6 +92,7 @@
             owner: options.getOwner?.(mail) || '',
             id: requestId,
             uid: mail.uid,
+            uidValidity: normalizeUidValidity(mail.uidValidity),
             folder: options.getFolder?.(mail) || 'inbox',
             dismissReply: persistOptions.dismissReply === true,
           }),
