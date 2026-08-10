@@ -42,7 +42,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-subtitle\.css\?v=20260809a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260728a"/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260810a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260809g" defer><\/script>/);
@@ -288,6 +288,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
 
 test('live momentum script wires habit toggles to chart and persisted state', () => {
   const js = read('assets/live-momentum.js');
+  const iconCatalogJs = read('assets/live-momentum-icon-catalog.js');
   const mobileJs = read('assets/live-momentum-mobile.js');
   const goalActionsJs = read('assets/live-momentum-goal-actions.js');
   const endGameCardsJs = read('assets/live-momentum-endgame-cards.js');
@@ -324,6 +325,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /ICON_CATEGORIES/);
   assert.match(js, /function renderIconPickerCategories\(\)/);
   assert.match(js, /Zoek op icoon of betekenis/);
+  assert.match(iconCatalogJs, /\['bed-exit', 'Uit bed', 'uit bed uit bed stappen opstaan wakker bed verlaten ochtend voeten op de vloer', 'out-of-bed'\]/);
+  assert.match(iconCatalogJs, /'bed-exit': '<path d="M2 11v9" \/>/);
+  assert.match(iconCatalogJs, /markup: customIconMarkup\[source\] \|\| iconMarkup\[source\] \|\| iconMarkup\.circle/);
   assert.match(js, /Workout/);
   assert.match(js, /90 min deep work/);
   assert.match(js, /Dagdoel behalen/);
