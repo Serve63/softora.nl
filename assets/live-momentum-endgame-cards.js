@@ -25,6 +25,7 @@
     { id: 'serves-gezondheidsdossier', title: "Servé's gezondheidsdossier" },
     { id: 'ruben-zet-toto', title: 'Ruben zet toto' },
     { id: 'world-watcher', title: "Ruben's World Watcher" },
+    { id: 'rubens-vakantieradar', title: "Ruben's vakantieradar" },
     { id: 'transfermarkt', title: 'Ruben Romano' },
     { id: 'rubens-company', title: 'Ruben’s Company' },
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
