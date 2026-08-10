@@ -21,7 +21,11 @@ const {
 const {
   createDefaultInstantlyMailboxService,
   mergeCampaignReplies,
+  syncInstantlyMailboxResponse,
 } = require('../../server/services/mailbox-instantly-integration');
+const {
+  createMailboxCampaignMutationRunner,
+} = require('../../server/services/mailbox-campaign-mutation-runner');
 
 function createStore(initialMessages = []) {
   const rows = initialMessages.slice();
@@ -88,6 +92,15 @@ function createStore(initialMessages = []) {
 function buildService(overrides = {}) {
   const store = overrides.store || createStore();
   const requests = [];
+  const syncUiState = new Map();
+  const getUiStateValues = overrides.getUiStateValues || (async (scope) => ({
+    values: { ...(syncUiState.get(scope) || {}) },
+    source: 'supabase',
+  }));
+  const setUiStateValues = overrides.setUiStateValues || (async (scope, values) => {
+    syncUiState.set(scope, { ...(values || {}) });
+    return { values: { ...(values || {}) }, source: 'supabase' };
+  });
   const service = createInstantlyMailboxService({
     config: {
       enabled: true,
@@ -106,9 +119,12 @@ function buildService(overrides = {}) {
     },
     mailboxIndexStore: store,
     getCustomerSourcesByEmails: overrides.getCustomerSourcesByEmails,
-    getUiStateValues: overrides.getUiStateValues,
-    setUiStateValues: overrides.setUiStateValues,
+    getUiStateValues,
+    setUiStateValues,
     onMessagesUpserted: overrides.onMessagesUpserted,
+    getCampaignMutationRunner: overrides.getCampaignMutationRunner,
+    requireMutationJournal: overrides.requireMutationJournal,
+    createMutationRequestKey: overrides.createMutationRequestKey,
     now: () => new Date('2026-07-25T12:00:00.000Z'),
     fetchJsonWithTimeout: async (url, options) => {
       requests.push({ url, options });
@@ -1592,6 +1608,154 @@ test('iedere duurzame Instantly-upsert invalideert de campagnemailbox-snapshot',
   assert.deepEqual(invalidations, [{ provider: 'instantly', count: 1 }]);
 });
 
+test('Instantly-upsert blijft pending tijdens de abortbare DB-write en faalt zonder verplichte journal', async () => {
+  const controller = new AbortController();
+  const store = createStore();
+  const baseUpsert = store.upsertProviderMessages.bind(store);
+  let writeSignal = null;
+  let writeMutationId = null;
+  let writeRequestKey = null;
+  let providerSignal = null;
+  let runnerOptions = null;
+  let activeChecks = 0;
+  store.upsertProviderMessages = async (options) => {
+    writeSignal = options.signal;
+    writeMutationId = options.mutationId;
+    writeRequestKey = options.requestKey;
+    return baseUpsert(options);
+  };
+  const { service } = buildService({
+    store,
+    requireMutationJournal: true,
+    createMutationRequestKey: () => 'instantly-upsert:test-1',
+    getCampaignMutationRunner: () => ({
+      isAvailable: () => true,
+      run: async (options, task) => {
+        runnerOptions = options;
+        return task({
+          signal: controller.signal,
+          mutationId: '11111111-1111-4111-8111-111111111111',
+          requestKey: options.requestKey,
+          assertActive: () => { activeChecks += 1; },
+        });
+      },
+    }),
+    fetchJsonWithTimeout: async (_url, options) => {
+      providerSignal = options.signal;
+      return {
+      response: { ok: true, status: 200 },
+      data: { items: [incoming()] },
+      };
+    },
+  });
+
+  const result = await service.hydrateThread({
+    threadId: 'thread-serve',
+    accountEmail: 'serve-sender@example.com',
+    owner: 'serve',
+  });
+  assert.equal(result.stored, 1);
+  assert.equal(writeSignal, controller.signal);
+  assert.equal(providerSignal, controller.signal);
+  assert.equal(writeMutationId, '11111111-1111-4111-8111-111111111111');
+  assert.equal(writeRequestKey, 'instantly-upsert:test-1');
+  assert.equal(activeChecks, 3);
+  assert.deepEqual(runnerOptions, {
+    requestKey: 'instantly-upsert:test-1',
+    kind: 'instantly-upsert',
+    accountEmail: 'serve-sender@example.com',
+    folder: 'instantly',
+  });
+
+  const withoutJournal = buildService({
+    requireMutationJournal: true,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: { items: [incoming()] },
+    }),
+  }).service;
+  await assert.rejects(
+    withoutJournal.hydrateThread({
+      threadId: 'thread-serve',
+      accountEmail: 'serve-sender@example.com',
+      owner: 'serve',
+    }),
+    { code: 'INSTANTLY_MUTATION_JOURNAL_UNAVAILABLE' }
+  );
+});
+
+test('webhook, polling en cron kunnen een onzekere providerwrite nooit als failed completeren', async () => {
+  for (const [index, channel] of ['webhook', 'polling', 'cron'].entries()) {
+    const store = createStore();
+    const unknown = new Error(`${channel} write-uitkomst onzeker`);
+    unknown.code = 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN';
+    unknown.status = 503;
+    unknown.leaveMutationPending = true;
+    store.upsertProviderMessages = async () => ({ ok: false, error: unknown });
+    let completes = 0;
+    const providerSignals = [];
+    const runner = createMailboxCampaignMutationRunner({
+      mailboxCampaignConsistencyStore: {
+        isAvailable: () => true,
+        beginMutation: async () => ({
+          mutationId: `44444444-4444-4444-8444-${String(index + 1).padStart(12, '0')}`,
+          status: 'pending',
+          replayed: false,
+        }),
+        completeMutation: async () => { completes += 1; },
+      },
+    });
+    const { service } = buildService({
+      store,
+      requireMutationJournal: true,
+      getCampaignMutationRunner: () => runner,
+      fetchJsonWithTimeout: async (url, options) => {
+        providerSignals.push(options.signal);
+        return {
+          response: { ok: true, status: 200 },
+          data: url.includes('/emails/incoming-serve-1')
+            ? incoming({ thread_id: '' })
+            : { items: [incoming({ thread_id: '' })] },
+        };
+      },
+    });
+
+    if (channel === 'webhook') {
+      await assert.rejects(service.ingestWebhook({
+        headers: { 'x-instantly-webhook-secret': 'webhook-secret' },
+        body: {
+          event_type: 'reply_received',
+          email_account: 'serve-sender@example.com',
+          email_id: 'incoming-serve-1',
+        },
+      }), { code: 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN' });
+    } else if (channel === 'polling') {
+      await assert.rejects(service.syncOwner('serve'), {
+        code: 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN',
+      });
+    } else {
+      const response = {
+        statusCode: 0,
+        body: null,
+        status(code) { this.statusCode = code; return this; },
+        json(body) { this.body = body; return this; },
+      };
+      await syncInstantlyMailboxResponse({
+        instantlyMailboxService: service,
+        req: { body: {}, query: { owner: 'serve' } },
+        res: response,
+        logger: { error() {} },
+        normalizeString: (value) => String(value || '').trim(),
+      });
+      assert.equal(response.statusCode, 503);
+      assert.equal(response.body.code, 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN');
+    }
+    assert.equal(completes, 0, `${channel} completeerde een onzekere mutation`);
+    assert.equal(providerSignals.length > 0, true);
+    assert.equal(providerSignals.every((signal) => signal instanceof AbortSignal), true);
+  }
+});
+
 test('mailbox integration never activates from the separate outreach scheduler flag', () => {
   const service = createDefaultInstantlyMailboxService({
     env: {
@@ -1606,14 +1770,55 @@ test('mailbox integration never activates from the separate outreach scheduler f
   assert.equal(service.isConfigured(), false);
 });
 
-test('bounded polling persists its cursor and resumes the next cycle without duplicate loss', async () => {
-  let values = {};
+test('standaard mailboxintegratie verplicht de mutation journal voor Instantly-webhooks', async () => {
+  let journalRuns = 0;
+  const controller = new AbortController();
+  const service = createDefaultInstantlyMailboxService({
+    env: {
+      INSTANTLY_MAILBOX_ENABLED: 'true',
+      INSTANTLY_API_KEY: 'key',
+      INSTANTLY_WEBHOOK_SECRET: 'webhook-secret',
+      INSTANTLY_ACCOUNT_OWNERS_JSON: '{"serve-sender@example.com":"serve"}',
+      INSTANTLY_CAMPAIGN_OWNERS_JSON: '{"campaign-serve":"serve"}',
+    },
+    mailboxIndexStore: createStore(),
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: incoming({ thread_id: '' }),
+    }),
+    getCampaignMutationRunner: () => ({
+      isAvailable: () => true,
+      run: async (_options, task) => {
+        journalRuns += 1;
+        return task({ signal: controller.signal, assertActive() {} });
+      },
+    }),
+  });
+
+  const result = await service.ingestWebhook({
+    headers: { 'x-instantly-webhook-secret': 'webhook-secret' },
+    body: {
+      event_type: 'reply_received',
+      email_account: 'serve-sender@example.com',
+      email_id: 'incoming-serve-1',
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(journalRuns, 1);
+});
+
+test('bounded polling always scans the fresh head and resumes its durable backlog without duplicate loss', async () => {
+  const states = new Map();
   const listQueries = [];
   const { service, store } = buildService({
-    config: { maxPages: 1 },
-    getUiStateValues: async () => ({ values }),
-    setUiStateValues: async (_scope, patch) => {
-      values = { ...values, ...patch };
+    config: { maxPages: 3 },
+    getUiStateValues: async (scope) => ({
+      values: { ...(states.get(scope) || {}) },
+      source: 'supabase',
+    }),
+    setUiStateValues: async (scope, patch) => {
+      states.set(scope, { ...(patch || {}) });
+      return { values: { ...(patch || {}) }, source: 'supabase' };
     },
     fetchJsonWithTimeout: async (url) => {
       const params = new URL(url).searchParams;
@@ -1621,11 +1826,24 @@ test('bounded polling persists its cursor and resumes the next cycle without dup
         return { response: { ok: true, status: 200 }, data: { items: [] } };
       }
       listQueries.push(Object.fromEntries(params.entries()));
+      const cursor = params.get('starting_after') || '';
+      const idByCursor = {
+        '': listQueries.length === 1 ? 'page-one' : 'fresh-head',
+        'cursor-page-two': 'page-two',
+        'cursor-page-three': 'page-three',
+        'cursor-page-four': 'page-four',
+      };
+      const nextByCursor = {
+        '': listQueries.length === 1 ? 'cursor-page-two' : '',
+        'cursor-page-two': 'cursor-page-three',
+        'cursor-page-three': 'cursor-page-four',
+        'cursor-page-four': '',
+      };
       return {
         response: { ok: true, status: 200 },
         data: {
-          items: [incoming({ id: params.get('starting_after') ? 'page-two' : 'page-one' })],
-          next_starting_after: params.get('starting_after') ? '' : 'cursor-page-two',
+          items: [incoming({ id: idByCursor[cursor] })],
+          next_starting_after: nextByCursor[cursor],
         },
       };
     },
@@ -1633,13 +1851,17 @@ test('bounded polling persists its cursor and resumes the next cycle without dup
 
   const first = await service.syncOwner('serve');
   assert.equal(first.partial, true);
-  assert.equal(values.cursor_serve, 'cursor-page-two');
+  const firstState = JSON.parse(states.get('instantly_mailbox_sync_serve').state_json);
+  assert.equal(firstState.segments[0].cursor, 'cursor-page-four');
   await service.syncOwner('serve');
-  assert.equal(listQueries[1].starting_after, 'cursor-page-two');
-  assert.equal(values.cursor_serve, '');
+  assert.equal(listQueries[3].starting_after, undefined);
+  assert.equal(listQueries[3].max_timestamp_created, '2026-07-25T12:00:00.000Z');
+  assert.equal(listQueries[4].starting_after, 'cursor-page-four');
+  const secondState = JSON.parse(states.get('instantly_mailbox_sync_serve').state_json);
+  assert.deepEqual(secondState.segments, []);
   assert.deepEqual(
     store.rows.map((message) => message.providerMessageId).sort(),
-    ['page-one', 'page-two']
+    ['fresh-head', 'page-four', 'page-one', 'page-three', 'page-two']
   );
 });
 
@@ -1915,7 +2137,7 @@ test('an exact RFC message imported through Gmail and Instantly appears only onc
   ]);
 });
 
-test('campaign aggregation retains both proven owners while refreshing only the selected owner', async () => {
+test('campaign aggregation leest en ververst alleen de geselecteerde owner', async () => {
   const listedOwners = [];
   const syncedOwners = [];
   const providerMessages = {
@@ -1968,15 +2190,16 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     refreshInstantly: true,
   });
   assert.deepEqual(syncedOwners, ['serve']);
-  assert.deepEqual(listedOwners.sort(), ['martijn', 'serve']);
+  assert.deepEqual(listedOwners, ['serve']);
   assert.deepEqual(
     selectedOwnerRefresh.messages.map((message) => [message.id, message.providerOwner]),
     [['ramon', 'serve']]
   );
   assert.deepEqual(
     selectedOwnerRefresh.snapshotMessages.map((message) => [message.id, message.providerOwner]),
-    [['martijn-thread', 'martijn'], ['ramon', 'serve']]
+    [['ramon', 'serve']]
   );
+  assert.equal(selectedOwnerRefresh.snapshotComplete, false);
 
   listedOwners.length = 0;
   const ownerlessBackgroundRefresh = await mergeCampaignReplies({
@@ -1989,6 +2212,7 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     ownerlessBackgroundRefresh.messages.map((message) => message.id),
     ['martijn-thread', 'ramon']
   );
+  assert.equal(ownerlessBackgroundRefresh.snapshotComplete, true);
   await assert.rejects(
     mergeCampaignReplies({
       ...dependencies,
@@ -1997,4 +2221,37 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     }),
     { code: 'INSTANTLY_OWNER_REQUIRED', status: 400 }
   );
+});
+
+test('campaign aggregation behoudt een gezonde owner als de andere provider-read faalt', async () => {
+  const result = await mergeCampaignReplies({
+    owner: '',
+    limit: 100,
+    refreshInstantly: false,
+    baseReplies: [],
+    instantlyMailboxService: {
+      isConfigured: () => true,
+      getConfiguredAccounts: (owner) => [{ email: `${owner}@example.test` }],
+      listOwnerConversations: async (owner) => {
+        if (owner === 'serve') {
+          const error = new Error('Serve provider tijdelijk onbereikbaar');
+          error.code = 'INSTANTLY_PROVIDER_UNAVAILABLE';
+          throw error;
+        }
+        return [{
+          id: 'martijn-healthy',
+          provider: 'instantly',
+          providerOwner: 'martijn',
+          activityAt: '2026-08-10T09:00:00.000Z',
+          threadMessages: [],
+        }];
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, max) => String(value || '').slice(0, max),
+  });
+
+  assert.deepEqual(result.messages.map((message) => message.id), ['martijn-healthy']);
+  assert.deepEqual(result.warnings, ['INSTANTLY_PROVIDER_UNAVAILABLE:serve']);
+  assert.equal(result.snapshotComplete, false);
 });

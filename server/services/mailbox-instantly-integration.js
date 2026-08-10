@@ -32,6 +32,7 @@ function createDefaultInstantlyMailboxService({
   getUiStateValues,
   setUiStateValues,
   onMessagesUpserted,
+  getCampaignMutationRunner,
   logger,
 }) {
   return createInstantlyMailboxService({
@@ -54,6 +55,8 @@ function createDefaultInstantlyMailboxService({
     getUiStateValues,
     setUiStateValues,
     onMessagesUpserted,
+    getCampaignMutationRunner,
+    requireMutationJournal: true,
     logger,
   });
 }
@@ -195,36 +198,56 @@ async function mergeCampaignReplies({
     : selectedOwner && knownOwners.includes(selectedOwner)
       ? [selectedOwner]
       : knownOwners;
+  const warnings = [];
+  const toOwnerFailure = (candidate, error, fallbackCode) => ({
+    ok: false,
+    owner: candidate,
+    code: normalizeString(error?.code) || fallbackCode,
+    error: truncateText(normalizeString(error?.message || error), 500),
+  });
   let instantlySync = null;
   if (refreshInstantly && instantlyMailboxService?.isConfigured?.()) {
-    try {
-      const ownersToSync = selectedOwner && knownOwners.includes(selectedOwner)
-        ? [selectedOwner]
-        : configuredOwners;
-      const syncResults = await Promise.all(
-        ownersToSync.map((candidate) => instantlyMailboxService.syncOwner(candidate))
-      );
-      instantlySync = syncResults.length === 1
-        ? syncResults[0]
-        : {
-            ok: syncResults.every((result) => result?.ok !== false),
-            owners: syncResults,
-          };
-    } catch (error) {
-      instantlySync = {
-        ok: false,
-        code: normalizeString(error?.code) || 'INSTANTLY_MAILBOX_SYNC_FAILED',
-        error: truncateText(normalizeString(error?.message || error), 500),
-      };
-    }
+    const ownersToSync = selectedOwner && knownOwners.includes(selectedOwner)
+      ? [selectedOwner]
+      : configuredOwners;
+    const settledSyncs = await Promise.allSettled(
+      ownersToSync.map((candidate) => instantlyMailboxService.syncOwner(candidate))
+    );
+    const syncResults = settledSyncs.map((settled, index) => settled.status === 'fulfilled'
+      ? settled.value
+      : toOwnerFailure(ownersToSync[index], settled.reason, 'INSTANTLY_MAILBOX_SYNC_FAILED'));
+    instantlySync = syncResults.length === 1
+      ? syncResults[0]
+      : {
+          ok: syncResults.every((result) => result?.ok !== false),
+          owners: syncResults,
+        };
   }
-  const allInstantlyReplies = instantlyMailboxService?.isConfigured?.()
-    ? (await Promise.all(configuredOwners.map((candidate) => (
+  const ownersToRead = selectedOwner
+    ? configuredOwners.filter((candidate) => candidate === selectedOwner)
+    : configuredOwners;
+  const settledReads = instantlyMailboxService?.isConfigured?.()
+    ? await Promise.allSettled(ownersToRead.map((candidate) => (
         instantlyMailboxService.listOwnerConversations(candidate, {
           limit: Number(limit || 100) || 100,
         })
-      )))).flat()
+      )))
     : [];
+  const allInstantlyReplies = [];
+  settledReads.forEach((settled, index) => {
+    const candidate = ownersToRead[index];
+    if (settled.status === 'fulfilled' && Array.isArray(settled.value)) {
+      allInstantlyReplies.push(...settled.value);
+      return;
+    }
+    const failure = settled.status === 'rejected'
+      ? toOwnerFailure(candidate, settled.reason, 'INSTANTLY_MAILBOX_READ_FAILED')
+      : toOwnerFailure(candidate, new Error('Instantly-mailbox gaf geen geldige berichtenlijst.'), 'INSTANTLY_MAILBOX_READ_INVALID');
+    warnings.push(`${failure.code}:${candidate}`);
+  });
+  const snapshotComplete = (
+    !selectedOwner || configuredOwners.every((candidate) => ownersToRead.includes(candidate))
+  ) && warnings.length === 0;
   const instantlyReplies = selectedOwner && knownOwners.includes(selectedOwner)
     ? allInstantlyReplies.filter((message) => message?.providerOwner === selectedOwner)
     : allInstantlyReplies;
@@ -261,6 +284,8 @@ async function mergeCampaignReplies({
     instantlyReplies: filterVisibleMailboxMessages(instantlyReplies),
     snapshotInstantlyReplies: filterVisibleMailboxMessages(allInstantlyReplies),
     instantlySync,
+    snapshotComplete,
+    warnings,
   };
 }
 
@@ -283,6 +308,7 @@ async function listMailboxCampaignReplySets({
       snapshotBaseReplies: Array.isArray(result?.snapshotMessages)
         ? result.snapshotMessages
         : [],
+      warnings: Array.isArray(result?.warnings) ? result.warnings : [],
     };
   }
   const replies = await mailboxCampaignRepliesService.listReplies({
@@ -292,6 +318,7 @@ async function listMailboxCampaignReplySets({
   return {
     replies: Array.isArray(replies) ? replies : [],
     snapshotBaseReplies: Array.isArray(replies) ? replies : [],
+    warnings: [],
   };
 }
 
@@ -332,15 +359,57 @@ async function syncInstantlyMailboxResponse({
     const syncOptions = fastRefresh
       ? { minIntervalMs: INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS }
       : {};
-    const results = await Promise.all(owners.map((owner) => (
+    const settled = await Promise.allSettled(owners.map((owner) => (
       instantlyMailboxService.syncOwner(owner, syncOptions)
     )));
-    return res.status(200).json({
-      ok: results.every((result) => result?.ok !== false),
+    const failures = [];
+    const results = settled.map((result, index) => {
+      const error = result.status === 'rejected' ? result.reason : null;
+      if (result.status === 'fulfilled' && result.value?.ok !== false) return result.value;
+      const failure = result.status === 'fulfilled'
+        ? {
+            ...result.value,
+            ok: false,
+            owner: normalizeString(result.value?.owner) || owners[index],
+            code: normalizeString(result.value?.code) || 'INSTANTLY_MAILBOX_SYNC_FAILED',
+            error: String(result.value?.error || result.value?.detail || 'Onbekende fout'),
+            status: Number(result.value?.status || result.value?.statusCode) || 503,
+          }
+        : {
+            ok: false,
+            owner: owners[index],
+            code: normalizeString(error?.code) || 'INSTANTLY_MAILBOX_SYNC_FAILED',
+            error: String(error?.message || 'Onbekende fout'),
+            status: Number(error?.status) || 503,
+          };
+      failures.push(failure);
+      logger.error(
+        `[Mailbox][InstantlySync][${owners[index]}]`,
+        error?.message || failure.error
+      );
+      return failure;
+    });
+    const failedCount = results.filter((result) => result?.ok === false).length;
+    const succeededCount = results.length - failedCount;
+    const statusCode = failedCount === 0
+      ? 200
+      : succeededCount > 0
+        ? 207
+        : owners.length === 1
+          ? Number(failures[0]?.status) || 503
+          : 503;
+    const singleFailure = owners.length === 1 && failures[0];
+    return res.status(statusCode).json({
+      ok: failedCount === 0,
       owners,
       startedAt,
       completedAt: new Date().toISOString(),
       results,
+      ...(singleFailure ? {
+        code: singleFailure.code,
+        error: 'Instantly-mailbox sync mislukt',
+        detail: singleFailure.error,
+      } : {}),
     });
   } catch (error) {
     logger.error('[Mailbox][InstantlySync]', error?.message || error);

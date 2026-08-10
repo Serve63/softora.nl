@@ -229,6 +229,37 @@ test('timestamp-invalidatie blijft alleen als v2-compatwrite bestaan', async () 
   );
 });
 
+test('snapshot-invalidatie stopt op abort en publiceert lokaal geen late freshness', async () => {
+  const controller = new AbortController();
+  let writes = 0;
+  const oldInvalidation = '2026-08-09T20:00:00.000Z';
+  const store = createMailboxCampaignSnapshotStore({
+    now: () => new Date('2026-08-09T20:01:02.003Z'),
+    getUiStateValues: async () => ({
+      values: { [MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY]: oldInvalidation },
+    }),
+    setUiStateValues: async () => {
+      writes += 1;
+      return new Promise(() => {});
+    },
+    mailboxCampaignConsistencyStore: { isAvailable: () => true },
+    logger: { warn() {} },
+  });
+  const running = store.invalidate({
+    at: '2026-08-09T20:01:01.000Z',
+    signal: controller.signal,
+    deadlineAt: Date.now() + 10_000,
+  });
+  const reason = Object.assign(new Error('folder timeout'), {
+    code: 'MAILBOX_SYNC_FOLDER_TIMEOUT', timedOut: true,
+  });
+  controller.abort(reason);
+
+  await assert.rejects(running, (error) => error === reason);
+  assert.equal(writes, 1);
+  assert.equal(await store.readInvalidatedAt(), oldInvalidation);
+});
+
 test('campaign snapshot fallback is hard begrensd en verbreedt nooit een ongeldige owner', async () => {
   const harness = createStateHarness();
   const tooOld = serializeMailboxCampaignSnapshot({
