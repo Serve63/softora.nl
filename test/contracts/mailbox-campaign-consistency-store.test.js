@@ -253,7 +253,7 @@ test('ongeldige idempotency-input bereikt de database niet', async () => {
 test('forward-only atomic-commit migration houdt messagewrite, contentVersion en journal in één lockscope', () => {
   const migration = fs.readFileSync(path.resolve(
     __dirname,
-    '../../supabase/migrations/20260809235914_mailbox_campaign_atomic_message_commit.sql'
+    '../../supabase/migrations/20260810032742_mailbox_campaign_atomic_message_commit.sql'
   ), 'utf8');
   const schema = fs.readFileSync(
     path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),

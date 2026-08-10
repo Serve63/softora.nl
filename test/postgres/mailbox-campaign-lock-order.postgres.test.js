@@ -24,7 +24,7 @@ if (!databaseUrl) {
   ), 'utf8');
   const forwardMigration = fs.readFileSync(path.resolve(
     __dirname,
-    '../../supabase/migrations/20260809235914_mailbox_campaign_atomic_message_commit.sql'
+    '../../supabase/migrations/20260810032742_mailbox_campaign_atomic_message_commit.sql'
   ), 'utf8');
   const clients = new Set();
 
