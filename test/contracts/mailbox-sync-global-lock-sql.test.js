@@ -12,6 +12,10 @@ const probePath = path.resolve(__dirname, '../../supabase/mailbox-sync-global-lo
 const migration = fs.readFileSync(migrationPath, 'utf8');
 const schema = fs.readFileSync(schemaPath, 'utf8');
 const probe = fs.readFileSync(probePath, 'utf8');
+const postgresTest = fs.readFileSync(path.resolve(
+  __dirname,
+  '../postgres/mailbox-campaign-lock-order.postgres.test.js'
+), 'utf8');
 
 function lockHardeningBlock(source) {
   const match = source.match(
@@ -103,4 +107,13 @@ test('transactionele probe dekt cap, force, oude UPSERT, reclaim en stale finish
   assert.match(probe, /PROBE_STALE_FINISH_CHANGED_RECLAIMED_LEASE/);
   assert.match(probe, /PROBE_REPLACEMENT_TOKEN_FINISH_FAILED/);
   assert.match(probe, /rollback;\s*$/);
+});
+
+test('CI voert de getrackte lockmigratie en transactionele probe echt op PostgreSQL uit', () => {
+  assert.match(postgresTest, /20260810100500_harden_mailbox_sync_global_locks\.sql/);
+  assert.match(postgresTest, /mailbox-sync-global-lock-probe\.sql/);
+  assert.match(
+    postgresTest,
+    /applyTrackedSql\([\s\S]*foundation[\s\S]*forwardMigration[\s\S]*globalLockMigration[\s\S]*globalLockProbe/
+  );
 });

@@ -26,6 +26,14 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260810032742_mailbox_campaign_atomic_message_commit.sql'
   ), 'utf8');
+  const globalLockMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260810100500_harden_mailbox_sync_global_locks.sql'
+  ), 'utf8');
+  const globalLockProbe = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/mailbox-sync-global-lock-probe.sql'
+  ), 'utf8');
   const clients = new Set();
 
   function applyTrackedSql(sql) {
@@ -144,7 +152,9 @@ if (!databaseUrl) {
         unique (account_email, folder, uid)
       );
     `;
-    applyTrackedSql(`${bootstrapSql}\n${foundation}\n${forwardMigration}`);
+    applyTrackedSql(
+      `${bootstrapSql}\n${foundation}\n${forwardMigration}\n${globalLockMigration}\n${globalLockProbe}`
+    );
   });
 
   test.after(async () => {
