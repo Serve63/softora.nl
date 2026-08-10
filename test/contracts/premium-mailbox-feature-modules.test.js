@@ -158,22 +158,18 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
     getActiveFolder: () => 'inbox',
     fetch: async (url, options) => {
       requests.push({ url, options });
-      return { ok: true, status: 202, json: async () => ({
-        ok: true, result: { processing: true, providerOutcomeUnknown: true },
-      }) };
+      return { ok: true, json: async () => ({ ok: true }) };
     },
     toast() {},
   });
   assert.equal(requests.length, 0);
   await controller.send();
-  await controller.send();
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 1);
   assert.equal(requests[0].url, '/api/mailbox/send');
   const payload = JSON.parse(requests[0].options.body);
   assert.equal(payload.mode, 'new-message');
   assert.equal(typeof payload.idempotencyKey, 'string');
   assert.ok(payload.idempotencyKey.length > 8);
-  assert.equal(JSON.parse(requests[1].options.body).idempotencyKey, payload.idempotencyKey);
   assert.deepEqual(payload.context, {
     conversationId: '',
     id: '',
@@ -318,123 +314,6 @@ test('gecombineerde mailbox verstuurt een Instantly-antwoord uitsluitend via de 
   assert.equal(requests.length, 1);
   assert.equal(requests[0].url, '/api/mailbox/send');
   assert.equal(JSON.parse(requests[0].options.body).owner, 'serve');
-});
-
-test('compose houdt een unknown Instantly-send open, ongeaccepteerd en op dezelfde browserkey', async () => {
-  const requests = [];
-  const toasts = [];
-  let closed = 0;
-  let accepted = 0;
-  const values = {
-    'c-to': { value: '' }, 'c-cc': { value: '' }, 'c-bcc': { value: '' },
-    'c-subject': { value: '' }, 'c-body': { value: 'Exact antwoord' },
-    'compose-overlay': { classList: { add() {}, remove() { closed += 1; } } },
-  };
-  const mail = {
-    id: 'instantly:unknown-1', provider: 'instantly', providerOwner: 'serve',
-    providerMessageId: 'incoming-unknown-1', providerThreadId: 'thread-unknown-1',
-    accountEmail: 'serve@softora.nl', email: 'prospect@example.nl', subject: 'Re: Website',
-  };
-  const controller = composeController.create({
-    document: {
-      getElementById: (id) => values[id] || null,
-      querySelector: () => null,
-    },
-    compose: {
-      buildReplyContext: () => ({
-        ...mail, mode: 'reply', conversationId: 'instantly:thread-unknown-1',
-      }),
-      getAttachments: () => [], reset() {}, resetOptionalFields() {},
-    },
-    campaignInbox: {
-      getAccount: (message) => message.accountEmail,
-      getMessageOwner: () => 'serve',
-    },
-    display: {
-      getReplyToAddress: () => mail.email,
-      formatDetailSubject: (value) => value,
-    },
-    findMail: () => mail,
-    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
-    getAccount: () => mail.accountEmail,
-    getOwner: () => 'serve',
-    getActiveFolder: () => 'outreach',
-    fetch: async (_url, options) => {
-      requests.push(JSON.parse(options.body));
-      return {
-        ok: true, status: 202,
-        json: async () => ({ ok: true, result: {
-          processing: true, providerOutcomeUnknown: true, reconcileRequired: true,
-        } }),
-      };
-    },
-    onAcceptedSend: () => { accepted += 1; },
-    toast: (message) => toasts.push(message),
-  });
-
-  controller.reply(mail);
-  await controller.send();
-  await controller.send();
-  assert.equal(requests.length, 2);
-  assert.equal(requests[0].idempotencyKey, requests[1].idempotencyKey);
-  assert.equal(accepted, 0);
-  assert.equal(closed, 0);
-  assert.equal(controller.getContext().id, mail.id);
-  assert.equal(toasts.at(-1), 'Verzending wordt gecontroleerd; stuur dit antwoord niet opnieuw.');
-});
-
-test('compose presenteert gedeeltelijke SMTP-acceptatie zonder een valse volledig-verzonden claim', async (t) => {
-  const scenarios = [
-    {
-      label: 'hoofdontvanger geweigerd',
-      result: { accepted: ['cc@example.nl'], rejected: ['klant@example.nl'], deliveryDegraded: true },
-      acceptedCount: 0,
-      toast: 'Mail deels verzonden, maar de hoofdontvanger is geweigerd; CC/BCC kan al ontvangen hebben. Stuur niet opnieuw zonder controle.',
-    },
-    {
-      label: 'alleen cc geweigerd',
-      result: { accepted: ['klant@example.nl'], rejected: ['cc@example.nl'], deliveryDegraded: true },
-      acceptedCount: 1,
-      toast: 'Mail aan de hoofdontvanger verzonden; één of meer CC/BCC-adressen zijn geweigerd.',
-    },
-    {
-      label: 'lokale opslag gedegradeerd',
-      result: { accepted: ['klant@example.nl'], rejected: [], storageDegraded: true, reconcileRequired: true },
-      acceptedCount: 1,
-      toast: 'Mail door de provider geaccepteerd; lokale verwerking wordt gecontroleerd.',
-    },
-  ];
-  for (const scenario of scenarios) {
-    await t.test(scenario.label, async () => {
-      const toasts = [];
-      let accepted = 0;
-      let closed = 0;
-      const values = {
-        'c-to': { value: 'klant@example.nl' }, 'c-cc': { value: 'cc@example.nl' },
-        'c-bcc': { value: '' }, 'c-subject': { value: 'Vraag' }, 'c-body': { value: 'Bericht' },
-        'compose-overlay': { classList: { add() {}, remove() { closed += 1; } } },
-      };
-      const controller = composeController.create({
-        document: {
-          getElementById: (id) => values[id] || null,
-          querySelector: () => null,
-        },
-        compose: { getAttachments: () => [], reset() {}, resetOptionalFields() {} },
-        normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
-        getAccount: () => 'serve@softora.nl', getActiveFolder: () => 'inbox',
-        fetch: async () => ({ ok: true, status: 200, json: async () => ({
-          ok: true,
-          result: { messageId: '<partial@softora.nl>', ...scenario.result },
-        }) }),
-        onAcceptedSend: () => { accepted += 1; },
-        toast: (message) => toasts.push(message),
-      });
-      await controller.send();
-      assert.equal(accepted, scenario.acceptedCount);
-      assert.equal(closed, 1);
-      assert.equal(toasts.at(-1), scenario.toast);
-    });
-  }
 });
 
 test('composevenster is sleepbaar en scrolt de mailbox achter de overlay', () => {

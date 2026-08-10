@@ -1,16 +1,6 @@
 const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
-const {
-  extendMinTimestamp,
-  prepareInstantlySendReconciliation,
-  reconcileInstantlySends,
-  reconciliationHealth,
-} = require('./instantly-mailbox-send-reconciliation');
 const { buildRejectedItem, mergeQuarantine } = require('./instantly-mailbox-quarantine');
-const {
-  extractInstantlyCursor,
-  extractInstantlyItems,
-  parseInstantlyEmailListResponse,
-} = require('./instantly-mailbox-provider-api');
+const { parseInstantlyEmailListResponse } = require('./instantly-mailbox-provider-api');
 const {
   readInstantlyOwnerSyncState,
   writeInstantlyOwnerSyncState,
@@ -51,7 +41,6 @@ function waitForLockRetry(delayMs) {
 }
 
 function createInstantlyMailboxSyncRunner({
-  accountOwnership,
   apiRequest,
   assertConfigured,
   assertOwner,
@@ -60,9 +49,7 @@ function createInstantlyMailboxSyncRunner({
   getConfiguredAccounts,
   getSyncStateKey,
   getUiStateValues,
-  logger = console,
   mailboxIndexStore,
-  mailboxSendProvenanceStore,
   normalizeInstantlyMessage,
   normalizedConfig,
   now,
@@ -206,11 +193,6 @@ function createInstantlyMailboxSyncRunner({
       accountEmail: syncKey,
       folder: 'instantly',
     });
-    let reconciliation = await prepareInstantlySendReconciliation({
-      store: mailboxSendProvenanceStore,
-      accounts,
-      logger,
-    });
     const recentSync = buildRecentSyncResult({
       state: initialState,
       owner,
@@ -218,9 +200,7 @@ function createInstantlyMailboxSyncRunner({
       minIntervalMs: options.minIntervalMs,
       nowMs: now().getTime(),
     });
-    if (recentSync && !reconciliation.degraded && reconciliation.intents.length === 0) {
-      return { ...recentSync, ...reconciliationHealth(reconciliation) };
-    }
+    if (recentSync) return recentSync;
 
     const lockDeadlineAt = Date.now() + SYNC_LOCK_RETRY_DEADLINE_MS;
     let lock = null;
@@ -252,9 +232,6 @@ function createInstantlyMailboxSyncRunner({
           pages: 0,
           skipped: true,
           reason: 'sync-in-progress',
-          partial: true,
-          degraded: reconciliation.degraded || reconciliation.intents.length > 0,
-          ...reconciliationHealth(reconciliation),
           lockReason: 'active_target',
           retryAt: lock.lockExpiresAt || null,
           retryAfterMs: Math.max(
@@ -295,14 +272,9 @@ function createInstantlyMailboxSyncRunner({
       const fallbackSince = runStartedMs
         - normalizedConfig.initialLookbackDays * 24 * 60 * 60 * 1000;
       const overlapMs = normalizedConfig.syncOverlapMinutes * 60 * 1000;
-      const calculatedMinTimestamp = new Date(
+      const minTimestamp = new Date(
         Math.max(fallbackSince, Number.isFinite(lastSyncedAt) ? lastSyncedAt - overlapMs : fallbackSince)
       ).toISOString();
-      const minTimestamp = extendMinTimestamp(
-        calculatedMinTimestamp,
-        calculatedMinTimestamp,
-        reconciliation.intents
-      );
       let seen = 0;
       let stored = 0;
       let pages = 0;
@@ -370,31 +342,6 @@ function createInstantlyMailboxSyncRunner({
         at: runStartedAt,
       });
       stored += retried.stored;
-      reconciliation = await reconcileInstantlySends({
-        state: reconciliation,
-        store: mailboxSendProvenanceStore,
-        owner,
-        accountOwnership,
-        apiRequest,
-        normalizeMessage: normalizeInstantlyMessage,
-        extractItems: extractInstantlyItems,
-        extractCursor: extractInstantlyCursor,
-        upsertMessages: async (messages) => ({
-          ok: true,
-          upserted: await persistMessages(
-            messages,
-            new Set(accounts.map((account) => account.email))
-          ),
-        }),
-        throwStoreFailure,
-        pageLimit: normalizedConfig.pageLimit,
-        maxPages: normalizedConfig.maxPages,
-        normalPageCount: pages,
-        logger,
-        nowMs: () => now().getTime(),
-      });
-      stored += Number(reconciliation.stored) || 0;
-      seen += Number(reconciliation.seen) || 0;
       await writeInstantlyOwnerSyncState({
         owner,
         state: durableState,
@@ -407,13 +354,6 @@ function createInstantlyMailboxSyncRunner({
           : '',
         durableState.quarantine.length
           ? `INSTANTLY_ITEMS_QUARANTINED:${durableState.quarantine.length}`
-          : '',
-        reconciliation.intents.length
-          ? `INSTANTLY_SEND_RECONCILE_PENDING:${reconciliation.intents.length}`
-          : '',
-        reconciliation.degraded ? 'INSTANTLY_SEND_RECONCILE_DEGRADED' : '',
-        reconciliation.providerRequestBudgetExhausted
-          ? 'INSTANTLY_PROVIDER_REQUEST_BUDGET_EXHAUSTED'
           : '',
       ].filter(Boolean);
       const finish = await mailboxIndexStore.finishSync({
@@ -436,20 +376,11 @@ function createInstantlyMailboxSyncRunner({
       let auditStored = 0;
       let auditError = '';
       try {
-        const auditResult = await auditThreadCandidates({
+        auditStored = Number(await auditThreadCandidates({
           accounts,
           owner,
           threadCandidates,
-          maxHydrations: reconciliation.requestsRemaining,
-        });
-        auditStored = Number(auditResult?.stored ?? auditResult) || 0;
-        reconciliation.requestsRemaining = Math.max(
-          0,
-          Number(reconciliation.requestsRemaining) - (Number(auditResult?.requestsUsed) || 0)
-        );
-        if (auditResult?.providerRequestBudgetExhausted === true) {
-          reconciliation.providerRequestBudgetExhausted = true;
-        }
+        })) || 0;
       } catch (error) {
         if (
           error?.leaveMutationPending === true ||
@@ -459,43 +390,25 @@ function createInstantlyMailboxSyncRunner({
         }
         auditError = normalizeText(error?.message || error);
       }
-      const reconciliationIncomplete = Boolean(
-        reconciliation.degraded ||
-        reconciliation.providerRequestBudgetExhausted ||
-        reconciliation.intents.length > 0
-      );
       return {
         ok: true,
-        complete:
-          durableState.segments.length === 0 &&
-          durableState.quarantine.length === 0 &&
-          !reconciliationIncomplete,
+        complete: durableState.segments.length === 0 && durableState.quarantine.length === 0,
         freshnessConfirmed:
           durableState.segments.length === 0 &&
           durableState.quarantine.length === 0 &&
-          !auditError &&
-          !reconciliationIncomplete,
+          !auditError,
         headFreshnessConfirmed: true,
         owner,
         accounts: accounts.map((account) => account.email),
         seen,
         stored: stored + auditStored,
-        reconciled: Number(reconciliation.reconciled) || 0,
-        ...reconciliationHealth(reconciliation),
-        providerRequestBudgetExhausted: reconciliation.providerRequestBudgetExhausted,
         pages,
-        partial:
-          durableState.segments.length > 0 ||
-          durableState.quarantine.length > 0 ||
-          reconciliationIncomplete,
+        partial: durableState.segments.length > 0 || durableState.quarantine.length > 0,
         backlogSegments: durableState.segments.length,
         quarantined: durableState.quarantine.length,
         recoveredFromQuarantine: retried.recovered,
         lockAttempts,
-        degraded:
-          durableState.quarantine.length > 0 ||
-          Boolean(auditError) ||
-          reconciliationIncomplete,
+        degraded: durableState.quarantine.length > 0 || Boolean(auditError),
         ...(auditError ? { warning: 'Instantly-threadverrijking is tijdelijk mislukt.' } : {}),
         syncedAt: runStartedAt,
       };

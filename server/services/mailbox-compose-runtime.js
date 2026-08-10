@@ -53,9 +53,8 @@ function createMailboxComposeRuntime(dependencies = {}) {
         normalizeString,
         threadProvenance,
         mailboxSendProvenanceStore,
-        logger,
       });
-      return res.status(result?.providerOutcomeUnknown ? 202 : 200).json({ ok: true, result });
+      return res.status(200).json({ ok: true, result });
     } catch (error) {
       logger.error('[Mailbox][Send]', error?.message || error);
       return res.status(error.status || 500).json({

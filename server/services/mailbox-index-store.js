@@ -299,8 +299,6 @@ function createMailboxIndexStore(deps = {}) {
         softoraSendIntentId: truncateText(normalizeString(message && message.softoraSendIntentId), 500),
         softoraSendMode: truncateText(normalizeString(message && message.softoraSendMode).toLowerCase(), 40),
         softoraReplyTargetMessageId: truncateText(normalizeString(message && message.softoraReplyTargetMessageId), 1000),
-        softoraRecipientFingerprint: truncateText(normalizeString(message && message.softoraRecipientFingerprint), 128),
-        softoraPayloadFingerprint: truncateText(normalizeString(message && message.softoraPayloadFingerprint), 128),
         softoraThreadProvenanceKnown: message && message.softoraThreadProvenanceKnown === true,
         ...(normalizeString(message && message.parseStatus) ? {
           parseStatus: truncateText(normalizeString(message.parseStatus), 80),
@@ -345,8 +343,6 @@ function createMailboxIndexStore(deps = {}) {
       softoraSendIntentId: normalizeString(payload.softoraSendIntentId),
       softoraSendMode: normalizeString(payload.softoraSendMode).toLowerCase(),
       softoraReplyTargetMessageId: normalizeString(payload.softoraReplyTargetMessageId),
-      softoraRecipientFingerprint: normalizeString(payload.softoraRecipientFingerprint),
-      softoraPayloadFingerprint: normalizeString(payload.softoraPayloadFingerprint),
       softoraThreadProvenanceKnown: payload.softoraThreadProvenanceKnown === true,
       parseStatus: normalizeString(payload.parseStatus),
       parseErrorCode: normalizeString(payload.parseErrorCode),
