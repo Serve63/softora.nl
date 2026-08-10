@@ -101,7 +101,7 @@ test('campaign loader requests only the currently selected owner and asks for sa
       return {
         ok: true,
         async json() {
-          return { ok: true, messages: [], contentAt: new Date().toISOString(), sync: {} };
+          return { ok: true, messages: [], sync: {} };
         },
       };
     },
@@ -110,7 +110,7 @@ test('campaign loader requests only the currently selected owner and asks for sa
   const url = new URL(requestedUrl, 'https://www.softora.nl');
   assert.equal(url.pathname, '/api/mailbox/campaign-replies');
   assert.equal(url.searchParams.get('owner'), 'martijn');
-  assert.equal(url.searchParams.get('refreshInstantly'), '0');
+  assert.equal(url.searchParams.get('refreshInstantly'), '1');
   assert.deepEqual(result.messages, []);
   campaignInbox.setOwner('serve');
 });

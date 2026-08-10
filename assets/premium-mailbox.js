@@ -149,8 +149,9 @@ async function initializeMailboxAccountPreference() {
     const bootstrappedSession = window.SoftoraMailboxCampaignInbox?.getPageBootstrapSession?.();
     let session = bootstrappedSession;
     if (!session) {
-      const { data } = await window.SoftoraMailboxRequestDeadline.requestInitJson('/api/auth/session', 'MAILBOX_AUTH_SESSION_TIMEOUT');
-      session = data && data.session ? data.session : data;
+      const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => ({}));
+      session = payload && payload.session ? payload.session : payload;
     }
     mailboxAccountPreferenceIdentity = resolveMailboxPreferenceIdentity(session); await window.SoftoraMailboxCampaignInbox.initializeOwnerPreference(session, window.SoftoraUiStateClient, mailboxAccountPreferenceIdentity);
   } catch (_) {
@@ -811,10 +812,12 @@ function normalizeMailboxApiMessage(message, options = {}) {
 }
 async function loadMailboxAccounts() {
   try {
-    const { response, data } = await window.SoftoraMailboxRequestDeadline.requestInitJson(
-      '/api/mailbox/accounts',
-      'MAILBOX_ACCOUNTS_TIMEOUT'
-    );
+    const response = await fetch('/api/mailbox/accounts', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
     if (response.ok && data?.ok && Array.isArray(data.accounts) && data.accounts.length) {
       mailboxAccounts = data.accounts
         .map((account) => Object.assign({}, account, { email: normalizeMailboxEmail(account.email) }))
@@ -1090,9 +1093,6 @@ function bindMailboxActions() {
 }
 bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody, openMail });
 mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
-window.addEventListener('pagehide', (event) => {
-  if (event?.persisted === true) mailboxOwnerView?.cancelActive?.();
-});
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
 if (mailboxAccountSwitcher) {
@@ -1164,7 +1164,7 @@ window.addEventListener('keydown', (event) => {
       activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder);
       setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
       await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
-      void loadMailboxAccounts();
+      void loadMailboxAccounts(); mailboxRefreshController?.start?.();
       return;
     }
     await loadMailboxAccounts();
@@ -1175,11 +1175,10 @@ window.addEventListener('keydown', (event) => {
       folder: intent.folder || 'outreach',
       keepSearch: true,
       openLatest: !(intent.message || intent.email || intent.query),
-    });
+    }); mailboxRefreshController?.start?.();
   } catch (error) {
     toast(String(error?.message || 'Mailbox laden mislukt'));
   } finally {
-    mailboxRefreshController?.start?.();
     window.SoftoraMailboxBoot?.markReady?.();
   }
 })();

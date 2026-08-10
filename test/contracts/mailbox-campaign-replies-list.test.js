@@ -19,7 +19,7 @@ test('campaign replies coordinator behoudt response en durable snapshot contract
   };
   const reads = [];
   const writes = [];
-  const { listCampaignReplies } = createMailboxCampaignRepliesList({
+  const listCampaignReplies = createMailboxCampaignRepliesList({
     mailboxCampaignRepliesService: {
       listReplies: async (options) => {
         reads.push(options);
@@ -49,9 +49,6 @@ test('campaign replies coordinator behoudt response en durable snapshot contract
     source: 'campaign-replies-index',
     refreshRecommended: false,
     warming: false,
-    degraded: false,
-    contentAt: result.contentAt,
-    warnings: [],
     instantly: null,
   });
   assert.equal(writes.length, 1);

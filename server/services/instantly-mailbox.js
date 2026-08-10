@@ -145,7 +145,6 @@ function createInstantlyMailboxService(deps = {}) {
     getCustomerSourcesByEmails = async () => [],
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
-    onMessagesUpserted = async () => ({ ok: true }),
     now = () => new Date(),
     logger = console,
   } = deps;
@@ -172,13 +171,6 @@ function createInstantlyMailboxService(deps = {}) {
   const accountOwnership = normalizeAccountOwnership(config.accountOwners);
   const campaignOwnership = normalizeCampaignOwnership(config.campaignOwners);
   let syncPromiseByOwner = new Map();
-
-  async function upsertInstantlyMessages(messages) {
-    const result = await mailboxIndexStore.upsertProviderMessages({ provider: 'instantly', messages });
-    if (!result?.ok || !(Number(result.upserted) > 0)) return result;
-    const invalidation = await onMessagesUpserted({ provider: 'instantly', count: Number(result.upserted) });
-    return invalidation?.ok === false ? { ...result, ok: false, invalidationFailed: true } : result;
-  }
 
   function getConfiguredAccounts(owner = '') {
     const selectedOwner = normalizeOwner(owner);
@@ -607,7 +599,10 @@ function createInstantlyMailboxService(deps = {}) {
         });
       }
     }
-    const upsert = await upsertInstantlyMessages(messages);
+    const upsert = await mailboxIndexStore.upsertProviderMessages({
+      provider: 'instantly',
+      messages,
+    });
     if (!upsert?.ok) {
       throw createInstantlyMailboxError(
         'Instantly-thread kon niet duurzaam worden opgeslagen.',
@@ -731,7 +726,10 @@ function createInstantlyMailboxService(deps = {}) {
               if (!threadCandidates.has(key)) threadCandidates.set(key, message);
             });
           seen += extractInstantlyItems(data).length;
-          const upsert = await upsertInstantlyMessages(messages);
+          const upsert = await mailboxIndexStore.upsertProviderMessages({
+            provider: 'instantly',
+            messages,
+          });
           if (!upsert?.ok) {
             throw createInstantlyMailboxError(
               'Instantly-berichten konden niet duurzaam worden opgeslagen.',
@@ -1062,7 +1060,10 @@ function createInstantlyMailboxService(deps = {}) {
       campaign_id: normalizeText(rawSent?.campaign_id || stored.providerCampaignId),
     });
     if (normalizedSent) {
-      const upsert = await upsertInstantlyMessages([normalizedSent]);
+      const upsert = await mailboxIndexStore.upsertProviderMessages({
+        provider: 'instantly',
+        messages: [normalizedSent],
+      });
       if (!upsert?.ok) {
         logger.error('[InstantlyMailbox][ReplyStore]', 'Verzonden antwoord kon niet lokaal worden opgeslagen.');
       }
@@ -1127,7 +1128,10 @@ function createInstantlyMailboxService(deps = {}) {
           409
         );
       }
-      const upsert = await upsertInstantlyMessages([normalizedMessage]);
+      const upsert = await mailboxIndexStore.upsertProviderMessages({
+        provider: 'instantly',
+        messages: [normalizedMessage],
+      });
       if (!upsert?.ok) {
         throw createInstantlyMailboxError(
           'Webhook-bericht kon niet duurzaam worden opgeslagen.',

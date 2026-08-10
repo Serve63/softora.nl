@@ -108,7 +108,6 @@ function buildService(overrides = {}) {
     getCustomerSourcesByEmails: overrides.getCustomerSourcesByEmails,
     getUiStateValues: overrides.getUiStateValues,
     setUiStateValues: overrides.setUiStateValues,
-    onMessagesUpserted: overrides.onMessagesUpserted,
     now: () => new Date('2026-07-25T12:00:00.000Z'),
     fetchJsonWithTimeout: async (url, options) => {
       requests.push({ url, options });
@@ -1570,26 +1569,6 @@ test('configuration stays fail-closed until key, secret and exact owner map exis
     'INSTANTLY_ACCOUNT_OWNERS_JSON',
   ]);
   assert.equal(service.isConfigured(), false);
-});
-
-test('iedere duurzame Instantly-upsert invalideert de campagnemailbox-snapshot', async () => {
-  const invalidations = [];
-  const { service } = buildService({
-    onMessagesUpserted: async (input) => { invalidations.push(input); return { ok: true }; },
-    fetchJsonWithTimeout: async () => ({
-      response: { ok: true, status: 200 },
-      data: { items: [incoming()] },
-    }),
-  });
-
-  const result = await service.hydrateThread({
-    threadId: 'thread-serve',
-    accountEmail: 'serve-sender@example.com',
-    owner: 'serve',
-  });
-
-  assert.equal(result.stored, 1);
-  assert.deepEqual(invalidations, [{ provider: 'instantly', count: 1 }]);
 });
 
 test('mailbox integration never activates from the separate outreach scheduler flag', () => {

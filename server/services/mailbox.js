@@ -606,19 +606,21 @@ function createMailboxService(deps = {}) {
       dataOpsStore,
       mailboxSendProvenanceStore,
     }),
-    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), logger }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
       env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY
   );
-  const { listCampaignReplies, invalidateCampaignSnapshot } = createMailboxCampaignRepliesList({
+  const listCampaignReplies = createMailboxCampaignRepliesList({
     mailboxCampaignRepliesService,
     instantlyMailboxService,
     filterVisibleMailboxMessages,
-    getUiStateValues, setUiStateValues, logger, mailboxCampaignSnapshotStore: deps.mailboxCampaignSnapshotStore,
-    normalizeString, truncateText,
+    setUiStateValues,
+    logger,
+    normalizeString,
+    truncateText,
   });
 
   const baseAccount = {
@@ -1335,13 +1337,9 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  const {
-    confirm: confirmMailboxWebdesignOutboundRecipient,
-    release: releaseMailboxWebdesignOutboundRecipient,
-    reserve: reserveMailboxWebdesignOutboundRecipient,
-  } = createMailboxWebdesignOutboundGuard({
-    buildError: buildMailboxWebdesignGuardError, normalizeEmail, normalizeString,
-    outboundRecipientGuardStore,
+  const { confirm: confirmMailboxWebdesignOutboundRecipient,
+    reserve: reserveMailboxWebdesignOutboundRecipient } = createMailboxWebdesignOutboundGuard({
+    buildError: buildMailboxWebdesignGuardError, normalizeEmail, normalizeString, outboundRecipientGuardStore,
   });
 
   function getPhotoMetaForRow(row, index, photoMap, photoByIdentity) {
@@ -2047,7 +2045,7 @@ function createMailboxService(deps = {}) {
     getSafeLimit,
     getAccounts,
     normalizeEmail,
-    normalizeFolder, invalidateCampaignSnapshot,
+    normalizeFolder,
     logger,
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
@@ -2062,7 +2060,8 @@ function createMailboxService(deps = {}) {
     allowLiveImapFallback = true } = {}) {
     const startedAt = Date.now(); const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder); const safeLimit = getSafeLimit(limit);
-    const indexClientAvailable = canUseMailboxIndex(); const indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
+    const indexClientAvailable = canUseMailboxIndex();
+    const indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
     const indexReadable = Array.isArray(indexedMessages);
 
     if (Array.isArray(indexedMessages) && indexedMessages.length) {
@@ -2131,7 +2130,7 @@ function createMailboxService(deps = {}) {
     const result = await listMessagesWithMeta(options);
     return result.messages;
   }
-  async function getMessage({ accountEmail, folder = 'inbox', id = '', persistIndex = true }) {
+  async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
     const normalizedFolder = normalizeString(folder).toLowerCase() === 'instantly' ? 'instantly' : normalizeFolder(folder);
     if (normalizedFolder === 'instantly') return getInstantlyMessage({ accountEmail, id });
     const account = assertReadableAccount(accountEmail);
@@ -2166,7 +2165,7 @@ function createMailboxService(deps = {}) {
       error.status = 404;
       throw error;
     }
-    if (persistIndex && canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
+    if (canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
       await mailboxIndexStore.upsertMessages({
         accountEmail: account.email,
         folder: normalizedFolder,
@@ -2340,13 +2339,12 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-
   async function campaignRepliesResponse(req, res) {
     try {
       return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
-        owner: normalizeString(req.query?.owner), persistSnapshot: req.premiumReadOnlyTokenFallback !== true,
-        refreshInstantly: false,
+        owner: normalizeString(req.query?.owner),
+        refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
       }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);
@@ -2362,7 +2360,7 @@ function createMailboxService(deps = {}) {
       const message = await getMessage({
         accountEmail: req.query?.account,
         folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
+        id: req.query?.id || req.query?.message || '',
       });
       return res.status(200).json({ ok: true, message });
     } catch (error) {
@@ -2385,7 +2383,7 @@ function createMailboxService(deps = {}) {
       const message = await getMessage({
         accountEmail: req.query?.account,
         folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
+        id: req.query?.id || req.query?.message || '',
       });
       const image = decodeMailboxMessageImage(
         Array.isArray(message && message.bodyImages) ? message.bodyImages[imageIndex] : null

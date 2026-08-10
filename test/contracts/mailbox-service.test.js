@@ -274,45 +274,6 @@ test('mailbox detail behoudt de virtuele Instantly-folder tot aan de providerind
   assert.deepEqual(lookups.map((lookup) => lookup.folder), ['instantly', 'instantly']);
 });
 
-test('mailbox read-only auth fallback leest een ontbrekend detail zonder indexwrite', async () => {
-  let upserts = 0;
-  const rawMessage = Buffer.from(
-    'Message-ID: <readonly-detail@example.test>\r\n' +
-    'Subject: Re: Kleine vraag\r\n' +
-    'From: Klant <klant@example.test>\r\n' +
-    'To: serve@softora.nl\r\n\r\n' +
-    'Alleen lezen.'
-  );
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => createFakeImapClient({
-      boxes: [{ path: 'INBOX', specialUse: '\\Inbox' }],
-      messagesByMailbox: {
-        INBOX: [{ uid: 42, flags: [], internalDate: new Date(), source: rawMessage }],
-      },
-    }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      getMessage: async () => null,
-      upsertMessages: async () => { upserts += 1; return { ok: true, upserted: 1 }; },
-    },
-  });
-  const res = createResponseRecorder();
-  await service.getMessageResponse({
-    premiumReadOnlyTokenFallback: true,
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
-  }, res);
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.message.body, 'Alleen lezen.');
-  assert.equal(upserts, 0);
-});
-
 test('mailbox service excludes automated delivery failures from list and detail without touching human replies', async () => {
   const automated = {
     id: 'inbox:1',
@@ -520,54 +481,6 @@ test('selected owner response stays isolated while durable snapshot retains both
     persisted.messages.map((message) => [message.id, message.providerOwner]),
     [['martijn-thread', 'martijn'], ['ramon', 'serve']]
   );
-});
-
-test('mailbox read-only auth fallback kan geen durable snapshot of provider-refresh schrijven', async () => {
-  const persists = [];
-  const service = createMailboxService({
-    mailboxCampaignRepliesService: { listReplies: async () => [] },
-    mailboxCampaignSnapshotStore: {
-      persist: async (...args) => { persists.push(args); return { ok: true }; },
-      readDegraded: async () => null,
-      invalidate: async () => ({ ok: true }),
-    },
-    instantlyMailboxService: {
-      isConfigured: () => false,
-      syncMailbox: async () => { throw new Error('provider-refresh mag niet worden gestart'); },
-    },
-  });
-  const fallbackResponse = createResponseRecorder();
-  await service.campaignRepliesResponse({
-    query: { limit: '100', refreshInstantly: '1' },
-    premiumReadOnlyTokenFallback: true,
-  }, fallbackResponse);
-  assert.equal(fallbackResponse.statusCode, 200);
-  assert.equal(persists.length, 0);
-
-  const normal = await service.listCampaignReplies({ limit: 100 });
-  assert.equal(persists.length, 1);
-  assert.equal(normal.savedAt, normal.contentAt);
-  assert.equal(persists[0][1].savedAt, normal.contentAt);
-  assert.equal(persists[0][1].contentAt, normal.contentAt);
-});
-
-test('ongeldige mailbox-owner blijft 400 en kan nooit verbreden naar beide eigenaren', async () => {
-  let reads = 0;
-  let fallbacks = 0;
-  const service = createMailboxService({
-    mailboxCampaignRepliesService: { listReplies: async () => { reads += 1; return []; } },
-    mailboxCampaignSnapshotStore: {
-      persist: async () => ({ ok: true }),
-      readDegraded: async () => { fallbacks += 1; return { ok: true, messages: [] }; },
-      invalidate: async () => ({ ok: true }),
-    },
-    instantlyMailboxService: { isConfigured: () => false },
-  });
-  const res = createResponseRecorder();
-  await service.campaignRepliesResponse({ query: { owner: 'aanvaller' } }, res);
-  assert.equal(res.statusCode, 400);
-  assert.equal(reads, 0);
-  assert.equal(fallbacks, 0);
 });
 
 test('mailbox service sends mail through selected account smtp', async () => {
@@ -3581,79 +3494,6 @@ test('mailbox image response serves exact-message MIME media with durable privat
   assert.equal(response.body.toString(), 'mailbox-image');
 });
 
-test('signed-token mailbox detail and image fallback never upsert the mailbox index', async () => {
-  const client = createFakeImapClient({
-    boxes: [{ path: 'INBOX' }],
-    messagesByMailbox: {
-      INBOX: [{
-        uid: 42,
-        flags: ['\\Seen'],
-        internalDate: new Date('2026-08-09T20:00:00.000Z'),
-        source: {
-          date: new Date('2026-08-09T20:00:00.000Z'),
-          text: 'Alleen lezen.',
-          html: '<p>Alleen lezen.</p><img src="cid:readonly-image@example.test">',
-          subject: 'Re: Kleine vraag',
-          from: { value: [{ name: 'Klant', address: 'klant@example.test' }] },
-          to: { value: [{ name: 'Servé', address: 'serve@softora.nl' }] },
-          attachments: [{
-            cid: 'readonly-image@example.test',
-            contentType: 'image/png',
-            content: Buffer.from('readonly-image'),
-          }],
-        },
-      }],
-    },
-  });
-  let upserts = 0;
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => client,
-    parseMailSource: async (source) => source,
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      getMessage: async () => null,
-      upsertMessages: async () => {
-        upserts += 1;
-        return { ok: true, upserted: 1 };
-      },
-    },
-  });
-  const fallbackDetailResponse = createResponseRecorder();
-
-  await service.getMessageResponse({
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
-    premiumReadOnlyTokenFallback: true,
-  }, fallbackDetailResponse);
-
-  assert.equal(fallbackDetailResponse.statusCode, 200);
-  assert.equal(upserts, 0);
-
-  const fallbackImageResponse = createResponseRecorder();
-  await service.getMessageImageResponse({
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', index: '0' },
-    premiumReadOnlyTokenFallback: true,
-  }, fallbackImageResponse);
-
-  assert.equal(fallbackImageResponse.statusCode, 200);
-  assert.equal(fallbackImageResponse.body.toString(), 'readonly-image');
-  assert.equal(upserts, 0);
-
-  const normalDetailResponse = createResponseRecorder();
-  await service.getMessageResponse({
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
-  }, normalDetailResponse);
-
-  assert.equal(normalDetailResponse.statusCode, 200);
-  assert.equal(upserts, 1);
-});
-
 test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
   let cronCalled = 0;
   const routes = [];
@@ -3875,7 +3715,6 @@ test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gma
       imapPass: 'app-password',
     }]),
     createImapClient: () => client,
-    setUiStateValues: async (_scope, values) => ({ values, source: 'supabase' }),
     mailboxIndexStore: {
       isAvailable: () => true,
       listMessages: async () => [],

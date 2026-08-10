@@ -460,13 +460,11 @@ function createPremiumApiAccessGuard(options = {}) {
   function isMailboxReadOnlyAdminFallbackRequest(req) {
     const method = normalizeString(req?.method || '').toUpperCase();
     const path = getNormalizedAdminRequestPath(req);
-    return method === 'GET' && [
-      '/api/mailbox/accounts',
-      '/api/mailbox/campaign-replies',
-      '/api/mailbox/message',
-      '/api/mailbox/message-image',
-      '/api/mailbox/messages',
-    ].includes(path);
+    return (
+      method === 'GET' && ['/api/mailbox/message', '/api/mailbox/message-image'].includes(path)
+    ) || (
+      method === 'POST' && path === '/api/mailbox/messages/bodies'
+    );
   }
 
   function isTrustedAdminTokenFallback(authState) {
@@ -554,7 +552,6 @@ function createPremiumApiAccessGuard(options = {}) {
 
     if (isMailboxReadOnlyAdminFallbackRequest(req) && isTrustedAdminTokenFallback(fallbackAuthState)) {
       req.premiumAuth = fallbackAuthState;
-      req.premiumReadOnlyTokenFallback = true;
       appendSecurityAuditEvent(
         {
           type: 'mailbox_readonly_token_fallback_allowed',
@@ -565,7 +562,7 @@ function createPremiumApiAccessGuard(options = {}) {
           path: getRequestPathname(req),
           origin: getRequestOriginFromHeaders(req),
           userAgent: getUserAgent(req),
-          detail: 'Alleen-lezen mailboxroute toegestaan op basis van een geldige gesigneerde Full Access-sessie.',
+          detail: 'Alleen-lezen mailboxbody toegestaan op basis van een geldige gesigneerde Full Access-sessie.',
         },
         'security_mailbox_readonly_token_fallback_allowed'
       );
