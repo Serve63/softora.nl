@@ -554,13 +554,10 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
   const accountEmail = text(identity.accountEmail, 320).toLowerCase();
   const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
   const uid = Number(identity.uid) || 0;
-  const uidValidity = sanitizeUidValidity(identity.uidValidity);
   const id = text(identity.id, 500);
   const messages = snapshot.messages.filter((message) => {
     if (message.accountEmail !== accountEmail || message.folder !== folder) return true;
-    if (uid > 0 && Number(message.uid) > 0) {
-      return Number(message.uid) !== uid || sanitizeUidValidity(message.uidValidity) !== uidValidity;
-    }
+    if (uid > 0 && Number(message.uid) > 0) return Number(message.uid) !== uid;
     return message.mailboxId !== id && message.id !== id;
   });
   if (messages.length === snapshot.messages.length) {
@@ -587,7 +584,6 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
   const accountEmail = text(identity.accountEmail, 320).toLowerCase();
   const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
   const uid = Number(identity.uid) || 0;
-  const uidValidity = sanitizeUidValidity(identity.uidValidity);
   const id = text(identity.id, 500);
   const dismissedAt = text(options.dismissedAt || new Date().toISOString(), 100);
   let changed = false;
@@ -595,9 +591,7 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
     const messageFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
     const messageUid = Number(message.storageUid || message.uid) || 0;
     if (message.accountEmail !== accountEmail || messageFolder !== folder) return false;
-    if (uid > 0 && messageUid > 0) {
-      return messageUid === uid && sanitizeUidValidity(message.uidValidity) === uidValidity;
-    }
+    if (uid > 0 && messageUid > 0) return messageUid === uid;
     return message.mailboxId === id || message.id === id;
   };
   const messages = snapshot.messages.map((message) => {
@@ -632,7 +626,6 @@ function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) 
   const accountEmail = text(identity.accountEmail, 320).toLowerCase();
   const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
   const uid = Number(identity.uid) || 0;
-  const uidValidity = sanitizeUidValidity(identity.uidValidity);
   const id = text(identity.id, 500);
   const readAt = text(options.readAt || new Date().toISOString(), 100);
   let changed = false;
@@ -640,9 +633,7 @@ function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) 
     const messageFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
     const messageUid = Number(message.storageUid || message.uid) || 0;
     if (message.accountEmail !== accountEmail || messageFolder !== folder) return false;
-    if (uid > 0 && messageUid > 0) {
-      return messageUid === uid && sanitizeUidValidity(message.uidValidity) === uidValidity;
-    }
+    if (uid > 0 && messageUid > 0) return messageUid === uid;
     return message.mailboxId === id || message.id === id;
   };
   const messages = snapshot.messages.map((message) => {

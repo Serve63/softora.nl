@@ -10,7 +10,7 @@ const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
 const { attachMailboxSyncReadResult, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
 const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
-const { assertMailboxClientUidValidity, normalizeMailboxUidValidity, requireMailboxUidValidity } = require('./mailbox-uid-validity');
+const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
@@ -19,7 +19,6 @@ const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, resolv
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const { createMailboxReadMessageService } = require('./mailbox-read-message');
-const { createMailboxUidValidityActionGuard } = require('./mailbox-uid-validity-action-guard');
 const {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   createMailboxCampaignRepliesService,
@@ -892,7 +891,7 @@ function createMailboxService(deps = {}) {
       error.status = 400;
       throw error;
     }
-    return { folder, uid, uidValidity: requireMailboxUidValidity(input.uidValidity) };
+    return { folder, uid };
   }
 
   function createClient(account, options = {}) {
@@ -908,7 +907,6 @@ function createMailboxService(deps = {}) {
       ...options,
     });
   }
-  const mailboxUidValidityGuard = createMailboxUidValidityActionGuard({ createClient, resolveMailboxName });
 
   function addressText(address) {
     if (!address) return '';
@@ -2010,11 +2008,10 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function fetchMessageFromImapById({ account, folder = 'inbox', id = '', uidValidity = 0 }) {
+  async function fetchMessageFromImapById({ account, folder = 'inbox', id = '' }) {
     const uid = Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
     if (!Number.isFinite(uid) || uid <= 0) return null;
     const messages = await fetchMessagesFromImap({ account, folder, uids: [uid], limit: 1 });
-    assertMailboxClientUidValidity({ mailbox: { uidValidity: messages.syncReadHealth?.uidValidity } }, uidValidity);
     return messages[0] || null;
   }
 
@@ -2141,14 +2138,15 @@ function createMailboxService(deps = {}) {
     const result = await listMessagesWithMeta(options);
     return result.messages;
   }
-  async function getMessage({ accountEmail, folder = 'inbox', id = '', uidValidity = 0, persistIndex = true }) {
+  async function getMessage({ accountEmail, folder = 'inbox', id = '', persistIndex = true }) {
     const normalizedFolder = normalizeString(folder).toLowerCase() === 'instantly' ? 'instantly' : normalizeFolder(folder);
     if (normalizedFolder === 'instantly') return getInstantlyMessage({ accountEmail, id });
-    const requestedUidValidity = requireMailboxUidValidity(uidValidity);
     const account = assertReadableAccount(accountEmail);
     if (canUseMailboxIndex() && typeof mailboxIndexStore.getMessage === 'function') {
       const indexed = await mailboxIndexStore.getMessage({
-        accountEmail: account.email, folder: normalizedFolder, id, uidValidity: requestedUidValidity,
+        accountEmail: account.email,
+        folder: normalizedFolder,
+        id,
       });
       if (indexed) assertMailboxMessageVisible(indexed);
       const recipientRoutingNeedsHydration = Boolean(
@@ -2166,13 +2164,10 @@ function createMailboxService(deps = {}) {
         !recipientRoutingNeedsHydration &&
         !webdesignLinkProvenance.needsHydration(indexed)
       ) {
-        await mailboxUidValidityGuard.withCurrentUidValidity({ account, folder: normalizedFolder, uidValidity: requestedUidValidity });
         return indexed;
       }
     }
-    const live = await fetchMessageFromImapById({
-      account, folder: normalizedFolder, id, uidValidity: requestedUidValidity,
-    });
+    const live = await fetchMessageFromImapById({ account, folder: normalizedFolder, id });
     if (!live) {
       const error = new Error('Mailboxbericht niet gevonden.');
       error.status = 404;
@@ -2200,7 +2195,6 @@ function createMailboxService(deps = {}) {
     getAccount,
     ...getInstantlyVisibilityDeps(instantlyMailboxService),
     parseMessageReference,
-    createClient,
     canUseMailboxIndex,
     mailboxIndexStore,
     getUiStateValues, setUiStateValues,
@@ -2369,9 +2363,9 @@ function createMailboxService(deps = {}) {
   async function getMessageResponse(req, res) {
     try {
       const message = await getMessage({
-        accountEmail: req.query?.account, folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '', uidValidity: req.query?.uidValidity,
-        persistIndex: req.premiumReadOnlyTokenFallback !== true,
+        accountEmail: req.query?.account,
+        folder: req.query?.folder || 'inbox',
+        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
       });
       return res.status(200).json({ ok: true, message });
     } catch (error) {
@@ -2392,9 +2386,9 @@ function createMailboxService(deps = {}) {
         throw error;
       }
       const message = await getMessage({
-        accountEmail: req.query?.account, folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '', uidValidity: req.query?.uidValidity,
-        persistIndex: req.premiumReadOnlyTokenFallback !== true,
+        accountEmail: req.query?.account,
+        folder: req.query?.folder || 'inbox',
+        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
       });
       const image = decodeMailboxMessageImage(
         Array.isArray(message && message.bodyImages) ? message.bodyImages[imageIndex] : null
@@ -2447,8 +2441,10 @@ function createMailboxService(deps = {}) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await markMessageRead({
-        accountEmail: body.account, id: body.id || body.messageId,
-        folder: body.folder, uid: body.uid, uidValidity: body.uidValidity, owner: body.owner,
+        accountEmail: body.account,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid, owner: body.owner,
         dismissReply: body.dismissReply === true,
       });
       return res.status(200).json({ ok: true, result });
@@ -2467,8 +2463,10 @@ function createMailboxService(deps = {}) {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await hideConversation({
         accountEmail: body.account, owner: body.owner,
-        id: body.id || body.messageId, folder: body.folder, uid: body.uid,
-        uidValidity: body.uidValidity, messages: body.messages,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid,
+        messages: body.messages,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
@@ -2486,8 +2484,10 @@ function createMailboxService(deps = {}) {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await restoreConversation({
         accountEmail: body.account, owner: body.owner,
-        id: body.id || body.messageId, folder: body.folder, uid: body.uid,
-        uidValidity: body.uidValidity, messages: body.messages,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid,
+        messages: body.messages,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {

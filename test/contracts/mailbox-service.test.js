@@ -17,7 +17,6 @@ const {
   parseMailboxCampaignSnapshot,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
-const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -59,15 +58,8 @@ function createMailboxService(deps = {}) {
       messageId: `<test-${provenanceSequence}@softora.nl>`,
     }),
   };
-  const mailboxIndexStore = deps.mailboxIndexStore ? {
-    acquireSyncLock: async ({ accountEmail, folder }) => ({ ok: true, lockToken: `test-action:${accountEmail}:${folder}` }),
-    releaseSyncLock: async () => ({ ok: true, data: [{ sync_key: 'test-action' }] }),
-    getMessageForAction: async (input) => ({ id: input.id, uid: input.uid }),
-    ...deps.mailboxIndexStore,
-  } : undefined;
   return createRawMailboxService({
     ...deps,
-    ...(mailboxIndexStore ? { mailboxIndexStore } : {}),
     mailboxSendProvenanceStore,
     mailboxComposeThreadContext,
   });
@@ -165,20 +157,6 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   };
 }
 
-function createUidValidityCheckClient(uidValidity = 777, events = []) {
-  return {
-    usable: true,
-    mailbox: { uidValidity },
-    async connect() { events.push('connect'); },
-    async list() { return [{ path: 'INBOX', specialUse: '\\Inbox' }]; },
-    async getMailboxLock(mailboxName) {
-      events.push(`lock:${mailboxName}`);
-      return { release: () => events.push(`release:${mailboxName}`) };
-    },
-    async logout() { this.usable = false; events.push('logout'); },
-  };
-}
-
 function withSyncReadHealth(messages = [], overrides = {}) {
   const selectedUids = messages.map((message) => Number(message?.uid) || 0).filter(Boolean);
   Object.defineProperty(messages, 'syncReadHealth', {
@@ -196,47 +174,6 @@ function withSyncReadHealth(messages = [], overrides = {}) {
     },
   });
   return messages;
-}
-
-function createPersistentMailboxUidSelectionClient(indexed) {
-  return {
-    from() {
-      const filters = {};
-      let minimumDate = '';
-      let rangeStart = 0;
-      let rangeEnd = Number.POSITIVE_INFINITY;
-      const execute = () => {
-        const rows = Array.from(indexed.values())
-          .filter((message) => (
-            (!filters.account_email || message.accountEmail === filters.account_email) &&
-            (!filters.folder || message.folder === filters.folder) &&
-            (!minimumDate || Date.parse(message.date) >= Date.parse(minimumDate))
-          ))
-          .sort((left, right) => Number(right.uid) - Number(left.uid))
-          .slice(rangeStart, rangeEnd + 1)
-          .map((message) => ({
-            uid: message.uid,
-            parse_status: message.parseStatus || null,
-            parse_retry_at: message.parseRetryAt || null,
-          }));
-        return Promise.resolve({ data: rows, error: null });
-      };
-      const query = {
-        select() { return query; },
-        eq(column, value) { filters[column] = value; return query; },
-        is() { return query; },
-        order() { return query; },
-        gte(column, value) {
-          if (column === 'date') minimumDate = value;
-          return query;
-        },
-        range(from, to) { rangeStart = from; rangeEnd = to; return query; },
-        abortSignal() { return execute(); },
-        then(resolve, reject) { return execute().then(resolve, reject); },
-      };
-      return query;
-    },
-  };
 }
 
 function createOutboundGuardStore(calls = [], overrides = {}) {
@@ -388,7 +325,7 @@ test('mailbox read-only auth fallback leest een ontbrekend detail zonder indexwr
   const res = createResponseRecorder();
   await service.getMessageResponse({
     premiumReadOnlyTokenFallback: true,
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: '777' },
+    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
   }, res);
 
   assert.equal(res.statusCode, 200);
@@ -400,7 +337,6 @@ test('mailbox service excludes automated delivery failures from list and detail 
   const automated = {
     id: 'inbox:1',
     uid: 1,
-    uidValidity: 777,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     email: 'mailer-daemon@googlemail.com',
@@ -415,7 +351,6 @@ test('mailbox service excludes automated delivery failures from list and detail 
   const human = {
     id: 'inbox:2',
     uid: 2,
-    uidValidity: 777,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     email: 'klant@example.test',
@@ -443,7 +378,6 @@ test('mailbox service excludes automated delivery failures from list and detail 
       imapPass: 'secret',
     },
     mailboxIndexStore,
-    createImapClient: () => createUidValidityCheckClient(777),
   });
 
   const messages = await service.listMessages({
@@ -456,7 +390,6 @@ test('mailbox service excludes automated delivery failures from list and detail 
       accountEmail: 'serve@softora.nl',
       folder: 'inbox',
       id: 'inbox:1',
-      uidValidity: 777,
     }),
     { status: 404 }
   );
@@ -464,7 +397,6 @@ test('mailbox service excludes automated delivery failures from list and detail 
     accountEmail: 'serve@softora.nl',
     folder: 'inbox',
     id: 'inbox:2',
-    uidValidity: 777,
   })).id, 'inbox:2');
 });
 
@@ -1960,7 +1892,7 @@ test('mailbox service trusts indexed zero-image evidence and never synthesizes r
     },
     createImapClient: () => {
       imapCalls += 1;
-      return createUidValidityCheckClient(777);
+      throw new Error('De volledige mailbox hoeft niet opnieuw via IMAP te worden opgehaald');
     },
   });
 
@@ -1968,52 +1900,12 @@ test('mailbox service trusts indexed zero-image evidence and never synthesizes r
     accountEmail: 'serve@softora.nl',
     folder: 'inbox',
     id: 'inbox:44',
-    uidValidity: 777,
   });
 
-  assert.equal(imapCalls, 1);
+  assert.equal(imapCalls, 0);
   assert.deepEqual(message.bodyImages || [], []);
   assert.deepEqual(message.inlineImages || [], []);
   assert.doesNotMatch(message.body, /\[image:/);
-});
-
-test('mailbox service weigert een volledig geïndexeerd detail uit een stale UIDVALIDITY-generatie', async () => {
-  const events = [];
-  const indexReads = [];
-  const service = createMailboxService({
-    logger: { error() {} },
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      getMessage: async (input) => {
-        indexReads.push(input);
-        return {
-          id: 'inbox:42', uid: 42, uidValidity: 111, folder: 'inbox',
-          accountEmail: 'serve@softora.nl', email: 'klant@example.nl', to: 'serve@softora.nl',
-          body: 'Oude generatie', hasBody: true, bodyImageEvidenceKnown: true, embeddedImageCount: 0,
-        };
-      },
-    },
-    createImapClient: () => createUidValidityCheckClient(222, events),
-  });
-  const res = createResponseRecorder();
-
-  await service.getMessageResponse({
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: 111 },
-  }, res);
-
-  assert.equal(res.statusCode, 409);
-  assert.match(res.body.detail, /UIDVALIDITY/i);
-  assert.deepEqual(indexReads, [{
-    accountEmail: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: 111,
-  }]);
-  assert.deepEqual(events, ['connect', 'lock:INBOX', 'release:INBOX', 'logout']);
 });
 
 test('mailbox service never replaces stale indexed image labels with another stored design', async () => {
@@ -2109,14 +2001,15 @@ test('mailbox service never replaces stale indexed image labels with another sto
         ];
       },
     },
-    createImapClient: () => createUidValidityCheckClient(777),
+    createImapClient: () => {
+      throw new Error('De volledige mailbox hoeft niet opnieuw via IMAP te worden opgehaald');
+    },
   });
 
   const message = await service.getMessage({
     accountEmail: 'serve@softora.nl',
     folder: 'inbox',
     id: 'inbox:45',
-    uidValidity: 777,
   });
 
   assert.deepEqual(requestedCustomerIds, []);
@@ -2203,14 +2096,15 @@ test('mailbox service never falls back to another company design for a matched r
     dataOpsStore: {
       listDesignPhotosWithSignedUrls: async () => [],
     },
-    createImapClient: () => createUidValidityCheckClient(777),
+    createImapClient: () => {
+      throw new Error('De volledige mailbox hoeft niet opnieuw via IMAP te worden opgehaald');
+    },
   });
 
   const message = await service.getMessage({
     accountEmail: 'serve@softora.nl',
     folder: 'inbox',
     id: 'inbox:46',
-    uidValidity: 777,
   });
 
   assert.equal((message.bodyImages || []).length, 0);
@@ -2361,7 +2255,6 @@ test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink ui
     accountEmail: 'serve@softora.nl',
     folder: 'sent',
     id: 'sent:247',
-    uidValidity: 777,
   });
 
   assert.match(
@@ -2823,7 +2716,6 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
     ]),
     createImapClient: (config) => ({
       usable: true,
-      mailbox: { uidValidity: 777 },
       connect: async () => calls.push(['connect', config.auth.user]),
       list: async () => [{ path: 'INBOX' }],
       getMailboxLock: async (mailboxName) => {
@@ -2851,7 +2743,6 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
       body: {
         account: 'serve@softora.nl',
         id: 'inbox:42',
-        uidValidity: 777,
       },
     },
     res
@@ -2863,84 +2754,15 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
     account: 'serve@softora.nl',
     folder: 'inbox',
     uid: 42,
-    uidValidity: 777,
     unread: false,
   });
   assert.deepEqual(calls, [
+    ['indexRead', { accountEmail: 'serve@softora.nl', id: 'inbox:42', folder: 'inbox', uid: 42 }],
     ['connect', 'serve@softora.nl'],
     ['lock', 'INBOX'],
-    ['indexRead', { accountEmail: 'serve@softora.nl', id: 'inbox:42', folder: 'inbox', uid: 42, uidValidity: 777 }],
     ['flagsAdd', [42], ['\\Seen'], { uid: true }],
     ['release', 'INBOX'],
     ['logout'],
-  ]);
-});
-
-test('mailbox service weigert stale UIDVALIDITY vóór database- en IMAP-leesmutatie', async () => {
-  const mutations = [];
-  const service = createMailboxService({
-    logger: { error() {} },
-    mailConfig: {},
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      name: 'Servé',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => ({
-      usable: true,
-      mailbox: { uidValidity: 222 },
-      connect: async () => {},
-      list: async () => [{ path: 'INBOX' }],
-      getMailboxLock: async () => ({ release() {} }),
-      messageFlagsAdd: async (...args) => mutations.push(['imap-seen', ...args]),
-      logout: async () => {},
-    }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      markMessageRead: async (input) => {
-        mutations.push(['index-read', input]);
-        return { ok: true };
-      },
-    },
-  });
-
-  const staleRes = createResponseRecorder();
-  await service.markMessageReadResponse({
-    body: {
-      account: 'serve@softora.nl',
-      id: 'inbox:42',
-      uid: 42,
-      uidValidity: 111,
-    },
-  }, staleRes);
-
-  assert.equal(staleRes.statusCode, 409);
-  assert.match(staleRes.body.detail, /UIDVALIDITY/i);
-  assert.deepEqual(mutations, []);
-
-  const currentRes = createResponseRecorder();
-  await service.markMessageReadResponse({
-    body: {
-      account: 'serve@softora.nl',
-      id: 'inbox:42',
-      uid: 42,
-      uidValidity: 222,
-    },
-  }, currentRes);
-
-  assert.equal(currentRes.statusCode, 200);
-  assert.deepEqual(mutations, [
-    ['index-read', {
-      accountEmail: 'serve@softora.nl',
-      id: 'inbox:42',
-      folder: 'inbox',
-      uid: 42,
-      uidValidity: 222,
-    }],
-    ['imap-seen', [42], ['\\Seen'], { uid: true }],
   ]);
 });
 
@@ -2958,7 +2780,6 @@ test('mailbox service handelt een antwoordherinnering pas na een geslaagde leesa
     }]),
     createImapClient: () => ({
       usable: true,
-      mailbox: { uidValidity: 777 },
       connect: async () => calls.push(['connect']),
       list: async () => [{ path: 'INBOX' }],
       getMailboxLock: async () => ({ release: () => calls.push(['release']) }),
@@ -2978,58 +2799,22 @@ test('mailbox service handelt een antwoordherinnering pas na een geslaagde leesa
   const res = createResponseRecorder();
 
   await service.markMessageReadResponse({
-    body: { account: 'serve@softora.nl', id: 'inbox:42', uidValidity: 777, dismissReply: true },
+    body: { account: 'serve@softora.nl', id: 'inbox:42', dismissReply: true },
   }, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.result.replyDismissedAt, dismissedAt);
   assert.deepEqual(calls, [
     ['connect'],
-    ['dismiss', { accountEmail: 'serve@softora.nl', id: 'inbox:42', folder: 'inbox', uid: 42, uidValidity: 777 }],
     ['seen'],
+    ['dismiss', { accountEmail: 'serve@softora.nl', id: 'inbox:42', folder: 'inbox', uid: 42 }],
     ['release'],
     ['logout'],
   ]);
 });
 
-test('mailbox service muteert niets als de atomische lees-en-dismissupdate stale blijkt', async () => {
-  const mutations = [];
-  const staleError = Object.assign(new Error('Stale UIDVALIDITY'), {
-    code: 'MAILBOX_UIDVALIDITY_STALE',
-    status: 409,
-  });
-  const service = createMailboxService({
-    logger: { error() {} },
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => ({
-      ...createUidValidityCheckClient(777),
-      messageFlagsAdd: async () => mutations.push('imap-seen'),
-    }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      markMessageRead: async () => { mutations.push('index-read'); return { ok: true }; },
-      markMessageReplyDismissed: async () => ({ ok: false, unavailable: false, data: [], error: staleError }),
-    },
-  });
-  const res = createResponseRecorder();
-
-  await service.markMessageReadResponse({
-    body: { account: 'serve@softora.nl', id: 'inbox:42', uidValidity: 777, dismissReply: true },
-  }, res);
-
-  assert.equal(res.statusCode, 409);
-  assert.deepEqual(mutations, []);
-});
-
 test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder bronmailmutatie', async () => {
   const persistenceCalls = [];
-  const actionOrder = [];
   let imapClientCreations = 0;
   const service = createMailboxService({
     mailConfig: {},
@@ -3044,37 +2829,12 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     ]),
     createImapClient: () => {
       imapClientCreations += 1;
-      let selectedMailbox = '';
-      return {
-        usable: true,
-        mailbox: { uidValidity: 777 },
-        connect: async () => {},
-        list: async () => [
-          { path: 'INBOX', specialUse: '\\Inbox' },
-          { path: 'Sent', specialUse: '\\Sent' },
-        ],
-        getMailboxLock: async (mailboxName) => {
-          selectedMailbox = mailboxName;
-          actionOrder.push(`lock:${mailboxName}`);
-          return { release: () => actionOrder.push(`release:${mailboxName}`) };
-        },
-        logout: async () => actionOrder.push(`logout:${selectedMailbox}`),
-      };
+      throw new Error('bronmailclient mag niet worden aangemaakt');
     },
     mailboxIndexStore: {
       isAvailable: () => true,
       listMessages: async () => [],
-      getSyncState: async () => ({ status: 'ok', last_error: null }),
-      acquireSyncLock: async ({ folder }) => {
-        actionOrder.push(`lease:${folder}`);
-        return { ok: true, lockToken: `lease:${folder}` };
-      },
-      releaseSyncLock: async ({ folder, status }) => {
-        actionOrder.push(`lease-release:${folder}:${status}`);
-        return { ok: true, data: [{ sync_key: folder }] };
-      },
       markMessageDeleted: async (input) => {
-        actionOrder.push(`delete:${input.folder}`);
         persistenceCalls.push(['index-delete', input]);
         return { ok: true };
       },
@@ -3092,8 +2852,8 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
         account: 'serve@softora.nl',
         id: 'inbox:42',
         messages: [
-          { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, uidValidity: 777, folder: 'inbox' },
-          { account: 'serve@softora.nl', id: 'sent:7', uid: 7, uidValidity: 777, folder: 'sent' },
+          { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, folder: 'inbox' },
+          { account: 'serve@softora.nl', id: 'sent:7', uid: 7, folder: 'sent' },
         ],
       },
     },
@@ -3108,27 +2868,19 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     messageCount: 2,
     snapshotUpdated: false,
   });
-  assert.equal(imapClientCreations, 2);
-  assert.deepEqual(actionOrder, [
-    'lease:inbox', 'lock:INBOX', 'lease:sent', 'lock:Sent',
-    'delete:inbox', 'delete:sent',
-    'release:Sent', 'logout:Sent', 'lease-release:sent:ok',
-    'release:INBOX', 'logout:INBOX', 'lease-release:inbox:ok',
-  ]);
+  assert.equal(imapClientCreations, 0);
   assert.deepEqual(persistenceCalls, [
     ['index-delete', {
       accountEmail: 'serve@softora.nl',
       id: 'inbox:42',
       folder: 'inbox',
       uid: 42,
-      uidValidity: 777,
     }],
     ['index-delete', {
       accountEmail: 'serve@softora.nl',
       id: 'sent:7',
       folder: 'sent',
       uid: 7,
-      uidValidity: 777,
     }],
   ]);
 
@@ -3139,8 +2891,8 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
         account: 'serve@softora.nl',
         id: 'inbox:42',
         messages: [
-          { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, uidValidity: 777, folder: 'inbox' },
-          { account: 'serve@softora.nl', id: 'sent:7', uid: 7, uidValidity: 777, folder: 'sent' },
+          { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, folder: 'inbox' },
+          { account: 'serve@softora.nl', id: 'sent:7', uid: 7, folder: 'sent' },
         ],
       },
     },
@@ -3152,132 +2904,21 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     sourceMailboxMutated: false,
     messageCount: 2,
   });
-  assert.equal(imapClientCreations, 4);
+  assert.equal(imapClientCreations, 0);
   assert.deepEqual(persistenceCalls.slice(-2), [
     ['index-restore', {
       accountEmail: 'serve@softora.nl',
       id: 'inbox:42',
       folder: 'inbox',
       uid: 42,
-      uidValidity: 777,
     }],
     ['index-restore', {
       accountEmail: 'serve@softora.nl',
       id: 'sent:7',
       folder: 'sent',
       uid: 7,
-      uidValidity: 777,
     }],
   ]);
-});
-
-test('mailbox service precontroleert elke gespreksmail en muteert niets bij één stale UIDVALIDITY', async () => {
-  const indexMutations = [];
-  const sourceMutations = [];
-  const service = createMailboxService({
-    logger: { error() {} },
-    mailConfig: {},
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      name: 'Servé',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => {
-      const client = {
-        usable: true,
-        mailbox: { uidValidity: 0 },
-        connect: async () => {},
-        list: async () => [
-          { path: 'INBOX', specialUse: '\\Inbox' },
-          { path: 'Sent', specialUse: '\\Sent' },
-        ],
-        getMailboxLock: async (mailboxName) => {
-          client.mailbox.uidValidity = mailboxName === 'Sent' ? 222 : 111;
-          return { release() {} };
-        },
-        messageFlagsAdd: async (...args) => sourceMutations.push(['flags', ...args]),
-        messageMove: async (...args) => sourceMutations.push(['move', ...args]),
-        messageDelete: async (...args) => sourceMutations.push(['delete', ...args]),
-        logout: async () => {},
-      };
-      return client;
-    },
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      markMessageDeleted: async (input) => {
-        indexMutations.push(['delete', input]);
-        return { ok: true };
-      },
-      restoreMessage: async (input) => {
-        indexMutations.push(['restore', input]);
-        return { ok: true };
-      },
-    },
-  });
-  const res = createResponseRecorder();
-
-  await service.hideConversationResponse({
-    body: {
-      account: 'serve@softora.nl',
-      id: 'inbox:42',
-      messages: [
-        { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, uidValidity: 111, folder: 'inbox' },
-        { account: 'serve@softora.nl', id: 'sent:42', uid: 42, uidValidity: 111, folder: 'sent' },
-      ],
-    },
-  }, res);
-
-  assert.equal(res.statusCode, 409);
-  assert.match(res.body.detail, /UIDVALIDITY/i);
-  assert.deepEqual(indexMutations, []);
-  assert.deepEqual(sourceMutations, []);
-});
-
-test('mailbox service preflight alle indexdoelen vóór de eerste zichtbaarheidsschrijf', async () => {
-  const indexMutations = [];
-  let preflightCount = 0;
-  const service = createMailboxService({
-    logger: { error() {} },
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => ({
-      usable: true,
-      mailbox: { uidValidity: 111 },
-      connect: async () => {},
-      list: async () => [{ path: 'INBOX', specialUse: '\\Inbox' }, { path: 'Sent', specialUse: '\\Sent' }],
-      getMailboxLock: async () => ({ release() {} }),
-      logout: async () => {},
-    }),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      getMessageForAction: async () => (++preflightCount === 1 ? { id: 'inbox:42' } : null),
-      markMessageDeleted: async (input) => { indexMutations.push(['delete', input]); return { ok: true }; },
-      restoreMessage: async (input) => { indexMutations.push(['rollback', input]); throw new Error('rollback failed'); },
-    },
-  });
-  const res = createResponseRecorder();
-
-  await service.hideConversationResponse({
-    body: {
-      account: 'serve@softora.nl',
-      messages: [
-        { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, uidValidity: 111, folder: 'inbox' },
-        { account: 'serve@softora.nl', id: 'sent:7', uid: 7, uidValidity: 111, folder: 'sent' },
-      ],
-    },
-  }, res);
-
-  assert.equal(res.statusCode, 409);
-  assert.equal(preflightCount, 2);
-  assert.deepEqual(indexMutations, []);
 });
 
 test('mailbox service strips tracking and standalone asset urls from display text', () => {
@@ -4120,9 +3761,7 @@ test('mailbox image response serves exact-message MIME media with durable privat
   const response = createResponseRecorder();
 
   await service.getMessageImageResponse({
-    query: {
-      account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: '777', index: '0',
-    },
+    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', index: '0' },
   }, response);
 
   assert.equal(response.statusCode, 200);
@@ -4180,7 +3819,7 @@ test('signed-token mailbox detail and image fallback never upsert the mailbox in
   const fallbackDetailResponse = createResponseRecorder();
 
   await service.getMessageResponse({
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: '777' },
+    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
     premiumReadOnlyTokenFallback: true,
   }, fallbackDetailResponse);
 
@@ -4189,9 +3828,7 @@ test('signed-token mailbox detail and image fallback never upsert the mailbox in
 
   const fallbackImageResponse = createResponseRecorder();
   await service.getMessageImageResponse({
-    query: {
-      account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: '777', index: '0',
-    },
+    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', index: '0' },
     premiumReadOnlyTokenFallback: true,
   }, fallbackImageResponse);
 
@@ -4201,7 +3838,7 @@ test('signed-token mailbox detail and image fallback never upsert the mailbox in
 
   const normalDetailResponse = createResponseRecorder();
   await service.getMessageResponse({
-    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uidValidity: '777' },
+    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' },
   }, normalDetailResponse);
 
   assert.equal(normalDetailResponse.statusCode, 200);
@@ -4889,24 +4526,14 @@ test('een tijdens fetch verdwenen geselecteerde UID blijft expliciet partial en 
 test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere gezonde refetch vervangt hem', async () => {
   const indexed = new Map();
   const finishes = [];
-  const upsertBatches = [];
-  let selectionNowMs = Date.now();
   let lockSequence = 0;
-  const persistentSelectionStore = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => createPersistentMailboxUidSelectionClient(indexed),
-    now: () => new Date(selectionNowMs),
-    mailboxIndexFailureCooldownMs: 0,
-    logger: { info() {}, warn() {}, error() {} },
-  });
   const mailboxIndexStore = {
     isAvailable: () => true,
     listMessages: async () => Array.from(indexed.values()),
     acquireSyncLock: async () => ({ ok: true, lockToken: `quarantine-lock-${++lockSequence}` }),
     prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
-    listMessageUidSyncStateForAccount: persistentSelectionStore.listMessageUidSyncStateForAccount,
+    listMessageUidsForAccount: async () => [],
     upsertMessages: async ({ messages }) => {
-      upsertBatches.push(messages.map((message) => ({ ...message })));
       messages.forEach((message) => indexed.set(message.uid, { ...message }));
       return { ok: true, upserted: messages.length };
     },
@@ -4985,7 +4612,6 @@ test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere
   assert.equal(placeholder.date, '2026-08-09T20:42:00.000Z');
   assert.equal(placeholder.providerMetadataEvidenceKnown, true);
   assert.equal(placeholder.bodyUnavailable, true);
-  assert.ok(Date.parse(placeholder.parseRetryAt) > selectionNowMs);
   assert.equal(indexed.get(43).body, 'Gezonde inhoud 43');
 
   const recoveredClient = createFakeImapClient({
@@ -5009,19 +4635,6 @@ test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere
     mailboxIndexStore,
     logger: { info() {}, warn() {}, error() {} },
   });
-  const deferred = await recoveredService.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
-    incrementalOnly: true, force: true,
-  });
-
-  assert.equal(deferred.complete, false);
-  assert.equal(deferred.freshnessConfirmed, false);
-  assert.equal(deferred.partial, true);
-  assert.deepEqual(deferred.selectedUids, []);
-  assert.deepEqual(deferred.quarantinedUids, [42]);
-  assert.equal(indexed.get(42).parseStatus, 'quarantined');
-
-  selectionNowMs = Date.parse(placeholder.parseRetryAt) + 1;
   const recovered = await recoveredService.syncMailboxFolder({
     accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
     incrementalOnly: true, force: true,
@@ -5029,14 +4642,11 @@ test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere
 
   assert.equal(recovered.complete, true);
   assert.equal(recovered.freshnessConfirmed, true);
-  assert.deepEqual(recovered.selectedUids, [42]);
-  assert.deepEqual(upsertBatches.at(-1).map((message) => message.uid), [42]);
   assert.equal(indexed.get(42).subject, 'Belangrijke aanvraag hersteld');
   assert.equal(indexed.get(42).body, 'Gezonde inhoud 42');
   assert.equal(indexed.get(42).parseStatus, undefined);
-  assert.equal(indexed.get(42).parseRetryAt, undefined);
   assert.equal(indexed.get(42).bodyUnavailable, undefined);
-  assert.equal(finishes.length, 3);
+  assert.equal(finishes.length, 2);
 });
 
 test('campaign cron kan zonder verplichte mutation journal geen fetch of upsert starten', async () => {

@@ -59,8 +59,6 @@ test('MIME-quarantaine van een UID lekt nooit naar dezelfde UID in een nieuwe ge
 
   assert.equal(poisoned.ok, false);
   assert.equal(cached.cached, true);
-  assert.ok(Date.parse(poisoned.retryAt) > Date.now());
-  assert.equal(cached.retryAt, poisoned.retryAt);
   assert.equal(nextGeneration.ok, true);
   assert.equal(parseCalls, 2);
 });
