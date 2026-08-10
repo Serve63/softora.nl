@@ -2137,7 +2137,7 @@ test('an exact RFC message imported through Gmail and Instantly appears only onc
   ]);
 });
 
-test('campaign aggregation retains both proven owners while refreshing only the selected owner', async () => {
+test('campaign aggregation leest en ververst alleen de geselecteerde owner', async () => {
   const listedOwners = [];
   const syncedOwners = [];
   const providerMessages = {
@@ -2190,15 +2190,16 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     refreshInstantly: true,
   });
   assert.deepEqual(syncedOwners, ['serve']);
-  assert.deepEqual(listedOwners.sort(), ['martijn', 'serve']);
+  assert.deepEqual(listedOwners, ['serve']);
   assert.deepEqual(
     selectedOwnerRefresh.messages.map((message) => [message.id, message.providerOwner]),
     [['ramon', 'serve']]
   );
   assert.deepEqual(
     selectedOwnerRefresh.snapshotMessages.map((message) => [message.id, message.providerOwner]),
-    [['martijn-thread', 'martijn'], ['ramon', 'serve']]
+    [['ramon', 'serve']]
   );
+  assert.equal(selectedOwnerRefresh.snapshotComplete, false);
 
   listedOwners.length = 0;
   const ownerlessBackgroundRefresh = await mergeCampaignReplies({
@@ -2211,6 +2212,7 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     ownerlessBackgroundRefresh.messages.map((message) => message.id),
     ['martijn-thread', 'ramon']
   );
+  assert.equal(ownerlessBackgroundRefresh.snapshotComplete, true);
   await assert.rejects(
     mergeCampaignReplies({
       ...dependencies,
@@ -2219,4 +2221,37 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     }),
     { code: 'INSTANTLY_OWNER_REQUIRED', status: 400 }
   );
+});
+
+test('campaign aggregation behoudt een gezonde owner als de andere provider-read faalt', async () => {
+  const result = await mergeCampaignReplies({
+    owner: '',
+    limit: 100,
+    refreshInstantly: false,
+    baseReplies: [],
+    instantlyMailboxService: {
+      isConfigured: () => true,
+      getConfiguredAccounts: (owner) => [{ email: `${owner}@example.test` }],
+      listOwnerConversations: async (owner) => {
+        if (owner === 'serve') {
+          const error = new Error('Serve provider tijdelijk onbereikbaar');
+          error.code = 'INSTANTLY_PROVIDER_UNAVAILABLE';
+          throw error;
+        }
+        return [{
+          id: 'martijn-healthy',
+          provider: 'instantly',
+          providerOwner: 'martijn',
+          activityAt: '2026-08-10T09:00:00.000Z',
+          threadMessages: [],
+        }];
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, max) => String(value || '').slice(0, max),
+  });
+
+  assert.deepEqual(result.messages.map((message) => message.id), ['martijn-healthy']);
+  assert.deepEqual(result.warnings, ['INSTANTLY_PROVIDER_UNAVAILABLE:serve']);
+  assert.equal(result.snapshotComplete, false);
 });

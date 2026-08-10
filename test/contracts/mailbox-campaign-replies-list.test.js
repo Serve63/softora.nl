@@ -125,3 +125,35 @@ test('persist-race degradeert de response ook na een aanvankelijk stabiele read'
   assert.equal(result.degraded, true);
   assert.equal(result.sync.degradedReason, 'consistency_changed_after_write');
 });
+
+test('CRM-waarschuwing behoudt replies maar verhindert een autoritatieve snapshotclaim', async () => {
+  const persists = [];
+  const coordinator = createMailboxCampaignRepliesList({
+    mailboxCampaignRepliesService: {
+      listRepliesWithSnapshot: async () => ({
+        messages: [reply('direct-reply')],
+        snapshotMessages: [reply('direct-reply')],
+        warnings: ['campaign_customer_link_unavailable'],
+      }),
+    },
+    instantlyMailboxService: { isConfigured: () => false },
+    filterVisibleMailboxMessages: (messages) => messages,
+    mailboxCampaignSnapshotStore: {
+      getFence: async () => ({ contentVersion: '12', pendingCount: 0, ready: true }),
+      persist: async (...args) => { persists.push(args); return { ok: true }; },
+      readDegraded: async () => null,
+      invalidate: async () => ({ ok: true }),
+    },
+    logger: { warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength) => String(value || '').slice(0, maxLength),
+  });
+
+  const result = await coordinator.listCampaignReplies({ owner: 'serve' });
+
+  assert.deepEqual(result.messages.map((message) => message.id), ['direct-reply']);
+  assert.equal(result.degraded, true);
+  assert.equal(result.sync.degradedReason, 'campaign_customer_link_unavailable');
+  assert.deepEqual(result.sync.warnings, ['campaign_customer_link_unavailable']);
+  assert.equal(persists.length, 0);
+});
