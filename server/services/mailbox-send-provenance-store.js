@@ -1,4 +1,48 @@
+const crypto = require('crypto');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
+
+function createCanonicalMailboxHash(parts = []) {
+  const source = parts.map((value) => {
+    const text = String(value ?? '');
+    return `${Buffer.byteLength(text, 'utf8')}:${text}`;
+  }).join('|');
+  return crypto.createHash('sha256').update(source).digest('hex');
+}
+
+function createMailboxSendScopeKey(input = {}, normalizeString = (value) => String(value || '').trim()) {
+  const text = (value) => normalizeString(value);
+  const email = (value) => text(value).toLowerCase();
+  const provider = text(input.provider || 'smtp').toLowerCase();
+  const mode = text(input.mode).toLowerCase();
+  const canonical = [
+    email(input.owner), email(input.accountEmail), email(input.recipientEmail), provider, mode,
+    mode === 'reply'
+      ? text(input.providerThreadId) || text(input.conversationId)
+      : text(input.conversationId),
+    mode === 'reply' ? text(input.replyTargetMessageId) : '',
+  ];
+  if (!['reply', 'new-message'].includes(mode)) canonical.push(text(input.idempotencyKey));
+  return `${provider}-${mode || 'invalid'}-scope:${createCanonicalMailboxHash(canonical)}`;
+}
+
+function createMailboxPayloadFingerprint(input = {}, normalizeString = (value) => String(value || '').trim()) {
+  return createCanonicalMailboxHash([
+    normalizeString(input.subject),
+    normalizeString(input.body).replace(/\r\n?/g, '\n'),
+    normalizeString(input.cc).toLowerCase(),
+    normalizeString(input.bcc).toLowerCase(),
+    normalizeString(input.attachmentsFingerprint),
+  ]);
+}
+
+function createMailboxSendIdentityKey(input = {}, normalizeString = (value) => String(value || '').trim()) {
+  const mode = normalizeString(input.mode).toLowerCase();
+  const scope = createMailboxSendScopeKey(input, normalizeString);
+  if (mode !== 'new-message') return scope.replace('-scope:', ':');
+  const payloadFingerprint = normalizeString(input.payloadFingerprint)
+    || createMailboxPayloadFingerprint(input, normalizeString);
+  return `new-message:${createCanonicalMailboxHash([scope, payloadFingerprint])}`;
+}
 
 function createMailboxSendProvenanceStore(deps = {}) {
   const {
@@ -145,4 +189,10 @@ function createMailboxSendProvenanceStore(deps = {}) {
   return { accept, fail, findByIdempotencyKey, isAvailable: () => Boolean(getClient()), listAcceptedMessages, reserve };
 }
 
-module.exports = { MAILBOX_SEND_PROVENANCE_TABLE, createMailboxSendProvenanceStore };
+module.exports = {
+  MAILBOX_SEND_PROVENANCE_TABLE,
+  createMailboxPayloadFingerprint,
+  createMailboxSendIdentityKey,
+  createMailboxSendProvenanceStore,
+  createMailboxSendScopeKey,
+};
