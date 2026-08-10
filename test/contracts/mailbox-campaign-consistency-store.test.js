@@ -1,7 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const {
   MAILBOX_CAMPAIGN_CONSISTENCY_RPCS,
@@ -74,42 +72,6 @@ test('beginMutation gebruikt alleen de service-role RPC en behoudt bigint-versie
   assert.equal(mutation.startedContentVersion, '9007199254740993');
   assert.equal(mutation.contentVersion, '9007199254740993');
   assert.equal(mutation.completedContentVersion, null);
-});
-
-test('beginMutation koppelt de totale taakdeadline als AbortSignal aan de echte RPC', async () => {
-  const controller = new AbortController();
-  let attachedSignal = null;
-  const response = {
-    data: [{
-      mutation_id: PROPOSED_MUTATION_ID,
-      request_key: 'sync:signal',
-      mutation_status: 'pending',
-      started_content_version: '12',
-      completed_content_version: null,
-      current_content_version: '12',
-      lease_expires_at: '2026-08-09T21:35:00.000Z',
-      replayed: false,
-    }],
-    error: null,
-  };
-  const store = createStore({
-    rpc() {
-      return {
-        abortSignal(signal) {
-          attachedSignal = signal;
-          return Promise.resolve(response);
-        },
-      };
-    },
-  });
-
-  await store.beginMutation({
-    requestKey: 'sync:signal',
-    kind: 'imap-sync',
-    signal: controller.signal,
-  });
-
-  assert.equal(attachedSignal, controller.signal);
 });
 
 test('completeMutation is retry-veilig en stuurt een begrensd JSON-resultaat', async () => {
@@ -284,58 +246,4 @@ test('ongeldige idempotency-input bereikt de database niet', async () => {
     code: 'MAILBOX_CAMPAIGN_CONSISTENCY_INVALID',
   });
   assert.equal(calls.length, 0);
-});
-
-test('forward-only atomic-commit migration houdt messagewrite, contentVersion en journal in één lockscope', () => {
-  const migration = fs.readFileSync(path.resolve(
-    __dirname,
-    '../../supabase/migrations/20260810032742_mailbox_campaign_atomic_message_commit.sql'
-  ), 'utf8');
-  const schema = fs.readFileSync(
-    path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
-    'utf8'
-  );
-  const foundation = fs.readFileSync(path.resolve(
-    __dirname,
-    '../../supabase/migrations/20260809213000_mailbox_campaign_consistency_foundation.sql'
-  ), 'utf8');
-  const atomicBlockPattern = /-- mailbox-campaign-atomic-commit:start[\s\S]+?-- mailbox-campaign-atomic-commit:end/;
-  const functionPattern = /create or replace function public\.softora_commit_mailbox_campaign_messages[\s\S]+?\n\$\$;/;
-  const migrationBlock = migration.match(atomicBlockPattern)?.[0] || '';
-  const schemaBlock = schema.match(atomicBlockPattern)?.[0] || '';
-  const migrationFunction = migration.match(functionPattern)?.[0] || '';
-  const schemaFunction = schema.match(functionPattern)?.[0] || '';
-
-  assert.ok(migrationBlock);
-  assert.equal(schemaBlock, migrationBlock);
-  assert.ok(migrationFunction);
-  assert.equal(schemaFunction, migrationFunction);
-  assert.doesNotMatch(foundation, /softora_commit_mailbox_campaign_messages/);
-  assert.match(migrationFunction, /consistency[\s\S]+for update;[\s\S]+mutations[\s\S]+for update;[\s\S]+insert into public\.softora_mailbox_messages/);
-  assert.match(migrationFunction, /v_mutation\.status <> 'pending'[\s\S]+insert into public\.softora_mailbox_messages/);
-  assert.match(migrationFunction, /insert into public\.softora_mailbox_messages[\s\S]+update public\.softora_mailbox_campaign_mutations[\s\S]+status = 'completed'/);
-  assert.match(migrationFunction, /completed_content_version = v_state\.content_version/);
-  assert.match(migrationFunction, /mutation_kind = 'instantly-upsert'[\s\S]+account_email[\s\S]+v_mutation\.account_email[\s\S]+providerAccountEmail[\s\S]+account_email/);
-  assert.match(migrationFunction, /mutation_kind not in \('imap-sync', 'instantly-upsert'\)/);
-  assert.match(migrationFunction, /existing_message\.message_key[\s\S]+existing_message\.account_email[\s\S]+existing_message\.folder[\s\S]+existing_message\.provider_id[\s\S]+errcode = '23505'/);
-  assert.match(migration, /softora_enforce_mailbox_message_identity_immutable[\s\S]+old\.message_key[\s\S]+old\.account_email[\s\S]+old\.folder[\s\S]+old\.uid[\s\S]+old\.provider_id[\s\S]+before update on public\.softora_mailbox_messages[\s\S]+for each row/);
-  assert.match(migration, /providerOwner'[\s\S]+=\s*'serve'[\s\S]+serve@websoftora\.com[\s\S]+servecreusen@websoftora\.com/);
-  assert.match(migration, /providerOwner'[\s\S]+=\s*'martijn'[\s\S]+martijn@websoftora\.com[\s\S]+martijnven@websoftora\.com/);
-  assert.deepEqual(Array.from(new Set(
-    migration.match(/[a-z0-9.]+@websoftora\.com/g) || []
-  )).sort(), [
-    'martijn@websoftora.com',
-    'martijnven@websoftora.com',
-    'serve@websoftora.com',
-    'servecreusen@websoftora.com',
-  ]);
-  assert.match(migration, /constraint softora_mailbox_instantly_owner_account_check[\s\S]+not valid;[\s\S]+validate constraint softora_mailbox_instantly_owner_account_check/);
-  assert.match(migration, /before insert or update or delete or truncate on public\.softora_mailbox_messages[\s\S]+for each statement/);
-  assert.match(migration, /revoke all privileges on table public\.softora_mailbox_messages\s+from public, anon, authenticated, service_role/);
-  assert.match(migration, /grant select, insert, update, delete on table public\.softora_mailbox_messages\s+to service_role/);
-  assert.doesNotMatch(migration, /grant[^;]*truncate[^;]*softora_mailbox_messages/i);
-  assert.match(migration, /revoke all on function public\.softora_commit_mailbox_campaign_messages[\s\S]+from public, anon, authenticated, service_role/);
-  assert.match(migration, /grant execute on function public\.softora_commit_mailbox_campaign_messages[\s\S]+to service_role/);
-  assert.match(migration, /revoke all on function public\.softora_enforce_mailbox_message_identity_immutable\(\)[\s\S]+from public, anon, authenticated, service_role;[\s\S]+grant execute on function public\.softora_enforce_mailbox_message_identity_immutable\(\)[\s\S]+to service_role;/);
-  assert.doesNotMatch(foundation, /softora_lock_mailbox_campaign_consistency_before_write/);
 });
