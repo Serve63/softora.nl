@@ -17,6 +17,7 @@ const {
   parseMailboxCampaignSnapshot,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
+const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -195,6 +196,47 @@ function withSyncReadHealth(messages = [], overrides = {}) {
     },
   });
   return messages;
+}
+
+function createPersistentMailboxUidSelectionClient(indexed) {
+  return {
+    from() {
+      const filters = {};
+      let minimumDate = '';
+      let rangeStart = 0;
+      let rangeEnd = Number.POSITIVE_INFINITY;
+      const execute = () => {
+        const rows = Array.from(indexed.values())
+          .filter((message) => (
+            (!filters.account_email || message.accountEmail === filters.account_email) &&
+            (!filters.folder || message.folder === filters.folder) &&
+            (!minimumDate || Date.parse(message.date) >= Date.parse(minimumDate))
+          ))
+          .sort((left, right) => Number(right.uid) - Number(left.uid))
+          .slice(rangeStart, rangeEnd + 1)
+          .map((message) => ({
+            uid: message.uid,
+            parse_status: message.parseStatus || null,
+            parse_retry_at: message.parseRetryAt || null,
+          }));
+        return Promise.resolve({ data: rows, error: null });
+      };
+      const query = {
+        select() { return query; },
+        eq(column, value) { filters[column] = value; return query; },
+        is() { return query; },
+        order() { return query; },
+        gte(column, value) {
+          if (column === 'date') minimumDate = value;
+          return query;
+        },
+        range(from, to) { rangeStart = from; rangeEnd = to; return query; },
+        abortSignal() { return execute(); },
+        then(resolve, reject) { return execute().then(resolve, reject); },
+      };
+      return query;
+    },
+  };
 }
 
 function createOutboundGuardStore(calls = [], overrides = {}) {
@@ -4847,14 +4889,24 @@ test('een tijdens fetch verdwenen geselecteerde UID blijft expliciet partial en 
 test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere gezonde refetch vervangt hem', async () => {
   const indexed = new Map();
   const finishes = [];
+  const upsertBatches = [];
+  let selectionNowMs = Date.now();
   let lockSequence = 0;
+  const persistentSelectionStore = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => createPersistentMailboxUidSelectionClient(indexed),
+    now: () => new Date(selectionNowMs),
+    mailboxIndexFailureCooldownMs: 0,
+    logger: { info() {}, warn() {}, error() {} },
+  });
   const mailboxIndexStore = {
     isAvailable: () => true,
     listMessages: async () => Array.from(indexed.values()),
     acquireSyncLock: async () => ({ ok: true, lockToken: `quarantine-lock-${++lockSequence}` }),
     prepareUidValidity: async () => ({ ok: true, uidValidity: 777 }),
-    listMessageUidsForAccount: async () => [],
+    listMessageUidSyncStateForAccount: persistentSelectionStore.listMessageUidSyncStateForAccount,
     upsertMessages: async ({ messages }) => {
+      upsertBatches.push(messages.map((message) => ({ ...message })));
       messages.forEach((message) => indexed.set(message.uid, { ...message }));
       return { ok: true, upserted: messages.length };
     },
@@ -4933,6 +4985,7 @@ test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere
   assert.equal(placeholder.date, '2026-08-09T20:42:00.000Z');
   assert.equal(placeholder.providerMetadataEvidenceKnown, true);
   assert.equal(placeholder.bodyUnavailable, true);
+  assert.ok(Date.parse(placeholder.parseRetryAt) > selectionNowMs);
   assert.equal(indexed.get(43).body, 'Gezonde inhoud 43');
 
   const recoveredClient = createFakeImapClient({
@@ -4956,6 +5009,19 @@ test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere
     mailboxIndexStore,
     logger: { info() {}, warn() {}, error() {} },
   });
+  const deferred = await recoveredService.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, force: true,
+  });
+
+  assert.equal(deferred.complete, false);
+  assert.equal(deferred.freshnessConfirmed, false);
+  assert.equal(deferred.partial, true);
+  assert.deepEqual(deferred.selectedUids, []);
+  assert.deepEqual(deferred.quarantinedUids, [42]);
+  assert.equal(indexed.get(42).parseStatus, 'quarantined');
+
+  selectionNowMs = Date.parse(placeholder.parseRetryAt) + 1;
   const recovered = await recoveredService.syncMailboxFolder({
     accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
     incrementalOnly: true, force: true,
@@ -4963,11 +5029,14 @@ test('een oversized MIME blijft zichtbaar als metadata-placeholder en een latere
 
   assert.equal(recovered.complete, true);
   assert.equal(recovered.freshnessConfirmed, true);
+  assert.deepEqual(recovered.selectedUids, [42]);
+  assert.deepEqual(upsertBatches.at(-1).map((message) => message.uid), [42]);
   assert.equal(indexed.get(42).subject, 'Belangrijke aanvraag hersteld');
   assert.equal(indexed.get(42).body, 'Gezonde inhoud 42');
   assert.equal(indexed.get(42).parseStatus, undefined);
+  assert.equal(indexed.get(42).parseRetryAt, undefined);
   assert.equal(indexed.get(42).bodyUnavailable, undefined);
-  assert.equal(finishes.length, 2);
+  assert.equal(finishes.length, 3);
 });
 
 test('campaign cron kan zonder verplichte mutation journal geen fetch of upsert starten', async () => {
