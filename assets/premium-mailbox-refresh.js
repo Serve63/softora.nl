@@ -41,7 +41,13 @@
 
   function isIncompleteRefreshPayload(value) {
     if (!value || typeof value !== 'object') return false;
-    if (value.ok === false || value.complete === false || value.freshnessConfirmed === false || value.skipped === true) return true;
+    const healthyRecentSync = value.skipped === true && String(value.reason || '') === 'recent-sync' &&
+      value.ok !== false && value.reconciliationDegraded !== true &&
+      !(Number.isFinite(Number(value.remainingReconcileCount)) && Number(value.remainingReconcileCount) > 0);
+    if (
+      value.ok === false || value.complete === false || value.freshnessConfirmed === false ||
+      (value.skipped === true && !healthyRecentSync)
+    ) return true;
     return Object.values(value).some(isIncompleteRefreshPayload);
   }
 
