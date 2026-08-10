@@ -28,7 +28,6 @@ const {
   createMailboxSyncService,
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
-const { getMailboxImapSyncTimeouts, getMailboxSyncResponseStatus } = require('./mailbox-imap-sync-deadline');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
@@ -857,9 +856,11 @@ function createMailboxService(deps = {}) {
       return account;
     });
   }
+
   function getAccounts() {
     return buildAccounts();
   }
+
   function getAccount(email) {
     return getAccounts().find((account) => account.email === normalizeEmail(email)) || null;
   }
@@ -888,7 +889,7 @@ function createMailboxService(deps = {}) {
     return { folder, uid };
   }
 
-  function createClient(account, options = {}) {
+  function createClient(account) {
     return createImapClient({
       host: account.imapHost,
       port: account.imapPort,
@@ -898,7 +899,6 @@ function createMailboxService(deps = {}) {
         pass: account.imapPass,
       },
       logger: false,
-      ...options,
     });
   }
 
@@ -1951,10 +1951,10 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, deadlineAt = 0, ...historySyncOptions }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, signal, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
-    const client = createClient(account, getMailboxImapSyncTimeouts({ signal, deadlineAt }));
+    const client = createClient(account);
     const abortScope = createMailboxImapAbortScope(client, signal);
     try {
       await client.connect();
@@ -2421,7 +2421,7 @@ function createMailboxService(deps = {}) {
         defaultLimit: DEFAULT_SYNC_LIMIT,
         cronLimit: CRON_SYNC_LIMIT,
       });
-      return res.status(getMailboxSyncResponseStatus(result)).json(result);
+      return res.status(result.ok ? 200 : 207).json(result);
     } catch (error) {
       logger.error('[Mailbox][SyncResponse]', error?.message || error);
       return res.status(error.status || 500).json({

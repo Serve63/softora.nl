@@ -3739,77 +3739,12 @@ test('mailbox service meldt een lege IMAP-targetset degraded en nooit compleet',
   await service.syncMailboxResponse({ query: {}, body: {} }, response);
 
   assert.equal(response.statusCode, 207);
-  assert.equal(response.body.ok, false);
-  assert.equal(response.body.complete, false);
-  assert.equal(response.body.freshnessConfirmed, false);
-  assert.equal(response.body.degraded, true);
-  assert.equal(response.body.reason, 'no_sync_targets');
-  assert.equal(response.body.statusCode, 207);
-  assert.deepEqual(response.body.results, []);
-});
-
-test('mailbox sync abort closes the active IMAP client before any index write', async () => {
-  let rejectConnect;
-  let closeCalls = 0;
-  let upsertCalls = 0;
-  let clientConfig = null;
-  const client = {
-    usable: true,
-    connect() {
-      return new Promise((_resolve, reject) => {
-        rejectConnect = reject;
-      });
-    },
-    close() {
-      closeCalls += 1;
-      this.usable = false;
-      rejectConnect?.(new Error('IMAP client gesloten'));
-    },
-  };
-  const service = createMailboxService({
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: (config) => {
-      clientConfig = config;
-      return client;
-    },
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      acquireSyncLock: async () => ({ ok: true, lockToken: 'abort-lock' }),
-      upsertMessages: async () => {
-        upsertCalls += 1;
-        return { ok: true, upserted: 1 };
-      },
-      finishSync: async () => ({ ok: true }),
-    },
+  assert.deepEqual(response.body, {
+    ok: false,
+    degraded: true,
+    reason: 'no_sync_targets',
+    results: [],
   });
-  const controller = new AbortController();
-  const deadlineAt = Date.now() + 10_000;
-  const pending = service.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    runSignal: controller.signal,
-    runDeadlineAt: deadlineAt,
-    folderTimeoutMs: 10_000,
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  const timeout = Object.assign(new Error('run timeout'), {
-    code: 'MAILBOX_SYNC_RUN_TIMEOUT',
-    timedOut: true,
-  });
-  controller.abort(timeout);
-
-  await assert.rejects(pending, (error) => error === timeout);
-  assert.equal(closeCalls, 1);
-  assert.equal(upsertCalls, 0);
-  assert.ok(clientConfig.connectionTimeout <= 8_000);
-  assert.ok(clientConfig.greetingTimeout <= 8_000);
-  assert.ok(clientConfig.socketTimeout <= 10_000);
 });
 
 test('campaign mailbox sync skips configured accounts outside the campaign', async () => {
@@ -3852,7 +3787,7 @@ test('campaign mailbox sync skips configured accounts outside the campaign', asy
     response
   );
 
-  assert.equal(response.statusCode, 202);
+  assert.equal(response.statusCode, 200);
   assert.deepEqual(requestedAccounts, ['serve@softora.nl', 'serve@softora.nl']);
 });
 
@@ -3907,7 +3842,7 @@ test('mailbox cron supplements normal folders with the Gmail campaign label', as
     body: {},
   }, response);
 
-  assert.equal(response.statusCode, 202);
+  assert.equal(response.statusCode, 200);
   assert.deepEqual(requestedFolders, ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]);
 });
 
@@ -4002,13 +3937,12 @@ test('campaign mailbox sync excludes an explicitly requested non-campaign accoun
     campaignOnly: true,
   });
 
-  assert.equal(result.ok, false);
-  assert.equal(result.complete, false);
-  assert.equal(result.freshnessConfirmed, false);
-  assert.equal(result.degraded, true);
-  assert.equal(result.reason, 'no_sync_targets');
-  assert.equal(result.statusCode, 207);
-  assert.deepEqual(result.results, []);
+  assert.deepEqual(result, {
+    ok: false,
+    degraded: true,
+    reason: 'no_sync_targets',
+    results: [],
+  });
   assert.equal(lockCalls, 0);
 });
 
@@ -4063,13 +3997,14 @@ test('campaign mailbox sync journaliseert IMAP-read en abortbare indexwrite in Ã
   });
 
   assert.equal(result.ok, true);
-  assert.equal(runnerOptions.requestKey, 'imap-sync:journal-lock:serve@softora.nl:inbox');
-  assert.equal(runnerOptions.kind, 'imap-sync');
-  assert.equal(runnerOptions.accountEmail, 'serve@softora.nl');
-  assert.equal(runnerOptions.folder, 'inbox');
-  assert.equal(runnerOptions.leaseSeconds, 120);
-  assert.equal(runnerOptions.deadlineMs, 90_000);
-  assert.ok(runnerOptions.signal instanceof AbortSignal);
+  assert.deepEqual(runnerOptions, {
+    requestKey: 'imap-sync:journal-lock:serve@softora.nl:inbox',
+    kind: 'imap-sync',
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    leaseSeconds: 120,
+    deadlineMs: 90_000,
+  });
   assert.equal(fetchSignal, controller.signal);
   assert.equal(writes[0].signal, controller.signal);
   assert.equal(writes[0].mutationId, '55555555-5555-4555-8555-555555555555');
@@ -4378,13 +4313,11 @@ test('campaign mailbox sync combines newest mail with missing historical convers
   );
 
   assert.equal(response.statusCode, 200);
-  const { signal: oldestLookupSignal, ...oldestLookupInput } = oldestLookup;
-  assert.deepEqual(oldestLookupInput, {
+  assert.deepEqual(oldestLookup, {
     accountEmail: 'serve290@gmail.com',
     folder: 'sent',
     subjectTerms: ['Kleine vraag over jullie website', 'Nieuw webdesign'],
   });
-  assert.equal(oldestLookupSignal instanceof AbortSignal, true);
   assert.equal(upsertedUids.length, CAMPAIGN_SYNC_FETCH_LIMIT);
   assert.deepEqual(upsertedUids, [118, 117, 90, 89]);
   assert.equal(client.searchQueries.length, 3);
