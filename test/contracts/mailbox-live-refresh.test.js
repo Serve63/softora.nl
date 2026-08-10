@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
+  CAMPAIGN_SYNC_FAST_FETCH_LIMIT,
   createMailboxSyncService,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
@@ -89,7 +90,12 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     syncMailbox: async (input) => { calls.push(input); return { ok: true, results: [] }; },
   });
 
-  assert.deepEqual(calls, [{
+  assert.equal(calls.length, 1);
+  assert.deepEqual({
+    ...calls[0],
+    deadlineAt: 0,
+    runId: '',
+  }, {
     accountEmail: '',
     owner: 'serve',
     folders: ['inbox'],
@@ -97,8 +103,15 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     force: false,
     campaignOnly: true,
     incrementalOnly: true,
+    fastRefresh: true,
     maxConcurrentAccounts: 3,
-  }]);
+    folderTimeoutMs: 10_000,
+    runTimeoutMs: 22_000,
+    deadlineAt: 0,
+    runId: '',
+  });
+  assert.equal(typeof calls[0].runId, 'string');
+  assert.ok(calls[0].deadlineAt > Date.now());
   assert.equal(normalizeMailboxSyncOwner('ALL'), 'both');
   await assert.rejects(
     syncMailboxRequest({
@@ -159,6 +172,39 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
   assert.equal(fetches[0].campaignHistory, false);
   assert.equal(result.results[0].historyBackfill, false);
   assert.equal(result.results[0].incrementalOnly, true);
+});
+
+test('fast IMAP refresh drains a burst larger than four messages in one cycle', async () => {
+  let fetchInput = null;
+  const selected = account('serve@softora.nl');
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      finishSync: async () => ({ ok: true }),
+      listMessageUidsForAccount: async () => [],
+      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async (input) => {
+      fetchInput = input;
+      return Array.from({ length: 8 }, (_item, index) => ({ uid: 100 + index }));
+    },
+    getSafeLimit: (value) => Math.min(100, Math.max(1, Number(value) || 50)),
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailbox({
+    owner: 'serve', folders: ['inbox'], limit: 4,
+    campaignOnly: true, incrementalOnly: true, fastRefresh: true,
+  });
+
+  assert.equal(fetchInput.limit, CAMPAIGN_SYNC_FAST_FETCH_LIMIT);
+  assert.equal(result.results[0].synced, 8);
+  assert.equal(result.complete, true);
 });
 
 test('Instantly fast refresh supports exact owners and both owners without mixing', async () => {
