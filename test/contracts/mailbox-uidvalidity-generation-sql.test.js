@@ -10,6 +10,10 @@ const migrationPath = path.join(
 );
 const schemaPath = path.join(root, 'supabase/data-ops-schema.sql');
 const probePath = path.join(root, 'supabase/mailbox-uidvalidity-generation-probe.sql');
+const identityAdoptionMigrationPath = path.join(
+  root,
+  'supabase/migrations/20260810130000_allow_mailbox_uid_generation_adoption.sql'
+);
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -27,8 +31,27 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function identityAdoptionBlock(source) {
+  const match = source.match(
+    /-- mailbox-uidvalidity-identity-adoption:start[\s\S]*?-- mailbox-uidvalidity-identity-adoption:end/
+  );
+  assert.ok(match, 'UIDVALIDITY identity-adoptieblok ontbreekt');
+  return match[0];
+}
+
 test('UIDVALIDITY-migratie en data-ops-schema bevatten exact hetzelfde generatiecontract', () => {
   assert.equal(block(read(schemaPath)), block(read(migrationPath)));
+});
+
+test('identity-trigger staat uitsluitend de eenmalige legacy-generatieadoptie toe', () => {
+  const migration = identityAdoptionBlock(read(identityAdoptionMigrationPath));
+  assert.equal(identityAdoptionBlock(read(schemaPath)), migration);
+  assert.match(migration, /old\.uid_validity is null/);
+  assert.match(migration, /new\.uid_validity between 1 and 4294967295/);
+  assert.match(migration, /old\.message_key = v_account_email[\s\S]*old\.uid::text/);
+  assert.match(migration, /new\.message_key = v_account_email[\s\S]*\|uv:[\s\S]*new\.uid_validity/);
+  assert.match(migration, /old\.uid_validity is distinct from new\.uid_validity/);
+  assert.match(migration, /if not v_generation_adoption then[\s\S]*raise exception/);
 });
 
 test('UIDVALIDITY-schema vervangt UID-only identiteit door een begrensde generatie-identiteit', () => {
