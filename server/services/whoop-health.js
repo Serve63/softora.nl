@@ -450,19 +450,21 @@ function createWhoopHealthService(deps = {}) {
 
   async function claimSyncLock() {
     const lockId = crypto.randomUUID();
-    const lockStarted = now();
-    const nowIso = lockStarted.toISOString();
-    const lockUntil = new Date(lockStarted.getTime() + SYNC_LOCK_MS).toISOString();
-    const { data, error } = await db()
-      .from('softora_health_whoop_connections')
-      .update({ sync_lock_id: lockId, sync_lock_until: lockUntil, updated_at: nowIso })
-      .eq('owner_key', OWNER_KEY)
-      .eq('status', 'connected')
-      .or(`sync_lock_until.is.null,sync_lock_until.lt.${nowIso}`)
-      .select('*')
-      .maybeSingle();
+    const { data, error } = await db().rpc('softora_claim_whoop_sync_lock', {
+      p_owner_key: OWNER_KEY,
+      p_lock_id: lockId,
+      p_lock_ttl_seconds: Math.ceil(SYNC_LOCK_MS / 1000),
+    });
     if (error) throw error;
-    return data ? { lockId, connection: data } : null;
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result?.acquired !== true || String(result.claimed_lock_id || '') !== lockId) return null;
+    const connection = await getConnection();
+    if (!connection || connection.sync_lock_id !== lockId) {
+      const lockError = new Error('WHOOP-synclock kon na de atomaire claim niet worden bevestigd.');
+      lockError.code = 'WHOOP_SYNC_LOCK_FENCE_LOST';
+      throw lockError;
+    }
+    return { lockId, connection };
   }
 
   async function releaseSyncLock(lockId) {
