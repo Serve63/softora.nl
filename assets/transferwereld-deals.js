@@ -59,9 +59,18 @@
     return shared * 10 + firstMatches - lengthPenalty;
   }
 
+  function transfermarktBadge(transfermarktId) {
+    const id = Number(transfermarktId);
+    return Number.isFinite(id) && id > 0
+      ? `https://tmssl.akamaized.net//images/wappen/head/${id}.png?lm=1`
+      : '';
+  }
+
   function buildClubResolver(clubs) {
     const candidates = new Map();
     const resolutionCache = new Map();
+    const clubsByTransfermarktId = new Map(clubs.map((club) => [Number(club.transfermarkt?.id), club]));
+    const externalClubsByTransfermarktId = new Map();
     const clubAliases = clubs.map((club) => ({ club, aliases: [...aliasesForClub(club)] }));
     clubAliases.forEach(({ club, aliases }) => {
       aliases.forEach((alias) => {
@@ -69,10 +78,14 @@
         candidates.get(alias).push(club);
       });
     });
-    return (name) => {
-      const cacheKey = normalize(name);
+    return (name, transfermarktId) => {
+      const numericId = Number(transfermarktId);
+      if (Number.isFinite(numericId) && clubsByTransfermarktId.has(numericId)) {
+        return clubsByTransfermarktId.get(numericId);
+      }
+      const cacheKey = `${normalize(name)}|${Number.isFinite(numericId) ? numericId : ''}`;
       if (resolutionCache.has(cacheKey)) return resolutionCache.get(cacheKey);
-      const exact = candidates.get(cacheKey);
+      const exact = candidates.get(normalize(name));
       if (exact?.length === 1) {
         resolutionCache.set(cacheKey, exact[0]);
         return exact[0];
@@ -86,7 +99,21 @@
         club,
         score: Math.max(...aliases.map((alias) => overlapScore(name, alias))),
       })).filter((candidate) => candidate.score >= 0).sort((left, right) => right.score - left.score);
-      const resolved = fuzzy.length && (fuzzy.length === 1 || fuzzy[0].score > fuzzy[1].score) ? fuzzy[0].club : null;
+      let resolved = fuzzy.length && (fuzzy.length === 1 || fuzzy[0].score > fuzzy[1].score) ? fuzzy[0].club : null;
+      if (!resolved && Number.isFinite(numericId) && numericId > 0) {
+        if (!externalClubsByTransfermarktId.has(numericId)) {
+          externalClubsByTransfermarktId.set(numericId, {
+            name: name || 'Onbekende club',
+            fullName: name || 'Onbekende club',
+            shortName: name || 'Onbekende club',
+            badge: transfermarktBadge(numericId),
+            rank: 10000,
+            isExternal: true,
+            transfermarkt: { id: numericId },
+          });
+        }
+        resolved = externalClubsByTransfermarktId.get(numericId);
+      }
       resolutionCache.set(cacheKey, resolved);
       return resolved;
     };
@@ -123,7 +150,7 @@
       ];
 
       movements.forEach((transfer) => {
-        const counterpartClub = resolveClub(transfer.counterpart);
+        const counterpartClub = resolveClub(transfer.counterpart, transfer.counterpartId);
         const sourceClub = transfer.direction === 'out' ? club : counterpartClub;
         const destinationClub = transfer.direction === 'in' ? club : counterpartClub;
         const sourceName = sourceClub?.name || (transfer.direction === 'in' ? transfer.counterpart : club.name) || 'Onbekend';

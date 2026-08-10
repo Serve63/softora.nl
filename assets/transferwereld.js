@@ -35,6 +35,22 @@
     return items.reduce((total, item) => total + (Number(item[key]) || 0), 0);
   }
 
+  function crestInitials(name) {
+    const words = String(name || 'Club').match(/[\p{L}\p{N}]+/gu) || ['C'];
+    return words.length > 1
+      ? `${words[0][0]}${words[1][0]}`.toUpperCase()
+      : words[0].slice(0, 2).toUpperCase();
+  }
+
+  function crestMarkup(club, name, className) {
+    const shellClass = className === 'crest' ? 'crest-shell' : 'route-crest-shell';
+    const initials = escapeHtml(crestInitials(name));
+    const badge = club?.badge
+      ? `<img class="${className}" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.remove()">`
+      : '';
+    return `<span class="${shellClass}" aria-hidden="true"><span class="${className} ${className}-fallback">${initials}</span>${badge}</span>`;
+  }
+
   function roleFor(position) {
     const value = normalize(position).replace(/[–—]/g, '-');
     if (/goalkeeper|goalie|keeper|portero|torwart|gardien|portiere|doelman|arquero|goleiro/.test(value)) return 'GK';
@@ -136,14 +152,11 @@
   function clubCell(club) {
     const rank = Number(club.rank) > 0 && Number(club.rank) < 10000 ? `#${club.rank} wereldwijd` : 'wereldrang niet beschikbaar';
     const meta = [club.country, club.league].filter(Boolean).join(' · ');
-    return `<div class="club-cell"><img class="crest" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.hidden=true"><div><strong>${escapeHtml(club.name)}</strong><small>${escapeHtml(meta)}${meta ? ' · ' : ''}${escapeHtml(rank)}</small></div></div>`;
+    return `<div class="club-cell">${crestMarkup(club, club.name, 'crest')}<div><strong>${escapeHtml(club.name)}</strong><small>${escapeHtml(meta)}${meta ? ' · ' : ''}${escapeHtml(rank)}</small></div></div>`;
   }
 
   function routeClub(name, club, label) {
-    const crest = club?.badge
-      ? `<img class="route-crest" src="${escapeHtml(club.badge)}" alt="" loading="lazy" onerror="this.hidden=true">`
-      : '<span class="route-crest route-crest-placeholder" aria-hidden="true"></span>';
-    return `<div class="route-club">${crest}<div><small>${label}</small><strong>${escapeHtml(name || 'Onbekend')}</strong></div></div>`;
+    return `<div class="route-club">${crestMarkup(club, name, 'route-crest')}<div><small>${label}</small><strong>${escapeHtml(name || 'Onbekend')}</strong></div></div>`;
   }
 
   function dealTypeLabel(kind) {

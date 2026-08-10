@@ -33,10 +33,10 @@ test('transferwereld exposes the five active analysis tabs and defaults to fee s
   assert.match(html, /Alle transfers uit de top 10 competities/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.doesNotMatch(html, /id="transfer-filters"|id="transfer-summary"|id="transfer-sort"/);
-  assert.match(html, /transferwereld-data\.js\?v=20260809b/);
-  assert.match(html, /transferwereld-scope-data\.js\?v=20260809b/);
+  assert.match(html, /transferwereld-data\.js\?v=20260810a/);
+  assert.match(html, /transferwereld-scope-data\.js\?v=20260810a/);
   assert.match(html, /transferwereld-scope\.js\?v=20260809b/);
-  assert.match(html, /transferwereld-deals\.js\?v=20260809a/);
+  assert.match(html, /transferwereld-deals\.js\?v=20260810a/);
   assert.doesNotMatch(html, /id="transfer-direction"/);
   const script = read('assets/transferwereld.js');
   assert.match(script, /\[\.\.\.deals\]\.sort\(\(left, right\) => right\.feeValue - left\.feeValue \|\| left\.rank - right\.rank\)/);
@@ -83,6 +83,38 @@ test('loan returns and permanent transfers on the same route remain separate dea
   assert.deepEqual(deals.map((deal) => deal.kind).sort(), ['return', 'transfer']);
 });
 
+test('transfermarkt club ids resolve translated and out-of-scope counterpart crests', () => {
+  const { buildUniqueDeals } = require('../../assets/transferwereld-deals.js');
+  const clubs = [
+    {
+      name: 'Aston Villa', badge: '/villa.png', transfermarkt: { id: 405 }, departures: [],
+      arrivals: [{ player: 'Johan Manzambi', counterpart: 'SC Fribourg', counterpartId: 60, fee: '€60m', feeValue: 60_000_000 }],
+    },
+    { name: 'Freiburg', badge: '/freiburg.png', transfermarkt: { id: 60 }, arrivals: [], departures: [] },
+    {
+      name: 'Tottenham Hotspur', badge: '/tottenham.png', transfermarkt: { id: 148 }, departures: [],
+      arrivals: [{ player: 'Mateus Fernandes', counterpart: 'West Ham United', counterpartId: 379, fee: '€99m', feeValue: 99_000_000 }],
+    },
+  ];
+  const deals = buildUniqueDeals(clubs);
+  const freiburgDeal = deals.find((deal) => deal.player === 'Johan Manzambi');
+  const westHamDeal = deals.find((deal) => deal.player === 'Mateus Fernandes');
+  assert.equal(freiburgDeal.sourceClub.name, 'Freiburg');
+  assert.equal(freiburgDeal.sourceClub.badge, '/freiburg.png');
+  assert.equal(westHamDeal.sourceClub.name, 'West Ham United');
+  assert.equal(westHamDeal.sourceClub.transfermarkt.id, 379);
+  assert.equal(westHamDeal.sourceClub.badge, 'https://tmssl.akamaized.net//images/wappen/head/379.png?lm=1');
+});
+
+test('every crest render has a visible initials fallback if the image is unavailable', () => {
+  const script = read('assets/transferwereld.js');
+  const css = read('assets/transferwereld.css');
+  assert.match(script, /function crestMarkup/);
+  assert.match(script, /onerror="this\.remove\(\)"/);
+  assert.doesNotMatch(script, /route-crest-placeholder/);
+  assert.match(css, /\.crest-fallback, \.route-crest-fallback/);
+});
+
 test('transferwereld shows a desktop-only notice below the desktop breakpoint', () => {
   const html = read('transfers.html');
   const css = read('assets/transferwereld.css');
@@ -124,6 +156,7 @@ test('transferwereld generated data is complete enough for the requested analysi
   assert.equal(clubsWithFullSquads, data.clubs.length, `squad coverage incomplete: ${clubsWithFullSquads}/${data.clubs.length} clubs`);
   assert.equal(data.meta.warnings, 0);
   assert.equal(data.meta.warnings, data.clubs.filter((club) => club.dataWarning).length);
+  assert.equal(data.clubs.filter((club) => !club.badge).length, 0, 'every active club must have a crest URL');
   const repeatedMovements = data.clubs.flatMap((club) => ['arrivals', 'departures'].flatMap((field) => {
     const keys = club[field].map((transfer) => [transfer.player, transfer.counterpart, transfer.feeValue].join('|').toLowerCase());
     return keys.filter((key, index) => keys.indexOf(key) !== index).map((key) => `${club.name}:${field}:${key}`);

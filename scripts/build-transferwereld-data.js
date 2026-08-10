@@ -466,6 +466,7 @@ function extractTransfers(html, direction) {
     const clubLink = firstElement(cells[4], (node) => (
       node.type === 'tag' && node.name === 'a' && /\/startseite\/verein\/\d+/.test(node.attribs?.href || '')
     ));
+    const counterpartId = Number(clubLink?.attribs?.href?.match(/\/verein\/(\d+)/)?.[1]) || null;
     const feeLink = firstElement(cells[5], (node) => node.type === 'tag' && node.name === 'a');
     const fee = cleanText(DomUtils.getText(cells[5])) || 'Onbekend';
     return {
@@ -475,6 +476,7 @@ function extractTransfers(html, direction) {
       age: Number(cleanText(DomUtils.getText(cells[2]))) || null,
       nationality: cleanText(nationalityImage?.attribs?.alt),
       counterpart: cleanText(clubLink?.attribs?.title || (clubLink ? DomUtils.getText(clubLink) : DomUtils.getText(cells[4]))),
+      counterpartId,
       fee,
       feeValue: parseFeeValue(fee),
       transferId: feeLink?.attribs?.href?.match(/transfer_id\/(\d+)/)?.[1] || '',
@@ -575,9 +577,19 @@ function loadExistingClubs() {
 
 function normalizeTransferRows(transfers) {
   const unique = new Map();
-  for (const { direction, player, position, age, counterpart, fee } of transfers || []) {
-    const row = { direction, player, position, age, counterpart, fee, feeValue: parseFeeValue(fee) };
-    const key = [direction, cleanText(player).toLowerCase(), cleanText(counterpart).toLowerCase(), row.feeValue].join('|');
+  for (const { direction, player, position, age, counterpart, counterpartId, fee } of transfers || []) {
+    const normalizedCounterpartId = Number(counterpartId) || null;
+    const row = {
+      direction,
+      player,
+      position,
+      age,
+      counterpart,
+      ...(normalizedCounterpartId ? { counterpartId: normalizedCounterpartId } : {}),
+      fee,
+      feeValue: parseFeeValue(fee),
+    };
+    const key = [direction, cleanText(player).toLowerCase(), normalizedCounterpartId || cleanText(counterpart).toLowerCase(), row.feeValue].join('|');
     const previous = unique.get(key);
     if (!previous || (!previous.age && row.age)) unique.set(key, row);
   }
