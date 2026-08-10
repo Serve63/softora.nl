@@ -4063,14 +4063,13 @@ test('campaign mailbox sync journaliseert IMAP-read en abortbare indexwrite in Ã
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(runnerOptions, {
-    requestKey: 'imap-sync:journal-lock:serve@softora.nl:inbox',
-    kind: 'imap-sync',
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    leaseSeconds: 120,
-    deadlineMs: 90_000,
-  });
+  assert.equal(runnerOptions.requestKey, 'imap-sync:journal-lock:serve@softora.nl:inbox');
+  assert.equal(runnerOptions.kind, 'imap-sync');
+  assert.equal(runnerOptions.accountEmail, 'serve@softora.nl');
+  assert.equal(runnerOptions.folder, 'inbox');
+  assert.equal(runnerOptions.leaseSeconds, 120);
+  assert.equal(runnerOptions.deadlineMs, 90_000);
+  assert.ok(runnerOptions.signal instanceof AbortSignal);
   assert.equal(fetchSignal, controller.signal);
   assert.equal(writes[0].signal, controller.signal);
   assert.equal(writes[0].mutationId, '55555555-5555-4555-8555-555555555555');

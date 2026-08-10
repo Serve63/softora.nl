@@ -855,11 +855,9 @@ function createMailboxService(deps = {}) {
       return account;
     });
   }
-
   function getAccounts() {
     return buildAccounts();
   }
-
   function getAccount(email) {
     return getAccounts().find((account) => account.email === normalizeEmail(email)) || null;
   }
