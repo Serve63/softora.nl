@@ -92,15 +92,6 @@ function createStore(initialMessages = []) {
 function buildService(overrides = {}) {
   const store = overrides.store || createStore();
   const requests = [];
-  const syncUiState = new Map();
-  const getUiStateValues = overrides.getUiStateValues || (async (scope) => ({
-    values: { ...(syncUiState.get(scope) || {}) },
-    source: 'supabase',
-  }));
-  const setUiStateValues = overrides.setUiStateValues || (async (scope, values) => {
-    syncUiState.set(scope, { ...(values || {}) });
-    return { values: { ...(values || {}) }, source: 'supabase' };
-  });
   const service = createInstantlyMailboxService({
     config: {
       enabled: true,
@@ -119,8 +110,8 @@ function buildService(overrides = {}) {
     },
     mailboxIndexStore: store,
     getCustomerSourcesByEmails: overrides.getCustomerSourcesByEmails,
-    getUiStateValues,
-    setUiStateValues,
+    getUiStateValues: overrides.getUiStateValues,
+    setUiStateValues: overrides.setUiStateValues,
     onMessagesUpserted: overrides.onMessagesUpserted,
     getCampaignMutationRunner: overrides.getCampaignMutationRunner,
     requireMutationJournal: overrides.requireMutationJournal,
@@ -1807,18 +1798,14 @@ test('standaard mailboxintegratie verplicht de mutation journal voor Instantly-w
   assert.equal(journalRuns, 1);
 });
 
-test('bounded polling always scans the fresh head and resumes its durable backlog without duplicate loss', async () => {
-  const states = new Map();
+test('bounded polling persists its cursor and resumes the next cycle without duplicate loss', async () => {
+  let values = {};
   const listQueries = [];
   const { service, store } = buildService({
-    config: { maxPages: 3 },
-    getUiStateValues: async (scope) => ({
-      values: { ...(states.get(scope) || {}) },
-      source: 'supabase',
-    }),
-    setUiStateValues: async (scope, patch) => {
-      states.set(scope, { ...(patch || {}) });
-      return { values: { ...(patch || {}) }, source: 'supabase' };
+    config: { maxPages: 1 },
+    getUiStateValues: async () => ({ values }),
+    setUiStateValues: async (_scope, patch) => {
+      values = { ...values, ...patch };
     },
     fetchJsonWithTimeout: async (url) => {
       const params = new URL(url).searchParams;
@@ -1826,24 +1813,11 @@ test('bounded polling always scans the fresh head and resumes its durable backlo
         return { response: { ok: true, status: 200 }, data: { items: [] } };
       }
       listQueries.push(Object.fromEntries(params.entries()));
-      const cursor = params.get('starting_after') || '';
-      const idByCursor = {
-        '': listQueries.length === 1 ? 'page-one' : 'fresh-head',
-        'cursor-page-two': 'page-two',
-        'cursor-page-three': 'page-three',
-        'cursor-page-four': 'page-four',
-      };
-      const nextByCursor = {
-        '': listQueries.length === 1 ? 'cursor-page-two' : '',
-        'cursor-page-two': 'cursor-page-three',
-        'cursor-page-three': 'cursor-page-four',
-        'cursor-page-four': '',
-      };
       return {
         response: { ok: true, status: 200 },
         data: {
-          items: [incoming({ id: idByCursor[cursor] })],
-          next_starting_after: nextByCursor[cursor],
+          items: [incoming({ id: params.get('starting_after') ? 'page-two' : 'page-one' })],
+          next_starting_after: params.get('starting_after') ? '' : 'cursor-page-two',
         },
       };
     },
@@ -1851,17 +1825,13 @@ test('bounded polling always scans the fresh head and resumes its durable backlo
 
   const first = await service.syncOwner('serve');
   assert.equal(first.partial, true);
-  const firstState = JSON.parse(states.get('instantly_mailbox_sync_serve').state_json);
-  assert.equal(firstState.segments[0].cursor, 'cursor-page-four');
+  assert.equal(values.cursor_serve, 'cursor-page-two');
   await service.syncOwner('serve');
-  assert.equal(listQueries[3].starting_after, undefined);
-  assert.equal(listQueries[3].max_timestamp_created, '2026-07-25T12:00:00.000Z');
-  assert.equal(listQueries[4].starting_after, 'cursor-page-four');
-  const secondState = JSON.parse(states.get('instantly_mailbox_sync_serve').state_json);
-  assert.deepEqual(secondState.segments, []);
+  assert.equal(listQueries[1].starting_after, 'cursor-page-two');
+  assert.equal(values.cursor_serve, '');
   assert.deepEqual(
     store.rows.map((message) => message.providerMessageId).sort(),
-    ['fresh-head', 'page-four', 'page-one', 'page-three', 'page-two']
+    ['page-one', 'page-two']
   );
 });
 
@@ -2137,7 +2107,7 @@ test('an exact RFC message imported through Gmail and Instantly appears only onc
   ]);
 });
 
-test('campaign aggregation leest en ververst alleen de geselecteerde owner', async () => {
+test('campaign aggregation retains both proven owners while refreshing only the selected owner', async () => {
   const listedOwners = [];
   const syncedOwners = [];
   const providerMessages = {
@@ -2190,16 +2160,15 @@ test('campaign aggregation leest en ververst alleen de geselecteerde owner', asy
     refreshInstantly: true,
   });
   assert.deepEqual(syncedOwners, ['serve']);
-  assert.deepEqual(listedOwners, ['serve']);
+  assert.deepEqual(listedOwners.sort(), ['martijn', 'serve']);
   assert.deepEqual(
     selectedOwnerRefresh.messages.map((message) => [message.id, message.providerOwner]),
     [['ramon', 'serve']]
   );
   assert.deepEqual(
     selectedOwnerRefresh.snapshotMessages.map((message) => [message.id, message.providerOwner]),
-    [['ramon', 'serve']]
+    [['martijn-thread', 'martijn'], ['ramon', 'serve']]
   );
-  assert.equal(selectedOwnerRefresh.snapshotComplete, false);
 
   listedOwners.length = 0;
   const ownerlessBackgroundRefresh = await mergeCampaignReplies({
@@ -2212,7 +2181,6 @@ test('campaign aggregation leest en ververst alleen de geselecteerde owner', asy
     ownerlessBackgroundRefresh.messages.map((message) => message.id),
     ['martijn-thread', 'ramon']
   );
-  assert.equal(ownerlessBackgroundRefresh.snapshotComplete, true);
   await assert.rejects(
     mergeCampaignReplies({
       ...dependencies,
@@ -2221,37 +2189,4 @@ test('campaign aggregation leest en ververst alleen de geselecteerde owner', asy
     }),
     { code: 'INSTANTLY_OWNER_REQUIRED', status: 400 }
   );
-});
-
-test('campaign aggregation behoudt een gezonde owner als de andere provider-read faalt', async () => {
-  const result = await mergeCampaignReplies({
-    owner: '',
-    limit: 100,
-    refreshInstantly: false,
-    baseReplies: [],
-    instantlyMailboxService: {
-      isConfigured: () => true,
-      getConfiguredAccounts: (owner) => [{ email: `${owner}@example.test` }],
-      listOwnerConversations: async (owner) => {
-        if (owner === 'serve') {
-          const error = new Error('Serve provider tijdelijk onbereikbaar');
-          error.code = 'INSTANTLY_PROVIDER_UNAVAILABLE';
-          throw error;
-        }
-        return [{
-          id: 'martijn-healthy',
-          provider: 'instantly',
-          providerOwner: 'martijn',
-          activityAt: '2026-08-10T09:00:00.000Z',
-          threadMessages: [],
-        }];
-      },
-    },
-    normalizeString: (value) => String(value || '').trim(),
-    truncateText: (value, max) => String(value || '').slice(0, max),
-  });
-
-  assert.deepEqual(result.messages.map((message) => message.id), ['martijn-healthy']);
-  assert.deepEqual(result.warnings, ['INSTANTLY_PROVIDER_UNAVAILABLE:serve']);
-  assert.equal(result.snapshotComplete, false);
 });

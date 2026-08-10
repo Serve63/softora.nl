@@ -627,8 +627,8 @@ test('server response isoleert IMAP en Instantly records exact op geselecteerde 
     'imap-martijn',
     'martijn-bcc-copy-in-serve',
     'instantly-serve',
+    'instantly-martijn',
   ]));
-  assert.equal(result.snapshotComplete, false);
   assert.equal(getMailboxMessageOwner(baseReplies[0]), 'serve');
   assert.equal(getMailboxMessageOwner(baseReplies[1]), 'martijn');
   assert.equal(getMailboxMessageOwner(baseReplies[2]), 'martijn');

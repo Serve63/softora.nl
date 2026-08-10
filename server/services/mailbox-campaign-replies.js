@@ -825,7 +825,6 @@ function createMailboxCampaignRepliesService(deps = {}) {
     mailboxIndexStore = null,
     dataOpsStore = null,
     mailboxSendProvenanceStore = null,
-    logger = console,
   } = deps;
 
   async function listRepliesWithSnapshot({
@@ -848,6 +847,12 @@ function createMailboxCampaignRepliesService(deps = {}) {
       error.status = 503;
       throw error;
     }
+    if (!dataOpsStore || typeof dataOpsStore.listCustomersByEmails !== 'function') {
+      const error = new Error('Klantkoppeling voor campagnereacties is niet beschikbaar.');
+      error.status = 503;
+      throw error;
+    }
+
     const recentMessages = await listMessagesAcrossFolders({
       mailboxIndexStore,
       method: 'listMessagesForAccounts',
@@ -896,24 +901,16 @@ function createMailboxCampaignRepliesService(deps = {}) {
     const senderEmails = Array.from(
       new Set(campaignMessages.map((message) => normalizeEmail(message && message.email)).filter(Boolean))
     );
-    const warnings = [];
-    let customers = [];
-    if (!dataOpsStore || typeof dataOpsStore.listCustomersByEmails !== 'function') {
-      warnings.push('campaign_customer_link_unavailable');
-    } else {
-      try {
-        const customerResult = await dataOpsStore.listCustomersByEmails({
-          emails: senderEmails,
-          bypassReadFailureCooldown: true,
-          suppressReadFailureCooldown: true,
-          suppressTransientReadFailureLog: true,
-        });
-        if (Array.isArray(customerResult)) customers = customerResult;
-        else warnings.push('campaign_customer_link_unavailable');
-      } catch (error) {
-        warnings.push('campaign_customer_link_unavailable');
-        logger?.warn?.('[Mailbox][CampaignCustomerLink]', error?.message || error);
-      }
+    const customers = await dataOpsStore.listCustomersByEmails({
+      emails: senderEmails,
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressTransientReadFailureLog: true,
+    });
+    if (!Array.isArray(customers)) {
+      const error = new Error('Klantkoppeling voor campagnereacties kon niet worden gelezen.');
+      error.status = 503;
+      throw error;
     }
 
     const campaignCustomerByEmail = new Map();
@@ -1105,7 +1102,6 @@ function createMailboxCampaignRepliesService(deps = {}) {
       // The bootstrap needs complete metadata, not hundreds of eagerly loaded
       // bodies. Detail bodies are fetched by exact message identity on open.
       snapshotMessages: snapshotConversations,
-      warnings: Array.from(new Set(warnings)),
     };
   }
 

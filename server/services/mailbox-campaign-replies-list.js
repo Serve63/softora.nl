@@ -97,7 +97,6 @@ function createMailboxCampaignRepliesList({
         instantlyReplies,
         snapshotInstantlyReplies,
         instantlySync,
-        snapshotComplete,
         warnings: providerWarnings,
       } = await mergeCampaignReplies({
         baseReplies: replies,
@@ -141,7 +140,6 @@ function createMailboxCampaignRepliesList({
           contentAt: snapshotAt,
           contentVersion,
           warnings,
-          snapshotComplete,
           instantly: instantlySync,
           consistency: {
             authoritative: consistency.authoritative,
@@ -155,7 +153,7 @@ function createMailboxCampaignRepliesList({
           },
         },
       };
-      if (persistSnapshot && !degraded && snapshotComplete !== false) {
+      if (persistSnapshot && !degraded) {
         const persisted = await snapshotStore.persist(
           {
             ...result,

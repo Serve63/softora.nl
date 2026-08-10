@@ -103,55 +103,6 @@ test('campaign mailbox applies the selected owner before limiting older conversa
   ));
 });
 
-test('CRM-uitval verbergt directe campagnereplies niet en laat onbewezen CRM-only mail dicht', async () => {
-  const directReply = {
-    id: 'inbox:direct-reply',
-    folder: 'inbox',
-    accountEmail: 'serve@softora.nl',
-    from: 'Burgers Hondenpension',
-    email: 'burgershondenpension@gmail.com',
-    to: 'serve@softora.nl',
-    subject: 'Re: Kleine vraag over jullie website',
-    preview: 'Geen interesse.',
-    date: '2026-08-07T14:56:02.000Z',
-    messageId: '<direct-reply@example.test>',
-  };
-  const unprovenCustomerOnlyMail = {
-    ...directReply,
-    id: 'inbox:customer-only',
-    email: 'mogelijk-klant@example.test',
-    subject: 'Los bericht zonder campagnebewijs',
-    messageId: '<customer-only@example.test>',
-  };
-  const service = createMailboxCampaignRepliesService({
-    mailboxIndexStore: {
-      listMessagesForAccounts: async ({ folder }) => folder === 'inbox'
-        ? [directReply, unprovenCustomerOnlyMail]
-        : [],
-      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'inbox'
-        ? [directReply, unprovenCustomerOnlyMail]
-        : [],
-      listMessagesByMessageIdsForAccounts: async () => [],
-      hydrateMessageBodies: async ({ messages }) => messages,
-    },
-    dataOpsStore: {
-      listCustomersByEmails: async () => {
-        const error = new Error('Supabase CRM timeout');
-        error.code = 'SUPABASE_TIMEOUT';
-        throw error;
-      },
-    },
-    logger: { warn() {} },
-  });
-
-  const result = await service.listRepliesWithSnapshot({ limit: 100, owner: 'serve' });
-
-  assert.deepEqual(result.messages.map((message) => message.id), ['inbox:direct-reply']);
-  assert.deepEqual(result.warnings, ['campaign_customer_link_unavailable']);
-  assert.equal(result.messages[0].campaign.customerId, '');
-  assert.equal(result.messages[0].outreach, null);
-});
-
 test('campaign mailbox bouwt een bewezen BCC-kopie als volledige chronologische thread', () => {
   const original = {
     id: 'sent:original',

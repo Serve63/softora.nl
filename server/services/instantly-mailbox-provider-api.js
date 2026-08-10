@@ -19,25 +19,6 @@ function extractInstantlyCursor(data) {
   );
 }
 
-function parseInstantlyEmailListResponse(data, createError) {
-  if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.items)) {
-    const error = typeof createError === 'function'
-      ? createError(
-          'Instantly gaf een ongeldig e-maillijstantwoord zonder verplichte items-array.',
-          'INSTANTLY_EMAIL_LIST_INVALID_RESPONSE',
-          502
-        )
-      : new Error('Instantly gaf een ongeldig e-maillijstantwoord zonder verplichte items-array.');
-    if (!error.code) error.code = 'INSTANTLY_EMAIL_LIST_INVALID_RESPONSE';
-    if (!error.status) error.status = 502;
-    throw error;
-  }
-  return {
-    items: data.items,
-    nextCursor: extractInstantlyCursor(data),
-  };
-}
-
 function createInstantlyApiRequest({
   assertConfigured,
   apiBaseUrl,
@@ -81,5 +62,4 @@ module.exports = {
   createInstantlyApiRequest,
   extractInstantlyCursor,
   extractInstantlyItems,
-  parseInstantlyEmailListResponse,
 };

@@ -13,21 +13,22 @@ const {
 } = require('./mailbox-automated-reply');
 const { buildAcceptedSentMessage, normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
+const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
 const {
   createInstantlyMailboxMutationWriter,
   throwInstantlyStoreFailure,
 } = require('./instantly-mailbox-mutation');
 const {
   createInstantlyApiRequest,
+  extractInstantlyCursor,
   extractInstantlyItems,
 } = require('./instantly-mailbox-provider-api');
-const { createInstantlyMailboxSyncRunner } = require('./instantly-mailbox-sync-runner');
-const { INSTANTLY_MAILBOX_SYNC_SCOPE } = require('./instantly-mailbox-sync-state');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
 const DEFAULT_MAX_PAGES = 4;
 const DEFAULT_RICH_BODY_AUDIT_LIMIT = 25;
+const INSTANTLY_MAILBOX_SYNC_SCOPE = 'instantly_mailbox_sync';
 const VALID_OWNERS = new Set(['serve', 'martijn']);
 
 function normalizeText(value) {
@@ -155,7 +156,7 @@ function createInstantlyMailboxService(deps = {}) {
       Math.min(60, Number(config.syncOverlapMinutes) || DEFAULT_SYNC_OVERLAP_MINUTES)
     ),
     pageLimit: Math.max(1, Math.min(100, Number(config.pageLimit) || DEFAULT_PAGE_LIMIT)),
-    maxPages: Math.max(3, Math.min(10, Number(config.maxPages) || DEFAULT_MAX_PAGES)),
+    maxPages: Math.max(1, Math.min(10, Number(config.maxPages) || DEFAULT_MAX_PAGES)),
     richBodyAuditLimit: Math.max(
       4,
       Math.min(50, Number(config.richBodyAuditLimit) || DEFAULT_RICH_BODY_AUDIT_LIMIT)
@@ -163,6 +164,8 @@ function createInstantlyMailboxService(deps = {}) {
   });
   const accountOwnership = normalizeAccountOwnership(config.accountOwners);
   const campaignOwnership = normalizeCampaignOwnership(config.campaignOwners);
+  let syncPromiseByOwner = new Map();
+
   const upsertInstantlyMessages = createInstantlyMailboxMutationWriter({
     mailboxIndexStore, onMessagesUpserted, getCampaignMutationRunner,
     requireMutationJournal, createMutationRequestKey,
@@ -596,70 +599,224 @@ function createInstantlyMailboxService(deps = {}) {
     return `instantly-${owner}@softora.internal`;
   }
 
-  async function auditThreadCandidates({ accounts, owner, threadCandidates }) {
-    const indexed = await mailboxIndexStore.listProviderMessages({
-      provider: 'instantly',
-      accountEmails: accounts.map((account) => account.email),
-      limit: 2000,
-      includeBody: false,
-    });
-    const activeConversationAuditMessages =
-      typeof mailboxIndexStore.listProviderActiveConversationAuditMessages === 'function'
-        ? await mailboxIndexStore.listProviderActiveConversationAuditMessages({
-            provider: 'instantly',
-            accountEmails: accounts.map((account) => account.email),
-          })
-        : [];
-    const { indexedThreadMessages } = buildIndexedThreadAuditState({
-      indexedMessages: indexed,
-      activeConversationAuditMessages,
-      threadCandidates,
-      selectedOwner: owner,
-    });
-    let stored = 0;
-    const pendingThreadHydrations = Array.from(threadCandidates.entries())
-      .filter(([key]) => {
-        const indexedMessages = indexedThreadMessages.get(key) || [];
-        return indexedMessages.length <= 1 || indexedMessages.some((message) => (
-          message.folder === 'sent' &&
-          message.originalCampaignOutbound === true &&
-          (
-            message.providerBodyHtmlEvidenceKnown !== true ||
-            message.providerOriginalBodyEvidenceKnown !== true
-          )
-        ));
-      })
-      .slice(0, normalizedConfig.richBodyAuditLimit);
-    for (const [key, candidate] of pendingThreadHydrations) {
-      const indexedMessages = indexedThreadMessages.get(key) || [];
-      const hydrated = await hydrateThread({
-        threadId: candidate.providerThreadId,
-        accountEmail: candidate.providerAccountEmail,
-        owner,
-        indexedMessages,
-      });
-      stored += Number(hydrated?.stored) || 0;
+  async function getContinuation(owner) {
+    try {
+      const state = await getUiStateValues(INSTANTLY_MAILBOX_SYNC_SCOPE);
+      const values = state && typeof state.values === 'object' ? state.values : {};
+      return {
+        cursor: normalizeText(values[`cursor_${owner}`]),
+        minTimestamp: normalizeText(values[`min_timestamp_${owner}`]),
+      };
+    } catch (_) {
+      return { cursor: '', minTimestamp: '' };
     }
-    return stored;
   }
 
-  const syncOwner = createInstantlyMailboxSyncRunner({
-    apiRequest,
-    assertConfigured,
-    assertOwner,
-    auditThreadCandidates,
-    createError: createInstantlyMailboxError,
-    getConfiguredAccounts,
-    getSyncStateKey,
-    getUiStateValues,
-    mailboxIndexStore,
-    normalizeInstantlyMessage,
-    normalizedConfig,
-    now,
-    setUiStateValues,
-    throwStoreFailure: throwInstantlyStoreFailure,
-    upsertMessages: upsertInstantlyMessages,
-  });
+  async function setContinuation(owner, continuation = {}) {
+    await setUiStateValues(
+      INSTANTLY_MAILBOX_SYNC_SCOPE,
+      {
+        [`cursor_${owner}`]: normalizeText(continuation.cursor),
+        [`min_timestamp_${owner}`]: normalizeText(continuation.minTimestamp),
+      },
+      {
+        source: 'instantly-mailbox-sync',
+        actor: 'Instantly mailbox',
+      }
+    );
+  }
+
+  async function syncOwner(owner, options = {}) {
+    const selectedOwner = assertOwner(owner);
+    assertConfigured();
+    if (!mailboxIndexStore?.upsertProviderMessages || !mailboxIndexStore?.getSyncState) {
+      throw createInstantlyMailboxError(
+        'Duurzame Instantly-mailboxopslag is niet beschikbaar.',
+        'INSTANTLY_MAILBOX_STORE_UNAVAILABLE',
+        503
+      );
+    }
+    if (syncPromiseByOwner.has(selectedOwner)) return syncPromiseByOwner.get(selectedOwner);
+    const promise = (async () => {
+      const accounts = getConfiguredAccounts(selectedOwner);
+      if (!accounts.length) {
+        throw createInstantlyMailboxError(
+          `Er zijn geen Instantly-accounts aan ${selectedOwner} gekoppeld.`,
+          'INSTANTLY_OWNER_HAS_NO_ACCOUNTS',
+          409
+        );
+      }
+      const syncKey = getSyncStateKey(selectedOwner);
+      const state = await mailboxIndexStore.getSyncState({ accountEmail: syncKey, folder: 'instantly' });
+      const recentSync = buildRecentSyncResult({ state, owner: selectedOwner, accounts, minIntervalMs: options.minIntervalMs, nowMs: now().getTime() });
+      if (recentSync) return recentSync;
+      const lock = await mailboxIndexStore.acquireSyncLock?.({
+        accountEmail: syncKey,
+        folder: 'instantly',
+      });
+      if (lock && !lock.ok) {
+        if (lock.locked) {
+          return {
+            ok: true,
+            owner: selectedOwner,
+            accounts: accounts.map((account) => account.email),
+            seen: 0,
+            stored: 0,
+            pages: 0,
+            skipped: true,
+            reason: 'sync-in-progress',
+          };
+        }
+        throw createInstantlyMailboxError(
+          'Instantly-sync kon geen duurzame lock verkrijgen.',
+          'INSTANTLY_SYNC_LOCK_FAILED',
+          503
+        );
+      }
+      const lockToken = normalizeText(lock?.lockToken);
+      const lastSyncedAt = Date.parse(normalizeText(state?.last_synced_at));
+      const fallbackSince = now().getTime() - normalizedConfig.initialLookbackDays * 24 * 60 * 60 * 1000;
+      const overlapMs = normalizedConfig.syncOverlapMinutes * 60 * 1000;
+      const continuation = await getContinuation(selectedOwner);
+      const calculatedMinTimestamp = new Date(
+        Math.max(fallbackSince, Number.isFinite(lastSyncedAt) ? lastSyncedAt - overlapMs : fallbackSince)
+      ).toISOString();
+      const minTimestamp = continuation.minTimestamp || calculatedMinTimestamp;
+      let cursor = continuation.cursor;
+      let page = 0;
+      let seen = 0;
+      let stored = 0;
+      const threadCandidates = new Map();
+      try {
+        do {
+          const pageResult = await upsertInstantlyMessages.runMutationLifecycle({
+            accountEmail: accounts[0]?.email,
+          }, async (mutationContext) => {
+            const data = await apiRequest('emails', {
+              signal: mutationContext?.signal,
+              query: {
+                limit: normalizedConfig.pageLimit,
+                starting_after: cursor,
+                eaccount: accounts.map((account) => account.email).join(','),
+                min_timestamp_created: minTimestamp,
+                sort_order: 'desc',
+              },
+            });
+            const rawItems = extractInstantlyItems(data);
+            const messages = rawItems
+              .map(normalizeInstantlyMessage)
+              .filter((message) => message && message.providerOwner === selectedOwner);
+            const upsert = await upsertInstantlyMessages(messages, mutationContext);
+            if (!upsert?.ok) {
+              throwInstantlyStoreFailure(
+                upsert,
+                'Instantly-berichten konden niet duurzaam worden opgeslagen.',
+                'INSTANTLY_MAILBOX_STORE_FAILED'
+              );
+            }
+            return { data, messages, rawCount: rawItems.length, upsert };
+          });
+          const { data, messages, rawCount, upsert } = pageResult;
+          messages
+            .filter((message) => message.folder !== 'sent' && message.providerThreadId)
+            .forEach((message) => {
+              const key = `${message.providerAccountEmail}|${message.providerThreadId}`;
+              if (!threadCandidates.has(key)) threadCandidates.set(key, message);
+            });
+          seen += rawCount;
+          stored += Number(upsert.upserted) || 0;
+          cursor = extractInstantlyCursor(data);
+          page += 1;
+        } while (cursor && page < normalizedConfig.maxPages);
+        const indexed = await mailboxIndexStore.listProviderMessages({
+          provider: 'instantly',
+          accountEmails: accounts.map((account) => account.email),
+          limit: 2000,
+          includeBody: false,
+        });
+        const activeConversationAuditMessages =
+          typeof mailboxIndexStore.listProviderActiveConversationAuditMessages === 'function'
+            ? await mailboxIndexStore.listProviderActiveConversationAuditMessages({
+                provider: 'instantly',
+                accountEmails: accounts.map((account) => account.email),
+              })
+            : [];
+        const { indexedThreadMessages } = buildIndexedThreadAuditState({
+          indexedMessages: indexed,
+          activeConversationAuditMessages,
+          threadCandidates,
+          selectedOwner,
+        });
+        const pendingThreadHydrations = Array.from(threadCandidates.entries())
+          .filter(([key]) => {
+            const indexedMessages = indexedThreadMessages.get(key) || [];
+            const hasMissingThreadMember = indexedMessages.length <= 1;
+            const needsExactProviderBody = indexedMessages.some((message) => (
+              message.folder === 'sent' &&
+              message.originalCampaignOutbound === true &&
+              (
+                message.providerBodyHtmlEvidenceKnown !== true ||
+                message.providerOriginalBodyEvidenceKnown !== true
+              )
+            ));
+            return hasMissingThreadMember || needsExactProviderBody;
+          })
+          .slice(0, normalizedConfig.richBodyAuditLimit);
+        for (const [key, candidate] of pendingThreadHydrations) {
+          const indexedMessages = indexedThreadMessages.get(key) || [];
+          const hasMissingThreadMember = indexedMessages.length <= 1;
+          const needsExactProviderBody = indexedMessages.some((message) => (
+            message.folder === 'sent' &&
+            message.originalCampaignOutbound === true &&
+            (
+              message.providerBodyHtmlEvidenceKnown !== true ||
+              message.providerOriginalBodyEvidenceKnown !== true
+            )
+          ));
+          if (!hasMissingThreadMember && !needsExactProviderBody) continue;
+          const hydrated = await hydrateThread({
+            threadId: candidate.providerThreadId,
+            accountEmail: candidate.providerAccountEmail,
+            owner: selectedOwner,
+            indexedMessages,
+          });
+          stored += hydrated.stored;
+        }
+        await mailboxIndexStore.finishSync?.({
+          accountEmail: syncKey,
+          folder: 'instantly',
+          lockToken,
+          messageCount: stored,
+        });
+        await setContinuation(selectedOwner, cursor
+          ? { cursor, minTimestamp }
+          : { cursor: '', minTimestamp: '' });
+        return {
+          ok: true,
+          owner: selectedOwner,
+          accounts: accounts.map((account) => account.email),
+          seen,
+          stored,
+          pages: page,
+          partial: Boolean(cursor),
+          syncedAt: now().toISOString(),
+        };
+      } catch (error) {
+        await mailboxIndexStore.finishSync?.({
+          accountEmail: syncKey,
+          folder: 'instantly',
+          lockToken,
+          messageCount: stored,
+          error: error?.message || error,
+        });
+        throw error;
+      }
+    })().finally(() => {
+      syncPromiseByOwner.delete(selectedOwner);
+    });
+    syncPromiseByOwner.set(selectedOwner, promise);
+    return promise;
+  }
 
   function getMessageIdentity(message) {
     return normalizeText(
