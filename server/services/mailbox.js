@@ -1982,9 +1982,7 @@ function createMailboxService(deps = {}) {
             folder: normalizedFolder,
           });
         }
-        if (!selectedUids.length) return attachMailboxSyncReadHealth([], {
-          parseFailures: [], selectedCount: 0, folderMissing: false,
-        });
+        if (!selectedUids.length) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: false });
         return await fetchSelectedMailboxMessages({
           account,
           client,
