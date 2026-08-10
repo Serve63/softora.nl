@@ -162,6 +162,7 @@ function createMailboxSyncStateStore({
     const lastSyncedAt = Number.isFinite(requestedSyncedThroughMs)
       ? new Date(Math.min(requestedSyncedThroughMs, finishedAtMs)).toISOString()
       : finishedAt;
+    const safeLastUid = Math.max(0, Number(lastUid) || 0);
     const patch = failed
       ? {
           status: 'error',
@@ -174,7 +175,7 @@ function createMailboxSyncStateStore({
           status: 'ok',
           last_error: truncateText(normalizeString(warning), 1000) || null,
           message_count: Math.max(0, Number(messageCount) || 0),
-          last_uid: Math.max(0, Number(lastUid) || 0),
+          ...(safeLastUid > 0 ? { last_uid: safeLastUid } : {}),
           last_synced_at: lastSyncedAt,
           lock_token: null,
           lock_expires_at: null,

@@ -222,6 +222,72 @@ test('fast IMAP cap is complete at 20 and honestly partial at 21 or more', async
   assert.match(finishCalls[1].error, /fetchlimiet/i);
 });
 
+test('fast refresh forwards the durable UID frontier and advances it only after completeness', async () => {
+  const fetches = [];
+  const finishes = [];
+  const service = createService({
+    mailboxIndexStore: {
+      getSyncState: async () => ({ last_uid: 100, uid_validity: 777 }),
+      listMessageUidsForAccount: async () => [98, 99, 100],
+      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
+      finishSync: async (options) => { finishes.push(options); return { ok: true }; },
+    },
+    fetchMessagesFromImap: async (options) => {
+      fetches.push(options);
+      return withSyncReadHealth([{ uid: 101, id: 'inbox:101' }], {
+        frontierMode: true,
+        frontierAfterUid: 100,
+        frontierProviderNewestUid: 101,
+      });
+    },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', campaignOnly: true,
+    incrementalOnly: true, fastRefresh: true,
+  });
+
+  assert.equal(result.complete, true);
+  assert.equal(result.freshnessConfirmed, true);
+  assert.equal(fetches[0].incrementalAfterUid, 100);
+  assert.equal(fetches[0].incrementalUidValidity, 777);
+  assert.deepEqual(fetches[0].indexedUids, [98, 99, 100]);
+  assert.equal(finishes[0].lastUid, 101);
+});
+
+test('successful empty sync preserves an existing durable UID high-water mark', async () => {
+  const updates = [];
+  const store = require('../../server/services/mailbox-sync-runtime').createMailboxSyncStateStore({
+    run: async (_label, operation) => operation({
+      from() {
+        return {
+          update(patch) {
+            updates.push(patch);
+            return {
+              eq() { return this; },
+              select: async () => ({ data: [{ sync_key: 'serve@softora.nl|inbox' }], error: null }),
+            };
+          },
+        };
+      },
+    }).then((result) => ({ ok: true, data: result.data })),
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, length) => String(value || '').slice(0, length),
+    now: () => new Date('2026-08-10T18:00:00.000Z'),
+    tableName: 'softora_mailbox_sync_state',
+  });
+
+  const result = await store.finishSync({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', lockToken: 'lock',
+    messageCount: 0, lastUid: 0,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(updates[0], 'last_uid'), false);
+});
+
 test('ordinary IMAP sync verwerkt 31 berichten over twee runs en noemt de eerste nooit vers', async () => {
   const allUids = Array.from({ length: 31 }, (_item, index) => index + 1);
   const indexed = new Set();

@@ -449,6 +449,19 @@ function createMailboxSyncService({
         await waitForMailboxSyncLockRetry(retryDelayMs, folderDeadline.signal);
       }
       throwIfSyncAborted(folderDeadline.signal);
+      const incrementalSyncState =
+        fastRefresh && incrementalOnly && typeof mailboxIndexStore.getSyncState === 'function'
+          ? await mailboxIndexStore.getSyncState({
+              accountEmail: account.email,
+              folder: normalizedFolder,
+              signal: folderDeadline.signal,
+            })
+          : null;
+      throwIfSyncAborted(folderDeadline.signal);
+      const incrementalAfterUid = Math.max(0, Number(incrementalSyncState?.last_uid) || 0);
+      const incrementalUidValidity = normalizeMailboxUidValidity(
+        incrementalSyncState?.uid_validity
+      );
       const hydrateCampaignHistory = campaignOnly && !incrementalOnly;
       const oldestIndexedCampaignUid =
         hydrateCampaignHistory &&
@@ -574,6 +587,8 @@ function createMailboxSyncService({
           threadRecipientTerms,
           priorityUids: retryDueQuarantineUids,
           indexedUids,
+          incrementalAfterUid,
+          incrementalUidValidity,
           reconcileIntentIds: normalizedFolder === 'sent'
             ? smtpReconciliation.intents.map((intent) => intent.intentId)
             : [],
@@ -744,7 +759,10 @@ function createMailboxSyncService({
         }
       }
       throwIfSyncAborted(folderDeadline.signal);
-      const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
+      const lastUid = Math.max(
+        messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0),
+        Number(readHealth.frontierProviderNewestUid) || 0
+      );
       const finish = await mailboxIndexStore.finishSync({
         accountEmail: account.email,
         folder: normalizedFolder,

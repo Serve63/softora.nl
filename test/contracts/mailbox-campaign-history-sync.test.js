@@ -135,6 +135,58 @@ test('narrow Gmail label sync advances through unindexed messages without campai
   assert.deepEqual(queries, [{ query: { all: true }, options: { uid: true } }]);
 });
 
+test('live incremental sync reads only the UID frontier and ignores old history gaps', async () => {
+  const queries = [];
+  const client = {
+    async search(query, options) {
+      queries.push({ query, options });
+      // A defensive provider may still return the range boundary. Selection
+      // must filter it and every older UID locally as well.
+      return [90, 100, 101, 102];
+    },
+  };
+
+  const selected = await resolveMailboxSyncUids({
+    client,
+    limit: 20,
+    campaignHistory: false,
+    incrementalAfterUid: 100,
+    indexedUids: [90, 101],
+  });
+
+  assert.deepEqual(selected, [102]);
+  assert.deepEqual(queries, [{ query: { uid: '101:*' }, options: { uid: true } }]);
+  assert.equal(selected.syncSelectionHealth.frontierMode, true);
+  assert.equal(selected.syncSelectionHealth.frontierAfterUid, 100);
+  assert.equal(selected.syncSelectionHealth.frontierProviderNewestUid, 102);
+  assert.equal(selected.syncSelectionHealth.remainingUidCount, 0);
+  assert.equal(selected.syncSelectionHealth.truncated, false);
+});
+
+test('live incremental frontier drains a burst in contiguous bounded batches', () => {
+  const allUids = Array.from({ length: 25 }, (_item, index) => 101 + index);
+  const first = selectMailboxSyncUids({
+    allUids,
+    incrementalAfterUid: 100,
+    indexedUids: [],
+    limit: 21,
+  });
+  const second = selectMailboxSyncUids({
+    allUids,
+    incrementalAfterUid: 100,
+    indexedUids: first,
+    limit: 21,
+  });
+
+  assert.deepEqual(first, Array.from({ length: 21 }, (_item, index) => 101 + index));
+  assert.equal(first.syncSelectionHealth.remainingUidCount, 4);
+  assert.equal(first.syncSelectionHealth.truncated, true);
+  assert.deepEqual(second, [122, 123, 124, 125]);
+  assert.equal(second.syncSelectionHealth.frontierProviderNewestUid, 125);
+  assert.equal(second.syncSelectionHealth.remainingUidCount, 0);
+  assert.equal(second.syncSelectionHealth.truncated, false);
+});
+
 test('ordinary IMAP selection advances past a full newest window without ever claiming it is complete', () => {
   const allUids = Array.from({ length: 31 }, (_item, index) => index + 1);
   const first = selectMailboxSyncUids({ allUids, indexedUids: [], limit: 30 });
