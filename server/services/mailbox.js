@@ -7,9 +7,11 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
+const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
+const { createMailboxWebdesignOutboundGuard } = require('./mailbox-webdesign-outbound-guard');
 const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, resolveReplyIdentity, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
@@ -1335,101 +1337,10 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  function buildMailboxWebdesignGuardConflictError(identity, conflict) {
-    const sender = normalizeEmail(conflict && conflict.sender_email);
-    const provider = normalizeString(conflict && conflict.provider).toLowerCase();
-    const target =
-      normalizeEmail(identity && identity.recipientEmail) ||
-      normalizeString(identity && identity.recipientCompany) ||
-      'deze ontvanger';
-    const source = provider === 'instantly'
-      ? 'Instantly'
-      : sender
-        ? sender
-        : 'de centrale outbound duplicate-guard';
-    return buildMailboxWebdesignGuardError(
-      `Webdesignmail geblokkeerd: ${target} is al eerder vastgezet via ${source}.`,
-      'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFLICT',
-      409,
-      { conflict }
-    );
-  }
-
-  function isCompleteOutboundGuardReservation(result) {
-    const actualCount = Number(result && result.count);
-    const expectedCount = Number(result && result.expectedCount);
-    if (!result || result.ok !== true) return false;
-    if (!Number.isFinite(actualCount) || actualCount <= 0) return false;
-    return !(Number.isFinite(expectedCount) && expectedCount > 0 && actualCount < expectedCount);
-  }
-
-  async function reserveMailboxWebdesignOutboundRecipient(identity, { accountEmail, subject } = {}) {
-    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard ontbreekt; webdesignmail niet verzonden.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_UNAVAILABLE',
-        503
-      );
-    }
-    const reservation = await outboundRecipientGuardStore.reserveRecipients([identity], {
-      provider: 'softora',
-      channel: 'mailbox',
-      senderEmail: accountEmail,
-      source: 'softora-mailbox-webdesign-pre-send',
-      actor: 'premium-mailbox-send',
-      status: 'reserved',
-      permanent: true,
-      payload: {
-        subject,
-        manualMailboxSend: true,
-      },
-    });
-    if (reservation && reservation.conflict) {
-      throw buildMailboxWebdesignGuardConflictError(identity, reservation.conflict);
-    }
-    if (!isCompleteOutboundGuardReservation(reservation)) {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard kon niet reserveren; webdesignmail niet verzonden.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_FAILED',
-        502
-      );
-    }
-    return reservation;
-  }
-
-  async function confirmMailboxWebdesignOutboundRecipient(reservationId, sentItem = {}) {
-    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard kan niet permanent worden bevestigd na SMTP-acceptatie.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
-        502
-      );
-    }
-    if (!reservationId) {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard mist een reservering na SMTP-acceptatie.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
-        502
-      );
-    }
-    const confirmation = await outboundRecipientGuardStore.confirmReservation(reservationId, {
-      status: 'sent',
-      permanent: true,
-      payload: {
-        messageId: sentItem.messageId,
-        email: sentItem.email,
-        subject: sentItem.subject,
-        manualMailboxSend: true,
-      },
-    });
-    if (!confirmation || confirmation.ok !== true || Number(confirmation.count || 0) <= 0) {
-      throw buildMailboxWebdesignGuardError(
-        'Centrale outbound duplicate-guard bevestigde geen bestaande reservering na SMTP-acceptatie.',
-        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
-        502
-      );
-    }
-  }
+  const { confirm: confirmMailboxWebdesignOutboundRecipient,
+    reserve: reserveMailboxWebdesignOutboundRecipient } = createMailboxWebdesignOutboundGuard({
+    buildError: buildMailboxWebdesignGuardError, normalizeEmail, normalizeString, outboundRecipientGuardStore,
+  });
 
   function getPhotoMetaForRow(row, index, photoMap, photoByIdentity) {
     const id = getCustomerId(row, index);
@@ -2064,30 +1975,17 @@ function createMailboxService(deps = {}) {
           });
         }
         if (!selectedUids.length) return [];
-        const records = [];
-        for await (const message of client.fetch(
+        return await fetchSelectedMailboxMessages({
+          account,
+          buildMailboxBodyImages,
+          client,
+          folder: normalizedFolder,
+          normalizeString,
+          parseMailSource,
+          sanitizeMailboxDisplayText,
           selectedUids,
-          { uid: true, flags: true, internalDate: true, source: true },
-          { uid: true }
-        )) {
-          const parsed = await parseMailSource(message.source);
-          const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
-          const primaryBodyImages = buildMailboxBodyImages(parsed);
-          records.push({
-            key: `${normalizedFolder}:${message.uid}`,
-            message,
-            parsed,
-            text,
-            primaryBodyImages,
-          });
-        }
-        const messages = records.map((record) =>
-          toClientMessage(record.parsed, record.message, normalizedFolder, account, {
-            text: record.text,
-            primaryBodyImages: record.primaryBodyImages,
-          })
-        );
-        return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          toClientMessage,
+        });
       } finally {
         lock.release();
       }
@@ -2158,16 +2056,10 @@ function createMailboxService(deps = {}) {
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);
   }
-  async function listMessagesWithMeta({
-    accountEmail,
-    folder = 'inbox',
-    limit = 50,
-    allowLiveImapFallback = true,
-  } = {}) {
-    const startedAt = Date.now();
-    const account = assertReadableAccount(accountEmail);
-    const normalizedFolder = normalizeFolder(folder);
-    const safeLimit = getSafeLimit(limit);
+  async function listMessagesWithMeta({ accountEmail, folder = 'inbox', limit = 50,
+    allowLiveImapFallback = true } = {}) {
+    const startedAt = Date.now(); const account = assertReadableAccount(accountEmail);
+    const normalizedFolder = normalizeFolder(folder); const safeLimit = getSafeLimit(limit);
     const indexClientAvailable = canUseMailboxIndex();
     const indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
     const indexReadable = Array.isArray(indexedMessages);
@@ -2238,7 +2130,7 @@ function createMailboxService(deps = {}) {
     const result = await listMessagesWithMeta(options);
     return result.messages;
   }
-  async function getMessage({ accountEmail, folder = 'inbox', id = '', persistIndex = true }) {
+  async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
     const normalizedFolder = normalizeString(folder).toLowerCase() === 'instantly' ? 'instantly' : normalizeFolder(folder);
     if (normalizedFolder === 'instantly') return getInstantlyMessage({ accountEmail, id });
     const account = assertReadableAccount(accountEmail);
@@ -2273,7 +2165,7 @@ function createMailboxService(deps = {}) {
       error.status = 404;
       throw error;
     }
-    if (persistIndex && canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
+    if (canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
       await mailboxIndexStore.upsertMessages({
         accountEmail: account.email,
         folder: normalizedFolder,
@@ -2451,8 +2343,8 @@ function createMailboxService(deps = {}) {
     try {
       return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
-        owner: normalizeString(req.query?.owner), persistSnapshot: req.premiumReadOnlyTokenFallback !== true,
-        refreshInstantly: req.premiumReadOnlyTokenFallback !== true && /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
+        owner: normalizeString(req.query?.owner),
+        refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
       }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);
@@ -2468,7 +2360,7 @@ function createMailboxService(deps = {}) {
       const message = await getMessage({
         accountEmail: req.query?.account,
         folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
+        id: req.query?.id || req.query?.message || '',
       });
       return res.status(200).json({ ok: true, message });
     } catch (error) {
@@ -2491,7 +2383,7 @@ function createMailboxService(deps = {}) {
       const message = await getMessage({
         accountEmail: req.query?.account,
         folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '', persistIndex: req.premiumReadOnlyTokenFallback !== true,
+        id: req.query?.id || req.query?.message || '',
       });
       const image = decodeMailboxMessageImage(
         Array.isArray(message && message.bodyImages) ? message.bodyImages[imageIndex] : null
