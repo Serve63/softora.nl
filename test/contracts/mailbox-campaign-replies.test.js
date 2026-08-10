@@ -100,6 +100,44 @@ test('durable lineage keeps a newly discovered transitive reply visible in one b
   assert.deepEqual(calls, { lineage: 1, recent: 2, matching: 0, legacy: 0 });
 });
 
+test('durable lineage vult een ontbrekende exacte Sent-ouder gericht aan voor de paarse threadkaart', async () => {
+  const parent = {
+    id: 'sent:romca', folder: 'sent', accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl', to: 'info@romca-packing.nl',
+    subject: 'Kleine vraag over jullie website', date: '2026-08-10T13:18:00.000Z',
+    messageId: '<a8892282-972b-7062-52eb-486a275d02a7@softora.nl>',
+    body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website romca-packing.nl tegen.',
+    originalCampaignOutbound: true,
+  };
+  const incoming = {
+    id: 'inbox:romca', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Romca Packing', email: 'info@romca-packing.nl', to: 'serve@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website', date: '2026-08-10T19:51:00.000Z',
+    messageId: '<romca-reply@mail.gmail.com>', inReplyTo: parent.messageId,
+    references: parent.messageId, body: 'Hallo serve,\n\nMooi, maar we hebben pas een nieuwe website.',
+  };
+  let requestedMessageIds = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listCampaignLineageMessages: async () => [incoming],
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
+      listMessagesByMessageIdsForAccounts: async ({ messageIds }) => {
+        requestedMessageIds = messageIds;
+        return [parent];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const replies = await service.listReplies({ limit: 10, owner: 'serve' });
+
+  assert.ok(requestedMessageIds.some((value) => String(value).includes('a8892282-972b-7062')));
+  assert.equal(replies.length, 1);
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), [parent.id]);
+  assert.equal(replies[0].threadMessages[0].body, parent.body);
+});
+
 test('durable lineage fails closed before a partial context can replace the mailbox', async () => {
   let recentReads = 0;
   const service = createMailboxCampaignRepliesService({
@@ -811,7 +849,7 @@ test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een an
   assert.equal(conversations[0].latestOutboundAt, '2026-06-10T08:00:00.000Z');
 });
 
-test('campaign mailbox hides only source-proven automatic replies and keeps unknown text visible', () => {
+test('campaign mailbox gebruikt bronbewijs plus smalle automatische fallback en houdt menselijke replies zichtbaar', () => {
   assert.equal(isAutomatedCampaignReply({
     subject: 'zomersluiting Re: Kleine vraag over jullie website',
     body: 'Beste mailer, tot 1 juli zijn wij gesloten.',
@@ -844,6 +882,24 @@ test('campaign mailbox hides only source-proven automatic replies and keeps unkn
     automatedReplyEvidence: false,
     automatedReplyEvidenceSource: 'instantly:is_auto_reply',
   }), false, 'providerbewijs dat is_auto_reply false is houdt het menselijke antwoord zichtbaar');
+
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Hartelijk dank voor uw bericht. In verband met vakantie zijn wij afwezig. Mails worden in de tussentijd niet gelezen.',
+  }), true, 'een ondubbelzinnig vakantieantwoord blijft gefilterd wanneer technische headers ontbreken');
+  assert.equal(isAutomatedCampaignReply({
+    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    preview: '##- Please type your reply above this line -##',
+    body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk door ons supportteam in behandeling genomen.',
+    autoSubmitted: 'no',
+  }), true, 'een ondubbelzinnige ticketbevestiging blijft zonder providerflag gefilterd');
+  assert.equal(isAutomatedCampaignReply({
+    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    body: 'Uw aanvraag (269705) is ontvangen. Ik heb het ontwerp bekeken en wil graag bellen.',
+    automatedReplyEvidenceKnown: true,
+    automatedReplyEvidence: false,
+    automatedReplyEvidenceSource: 'instantly:is_auto_reply',
+  }), false, 'expliciet providerbewijs dat een antwoord menselijk is blijft leidend');
 });
 
 test('campaign mailbox koppelt een unieke nabije automatische reactie zonder RFC-referenties fail-closed', () => {

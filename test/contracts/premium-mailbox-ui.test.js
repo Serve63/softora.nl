@@ -124,7 +124,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-message-identity\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-snapshot-freshness\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810c/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810d/);
   assert.match(readPage(), /assets\/premium-mailbox-ui-state\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260810b/);
@@ -1644,6 +1644,60 @@ test('MHC quote staat alleen in de bewezen roze outboundkaart en niet dubbel in 
   assert.doesNotMatch(html, /Volledig bericht is niet beschikbaar/);
 });
 
+test('Romca toont alleen nieuwe ontvangsttekst grijs en de exact gekoppelde coldmail apart paars', () => {
+  const outboundBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website romca-packing.nl tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const quotedOutbound = outboundBody
+    .replace('romca-packing.nl', 'romca\u2060-\u2060packing\u2060.\u2060nl')
+    .split('\n')
+    .map((line) => `> ${line}`);
+  const incomingBody = [
+    'Hallo serve,',
+    '',
+    'Mooi, maar we hebben pas een nieuwe website.',
+    '',
+    'Groetjes',
+    'Carla',
+    '',
+    'Op ma 10 aug 2026 om 15:18 schreef Servé Creusen',
+    '',
+    ...quotedOutbound,
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:romca',
+    mail: {
+      id: 'inbox:romca',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-10T19:51:00.000Z',
+      inReplyTo: '<a8892282-972b-7062-52eb-486a275d02a7@softora.nl>',
+      threadMessages: [{
+        id: 'sent:romca',
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        date: '2026-08-10T13:18:00.000Z',
+        messageId: '<a8892282-972b-7062-52eb-486a275d02a7@softora.nl>',
+        body: outboundBody,
+      }],
+    },
+  });
+
+  assert.match(html, /detail-mail-section-received[\s\S]*Mooi, maar we hebben pas een nieuwe website\./);
+  assert.match(html, /detail-mail-section-sent[\s\S]*Jouw bericht/);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website romca-packing\.nl tegen\./g) || []).length, 1);
+  assert.doesNotMatch(html, /Op ma 10 aug 2026 om 15:18 schreef Servé Creusen/);
+});
+
 test('mailbox verwijdert alleen een exacte dubbele URL-annotatie op de volgende regel', () => {
   const url = 'https://www.festivalcement.nl/over-cement';
   const html = renderMailboxBodyForTest([
@@ -2944,7 +2998,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810c/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810d/);
   assert.match(readPage(), /assets\/premium-mailbox-request-deadline\.js\?v=20260809a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260810b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
@@ -3175,7 +3229,7 @@ test('coldmail eigenaarfilter lekt een bewezen Martijn-kopie nooit naar Servé',
   }], 'serve'), []);
 });
 
-test('coldmail lijst verbergt alleen bronbewezen automatische antwoorden uit bootstrap- of sessiecache', () => {
+test('coldmail lijst combineert bronbewijs met een smalle automatische fallback uit bootstrap- of sessiecache', () => {
   const messages = [
     {
       id: 'human',
@@ -3275,11 +3329,11 @@ test('coldmail lijst verbergt alleen bronbewezen automatische antwoorden uit boo
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[5]), false);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[6]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[7]), false);
-  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[8]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[8]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[9]), false);
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
-    ['provider-known-human', 'bare-evidence-only', 'human-automation-question', 'human-about-automation', 'human']
+    ['provider-known-human', 'human-automation-question', 'human-about-automation', 'human']
   );
   assert.deepEqual(campaignInboxModule.filterMessages(messages, 'serve'), []);
 });
@@ -3338,6 +3392,30 @@ test('mailbox normalisatie bewaart de volledige bronbewezen auto-replyclassifica
   assert.equal(normalized.automatedReplyEvidenceKnown, true);
   assert.equal(normalized.automatedReplyEvidence, false);
   assert.equal(normalized.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
+});
+
+test('coldmail lijst filtert ondubbelzinnige vakantie- en ticketantwoorden ook zonder technische headers', () => {
+  const vacationReply = {
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Hartelijk dank voor uw bericht. In verband met vakantie zijn wij afwezig. Mails worden in de tussentijd niet gelezen.',
+  };
+  const supportAcknowledgement = {
+    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    preview: '##- Please type your reply above this line -##',
+    body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+    autoSubmitted: 'no',
+  };
+  const providerConfirmedHuman = {
+    ...supportAcknowledgement,
+    body: 'Uw aanvraag (269705) is ontvangen. Ik heb het ontwerp bekeken en wil graag bellen.',
+    automatedReplyEvidenceKnown: true,
+    automatedReplyEvidence: false,
+    automatedReplyEvidenceSource: 'instantly:is_auto_reply',
+  };
+
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(vacationReply), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(supportAcknowledgement), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(providerConfirmedHuman), false);
 });
 
 test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespreksvak', () => {
@@ -6227,7 +6305,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v18:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v19:usr_serve:serve');
         return {
           ok: true,
           contentAt: new Date().toISOString(),

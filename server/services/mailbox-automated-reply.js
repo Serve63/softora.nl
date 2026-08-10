@@ -1,3 +1,5 @@
+const { getAuthoredMessageText } = require('./mailbox-image-ownership');
+
 function normalizeText(value) {
   return String(value || '').trim();
 }
@@ -8,6 +10,33 @@ function normalizeClassifierText(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+}
+
+function hasStrongAutomatedReplyText(message) {
+  const subject = normalizeClassifierText(message && message.subject);
+  const content = normalizeClassifierText([
+    message && message.preview ? getAuthoredMessageText(message.preview) : '',
+    message && message.body ? getAuthoredMessageText(message.body) : '',
+  ].filter(Boolean).join(' '));
+  const automaticSubject = Boolean(
+    /^(?:(?:re|fw|fwd)\s*:\s*)*(?:automatisch antwoord|automatic (?:reply|response)|auto[ -]?reply|out[ -]?of[ -]?office|afwezigheidsmelding|ontvangstbevestiging)\b/.test(subject)
+  );
+  const explicitlyAutomatedBody = Boolean(
+    /\b(?:dit (?:bericht|e-?mail|email) is automatisch gegenereerd|dit is (?:een )?automatisch(?:e)? (?:e-?mail|mail|bericht|antwoord|reactie|ontvangstbevestiging)|this is an automated (?:e-?mail|mail|message|reply|response))\b/.test(content)
+  );
+  const vacationBody = Boolean(
+    /\b(?:in verband met vakantie|op vakantie|vakantie|afwezig|out of (?:the )?office)\b/.test(content) &&
+    /\b(?:mails?|e-?mails?|berichten) worden\b.{0,100}\b(?:niet|beperkt) gelezen\b/.test(content)
+  );
+  const supportSubject = /^(?:\[serviceaanvraag ontvangen\]|serviceaanvraag ontvangen)(?:\s|$)/.test(subject);
+  const supportReplyMarker = /\bplease type your reply above this line\b/.test(content);
+  const supportReceipt = Boolean(
+    /\buw aanvraag\s*\([^)]{1,40}\)\s+is ontvangen\b/.test(content) ||
+    /\byour request\s*\([^)]{1,40}\)\s+has been received\b/.test(content)
+  );
+  return automaticSubject || explicitlyAutomatedBody || vacationBody || (
+    supportReceipt && (supportSubject || supportReplyMarker)
+  );
 }
 
 function parseBooleanEvidence(value, explicitlyKnown = false) {
@@ -73,11 +102,13 @@ function isAutomatedCampaignReply(message) {
     precedence: message.precedence,
     autoResponseSuppress: message.autoResponseSuppress,
   });
-  return inferred.automatedReplyEvidenceKnown === true && inferred.automatedReplyEvidence === true;
+  if (inferred.automatedReplyEvidence === true) return true;
+  return hasStrongAutomatedReplyText(message);
 }
 
 module.exports = {
   buildAutomatedReplyEvidence,
+  hasStrongAutomatedReplyText,
   isAutomatedCampaignReply,
   normalizeClassifierText,
   parseBooleanEvidence,

@@ -22,7 +22,7 @@ test('public asset cache keeps unhashed app js/css fresh even with version query
     'public, max-age=60, stale-while-revalidate=300'
   );
   assert.equal(
-    getStaticAssetCacheControl('/app/assets/premium-mailbox-campaign-inbox.js', '/assets/premium-mailbox-campaign-inbox.js?v=20260810c'),
+    getStaticAssetCacheControl('/app/assets/premium-mailbox-campaign-inbox.js', '/assets/premium-mailbox-campaign-inbox.js?v=20260810d'),
     'public, max-age=60, stale-while-revalidate=300'
   );
   assert.equal(
