@@ -112,7 +112,9 @@ if (!databaseUrl) {
         unique (account_email, folder, uid)
       );
     `);
+    // lgtm[js/sql-query-built-from-user-controlled-sources] Repo-tracked migration; the harness refuses every non-dedicated test database above.
     await admin.query(foundation);
+    // lgtm[js/sql-query-built-from-user-controlled-sources] Repo-tracked migration; the harness refuses every non-dedicated test database above.
     await admin.query(forwardMigration);
   });
 
@@ -386,6 +388,7 @@ if (!databaseUrl) {
 
   test('forward migration kan veilig opnieuw draaien zonder constraint- of datadrift', async () => {
     const client = await connect();
+    // lgtm[js/sql-query-built-from-user-controlled-sources] Idempotency rerun of the same repo-tracked migration in the dedicated test database.
     await client.query(forwardMigration);
     const constraintCount = (await client.query(`
       select count(*)::integer as count
