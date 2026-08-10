@@ -3,6 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  createMailboxPayloadFingerprint,
+  createMailboxSendIdentityKey,
+  createMailboxSendScopeKey,
+} = require('../../server/services/mailbox-send-provenance-store');
 
 const databaseUrl = String(process.env.MAILBOX_POSTGRES_TEST_URL || '').trim();
 const destructiveAllowed = process.env.MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE === '1';
@@ -33,6 +38,14 @@ if (!databaseUrl) {
   const globalLockProbe = fs.readFileSync(path.resolve(
     __dirname,
     '../../supabase/mailbox-sync-global-lock-probe.sql'
+  ), 'utf8');
+  const sendProvenanceFoundation = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
+  ), 'utf8');
+  const providerOutcomeMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260810012150_mailbox_send_provider_outcome_state.sql'
   ), 'utf8');
   const clients = new Set();
 
@@ -119,13 +132,76 @@ if (!databaseUrl) {
     );
   }
 
+  async function seedMessage(client, key) {
+    const row = messageRow(key);
+    await client.query(`
+      insert into public.softora_mailbox_messages
+        (message_key,account_email,folder,uid,provider_id,subject,body_text,date,unread,payload)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,true,$9::jsonb)
+      on conflict (message_key) do nothing
+    `, [row.message_key, row.account_email, row.folder, row.uid, row.provider_id,
+      'Seed', 'Seed body', row.date, JSON.stringify(row.payload)]);
+  }
+
+  async function prepareDirectOperation(client, key, operation) {
+    if (operation !== 'restore') return;
+    await client.query(`
+      update public.softora_mailbox_messages
+      set deleted_at=clock_timestamp(),reply_dismissed_at=clock_timestamp() where message_key=$1
+    `, [key]);
+  }
+
+  async function runDirectOperation(client, key, operation, label) {
+    const row = messageRow(key);
+    if (operation === 'hydrate') return client.query(`
+        insert into public.softora_mailbox_messages
+          (message_key,account_email,folder,uid,provider_id,subject,body_text,date,unread,payload)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,true,$9::jsonb)
+        on conflict (message_key) do update set
+          subject=excluded.subject,body_text=excluded.body_text,unread=excluded.unread,
+          payload=excluded.payload,updated_at=clock_timestamp()
+      `, [row.message_key, row.account_email, row.folder, row.uid, row.provider_id,
+        `Direct ${label}`, `Direct hydration ${label}`, row.date, JSON.stringify(row.payload)]);
+    if (operation === 'read') return client.query(`
+      update public.softora_mailbox_messages set unread=false,softora_read_at=clock_timestamp()
+      where message_key=$1
+    `, [key]);
+    if (operation === 'hide') return client.query(`
+      update public.softora_mailbox_messages
+      set deleted_at=clock_timestamp(),reply_dismissed_at=clock_timestamp() where message_key=$1
+    `, [key]);
+    return client.query(`
+      update public.softora_mailbox_messages set deleted_at=null,reply_dismissed_at=null where message_key=$1
+    `, [key]);
+  }
+
+  async function assertDirectEffect(client, key, operation, label) {
+    const row = (await client.query(`
+      select subject,body_text,unread,softora_read_at,deleted_at,reply_dismissed_at
+      from public.softora_mailbox_messages where message_key=$1
+    `, [key])).rows[0];
+    if (operation === 'hydrate') {
+      assert.equal(row.subject, `Direct ${label}`);
+      assert.equal(row.body_text, `Direct hydration ${label}`);
+    } else if (operation === 'read') {
+      assert.equal(row.unread, false);
+      assert.ok(row.softora_read_at);
+    } else if (operation === 'hide') {
+      assert.ok(row.deleted_at);
+      assert.ok(row.reply_dismissed_at);
+    } else {
+      assert.equal(row.deleted_at, null);
+      assert.equal(row.reply_dismissed_at, null);
+    }
+  }
+
   async function assertBlocked(promise, label) {
     const marker = Symbol(label);
     const early = await Promise.race([
       promise.then(() => 'resolved', () => 'rejected'),
       new Promise((resolve) => setTimeout(() => resolve(marker), 150)),
     ]);
-    assert.equal(early, marker, `${label} blokkeerde niet op de gedeelde state-lock`);
+    assert.equal(early, marker, `${label} blokkeerde niet zoals verwacht`);
   }
 
   test.before(() => {
@@ -168,8 +244,19 @@ if (!databaseUrl) {
         updated_at timestamptz not null default now()
       );
     `;
+    const legacySendSeedSql = `
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,owner,account_email,recipient_email,mode,conversation_id,
+        reply_target_message_id,references_text,provider,subject,body_text,status
+      ) values (
+        'send:legacy-accepted','legacy-browser-key','serve','serve@softora.nl','legacy@example.org',
+        'reply','conversation:legacy','<legacy-incoming@example.org>','<legacy-incoming@example.org>',
+        'smtp','Re: Legacy','Legacy antwoord','accepted'
+      );
+    `;
     applyTrackedSql(
-      `${bootstrapSql}\n${foundation}\n${forwardMigration}\n${globalLockMigration}\n${globalLockProbe}`
+      `${bootstrapSql}\n${foundation}\n${forwardMigration}\n${globalLockMigration}\n${globalLockProbe}` +
+      `\n${sendProvenanceFoundation}\n${legacySendSeedSql}\n${providerOutcomeMigration}`
     );
   });
 
@@ -177,47 +264,70 @@ if (!databaseUrl) {
     await Promise.all(Array.from(clients, (client) => client.end().catch(() => null)));
   });
 
-  test('atomic wint: reaper wacht en ziet uitsluitend committed data', { timeout: 10_000 }, async () => {
-    const atomic = await connect();
-    const reaper = await connect();
-    const mutationId = '10000000-0000-4000-8000-000000000001';
-    const requestKey = 'postgres:atomic-wins';
-    await beginMutation(atomic, { mutationId, requestKey });
-    await atomic.query('begin');
-    await atomicCommit(atomic, mutationId, requestKey, [messageRow('atomic-wins-1')]);
-    const fencePromise = reaper.query('select * from public.softora_get_mailbox_campaign_fence(true)');
-    await assertBlocked(fencePromise, 'reaper achter atomic');
-    await atomic.query('commit');
-    const fence = (await fencePromise).rows[0];
-    assert.equal(fence.ready, true);
-    assert.equal(fence.reaped_count, '0');
-    assert.equal((await reaper.query(
-      "select count(*)::text as count from public.softora_mailbox_messages where message_key='atomic-wins-1'"
-    )).rows[0].count, '1');
+  test('atomic-wint same-row matrix blokkeert iedere directe app-writeklasse afzonderlijk', async (t) => {
+    for (const [index, operation] of ['hydrate', 'read', 'hide', 'restore'].entries()) {
+      await t.test(operation, { timeout: 10_000 }, async () => {
+        const setup = await connect();
+        const atomic = await connect();
+        const direct = await connect();
+        const suffix = 101 + index;
+        const mutationId = `10000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`;
+        const requestKey = `postgres:atomic-wins:${operation}`;
+        const key = `same-row-atomic-wins-${suffix}`;
+        await seedMessage(setup, key);
+        await prepareDirectOperation(setup, key, operation);
+        await beginMutation(atomic, { mutationId, requestKey });
+        await atomic.query('begin');
+        await atomicCommit(atomic, mutationId, requestKey, [{
+          ...messageRow(key), subject: `Atomic ${operation}`, body_text: `Atomic ${operation} body`,
+        }]);
+        await direct.query('begin');
+        const directPromise = runDirectOperation(direct, key, operation, `after atomic ${operation}`);
+        await assertBlocked(directPromise, `${operation} achter atomic op dezelfde row`);
+        await atomic.query('commit');
+        await directPromise;
+        await assertDirectEffect(direct, key, operation, `after atomic ${operation}`);
+        await direct.query('commit');
+      });
+    }
   });
 
-  test('direct-write wint: atomic wacht zonder deadlock en commit daarna', { timeout: 10_000 }, async () => {
-    const direct = await connect();
-    const atomic = await connect();
-    const mutationId = '20000000-0000-4000-8000-000000000002';
-    const requestKey = 'postgres:direct-wins';
-    await direct.query('begin');
-    await direct.query(`
-      insert into public.softora_mailbox_messages
-        (message_key,account_email,folder,uid,provider_id,date,payload)
-      values ('direct-wins-2','serve@softora.nl','inbox',2002,'direct-wins-2',now(),'{}'::jsonb)
-    `);
-    const atomicPromise = (async () => {
-      await atomic.query('begin');
-      await beginMutation(atomic, { mutationId, requestKey });
-      const result = await atomicCommit(atomic, mutationId, requestKey, [messageRow('atomic-after-direct-3')]);
-      await atomic.query('commit');
-      return result;
-    })();
-    await assertBlocked(atomicPromise, 'atomic achter directe writer');
-    await direct.query('commit');
-    const result = await atomicPromise;
-    assert.equal(result.rows[0].mutation_status, 'completed');
+  test('direct-wint same-row matrix laat atomic per app-writeklasse wachten zonder deadlock', async (t) => {
+    for (const [index, operation] of ['hydrate', 'read', 'hide', 'restore'].entries()) {
+      await t.test(operation, { timeout: 10_000 }, async () => {
+        const setup = await connect();
+        const direct = await connect();
+        const atomic = await connect();
+        const suffix = 201 + index;
+        const mutationId = `20000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`;
+        const requestKey = `postgres:direct-wins:${operation}`;
+        const key = `same-row-direct-wins-${suffix}`;
+        await seedMessage(setup, key);
+        await prepareDirectOperation(setup, key, operation);
+        await beginMutation(atomic, { mutationId, requestKey });
+        await direct.query('begin');
+        await runDirectOperation(direct, key, operation, `before atomic ${operation}`);
+        await assertDirectEffect(direct, key, operation, `before atomic ${operation}`);
+        const atomicPromise = (async () => {
+          await atomic.query('begin');
+          const result = await atomicCommit(atomic, mutationId, requestKey, [{
+            ...messageRow(key), subject: `Atomic last ${operation}`,
+            body_text: `Atomic last ${operation} body`, unread: true,
+          }]);
+          await atomic.query('commit');
+          return result;
+        })();
+        await assertBlocked(atomicPromise, `atomic achter ${operation} op dezelfde row`);
+        await direct.query('commit');
+        const result = await atomicPromise;
+        assert.equal(result.rows[0].mutation_status, 'completed');
+        const final = (await setup.query(
+          'select subject,body_text from public.softora_mailbox_messages where message_key=$1', [key]
+        )).rows[0];
+        assert.equal(final.subject, `Atomic last ${operation}`);
+        assert.equal(final.body_text, `Atomic last ${operation} body`);
+      });
+    }
   });
 
   test('reaper wint: late atomic RPC weigert vóór iedere messagewrite', { timeout: 10_000 }, async () => {
@@ -457,6 +567,202 @@ if (!databaseUrl) {
     )).rows[0].account_email, 'serve@websoftora.com');
   });
 
+  test('verschillende browserkeys voor één Instantly-sendidentiteit reserveren atomair maar één intent', { timeout: 10_000 }, async () => {
+    const first = await connect();
+    const second = await connect();
+    const observer = await connect();
+    const identity = 'instantly-reply:postgres-concurrent-identity';
+    const values = (suffix) => [
+      `send:postgres-${suffix}`, `browser-key-${suffix}`, identity, identity, 'serve',
+      'serve@softora.nl', 'prospect@example.org', 'reply', 'instantly:thread-1',
+      'incoming-1', 'incoming-1', 'instantly', 'thread-1', 'Re: Website', 'Exact antwoord',
+      'payload:instantly-race',
+    ];
+    const insert = (client, suffix) => client.query(`
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,send_identity_key,send_scope_key,owner,account_email,recipient_email,
+        mode,conversation_id,reply_target_message_id,references_text,provider,
+        provider_thread_id,subject,body_text,payload_fingerprint,status
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'prepared')
+    `, values(suffix));
+
+    await first.query('begin');
+    await insert(first, 'first');
+    const competingInsert = insert(second, 'second');
+    await assertBlocked(competingInsert, 'tweede send-identiteitsreservering');
+    await first.query('commit');
+    await assert.rejects(competingInsert, (error) => error.code === '23505');
+    const count = await observer.query(
+      'select count(*)::integer as count from public.softora_mailbox_send_provenance where send_identity_key=$1',
+      [identity]
+    );
+    assert.equal(count.rows[0].count, 1);
+  });
+
+  test('new-message heeft blijvende exact-replay key en tijdelijke onbekende scope-lock', async () => {
+    const client = await connect();
+    const insert = ({ intent, idempotency, identity, scope, status }) => client.query(`
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,send_identity_key,send_scope_key,owner,account_email,
+        recipient_email,mode,conversation_id,provider,subject,body_text,payload_fingerprint,
+        dispatch_state,status
+      ) values ($1,$2,$3,$4,'serve','serve@softora.nl','prospect@example.org',
+        'new-message','draft:prospect','smtp','Vraag','Bericht',$5,
+        case when $6='prepared' then 'reserved' else case when $6='unknown' then 'started' else 'finished' end end,$6)
+    `, [intent, idempotency, identity, scope, `payload:${identity}`, status]);
+
+    await insert({ intent: 'send:new-accepted', idempotency: 'key:new-accepted',
+      identity: 'new:payload-one', scope: 'new:scope-one', status: 'accepted' });
+    await assert.rejects(insert({ intent: 'send:new-exact-replay', idempotency: 'key:new-replay',
+      identity: 'new:payload-one', scope: 'new:scope-one', status: 'prepared' }),
+    (error) => error.code === '23505');
+    await insert({ intent: 'send:new-real-next', idempotency: 'key:new-next',
+      identity: 'new:payload-two', scope: 'new:scope-one', status: 'accepted' });
+
+    await insert({ intent: 'send:new-unknown', idempotency: 'key:new-unknown',
+      identity: 'new:payload-three', scope: 'new:scope-two', status: 'unknown' });
+    await assert.rejects(insert({ intent: 'send:new-changed-while-unknown', idempotency: 'key:new-changed',
+      identity: 'new:payload-four', scope: 'new:scope-two', status: 'prepared' }),
+    (error) => error.code === '23505');
+  });
+
+  test('legacy accepted reply krijgt exact dezelfde semantische key als een nieuwe browserrequest', async () => {
+    const client = await connect();
+    const input = {
+      owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'legacy@example.org',
+      mode: 'reply', conversationId: 'conversation:legacy', provider: 'smtp', providerThreadId: '',
+      replyTargetMessageId: '<legacy-incoming@example.org>', subject: 'Re: Legacy',
+      body: 'Legacy antwoord', cc: '', bcc: '', attachmentsFingerprint: '',
+    };
+    const expectedScope = createMailboxSendScopeKey(input);
+    const expectedIdentity = createMailboxSendIdentityKey(input);
+    const expectedPayload = createMailboxPayloadFingerprint(input);
+    const legacy = (await client.query(`
+      select send_scope_key,send_identity_key,payload_fingerprint,dispatch_state
+      from public.softora_mailbox_send_provenance where intent_id='send:legacy-accepted'
+    `)).rows[0];
+    assert.deepEqual(legacy, {
+      send_scope_key: expectedScope,
+      send_identity_key: expectedIdentity,
+      payload_fingerprint: expectedPayload,
+      dispatch_state: 'finished',
+    });
+    await assert.rejects(client.query(`
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,send_identity_key,send_scope_key,payload_fingerprint,
+        owner,account_email,recipient_email,mode,conversation_id,reply_target_message_id,
+        references_text,provider,subject,body_text,status
+      ) values (
+        'send:legacy-replay','new-browser-key',$1,$2,$3,'serve','serve@softora.nl',
+        'legacy@example.org','reply','conversation:legacy','<legacy-incoming@example.org>',
+        '<legacy-incoming@example.org>','smtp','Re: Legacy gewijzigd','Nieuwe browsertekst','prepared'
+      )
+    `, [expectedIdentity, expectedScope, createMailboxPayloadFingerprint({
+      ...input, subject: 'Re: Legacy gewijzigd', body: 'Nieuwe browsertekst',
+    })]), (error) => error.code === '23505');
+  });
+
+  test('providerconstraint weigert client-verzonnen provideridentiteiten', async () => {
+    const client = await connect();
+    for (const provider of ['foo', 'bar']) {
+      await assert.rejects(client.query(`
+        insert into public.softora_mailbox_send_provenance (
+          intent_id,idempotency_key,send_identity_key,send_scope_key,payload_fingerprint,
+          owner,account_email,recipient_email,mode,conversation_id,provider,subject,body_text,status
+        ) values ($1,$2,$3,$4,'payload','serve','serve@softora.nl','provider@example.org',
+          'new-message','draft:provider',$5,'Provider','Body','prepared')
+      `, [`send:provider:${provider}`, `key:provider:${provider}`, `identity:${provider}`, `scope:${provider}`, provider]),
+      (error) => error.code === '23514');
+    }
+  });
+
+  test('statusmachine houdt accepted terminaal en laat alleen unknown naar accepted herstellen', async () => {
+    const client = await connect();
+    const seed = async (suffix) => client.query(`
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,send_identity_key,send_scope_key,payload_fingerprint,
+        owner,account_email,recipient_email,mode,conversation_id,provider,subject,body_text,
+        dispatch_state,dispatch_started_at,reconcile_required,status
+      ) values ($1,$2,$3,$4,'payload','serve','serve@softora.nl',$5,'new-message',$6,'smtp',
+        'Statusrace','Body','started',clock_timestamp(),true,'prepared')
+    `, [`send:status:${suffix}`, `key:status:${suffix}`, `identity:status:${suffix}`,
+      `scope:status:${suffix}`, `${suffix}@example.org`, `draft:${suffix}`]);
+
+    await seed('accept-first');
+    await client.query("update public.softora_mailbox_send_provenance set status='accepted',dispatch_state='finished' where intent_id='send:status:accept-first'");
+    await assert.rejects(client.query(
+      "update public.softora_mailbox_send_provenance set status='unknown',dispatch_state='started' where intent_id='send:status:accept-first'"
+    ), (error) => error.code === '23514');
+    await assert.rejects(client.query(
+      "update public.softora_mailbox_send_provenance set status='failed' where intent_id='send:status:accept-first'"
+    ), (error) => error.code === '23514');
+
+    await seed('unknown-first');
+    await client.query("update public.softora_mailbox_send_provenance set status='unknown' where intent_id='send:status:unknown-first'");
+    await client.query("update public.softora_mailbox_send_provenance set status='accepted',dispatch_state='finished' where intent_id='send:status:unknown-first'");
+    const restored = (await client.query(
+      "select status,dispatch_state from public.softora_mailbox_send_provenance where intent_id='send:status:unknown-first'"
+    )).rows[0];
+    assert.deepEqual(restored, { status: 'accepted', dispatch_state: 'finished' });
+
+    await seed('failed-first');
+    await client.query("update public.softora_mailbox_send_provenance set status='failed',dispatch_state='finished' where intent_id='send:status:failed-first'");
+    await assert.rejects(client.query(
+      "update public.softora_mailbox_send_provenance set status='accepted' where intent_id='send:status:failed-first'"
+    ), (error) => error.code === '23514');
+  });
+
+  test('concurrent accepted wint van late unknown/failed en unknown kan nog naar accepted herstellen', { timeout: 10_000 }, async () => {
+    const setup = await connect();
+    const first = await connect();
+    const second = await connect();
+    const seed = (suffix) => setup.query(`
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,send_identity_key,send_scope_key,payload_fingerprint,
+        owner,account_email,recipient_email,mode,conversation_id,provider,subject,body_text,
+        dispatch_state,dispatch_started_at,reconcile_required,status
+      ) values ($1,$2,$3,$4,'payload','serve','serve@softora.nl',$5,'new-message',$6,'smtp',
+        'Concurrent status','Body','started',clock_timestamp(),true,'prepared')
+    `, [`send:concurrent:${suffix}`, `key:concurrent:${suffix}`, `identity:concurrent:${suffix}`,
+      `scope:concurrent:${suffix}`, `${suffix}@example.org`, `draft:concurrent:${suffix}`]);
+
+    for (const lateStatus of ['unknown', 'failed']) {
+      const suffix = `accepted-before-${lateStatus}`;
+      await seed(suffix);
+      await first.query('begin');
+      await first.query(`
+        update public.softora_mailbox_send_provenance
+        set status='accepted',dispatch_state='finished' where intent_id=$1
+      `, [`send:concurrent:${suffix}`]);
+      const lateUpdate = second.query(`
+        update public.softora_mailbox_send_provenance set status=$2,
+          dispatch_state=case when $2='failed' then 'finished' else 'started' end
+        where intent_id=$1
+      `, [`send:concurrent:${suffix}`, lateStatus]);
+      await assertBlocked(lateUpdate, `${lateStatus} achter accepted`);
+      await first.query('commit');
+      await assert.rejects(lateUpdate, (error) => error.code === '23514');
+    }
+
+    await seed('unknown-before-accepted');
+    await first.query('begin');
+    await first.query(`
+      update public.softora_mailbox_send_provenance set status='unknown'
+      where intent_id='send:concurrent:unknown-before-accepted'
+    `);
+    const acceptUpdate = second.query(`
+      update public.softora_mailbox_send_provenance set status='accepted',dispatch_state='finished'
+      where intent_id='send:concurrent:unknown-before-accepted'
+    `);
+    await assertBlocked(acceptUpdate, 'accepted achter unknown');
+    await first.query('commit');
+    await acceptUpdate;
+    assert.equal((await setup.query(`
+      select status from public.softora_mailbox_send_provenance
+      where intent_id='send:concurrent:unknown-before-accepted'
+    `)).rows[0].status, 'accepted');
+  });
+
   test('ACL geeft service_role geen TRUNCATE en publieke rollen geen tabel/RPC-toegang', async () => {
     const client = await connect();
     const privileges = (await client.query(`
@@ -468,6 +774,13 @@ if (!databaseUrl) {
         has_table_privilege('service_role','public.softora_mailbox_messages','TRUNCATE') as service_truncate,
         has_table_privilege('anon','public.softora_mailbox_messages','SELECT') as anon_select,
         has_table_privilege('authenticated','public.softora_mailbox_messages','SELECT') as authenticated_select,
+        has_table_privilege('service_role','public.softora_mailbox_send_provenance','SELECT') as provenance_service_select,
+        has_table_privilege('service_role','public.softora_mailbox_send_provenance','INSERT') as provenance_service_insert,
+        has_table_privilege('service_role','public.softora_mailbox_send_provenance','UPDATE') as provenance_service_update,
+        has_table_privilege('service_role','public.softora_mailbox_send_provenance','DELETE') as provenance_service_delete,
+        has_table_privilege('service_role','public.softora_mailbox_send_provenance','TRUNCATE') as provenance_service_truncate,
+        has_table_privilege('anon','public.softora_mailbox_send_provenance','SELECT') as provenance_anon_select,
+        has_table_privilege('authenticated','public.softora_mailbox_send_provenance','SELECT') as provenance_authenticated_select,
         has_function_privilege('anon','public.softora_commit_mailbox_campaign_messages(uuid,text,jsonb,jsonb)','EXECUTE') as anon_commit,
         has_function_privilege('authenticated','public.softora_commit_mailbox_campaign_messages(uuid,text,jsonb,jsonb)','EXECUTE') as authenticated_commit,
         has_function_privilege('service_role','public.softora_commit_mailbox_campaign_messages(uuid,text,jsonb,jsonb)','EXECUTE') as service_commit,
@@ -483,6 +796,13 @@ if (!databaseUrl) {
       service_truncate: false,
       anon_select: false,
       authenticated_select: false,
+      provenance_service_select: true,
+      provenance_service_insert: true,
+      provenance_service_update: true,
+      provenance_service_delete: false,
+      provenance_service_truncate: false,
+      provenance_anon_select: false,
+      provenance_authenticated_select: false,
       anon_commit: false,
       authenticated_commit: false,
       service_commit: true,
