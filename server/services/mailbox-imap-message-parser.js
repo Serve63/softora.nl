@@ -20,6 +20,19 @@ function attachMailboxSyncReadHealth(messages, health = {}) {
   return source;
 }
 
+function attachMailboxSyncReadResult(messages, {
+  selectedUids = [], parseFailures = [], folderMissing = false,
+} = {}) {
+  const selectionHealth = selectedUids.syncSelectionHealth || {};
+  return attachMailboxSyncReadHealth(messages, {
+    parseFailures,
+    selectedCount: selectedUids.length,
+    folderMissing,
+    ...selectionHealth,
+    selectionTruncated: selectionHealth.truncated === true,
+  });
+}
+
 function createMailboxImapMessageParser({
   parseMailSource,
   normalizeString,
@@ -112,5 +125,6 @@ module.exports = {
   MAILBOX_IMAP_PARSE_TIMEOUT_MS,
   MAILBOX_IMAP_SOURCE_MAX_BYTES,
   attachMailboxSyncReadHealth,
+  attachMailboxSyncReadResult,
   createMailboxImapMessageParser,
 };

@@ -20,10 +20,12 @@ const {
 } = require('./mailbox-sync-runtime');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
-const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
+const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 10_000;
 const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
 const CAMPAIGN_SYNC_FAST_FETCH_LIMIT = 20;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
+const MAILBOX_SYNC_LOCK_RETRY_BASE_MS = 75;
+const MAILBOX_SYNC_LOCK_RETRY_MAX_MS = 500;
 
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -129,6 +131,28 @@ async function mapWithConcurrency(items, concurrency, worker) {
     }
   }));
   return results;
+}
+
+function waitForMailboxSyncLockRetry(delayMs, signal) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      callback(value);
+    };
+    const abort = () => finish(
+      reject,
+      signal?.reason instanceof Error
+        ? signal.reason
+        : getAbortReason(signal, 'MAILBOX_SYNC_FOLDER_TIMEOUT')
+    );
+    const timer = setTimeout(() => finish(resolve), Math.max(1, Number(delayMs) || 1));
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function isGmailImapAccount(account = {}) {
@@ -321,15 +345,37 @@ function createMailboxSyncService({
           runId,
         };
       }
-      lock = await mailboxIndexStore.acquireSyncLock({
-        accountEmail: account.email,
-        folder: normalizedFolder,
-        force,
-        lockTtlMs: Math.max(10_000, folderDeadlineAt - Date.now() + 5_000),
-        signal: folderDeadline.signal,
-      });
-      if (!lock.ok) {
-        if (lock.locked) {
+      let lockAttempts = 0;
+      while (true) {
+        lockAttempts += 1;
+        lock = await mailboxIndexStore.acquireSyncLock({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+          force,
+          lockTtlMs: Math.max(10_000, folderDeadlineAt - Date.now() + 5_000),
+          signal: folderDeadline.signal,
+        });
+        if (lock.ok) break;
+        if (!lock.locked) {
+          return {
+            ok: false,
+            complete: false,
+            freshnessConfirmed: false,
+            skipped: true,
+            reason: 'lock_failed',
+            statusCode: 503,
+            account: account.email,
+            folder: normalizedFolder,
+            runId,
+            lockAttempts,
+            error: String(lock.error?.message || 'Mailbox-lock claim mislukt'),
+          };
+        }
+        if (lock.lockReason === 'active_target' || lock.lockExpiresAt) {
+          const retryAfterMs = Math.max(
+            1,
+            Math.min(300_000, Date.parse(lock.lockExpiresAt || '') - Date.now() || 1)
+          );
           return {
             ok: true,
             complete: false,
@@ -337,24 +383,32 @@ function createMailboxSyncService({
             accepted: true,
             skipped: true,
             reason: 'locked',
+            lockReason: 'active_target',
+            retryAt: lock.lockExpiresAt,
+            retryAfterMs,
             statusCode: 202,
             account: account.email,
             folder: normalizedFolder,
             runId,
+            lockAttempts,
           };
         }
-        return {
-          ok: false,
-          complete: false,
-          freshnessConfirmed: false,
-          skipped: true,
-          reason: 'lock_failed',
-          statusCode: 503,
-          account: account.email,
-          folder: normalizedFolder,
-          runId,
-          error: String(lock.error?.message || 'Mailbox-lock claim mislukt'),
-        };
+        const retryDelayMs = Math.min(
+          MAILBOX_SYNC_LOCK_RETRY_MAX_MS,
+          MAILBOX_SYNC_LOCK_RETRY_BASE_MS * (2 ** Math.min(4, lockAttempts - 1))
+        );
+        if (Date.now() + retryDelayMs >= folderDeadlineAt) {
+          const timeout = getAbortReason(folderDeadline.signal, 'MAILBOX_SYNC_FOLDER_TIMEOUT');
+          if (!folderDeadline.signal.aborted) {
+            timeout.code = 'MAILBOX_SYNC_GLOBAL_CAP_TIMEOUT';
+            timeout.message = 'Mailbox-sync kreeg vóór de deadline geen globale leasecapaciteit.';
+            timeout.lockReason = 'global_capacity';
+            timeout.retryAfterMs = retryDelayMs;
+            timeout.lockAttempts = lockAttempts;
+          }
+          throw timeout;
+        }
+        await waitForMailboxSyncLockRetry(retryDelayMs, folderDeadline.signal);
       }
       throwIfSyncAborted(folderDeadline.signal);
       const hydrateCampaignHistory = campaignOnly && !incrementalOnly;
@@ -373,18 +427,19 @@ function createMailboxSyncService({
       let threadReferenceIds = [];
       let threadRecipientTerms = [];
       let indexedUids = [];
+      if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
+        indexedUids =
+          (await mailboxIndexStore.listMessageUidsForAccount({
+            accountEmail: account.email,
+            folder: normalizedFolder,
+            since: campaignOnly ? CAMPAIGN_HISTORY_SINCE.toISOString() : '',
+            limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+            signal: folderDeadline.signal,
+          })) || [];
+        throwIfSyncAborted(folderDeadline.signal);
+      }
+      const indexedUidScanTruncated = indexedUids.length >= CAMPAIGN_SYNC_UID_SCAN_LIMIT;
       if (campaignOnly) {
-        if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
-          indexedUids =
-            (await mailboxIndexStore.listMessageUidsForAccount({
-              accountEmail: account.email,
-              folder: normalizedFolder,
-              since: CAMPAIGN_HISTORY_SINCE.toISOString(),
-              limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
-              signal: folderDeadline.signal,
-            })) || [];
-          throwIfSyncAborted(folderDeadline.signal);
-        }
         if (
           hydrateCampaignHistory &&
           normalizedFolder === 'sent' &&
@@ -518,7 +573,34 @@ function createMailboxSyncService({
       const selectedCount = Math.max(messages.length, Number(readHealth.selectedCount) || 0);
       const folderMissing = readHealth.folderMissing === true;
       const fastFetchCapReached = fastRefresh && selectedCount > CAMPAIGN_SYNC_FAST_FETCH_LIMIT;
-      const incomplete = folderMissing || fastFetchCapReached || parseFailures.length > 0;
+      const selectionTruncated = readHealth.selectionTruncated === true;
+      const degradedReasons = [];
+      if (folderMissing) degradedReasons.push({
+        reason: 'folder_missing',
+        code: 'MAILBOX_SYNC_FOLDER_MISSING',
+        error: 'Mailboxmap ontbreekt bij de IMAP-provider.',
+      });
+      if (fastFetchCapReached) degradedReasons.push({
+        reason: 'fetch_cap_reached',
+        code: 'MAILBOX_SYNC_FETCH_TRUNCATED',
+        error: 'Mailbox fast-refresh fetchlimiet bereikt.',
+      });
+      if (indexedUidScanTruncated) degradedReasons.push({
+        reason: 'uid_index_scan_truncated',
+        code: 'MAILBOX_SYNC_UID_INDEX_SCAN_TRUNCATED',
+        error: 'Mailbox UID-indexscan bereikte de veilige scanlimiet.',
+      });
+      if (selectionTruncated) degradedReasons.push({
+        reason: 'selection_truncated',
+        code: 'MAILBOX_SYNC_SELECTION_TRUNCATED',
+        error: `Mailbox heeft nog ${Math.max(1, Number(readHealth.remainingUidCount) || 0)} niet-geïndexeerde berichten.`,
+      });
+      if (parseFailures.length) degradedReasons.push({
+        reason: 'message_parse_failed',
+        code: 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL',
+        error: `Mailbox parsefouten: ${parseFailures.map((failure) => `${failure.uid}:${failure.code}`).join(', ')}`,
+      });
+      const incomplete = degradedReasons.length > 0;
       if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
         const invalidation = await invalidateCampaignSnapshot({
           source: 'mailbox-index-upsert',
@@ -541,11 +623,7 @@ function createMailboxSyncService({
         lockToken: lock.lockToken,
         messageCount: messages.length,
         lastUid,
-        ...(incomplete ? { error: folderMissing
-          ? 'Mailboxmap ontbreekt bij de IMAP-provider.'
-          : fastFetchCapReached
-            ? 'Mailbox fast-refresh fetchlimiet bereikt.'
-            : `Mailbox parsefouten: ${parseFailures.map((failure) => `${failure.uid}:${failure.code}`).join(', ')}` } : {}),
+        ...(incomplete ? { error: degradedReasons.map((entry) => entry.error).join(' ') } : {}),
         signal: folderDeadline.signal,
       });
       if (!finish || finish.ok === false) {
@@ -560,14 +638,9 @@ function createMailboxSyncService({
         degraded: incomplete,
         statusCode: incomplete ? 207 : 200,
         ...(incomplete ? {
-          reason: folderMissing
-            ? 'folder_missing'
-            : fastFetchCapReached ? 'fetch_cap_reached' : 'message_parse_failed',
-          code: folderMissing
-            ? 'MAILBOX_SYNC_FOLDER_MISSING'
-            : fastFetchCapReached
-              ? 'MAILBOX_SYNC_FETCH_TRUNCATED'
-              : 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL',
+          reason: degradedReasons[0].reason,
+          code: degradedReasons[0].code,
+          degradedReasons: degradedReasons.map((entry) => entry.reason),
         } : {}),
         account: account.email,
         folder: normalizedFolder,
@@ -575,6 +648,9 @@ function createMailboxSyncService({
         upserted,
         failedMessageCount: parseFailures.length,
         folderMissing,
+        selectionTruncated,
+        remainingUidCount: Math.max(0, Number(readHealth.remainingUidCount) || 0),
+        indexedUidScanTruncated,
         failedUids: parseFailures.map((failure) => failure.uid),
         parseFailures,
         historyBackfill: Boolean(campaignOnly && !incrementalOnly),
@@ -582,6 +658,7 @@ function createMailboxSyncService({
         targetedThreadReferences: threadReferenceIds.length,
         targetedThreadRecipients: threadRecipientTerms.length,
         incrementalOnly: Boolean(incrementalOnly),
+        lockAttempts,
         durationMs: Date.now() - startedAt,
         runId,
       };
@@ -718,6 +795,9 @@ function createMailboxSyncService({
                 timedOut,
                 uncertain,
                 lockLost: error?.lockLost === true || error?.code === 'MAILBOX_SYNC_LOCK_LOST',
+                lockReason: String(error?.lockReason || ''),
+                retryAfterMs: Math.max(0, Number(error?.retryAfterMs) || 0),
+                lockAttempts: Math.max(0, Number(error?.lockAttempts) || 0),
                 statusCode: timedOut ? 504 : 503,
                 error: String(error?.message || error || 'Mailbox sync mislukt'),
                 durationMs: Date.now() - startedAt,
