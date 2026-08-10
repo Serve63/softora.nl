@@ -28,6 +28,7 @@ const {
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
 const { getMailboxImapSyncTimeouts, getMailboxSyncResponseStatus } = require('./mailbox-imap-sync-deadline');
+const { createDeadlineController } = require('./mailbox-sync-runtime');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
@@ -552,6 +553,7 @@ const INDEX_STALE_MS = 2 * 60 * 1000;
 const DEFAULT_SYNC_FOLDERS = ['inbox', 'sent'];
 const DEFAULT_SYNC_LIMIT = 50;
 const CRON_SYNC_LIMIT = 30;
+const MAILBOX_LIST_LIVE_TIMEOUT_MS = 8_000;
 
 function createMailboxService(deps = {}) {
   const {
@@ -602,10 +604,12 @@ function createMailboxService(deps = {}) {
       mailboxIndexStore,
     }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
+    mailboxListLiveTimeoutMs = MAILBOX_LIST_LIVE_TIMEOUT_MS,
     mailboxCampaignRepliesService = createMailboxCampaignRepliesService({
       mailboxIndexStore,
       dataOpsStore,
       mailboxSendProvenanceStore,
+      logger,
     }),
     instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, onMessagesUpserted: (...args) => invalidateCampaignSnapshot(...args), getCampaignMutationRunner: () => campaignRuntime?.syncOptions?.campaignMutationRunner, logger }),
   } = deps;
@@ -2155,14 +2159,17 @@ function createMailboxService(deps = {}) {
     accountEmail,
     folder = 'inbox',
     limit = 50,
-    allowLiveImapFallback = true,
   } = {}) {
     const startedAt = Date.now();
     const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
-    const indexClientAvailable = canUseMailboxIndex();
-    const indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
+    let indexedMessages = null;
+    try {
+      indexedMessages = await readIndexedMessages({ account, folder: normalizedFolder, limit: safeLimit });
+    } catch (error) {
+      logger?.warn?.('[Mailbox][IndexList]', error?.message || error);
+    }
     const indexReadable = Array.isArray(indexedMessages);
 
     if (Array.isArray(indexedMessages) && indexedMessages.length) {
@@ -2180,51 +2187,37 @@ function createMailboxService(deps = {}) {
       };
     }
 
-    if (indexReadable && !allowLiveImapFallback) {
-      const sync = await getMailboxSyncMeta({ account, folder: normalizedFolder });
+    const liveDeadline = createDeadlineController({
+      deadlineAt: Date.now() + Math.max(1, Number(mailboxListLiveTimeoutMs) || MAILBOX_LIST_LIVE_TIMEOUT_MS),
+      timeoutCode: 'MAILBOX_LIST_LIVE_TIMEOUT',
+    });
+    try {
+      const messages = filterVisibleMailboxMessages(await fetchMessagesFromImap({
+        account,
+        folder: normalizedFolder,
+        limit: safeLimit,
+        signal: liveDeadline.signal,
+        deadlineAt: liveDeadline.deadlineAt,
+      }));
       return {
-        messages: [],
-        sync: {
-          ...sync,
-          indexed: true,
-          stale: Boolean(sync.stale),
-          source: 'index-empty',
-          refreshRecommended: true,
-          indexAvailable: true,
-          warming: true,
-          durationMs: getElapsedMs(startedAt),
-        },
-      };
-    }
-
-    if ((!indexClientAvailable || !indexReadable) && !allowLiveImapFallback) {
-      return {
-        messages: [],
+        messages,
         sync: {
           indexed: false,
-          stale: true,
-          source: 'index-unavailable',
+          stale: false,
+          source: 'imap-live',
           refreshRecommended: false,
-          indexAvailable: false,
+          indexAvailable: indexReadable,
           warming: false,
           durationMs: getElapsedMs(startedAt),
         },
       };
+    } catch (error) {
+      if (!Number(error?.status)) error.status = 503;
+      if (!normalizeString(error?.code)) error.code = 'MAILBOX_LIVE_FALLBACK_FAILED';
+      throw error;
+    } finally {
+      liveDeadline.cleanup();
     }
-
-    const messages = filterVisibleMailboxMessages(await fetchMessagesFromImap({ account, folder: normalizedFolder, limit: safeLimit }));
-    return {
-      messages,
-      sync: {
-        indexed: false,
-        stale: false,
-        source: 'imap-live',
-        refreshRecommended: false,
-        indexAvailable: indexReadable,
-        warming: false,
-        durationMs: getElapsedMs(startedAt),
-      },
-    };
   }
 
   async function listMessages(options) {
@@ -2424,7 +2417,6 @@ function createMailboxService(deps = {}) {
         accountEmail: req.query?.account,
         folder: normalizeFolder(req.query?.folder || 'inbox'),
         limit: Number(req.query?.limit || 50) || 50,
-        allowLiveImapFallback: req.query?.fallback === 'imap-live',
       });
       if (Number.isFinite(Number(result.sync?.durationMs))) {
         res.setHeader('Server-Timing', `mailbox;dur=${Number(result.sync.durationMs)}`);
@@ -2435,6 +2427,7 @@ function createMailboxService(deps = {}) {
       const folder = normalizeFolder(req.query?.folder || 'inbox');
       return res.status(error.status || 500).json({
         ok: false,
+        code: normalizeString(error?.code) || 'MAILBOX_LIST_FAILED',
         error: 'Mailbox laden mislukt',
         detail: publicListErrorMessage(error, folder),
       });
