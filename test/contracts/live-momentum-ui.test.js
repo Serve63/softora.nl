@@ -40,6 +40,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260804a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260804a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-subtitle\.css\?v=20260809a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-vakantieradar\.css\?v=20260810a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260728a"/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260810a" defer><\/script>/);
@@ -120,6 +121,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const endGameNumbersCss = read('assets/live-momentum-endgame-numbers.css');
   const checkpointCss = read('assets/live-momentum-endgame-checkpoint.css');
   const subtitleCss = read('assets/live-momentum-endgame-subtitle.css');
+  const vacationRadarCss = read('assets/live-momentum-endgame-vakantieradar.css');
   const videoCss = read('assets/live-momentum-video.css');
 
   assert.match(css, /--page-bg:\s*#f8f7f4;/);
@@ -175,6 +177,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.habit-board\s*\{[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/);
   assert.match(css, /\.habit-board::\-webkit-scrollbar\s*\{[^}]*display:\s*none;/);
   assert.match(css, /\.end-game-title\s*\{[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*font-size:\s*2rem;[\s\S]*text-align:\s*center;/);
+  assert.match(vacationRadarCss, /\.end-game-card-slot\[data-end-game-card-id="rubens-vakantieradar"\] \.end-game-card-photo-shade\s*\{[\s\S]*rgba\(8, 12, 12, \.62\) 27%[\s\S]*rgba\(8, 12, 12, \.28\) 52%[\s\S]*rgba\(8, 12, 12, \.78\) 76%/);
   assert.match(endGameNumbersCss, /\.end-game-card-photo--edge-crop \.end-game-card-photo-image\s*\{[\s\S]*transform:\s*scale\(1\.1\);[\s\S]*transform-origin:\s*center bottom;/);
   assert.match(progressCss, /\.end-game-heading\s*\{[\s\S]*width:\s*max-content;[\s\S]*margin:\s*clamp\(3\.5rem, 7vh, 6rem\) auto 0;/);
   assert.match(progressCss, /\.end-game-heading \.end-game-title\s*\{[\s\S]*margin:\s*0;/);
