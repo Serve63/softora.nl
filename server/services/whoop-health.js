@@ -9,6 +9,9 @@ const WHOOP_SCOPES = [
   'offline', 'read:cycles', 'read:recovery', 'read:sleep', 'read:workout', 'read:profile',
   'read:body_measurement',
 ];
+const TOKEN_REFRESH_LOCK_MS = 15000;
+const TOKEN_REFRESH_WAIT_MS = 6000;
+const WEBHOOK_TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
 
 function formatDay(date, timezone = TIMEZONE) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -20,6 +23,40 @@ function addDays(day, amount) {
   const date = new Date(`${day}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + amount);
   return date.toISOString().slice(0, 10);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function safeTimingEqual(left, right) {
+  const a = Buffer.from(String(left || ''));
+  const b = Buffer.from(String(right || ''));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function verifyWhoopWebhookSignature({ rawBody, signature, timestamp, clientSecret, nowMs = Date.now() }) {
+  const rawTimestamp = String(timestamp || '').trim();
+  const rawSignature = String(signature || '').trim();
+  const secret = String(clientSecret || '').trim();
+  const timestampMs = Number(rawTimestamp);
+  if (!secret || !rawSignature || !rawTimestamp || !Number.isFinite(timestampMs)) return false;
+  if (Math.abs(Number(nowMs) - timestampMs) > WEBHOOK_TIMESTAMP_TOLERANCE_MS) return false;
+  const body = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody || ''), 'utf8');
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(Buffer.concat([Buffer.from(rawTimestamp, 'utf8'), body]))
+    .digest('base64');
+  return safeTimingEqual(expected, rawSignature);
+}
+
+class WhoopHttpError extends Error {
+  constructor(message, status = 0, data = null) {
+    super(message);
+    this.name = 'WhoopHttpError';
+    this.status = Number(status || 0);
+    this.data = data || null;
+  }
 }
 
 function createWhoopHealthService(deps = {}) {
@@ -38,6 +75,10 @@ function createWhoopHealthService(deps = {}) {
     const client = getSupabaseClient({ timeoutMs: 20000, ignoreFailureCooldown: true });
     if (!client) throw new Error('Supabase is niet geconfigureerd voor het gezondheidsdossier.');
     return client;
+  }
+
+  function today() {
+    return formatDay(now(), timezone);
   }
 
   function encryptionKey() {
@@ -79,15 +120,71 @@ function createWhoopHealthService(deps = {}) {
     return data;
   }
 
+  async function releaseTokenRefreshLock(lockId) {
+    if (!lockId) return;
+    const { error } = await db().from('softora_health_whoop_connections').update({
+      token_refresh_lock_id: null,
+      token_refresh_lock_until: null,
+      updated_at: now().toISOString(),
+    }).eq('owner_key', OWNER_KEY).eq('token_refresh_lock_id', lockId);
+    if (error) throw error;
+  }
+
+  async function tryAcquireTokenRefreshLock() {
+    const lockId = crypto.randomUUID();
+    const nowIso = now().toISOString();
+    const lockUntil = new Date(now().getTime() + TOKEN_REFRESH_LOCK_MS).toISOString();
+    const values = { token_refresh_lock_id: lockId, token_refresh_lock_until: lockUntil, updated_at: nowIso };
+
+    let result = await db().from('softora_health_whoop_connections').update(values)
+      .eq('owner_key', OWNER_KEY).is('token_refresh_lock_until', null).select('*').maybeSingle();
+    if (result.error) throw result.error;
+    if (result.data) return { lockId, connection: result.data };
+
+    result = await db().from('softora_health_whoop_connections').update(values)
+      .eq('owner_key', OWNER_KEY).lte('token_refresh_lock_until', nowIso).select('*').maybeSingle();
+    if (result.error) throw result.error;
+    return result.data ? { lockId, connection: result.data } : null;
+  }
+
   async function exchangeToken(payload) {
-    const response = await fetchImpl(WHOOP_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: new URLSearchParams(payload),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.access_token) throw new Error(data.error_description || data.error || `WHOOP tokenfout (${response.status})`);
-    return data;
+    let priorTransientError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let response;
+      try {
+        response = await fetchImpl(WHOOP_TOKEN_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+          body: new URLSearchParams(payload),
+        });
+      } catch (error) {
+        const wrapped = new WhoopHttpError(String(error.message || error), 0);
+        if (attempt === 0) {
+          priorTransientError = wrapped;
+          await delay(500);
+          continue;
+        }
+        throw wrapped;
+      }
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.access_token) return data;
+      const error = new WhoopHttpError(
+        data.error_description || data.error || `WHOOP tokenfout (${response.status})`,
+        response.status,
+        data
+      );
+      const transient = response.status === 429 || response.status >= 500;
+      if (attempt === 0 && transient) {
+        priorTransientError = error;
+        await delay(response.status === 429 ? 1000 : 500);
+        continue;
+      }
+      if (priorTransientError && (response.status === 400 || response.status === 401)) {
+        error.ambiguousRotation = true;
+      }
+      throw error;
+    }
+    throw priorTransientError || new WhoopHttpError('WHOOP tokenvernieuwing mislukt.');
   }
 
   function normalizeTokens(data, previous = {}) {
@@ -99,16 +196,70 @@ function createWhoopHealthService(deps = {}) {
     };
   }
 
-  async function validAccessToken(connection) {
+  async function waitForConcurrentTokenRefresh(previousEncryptedTokens) {
+    const deadline = Date.now() + TOKEN_REFRESH_WAIT_MS;
+    while (Date.now() < deadline) {
+      await delay(250);
+      const fresh = await getConnection();
+      if (!fresh?.encrypted_tokens) continue;
+      if (fresh.encrypted_tokens !== previousEncryptedTokens) return fresh;
+      const lockUntil = fresh.token_refresh_lock_until ? new Date(fresh.token_refresh_lock_until).getTime() : 0;
+      if (!fresh.token_refresh_lock_id || lockUntil <= Date.now()) return fresh;
+    }
+    throw new WhoopHttpError('WHOOP tokenvernieuwing is nog bezig; verzoek wordt opnieuw geprobeerd.', 503);
+  }
+
+  async function validAccessToken(connection, depth = 0) {
+    if (!connection?.encrypted_tokens) throw new Error('WHOOP-koppeling bevat geen tokens.');
+    if (depth > 3) throw new WhoopHttpError('WHOOP tokenvernieuwing kon niet veilig worden afgerond.', 503);
     const tokens = decryptTokens(connection.encrypted_tokens);
     if (Number(tokens.expires_at || 0) > Date.now() + 120000) return tokens.access_token;
-    const refreshed = await exchangeToken({
-      grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: clientId,
-      client_secret: clientSecret, scope: 'offline',
-    });
-    const next = normalizeTokens(refreshed, tokens);
-    await patchConnection({ encrypted_tokens: encryptTokens(next), status: 'connected', last_sync_error: null });
-    return next.access_token;
+
+    const acquired = await tryAcquireTokenRefreshLock();
+    if (!acquired) {
+      const fresh = await waitForConcurrentTokenRefresh(connection.encrypted_tokens);
+      return validAccessToken(fresh, depth + 1);
+    }
+
+    const lockId = acquired.lockId;
+    const lockedConnection = acquired.connection || connection;
+    try {
+      const latestTokens = decryptTokens(lockedConnection.encrypted_tokens);
+      if (Number(latestTokens.expires_at || 0) > Date.now() + 120000) {
+        await releaseTokenRefreshLock(lockId);
+        return latestTokens.access_token;
+      }
+      const refreshed = await exchangeToken({
+        grant_type: 'refresh_token', refresh_token: latestTokens.refresh_token, client_id: clientId,
+        client_secret: clientSecret, scope: 'offline',
+      });
+      const next = normalizeTokens(refreshed, latestTokens);
+      await patchConnection({
+        encrypted_tokens: encryptTokens(next),
+        status: 'connected',
+        last_sync_error: null,
+        token_refresh_lock_id: null,
+        token_refresh_lock_until: null,
+      });
+      return next.access_token;
+    } catch (error) {
+      await releaseTokenRefreshLock(lockId).catch(() => {});
+      const status = Number(error?.status || 0);
+      if (status === 400 || status === 401) {
+        const fresh = await getConnection();
+        if (fresh?.encrypted_tokens && fresh.encrypted_tokens !== lockedConnection.encrypted_tokens) {
+          return validAccessToken(fresh, depth + 1);
+        }
+        await patchConnection({
+          status: 'error',
+          last_sync_status: 'failed',
+          last_sync_error: error.ambiguousRotation
+            ? 'WHOOP refresh-token is waarschijnlijk geroteerd tijdens een tijdelijke tokenserverfout; opnieuw koppelen is vereist.'
+            : String(error.message || error).slice(0, 1000),
+        });
+      }
+      throw error;
+    }
   }
 
   async function whoopRequest(path, token) {
@@ -116,7 +267,7 @@ function createWhoopHealthService(deps = {}) {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || data.error || `WHOOP API-fout (${response.status})`);
+    if (!response.ok) throw new WhoopHttpError(data.message || data.error || `WHOOP API-fout (${response.status})`, response.status, data);
     return data;
   }
 
@@ -138,7 +289,7 @@ function createWhoopHealthService(deps = {}) {
   function localDayFor(type, item) {
     const raw = type === 'sleep' ? (item.end || item.start) : (item.start || item.created_at);
     const date = new Date(raw || 0);
-    return Number.isNaN(date.getTime()) ? formatDay(now(), timezone) : formatDay(date, timezone);
+    return Number.isNaN(date.getTime()) ? today() : formatDay(date, timezone);
   }
 
   function mapRecord(type, item) {
@@ -162,6 +313,12 @@ function createWhoopHealthService(deps = {}) {
       source_updated_at: item.updated_at || null,
       updated_at: now().toISOString(),
     };
+  }
+
+  async function writeRecords(records) {
+    if (!records.length) return;
+    const { error } = await db().from('softora_health_whoop_records').upsert(records, { onConflict: 'owner_key,source_type,source_id' });
+    if (error) throw error;
   }
 
   async function createAuthorizationUrl() {
@@ -192,13 +349,13 @@ function createWhoopHealthService(deps = {}) {
       whoop_user_id: Number(profile.user_id), status: 'connected', encrypted_tokens: encryptTokens(tokens),
       scopes: String(tokens.scope || '').split(/\s+/).filter(Boolean), profile,
       body_measurement: bodyMeasurement, connected_at: now().toISOString(), oauth_state_hash: null,
-      oauth_state_expires_at: null, last_sync_error: null,
+      oauth_state_expires_at: null, last_sync_error: null, token_refresh_lock_id: null,
+      token_refresh_lock_until: null,
     });
+    await db().from('softora_health_whoop_webhook_events').update({
+      status: 'pending', next_attempt_at: now().toISOString(), last_error: null,
+    }).in('status', ['blocked', 'retry']);
     return { ok: true, userId: Number(profile.user_id) };
-  }
-
-  function yesterday() {
-    return addDays(formatDay(now(), timezone), -1);
   }
 
   async function getSheetSnapshot() {
@@ -212,54 +369,246 @@ function createWhoopHealthService(deps = {}) {
     return { records: records || [], runs: runs || [] };
   }
 
+  async function syncSheet() {
+    try {
+      return await sheetService.syncSnapshot(await getSheetSnapshot());
+    } catch (sheetError) {
+      return { ok: false, error: String(sheetError.message || sheetError) };
+    }
+  }
+
+  async function createSyncRun(targetDay, mode = 'manual') {
+    const startedAt = now().toISOString();
+    const { data: run, error } = await db().from('softora_health_sync_runs').insert({
+      owner_key: OWNER_KEY, target_day: targetDay, mode, status: 'running', started_at: startedAt,
+    }).select('*').single();
+    if (error) throw error;
+    await patchConnection({ last_sync_started_at: startedAt, last_sync_status: 'running', last_sync_error: null });
+    return run;
+  }
+
+  async function finishSyncRun(run, { targetDay, records, sheetResult, advanceSyncedDay }) {
+    const completedAt = now().toISOString();
+    const sheetStatus = sheetResult.ok === false ? 'failed' : (sheetResult.skipped ? 'skipped' : 'completed');
+    await db().from('softora_health_sync_runs').update({
+      target_day: targetDay,
+      status: 'completed',
+      records_seen: records.length,
+      records_upserted: records.length,
+      completed_at: completedAt,
+      sheet_status: sheetStatus,
+      error: sheetResult.error || null,
+    }).eq('id', run.id);
+    const patch = {
+      last_sync_completed_at: completedAt,
+      last_sync_status: 'completed',
+      last_sync_error: sheetResult.error || null,
+    };
+    if (advanceSyncedDay) patch.last_synced_day = targetDay;
+    await patchConnection(patch);
+    return completedAt;
+  }
+
+  async function failSyncRun(run, error) {
+    const message = String(error.message || error).slice(0, 1000);
+    await db().from('softora_health_sync_runs').update({
+      status: 'failed', error: message, completed_at: now().toISOString(),
+    }).eq('id', run.id);
+    const connection = await getConnection().catch(() => null);
+    await patchConnection({
+      last_sync_status: 'failed',
+      last_sync_error: message,
+      status: connection?.status === 'error' ? 'error' : 'connected',
+    }).catch(() => {});
+  }
+
   async function sync(options = {}) {
     const mode = ['daily', 'backfill', 'manual'].includes(options.mode) ? options.mode : 'manual';
-    const targetDay = String(options.targetDay || yesterday());
-    const localHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', hour12: false }).format(now()));
     const connection = await getConnection();
-    if (options.enforceSchedule && localHour !== 8) return { ok: true, skipped: true, reason: 'outside_local_08_hour' };
+    const targetDay = String(options.targetDay || today());
+    const localHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', hour12: false }).format(now()));
+    const enforceScheduleHour = Number(options.enforceScheduleHour);
+    if (Number.isFinite(enforceScheduleHour) && localHour !== enforceScheduleHour) {
+      return { ok: true, skipped: true, reason: `outside_local_${enforceScheduleHour}_hour` };
+    }
     if (!connection?.encrypted_tokens || connection.status !== 'connected') return { ok: true, skipped: true, reason: 'whoop_not_connected' };
     if (mode === 'daily' && connection.last_synced_day === targetDay && connection.last_sync_status === 'completed') {
       return { ok: true, skipped: true, reason: 'day_already_synced', targetDay };
     }
-    const startedAt = now().toISOString();
-    const { data: run, error: runError } = await db().from('softora_health_sync_runs').insert({ owner_key: OWNER_KEY, target_day: targetDay, mode, status: 'running', started_at: startedAt }).select('*').single();
-    if (runError) throw runError;
-    await patchConnection({ last_sync_started_at: startedAt, last_sync_status: 'running', last_sync_error: null });
+
+    const run = await createSyncRun(targetDay, mode);
     try {
       const token = await validAccessToken(connection);
-      const range = mode === 'backfill' ? null : {
-        start: new Date(`${addDays(targetDay, -1)}T00:00:00Z`).toISOString(),
-        end: new Date(`${addDays(targetDay, 2)}T00:00:00Z`).toISOString(),
-      };
+      let range;
+      let fromDay = targetDay;
+      let toDay = targetDay;
+      if (mode === 'backfill') {
+        fromDay = String(options.fromDay || (connection.last_synced_day ? addDays(connection.last_synced_day, 1) : addDays(today(), -30)));
+        toDay = String(options.toDay || today());
+        range = {
+          start: new Date(`${addDays(fromDay, -1)}T00:00:00Z`).toISOString(),
+          end: new Date(`${addDays(toDay, 2)}T00:00:00Z`).toISOString(),
+        };
+      } else {
+        range = {
+          start: new Date(`${addDays(targetDay, -1)}T00:00:00Z`).toISOString(),
+          end: new Date(`${addDays(targetDay, 2)}T00:00:00Z`).toISOString(),
+        };
+      }
       const batches = await Promise.all([
         collection('/cycle', token, range), collection('/recovery', token, range),
         collection('/activity/sleep', token, range), collection('/activity/workout', token, range),
       ]);
       let records = ['cycle', 'recovery', 'sleep', 'workout'].flatMap((type, index) => batches[index].map((item) => mapRecord(type, item)));
-      if (mode !== 'backfill') records = records.filter((record) => record.local_day === targetDay);
-      if (records.length) {
-        const { error } = await db().from('softora_health_whoop_records').upsert(records, { onConflict: 'owner_key,source_type,source_id' });
-        if (error) throw error;
+      if (mode === 'backfill') {
+        records = records.filter((record) => record.local_day >= fromDay && record.local_day <= toDay);
+      } else {
+        records = records.filter((record) => record.local_day === targetDay);
       }
-      const completedAt = now().toISOString();
-      await db().from('softora_health_sync_runs').update({ status: 'completed', records_seen: records.length, records_upserted: records.length, completed_at: completedAt }).eq('id', run.id);
-      let sheetResult = { ok: true, skipped: true };
-      try {
-        sheetResult = await sheetService.syncSnapshot(await getSheetSnapshot());
-      } catch (sheetError) {
-        sheetResult = { ok: false, error: String(sheetError.message || sheetError) };
-      }
-      const sheetStatus = sheetResult.ok === false ? 'failed' : (sheetResult.skipped ? 'skipped' : 'completed');
-      await db().from('softora_health_sync_runs').update({ sheet_status: sheetStatus, error: sheetResult.error || null }).eq('id', run.id);
-      await patchConnection({ last_sync_completed_at: completedAt, last_sync_status: 'completed', last_sync_error: sheetResult.error || null, last_synced_day: targetDay });
-      return { ok: true, targetDay, records: records.length, sheet: sheetResult };
+      await writeRecords(records);
+      const sheetResult = await syncSheet();
+      const finalTargetDay = mode === 'backfill' ? toDay : targetDay;
+      await finishSyncRun(run, {
+        targetDay: finalTargetDay,
+        records,
+        sheetResult,
+        advanceSyncedDay: true,
+      });
+      return { ok: true, targetDay: finalTargetDay, records: records.length, sheet: sheetResult };
     } catch (error) {
-      const message = String(error.message || error).slice(0, 1000);
-      await db().from('softora_health_sync_runs').update({ status: 'failed', error: message, completed_at: now().toISOString() }).eq('id', run.id);
-      await patchConnection({ last_sync_status: 'failed', last_sync_error: message });
+      await failSyncRun(run, error);
       throw error;
     }
+  }
+
+  async function syncRecoveryEvent(event = {}) {
+    const connection = await getConnection();
+    if (!connection?.encrypted_tokens || connection.status !== 'connected') {
+      throw new Error('WHOOP-koppeling moet opnieuw worden geautoriseerd.');
+    }
+    if (Number(event.user_id || 0) !== Number(connection.whoop_user_id || 0)) {
+      throw new Error('WHOOP-webhook hoort niet bij de gekoppelde gebruiker.');
+    }
+    const run = await createSyncRun(today(), 'manual');
+    try {
+      const token = await validAccessToken(connection);
+      const sleepId = String(event.id || '').trim();
+      if (!sleepId) throw new Error('WHOOP-webhook bevat geen sleep-id.');
+      const sleep = await whoopRequest(`/activity/sleep/${encodeURIComponent(sleepId)}`, token);
+      const cycleId = Number(sleep.cycle_id || 0);
+      if (!cycleId) throw new Error('WHOOP-slaap heeft geen cycle-id.');
+      const [recovery, cycle] = await Promise.all([
+        whoopRequest(`/cycle/${cycleId}/recovery`, token),
+        whoopRequest(`/cycle/${cycleId}`, token),
+      ]);
+      const records = [
+        mapRecord('cycle', cycle),
+        mapRecord('recovery', recovery),
+        mapRecord('sleep', sleep),
+      ];
+      await writeRecords(records);
+      const targetDay = localDayFor('recovery', recovery);
+      const sheetResult = await syncSheet();
+      await finishSyncRun(run, { targetDay, records, sheetResult, advanceSyncedDay: false });
+      return { ok: true, targetDay, records: records.length, sheet: sheetResult };
+    } catch (error) {
+      await failSyncRun(run, error);
+      throw error;
+    }
+  }
+
+  function verifyWebhookRequest({ rawBody, signature, timestamp }) {
+    return verifyWhoopWebhookSignature({
+      rawBody,
+      signature,
+      timestamp,
+      clientSecret,
+      nowMs: now().getTime(),
+    });
+  }
+
+  async function enqueueWebhookEvent(event = {}) {
+    const type = String(event.type || '').trim();
+    if (type !== 'recovery.updated') return { ok: true, ignored: true, type };
+    const traceId = String(event.trace_id || '').trim();
+    const resourceId = String(event.id || '').trim();
+    const whoopUserId = Number(event.user_id || 0);
+    if (!traceId || !resourceId || !whoopUserId) throw new Error('WHOOP-webhook is onvolledig.');
+    const connection = await getConnection();
+    if (!connection?.whoop_user_id || Number(connection.whoop_user_id) !== whoopUserId) {
+      throw new Error('WHOOP-webhook hoort niet bij de gekoppelde gebruiker.');
+    }
+    const receivedAt = now().toISOString();
+    const { error } = await db().from('softora_health_whoop_webhook_events').insert({
+      trace_id: traceId,
+      whoop_user_id: whoopUserId,
+      resource_id: resourceId,
+      event_type: type,
+      status: 'pending',
+      attempts: 0,
+      next_attempt_at: receivedAt,
+      received_at: receivedAt,
+    });
+    if (error && String(error.code || '') !== '23505') throw error;
+    return { ok: true, duplicate: Boolean(error), traceId };
+  }
+
+  async function processWebhookEvents(limit = 5) {
+    const safeLimit = Math.max(1, Math.min(20, Number(limit) || 5));
+    const { data: rows, error } = await db().from('softora_health_whoop_webhook_events')
+      .select('*')
+      .in('status', ['pending', 'retry'])
+      .lte('next_attempt_at', now().toISOString())
+      .order('received_at', { ascending: true })
+      .limit(safeLimit);
+    if (error) throw error;
+    let processed = 0;
+    let failed = 0;
+    for (const row of rows || []) {
+      const attempts = Number(row.attempts || 0) + 1;
+      const { data: claimed, error: claimError } = await db().from('softora_health_whoop_webhook_events')
+        .update({ status: 'processing', attempts })
+        .eq('trace_id', row.trace_id)
+        .in('status', ['pending', 'retry'])
+        .select('*')
+        .maybeSingle();
+      if (claimError) throw claimError;
+      if (!claimed) continue;
+      try {
+        await syncRecoveryEvent({
+          trace_id: claimed.trace_id,
+          user_id: claimed.whoop_user_id,
+          id: claimed.resource_id,
+          type: claimed.event_type,
+        });
+        await db().from('softora_health_whoop_webhook_events').update({
+          status: 'completed', processed_at: now().toISOString(), last_error: null,
+        }).eq('trace_id', claimed.trace_id);
+        processed += 1;
+      } catch (eventError) {
+        const connection = await getConnection().catch(() => null);
+        const blocked = connection?.status === 'error';
+        const retryMinutes = Math.min(60, 2 ** Math.min(attempts, 5));
+        await db().from('softora_health_whoop_webhook_events').update({
+          status: blocked ? 'blocked' : 'retry',
+          next_attempt_at: new Date(now().getTime() + retryMinutes * 60 * 1000).toISOString(),
+          last_error: String(eventError.message || eventError).slice(0, 1000),
+        }).eq('trace_id', claimed.trace_id);
+        failed += 1;
+      }
+    }
+    return { ok: true, processed, failed, seen: (rows || []).length };
+  }
+
+  async function repairGap() {
+    const connection = await getConnection();
+    if (!connection?.encrypted_tokens || connection.status !== 'connected') {
+      return { ok: true, skipped: true, reason: 'whoop_not_connected' };
+    }
+    const toDay = today();
+    const fromDay = connection.last_synced_day ? addDays(connection.last_synced_day, 1) : addDays(toDay, -30);
+    if (fromDay > toDay) return { ok: true, skipped: true, reason: 'no_gap' };
+    return sync({ mode: 'backfill', fromDay, toDay, targetDay: toDay });
   }
 
   async function getStatus() {
@@ -267,6 +616,7 @@ function createWhoopHealthService(deps = {}) {
     return {
       configured: Boolean(clientId && clientSecret && redirectUri && encryptionSecret),
       connected: Boolean(connection?.status === 'connected' && connection.encrypted_tokens),
+      needsReauthorization: Boolean(connection?.status === 'error' && connection.encrypted_tokens),
       profile: connection?.profile || {}, bodyMeasurement: connection?.body_measurement || {},
       lastSyncStartedAt: connection?.last_sync_started_at || null,
       lastSyncCompletedAt: connection?.last_sync_completed_at || null,
@@ -276,13 +626,24 @@ function createWhoopHealthService(deps = {}) {
   }
 
   async function getDashboard(days = 90) {
-    const fromDay = addDays(formatDay(now(), timezone), -Math.max(7, Math.min(730, Number(days) || 90)));
+    const fromDay = addDays(today(), -Math.max(7, Math.min(730, Number(days) || 90)));
     const { data, error } = await db().from('softora_health_whoop_records').select('*').eq('owner_key', OWNER_KEY).gte('local_day', fromDay).order('local_day', { ascending: false }).limit(5000);
     if (error) throw error;
     return { records: data || [], fromDay, timezone };
   }
 
-  return { completeAuthorization, createAuthorizationUrl, getDashboard, getStatus, sync };
+  return {
+    completeAuthorization,
+    createAuthorizationUrl,
+    enqueueWebhookEvent,
+    getDashboard,
+    getStatus,
+    processWebhookEvents,
+    repairGap,
+    sync,
+    syncRecoveryEvent,
+    verifyWebhookRequest,
+  };
 }
 
-module.exports = { addDays, createWhoopHealthService, formatDay };
+module.exports = { addDays, createWhoopHealthService, formatDay, verifyWhoopWebhookSignature };
