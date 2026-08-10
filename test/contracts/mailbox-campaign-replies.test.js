@@ -937,6 +937,97 @@ test('campaign reply service houdt gewijzigde onderwerpregels van een alternatie
   assert.deepEqual(replies[0].threadMessages.map((message) => message.id), [parent.id]);
 });
 
+test('campaign reply lineage vertrouwt directe In-Reply-To en alleen één ondubbelzinnige References-ouder', async () => {
+  const sentParent = (id, overrides = {}) => ({
+    id: `sent:${id}`,
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl',
+    to: `${id}@example.test`,
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-08-01T09:00:00.000Z',
+    messageId: `<${id}@softora.test>`,
+    originalCampaignOutbound: true,
+    ...overrides,
+  });
+  const directCampaignParent = sentParent('direct-campaign');
+  const referencesCampaignParent = sentParent('references-campaign');
+  const otherCampaignParent = sentParent('other-campaign');
+  const explicitNonCampaignParent = sentParent('manual-non-campaign', {
+    originalCampaignOutbound: false,
+  });
+  const incoming = (id, overrides = {}) => ({
+    id: `inbox:${id}`,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: `${id}@example.test`,
+    to: 'serve@softora.nl',
+    subject: `Ander onderwerp ${id}`,
+    preview: 'Los vervolgbericht.',
+    date: '2026-08-04T09:00:00.000Z',
+    messageId: `<${id}@example.test>`,
+    ...overrides,
+  });
+  const incomingMessages = [
+    incoming('direct-campaign', {
+      inReplyTo: directCampaignParent.messageId,
+      references: `${otherCampaignParent.messageId} ${directCampaignParent.messageId}`,
+    }),
+    incoming('references-unique', {
+      references: referencesCampaignParent.messageId,
+    }),
+    incoming('direct-non-campaign', {
+      inReplyTo: explicitNonCampaignParent.messageId,
+      references: `${directCampaignParent.messageId} ${explicitNonCampaignParent.messageId}`,
+    }),
+    incoming('references-ambiguous', {
+      references: `${directCampaignParent.messageId} ${otherCampaignParent.messageId}`,
+    }),
+    incoming('references-forwarded', {
+      references: `${referencesCampaignParent.messageId} ${explicitNonCampaignParent.messageId}`,
+    }),
+    incoming('subject-fallback-forbidden', {
+      inReplyTo: explicitNonCampaignParent.messageId,
+    }),
+  ];
+  const parents = [
+    directCampaignParent,
+    referencesCampaignParent,
+    otherCampaignParent,
+    explicitNonCampaignParent,
+  ];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? incomingMessages : [],
+      listMatchingMessagesForAccounts: async () => [],
+      listMessagesByMessageIdsForAccounts: async ({ messageIds }) => {
+        const normalized = new Set(messageIds.map((value) => String(value).replace(/^<+|>+$/g, '')));
+        return parents.filter((message) => (
+          normalized.has(String(message.messageId).replace(/^<+|>+$/g, ''))
+        ));
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'serve' });
+  const repliesById = new Map(replies.map((reply) => [reply.id, reply]));
+
+  assert.deepEqual(Array.from(repliesById.keys()).sort(), [
+    'inbox:direct-campaign',
+    'inbox:references-unique',
+  ]);
+  assert.deepEqual(
+    repliesById.get('inbox:direct-campaign').threadMessages.map((message) => message.id),
+    [directCampaignParent.id]
+  );
+  assert.deepEqual(
+    repliesById.get('inbox:references-unique').threadMessages.map((message) => message.id),
+    [referencesCampaignParent.id]
+  );
+});
+
 test('campaign reply lineage blijft dicht voor onbekende ouders andere accounts niet-campagnemail en automaten', async () => {
   const validParent = {
     id: 'sent:valid', folder: 'sent', accountEmail: 'serve@softora.nl',

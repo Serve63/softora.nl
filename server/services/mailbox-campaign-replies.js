@@ -39,6 +39,13 @@ const {
 } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
+const {
+  CAMPAIGN_EXACT_PARENT_EVIDENCE,
+  getExactSentCampaignParent,
+  getMessageReferenceIds,
+  getMessageReferenceLookupValues,
+  normalizeMessageId,
+} = require('./mailbox-campaign-reply-lineage');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -87,12 +94,6 @@ function selectSnapshotConversations(conversations, limit) {
     if (!getCampaignConversationOwner(message)) selected.add(index);
   });
   return source.filter((_message, index) => selected.has(index));
-}
-
-function normalizeMessageId(value) {
-  return normalizeText(value)
-    .toLowerCase()
-    .replace(/^<+|>+$/g, '');
 }
 
 function normalizeSubject(value) {
@@ -154,37 +155,6 @@ function getConversationTimestamp(message) {
 function messageReferencesId(message, messageId) {
   if (!messageId) return false;
   return getMessageReferenceIds(message).includes(messageId);
-}
-
-function getMessageReferenceIds(message) {
-  return Array.from(new Set([
-    message && message.references,
-    message && message.inReplyTo,
-  ].flatMap((value) => {
-    const source = normalizeText(value).toLowerCase();
-    if (!source) return [];
-    return source.match(/<[^<>]+>/g) || source.split(/[,\s]+/);
-  }).map(normalizeMessageId).filter(Boolean)));
-}
-
-function getMessageReferenceLookupValues(messages) {
-  const values = new Set();
-  (Array.isArray(messages) ? messages : []).forEach((message) => {
-    [message && message.messageId, message && message.inReplyTo, message && message.references].forEach((rawValue) => {
-      const source = normalizeText(rawValue);
-      if (!source) return;
-      const tokens = source.match(/<[^<>]+>/g) || source.split(/\s+/);
-      tokens.forEach((token) => {
-        const raw = normalizeText(token);
-        const bare = raw.replace(/^<+|>+$/g, '');
-        if (!bare) return;
-        values.add(raw);
-        values.add(bare);
-        values.add(`<${bare}>`);
-      });
-    });
-  });
-  return Array.from(values).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
 }
 
 async function listExactSentDescendants({
@@ -670,20 +640,6 @@ function isCampaignReplySubject(message) {
   );
 }
 
-function getExactSentCampaignParent(message, sentMessages, allowedAccounts) {
-  if (!message || getMailboxMessageDirection(message) === 'sent' || isAutomatedCampaignReply(message)) return null;
-  const account = normalizeEmail(message.accountEmail);
-  const referenceIds = new Set(getMessageReferenceIds(message));
-  if (!account || !allowedAccounts?.has(account) || !referenceIds.size) return null;
-  return (Array.isArray(sentMessages) ? sentMessages : []).find((parent) => (
-    getMailboxMessageDirection(parent) === 'sent' &&
-    normalizeText(parent && parent.folder).toLowerCase() === 'sent' &&
-    normalizeEmail(parent && parent.accountEmail) === account &&
-    referenceIds.has(normalizeMessageId(parent && parent.messageId)) &&
-    (parent?.originalCampaignOutbound === true || isCampaignReplySubject(parent))
-  )) || null;
-}
-
 function dedupeCampaignMessages(messages) {
   const messagesByIdentity = new Map();
   (Array.isArray(messages) ? messages : []).forEach((rawMessage) => {
@@ -997,7 +953,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
           return null;
         }
         const provenMessage = exactParent
-          ? { ...message, threadCorrelationEvidence: 'exact-same-account-sent-campaign-parent' }
+          ? {
+              ...message,
+              threadCorrelationEvidence: CAMPAIGN_EXACT_PARENT_EVIDENCE,
+              threadCorrelationParentMessageId: normalizeMessageId(exactParent.messageId),
+            }
           : message;
         return buildCampaignReply(provenMessage, customer || null);
       })
@@ -1023,9 +983,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
               limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
             })
     ).catch(() => []);
-    const acceptedParentMessageIds = new Set(
-      getMessageReferenceLookupValues(replies).map(normalizeMessageId)
-    );
+    const acceptedParentMessageIds = new Set(replies.flatMap(getMessageReferenceIds));
     const targetedParentMessagesResult = Array.isArray(candidateParentMessagesResult)
       ? candidateParentMessagesResult.filter((message) => (
           acceptedParentMessageIds.has(normalizeMessageId(message && message.messageId))
