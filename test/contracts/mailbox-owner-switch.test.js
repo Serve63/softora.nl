@@ -187,6 +187,56 @@ test('tijdelijke indexfout bewaart de huidige mailbox en hervat afgebroken detai
   assert.deepEqual(toasts, []);
 });
 
+test('vastgelopen gewone inboxlijst wordt hard begrensd en laat een volgende refresh vrij', async () => {
+  const messages = [{ id: 'bestaand-inboxbericht' }];
+  const statuses = [];
+  const busyStates = [];
+  let timeoutHandler;
+  let requestSignal;
+  let requestAborted = false;
+  const view = ownerSession.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: {
+      async load() { return null; },
+      filterMessages: (value) => value,
+    },
+    fetch(_url, init) {
+      requestSignal = init.signal;
+      requestSignal.addEventListener('abort', () => { requestAborted = true; }, { once: true });
+      return new Promise(() => {});
+    },
+    getMessages: () => messages,
+    setMessages() { throw new Error('een timeout mag zichtbare mail niet vervangen'); },
+    filterDeleted: (value) => value,
+    getActiveMail: () => messages[0].id,
+    getListElement: () => ({ setAttribute(_name, value) { busyStates.push(value); } }),
+    renderList() {},
+    openMail() {},
+    setSync() {},
+    setStatus: (value) => statuses.push(value),
+    setTimeout(handler) { timeoutHandler = handler; return 1; },
+    clearTimeout() {},
+  });
+
+  const pending = view.load({ preserveOnError: true, openLatest: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(typeof timeoutHandler, 'function');
+  assert.equal(requestSignal.aborted, false);
+  timeoutHandler();
+
+  assert.equal(await pending, false);
+  assert.equal(requestSignal.aborted, true);
+  assert.equal(requestAborted, true);
+  assert.deepEqual(messages.map((message) => message.id), ['bestaand-inboxbericht']);
+  assert.equal(statuses.at(-1), ownerSession.MAILBOX_STALE_STATUS);
+  assert.equal(busyStates.at(-1), 'false');
+
+  const second = view.load({ preserveOnError: true, openLatest: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  timeoutHandler();
+  assert.equal(await second, false);
+});
+
 test('een oudere degraded response kan een nieuwere zichtbare mailbox nooit overschrijven', async () => {
   const newerAt = new Date(Date.now() - 30_000).toISOString();
   const olderAt = new Date(Date.now() - 90_000).toISOString();
