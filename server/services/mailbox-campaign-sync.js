@@ -228,6 +228,10 @@ function createMailboxSyncService({
   normalizeEmail,
   normalizeFolder,
   invalidateCampaignSnapshot = async () => ({ ok: true }),
+  campaignMutationRunner = null,
+  requireCampaignMutationJournal = false,
+  campaignMutationLeaseSeconds,
+  campaignMutationDeadlineMs,
   logger = console,
   defaultFolders = ['inbox', 'sent'],
   defaultLimit = 50,
@@ -333,27 +337,62 @@ function createMailboxSyncService({
           indexedUids = indexedMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
         }
       }
-      const messages = await fetchMessagesFromImap({
-        account,
-        folder: normalizedFolder,
-        limit: campaignOnly
-          ? Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
-          : getSafeLimit(limit),
-        campaignHistory:
-          hydrateCampaignHistory && normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER,
-        oldestIndexedCampaignUid,
-        threadReferenceIds,
-        threadRecipientTerms,
-        indexedUids,
-      });
-      const saved = await mailboxIndexStore.upsertMessages({
-        accountEmail: account.email,
-        folder: normalizedFolder,
-        messages,
-      });
-      if (!saved || saved.ok === false) {
-        throw saved?.error || new Error('Mailbox-index opslaan mislukt');
+      const fetchAndPersistMessages = async (mutationContext = null) => {
+        const messages = await fetchMessagesFromImap({
+          account,
+          folder: normalizedFolder,
+          limit: campaignOnly
+            ? Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
+            : getSafeLimit(limit),
+          campaignHistory:
+            hydrateCampaignHistory && normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER,
+          oldestIndexedCampaignUid,
+          threadReferenceIds,
+          threadRecipientTerms,
+          indexedUids,
+          signal: mutationContext?.signal,
+        });
+        // IMAP clients cannot all be interrupted while a command is in flight.
+        // This checkpoint guarantees that a response arriving after our hard
+        // deadline can never start a late Supabase write.
+        mutationContext?.assertActive();
+        const saved = await mailboxIndexStore.upsertMessages({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+          messages,
+          signal: mutationContext?.signal,
+          mutationId: mutationContext?.mutationId,
+          requestKey: mutationContext?.requestKey,
+        });
+        mutationContext?.assertActive();
+        if (!saved || saved.ok === false) {
+          throw saved?.error || new Error('Mailbox-index opslaan mislukt');
+        }
+        return { messages, saved };
+      };
+      const touchesCampaignContent =
+        CAMPAIGN_MAILBOX_ACCOUNTS.map(normalizeEmail).includes(normalizeEmail(account.email)) &&
+        ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder);
+      const canJournalMutation = Boolean(
+        touchesCampaignContent &&
+        campaignMutationRunner?.isAvailable?.() &&
+        typeof campaignMutationRunner.run === 'function'
+      );
+      if (touchesCampaignContent && requireCampaignMutationJournal && !canJournalMutation) {
+        const error = new Error('Duurzame mailboxmutatiejournal is niet beschikbaar.');
+        error.code = 'MAILBOX_CAMPAIGN_MUTATION_UNAVAILABLE';
+        throw error;
       }
+      const { messages, saved } = canJournalMutation
+        ? await campaignMutationRunner.run({
+            requestKey: `imap-sync:${lock.lockToken}:${normalizeEmail(account.email)}:${normalizedFolder}`,
+            kind: 'imap-sync',
+            accountEmail: account.email,
+            folder: normalizedFolder,
+            leaseSeconds: campaignMutationLeaseSeconds,
+            deadlineMs: campaignMutationDeadlineMs,
+          }, fetchAndPersistMessages)
+        : await fetchAndPersistMessages();
       if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
         const invalidation = await invalidateCampaignSnapshot({
           source: 'mailbox-index-upsert',
@@ -453,8 +492,10 @@ function createMailboxSyncService({
       }
     );
     const results = accountResults.flat();
+    const hasTargets = results.length > 0;
     return {
-      ok: results.every((result) => result.ok !== false),
+      ok: hasTargets && results.every((result) => result.ok !== false),
+      ...(!hasTargets ? { degraded: true, reason: 'no_sync_targets' } : {}),
       results,
     };
   }

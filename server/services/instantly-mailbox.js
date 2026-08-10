@@ -14,6 +14,15 @@ const {
 const { buildAcceptedSentMessage, normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
+const {
+  createInstantlyMailboxMutationWriter,
+  throwInstantlyStoreFailure,
+} = require('./instantly-mailbox-mutation');
+const {
+  createInstantlyApiRequest,
+  extractInstantlyCursor,
+  extractInstantlyItems,
+} = require('./instantly-mailbox-provider-api');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -107,23 +116,6 @@ function extractName(value) {
   return normalizeText(value.name || value.display_name || value.address_name);
 }
 
-function extractInstantlyItems(data) {
-  if (Array.isArray(data)) return data;
-  for (const candidate of [data?.items, data?.data, data?.emails, data?.results]) {
-    if (Array.isArray(candidate)) return candidate;
-  }
-  return [];
-}
-
-function extractCursor(data) {
-  return normalizeText(
-    data?.next_starting_after ||
-    data?.next_cursor ||
-    data?.pagination?.next_starting_after ||
-    data?.pagination?.next_cursor
-  );
-}
-
 function parseDate(value, fallback = new Date()) {
   const date = value ? new Date(value) : fallback;
   return Number.isFinite(date.getTime()) ? date : fallback;
@@ -146,6 +138,7 @@ function createInstantlyMailboxService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     onMessagesUpserted = async () => ({ ok: true }),
+    getCampaignMutationRunner = () => null, requireMutationJournal = false, createMutationRequestKey,
     now = () => new Date(),
     logger = console,
   } = deps;
@@ -173,12 +166,15 @@ function createInstantlyMailboxService(deps = {}) {
   const campaignOwnership = normalizeCampaignOwnership(config.campaignOwners);
   let syncPromiseByOwner = new Map();
 
-  async function upsertInstantlyMessages(messages) {
-    const result = await mailboxIndexStore.upsertProviderMessages({ provider: 'instantly', messages });
-    if (!result?.ok || !(Number(result.upserted) > 0)) return result;
-    const invalidation = await onMessagesUpserted({ provider: 'instantly', count: Number(result.upserted) });
-    return invalidation?.ok === false ? { ...result, ok: false, invalidationFailed: true } : result;
-  }
+  const upsertInstantlyMessages = createInstantlyMailboxMutationWriter({
+    mailboxIndexStore, onMessagesUpserted, getCampaignMutationRunner,
+    requireMutationJournal, createMutationRequestKey,
+  });
+  const apiRequest = createInstantlyApiRequest({
+    assertConfigured, apiBaseUrl: normalizedConfig.apiBaseUrl,
+    apiKey: normalizedConfig.apiKey, fetchJsonWithTimeout,
+    createError: createInstantlyMailboxError,
+  });
 
   function getConfiguredAccounts(owner = '') {
     const selectedOwner = normalizeOwner(owner);
@@ -373,38 +369,16 @@ function createInstantlyMailboxService(deps = {}) {
     };
   }
 
-  async function apiRequest(path, { method = 'GET', query = {}, body } = {}) {
-    assertConfigured();
-    const url = new URL(`${normalizedConfig.apiBaseUrl}/${normalizeText(path).replace(/^\/+/, '')}`);
-    Object.entries(query).forEach(([key, value]) => {
-      if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, String(value));
-    });
-    const options = {
-      method,
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${normalizedConfig.apiKey}`,
-      },
-    };
-    if (body !== undefined) {
-      options.headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify(body);
-    }
-    const { response, data } = await fetchJsonWithTimeout(url.toString(), options, 20_000);
-    if (!response?.ok) {
-      const status = Number(response?.status) || 502;
-      const detail = normalizeText(data?.message || data?.error || data?.detail);
-      throw createInstantlyMailboxError(
-        detail || `Instantly gaf HTTP ${status}.`,
-        status === 429 ? 'INSTANTLY_RATE_LIMITED' : 'INSTANTLY_API_FAILED',
-        status === 429 ? 429 : 502,
-        { providerStatus: status }
-      );
-    }
-    return data;
+  async function hydrateThread(input = {}) {
+    const accountEmail = normalizeEmail(input.accountEmail);
+    if (!normalizeText(input.threadId) || !accountEmail) return { stored: 0 };
+    return upsertInstantlyMessages.runMutationLifecycle({ accountEmail }, (mutationContext) =>
+      hydrateThreadWithinMutation(input, mutationContext));
   }
 
-  async function hydrateThread({ threadId, accountEmail, owner, indexedMessages = [] }) {
+  async function hydrateThreadWithinMutation({
+    threadId, accountEmail, owner, indexedMessages = [],
+  }, mutationContext = null) {
     const exactThreadId = normalizeText(threadId);
     const exactAccountEmail = normalizeEmail(accountEmail);
     const exactOwner = assertOwner(owner);
@@ -417,7 +391,10 @@ function createInstantlyMailboxService(deps = {}) {
         403
       );
     }
-    const data = await apiRequest('emails', {
+    const mutationApiRequest = (path, options = {}) => apiRequest(path, {
+      ...options, signal: mutationContext?.signal,
+    });
+    const data = await mutationApiRequest('emails', {
       query: {
         limit: 100,
         eaccount: exactAccountEmail,
@@ -434,7 +411,7 @@ function createInstantlyMailboxService(deps = {}) {
       indexedMessages,
       threadId: exactThreadId,
       accountEmail: exactAccountEmail,
-      apiRequest,
+      apiRequest: mutationApiRequest,
     });
     const originalRecipients = Array.from(new Set(
       rawMessages
@@ -518,9 +495,9 @@ function createInstantlyMailboxService(deps = {}) {
       try {
         if (!leadSourceCache.has(leadCacheKey)) {
           if (leadId) {
-            leadSourceCache.set(leadCacheKey, await apiRequest(`leads/${encodeURIComponent(leadId)}`));
+            leadSourceCache.set(leadCacheKey, await mutationApiRequest(`leads/${encodeURIComponent(leadId)}`));
           } else if (recipientEmail && normalizeText(rawMessage.campaign_id)) {
-            const leadList = await apiRequest('leads/list', {
+            const leadList = await mutationApiRequest('leads/list', {
               method: 'POST',
               body: {
                 campaign: normalizeText(rawMessage.campaign_id),
@@ -607,12 +584,12 @@ function createInstantlyMailboxService(deps = {}) {
         });
       }
     }
-    const upsert = await upsertInstantlyMessages(messages);
+    const upsert = await upsertInstantlyMessages(messages, mutationContext);
     if (!upsert?.ok) {
-      throw createInstantlyMailboxError(
+      throwInstantlyStoreFailure(
+        upsert,
         'Instantly-thread kon niet duurzaam worden opgeslagen.',
-        'INSTANTLY_THREAD_STORE_FAILED',
-        503
+        'INSTANTLY_THREAD_STORE_FAILED'
       );
     }
     return { stored: Number(upsert.upserted) || 0 };
@@ -712,35 +689,43 @@ function createInstantlyMailboxService(deps = {}) {
       const threadCandidates = new Map();
       try {
         do {
-          const data = await apiRequest('emails', {
-            query: {
-              limit: normalizedConfig.pageLimit,
-              starting_after: cursor,
-              eaccount: accounts.map((account) => account.email).join(','),
-              min_timestamp_created: minTimestamp,
-              sort_order: 'desc',
-            },
+          const pageResult = await upsertInstantlyMessages.runMutationLifecycle({
+            accountEmail: accounts[0]?.email,
+          }, async (mutationContext) => {
+            const data = await apiRequest('emails', {
+              signal: mutationContext?.signal,
+              query: {
+                limit: normalizedConfig.pageLimit,
+                starting_after: cursor,
+                eaccount: accounts.map((account) => account.email).join(','),
+                min_timestamp_created: minTimestamp,
+                sort_order: 'desc',
+              },
+            });
+            const rawItems = extractInstantlyItems(data);
+            const messages = rawItems
+              .map(normalizeInstantlyMessage)
+              .filter((message) => message && message.providerOwner === selectedOwner);
+            const upsert = await upsertInstantlyMessages(messages, mutationContext);
+            if (!upsert?.ok) {
+              throwInstantlyStoreFailure(
+                upsert,
+                'Instantly-berichten konden niet duurzaam worden opgeslagen.',
+                'INSTANTLY_MAILBOX_STORE_FAILED'
+              );
+            }
+            return { data, messages, rawCount: rawItems.length, upsert };
           });
-          const messages = extractInstantlyItems(data)
-            .map(normalizeInstantlyMessage)
-            .filter((message) => message && message.providerOwner === selectedOwner);
+          const { data, messages, rawCount, upsert } = pageResult;
           messages
             .filter((message) => message.folder !== 'sent' && message.providerThreadId)
             .forEach((message) => {
               const key = `${message.providerAccountEmail}|${message.providerThreadId}`;
               if (!threadCandidates.has(key)) threadCandidates.set(key, message);
             });
-          seen += extractInstantlyItems(data).length;
-          const upsert = await upsertInstantlyMessages(messages);
-          if (!upsert?.ok) {
-            throw createInstantlyMailboxError(
-              'Instantly-berichten konden niet duurzaam worden opgeslagen.',
-              'INSTANTLY_MAILBOX_STORE_FAILED',
-              503
-            );
-          }
+          seen += rawCount;
           stored += Number(upsert.upserted) || 0;
-          cursor = extractCursor(data);
+          cursor = extractInstantlyCursor(data);
           page += 1;
         } while (cursor && page < normalizedConfig.maxPages);
         const indexed = await mailboxIndexStore.listProviderMessages({
@@ -1118,23 +1103,33 @@ function createInstantlyMailboxService(deps = {}) {
     }
     const providerMessageId = normalizeText(payload.email_id);
     if (providerMessageId) {
-      const rawMessage = await apiRequest(`emails/${encodeURIComponent(providerMessageId)}`);
-      const normalizedMessage = normalizeInstantlyMessage(rawMessage?.email || rawMessage?.data || rawMessage);
-      if (!normalizedMessage || normalizedMessage.providerOwner !== accountRecord.owner) {
-        throw createInstantlyMailboxError(
-          'Webhook-bericht kon niet aan het exacte Instantly-account worden gekoppeld.',
-          'INSTANTLY_WEBHOOK_PROVENANCE_MISMATCH',
-          409
+      const persisted = await upsertInstantlyMessages.runMutationLifecycle({
+        accountEmail: accountRecord.email,
+      }, async (mutationContext) => {
+        const rawMessage = await apiRequest(`emails/${encodeURIComponent(providerMessageId)}`, {
+          signal: mutationContext?.signal,
+        });
+        const normalizedMessage = normalizeInstantlyMessage(
+          rawMessage?.email || rawMessage?.data || rawMessage
         );
-      }
-      const upsert = await upsertInstantlyMessages([normalizedMessage]);
-      if (!upsert?.ok) {
-        throw createInstantlyMailboxError(
-          'Webhook-bericht kon niet duurzaam worden opgeslagen.',
-          'INSTANTLY_WEBHOOK_STORE_FAILED',
-          503
-        );
-      }
+        if (!normalizedMessage || normalizedMessage.providerOwner !== accountRecord.owner) {
+          throw createInstantlyMailboxError(
+            'Webhook-bericht kon niet aan het exacte Instantly-account worden gekoppeld.',
+            'INSTANTLY_WEBHOOK_PROVENANCE_MISMATCH',
+            409
+          );
+        }
+        const upsert = await upsertInstantlyMessages([normalizedMessage], mutationContext);
+        if (!upsert?.ok) {
+          throwInstantlyStoreFailure(
+            upsert,
+            'Webhook-bericht kon niet duurzaam worden opgeslagen.',
+            'INSTANTLY_WEBHOOK_STORE_FAILED'
+          );
+        }
+        return { normalizedMessage };
+      });
+      const { normalizedMessage } = persisted;
       const hydrated = normalizedMessage.providerThreadId
         ? await hydrateThread({
             threadId: normalizedMessage.providerThreadId,

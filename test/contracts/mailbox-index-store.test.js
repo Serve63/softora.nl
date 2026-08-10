@@ -7,6 +7,12 @@ const {
   MAILBOX_INDEX_PAGE_SIZE,
   createMailboxIndexStore,
 } = require('../../server/services/mailbox-index-store');
+const {
+  createMailboxCampaignMutationRunner,
+} = require('../../server/services/mailbox-campaign-mutation-runner');
+const {
+  MAILBOX_CAMPAIGN_ATOMIC_COMMIT_RPC,
+} = require('../../server/services/mailbox-index-atomic-commit');
 
 function createMailboxIndexClient() {
   const stateRows = new Map();
@@ -848,6 +854,445 @@ test('mailbox index sync laat ontbrekende tombstonevelden ongemoeid bij upsert',
     onConflict: 'message_key',
     defaultToNull: false,
   });
+});
+
+test('mailbox index campaign-upsert koppelt de harde abortsignal aan PostgREST', async () => {
+  const controller = new AbortController();
+  let attachedSignal = null;
+  let rpcCall = null;
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      rpc(name, args) {
+        rpcCall = { name, args };
+        return {
+          abortSignal(signal) {
+            attachedSignal = signal;
+            return Promise.resolve({
+              data: [{ mutation_status: 'completed', upserted_count: 1 }],
+              error: null,
+            });
+          },
+        };
+      },
+    }),
+  });
+
+  const result = await store.upsertMessages({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    signal: controller.signal,
+    mutationId: '11111111-1111-4111-8111-111111111111',
+    requestKey: 'imap-sync:test-42',
+    messages: [{ id: 'inbox:42', uid: 42, date: '2026-08-09T20:00:00.000Z' }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(attachedSignal);
+  assert.notEqual(attachedSignal, controller.signal);
+  assert.equal(attachedSignal.aborted, false);
+  assert.equal(rpcCall.name, MAILBOX_CAMPAIGN_ATOMIC_COMMIT_RPC);
+  assert.equal(rpcCall.args.p_request_key, 'imap-sync:test-42');
+  assert.equal(rpcCall.args.p_rows[0].message_key, 'serve@softora.nl|inbox|42');
+});
+
+test('mailbox index Instantly-upsert koppelt dezelfde harde abortsignal aan PostgREST', async () => {
+  const controller = new AbortController();
+  let attachedSignal = null;
+  const query = {
+    abortSignal(signal) {
+      attachedSignal = signal;
+      return Promise.resolve({
+        data: [{ mutation_status: 'completed', upserted_count: 1 }],
+        error: null,
+      });
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      rpc: () => query,
+    }),
+  });
+
+  const result = await store.upsertProviderMessages({
+    provider: 'instantly',
+    signal: controller.signal,
+    mutationId: '22222222-2222-4222-8222-222222222222',
+    requestKey: 'instantly-upsert:test-reply-1',
+    messages: [{
+      providerMessageId: 'reply-1',
+      providerAccountEmail: 'serve@websoftora.com',
+      providerOwner: 'serve',
+      date: '2026-08-09T19:00:00.000Z',
+      subject: 'Re: Website',
+    }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(attachedSignal);
+  assert.notEqual(attachedSignal, controller.signal);
+  assert.equal(attachedSignal.aborted, false);
+});
+
+test('late niet-cooperatieve campaign writes settelen vóór journal-completion en onzekere abort blijft pending', async () => {
+  function deferredWrite({ rejectOnAbort = false } = {}) {
+    let resolveWrite;
+    let rejectWrite;
+    let resolveAborted;
+    const promise = new Promise((resolve, reject) => {
+      resolveWrite = resolve;
+      rejectWrite = reject;
+    });
+    const aborted = new Promise((resolve) => { resolveAborted = resolve; });
+    return {
+      aborted,
+      query: {
+        abortSignal(signal) {
+          signal.addEventListener('abort', () => {
+            resolveAborted();
+            if (rejectOnAbort) rejectWrite(new Error('HTTP-request geannuleerd'));
+          }, { once: true });
+          return promise;
+        },
+      },
+      commit() {
+        resolveWrite({
+          data: [{ mutation_status: 'completed', upserted_count: 1 }],
+          error: null,
+        });
+      },
+    };
+  }
+
+  const lateImap = deferredWrite();
+  const lateProvider = deferredWrite();
+  const uncertainImap = deferredWrite({ rejectOnAbort: true });
+  const imapQueries = [lateImap.query, uncertainImap.query];
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      rpc(_name, args) {
+        return args.p_rows[0]?.folder === 'instantly' ? lateProvider.query : imapQueries.shift();
+      },
+    }),
+    mailboxIndexQueryTimeoutMs: 250,
+    mailboxIndexFailureCooldownMs: 0,
+    logger: { error() {}, info() {} },
+  });
+  let mutationSequence = 0;
+  const committed = new Set();
+  const completions = [];
+  const runner = createMailboxCampaignMutationRunner({
+    mailboxCampaignConsistencyStore: {
+      isAvailable: () => true,
+      beginMutation: async () => ({
+        mutationId: `11111111-1111-4111-8111-${String(++mutationSequence).padStart(12, '0')}`,
+        status: 'pending',
+        replayed: false,
+      }),
+      completeMutation: async (input) => {
+        assert.equal(committed.has(input.requestKey), true, 'journal completed vóór write-settlement');
+        completions.push(input);
+      },
+    },
+  });
+  const runIndexedWrite = (requestKey, kind, write) => runner.run({
+    requestKey,
+    kind,
+  }, async (context) => {
+    const result = await write(context);
+    if (!result.ok) throw result.error;
+    return result;
+  });
+  const lateImapRun = runIndexedWrite('late-imap', 'imap-sync', (context) => store.upsertMessages({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    signal: context.signal, mutationId: context.mutationId, requestKey: context.requestKey,
+    messages: [{ id: 'inbox:42', uid: 42, date: '2026-08-09T20:00:00.000Z' }],
+  }));
+  const lateProviderRun = runIndexedWrite('late-provider', 'instantly-upsert', (context) => store.upsertProviderMessages({
+    provider: 'instantly',
+    signal: context.signal, mutationId: context.mutationId, requestKey: context.requestKey,
+    messages: [{
+      providerMessageId: 'reply-late',
+      providerAccountEmail: 'serve@websoftora.com',
+      providerOwner: 'serve',
+      date: '2026-08-09T20:01:00.000Z',
+      subject: 'Re: Website',
+    }],
+  }));
+  const uncertainRun = runIndexedWrite('uncertain-imap', 'imap-sync', (context) => store.upsertMessages({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    signal: context.signal, mutationId: context.mutationId, requestKey: context.requestKey,
+    messages: [{ id: 'inbox:43', uid: 43, date: '2026-08-09T20:02:00.000Z' }],
+  }));
+  const uncertainAssertion = assert.rejects(uncertainRun, {
+    code: 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN',
+    leaveMutationPending: true,
+  });
+
+  await Promise.all([lateImap.aborted, lateProvider.aborted, uncertainImap.aborted]);
+  assert.equal(completions.length, 0);
+  committed.add('late-imap');
+  lateImap.commit();
+  committed.add('late-provider');
+  lateProvider.commit();
+
+  const [imapResult, providerResult] = await Promise.all([lateImapRun, lateProviderRun]);
+  await uncertainAssertion;
+  assert.equal(imapResult.ok, true);
+  assert.equal(providerResult.ok, true);
+  assert.deepEqual(completions.map((item) => item.requestKey).sort(), [
+    'late-imap',
+    'late-provider',
+  ]);
+  assert.equal(completions.every((item) => item.result.ok === true), true);
+});
+
+test('deadline → reap-poging → late atomische commit maakt de fence nooit voortijdig ready', async () => {
+  let deadlineCallback = null;
+  let resolveTransactionStarted;
+  let resolveTransactionLock;
+  let commitTransaction;
+  let completes = 0;
+  const transactionStarted = new Promise((resolve) => { resolveTransactionStarted = resolve; });
+  const transactionLock = new Promise((resolve) => { resolveTransactionLock = resolve; });
+  const database = { contentVersion: 0, messages: [], mutationStatus: 'pending', locked: false };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    mailboxIndexQueryTimeoutMs: 10_000,
+    mailboxIndexFailureCooldownMs: 0,
+    logger: { error() {}, info() {} },
+    getSupabaseClient: () => ({
+      rpc(name, args) {
+        assert.equal(name, MAILBOX_CAMPAIGN_ATOMIC_COMMIT_RPC);
+        return {
+          abortSignal() {
+            database.locked = true;
+            resolveTransactionStarted();
+            return new Promise((resolve) => {
+              commitTransaction = () => {
+                database.messages.push(...args.p_rows);
+                database.contentVersion += 1;
+                database.mutationStatus = 'completed';
+                database.locked = false;
+                resolve({
+                  data: [{ mutation_status: 'completed', upserted_count: args.p_rows.length }],
+                  error: null,
+                });
+                resolveTransactionLock();
+              };
+            });
+          },
+        };
+      },
+    }),
+  });
+  const runner = createMailboxCampaignMutationRunner({
+    mailboxCampaignConsistencyStore: {
+      isAvailable: () => true,
+      beginMutation: async () => ({
+        mutationId: '33333333-3333-4333-8333-333333333333',
+        status: 'pending',
+        replayed: false,
+      }),
+      completeMutation: async () => { completes += 1; },
+    },
+    setTimer(callback) {
+      deadlineCallback = callback;
+      return { unref() {} };
+    },
+    clearTimer() {},
+  });
+  const running = runner.run({
+    requestKey: 'imap-sync:late-atomic',
+    kind: 'imap-sync',
+  }, async (context) => {
+    const result = await store.upsertMessages({
+      accountEmail: 'serve@softora.nl',
+      folder: 'inbox',
+      signal: context.signal,
+      mutationId: context.mutationId,
+      requestKey: context.requestKey,
+      messages: [{ id: 'inbox:99', uid: 99, date: '2026-08-09T20:03:00.000Z' }],
+    });
+    if (!result.ok) throw result.error;
+    return result;
+  });
+
+  await transactionStarted;
+  deadlineCallback();
+  await assert.rejects(running, { code: 'MAILBOX_CAMPAIGN_MUTATION_DEADLINE' });
+  assert.equal(completes, 0);
+
+  let fenceSettled = false;
+  const fenceAttempt = (async () => {
+    if (database.locked) await transactionLock;
+    let reapedCount = 0;
+    if (database.mutationStatus === 'pending') {
+      database.mutationStatus = 'abandoned';
+      reapedCount = 1;
+    }
+    return {
+      contentVersion: database.contentVersion,
+      ready: database.mutationStatus !== 'pending',
+      reapedCount,
+    };
+  })().then((result) => { fenceSettled = true; return result; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fenceSettled, false, 'fence werd ready terwijl de DB-transactie nog kon committen');
+
+  commitTransaction();
+  const fence = await fenceAttempt;
+  assert.deepEqual(fence, { contentVersion: 1, ready: true, reapedCount: 0 });
+  assert.equal(database.messages.length, 1);
+  assert.equal(database.mutationStatus, 'completed');
+});
+
+test('deadline → concurrent reap → RPC-rollback levert ready zonder late data', async () => {
+  let deadlineCallback = null;
+  let resolveTransactionStarted;
+  let resolveTransactionLock;
+  let rollbackTransaction;
+  const transactionStarted = new Promise((resolve) => { resolveTransactionStarted = resolve; });
+  const transactionLock = new Promise((resolve) => { resolveTransactionLock = resolve; });
+  const database = { contentVersion: 0, messages: [], mutationStatus: 'pending', locked: false };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    mailboxIndexQueryTimeoutMs: 10_000,
+    mailboxIndexFailureCooldownMs: 0,
+    logger: { error() {}, info() {} },
+    getSupabaseClient: () => ({
+      rpc() {
+        return {
+          abortSignal() {
+            database.locked = true;
+            resolveTransactionStarted();
+            return new Promise((resolve) => {
+              rollbackTransaction = () => {
+                database.locked = false;
+                resolve({ data: null, error: { code: '57014', message: 'rollback' } });
+                resolveTransactionLock();
+              };
+            });
+          },
+        };
+      },
+    }),
+  });
+  const runner = createMailboxCampaignMutationRunner({
+    mailboxCampaignConsistencyStore: {
+      isAvailable: () => true,
+      beginMutation: async () => ({
+        mutationId: '44444444-4444-4444-8444-444444444444',
+        status: 'pending',
+        replayed: false,
+      }),
+      completeMutation: async () => assert.fail('onzekere rollback mag niet completeren'),
+    },
+    setTimer(callback) {
+      deadlineCallback = callback;
+      return { unref() {} };
+    },
+    clearTimer() {},
+  });
+  const running = runner.run({ requestKey: 'imap-sync:rollback', kind: 'imap-sync' },
+    async (context) => {
+      const result = await store.upsertMessages({
+        accountEmail: 'serve@softora.nl', folder: 'inbox', signal: context.signal,
+        mutationId: context.mutationId, requestKey: context.requestKey,
+        messages: [{ id: 'inbox:100', uid: 100, date: '2026-08-09T20:04:00.000Z' }],
+      });
+      if (!result.ok) throw result.error;
+      return result;
+    });
+
+  await transactionStarted;
+  deadlineCallback();
+  await assert.rejects(running, { code: 'MAILBOX_CAMPAIGN_MUTATION_DEADLINE' });
+  let fenceSettled = false;
+  const fenceAttempt = (async () => {
+    if (database.locked) await transactionLock;
+    if (database.mutationStatus === 'pending') database.mutationStatus = 'abandoned';
+    return { contentVersion: database.contentVersion, ready: true, reapedCount: 1 };
+  })().then((result) => { fenceSettled = true; return result; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fenceSettled, false);
+
+  rollbackTransaction();
+  assert.deepEqual(await fenceAttempt, { contentVersion: 0, ready: true, reapedCount: 1 });
+  assert.deepEqual(database.messages, []);
+  assert.equal(database.mutationStatus, 'abandoned');
+});
+
+test('reaper wint vóór een gequeue-de RPC en die late RPC schrijft niets na ready', async () => {
+  let deadlineCallback = null;
+  let startQueuedRpc;
+  const database = { messages: [], mutationStatus: 'pending' };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    mailboxIndexQueryTimeoutMs: 10_000,
+    mailboxIndexFailureCooldownMs: 0,
+    logger: { error() {}, info() {} },
+    getSupabaseClient: () => ({
+      rpc(_name, args) {
+        return {
+          abortSignal() {
+            return new Promise((resolve) => {
+              startQueuedRpc = () => {
+                if (database.mutationStatus !== 'pending') {
+                  resolve({ data: null, error: { code: '55000', message: 'niet schrijfbaar' } });
+                  return;
+                }
+                database.messages.push(...args.p_rows);
+                database.mutationStatus = 'completed';
+                resolve({ data: [{ mutation_status: 'completed', upserted_count: 1 }], error: null });
+              };
+            });
+          },
+        };
+      },
+    }),
+  });
+  const runner = createMailboxCampaignMutationRunner({
+    mailboxCampaignConsistencyStore: {
+      isAvailable: () => true,
+      beginMutation: async () => ({
+        mutationId: '55555555-5555-4555-8555-555555555555',
+        status: 'pending',
+        replayed: false,
+      }),
+      completeMutation: async () => assert.fail('deadline mag niet completeren'),
+    },
+    setTimer(callback) {
+      deadlineCallback = callback;
+      return { unref() {} };
+    },
+    clearTimer() {},
+  });
+  const running = runner.run({ requestKey: 'imap-sync:queued', kind: 'imap-sync' },
+    async (context) => {
+      const result = await store.upsertMessages({
+        accountEmail: 'serve@softora.nl', folder: 'inbox', signal: context.signal,
+        mutationId: context.mutationId, requestKey: context.requestKey,
+        messages: [{ id: 'inbox:101', uid: 101, date: '2026-08-09T20:05:00.000Z' }],
+      });
+      if (!result.ok) throw result.error;
+      return result;
+    });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  deadlineCallback();
+  await assert.rejects(running, { code: 'MAILBOX_CAMPAIGN_MUTATION_DEADLINE' });
+  database.mutationStatus = 'abandoned';
+  const fence = { ready: true, reapedCount: 1 };
+  startQueuedRpc();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(fence, { ready: true, reapedCount: 1 });
+  assert.deepEqual(database.messages, []);
+  assert.equal(database.mutationStatus, 'abandoned');
 });
 
 test('mailbox index store reads campaign inbox messages across selected accounts', async () => {

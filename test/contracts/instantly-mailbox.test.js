@@ -21,7 +21,11 @@ const {
 const {
   createDefaultInstantlyMailboxService,
   mergeCampaignReplies,
+  syncInstantlyMailboxResponse,
 } = require('../../server/services/mailbox-instantly-integration');
+const {
+  createMailboxCampaignMutationRunner,
+} = require('../../server/services/mailbox-campaign-mutation-runner');
 
 function createStore(initialMessages = []) {
   const rows = initialMessages.slice();
@@ -109,6 +113,9 @@ function buildService(overrides = {}) {
     getUiStateValues: overrides.getUiStateValues,
     setUiStateValues: overrides.setUiStateValues,
     onMessagesUpserted: overrides.onMessagesUpserted,
+    getCampaignMutationRunner: overrides.getCampaignMutationRunner,
+    requireMutationJournal: overrides.requireMutationJournal,
+    createMutationRequestKey: overrides.createMutationRequestKey,
     now: () => new Date('2026-07-25T12:00:00.000Z'),
     fetchJsonWithTimeout: async (url, options) => {
       requests.push({ url, options });
@@ -1592,6 +1599,154 @@ test('iedere duurzame Instantly-upsert invalideert de campagnemailbox-snapshot',
   assert.deepEqual(invalidations, [{ provider: 'instantly', count: 1 }]);
 });
 
+test('Instantly-upsert blijft pending tijdens de abortbare DB-write en faalt zonder verplichte journal', async () => {
+  const controller = new AbortController();
+  const store = createStore();
+  const baseUpsert = store.upsertProviderMessages.bind(store);
+  let writeSignal = null;
+  let writeMutationId = null;
+  let writeRequestKey = null;
+  let providerSignal = null;
+  let runnerOptions = null;
+  let activeChecks = 0;
+  store.upsertProviderMessages = async (options) => {
+    writeSignal = options.signal;
+    writeMutationId = options.mutationId;
+    writeRequestKey = options.requestKey;
+    return baseUpsert(options);
+  };
+  const { service } = buildService({
+    store,
+    requireMutationJournal: true,
+    createMutationRequestKey: () => 'instantly-upsert:test-1',
+    getCampaignMutationRunner: () => ({
+      isAvailable: () => true,
+      run: async (options, task) => {
+        runnerOptions = options;
+        return task({
+          signal: controller.signal,
+          mutationId: '11111111-1111-4111-8111-111111111111',
+          requestKey: options.requestKey,
+          assertActive: () => { activeChecks += 1; },
+        });
+      },
+    }),
+    fetchJsonWithTimeout: async (_url, options) => {
+      providerSignal = options.signal;
+      return {
+      response: { ok: true, status: 200 },
+      data: { items: [incoming()] },
+      };
+    },
+  });
+
+  const result = await service.hydrateThread({
+    threadId: 'thread-serve',
+    accountEmail: 'serve-sender@example.com',
+    owner: 'serve',
+  });
+  assert.equal(result.stored, 1);
+  assert.equal(writeSignal, controller.signal);
+  assert.equal(providerSignal, controller.signal);
+  assert.equal(writeMutationId, '11111111-1111-4111-8111-111111111111');
+  assert.equal(writeRequestKey, 'instantly-upsert:test-1');
+  assert.equal(activeChecks, 3);
+  assert.deepEqual(runnerOptions, {
+    requestKey: 'instantly-upsert:test-1',
+    kind: 'instantly-upsert',
+    accountEmail: 'serve-sender@example.com',
+    folder: 'instantly',
+  });
+
+  const withoutJournal = buildService({
+    requireMutationJournal: true,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: { items: [incoming()] },
+    }),
+  }).service;
+  await assert.rejects(
+    withoutJournal.hydrateThread({
+      threadId: 'thread-serve',
+      accountEmail: 'serve-sender@example.com',
+      owner: 'serve',
+    }),
+    { code: 'INSTANTLY_MUTATION_JOURNAL_UNAVAILABLE' }
+  );
+});
+
+test('webhook, polling en cron kunnen een onzekere providerwrite nooit als failed completeren', async () => {
+  for (const [index, channel] of ['webhook', 'polling', 'cron'].entries()) {
+    const store = createStore();
+    const unknown = new Error(`${channel} write-uitkomst onzeker`);
+    unknown.code = 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN';
+    unknown.status = 503;
+    unknown.leaveMutationPending = true;
+    store.upsertProviderMessages = async () => ({ ok: false, error: unknown });
+    let completes = 0;
+    const providerSignals = [];
+    const runner = createMailboxCampaignMutationRunner({
+      mailboxCampaignConsistencyStore: {
+        isAvailable: () => true,
+        beginMutation: async () => ({
+          mutationId: `44444444-4444-4444-8444-${String(index + 1).padStart(12, '0')}`,
+          status: 'pending',
+          replayed: false,
+        }),
+        completeMutation: async () => { completes += 1; },
+      },
+    });
+    const { service } = buildService({
+      store,
+      requireMutationJournal: true,
+      getCampaignMutationRunner: () => runner,
+      fetchJsonWithTimeout: async (url, options) => {
+        providerSignals.push(options.signal);
+        return {
+          response: { ok: true, status: 200 },
+          data: url.includes('/emails/incoming-serve-1')
+            ? incoming({ thread_id: '' })
+            : { items: [incoming({ thread_id: '' })] },
+        };
+      },
+    });
+
+    if (channel === 'webhook') {
+      await assert.rejects(service.ingestWebhook({
+        headers: { 'x-instantly-webhook-secret': 'webhook-secret' },
+        body: {
+          event_type: 'reply_received',
+          email_account: 'serve-sender@example.com',
+          email_id: 'incoming-serve-1',
+        },
+      }), { code: 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN' });
+    } else if (channel === 'polling') {
+      await assert.rejects(service.syncOwner('serve'), {
+        code: 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN',
+      });
+    } else {
+      const response = {
+        statusCode: 0,
+        body: null,
+        status(code) { this.statusCode = code; return this; },
+        json(body) { this.body = body; return this; },
+      };
+      await syncInstantlyMailboxResponse({
+        instantlyMailboxService: service,
+        req: { body: {}, query: { owner: 'serve' } },
+        res: response,
+        logger: { error() {} },
+        normalizeString: (value) => String(value || '').trim(),
+      });
+      assert.equal(response.statusCode, 503);
+      assert.equal(response.body.code, 'MAILBOX_INDEX_WRITE_OUTCOME_UNKNOWN');
+    }
+    assert.equal(completes, 0, `${channel} completeerde een onzekere mutation`);
+    assert.equal(providerSignals.length > 0, true);
+    assert.equal(providerSignals.every((signal) => signal instanceof AbortSignal), true);
+  }
+});
+
 test('mailbox integration never activates from the separate outreach scheduler flag', () => {
   const service = createDefaultInstantlyMailboxService({
     env: {
@@ -1604,6 +1759,43 @@ test('mailbox integration never activates from the separate outreach scheduler f
   });
   assert.equal(service.getStatus().enabled, false);
   assert.equal(service.isConfigured(), false);
+});
+
+test('standaard mailboxintegratie verplicht de mutation journal voor Instantly-webhooks', async () => {
+  let journalRuns = 0;
+  const controller = new AbortController();
+  const service = createDefaultInstantlyMailboxService({
+    env: {
+      INSTANTLY_MAILBOX_ENABLED: 'true',
+      INSTANTLY_API_KEY: 'key',
+      INSTANTLY_WEBHOOK_SECRET: 'webhook-secret',
+      INSTANTLY_ACCOUNT_OWNERS_JSON: '{"serve-sender@example.com":"serve"}',
+      INSTANTLY_CAMPAIGN_OWNERS_JSON: '{"campaign-serve":"serve"}',
+    },
+    mailboxIndexStore: createStore(),
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: incoming({ thread_id: '' }),
+    }),
+    getCampaignMutationRunner: () => ({
+      isAvailable: () => true,
+      run: async (_options, task) => {
+        journalRuns += 1;
+        return task({ signal: controller.signal, assertActive() {} });
+      },
+    }),
+  });
+
+  const result = await service.ingestWebhook({
+    headers: { 'x-instantly-webhook-secret': 'webhook-secret' },
+    body: {
+      event_type: 'reply_received',
+      email_account: 'serve-sender@example.com',
+      email_id: 'incoming-serve-1',
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(journalRuns, 1);
 });
 
 test('bounded polling persists its cursor and resumes the next cycle without duplicate loss', async () => {
