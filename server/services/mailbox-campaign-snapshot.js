@@ -1,4 +1,4 @@
-const MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE = 'premium_mailbox_campaign_snapshot_v3';
+const MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE = 'premium_mailbox_campaign_snapshot';
 const {
   buildMailboxMessageImageUrl,
   isMailboxMessageImageUrl,
@@ -6,11 +6,10 @@ const {
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
-const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v3';
+const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
 const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE = 'premium_mailbox_campaign_snapshot_invalidation';
 const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY = 'softora_mailbox_campaign_snapshot_invalidated_at_v1';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 16;
-const POSTGRES_BIGINT_MAX = 9223372036854775807n;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 15;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -27,23 +26,6 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
-}
-
-function normalizeMailboxCampaignContentVersion(value) {
-  if (typeof value === 'bigint') {
-    return value >= 0n && value <= POSTGRES_BIGINT_MAX ? value.toString() : null;
-  }
-  if (typeof value === 'number') {
-    return Number.isSafeInteger(value) && value >= 0 ? String(value) : null;
-  }
-  const normalized = String(value == null ? '' : value).trim();
-  if (!/^\d+$/.test(normalized)) return null;
-  try {
-    const parsed = BigInt(normalized);
-    return parsed <= POSTGRES_BIGINT_MAX ? parsed.toString() : null;
-  } catch (_error) {
-    return null;
-  }
 }
 
 function getMailboxCampaignSnapshotAgeMs(snapshot, nowValue = Date.now()) {
@@ -455,13 +437,6 @@ function fitSnapshotToBudget(snapshot) {
 }
 
 function serializeMailboxCampaignSnapshot(result, options = {}) {
-  const suppliedContentVersion = normalizeMailboxCampaignContentVersion(
-    options.contentVersion ?? result?.contentVersion ?? result?.sync?.contentVersion
-  );
-  // Serializer callers that only need a compact, non-authoritative in-memory
-  // value retain compatibility. Durable persist rejects them before this
-  // point, and stale/degraded flags prevent version 0 from ever claiming live.
-  const contentVersion = suppliedContentVersion === null ? '0' : suppliedContentVersion;
   const messages = selectSnapshotMessages(result && result.messages)
     .map((message, index) => sanitizeMessage(message, {
       includeBody: index < MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT,
@@ -477,7 +452,6 @@ function serializeMailboxCampaignSnapshot(result, options = {}) {
     : savedAt;
   return fitSnapshotToBudget({
     version: MAILBOX_CAMPAIGN_SNAPSHOT_VERSION,
-    contentVersion,
     savedAt,
     contentAt,
     ok: result && result.ok !== false,
@@ -485,16 +459,11 @@ function serializeMailboxCampaignSnapshot(result, options = {}) {
     sync: result && result.sync && typeof result.sync === 'object'
       ? {
           ...result.sync,
-          ...(suppliedContentVersion === null
-            ? { stale: true, degraded: true, complete: false, refreshRecommended: true }
-            : {}),
           source: 'campaign-replies-snapshot',
         }
       : {
           indexed: true,
           stale: true,
-          degraded: true,
-          complete: false,
           source: 'campaign-replies-snapshot',
           refreshRecommended: true,
           warming: false,
@@ -509,7 +478,6 @@ function parseMailboxCampaignSnapshot(rawValue) {
       !parsed ||
       typeof parsed !== 'object' ||
       Number(parsed.version) !== MAILBOX_CAMPAIGN_SNAPSHOT_VERSION ||
-      normalizeMailboxCampaignContentVersion(parsed.contentVersion) === null ||
       !Number.isFinite(Date.parse(parsed.contentAt || '')) ||
       !Array.isArray(parsed.messages)
     ) {
@@ -517,7 +485,6 @@ function parseMailboxCampaignSnapshot(rawValue) {
     }
     return {
       ok: parsed.ok !== false,
-      contentVersion: normalizeMailboxCampaignContentVersion(parsed.contentVersion),
       savedAt: Number.isFinite(Date.parse(parsed.savedAt || ''))
         ? new Date(parsed.savedAt).toISOString()
         : null,
@@ -559,11 +526,7 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
     serialized: messages.length
       ? serializeMailboxCampaignSnapshot(
           { ok: snapshot.ok, messages, sync: snapshot.sync },
-          {
-            savedAt: options.savedAt || new Date().toISOString(),
-            contentAt: snapshot.contentAt,
-            contentVersion: snapshot.contentVersion,
-          }
+          { savedAt: options.savedAt || new Date().toISOString(), contentAt: snapshot.contentAt }
         )
       : '',
   };
@@ -602,11 +565,7 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
       { ok: snapshot.ok, messages, sync: snapshot.sync },
-      {
-        savedAt: options.savedAt || dismissedAt,
-        contentAt: snapshot.contentAt,
-        contentVersion: snapshot.contentVersion,
-      }
+      { savedAt: options.savedAt || dismissedAt, contentAt: snapshot.contentAt }
     ),
   };
 }
@@ -642,11 +601,7 @@ function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) 
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
       { ok: snapshot.ok, messages, sync: snapshot.sync },
-      {
-        savedAt: options.savedAt || readAt,
-        contentAt: snapshot.contentAt,
-        contentVersion: snapshot.contentVersion,
-      }
+      { savedAt: options.savedAt || readAt, contentAt: snapshot.contentAt }
     ),
   };
 }
@@ -664,7 +619,6 @@ module.exports = {
   markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
   markMailboxCampaignSnapshotStale,
-  normalizeMailboxCampaignContentVersion,
   parseMailboxCampaignSnapshot,
   parseMailboxCampaignSnapshotInvalidatedAt,
   removeMailboxCampaignSnapshotMessage,

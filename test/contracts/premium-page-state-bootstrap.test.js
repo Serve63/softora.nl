@@ -4,11 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY,
   PAGE_STATE_SCOPES,
   createPremiumPageStateBootstrapService,
 } = require('../../server/services/premium-page-state-bootstrap');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
@@ -86,8 +88,9 @@ test('pagina-bootstrap leest scopes parallel en levert een veilig snapshot', asy
     'premium_mailbox_preferences',
     'premium_coldmailing_settings',
   ]);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.ok(calls.some((call) => call.scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE));
+  assert.ok(calls.some((call) => call.scope === MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE));
   assert.ok(calls.every((call) => call.options.preferSupabaseRestRead === true));
   assert.equal(payload.scopes.premium_mailbox_preferences.ok, true);
 });
@@ -291,53 +294,7 @@ test('mailbox-bootstrap leest bij een koude server eerst het duurzame snapshot',
   assert.equal(mailboxReads, 1);
 });
 
-test('mailbox-bootstrap bewaart een geverifieerd gecombineerd snapshot voor lekvrije clientfiltering', async () => {
-  const snapshotAt = '2026-08-09T20:00:00.000Z';
-  let readOptions = null;
-  const service = createPremiumPageStateBootstrapService({
-    now: () => new Date('2026-08-09T20:00:10.000Z'),
-    mailboxRefreshWaitMs: 1,
-    mailboxCoordinator: {
-      readCampaignSnapshotDegraded: async (options) => {
-        readOptions = options;
-        return {
-          ok: true,
-          owner: 'both',
-          savedAt: snapshotAt,
-          contentAt: snapshotAt,
-          contentVersion: '12',
-          complete: false,
-          degraded: true,
-          messages: [
-            { id: 'serve-bootstrap', accountEmail: 'serve@softora.nl' },
-            { id: 'martijn-bootstrap', accountEmail: 'martijn@softora.nl' },
-          ],
-          sync: {
-            source: 'campaign-replies-degraded-snapshot',
-            stale: true,
-            contentAt: snapshotAt,
-            contentVersion: '12',
-          },
-        };
-      },
-      listCampaignReplies: async () => new Promise(() => {}),
-    },
-  });
-
-  const payload = await service.buildPageStateBootstrapPayload('premium-mailbox.html', {
-    session: { authenticated: true, email: 'serve@softora.nl' },
-  });
-
-  assert.deepEqual(readOptions, { owner: 'both', reason: 'bootstrap_persisted' });
-  assert.equal(payload.mailbox.owner, 'both');
-  assert.equal(payload.mailbox.contentVersion, '12');
-  assert.deepEqual(payload.mailbox.messages.map((item) => item.id), [
-    'serve-bootstrap',
-    'martijn-bootstrap',
-  ]);
-});
-
-test('mailbox-bootstrap toont een snapshot nooit na een content-version mismatch', async () => {
+test('mailbox-bootstrap toont een snapshot nooit nadat de index hem heeft geïnvalideerd', async () => {
   const snapshotAt = '2026-08-09T20:00:00.000Z';
   const persisted = serializeMailboxCampaignSnapshot({
     ok: true,
@@ -351,12 +308,22 @@ test('mailbox-bootstrap toont een snapshot nooit na een content-version mismatch
   }, { savedAt: snapshotAt, contentAt: snapshotAt });
   const service = createPremiumPageStateBootstrapService({
     now: () => new Date('2026-08-09T20:00:10.000Z'),
+    getUiStateValues: async (scope) => {
+      if (scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE) {
+        return { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted }, source: 'supabase' };
+      }
+      if (scope === MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE) {
+        return {
+          values: { [MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY]: '2026-08-09T20:00:00.001Z' },
+          source: 'supabase',
+        };
+      }
+      return { values: {}, source: 'supabase' };
+    },
     mailboxCoordinator: {
-      readCampaignSnapshotDegraded: async () => null,
       listCampaignReplies: async () => ({
         ok: true,
         contentAt: '2026-08-09T20:00:10.000Z',
-        contentVersion: '2',
         messages: [{ id: 'inbox:nieuw', accountEmail: 'serve@softora.nl' }],
         sync: { indexed: true, stale: false },
       }),
@@ -368,7 +335,7 @@ test('mailbox-bootstrap toont een snapshot nooit na een content-version mismatch
   assert.deepEqual(payload.mailbox.messages.map((item) => item.id), ['inbox:nieuw']);
 });
 
-test('mailbox-bootstrap claimt geen durable snapshot als de consistency-fence faalt', async () => {
+test('mailbox-bootstrap toont geen durable snapshot zonder bevestigde invalidatie-read', async () => {
   const snapshotAt = '2026-08-09T20:00:00.000Z';
   const persisted = serializeMailboxCampaignSnapshot({
     ok: true,
@@ -380,13 +347,10 @@ test('mailbox-bootstrap claimt geen durable snapshot als de consistency-fence fa
       ? { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted }, source: 'supabase' }
       : null,
     mailboxCoordinator: {
-      readCampaignSnapshotDegraded: async () => { throw new Error('Supabase timeout'); },
       listCampaignReplies: async () => ({
         ok: true,
         contentAt: '2026-08-09T20:00:10.000Z',
-        degraded: true,
         messages: [{ id: 'inbox:nieuw', accountEmail: 'serve@softora.nl' }],
-        sync: { stale: true, degraded: true },
       }),
     },
   });

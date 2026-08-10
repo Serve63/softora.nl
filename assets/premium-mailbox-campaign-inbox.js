@@ -852,7 +852,7 @@
     const mailbox = payload?.mailbox;
     if (!mailbox || mailbox.ok === false || !Array.isArray(mailbox.messages)) return null;
     const snapshotOwner = isOwner(mailbox.owner) ? normalizeOwner(mailbox.owner) : '';
-    if (snapshotOwner && snapshotOwner !== 'both' && snapshotOwner !== requestedOwner) return null;
+    if (snapshotOwner && snapshotOwner !== requestedOwner) return null;
     return snapshotFreshness?.normalizeSnapshot?.({
       ...mailbox,
       owner: requestedOwner,

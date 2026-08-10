@@ -8,69 +8,10 @@ function createMailboxCampaignRepliesList({
   setUiStateValues,
   logger,
   mailboxCampaignSnapshotStore,
-  mailboxCampaignConsistencyStore,
-  compareAndSwapUiStateValues,
-  isSupabaseConfigured,
-  getSupabaseClient,
   normalizeString = (value) => String(value || '').trim(),
   truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
 } = {}) {
-  const snapshotStore = mailboxCampaignSnapshotStore || createMailboxCampaignSnapshotStore({
-    getUiStateValues,
-    setUiStateValues,
-    compareAndSwapUiStateValues,
-    mailboxCampaignConsistencyStore,
-    isSupabaseConfigured,
-    getSupabaseClient,
-    logger,
-  });
-
-  async function readFenceSafely() {
-    try {
-      return { fence: await snapshotStore.getFence(), error: null };
-    } catch (error) {
-      logger?.warn?.('[Mailbox][CampaignRepliesFence]', error?.message || error);
-      return { fence: null, error };
-    }
-  }
-
-  function evaluateReadConsistency(before, after) {
-    if (before.error || after.error || !before.fence || !after.fence) {
-      return { authoritative: false, reason: 'campaign_consistency_unavailable' };
-    }
-    if (
-      before.fence.ready !== true ||
-      after.fence.ready !== true ||
-      Number(before.fence.pendingCount) > 0 ||
-      Number(after.fence.pendingCount) > 0
-    ) {
-      return { authoritative: false, reason: 'campaign_mutation_pending' };
-    }
-    if (String(before.fence.contentVersion) !== String(after.fence.contentVersion)) {
-      return { authoritative: false, reason: 'content_version_changed_during_read' };
-    }
-    return { authoritative: true, reason: '' };
-  }
-
-  function markResultDegraded(result, reason) {
-    const warnings = Array.from(new Set([
-      ...(Array.isArray(result?.sync?.warnings) ? result.sync.warnings : []),
-      reason,
-    ].filter(Boolean)));
-    return {
-      ...result,
-      degraded: true,
-      sync: {
-        ...(result.sync || {}),
-        stale: true,
-        refreshRecommended: true,
-        degraded: true,
-        degradedReason: reason,
-        warnings,
-      },
-    };
-  }
-
+  const snapshotStore = mailboxCampaignSnapshotStore || createMailboxCampaignSnapshotStore({ getUiStateValues, setUiStateValues, logger });
   async function listCampaignReplies({
     limit = 100,
     owner = '',
@@ -87,7 +28,6 @@ function createMailboxCampaignRepliesList({
     }
     const selectedOwner = ['both', 'all'].includes(requestedOwner) ? '' : requestedOwner;
     try {
-      const consistencyBefore = await readFenceSafely();
       const snapshotAt = new Date().toISOString();
       const { replies, snapshotBaseReplies, warnings: indexWarnings } =
         await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner: selectedOwner, hydrateBodies });
@@ -109,24 +49,12 @@ function createMailboxCampaignRepliesList({
         normalizeString,
         truncateText,
       });
-      const consistencyAfter = await readFenceSafely();
-      const consistency = evaluateReadConsistency(consistencyBefore, consistencyAfter);
-      const contentVersion = consistencyAfter.fence?.contentVersion ||
-        consistencyBefore.fence?.contentVersion || null;
-      const warnings = [
-        ...(indexWarnings || []),
-        ...(providerWarnings || []),
-        ...(!consistency.authoritative ? [consistency.reason] : []),
-      ];
+      const warnings = [...(indexWarnings || []), ...(providerWarnings || [])];
       const degraded = warnings.length > 0 || instantlySync?.ok === false;
-      const degradedReason = degraded
-        ? consistency.reason || warnings[0] || 'campaign_reply_read_degraded'
-        : null;
-      let result = {
+      const result = {
         ok: true,
         savedAt: snapshotAt,
         contentAt: snapshotAt,
-        contentVersion,
         degraded,
         messages,
         sync: {
@@ -136,25 +64,13 @@ function createMailboxCampaignRepliesList({
           refreshRecommended: degraded,
           warming: false,
           degraded,
-          degradedReason,
           contentAt: snapshotAt,
-          contentVersion,
           warnings,
           instantly: instantlySync,
-          consistency: {
-            authoritative: consistency.authoritative,
-            reason: consistency.reason || null,
-            beforeContentVersion: consistencyBefore.fence?.contentVersion || null,
-            currentContentVersion: consistencyAfter.fence?.contentVersion || null,
-            pendingCount: Math.max(
-              Number(consistencyBefore.fence?.pendingCount) || 0,
-              Number(consistencyAfter.fence?.pendingCount) || 0
-            ),
-          },
         },
       };
       if (persistSnapshot && !degraded) {
-        const persisted = await snapshotStore.persist(
+        await snapshotStore.persist(
           {
             ...result,
             messages: snapshotMessages,
@@ -165,14 +81,8 @@ function createMailboxCampaignRepliesList({
                 : 'campaign-replies-index',
             },
           },
-          { savedAt: snapshotAt, contentAt: snapshotAt, contentVersion }
+          { savedAt: snapshotAt, contentAt: snapshotAt }
         );
-        if (!persisted?.ok) {
-          result = markResultDegraded(
-            result,
-            persisted?.reason || 'campaign_snapshot_persist_failed'
-          );
-        }
       }
       return includeSnapshotMessages ? { ...result, snapshotMessages } : result;
     } catch (error) {
@@ -186,7 +96,6 @@ function createMailboxCampaignRepliesList({
   return {
     listCampaignReplies,
     invalidateCampaignSnapshot: (options) => snapshotStore.invalidate(options),
-    readCampaignSnapshotDegraded: (options) => snapshotStore.readDegraded(options),
   };
 }
 module.exports = {

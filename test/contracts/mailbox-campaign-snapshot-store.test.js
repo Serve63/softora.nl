@@ -7,7 +7,6 @@ const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   parseMailboxCampaignSnapshot,
-  serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
 const {
   createMailboxCampaignSnapshotStore,
@@ -24,223 +23,132 @@ function message(id = 'inbox:42') {
   };
 }
 
-function createStateHarness({ fence = null, getFence, casOverride } = {}) {
-  const scopes = new Map();
-  const records = new Map();
-  const calls = [];
-  const consistencyStore = {
-    isAvailable: () => true,
-    getFence: getFence || (async () => fence || {
-      contentVersion: '7', pendingCount: 0, ready: true, reapedCount: 0,
-      checkedAt: '2026-08-09T20:01:00.000Z',
-    }),
-  };
-  async function getUiStateValues(scope) {
-    const record = records.get(scope) || { revision: 0, updatedAt: null, exists: false };
-    return {
-      values: scopes.get(scope) || {},
-      source: 'supabase',
-      revision: record.revision,
-      updatedAt: record.updatedAt,
-      exists: record.exists,
-    };
-  }
-  async function compareAndSwapUiStateValues(scope, values, meta) {
-    calls.push({ type: 'cas', scope, values, meta });
-    if (casOverride) return casOverride({ scope, values, meta, scopes, records, calls });
-    const current = records.get(scope) || { revision: 0, updatedAt: null, exists: false };
-    if (current.revision !== meta.expectedRevision) {
-      return { ok: false, conflict: true, revision: current.revision };
-    }
-    const revision = current.revision + 1;
-    const updatedAt = '2026-08-09T20:01:01.000Z';
-    scopes.set(scope, values);
-    records.set(scope, { revision, updatedAt, exists: true });
-    return { ok: true, revision, updatedAt, values, source: 'supabase' };
-  }
-  async function setUiStateValues(scope, values, meta) {
-    calls.push({ type: 'set', scope, values, meta });
-    scopes.set(scope, values);
-    return { values, source: 'supabase' };
-  }
+test('campaign snapshot store gebruikt exact dezelfde contenttijd voor response en durable snapshot', async () => {
+  const writes = [];
   const store = createMailboxCampaignSnapshotStore({
-    now: () => new Date('2026-08-09T20:01:02.003Z'),
-    getUiStateValues,
-    setUiStateValues,
-    compareAndSwapUiStateValues,
-    mailboxCampaignConsistencyStore: consistencyStore,
-    logger: { warn() {} },
+    setUiStateValues: async (scope, values) => {
+      writes.push({ scope, values });
+      return { values, source: 'supabase' };
+    },
   });
-  return { calls, records, scopes, store };
-}
-
-test('campaign snapshot store bewaart contenttijd en monotone contentVersion via CAS', async () => {
-  const harness = createStateHarness();
   const contentAt = '2026-08-09T20:01:02.003Z';
-  const result = await harness.store.persist({
-    ok: true,
-    messages: [message()],
-    contentAt,
-    contentVersion: '7',
-  }, { savedAt: contentAt, contentAt, contentVersion: '7' });
-  const write = harness.calls.find((call) => call.type === 'cas');
-  const parsed = parseMailboxCampaignSnapshot(write.values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]);
 
-  assert.equal(result.ok, true);
-  assert.equal(result.contentVersion, '7');
-  assert.equal(write.scope, MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE);
-  assert.equal(write.meta.expectedRevision, 0);
+  const result = await store.persist({ ok: true, messages: [message()], contentAt }, {
+    savedAt: contentAt,
+    contentAt,
+  });
+  const parsed = parseMailboxCampaignSnapshot(
+    writes[0].values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]
+  );
+
+  assert.deepEqual(result, { ok: true, savedAt: contentAt });
+  assert.equal(writes[0].scope, MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE);
   assert.equal(parsed.savedAt, contentAt);
   assert.equal(parsed.contentAt, contentAt);
-  assert.equal(parsed.contentVersion, '7');
 });
 
-test('pending mutation blokkeert authoritative persist en maakt fallback zichtbaar degraded', async () => {
-  const harness = createStateHarness({
-    fence: {
-      contentVersion: '7', pendingCount: 1, ready: false, reapedCount: 0,
-      checkedAt: '2026-08-09T20:01:00.000Z',
-    },
+test('campaign snapshot store behandelt een stille null-write als fout', async () => {
+  const store = createMailboxCampaignSnapshotStore({
+    setUiStateValues: async () => null,
   });
-  const raw = serializeMailboxCampaignSnapshot({
-    ok: true, messages: [message()], contentVersion: '7',
-  }, {
-    savedAt: '2026-08-09T20:01:00.000Z',
-    contentAt: '2026-08-09T20:01:00.000Z',
-    contentVersion: '7',
-  });
-  harness.scopes.set(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
-    [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw,
-  });
-
-  const persisted = await harness.store.persist({
-    ok: true, messages: [message()], contentVersion: '7',
-  }, { contentVersion: '7' });
-  const degraded = await harness.store.readDegraded();
-
-  assert.equal(persisted.ok, false);
-  assert.equal(persisted.reason, 'mutation_pending');
-  assert.equal(harness.calls.filter((call) => call.type === 'cas').length, 0);
-  assert.equal(degraded.degraded, true);
-  assert.equal(degraded.sync.degradedReason, 'campaign_mutation_pending');
-  assert.equal(degraded.sync.consistency.pendingCount, 1);
-});
-
-test('stale persist wordt afgewezen zodra de DB-contentversie verder staat', async () => {
-  const harness = createStateHarness({
-    fence: {
-      contentVersion: '9', pendingCount: 0, ready: true, reapedCount: 0,
-      checkedAt: '2026-08-09T20:01:00.000Z',
-    },
-  });
-  const result = await harness.store.persist({
-    ok: true, messages: [message()], contentVersion: '8',
-  }, { contentVersion: '8' });
+  const result = await store.persist({ ok: true, messages: [message()] });
   assert.equal(result.ok, false);
-  assert.equal(result.reason, 'content_version_mismatch');
-  assert.equal(harness.calls.length, 0);
+  assert.equal(result.reason, 'write_failed');
 });
 
-test('multi-instance CAS-race laat een oudere snapshot nooit later overschrijven', async () => {
-  let first = true;
-  const harness = createStateHarness({
-    casOverride: async ({ scope, records, scopes }) => {
-      if (first) {
-        first = false;
-        const newer = serializeMailboxCampaignSnapshot({
-          ok: true,
-          messages: [message('inbox:newer')],
-          contentVersion: '7',
-        }, {
-          savedAt: '2026-08-09T20:01:02.000Z',
-          contentAt: '2026-08-09T20:01:02.000Z',
-          contentVersion: '7',
-        });
-        scopes.set(scope, { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: newer });
-        records.set(scope, {
-          revision: 1,
-          updatedAt: '2026-08-09T20:01:02.000Z',
-          exists: true,
-        });
-        return { ok: false, conflict: true, revision: 1 };
-      }
-      throw new Error('een oudere tweede CAS-poging mag nooit starten');
+test('campaign snapshot store weigert een snapshot die na indexupsert is geïnvalideerd', async () => {
+  const snapshotAt = '2026-08-09T20:00:00.000Z';
+  const valuesByScope = new Map();
+  const store = createMailboxCampaignSnapshotStore({
+    now: () => new Date('2026-08-09T20:01:00.000Z'),
+    getUiStateValues: async (scope) => ({ values: valuesByScope.get(scope) || {}, source: 'supabase' }),
+    setUiStateValues: async (scope, values) => {
+      valuesByScope.set(scope, values);
+      return { values, source: 'supabase' };
     },
   });
-
-  const result = await harness.store.persist({
-    ok: true,
-    messages: [message('inbox:older')],
-    contentVersion: '7',
-  }, {
-    savedAt: '2026-08-09T20:01:01.000Z',
-    contentAt: '2026-08-09T20:01:01.000Z',
-    contentVersion: '7',
+  await store.persist({ ok: true, messages: [message()], contentAt: snapshotAt }, {
+    savedAt: snapshotAt,
+    contentAt: snapshotAt,
   });
+  assert.equal((await store.readDegraded()).messages.length, 1);
+  assert.equal((await store.readDegraded({ owner: 'both' })).messages.length, 1);
 
-  assert.equal(result.ok, false);
-  assert.equal(result.reason, 'stale_snapshot');
-  assert.equal(harness.calls.filter((call) => call.type === 'cas').length, 1);
-});
+  const invalidation = await store.invalidate({ at: '2026-08-09T20:00:00.001Z' });
 
-test('Supabase/fence-fout toont beschikbare cache uitsluitend non-authoritative', async () => {
-  const harness = createStateHarness({
-    getFence: async () => { throw new Error('Supabase timeout'); },
-  });
-  const raw = serializeMailboxCampaignSnapshot({
-    ok: true, messages: [message()], contentVersion: '7',
-  }, {
-    savedAt: '2026-08-09T20:01:00.000Z',
-    contentAt: '2026-08-09T20:01:00.000Z',
-    contentVersion: '7',
-  });
-  harness.scopes.set(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
-    [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw,
-  });
-
-  const degraded = await harness.store.readDegraded();
-  assert.equal(degraded.messages.length, 1);
-  assert.equal(degraded.degraded, true);
-  assert.equal(degraded.sync.degradedReason, 'campaign_consistency_unavailable');
-  assert.equal(degraded.sync.consistency.verified, false);
-});
-
-test('rolling legacy snapshot zonder contentVersion faalt gesloten', async () => {
-  const harness = createStateHarness();
-  harness.scopes.set(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
-    [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: JSON.stringify({
-      version: 15,
-      savedAt: '2026-08-09T20:01:00.000Z',
-      contentAt: '2026-08-09T20:01:00.000Z',
-      ok: true,
-      messages: [message()],
-    }),
-  });
-  assert.equal(await harness.store.readDegraded(), null);
-});
-
-test('timestamp-invalidatie blijft alleen als v2-compatwrite bestaan', async () => {
-  const harness = createStateHarness();
-  const invalidation = await harness.store.invalidate({ at: '2026-08-09T20:01:01.000Z' });
   assert.equal(invalidation.ok, true);
   assert.equal(
-    harness.scopes.get(MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE)[MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY],
-    '2026-08-09T20:01:01.000Z'
+    valuesByScope.get(MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE)[MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY],
+    '2026-08-09T20:00:00.001Z'
   );
+  assert.equal(await store.readDegraded(), null);
+});
+
+test('campaign snapshot fallback faalt dicht als de invalidatiecontrole niet leesbaar is', async () => {
+  const contentAt = '2026-08-09T20:00:00.000Z';
+  const persisted = JSON.stringify({
+    version: 15,
+    savedAt: contentAt,
+    contentAt,
+    ok: true,
+    messages: [message()],
+  });
+  const store = createMailboxCampaignSnapshotStore({
+    now: () => new Date('2026-08-09T20:00:10.000Z'),
+    getUiStateValues: async (scope) => scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+      ? { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted }, source: 'supabase' }
+      : null,
+    logger: { warn() {} },
+  });
+
+  assert.equal(await store.readDegraded(), null);
+});
+
+test('mislukte invalidatiewrite blijft binnen dezelfde runtime fail-closed', async () => {
+  const contentAt = '2026-08-09T20:00:00.000Z';
+  const persisted = JSON.stringify({
+    version: 15,
+    savedAt: contentAt,
+    contentAt,
+    ok: true,
+    messages: [message()],
+  });
+  const store = createMailboxCampaignSnapshotStore({
+    now: () => new Date('2026-08-09T20:00:10.000Z'),
+    getUiStateValues: async (scope) => ({
+      values: scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+        ? { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted }
+        : {},
+      source: 'supabase',
+    }),
+    setUiStateValues: async () => null,
+    logger: { warn() {} },
+  });
+
+  assert.equal((await store.invalidate({ at: '2026-08-09T20:00:00.001Z' })).ok, false);
+  assert.equal(await store.readDegraded(), null);
 });
 
 test('campaign snapshot fallback is hard begrensd en verbreedt nooit een ongeldige owner', async () => {
-  const harness = createStateHarness();
-  const tooOld = serializeMailboxCampaignSnapshot({
-    ok: true, messages: [message()], contentVersion: '7',
-  }, {
-    savedAt: '2026-08-09T19:40:00.000Z',
-    contentAt: '2026-08-09T19:40:00.000Z',
-    contentVersion: '7',
+  const contentAt = '2026-08-09T19:40:00.000Z';
+  const snapshotStore = createMailboxCampaignSnapshotStore({
+    now: () => new Date('2026-08-09T20:00:01.000Z'),
+    getUiStateValues: async (scope) => scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+      ? {
+          values: {
+            [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: JSON.stringify({
+              version: 15,
+              savedAt: contentAt,
+              contentAt,
+              ok: true,
+              messages: [message()],
+            }),
+          },
+          source: 'supabase',
+        }
+      : { values: {}, source: 'supabase' },
   });
-  harness.scopes.set(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
-    [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: tooOld,
-  });
-  assert.equal(await harness.store.readDegraded(), null);
-  assert.equal(await harness.store.readDegraded({ owner: 'aanvaller' }), null);
+
+  assert.equal(await snapshotStore.readDegraded(), null);
+  assert.equal(await snapshotStore.readDegraded({ owner: 'aanvaller' }), null);
 });

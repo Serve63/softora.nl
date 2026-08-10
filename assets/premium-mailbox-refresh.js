@@ -267,11 +267,8 @@
         const partialPayload = fulfilled.some((entry) => (
           isIncompleteRefreshPayload(entry?.data) || Number(entry?.response?.status) !== 200
         ));
+        if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
 
-        // Provider writes may be unavailable while the read-only mailbox endpoint is
-        // still healthy (for example during an auth-hydration outage). Never let a
-        // failed sync suppress the list read: the durable index may already contain
-        // a reply written by cron, a webhook or another browser session.
         const listUpdated = await loadMessages({
           showLoader: false,
           skipBackgroundSync: true,
