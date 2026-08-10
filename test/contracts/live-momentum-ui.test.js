@@ -15,7 +15,7 @@ const endGameCardFiles = [
   'leuke-vriendin.png', 'lijpe-instagram-feed.png', 'maatpak.png', 'nieuwe-fiets.png', 'nieuwe-whoop.png', 'oktober-2024.png',
   'persoonlijke-handtekening.png', 'professionele-fotoshoot.png', 'prp-behandeling.png',
   'range-rover-sport.png', 'rolex-datejust.png', 'ruben-zet-toto.png', 'rubens-company.png',
-  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'serves-gezondheidsdossier.png', 'sponsorbord-nemelaer.png',
+  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'serves-gezondheidsdossier.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
   'tanden-rechtzetten.png', 'tandenbleek-voorraad.png', 'transfermarkt.png',
   'vakantiehuis-kopen.png', 'vijf-kilo-spiermassa.png', 'vip-box-psv.png', 'vip-box-willem-2.png',
   'wereldkaart-bezochte-landen.png', 'world-watcher.png'
@@ -46,7 +46,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260810a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260810c" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260810d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -407,6 +407,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
   assert.match(endGameCardsJs, /\{ id: 'vaste-parfum-voorraad', title: 'Vaste Parfum voorraad', imageId: 'eigen-parfum' \}/);
   assert.match(endGameCardsJs, /\{ id: 'alle-formaten-scheermesjes', title: 'Alle formaten scheermesjes' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'softora-apple-kwaliteit-software', title: 'Softora Apple kwaliteit software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -428,7 +429,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
   [
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Vaste Parfum voorraad', 'Alle formaten scheermesjes', 'Gezichtsbeharing naar wens',
-    'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
+    'Bestaanszekerheid bedrijf', 'Softora Apple kwaliteit software', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'Ruben zet toto', "Ruben's World Watcher", "Ruben's vakantieradar", 'Ruben Romano',
     'Ruben’s Company', 'Ruben’s Trading System', 'Jurisalem af', 'Gewenst lang kapsel', 'Gewenste kledingkast',
