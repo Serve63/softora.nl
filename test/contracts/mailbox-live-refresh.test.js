@@ -487,6 +487,24 @@ test('refresh status is exclusive while active, successful, partial and failed',
       if (mode === 'skipped-sync' && url === '/api/mailbox/instantly/sync') {
         return successfulResponse({ ok: true, results: [{ ok: true, skipped: true, reason: 'sync-in-progress' }] });
       }
+      if (mode === 'recent-sync' && url === '/api/mailbox/instantly/sync') {
+        return successfulResponse({
+          ok: true,
+          results: [{
+            ok: true, skipped: true, reason: 'recent-sync',
+            reconciliationDegraded: false, remainingReconcileCount: 0,
+          }],
+        });
+      }
+      if (mode === 'recent-sync-degraded' && url === '/api/mailbox/instantly/sync') {
+        return successfulResponse({
+          ok: true,
+          results: [{
+            ok: true, skipped: true, reason: 'recent-sync',
+            reconciliationDegraded: true, remainingReconcileCount: 1,
+          }],
+        });
+      }
       if (mode === 'error') {
         return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
       }
@@ -520,6 +538,14 @@ test('refresh status is exclusive while active, successful, partial and failed',
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
 
   mode = 'skipped-sync';
+  assert.equal(await controller.refresh(), false);
+  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
+
+  mode = 'recent-sync';
+  assert.equal(await controller.refresh(), true);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+
+  mode = 'recent-sync-degraded';
   assert.equal(await controller.refresh(), false);
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
 
