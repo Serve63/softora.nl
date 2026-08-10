@@ -30,7 +30,10 @@
     const activityWhen = formatMailDate(activityAt);
     return {
       autoSubmitted: source.autoSubmitted || '', precedence: source.precedence || '',
-      autoResponseSuppress: source.autoResponseSuppress || '', automatedReplyEvidence: source.automatedReplyEvidence === true,
+      autoResponseSuppress: source.autoResponseSuppress || '',
+      automatedReplyEvidenceKnown: source.automatedReplyEvidenceKnown === true,
+      automatedReplyEvidence: source.automatedReplyEvidence === true,
+      automatedReplyEvidenceSource: source.automatedReplyEvidenceSource || '',
       time: when.time, date: when.date, listDate: when.listDate,
       activityAt, latestInboundAt: activityAt, latestOutboundAt: source.latestOutboundAt || '',
       activityTime: activityWhen.time, activityDate: activityWhen.date, activityListDate: activityWhen.listDate,

@@ -124,7 +124,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-message-identity\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-snapshot-freshness\.js\?v=20260810b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810c/);
+  assert.match(readPage(), /assets\/premium-mailbox-ui-state\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-compose-controller\.js\?v=20260810b/);
@@ -2124,6 +2125,9 @@ test('mailbox toont Neelis zonder emoji-variantquote en zonder WhatsApp-autorepl
         subject: 'Whatsapp Re: Kleine vraag over jullie website',
         date: '2026-07-28T06:28:31.000Z',
         body: 'Welkom bij Neelis Stikwerken. Als u een foto met de globale maten naar whatsapp stuurt, dan krijgt u van mij zo snel mogelijk een richtprijs.',
+        automatedReplyEvidenceKnown: true,
+        automatedReplyEvidence: true,
+        automatedReplyEvidenceSource: 'instantly:is_auto_reply',
       }, {
         id: 'instantly:neelis-sent',
         folder: 'sent',
@@ -2940,7 +2944,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260810b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260810c/);
   assert.match(readPage(), /assets\/premium-mailbox-request-deadline\.js\?v=20260809a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260810b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
@@ -3171,7 +3175,7 @@ test('coldmail eigenaarfilter lekt een bewezen Martijn-kopie nooit naar Servé',
   }], 'serve'), []);
 });
 
-test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessiecache', () => {
+test('coldmail lijst verbergt alleen bronbewezen automatische antwoorden uit bootstrap- of sessiecache', () => {
   const messages = [
     {
       id: 'human',
@@ -3189,6 +3193,9 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       preview: 'Beste mailer, Tot 1 juli is impressioni gesloten. Daarna helpen we u graag weer!',
       body: 'Beste mailer,\n\nTot 1 juli is impressioni gesloten.\nDaarna helpen we u graag weer!',
       receivedAt: '2026-07-23T09:30:00.000Z',
+      automatedReplyEvidenceKnown: true,
+      automatedReplyEvidence: true,
+      automatedReplyEvidenceSource: 'instantly:is_auto_reply',
     },
     {
       id: 'qccs-away',
@@ -3196,6 +3203,7 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       subject: 'Afwezigheidmelding Re: Kleine vraag over jullie website',
       body: 'Vanaf 2 juli tot en met 3 augustus 2026 is ons kantoor gesloten.',
       receivedAt: '2026-07-23T10:00:00.000Z',
+      autoSubmitted: 'auto-replied',
     },
     {
       id: 'body-only-auto',
@@ -3204,6 +3212,7 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       preview: 'Beste lezer, wij hebben een nieuw e-mailadres.',
       body: 'Dit bericht is automatisch gegenereerd.',
       receivedAt: '2026-07-23T11:00:00.000Z',
+      autoResponseSuppress: 'All',
     },
     {
       id: 'sushi-auto',
@@ -3212,6 +3221,7 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       preview: 'Dit is een automatisch email van info@sushidetoren.com.',
       body: 'We hebben uw email in goede orde ontvangen en proberen uw email binnen 24 uur te beantwoorden.',
       receivedAt: '2026-07-23T12:00:00.000Z',
+      precedence: 'bulk',
     },
     {
       id: 'human-about-automation',
@@ -3226,6 +3236,9 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       subject: 'Automatisch antwoorden: Nieuw webdesign gemaakt!',
       body: 'Hartelijk dank voor je email. Ik streef er naar om deze binnen 2 werkdagen te beantwoorden.',
       receivedAt: '2026-07-23T14:00:00.000Z',
+      automatedReplyEvidenceKnown: true,
+      automatedReplyEvidence: true,
+      automatedReplyEvidenceSource: 'instantly:webhook:auto_reply_received',
     },
     {
       id: 'human-automation-question',
@@ -3233,6 +3246,24 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       subject: 'Vraag over automatisch antwoorden in Gmail',
       body: 'Kun je uitleggen hoe ik dit zelf instel?',
       receivedAt: '2026-07-23T15:00:00.000Z',
+    },
+    {
+      id: 'bare-evidence-only',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Automatisch antwoord Re: Kleine vraag over jullie website',
+      body: 'Dit bericht lijkt automatisch, maar heeft geen herleidbare provider- of MIME-bron.',
+      receivedAt: '2026-07-23T16:00:00.000Z',
+      automatedReplyEvidence: true,
+    },
+    {
+      id: 'provider-known-human',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Out of office software',
+      body: 'Onze out-of-office software werkt. Kun je een prijs sturen?',
+      receivedAt: '2026-07-23T17:00:00.000Z',
+      automatedReplyEvidenceKnown: true,
+      automatedReplyEvidence: false,
+      automatedReplyEvidenceSource: 'instantly:is_auto_reply',
     },
   ];
 
@@ -3244,9 +3275,11 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[5]), false);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[6]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[7]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[8]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[9]), false);
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
-    ['human-automation-question', 'human-about-automation', 'human']
+    ['provider-known-human', 'bare-evidence-only', 'human-automation-question', 'human-about-automation', 'human']
   );
   assert.deepEqual(campaignInboxModule.filterMessages(messages, 'serve'), []);
 });
@@ -3258,6 +3291,9 @@ test('coldmail lijst verbergt Cafe Bar le Duc en out-of-office maar bewaart echt
       accountEmail: 'serve@softora.nl',
       subject: 'Bedankt voor je bericht! Re: Kleine vraag over jullie website',
       body: 'Bedankt voor je bericht! We streven ernaar jouw mail de eerstvolgende werkdag te beantwoorden. Op woensdag wordt de mail beperkt gelezen.',
+      automatedReplyEvidenceKnown: true,
+      automatedReplyEvidence: true,
+      automatedReplyEvidenceSource: 'instantly:is_auto_reply',
     },
     {
       id: 'rens-ooo',
@@ -3265,7 +3301,9 @@ test('coldmail lijst verbergt Cafe Bar le Duc en out-of-office maar bewaart echt
       subject: 'Out of the office Re: Kleine vraag over jullie website',
       body: 'I am currently out of the office. For urgent matters, please contact my colleague.',
       autoSubmitted: 'auto-replied',
+      automatedReplyEvidenceKnown: true,
       automatedReplyEvidence: true,
+      automatedReplyEvidenceSource: 'mime:auto-submitted',
     },
     {
       id: 'human-price-question',
@@ -3283,6 +3321,23 @@ test('coldmail lijst verbergt Cafe Bar le Duc en out-of-office maar bewaart echt
     campaignInboxModule.filterMessages(messages, 'serve').map((message) => message.id),
     ['human-price-question']
   );
+});
+
+test('mailbox normalisatie bewaart de volledige bronbewezen auto-replyclassificatie', () => {
+  const normalized = uiStateModule.normalizeMessageState(
+    {
+      receivedAt: '2026-08-10T15:00:00.000Z',
+      automatedReplyEvidenceKnown: true,
+      automatedReplyEvidence: false,
+      automatedReplyEvidenceSource: 'instantly:is_auto_reply',
+    },
+    { time: '17:00', date: 'Vandaag', listDate: 'Vandaag' },
+    () => ({ time: '17:00', date: 'Vandaag', listDate: 'Vandaag' })
+  );
+
+  assert.equal(normalized.automatedReplyEvidenceKnown, true);
+  assert.equal(normalized.automatedReplyEvidence, false);
+  assert.equal(normalized.automatedReplyEvidenceSource, 'instantly:is_auto_reply');
 });
 
 test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespreksvak', () => {
