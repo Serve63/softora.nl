@@ -42,29 +42,9 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: 01 Agent guardrails
-        run: npm run check:guardrails
-      - name: 02 Repo hygiene
-        run: npm run check:repo-hygiene
-      - name: 03 Public data
-        run: npm run check:public-data
-      - name: 04 Dependency audit
-        run: npm run check:deps
-      - name: 05 Quality lock
-        run: npm run check:quality-lock
-      - name: 06 Contract tests
-        run: npm run test:contracts
+      - name: Verify critical flows
+        run: npm run verify:critical
         env:
           MAILBOX_POSTGRES_TEST_URL: postgresql://postgres:mailbox-ci-only@127.0.0.1:5432/softora_mailbox_lock_test_ci
           MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE: '1'
           MAILBOX_POSTGRES_TEST_CONTAINER_ID: ${{ job.services.postgres.id }}
-      - name: 07 Smoke tests
-        run: npm run test:smoke
-      - name: 08 Postgres mailbox locks
-        run: npm run test:postgres:mailbox-locks
-        env:
-          MAILBOX_POSTGRES_TEST_URL: postgresql://postgres:mailbox-ci-only@127.0.0.1:5432/softora_mailbox_lock_test_ci
-          MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE: '1'
-          MAILBOX_POSTGRES_TEST_CONTAINER_ID: ${{ job.services.postgres.id }}
-      - name: 09 Secret scan
-        run: npm run check:secrets
