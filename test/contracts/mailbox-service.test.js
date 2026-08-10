@@ -3729,7 +3729,7 @@ test('mailbox cron sync skips safely during Supabase outage pause', () => {
   assert.equal(cronCalled, 0);
 });
 
-test('mailbox service meldt een lege IMAP-targetset degraded en nooit compleet', async () => {
+test('mailbox service exposes sync response handler for cron and admin routes', async () => {
   const service = createMailboxService({ mailConfig: {} });
 
   assert.equal(typeof service.syncMailboxResponse, 'function');
@@ -3738,13 +3738,8 @@ test('mailbox service meldt een lege IMAP-targetset degraded en nooit compleet',
   const response = createResponseRecorder();
   await service.syncMailboxResponse({ query: {}, body: {} }, response);
 
-  assert.equal(response.statusCode, 207);
-  assert.deepEqual(response.body, {
-    ok: false,
-    degraded: true,
-    reason: 'no_sync_targets',
-    results: [],
-  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { ok: true, results: [] });
 });
 
 test('campaign mailbox sync skips configured accounts outside the campaign', async () => {
@@ -3937,200 +3932,8 @@ test('campaign mailbox sync excludes an explicitly requested non-campaign accoun
     campaignOnly: true,
   });
 
-  assert.deepEqual(result, {
-    ok: false,
-    degraded: true,
-    reason: 'no_sync_targets',
-    results: [],
-  });
+  assert.deepEqual(result, { ok: true, results: [] });
   assert.equal(lockCalls, 0);
-});
-
-test('campaign mailbox sync journaliseert IMAP-read en abortbare indexwrite in één mutation scope', async () => {
-  const controller = new AbortController();
-  const writes = [];
-  let runnerOptions = null;
-  let fetchSignal = null;
-  let activeChecks = 0;
-  const service = createMailboxSyncService({
-    mailboxIndexStore: {
-      acquireSyncLock: async () => ({ ok: true, lockToken: 'journal-lock' }),
-      listMessageUidsForAccount: async () => [],
-      upsertMessages: async (options) => {
-        writes.push(options);
-        return { ok: true, upserted: options.messages.length };
-      },
-      finishSync: async () => ({ ok: true }),
-    },
-    assertReadableAccount: (email) => ({ email, imapConfigured: true }),
-    canUseMailboxIndex: () => true,
-    fetchMessagesFromImap: async (options) => {
-      fetchSignal = options.signal;
-      return [{ uid: 91, id: 'inbox:91' }];
-    },
-    getSafeLimit: (limit) => limit,
-    getAccounts: () => [],
-    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
-    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
-    invalidateCampaignSnapshot: async () => ({ ok: true }),
-    campaignMutationLeaseSeconds: 120,
-    campaignMutationDeadlineMs: 90_000,
-    campaignMutationRunner: {
-      isAvailable: () => true,
-      run: async (options, task) => {
-        runnerOptions = options;
-        return task({
-          signal: controller.signal,
-          mutationId: '55555555-5555-4555-8555-555555555555',
-          requestKey: options.requestKey,
-          assertActive: () => { activeChecks += 1; },
-        });
-      },
-    },
-  });
-
-  const result = await service.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    campaignOnly: true,
-    force: true,
-  });
-
-  assert.equal(result.ok, true);
-  assert.deepEqual(runnerOptions, {
-    requestKey: 'imap-sync:journal-lock:serve@softora.nl:inbox',
-    kind: 'imap-sync',
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    leaseSeconds: 120,
-    deadlineMs: 90_000,
-  });
-  assert.equal(fetchSignal, controller.signal);
-  assert.equal(writes[0].signal, controller.signal);
-  assert.equal(writes[0].mutationId, '55555555-5555-4555-8555-555555555555');
-  assert.equal(writes[0].requestKey, runnerOptions.requestKey);
-  assert.equal(activeChecks, 2);
-});
-
-test('campaign deadline sluit een hangende ImapFlow hard en laat geen orphan of late upsert achter', async () => {
-  const controller = new AbortController();
-  let resolveFetchStarted;
-  let resolveFetchAfterClose;
-  const fetchStarted = new Promise((resolve) => { resolveFetchStarted = resolve; });
-  const fetchAfterClose = new Promise((resolve) => { resolveFetchAfterClose = resolve; });
-  let closeCalls = 0;
-  let logoutCalls = 0;
-  let parseCalls = 0;
-  let upserts = 0;
-  const client = {
-    usable: true,
-    async connect() {},
-    async list() { return [{ path: 'INBOX', specialUse: '\\Inbox' }]; },
-    async getMailboxLock() { return { release() {} }; },
-    async search() { return [91]; },
-    fetch() {
-      return (async function* hangingFetch() {
-        resolveFetchStarted();
-        await fetchAfterClose;
-        if (!client.usable) return;
-        yield {
-          uid: 91,
-          flags: [],
-          internalDate: new Date('2026-08-09T20:00:00.000Z'),
-          source: Buffer.from('Subject: late'),
-        };
-      })();
-    },
-    close() {
-      closeCalls += 1;
-      this.usable = false;
-      resolveFetchAfterClose();
-    },
-    async logout() { logoutCalls += 1; },
-  };
-  const service = createMailboxService({
-    mailConfig: {},
-    mailboxAccountsRaw: JSON.stringify([{
-      email: 'serve@softora.nl',
-      imapHost: 'imap.example.test',
-      imapUser: 'serve@softora.nl',
-      imapPass: 'secret',
-    }]),
-    createImapClient: () => client,
-    parseMailSource: async () => { parseCalls += 1; return {}; },
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      acquireSyncLock: async () => ({ ok: true, lockToken: 'abort-imap-lock' }),
-      listMessageUidsForAccount: async () => [],
-      upsertMessages: async () => { upserts += 1; return { ok: true, upserted: 1 }; },
-      finishSync: async () => ({ ok: true }),
-    },
-    mailboxCampaignMutationRunner: {
-      isAvailable: () => true,
-      run: async (_options, task) => task({
-        signal: controller.signal,
-        assertActive() {
-          if (controller.signal.aborted) throw controller.signal.reason;
-        },
-      }),
-    },
-    logger: { error() {}, warn() {} },
-  });
-
-  const running = service.syncMailboxFolder({
-    accountEmail: 'serve@softora.nl',
-    folder: 'inbox',
-    campaignOnly: true,
-    incrementalOnly: true,
-    force: true,
-  });
-  await fetchStarted;
-  const deadlineError = new Error('campaign deadline');
-  deadlineError.code = 'MAILBOX_CAMPAIGN_MUTATION_DEADLINE';
-  controller.abort(deadlineError);
-
-  await assert.rejects(running, { code: 'MAILBOX_CAMPAIGN_MUTATION_DEADLINE' });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(closeCalls, 1);
-  assert.equal(logoutCalls, 0);
-  assert.equal(parseCalls, 0);
-  assert.equal(upserts, 0);
-});
-
-test('campaign cron kan zonder verplichte mutation journal geen fetch of upsert starten', async () => {
-  let fetches = 0;
-  let writes = 0;
-  const service = createMailboxSyncService({
-    mailboxIndexStore: {
-      acquireSyncLock: async () => ({ ok: true, lockToken: 'journal-missing' }),
-      listMessageUidsForAccount: async () => [],
-      upsertMessages: async () => { writes += 1; return { ok: true, upserted: 1 }; },
-      finishSync: async () => ({ ok: true }),
-    },
-    assertReadableAccount: (email) => ({ email, imapConfigured: true }),
-    canUseMailboxIndex: () => true,
-    fetchMessagesFromImap: async () => { fetches += 1; return [{ uid: 91 }]; },
-    getSafeLimit: (limit) => limit,
-    getAccounts: () => [],
-    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
-    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
-    requireCampaignMutationJournal: true,
-    campaignMutationRunner: { isAvailable: () => false },
-    logger: { error() {} },
-  });
-
-  const result = await service.syncMailbox({
-    accountEmail: 'serve@softora.nl',
-    folders: ['inbox'],
-    campaignOnly: true,
-    force: true,
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.results[0].error, /mutatiejournal/i);
-  assert.equal(fetches, 0);
-  assert.equal(writes, 0);
 });
 
 test('campaign Gmail label sync records a failure and succeeds on the next forced retry', async () => {

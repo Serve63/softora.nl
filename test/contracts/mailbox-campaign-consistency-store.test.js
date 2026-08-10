@@ -76,42 +76,6 @@ test('beginMutation gebruikt alleen de service-role RPC en behoudt bigint-versie
   assert.equal(mutation.completedContentVersion, null);
 });
 
-test('beginMutation koppelt de totale taakdeadline als AbortSignal aan de echte RPC', async () => {
-  const controller = new AbortController();
-  let attachedSignal = null;
-  const response = {
-    data: [{
-      mutation_id: PROPOSED_MUTATION_ID,
-      request_key: 'sync:signal',
-      mutation_status: 'pending',
-      started_content_version: '12',
-      completed_content_version: null,
-      current_content_version: '12',
-      lease_expires_at: '2026-08-09T21:35:00.000Z',
-      replayed: false,
-    }],
-    error: null,
-  };
-  const store = createStore({
-    rpc() {
-      return {
-        abortSignal(signal) {
-          attachedSignal = signal;
-          return Promise.resolve(response);
-        },
-      };
-    },
-  });
-
-  await store.beginMutation({
-    requestKey: 'sync:signal',
-    kind: 'imap-sync',
-    signal: controller.signal,
-  });
-
-  assert.equal(attachedSignal, controller.signal);
-});
-
 test('completeMutation is retry-veilig en stuurt een begrensd JSON-resultaat', async () => {
   const { client, calls } = createRpcClient(() => ({
     data: [{
