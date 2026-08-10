@@ -198,7 +198,7 @@
       throw lastError || new Error('Mailbox vernieuwen mislukt');
     }
 
-    function buildRefreshRequests(scope, signal) {
+    function buildRefreshRequestBatches(scope, signal) {
       const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
       const init = (body) => ({
         method: 'POST',
@@ -209,22 +209,34 @@
       });
       if (scope.folder === 'outreach') {
         return [
-          requestJson('/api/mailbox/sync', init({
-            owner: scope.owner,
-            folder: 'inbox',
-            limit: 4,
-            campaignOnly: true,
-            incrementalOnly: true,
-            fastRefresh: true,
-          }), signal),
-          requestJson('/api/mailbox/instantly/sync', init({ owner: scope.owner, fastRefresh: true }), signal),
+          [() => requestJson(
+            '/api/mailbox/sync',
+            init({
+              owner: scope.owner,
+              folder: 'inbox',
+              limit: 4,
+              campaignOnly: true,
+              incrementalOnly: true,
+              fastRefresh: true,
+            }),
+            signal
+          )],
+          [() => requestJson(
+            '/api/mailbox/instantly/sync',
+            init({ owner: scope.owner, fastRefresh: true }),
+            signal
+          )],
         ];
       }
-      return [requestJson('/api/mailbox/sync', init({
-        account: scope.account,
-        folder: scope.folder,
-        limit: 20,
-      }), signal)];
+      return [[() => requestJson(
+        '/api/mailbox/sync',
+        init({
+          account: scope.account,
+          folder: scope.folder,
+          limit: 20,
+        }),
+        signal
+      )]];
     }
 
     async function refresh({ manual = false } = {}) {
@@ -244,22 +256,32 @@
       activeController = typeof AbortController === 'function' ? new AbortController() : null;
       const signal = activeController?.signal;
       try {
-        const settled = await Promise.allSettled(buildRefreshRequests(scope, signal));
-        if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
+        const settled = [];
+        let listUpdated = false;
+        for (const batch of buildRefreshRequestBatches(scope, signal)) {
+          const batchSettled = await Promise.allSettled(batch.map((startRequest) => startRequest()));
+          settled.push(...batchSettled);
+          if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
+          const batchFulfilled = batchSettled
+            .filter((entry) => entry.status === 'fulfilled')
+            .map((entry) => entry.value);
+          if (!batchFulfilled.length) continue;
+          const batchListUpdated = await loadMessages({
+            showLoader: false,
+            skipBackgroundSync: true,
+            skipProviderRefresh: true,
+            skipPageBootstrap: true,
+            openLatest: false,
+            preserveOnError: true,
+          });
+          if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
+          if (batchListUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
+          listUpdated = true;
+        }
         const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
         const rejected = settled.filter((entry) => entry.status === 'rejected');
         const partialPayload = fulfilled.some((entry) => entry?.data?.ok === false);
         if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
-
-        const listUpdated = await loadMessages({
-          showLoader: false,
-          skipBackgroundSync: true,
-          skipProviderRefresh: true,
-          skipPageBootstrap: true,
-          openLatest: false,
-          preserveOnError: true,
-        });
-        if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
         if (listUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
 
         const complete = !rejected.length && !partialPayload;

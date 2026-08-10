@@ -843,7 +843,10 @@ async function syncMailboxInBackground() {
   });
 }
 async function loadMailboxMessages(options = {}) {
-  return mailboxOwnerView.load(options);
+  const loadOptions = activeFolder === 'outreach' && !Object.prototype.hasOwnProperty.call(options, 'skipProviderRefresh')
+    ? { ...options, skipProviderRefresh: true }
+    : options;
+  return mailboxOwnerView.load(loadOptions);
 }
 function resetMailboxViewForScopeChange() {
   mailboxOwnerView.reset();
