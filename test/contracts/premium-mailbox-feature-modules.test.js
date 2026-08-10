@@ -19,8 +19,8 @@ function assetSource(filename) {
 test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duurzaam af', async () => {
   const renders = [];
   const requests = [];
-  const latestReply = { id: 'inbox:43', uid: 43, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '' };
-  const mail = { id: 'inbox:42', uid: 42, uidValidity: 222, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T14:00:00.000Z', unread: false, replyDismissedAt: '', threadMessages: [latestReply] };
+  const latestReply = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '' };
+  const mail = { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T14:00:00.000Z', unread: false, replyDismissedAt: '', threadMessages: [latestReply] };
   const controller = mailboxRead.create({
     getAccount: () => 'serve@softora.nl',
     getFolder: () => 'inbox',
@@ -51,7 +51,7 @@ test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duu
   assert.deepEqual(requests, [{
     url: '/api/mailbox/messages/read',
     body: {
-      account: 'serve@softora.nl', owner: 'serve', id: 'inbox:43', uid: 43, uidValidity: 222,
+      account: 'serve@softora.nl', owner: 'serve', id: 'inbox:43', uid: 43,
       folder: 'inbox', dismissReply: true,
     },
   }]);
@@ -175,7 +175,6 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
     id: '',
     folder: '',
     uid: 0,
-    uidValidity: 0,
     messageId: '',
     references: '',
   });
@@ -408,14 +407,12 @@ test('verbergen gebruikt uitsluitend Softora hide en restore en nooit een bronma
   const mail = {
     id: 'inbox:12',
     uid: 12,
-    uidValidity: 222,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     subject: 'Vraag',
     threadMessages: [{
       id: 'sent:11',
       uid: 11,
-      uidValidity: 222,
       folder: 'sent',
       accountEmail: 'serve@softora.nl',
     }],

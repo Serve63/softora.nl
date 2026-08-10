@@ -798,7 +798,6 @@ function normalizeMailboxApiMessage(message, options = {}) {
     references: message.references || '',
     ...window.SoftoraMailboxUiState.normalizeMessageState(message, when, formatMailDate),
     uid: message.uid,
-    uidValidity: Number(message.uidValidity) || 0,
     unread: Boolean(message.unread),
     starred: Boolean(message.starred),
     replyDismissedAt: String(message.replyDismissedAt || ''),

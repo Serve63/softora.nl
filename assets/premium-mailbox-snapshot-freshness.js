@@ -13,12 +13,6 @@
     if (!/^\d+$/.test(normalized)) return '';
     try { return BigInt(normalized).toString(); } catch (_) { return ''; }
   }
-  function normalizeUidValidity(value) {
-    const normalized = Number(value);
-    return Number.isSafeInteger(normalized) && normalized > 0 && normalized <= 4294967295
-      ? normalized
-      : 0;
-  }
   function getContentAt(snapshot) { const source = snapshot && typeof snapshot === 'object' ? snapshot : {}; return normalizeTimestamp(source.contentAt || source.sync?.contentAt); }
   function getContentVersion(snapshot) { const source = snapshot && typeof snapshot === 'object' ? snapshot : {}; return normalizeContentVersion(source.contentVersion ?? source.sync?.contentVersion); }
   function isCompleteSnapshot(snapshot) {
@@ -56,12 +50,9 @@
     const account = normalizeText(source.accountEmail || source.account || source.campaign?.account);
     const folder = normalizeText(source.storageFolder || source.folder || 'inbox');
     const uid = Number(source.uid) || 0;
-    const uidValidity = normalizeUidValidity(source.uidValidity);
     const id = normalizeText(source.mailboxId || source.id || source.messageId);
     if (!account || (!uid && !id)) return '';
-    return `${account}\n${folder}\n${folder !== 'instantly' && uid > 0
-      ? `uv:${uidValidity}\nuid:${uid}`
-      : `id:${id}`}`;
+    return `${account}\n${folder}\n${uid > 0 ? `uid:${uid}` : `id:${id}`}`;
   }
   function mergeAdditiveMessages(currentMessages, incomingMessages) {
     const current = Array.isArray(currentMessages) ? currentMessages : [];
@@ -115,7 +106,6 @@
         accountEmail: normalizeText(identity.accountEmail || identity.account || identity.campaign?.account),
         folder: normalizeText(identity.storageFolder || identity.folder || 'inbox'),
         uid: Number(identity.uid) || 0,
-        uidValidity: normalizeUidValidity(identity.uidValidity),
         id: String(identity.mailboxId || identity.id || identity.messageId || '').trim(),
       },
       hiddenAt,

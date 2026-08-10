@@ -40,18 +40,12 @@
 
   function getMessageKey(message) {
     const source = message && typeof message === 'object' ? message : {};
+    const direct = source.id || source.mailboxId || source.messageId;
+    if (direct != null && String(direct).trim()) return String(direct).trim();
     const account = normalize(source.accountEmail || source.account);
     const folder = normalize(source.storageFolder || source.folder);
-    const uid = Number(source.uid) || 0;
-    const uidValidity = Number(source.uidValidity) || 0;
-    if (account && folder && folder !== 'instantly' && Number.isSafeInteger(uid) && uid > 0) {
-      return `${account}|${folder}|uv:${uidValidity}|uid:${uid}`;
-    }
-    const direct = source.id || source.mailboxId || source.messageId;
-    if (direct != null && String(direct).trim()) {
-      return account && folder ? `${account}|${folder}|id:${String(direct).trim()}` : String(direct).trim();
-    }
-    return '';
+    const uid = String(source.uid == null ? '' : source.uid).trim();
+    return account && folder && uid ? `${account}|${folder}|${uid}` : '';
   }
 
   function getBodyCompleteness(message) {

@@ -9,9 +9,8 @@
   const requestDeadline = global.SoftoraMailboxRequestDeadline || (
     typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-request-deadline.js') : null
   );
-  const messageIdentity = global.SoftoraMailboxMessageIdentity || (typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-message-identity.js') : null);
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v18';
-  const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v2';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v17';
+  const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
     'servecreusen@softora.nl': 'serve',
@@ -40,6 +39,7 @@
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
   }
+
   function normalizeClassifierText(value) {
     return String(value || '')
       .trim()
@@ -269,8 +269,6 @@
     if (account && referenceIds.length) return `conversation:${account}|${referenceIds[0]}`;
     const messageId = normalizeMessageId(mail && mail.messageId);
     if (account && messageId) return `conversation:${account}|${messageId}`;
-    const identity = messageIdentity.resolve(mail, { account, folder: getFolder(mail, 'inbox') });
-    if (identity.imap && identity.uidValidity) return `conversation:${messageIdentity.getKey(identity)}`;
     const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
     if (account && mailboxId) return `conversation:${account}|mailbox:${mailboxId}`;
     return '';
@@ -301,17 +299,18 @@
 
   function getMessageIdentity(mail) {
     const account = normalizeEmail(mail && mail.accountEmail);
-    const identity = messageIdentity.resolve(mail, { account, folder: getFolder(mail, 'inbox') }); if (identity.imap) return messageIdentity.getKey(identity);
     const messageId = normalizeMessageId(mail && mail.messageId);
     if (account && messageId) return `${account}|message:${messageId}`;
-    return identity.account && identity.id ? `${identity.account}|mailbox:${identity.id}` : '';
+    const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
+    return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
   }
+
   function getActionMessageKey(mail) {
-    const identity = messageIdentity.resolve(mail, { account: normalizeEmail(mail && mail.accountEmail), folder: getFolder(mail, 'inbox') });
-    if (identity.imap) return messageIdentity.getKey(identity);
     const messageId = normalizeMessageId(mail && mail.messageId);
     if (messageId) return `message:${messageId}`;
-    return identity.account && identity.id ? `${identity.account}|mailbox:${identity.id}` : '';
+    const account = normalizeEmail(mail && mail.accountEmail);
+    const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
+    return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
   }
 
   function getConversationAction(mail) {
@@ -458,15 +457,13 @@
   function decorateMessage(mail, source) {
     const message = source && typeof source === 'object' ? source : {};
     const mailboxId = String(message.mailboxId || message.id || mail && mail.id || '').trim();
-    const identity = messageIdentity.resolve(message, { account: message.accountEmail || mail && mail.accountEmail, folder: getFolder(message, getFolder(mail, 'inbox')), id: mailboxId, uid: message.uid ?? (mail && mail.uid), uidValidity: message.uidValidity ?? (mail && mail.uidValidity) });
-    const { account: accountEmail, uidValidity } = identity;
+    const accountEmail = normalizeEmail(message.accountEmail || mail && mail.accountEmail);
     const receivedAtValue = message.receivedAt || message.date || mail && mail.receivedAt;
     const activityAtValue = message.latestInboundAt || receivedAtValue || message.activityAt;
     return {
       ...mail,
-      id: messageIdentity.getUiId(identity) || (mail && mail.id) || mailboxId,
+      id: accountEmail && mailboxId ? `${accountEmail}|${mailboxId}` : (mail && mail.id) || mailboxId,
       mailboxId,
-      uidValidity,
       accountEmail,
       receivedAt: Number.isFinite(Date.parse(receivedAtValue || ''))
         ? new Date(receivedAtValue).toISOString()
@@ -947,9 +944,12 @@
 
   function getDeletionIdentity(mail) {
     if (!mail || typeof mail !== 'object') return null;
-    const identity = messageIdentity.resolve(mail, { account: getAccount(mail, ''), folder: getFolder(mail, 'inbox'), id: getRequestId(mail) });
-    if (!identity.account || (!identity.uid && !identity.id)) return null;
-    return { accountEmail: identity.account, folder: identity.folder, uid: identity.uid, uidValidity: identity.uidValidity, id: identity.id };
+    const accountEmail = getAccount(mail, '');
+    const folder = getFolder(mail, 'inbox');
+    const uid = Number(mail.uid) || 0;
+    const id = getRequestId(mail);
+    if (!accountEmail || (!uid && !id)) return null;
+    return { accountEmail, folder, uid, id };
   }
 
   function matchesMessageIdentity(mail, identity) {
@@ -957,7 +957,7 @@
     const deleted = getDeletionIdentity(identity);
     if (!candidate || !deleted) return false;
     if (candidate.accountEmail !== deleted.accountEmail || candidate.folder !== deleted.folder) return false;
-    if (candidate.uid > 0 && deleted.uid > 0) return candidate.uid === deleted.uid && candidate.uidValidity === deleted.uidValidity;
+    if (candidate.uid > 0 && deleted.uid > 0) return candidate.uid === deleted.uid;
     return Boolean(candidate.id && deleted.id && candidate.id === deleted.id);
   }
 

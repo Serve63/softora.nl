@@ -819,10 +819,6 @@ test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht
       calls.push(['eq', column, value]);
       return query;
     },
-    is(column, value) {
-      calls.push(['is', column, value]);
-      return query;
-    },
     select(columns) {
       calls.push(['select', columns]);
       return query;
@@ -857,7 +853,6 @@ test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
-    ['is', 'generation_superseded_at', null],
     ['eq', 'uid', 42],
     ['select', 'message_key'],
   ]);
@@ -899,153 +894,6 @@ test('mailbox index sync laat ontbrekende tombstonevelden ongemoeid bij upsert',
     onConflict: 'message_key',
     defaultToNull: false,
   });
-});
-
-test('mailbox index gebruikt UIDVALIDITY in key, kolom en genormaliseerd bericht', () => {
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => false,
-    getSupabaseClient: () => null,
-    now: () => new Date('2026-08-10T10:00:00.000Z'),
-  });
-  const row111 = store.buildMessageRow(
-    { uid: 42, id: 'inbox:42', date: '2026-08-10T09:00:00.000Z' },
-    'SERVE@SOFTORA.NL', 'INBOX', 0, 111
-  );
-  const row222 = store.buildMessageRow(
-    { uid: 42, id: 'inbox:42', date: '2026-08-10T09:00:00.000Z' },
-    'serve@softora.nl', 'inbox', 0, 222
-  );
-
-  assert.equal(row111.message_key, 'serve@softora.nl|inbox|uv:111|42');
-  assert.equal(row111.uid_validity, 111);
-  assert.notEqual(row111.message_key, row222.message_key);
-  assert.equal(store.normalizeMessageRow(row222).uidValidity, 222);
-});
-
-test('mailbox index bereidt UIDVALIDITY alleen via de exacte actieve lease-RPC voor', async () => {
-  let rpcCall = null;
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({
-      rpc(name, args) {
-        rpcCall = { name, args };
-        return Promise.resolve({
-          data: [{
-            applied: true,
-            lock_lost: false,
-            previous_uid_validity: 111,
-            current_uid_validity: 222,
-            reset_detected: true,
-            adopted_legacy: false,
-            superseded_count: 4,
-          }],
-          error: null,
-        });
-      },
-    }),
-  });
-
-  const result = await store.prepareUidValidity({
-    accountEmail: 'SERVE@SOFTORA.NL', folder: 'INBOX',
-    lockToken: 'exact-lock', uidValidity: 222,
-  });
-
-  assert.deepEqual(rpcCall, {
-    name: 'softora_prepare_mailbox_uid_validity',
-    args: {
-      p_sync_key: 'serve@softora.nl|inbox',
-      p_lock_token: 'exact-lock',
-      p_uid_validity: 222,
-    },
-  });
-  assert.deepEqual(result, {
-    ok: true,
-    adoptedLegacy: false,
-    previousUidValidity: 111,
-    resetDetected: true,
-    supersededCount: 4,
-    uidValidity: 222,
-  });
-});
-
-test('mailbox index accepteert nooit een ambigue UIDVALIDITY-RPC-response', async () => {
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({
-      rpc: async () => ({
-        data: [
-          { applied: true, current_uid_validity: 222 },
-          { applied: true, current_uid_validity: 222 },
-        ],
-        error: null,
-      }),
-    }),
-  });
-
-  const result = await store.prepareUidValidity({
-    accountEmail: 'serve@softora.nl', folder: 'inbox',
-    lockToken: 'exact-lock', uidValidity: 222,
-  });
-
-  assert.equal(result.ok, false);
-  assert.equal(result.lockLost, true);
-  assert.equal(result.error.code, 'MAILBOX_SYNC_LOCK_LOST');
-});
-
-test('lege atomische IMAP-commit draagt lease en generatie en rondt de reset duurzaam af', async () => {
-  let rpcCall = null;
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({
-      rpc(name, args) {
-        rpcCall = { name, args };
-        return Promise.resolve({
-          data: [{ mutation_status: 'completed', upserted_count: 0 }],
-          error: null,
-        });
-      },
-    }),
-  });
-
-  const result = await store.upsertMessages({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', messages: [],
-    mutationId: '77777777-7777-4777-8777-777777777777',
-    requestKey: 'imap-sync:empty-generation',
-    syncLockToken: 'empty-lock', uidValidity: 987,
-  });
-
-  assert.equal(result.ok, true);
-  assert.equal(result.upserted, 0);
-  assert.equal(rpcCall.name, MAILBOX_CAMPAIGN_ATOMIC_COMMIT_RPC);
-  assert.deepEqual(rpcCall.args.p_rows, []);
-  assert.deepEqual(rpcCall.args.p_result, {
-    source: 'imap-sync',
-    syncLockToken: 'empty-lock',
-    uidValidity: 987,
-  });
-});
-
-test('mailbox index weigert een mixed-generation IMAP-batch vóór iedere databasewrite', async () => {
-  let clientCalls = 0;
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => {
-      clientCalls += 1;
-      return { from() { throw new Error('mag niet schrijven'); } };
-    },
-  });
-
-  const result = await store.upsertMessages({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', uidValidity: 111,
-    messages: [
-      { uid: 42, uidValidity: 111 },
-      { uid: 43, uidValidity: 222 },
-    ],
-  });
-
-  assert.equal(result.ok, false);
-  assert.equal(result.error.code, 'MAILBOX_SYNC_UIDVALIDITY_BATCH_MISMATCH');
-  assert.equal(clientCalls, 0);
 });
 
 test('mailbox index campaign-upsert koppelt de harde abortsignal aan PostgREST', async () => {

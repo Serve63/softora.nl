@@ -316,7 +316,6 @@ async function loadBody({
 }) {
   const mail = getMail(id);
   if (!mail || mail.bodyLoading) return;
-  const uidValidity = Number(mail.uidValidity) || 0;
   const bodyLoadDeadline = createBodyLoadDeadline(signal, bodyLoadDeadlineMs);
   mail.bodyLoading = true;
   let exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
@@ -328,13 +327,7 @@ async function loadBody({
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          messages: [{
-            account,
-            folder,
-            id: String(requestId || id),
-            uid: Number(mail.uid) || 0,
-            uidValidity,
-          }],
+          messages: [{ account, folder, id: String(requestId || id) }],
         }),
       }, { signal: bodyLoadDeadline.signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
       const indexedMessage = Array.isArray(indexedData && indexedData.messages)
@@ -398,12 +391,7 @@ async function loadBody({
       // De exacte detailroute hieronder blijft de fallback voor nog niet
       // geïndexeerde berichten en ontbrekende media- of linkprovenance.
     }
-    const params = new URLSearchParams({
-      account,
-      folder,
-      id: String(requestId || id),
-      uidValidity: String(uidValidity),
-    });
+    const params = new URLSearchParams({ account, folder, id: String(requestId || id) });
     const { response, data } = await fetchMailboxBodyJson(fetch, `/api/mailbox/message?${params.toString()}`, {
       credentials: 'same-origin',
       cache: 'no-store',
@@ -490,13 +478,7 @@ function getThreadMessageRequest(message, mail) {
   const account = normalizeText(message && (message.accountEmail || mail && mail.accountEmail)).toLowerCase();
   const folder = normalizeText(message && (message.storageFolder || message.folder) || 'sent').toLowerCase() || 'sent';
   const id = normalizeText(message && (message.mailboxId || message.id));
-  return {
-    account,
-    folder,
-    id,
-    uid: Number(message && message.uid) || 0,
-    uidValidity: Number(message && message.uidValidity) || 0,
-  };
+  return { account, folder, id, uid: Number(message && message.uid) || 0 };
 }
 
 function applyThreadMessagePayload(message, source, normalizeBodyImages, normalizeOptOutUrl) {
@@ -618,10 +600,7 @@ async function loadThreadBodies({
     const targetByIdentity = new Map(
       targets.map((message) => {
         const reference = getThreadMessageRequest(message, mail);
-        return [
-          `${reference.account}|${reference.folder}|${reference.uidValidity}|${reference.uid || reference.id}`,
-          { message, reference },
-        ];
+        return [`${reference.account}|${reference.folder}|${reference.uid || reference.id}`, { message, reference }];
       })
     );
     const targetReferences = Array.from(targetByIdentity.values()).map(({ reference }) => reference);
@@ -642,7 +621,7 @@ async function loadThreadBodies({
         if (!stillCurrent()) return false;
         data.messages.forEach((source) => {
           if (source && source.resolved === false) return;
-          const identity = `${normalizeText(source.accountEmail).toLowerCase()}|${normalizeText(source.folder).toLowerCase()}|${Number(source.uidValidity) || 0}|${Number(source.uid) || normalizeText(source.id)}`;
+          const identity = `${normalizeText(source.accountEmail).toLowerCase()}|${normalizeText(source.folder).toLowerCase()}|${Number(source.uid) || normalizeText(source.id)}`;
           const target = targetByIdentity.get(identity);
           if (!target) return;
           updated = applyThreadMessagePayload(
@@ -681,7 +660,7 @@ async function loadThreadBodies({
     ));
     for (let offset = 0; offset < detailTargets.length; offset += 2) {
       await Promise.all(detailTargets.slice(offset, offset + 2).map(async (message) => {
-        const { account, folder, id, uidValidity } = getThreadMessageRequest(message, mail);
+        const { account, folder, id } = getThreadMessageRequest(message, mail);
         if (!account || !id) {
           message.webdesignLinkHydrationAttempted = true;
           message.bodyLoadError = needsThreadBodyHydration(message)
@@ -692,12 +671,7 @@ async function loadThreadBodies({
         message.imageLoading = true;
         message.bodyLoading = needsThreadBodyHydration(message);
         try {
-          const params = new URLSearchParams({
-            account,
-            folder,
-            id,
-            uidValidity: String(uidValidity),
-          });
+          const params = new URLSearchParams({ account, folder, id });
           const { response, data } = await fetchMailboxBodyJson(request, `/api/mailbox/message?${params.toString()}`, {
             credentials: 'same-origin',
             cache: 'no-store',
