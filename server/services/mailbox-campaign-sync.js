@@ -428,15 +428,32 @@ function createMailboxSyncService({
       let threadReferenceIds = [];
       let threadRecipientTerms = [];
       let indexedUids = [];
-      if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
-        indexedUids =
-          (await mailboxIndexStore.listMessageUidsForAccount({
-            accountEmail: account.email,
-            folder: normalizedFolder,
-            since: campaignOnly ? CAMPAIGN_HISTORY_SINCE.toISOString() : '',
-            limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
-            signal: folderDeadline.signal,
-          })) || [];
+      let deferredQuarantineUids = [];
+      let retryDueQuarantineUids = [];
+      if (campaignOnly && typeof mailboxIndexStore.listMessageUidSyncStateForAccount === 'function') {
+        const uidSyncState = await mailboxIndexStore.listMessageUidSyncStateForAccount({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+          since: CAMPAIGN_HISTORY_SINCE.toISOString(),
+          limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+          signal: folderDeadline.signal,
+        });
+        indexedUids = Array.isArray(uidSyncState?.indexedUids) ? uidSyncState.indexedUids : [];
+        deferredQuarantineUids = Array.isArray(uidSyncState?.deferredQuarantineUids)
+          ? uidSyncState.deferredQuarantineUids
+          : [];
+        retryDueQuarantineUids = Array.isArray(uidSyncState?.retryDueQuarantineUids)
+          ? uidSyncState.retryDueQuarantineUids
+          : [];
+        throwIfSyncAborted(folderDeadline.signal);
+      } else if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
+        indexedUids = (await mailboxIndexStore.listMessageUidsForAccount({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+          since: campaignOnly ? CAMPAIGN_HISTORY_SINCE.toISOString() : '',
+          limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+          signal: folderDeadline.signal,
+        })) || [];
         throwIfSyncAborted(folderDeadline.signal);
       }
       const indexedUidScanTruncated = indexedUids.length >= CAMPAIGN_SYNC_UID_SCAN_LIMIT;
@@ -518,6 +535,7 @@ function createMailboxSyncService({
           oldestIndexedCampaignUid,
           threadReferenceIds,
           threadRecipientTerms,
+          priorityUids: retryDueQuarantineUids,
           indexedUids,
           signal: mutationSignal,
           deadlineAt: folderDeadlineAt,
@@ -605,9 +623,19 @@ function createMailboxSyncService({
       const readHealth = messages.syncReadHealth || {};
       const parseFailures = Array.isArray(readHealth.parseFailures) ? readHealth.parseFailures : [];
       const missingUids = Array.isArray(readHealth.missingUids) ? readHealth.missingUids : [];
+      const yieldedUidSet = new Set(
+        (Array.isArray(readHealth.yieldedUids) ? readHealth.yieldedUids : [])
+          .map(Number)
+          .filter((uid) => Number.isSafeInteger(uid) && uid > 0)
+      );
+      const pendingQuarantineUids = Array.from(new Set([
+        ...deferredQuarantineUids,
+        ...retryDueQuarantineUids.filter((uid) => !yieldedUidSet.has(Number(uid))),
+      ])).sort((left, right) => left - right);
       const selectedCount = Math.max(messages.length, Number(readHealth.selectedCount) || 0);
       const folderMissing = readHealth.folderMissing === true;
       const fastFetchCapReached = fastRefresh && selectedCount > CAMPAIGN_SYNC_FAST_FETCH_LIMIT;
+      const fetchIncomplete = missingUids.length > 0;
       const selectionTruncated = readHealth.selectionTruncated === true;
       const degradedReasons = [];
       if (folderMissing) degradedReasons.push({
@@ -630,7 +658,7 @@ function createMailboxSyncService({
         code: 'MAILBOX_SYNC_SELECTION_TRUNCATED',
         error: `Mailbox heeft nog ${Math.max(1, Number(readHealth.remainingUidCount) || 0)} niet-geïndexeerde berichten.`,
       });
-      if (missingUids.length) degradedReasons.push({
+      if (fetchIncomplete) degradedReasons.push({
         reason: 'provider_fetch_incomplete',
         code: 'MAILBOX_SYNC_FETCH_INCOMPLETE',
         error: `Mailbox provider leverde geselecteerde UID(s) niet: ${missingUids.join(', ')}.`,
@@ -639,6 +667,11 @@ function createMailboxSyncService({
         reason: 'message_parse_failed',
         code: 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL',
         error: `Mailbox parsefouten: ${parseFailures.map((failure) => `${failure.uid}:${failure.code}`).join(', ')}`,
+      });
+      if (pendingQuarantineUids.length) degradedReasons.push({
+        reason: 'quarantine_retry_pending',
+        code: 'MAILBOX_SYNC_QUARANTINE_PENDING',
+        error: `Mailbox parse-herpoging wacht op UID(s): ${pendingQuarantineUids.join(', ')}.`,
       });
       const incomplete = degradedReasons.length > 0;
       if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
@@ -687,6 +720,14 @@ function createMailboxSyncService({
         synced: messages.length,
         upserted,
         failedMessageCount: parseFailures.length,
+        quarantinedMessageCount: new Set([
+          ...pendingQuarantineUids,
+          ...parseFailures.map((failure) => Number(failure?.uid) || 0).filter(Boolean),
+        ]).size,
+        quarantinedUids: Array.from(new Set([
+          ...pendingQuarantineUids,
+          ...parseFailures.map((failure) => Number(failure?.uid) || 0).filter(Boolean),
+        ])).sort((left, right) => left - right),
         folderMissing,
         selectionTruncated,
         remainingUidCount: Math.max(0, Number(readHealth.remainingUidCount) || 0),

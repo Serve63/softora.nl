@@ -1,7 +1,10 @@
 const MAILBOX_IMAP_PARSE_TIMEOUT_MS = 2500;
-const MAILBOX_IMAP_QUARANTINE_TTL_MS = 15 * 60 * 1000;
 const MAILBOX_IMAP_SOURCE_MAX_BYTES = 15 * 1024 * 1024;
 const { normalizeMailboxUidValidity } = require('./mailbox-uid-validity');
+const {
+  MAILBOX_IMAP_QUARANTINE_RETRY_DELAY_MS,
+  buildMailboxImapQuarantineRetryAt,
+} = require('./mailbox-imap-quarantine-policy');
 
 function createParseError(message, code) {
   const error = new Error(message);
@@ -93,9 +96,16 @@ function createMailboxImapMessageParser({
   function recordFailure(key, uid, error) {
     const code = String(error?.code || 'MAILBOX_MESSAGE_PARSE_FAILED').slice(0, 120);
     const reason = String(error?.message || error || 'Onbekende parsefout').slice(0, 240);
-    quarantine.set(key, { code, reason, until: now() + MAILBOX_IMAP_QUARANTINE_TTL_MS });
+    const failedAtMs = now();
+    const retryAt = buildMailboxImapQuarantineRetryAt(failedAtMs);
+    quarantine.set(key, {
+      code,
+      reason,
+      retryAt,
+      until: failedAtMs + MAILBOX_IMAP_QUARANTINE_RETRY_DELAY_MS,
+    });
     logger.warn?.('[Mailbox][ImapMessageQuarantined]', { uid, code, reason });
-    return { ok: false, uid, code, reason, quarantined: true };
+    return { ok: false, uid, code, reason, retryAt, quarantined: true };
   }
 
   async function parseMessage({
@@ -108,7 +118,15 @@ function createMailboxImapMessageParser({
     }|${uid}`;
     const cached = quarantine.get(key);
     if (cached && cached.until > now()) {
-      return { ok: false, uid, code: cached.code, reason: cached.reason, quarantined: true, cached: true };
+      return {
+        ok: false,
+        uid,
+        code: cached.code,
+        reason: cached.reason,
+        retryAt: cached.retryAt,
+        quarantined: true,
+        cached: true,
+      };
     }
     quarantine.delete(key);
     if (getSourceBytes(message?.source) > MAILBOX_IMAP_SOURCE_MAX_BYTES) {

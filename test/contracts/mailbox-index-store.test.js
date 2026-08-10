@@ -2028,7 +2028,7 @@ test('mailbox index store haalt alleen exacte Sent-descendants binnen hetzelfde 
   assert.ok(calls.some((call) => call[0] === 'or' && call[1].includes('in_reply_to')));
 });
 
-test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie', async () => {
+test('mailbox index store stelt quarantaines alleen uit tot hun duurzame retrymoment', async () => {
   const calls = [];
   const client = {
     from() {
@@ -2056,7 +2056,13 @@ test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie'
         range(from, to) {
           calls.push(['range', from, to]);
           return Promise.resolve({
-            data: [{ uid: 42 }, { uid: 42 }, { uid: 41 }],
+            data: [
+              { uid: 44, parse_status: 'quarantined', parse_retry_at: null },
+              { uid: 43, parse_status: null, parse_retry_at: null },
+              { uid: 43, parse_status: 'quarantined', parse_retry_at: '2026-08-10T11:59:59.999Z' },
+              { uid: 42, parse_status: 'quarantined', parse_retry_at: '2026-08-10T12:15:00.000Z' },
+              { uid: 41, parse_status: null, parse_retry_at: null },
+            ],
             error: null,
           });
         },
@@ -2067,18 +2073,30 @@ test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie'
   const store = createMailboxIndexStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
+    now: () => new Date('2026-08-10T12:00:00.000Z'),
     logger: { error() {}, info() {} },
   });
 
-  const uids = await store.listMessageUidsForAccount({
+  const state = await store.listMessageUidSyncStateForAccount({
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'SENT',
     since: '2026-05-01T00:00:00.000Z',
     limit: 500,
   });
 
-  assert.deepEqual(uids, [42, 41]);
-  assert.deepEqual(calls.find((call) => call[0] === 'select'), ['select', 'uid']);
+  assert.deepEqual(state.indexedUids, [42, 41]);
+  assert.deepEqual(state.deferredQuarantineUids, [42]);
+  assert.deepEqual(state.retryDueQuarantineUids, [44, 43]);
+  assert.deepEqual(await store.listMessageUidsForAccount({
+    accountEmail: 'SERVE@SOFTORA.NL',
+    folder: 'SENT',
+    since: '2026-05-01T00:00:00.000Z',
+    limit: 500,
+  }), [42, 41]);
+  assert.deepEqual(calls.find((call) => call[0] === 'select'), [
+    'select',
+    'uid,parse_status:payload->>parseStatus,parse_retry_at:payload->>parseRetryAt',
+  ]);
   assert.deepEqual(calls.find((call) => call[0] === 'gte'), [
     'gte',
     'date',
