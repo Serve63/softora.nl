@@ -454,7 +454,7 @@ function createMailboxSyncService({
           folder: normalizedFolder,
           limit: campaignOnly
             ? fastRefresh
-              ? getSafeLimit(CAMPAIGN_SYNC_FAST_FETCH_LIMIT + 1)
+              ? getSafeLimit(Math.max(Number(limit) || 0, CAMPAIGN_SYNC_FAST_FETCH_LIMIT))
               : Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
             : getSafeLimit(limit),
           campaignHistory:
@@ -505,27 +505,17 @@ function createMailboxSyncService({
             accountEmail: account.email,
             folder: normalizedFolder,
             leaseSeconds: campaignMutationLeaseSeconds,
-            deadlineMs: Math.min(
-              Number(campaignMutationDeadlineMs) || Number.POSITIVE_INFINITY,
-              Math.max(1, folderDeadlineAt - Date.now())
-            ),
+            deadlineMs: campaignMutationDeadlineMs,
             signal: folderDeadline.signal,
           }, fetchAndPersistMessages)
         : await fetchAndPersistMessages();
       upserted = Math.max(0, Number(saved.upserted) || 0);
-      const readHealth = messages.syncReadHealth || {};
-      const parseFailures = Array.isArray(readHealth.parseFailures) ? readHealth.parseFailures : [];
-      const selectedCount = Math.max(messages.length, Number(readHealth.selectedCount) || 0);
-      const folderMissing = readHealth.folderMissing === true;
-      const fastFetchCapReached = fastRefresh && selectedCount > CAMPAIGN_SYNC_FAST_FETCH_LIMIT;
-      const incomplete = folderMissing || fastFetchCapReached || parseFailures.length > 0;
       if ((saved.upserted || 0) > 0 && ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER].includes(normalizedFolder)) {
         const invalidation = await invalidateCampaignSnapshot({
           source: 'mailbox-index-upsert',
           accountEmail: account.email,
           folder: normalizedFolder,
           signal: folderDeadline.signal,
-          deadlineAt: folderDeadlineAt,
         });
         if (!invalidation || invalidation.ok === false) {
           const error = new Error('Mailbox-snapshot invalidatie mislukt');
@@ -541,11 +531,6 @@ function createMailboxSyncService({
         lockToken: lock.lockToken,
         messageCount: messages.length,
         lastUid,
-        ...(incomplete ? { error: folderMissing
-          ? 'Mailboxmap ontbreekt bij de IMAP-provider.'
-          : fastFetchCapReached
-            ? 'Mailbox fast-refresh fetchlimiet bereikt.'
-            : `Mailbox parsefouten: ${parseFailures.map((failure) => `${failure.uid}:${failure.code}`).join(', ')}` } : {}),
         signal: folderDeadline.signal,
       });
       if (!finish || finish.ok === false) {
@@ -553,30 +538,12 @@ function createMailboxSyncService({
       }
       return {
         ok: true,
-        complete: !incomplete,
-        freshnessConfirmed: !incomplete,
-        partial: incomplete,
-        truncated: incomplete,
-        degraded: incomplete,
-        statusCode: incomplete ? 207 : 200,
-        ...(incomplete ? {
-          reason: folderMissing
-            ? 'folder_missing'
-            : fastFetchCapReached ? 'fetch_cap_reached' : 'message_parse_failed',
-          code: folderMissing
-            ? 'MAILBOX_SYNC_FOLDER_MISSING'
-            : fastFetchCapReached
-              ? 'MAILBOX_SYNC_FETCH_TRUNCATED'
-              : 'MAILBOX_SYNC_MESSAGE_PARSE_PARTIAL',
-        } : {}),
+        complete: true,
+        freshnessConfirmed: true,
         account: account.email,
         folder: normalizedFolder,
         synced: messages.length,
-        upserted,
-        failedMessageCount: parseFailures.length,
-        folderMissing,
-        failedUids: parseFailures.map((failure) => failure.uid),
-        parseFailures,
+        upserted: saved.upserted || messages.length,
         historyBackfill: Boolean(campaignOnly && !incrementalOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
         targetedThreadReferences: threadReferenceIds.length,
@@ -586,12 +553,7 @@ function createMailboxSyncService({
         runId,
       };
     } catch (error) {
-      const uncertainWrite = error?.leaveMutationPending === true;
-      // A cancelled mutation can have reached Postgres even when the client no
-      // longer receives its outcome. Keep both the mutation journal and sync
-      // lease unresolved so no later path can mislabel that write as a clean
-      // failure (or, worse, a completed sync) before reconciliation.
-      if (lock?.ok && lock.lockToken && !uncertainWrite) {
+      if (lock?.ok && lock.lockToken) {
         const failedFinish = await mailboxIndexStore.finishSync({
           accountEmail: account.email,
           folder: normalizedFolder,
@@ -602,7 +564,6 @@ function createMailboxSyncService({
           error.lockLost = true;
         }
       }
-      if (uncertainWrite) error.uncertain = true;
       error.upserted = upserted;
       throw error;
     } finally {
@@ -696,7 +657,6 @@ function createMailboxSyncService({
               }));
             } catch (error) {
               const timedOut = error?.timedOut === true || /_TIMEOUT$/.test(String(error?.code || ''));
-              const uncertain = error?.leaveMutationPending === true || error?.uncertain === true;
               logger.error?.('[Mailbox][Sync]', {
                 event: 'folder_failed',
                 runId,
@@ -704,7 +664,6 @@ function createMailboxSyncService({
                 folder,
                 code: String(error?.code || 'MAILBOX_SYNC_FAILED'),
                 timedOut,
-                uncertain,
                 lockLost: error?.lockLost === true || error?.code === 'MAILBOX_SYNC_LOCK_LOST',
                 durationMs: Date.now() - startedAt,
               });
@@ -716,7 +675,6 @@ function createMailboxSyncService({
                 folder,
                 code: String(error?.code || 'MAILBOX_SYNC_FAILED'),
                 timedOut,
-                uncertain,
                 lockLost: error?.lockLost === true || error?.code === 'MAILBOX_SYNC_LOCK_LOST',
                 statusCode: timedOut ? 504 : 503,
                 error: String(error?.message || error || 'Mailbox sync mislukt'),

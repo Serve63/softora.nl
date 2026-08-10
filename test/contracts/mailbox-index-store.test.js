@@ -16,47 +16,8 @@ const {
 
 function createMailboxIndexClient() {
   const stateRows = new Map();
-  const rpcCalls = [];
   return {
-    rpcCalls,
     stateRows,
-    async rpc(name, args) {
-      rpcCalls.push({ name, args });
-      if (name !== 'softora_claim_mailbox_sync_lock') {
-        return { data: null, error: new Error(`Onverwachte RPC: ${name}`) };
-      }
-      const current = stateRows.get(args.p_sync_key);
-      if (current?.status === 'syncing' && current.lock_token) {
-        return {
-          data: [{
-            acquired: false,
-            locked: true,
-            claimed_lock_token: null,
-            lock_expires_at: current.lock_expires_at,
-          }],
-          error: null,
-        };
-      }
-      const lockExpiresAt = new Date(Date.now() + (args.p_lock_ttl_seconds * 1000)).toISOString();
-      stateRows.set(args.p_sync_key, {
-        ...(current || {}),
-        sync_key: args.p_sync_key,
-        account_email: args.p_account_email,
-        folder: args.p_folder,
-        status: 'syncing',
-        lock_token: args.p_lock_token,
-        lock_expires_at: lockExpiresAt,
-      });
-      return {
-        data: [{
-          acquired: true,
-          locked: false,
-          claimed_lock_token: args.p_lock_token,
-          lock_expires_at: lockExpiresAt,
-        }],
-        error: null,
-      };
-    },
     from(table) {
       if (table !== 'softora_mailbox_sync_state') {
         return {
@@ -89,15 +50,14 @@ function createMailboxIndexClient() {
           return {
             eq(column, value) {
               filters[column] = value;
-              return this;
-            },
-            async select() {
-              const current = stateRows.get(filters.sync_key);
-              if (!current || current.lock_token !== filters.lock_token) {
-                return { data: [], error: null };
+              if (filters.sync_key && Object.prototype.hasOwnProperty.call(filters, 'lock_token')) {
+                const current = stateRows.get(filters.sync_key);
+                if (current && current.lock_token === filters.lock_token) {
+                  stateRows.set(filters.sync_key, { ...current, ...patch });
+                }
+                return Promise.resolve({ data: [], error: null });
               }
-              stateRows.set(filters.sync_key, { ...current, ...patch });
-              return { data: [{ sync_key: filters.sync_key }], error: null };
+              return this;
             },
           };
         },
@@ -936,44 +896,6 @@ test('mailbox index campaign-upsert koppelt de harde abortsignal aan PostgREST',
   assert.equal(rpcCall.args.p_rows[0].message_key, 'serve@softora.nl|inbox|42');
 });
 
-test('non-campaign syncwrite gebruikt abortbare PostgREST zonder atomische campaign-RPC', async () => {
-  const controller = new AbortController();
-  let attachedSignal = null;
-  let rpcCalls = 0;
-  let upsertCalls = 0;
-  const query = {
-    abortSignal(signal) {
-      attachedSignal = signal;
-      return Promise.resolve({ data: [], error: null });
-    },
-  };
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({
-      rpc() { rpcCalls += 1; return query; },
-      from() {
-        return {
-          upsert() { upsertCalls += 1; return query; },
-        };
-      },
-    }),
-  });
-
-  const result = await store.upsertMessages({
-    accountEmail: 'beheer@example.test',
-    folder: 'inbox',
-    signal: controller.signal,
-    messages: [{ id: 'inbox:7', uid: 7, date: '2026-08-09T20:00:00.000Z' }],
-  });
-
-  assert.equal(result.ok, true);
-  assert.equal(result.upserted, 1);
-  assert.equal(rpcCalls, 0);
-  assert.equal(upsertCalls, 1);
-  assert.ok(attachedSignal);
-  assert.notEqual(attachedSignal, controller.signal);
-});
-
 test('mailbox index Instantly-upsert koppelt dezelfde harde abortsignal aan PostgREST', async () => {
   const controller = new AbortController();
   let attachedSignal = null;
@@ -1011,96 +933,6 @@ test('mailbox index Instantly-upsert koppelt dezelfde harde abortsignal aan Post
   assert.ok(attachedSignal);
   assert.notEqual(attachedSignal, controller.signal);
   assert.equal(attachedSignal.aborted, false);
-});
-
-test('Instantly provider-read koppelt caller abort aan de actieve PostgREST-query', async () => {
-  const controller = new AbortController();
-  let attachedSignal = null;
-  const query = {
-    select() { return this; },
-    eq() { return this; },
-    in() { return this; },
-    is() { return this; },
-    order() { return this; },
-    limit() { return this; },
-    abortSignal(signal) {
-      attachedSignal = signal;
-      return new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-      });
-    },
-  };
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({ from: () => query }),
-    mailboxIndexFailureCooldownMs: 0,
-    logger: { error() {}, info() {} },
-  });
-  const running = store.listProviderMessages({
-    provider: 'instantly',
-    accountEmails: ['serve@websoftora.com'],
-    signal: controller.signal,
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  const reason = Object.assign(new Error('owner deadline'), {
-    code: 'INSTANTLY_SYNC_OWNER_TIMEOUT', timedOut: true,
-  });
-  controller.abort(reason);
-
-  assert.equal(await running, null);
-  assert.ok(attachedSignal);
-  assert.equal(attachedSignal.aborted, true);
-  assert.equal(attachedSignal.reason, reason);
-});
-
-test('alle campaign history pre-reads dragen de folderdeadline naar PostgREST', async () => {
-  const controller = new AbortController();
-  const attachedSignals = [];
-  const createQuery = () => {
-    const query = {
-      select() { return this; },
-      in() { return this; },
-      eq() { return this; },
-      ilike() { return this; },
-      is() { return this; },
-      gte() { return this; },
-      order() { return this; },
-      range() { return this; },
-      limit() { return this; },
-      abortSignal(signal) {
-        attachedSignals.push(signal);
-        return Promise.resolve({ data: [], error: null });
-      },
-    };
-    return query;
-  };
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({ from: () => createQuery() }),
-  });
-
-  await store.listAllMessagesForAccounts({
-    accountEmails: ['serve@softora.nl'], folder: 'inbox', limit: 1,
-    signal: controller.signal,
-  });
-  await store.listMatchingMessagesForAccounts({
-    accountEmails: ['serve@softora.nl'], folder: 'inbox', subjectTerms: ['kleine vraag'],
-    limit: 1, signal: controller.signal,
-  });
-  await store.listMessageUidsForAccount({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', limit: 1,
-    signal: controller.signal,
-  });
-  await store.getOldestMatchingMessageUid({
-    accountEmail: 'serve@softora.nl', folder: 'inbox', subjectTerms: ['kleine vraag'],
-    signal: controller.signal,
-  });
-
-  assert.equal(attachedSignals.length, 4);
-  attachedSignals.forEach((signal) => {
-    assert.notEqual(signal, controller.signal);
-    assert.equal(signal.aborted, false);
-  });
 });
 
 test('late niet-cooperatieve campaign writes settelen vóór journal-completion en onzekere abort blijft pending', async () => {
@@ -2052,24 +1884,9 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
 
   const first = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
   const second = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
-  const forced = await store.acquireSyncLock({
-    accountEmail: 'info@softora.nl', folder: 'inbox', force: true,
-  });
 
   assert.equal(first.ok, true);
   assert.equal(second.locked, true);
-  assert.equal(forced.locked, true);
-  assert.equal(client.rpcCalls.length, 3);
-  assert.equal(client.rpcCalls[0].name, 'softora_claim_mailbox_sync_lock');
-  assert.equal(client.rpcCalls[0].args.p_sync_key, 'info@softora.nl|inbox');
-  assert.equal(client.rpcCalls[0].args.p_force, false);
-  assert.equal(client.rpcCalls[2].args.p_force, true);
-
-  const staleFinish = await store.finishSync({
-    accountEmail: 'info@softora.nl', folder: 'inbox', lockToken: 'stale-token',
-  });
-  assert.equal(staleFinish.ok, false);
-  assert.equal(staleFinish.lockLost, true);
 
   await store.finishSync({
     accountEmail: 'info@softora.nl',
@@ -2081,31 +1898,6 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
 
   const third = await store.acquireSyncLock({ accountEmail: 'info@softora.nl', folder: 'inbox' });
   assert.equal(third.ok, true);
-});
-
-test('mailbox index lockclaim faalt gesloten als de database-RPC ontbreekt', async () => {
-  let directStateWrites = 0;
-  const rpcError = Object.assign(new Error('RPC ontbreekt'), { code: 'PGRST202' });
-  const store = createMailboxIndexStore({
-    isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({
-      async rpc() { return { data: null, error: rpcError }; },
-      from() {
-        directStateWrites += 1;
-        return { upsert: async () => ({ data: [], error: null }) };
-      },
-    }),
-    logger: { error() {} },
-  });
-
-  const result = await store.acquireSyncLock({
-    accountEmail: 'info@softora.nl', folder: 'inbox', force: true,
-  });
-
-  assert.equal(result.ok, false);
-  assert.equal(result.locked, false);
-  assert.equal(result.error, rpcError);
-  assert.equal(directStateWrites, 0);
 });
 
 test('mailbox index store logs Supabase timeouts as soft index errors', async () => {

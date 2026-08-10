@@ -202,7 +202,7 @@ test('fast IMAP refresh drains a burst larger than four messages in one cycle', 
     campaignOnly: true, incrementalOnly: true, fastRefresh: true,
   });
 
-  assert.equal(fetchInput.limit, CAMPAIGN_SYNC_FAST_FETCH_LIMIT + 1);
+  assert.equal(fetchInput.limit, CAMPAIGN_SYNC_FAST_FETCH_LIMIT);
   assert.equal(result.results[0].synced, 8);
   assert.equal(result.complete, true);
 });

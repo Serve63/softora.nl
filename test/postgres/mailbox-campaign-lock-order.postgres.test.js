@@ -227,22 +227,6 @@ if (!databaseUrl) {
         updated_at timestamptz not null default now(), deleted_at timestamptz,
         unique (account_email, folder, uid)
       );
-      create table public.softora_mailbox_sync_state (
-        sync_key text primary key,
-        account_email text not null,
-        folder text not null,
-        status text not null default 'idle'
-          check (status in ('idle', 'syncing', 'ok', 'error')),
-        last_synced_at timestamptz,
-        sync_started_at timestamptz,
-        lock_token text,
-        lock_expires_at timestamptz,
-        last_uid bigint,
-        message_count integer not null default 0,
-        last_error text,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      );
     `;
     const legacySendSeedSql = `
       insert into public.softora_mailbox_send_provenance (

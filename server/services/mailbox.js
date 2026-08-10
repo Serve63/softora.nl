@@ -8,7 +8,6 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxImapAbortScope } = require('./mailbox-imap-abort');
-const { attachMailboxSyncReadHealth, createMailboxImapMessageParser } = require('./mailbox-imap-message-parser');
 const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
@@ -1933,10 +1932,6 @@ function createMailboxService(deps = {}) {
     };
   }
 
-  const imapMessageParser = createMailboxImapMessageParser({ parseMailSource, normalizeString,
-    sanitizeDisplayText: sanitizeMailboxDisplayText, buildBodyImages: buildMailboxBodyImages,
-    toClientMessage, logger });
-
   function getSafeLimit(limit, max = 100) {
     return Math.max(1, Math.min(max, Number(limit) || DEFAULT_SYNC_LIMIT));
   }
@@ -1964,7 +1959,7 @@ function createMailboxService(deps = {}) {
     try {
       await client.connect();
       const mailboxName = await resolveMailboxName(client, normalizedFolder);
-      if (!mailboxName) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: true });
+      if (!mailboxName) return [];
       const lock = await client.getMailboxLock(mailboxName);
       try {
         let selectedUids = Array.isArray(uids) && uids.length
@@ -1982,16 +1977,17 @@ function createMailboxService(deps = {}) {
             folder: normalizedFolder,
           });
         }
-        if (!selectedUids.length) return attachMailboxSyncReadHealth([], { parseFailures: [], selectedCount: 0, folderMissing: false });
+        if (!selectedUids.length) return [];
         return await fetchSelectedMailboxMessages({
           account,
+          buildMailboxBodyImages,
           client,
-          deadlineAt,
           folder: normalizedFolder,
-          parseMessage: imapMessageParser.parseMessage,
+          normalizeString,
+          parseMailSource,
+          sanitizeMailboxDisplayText,
           selectedUids,
-          signal,
-          throwIfAborted: abortScope.throwIfAborted,
+          toClientMessage,
         });
       } finally {
         lock.release();
