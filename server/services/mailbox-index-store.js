@@ -41,7 +41,6 @@ const BODY_MAX_CHARS = 200 * 1024;
 const SYNC_LOCK_TTL_MS = 90_000;
 const MAILBOX_INDEX_PAGE_SIZE = 1000;
 const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
-const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
   'message_key,account_email,folder,uid,uid_validity,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,softora_read_at,starred,reply_dismissed_at,has_body,body_truncated,payload';
@@ -514,10 +513,9 @@ function createMailboxIndexStore(deps = {}) {
         (client) =>
           client
             .from(MAILBOX_INDEX_TABLES.messages)
-            .select('account_email,provider_thread_id:payload->>providerThreadId')
+            .select('account_email,payload')
             .eq('folder', normalizedProvider)
             .in('account_email', normalizedAccounts)
-            .eq('payload->>direction', 'received')
             .is('deleted_at', null)
             .order('date', { ascending: false })
             .range(offset, offset + MAILBOX_INDEX_PAGE_SIZE - 1)
@@ -525,24 +523,22 @@ function createMailboxIndexStore(deps = {}) {
       if (!result.ok) return null;
       const page = Array.isArray(result.data) ? result.data : [];
       page.forEach((row) => {
+        const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+        if (normalizeString(payload.direction).toLowerCase() !== 'received') return;
         const accountEmail = normalizeEmail(row && row.account_email);
-        const threadId = normalizeString(row && row.provider_thread_id);
+        const threadId = normalizeString(payload.providerThreadId);
         if (accountEmail && threadId) activeThreadKeys.add(`${accountEmail}|${threadId}`);
       });
       if (page.length < MAILBOX_INDEX_PAGE_SIZE) break;
     }
     if (!activeThreadKeys.size) return [];
 
-    const threadIds = Array.from(
-      new Set(Array.from(activeThreadKeys, (key) => key.slice(key.indexOf('|') + 1)))
-    );
     const rowsByKey = new Map();
     for (
       let offset = 0;
-      offset < threadIds.length;
-      offset += PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE
+      offset < PROVIDER_ACTIVE_THREAD_MAX_COUNT;
+      offset += MAILBOX_INDEX_PAGE_SIZE
     ) {
-      const batch = threadIds.slice(offset, offset + PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE);
       const result = await run(
         `list-provider-active-audit-messages:${normalizedProvider}:${offset}`,
         (client) =>
@@ -551,16 +547,18 @@ function createMailboxIndexStore(deps = {}) {
             .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
             .eq('folder', normalizedProvider)
             .in('account_email', normalizedAccounts)
-            .in('payload->>providerThreadId', batch)
             .contains('payload', { originalCampaignOutbound: true })
             .is('deleted_at', null)
             .order('date', { ascending: false })
+            .range(offset, offset + MAILBOX_INDEX_PAGE_SIZE - 1)
       , { signal });
       if (!result.ok) return null;
-      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+      const page = Array.isArray(result.data) ? result.data : [];
+      page.forEach((row) => {
         const messageKey = normalizeString(row && row.message_key);
         if (messageKey && !rowsByKey.has(messageKey)) rowsByKey.set(messageKey, row);
       });
+      if (page.length < MAILBOX_INDEX_PAGE_SIZE) break;
     }
 
     return Array.from(rowsByKey.values())
