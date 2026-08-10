@@ -5,6 +5,9 @@ const {
 const {
   createMailboxMessageReferenceLookup,
 } = require('../repositories/mailbox-message-reference-lookup');
+const {
+  createMailboxCampaignLineageLookup,
+} = require('../repositories/mailbox-campaign-lineage-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
 const { executeMailboxIndexQuery } = require('./mailbox-index-query-timeout');
 const {
@@ -1126,6 +1129,12 @@ function createMailboxIndexStore(deps = {}) {
     normalizeFolder,
     normalizeMessageRow,
   });
+  const listCampaignLineageMessages = createMailboxCampaignLineageLookup({
+    run,
+    normalizeString,
+    normalizeEmail,
+    normalizeMessageRow,
+  });
   const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
 
   return {
@@ -1149,6 +1158,7 @@ function createMailboxIndexStore(deps = {}) {
     isAvailable,
     isSyncStateStale,
     listAllMessagesForAccounts,
+    listCampaignLineageMessages,
     listMatchingMessagesForAccounts,
     listMessagesByMessageIdsForAccounts,
     listSentCandidatesForQuotedReplies,
