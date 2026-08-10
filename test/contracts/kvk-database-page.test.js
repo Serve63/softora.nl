@@ -65,7 +65,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
@@ -77,7 +77,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
 });
 
@@ -136,9 +136,9 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809e/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809c/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809e/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -438,7 +438,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804d/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260804c/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260809f/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);
   assert.match(metricsSource, /companies-treated/);
@@ -490,7 +490,6 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.match(pageSource, /id="database-fill-toggle"[^>]*role="status"/);
   assert.doesNotMatch(pageSource, /<button id="database-fill-toggle"/);
   assert.match(pageSource, /database-fill-toggle__caption">Database vullen/);
-  assert.match(pageSource, /id="database-fill-toggle-label"[^>]*>UIT</);
   assert.match(pageSource, /id="last-refresh-time" class="kvk-visually-hidden"/);
   assert.doesNotMatch(pageSource, /Tijd sinds laatste refresh/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
@@ -498,9 +497,12 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.doesNotMatch(controlSource, /method: 'POST'/);
   assert.doesNotMatch(controlSource, /addEventListener\('click'/);
   assert.doesNotMatch(controlSource, /JSON\.stringify\(\{ enabled:/);
-  assert.match(controlSource, /statusLabel = workerState === 'error'/);
+  assert.match(controlSource, /statusLabel = workerState === 'error' \? 'FOUT' : ''/);
+  assert.doesNotMatch(controlSource, /'BEZIG'/);
   assert.doesNotMatch(controlSource, /'WACHT'/);
-  assert.match(controlSource, /enabled\s*\? 'AAN'/);
+  assert.match(controlSource, /const accessibleStatusLabel = workerState === 'error'/);
+  assert.match(controlSource, /fillButtonLabel\.hidden = !statusLabel/);
+  assert.match(pageSource, /id="database-fill-toggle-label"[^>]*hidden><\/strong>/);
   assert.match(controlSource, /uitsluitend via de Codex-chat/);
   assert.match(controlSource, /\['vuller', 'controle', 'goedgekeurd'\]/);
   assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
@@ -510,6 +512,8 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.match(pageSource, /stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced[\s\S]*?<span>Mét Website<\/span>/);
   assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced/);
   assert.match(metricsStyles, /\.stat-card-without-website \.stat-main > span/);
+  assert.match(pageSource, /stat-card stat-card-successful-found stat-card-directory kvk-stat-card-enhanced[\s\S]*?<span>Succesvol Gevonden<\/span>/);
+  assert.match(metricsStyles, /\.stat-card-successful-found \.stat-main > span/);
   assert.match(metricsStyles, /white-space: nowrap/);
 });
 
@@ -520,7 +524,7 @@ test('kvk framed content uses the same solid background as the surrounding page'
 
   assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260809a/);
   assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260809a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809c/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809e/);
   assert.match(
     frameStyleSource,
     /html\[data-softora-sidebar-content-frame="1"\][\s\S]*background:\s*#f4f1ed !important;/

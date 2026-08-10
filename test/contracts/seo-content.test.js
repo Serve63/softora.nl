@@ -1046,6 +1046,56 @@ test('chatbot-CRM-koppeling gebruikt quality v2 met herstelroute en twee unieke 
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 });
 
+test('chatbot-offertegids normaliseert voorstellen met bewijs en twee verschillende beelden', () => {
+  const now = new Date('2026-08-10T12:00:00.000Z');
+  const item = getSeoContentItem('blog', 'chatbot-offerte-vergelijken', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const chatbotPage = fs.readFileSync(path.join(repoRoot, 'premium-chatbot.html'), 'utf8');
+  const costHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'chatbot-kosten-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-10');
+  assert.equal(item.targetMoneyPage, '/chatbot-laten-maken');
+  assert.ok(item.informationGain.includes('vier beslispoorten'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualFamily, 'forest-proposal-evidence-tabletop');
+  assert.equal(item.visualBrief.support.visualFamily, 'yellow-screenprint-evidence-grid');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.src, '/assets/seo-content/chatbot-offerte-vergelijking-bewijsstukken-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/chatbot-offerte-beslismatrix-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/chatbot-offerte-vergelijken">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"datePublished":"2026-08-10"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Gebruik vier beslispoorten in plaats van één totaalscore/);
+  assert.match(html, /href="\/chatbot-laten-maken">chatbot laten maken<\/a>/);
+  assert.match(html, /href="\/blog\/chatbot-crm-koppeling-leads-opvolgen">chatbot en CRM koppelen<\/a>/);
+  assert.match(html, /href="\/vergelijkingen\/chatbot-vs-livechat">chatbot en livechat per gesprekstype<\/a>/);
+  assert.match(costHtml, /href="\/blog\/chatbot-offerte-vergelijken">chatbot-offertes op dezelfde scope<\/a>/);
+  assert.match(chatbotPage, /href="\/blog\/chatbot-offerte-vergelijken">chatbot-offertes naast dezelfde beslispoorten<\/a>/);
+  assert.doesNotMatch(html, /beste leverancier|gegarandeerde besparing|foutloze werking/i);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/chatbot-offerte-vergelijken');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/chatbot-offerte-vergelijking-bewijsstukken-softora.jpg',
+    '/assets/seo-content/chatbot-offerte-beslismatrix-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));

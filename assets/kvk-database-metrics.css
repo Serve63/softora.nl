@@ -31,6 +31,11 @@
   white-space: nowrap;
 }
 
+.stat-card-successful-found .stat-main > span {
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+
 .stat-delta {
   display: flex;
   align-items: baseline;

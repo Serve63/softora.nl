@@ -1,4 +1,4 @@
-const MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE = 'premium_mailbox_campaign_snapshot';
+const MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE = 'premium_mailbox_campaign_snapshot_v3';
 const {
   buildMailboxMessageImageUrl,
   isMailboxMessageImageUrl,
@@ -6,13 +6,18 @@ const {
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
-const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 14;
+const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v3';
+const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE = 'premium_mailbox_campaign_snapshot_invalidation';
+const MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY = 'softora_mailbox_campaign_snapshot_invalidated_at_v1';
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 16;
+const POSTGRES_BIGINT_MAX = 9223372036854775807n;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_FRESH_MS = 2 * 60 * 1000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_STALE_MS = 15 * 60 * 1000;
 // Keep the durable bootstrap focused on the complete conversation list. The
 // newest few bodies remain instant; older bodies are fetched from the mailbox
 // index only when opened, so hundreds of historical rows still fit in the
@@ -22,6 +27,61 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
+}
+
+function normalizeMailboxCampaignContentVersion(value) {
+  if (typeof value === 'bigint') {
+    return value >= 0n && value <= POSTGRES_BIGINT_MAX ? value.toString() : null;
+  }
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value >= 0 ? String(value) : null;
+  }
+  const normalized = String(value == null ? '' : value).trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  try {
+    const parsed = BigInt(normalized);
+    return parsed <= POSTGRES_BIGINT_MAX ? parsed.toString() : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getMailboxCampaignSnapshotAgeMs(snapshot, nowValue = Date.now()) {
+  const savedAtMs = Date.parse(snapshot && snapshot.contentAt || '');
+  const currentMs = nowValue instanceof Date ? nowValue.getTime() : Number(nowValue);
+  if (!Number.isFinite(savedAtMs) || !Number.isFinite(currentMs)) return Infinity;
+  return Math.max(0, currentMs - savedAtMs);
+}
+
+function parseMailboxCampaignSnapshotInvalidatedAt(value) {
+  return Number.isFinite(Date.parse(value || '')) ? new Date(value).toISOString() : null;
+}
+
+function isMailboxCampaignSnapshotInvalidated(snapshot, invalidatedAt) {
+  const contentAtMs = Date.parse(snapshot && snapshot.contentAt || '');
+  const invalidatedAtMs = Date.parse(invalidatedAt || '');
+  return Number.isFinite(invalidatedAtMs) && (
+    !Number.isFinite(contentAtMs) || contentAtMs <= invalidatedAtMs
+  );
+}
+
+function markMailboxCampaignSnapshotStale(snapshot, reason = 'snapshot_stale') {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  return {
+    ...snapshot,
+    degraded: true,
+    sync: {
+      ...(snapshot.sync && typeof snapshot.sync === 'object' ? snapshot.sync : {}),
+      indexed: true,
+      stale: true,
+      source: 'campaign-replies-degraded-snapshot',
+      refreshRecommended: true,
+      warming: false,
+      degraded: true,
+      degradedReason: text(reason, 120),
+      contentAt: snapshot.contentAt || null,
+    },
+  };
 }
 
 function selectSnapshotMessages(value) {
@@ -395,29 +455,46 @@ function fitSnapshotToBudget(snapshot) {
 }
 
 function serializeMailboxCampaignSnapshot(result, options = {}) {
+  const suppliedContentVersion = normalizeMailboxCampaignContentVersion(
+    options.contentVersion ?? result?.contentVersion ?? result?.sync?.contentVersion
+  );
+  // Serializer callers that only need a compact, non-authoritative in-memory
+  // value retain compatibility. Durable persist rejects them before this
+  // point, and stale/degraded flags prevent version 0 from ever claiming live.
+  const contentVersion = suppliedContentVersion === null ? '0' : suppliedContentVersion;
   const messages = selectSnapshotMessages(result && result.messages)
     .map((message, index) => sanitizeMessage(message, {
       includeBody: index < MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT,
       includeImages: index < MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT,
     }));
-  if (!messages.length) return '';
   const savedAtValue = options.savedAt || new Date().toISOString();
   const savedAt = Number.isFinite(Date.parse(savedAtValue))
     ? new Date(savedAtValue).toISOString()
     : new Date().toISOString();
+  const contentAtValue = options.contentAt || result && result.contentAt || savedAt;
+  const contentAt = Number.isFinite(Date.parse(contentAtValue))
+    ? new Date(contentAtValue).toISOString()
+    : savedAt;
   return fitSnapshotToBudget({
     version: MAILBOX_CAMPAIGN_SNAPSHOT_VERSION,
+    contentVersion,
     savedAt,
+    contentAt,
     ok: result && result.ok !== false,
     messages,
     sync: result && result.sync && typeof result.sync === 'object'
       ? {
           ...result.sync,
+          ...(suppliedContentVersion === null
+            ? { stale: true, degraded: true, complete: false, refreshRecommended: true }
+            : {}),
           source: 'campaign-replies-snapshot',
         }
       : {
           indexed: true,
           stale: true,
+          degraded: true,
+          complete: false,
           source: 'campaign-replies-snapshot',
           refreshRecommended: true,
           warming: false,
@@ -432,15 +509,20 @@ function parseMailboxCampaignSnapshot(rawValue) {
       !parsed ||
       typeof parsed !== 'object' ||
       Number(parsed.version) !== MAILBOX_CAMPAIGN_SNAPSHOT_VERSION ||
-      !Array.isArray(parsed.messages) ||
-      !parsed.messages.length
+      normalizeMailboxCampaignContentVersion(parsed.contentVersion) === null ||
+      !Number.isFinite(Date.parse(parsed.contentAt || '')) ||
+      !Array.isArray(parsed.messages)
     ) {
       return null;
     }
     return {
       ok: parsed.ok !== false,
+      contentVersion: normalizeMailboxCampaignContentVersion(parsed.contentVersion),
       savedAt: Number.isFinite(Date.parse(parsed.savedAt || ''))
         ? new Date(parsed.savedAt).toISOString()
+        : null,
+      contentAt: Number.isFinite(Date.parse(parsed.contentAt || ''))
+        ? new Date(parsed.contentAt).toISOString()
         : null,
       messages: parsed.messages
         .slice(0, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES)
@@ -477,7 +559,11 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
     serialized: messages.length
       ? serializeMailboxCampaignSnapshot(
           { ok: snapshot.ok, messages, sync: snapshot.sync },
-          { savedAt: options.savedAt || new Date().toISOString() }
+          {
+            savedAt: options.savedAt || new Date().toISOString(),
+            contentAt: snapshot.contentAt,
+            contentVersion: snapshot.contentVersion,
+          }
         )
       : '',
   };
@@ -516,7 +602,11 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
       { ok: snapshot.ok, messages, sync: snapshot.sync },
-      { savedAt: options.savedAt || dismissedAt }
+      {
+        savedAt: options.savedAt || dismissedAt,
+        contentAt: snapshot.contentAt,
+        contentVersion: snapshot.contentVersion,
+      }
     ),
   };
 }
@@ -552,18 +642,31 @@ function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) 
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
       { ok: snapshot.ok, messages, sync: snapshot.sync },
-      { savedAt: options.savedAt || readAt }
+      {
+        savedAt: options.savedAt || readAt,
+        contentAt: snapshot.contentAt,
+        contentVersion: snapshot.contentVersion,
+      }
     ),
   };
 }
 
 module.exports = {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATED_AT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_INVALIDATION_SCOPE,
+  MAILBOX_CAMPAIGN_SNAPSHOT_FRESH_MS,
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
+  MAILBOX_CAMPAIGN_SNAPSHOT_MAX_STALE_MS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  getMailboxCampaignSnapshotAgeMs,
+  isMailboxCampaignSnapshotInvalidated,
   markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
+  markMailboxCampaignSnapshotStale,
+  normalizeMailboxCampaignContentVersion,
   parseMailboxCampaignSnapshot,
+  parseMailboxCampaignSnapshotInvalidatedAt,
   removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
 };

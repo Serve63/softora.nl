@@ -25,7 +25,7 @@
     { id: 'serves-gezondheidsdossier', title: "Servé's gezondheidsdossier" },
     { id: 'ruben-zet-toto', title: 'Ruben zet toto' },
     { id: 'world-watcher', title: 'world watcher' },
-    { id: 'transfermarkt', title: 'Transfermarkt' },
+    { id: 'transfermarkt', title: 'Ruben Romano' },
     { id: 'rubens-company', title: 'Ruben’s Company' },
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'jurisalem-af', title: 'Jurisalem af' },
@@ -47,9 +47,11 @@
     { id: 'professionele-fotoshoot-2028', title: 'Professionele fotoshoot', timeframe: 2028, imageId: 'professionele-fotoshoot' },
     { id: 'persoonlijke-handtekening-2028', title: 'Persoonlijke handtekening', timeframe: 2028, imageId: 'persoonlijke-handtekening' },
     { id: 'sponsorbord-nemelaer-2028', title: 'Sponsorbord bij Nemelaer', timeframe: 2028, imageId: 'sponsorbord-nemelaer' },
+    { id: 'vip-box-willem-2-2028', title: 'VIP-box Willem II', timeframe: 2028, imageId: 'vip-box-willem-2' },
     { id: 'instagram-post-2027', title: 'Jaarlijkse Instagram-post 2027', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
+    { id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' },
     { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
     { id: 'range-rover-sport-2035', title: 'Range Rover Sport kopen', timeframe: 2035, imageId: 'range-rover-sport' },
     { id: 'rolex-datejust-2035', title: 'Rolex Datejust kopen', timeframe: 2035, imageId: 'rolex-datejust' },
@@ -142,20 +144,22 @@
   function createCardArtwork(card) {
     const artwork = document.createElement('div');
     const image = document.createElement('img');
+    const imageId = card.imageId || card.id;
     const shade = document.createElement('div');
     const top = document.createElement('span');
     const title = document.createElement('strong');
+    const subtitle = document.createElement('span');
     const mission = document.createElement('span');
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260809d`;
+    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260809g`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
     image.loading = 'lazy';
     image.decoding = 'async';
-    if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(card.id)) {
+    if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(imageId)) {
       artwork.classList.add('end-game-card-photo--edge-crop');
     }
     shade.className = 'end-game-card-photo-shade';
@@ -171,6 +175,8 @@
           : 'END GAME';
     title.className = 'end-game-card-name';
     title.textContent = card.title;
+    subtitle.className = 'end-game-card-subtitle';
+    subtitle.textContent = card.subtitle || '';
     if (['origin', 'checkpoint', 'destination'].includes(card.type)) {
       const specialLabel = document.createElement('span');
       specialLabel.className = `end-game-card-special-label end-game-card-${card.type}-label`;
@@ -186,7 +192,9 @@
       mission.textContent = 'MISSIE';
       target.className = 'end-game-card-target';
       target.append(createTargetIcon());
-      artwork.append(image, shade, top, title, mission, target);
+      artwork.append(image, shade, top, title);
+      if (card.subtitle) artwork.append(subtitle);
+      artwork.append(mission, target);
     }
     return artwork;
   }

@@ -85,16 +85,18 @@
     const running = ['starting', 'running', 'waiting'].includes(workerState);
     fillButton.classList.toggle('is-on', enabled);
     fillButton.classList.toggle('is-error', workerState === 'error');
-    const statusLabel = workerState === 'error'
-      ? 'FOUT'
+    const statusLabel = workerState === 'error' ? 'FOUT' : '';
+    const accessibleStatusLabel = workerState === 'error'
+      ? 'fout'
       : enabled && workerState === 'running'
-        ? 'BEZIG'
+        ? 'bezig'
         : enabled
-          ? 'AAN'
-          : 'UIT';
+          ? 'aan'
+          : 'uit';
     fillButtonLabel.textContent = statusLabel;
+    fillButtonLabel.hidden = !statusLabel;
     fillButton.setAttribute('aria-busy', enabled && running ? 'true' : 'false');
-    fillButton.setAttribute('aria-label', `Database vullen: ${statusLabel.toLowerCase()}. Alleen-lezen status.`);
+    fillButton.setAttribute('aria-label', `Database vullen: ${accessibleStatusLabel}. Alleen-lezen status.`);
     const workerLabels = {
       vuller: 'Vuller',
       controle: 'Controle',

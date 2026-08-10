@@ -39,6 +39,12 @@
     return [408, 425, 429, 500, 502, 503, 504].includes(Number(status));
   }
 
+  function isIncompleteRefreshPayload(value) {
+    if (!value || typeof value !== 'object') return false;
+    if (value.ok === false || value.complete === false || value.freshnessConfirmed === false || value.skipped === true) return true;
+    return Object.values(value).some(isIncompleteRefreshPayload);
+  }
+
   function createAbortError() {
     const error = new Error('Mailboxverversing geannuleerd.');
     error.name = 'AbortError';
@@ -48,6 +54,7 @@
   function create(options = {}) {
     const documentRef = options.document || global.document;
     const windowRef = options.window || global;
+    const AbortControllerImpl = options.AbortController || windowRef?.AbortController || global.AbortController;
     const button = options.button || documentRef?.getElementById?.('mailbox-refresh');
     const ageLabel = options.ageLabel || documentRef?.getElementById?.('mailbox-refresh-age');
     const getAccount = typeof options.getAccount === 'function' ? options.getAccount : () => '';
@@ -75,6 +82,7 @@
     let refreshQueued = false;
     let started = false;
     let destroyed = false;
+    let paused = false;
     let refreshTimer = 0;
     let refreshAgeTimer = 0;
     let activeController = null;
@@ -102,7 +110,7 @@
       } else if (state.status === 'partial') {
         ageLabel.textContent = 'Deels bijgewerkt';
       } else if (state.status === 'recovering') {
-        ageLabel.textContent = age ? `${age} gecontroleerd` : 'Opnieuw verbinden…';
+        ageLabel.textContent = 'Niet live · herstellen…';
       } else {
         ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
       }
@@ -134,16 +142,24 @@
       refreshTimer = 0;
     }
 
-    function getNextDelay() {
+    function getNextDelay(cycleStartedAt = null) {
       const hidden = documentRef?.visibilityState === 'hidden';
       const baseDelay = hidden ? HIDDEN_REFRESH_INTERVAL_MS : VISIBLE_REFRESH_INTERVAL_MS;
-      if (!failureCount) return baseDelay;
-      const recoveryBaseDelay = hidden ? VISIBLE_REFRESH_INTERVAL_MS : RECOVERY_REFRESH_INTERVAL_MS;
-      return Math.min(baseDelay, recoveryBaseDelay * Math.pow(2, Math.min(2, failureCount - 1)));
+      const cadence = !failureCount
+        ? baseDelay
+        : Math.min(
+            baseDelay,
+            (hidden ? VISIBLE_REFRESH_INTERVAL_MS : RECOVERY_REFRESH_INTERVAL_MS) *
+              Math.pow(2, Math.min(2, failureCount - 1))
+          );
+      if (cycleStartedAt === null || cycleStartedAt === undefined || !Number.isFinite(Number(cycleStartedAt))) {
+        return cadence;
+      }
+      return Math.max(0, cadence - Math.max(0, getNow() - Number(cycleStartedAt)));
     }
 
     function scheduleNext(delayMs = getNextDelay()) {
-      if (!started || destroyed || typeof scheduleTimeout !== 'function') return;
+      if (!started || destroyed || paused || typeof scheduleTimeout !== 'function') return;
       clearRefreshTimer();
       refreshTimer = scheduleTimeout(() => {
         refreshTimer = 0;
@@ -155,7 +171,7 @@
       let lastError = null;
       for (let attempt = 0; attempt < REFRESH_MAX_ATTEMPTS; attempt += 1) {
         if (signal?.aborted) throw createAbortError();
-        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const controller = typeof AbortControllerImpl === 'function' ? new AbortControllerImpl() : null;
         const abortFromParent = () => controller?.abort?.();
         signal?.addEventListener?.('abort', abortFromParent, { once: true });
         let timeoutId = 0;
@@ -227,7 +243,7 @@
     }
 
     async function refresh({ manual = false } = {}) {
-      if (destroyed) return false;
+      if (destroyed || paused) return false;
       if (refreshInFlight) {
         refreshQueued = true;
         return false;
@@ -235,21 +251,27 @@
       const scope = getScope();
       const scopeKey = getScopeKey(scope);
       const state = getFreshness(scope);
+      const cycleStartedAt = getNow();
       clearRefreshTimer();
       refreshInFlight = true;
       state.status = 'checking';
       setRefreshing(true);
       updateRefreshAge();
-      activeController = typeof AbortController === 'function' ? new AbortController() : null;
+      activeController = typeof AbortControllerImpl === 'function' ? new AbortControllerImpl() : null;
       const signal = activeController?.signal;
       try {
         const settled = await Promise.allSettled(buildRefreshRequests(scope, signal));
         if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
         const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
         const rejected = settled.filter((entry) => entry.status === 'rejected');
-        const partialPayload = fulfilled.some((entry) => entry?.data?.ok === false);
-        if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
+        const partialPayload = fulfilled.some((entry) => (
+          isIncompleteRefreshPayload(entry?.data) || Number(entry?.response?.status) !== 200
+        ));
 
+        // Provider writes may be unavailable while the read-only mailbox endpoint is
+        // still healthy (for example during an auth-hydration outage). Never let a
+        // failed sync suppress the list read: the durable index may already contain
+        // a reply written by cron, a webhook or another browser session.
         const listUpdated = await loadMessages({
           showLoader: false,
           skipBackgroundSync: true,
@@ -286,19 +308,19 @@
         if (scopeKey === getScopeKey(getScope())) setRefreshing(false);
         refreshInFlight = false;
         activeController = null;
-        if (!destroyed) {
+        if (!destroyed && !paused) {
           if (refreshQueued) {
             refreshQueued = false;
             scheduleNext(0);
           } else {
-            scheduleNext();
+            scheduleNext(getNextDelay(cycleStartedAt));
           }
         }
       }
     }
 
     function requestImmediateRefresh() {
-      if (!started || destroyed) return;
+      if (!started || destroyed || paused) return;
       if (refreshInFlight) {
         refreshQueued = true;
         return;
@@ -320,16 +342,47 @@
       requestImmediateRefresh();
     }
 
+    function startRefreshAgeTimer() {
+      if (refreshAgeTimer || typeof scheduleInterval !== 'function') return;
+      refreshAgeTimer = scheduleInterval(updateRefreshAge, REFRESH_AGE_UPDATE_INTERVAL_MS);
+    }
+
+    function stopRefreshAgeTimer() {
+      if (refreshAgeTimer) cancelInterval?.(refreshAgeTimer);
+      refreshAgeTimer = 0;
+    }
+
+    function handlePageHide(event) {
+      if (event?.persisted === true) {
+        paused = true;
+        refreshQueued = false;
+        activeController?.abort?.();
+        clearRefreshTimer();
+        stopRefreshAgeTimer();
+        setRefreshing(false);
+        return;
+      }
+      destroy();
+    }
+
+    function handlePageShow(event) {
+      if (event?.persisted !== true || destroyed || !started) return;
+      paused = false;
+      startRefreshAgeTimer();
+      updateRefreshAge();
+      requestImmediateRefresh();
+    }
+
     function start() {
       if (started || destroyed) return;
       started = true;
-      if (typeof scheduleInterval === 'function') {
-        refreshAgeTimer = scheduleInterval(updateRefreshAge, REFRESH_AGE_UPDATE_INTERVAL_MS);
-      }
+      paused = false;
+      startRefreshAgeTimer();
       documentRef?.addEventListener?.('visibilitychange', handleVisibilityChange);
       windowRef?.addEventListener?.('focus', requestImmediateRefresh);
       windowRef?.addEventListener?.('online', requestImmediateRefresh);
-      windowRef?.addEventListener?.('pagehide', destroy, { once: true });
+      windowRef?.addEventListener?.('pagehide', handlePageHide);
+      windowRef?.addEventListener?.('pageshow', handlePageShow);
       updateRefreshAge();
       scheduleNext(0);
     }
@@ -337,16 +390,23 @@
     function destroy() {
       if (destroyed) return;
       destroyed = true;
+      paused = false;
       activeController?.abort?.();
       clearRefreshTimer();
-      if (refreshAgeTimer) cancelInterval?.(refreshAgeTimer);
-      refreshAgeTimer = 0;
+      stopRefreshAgeTimer();
       documentRef?.removeEventListener?.('visibilitychange', handleVisibilityChange);
       windowRef?.removeEventListener?.('focus', requestImmediateRefresh);
       windowRef?.removeEventListener?.('online', requestImmediateRefresh);
+      windowRef?.removeEventListener?.('pagehide', handlePageHide);
+      windowRef?.removeEventListener?.('pageshow', handlePageShow);
+      button?.removeEventListener?.('click', handleButtonClick);
     }
 
-    if (button) button.addEventListener('click', () => void refresh({ manual: true }));
+    function handleButtonClick() {
+      void refresh({ manual: true });
+    }
+
+    if (button) button.addEventListener('click', handleButtonClick);
     updateRefreshAge();
     if (options.autoStart !== false) start();
     return {

@@ -314,6 +314,877 @@ create index if not exists softora_mailbox_sync_state_status_idx
 create index if not exists softora_mailbox_sync_state_account_folder_idx
   on public.softora_mailbox_sync_state (account_email, folder);
 
+-- mailbox-sync-lock-hardening:start
+-- Serialize every mailbox lease transition across instances. The fixed
+-- transaction advisory lock makes the active-count check one global decision.
+create or replace function public.softora_lock_mailbox_sync_capacity()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+begin
+  -- A statement trigger runs before UPDATE has row-locked a lease. This keeps
+  -- old direct writes and the new RPC on the same advisory -> row lock order.
+  perform pg_advisory_xact_lock(824031, 3);
+  return null;
+end;
+$$;
+
+drop trigger if exists softora_mailbox_sync_capacity_lock
+  on public.softora_mailbox_sync_state;
+create trigger softora_mailbox_sync_capacity_lock
+before insert or update or delete on public.softora_mailbox_sync_state
+for each statement execute function public.softora_lock_mailbox_sync_capacity();
+
+create or replace function public.softora_guard_mailbox_sync_lock()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_sync_key text := lower(btrim(coalesce(new.sync_key, '')));
+  v_account_email text := lower(btrim(coalesce(new.account_email, '')));
+  v_folder text := lower(btrim(coalesce(new.folder, '')));
+  v_lock_token text := btrim(coalesce(new.lock_token, ''));
+  v_active_count integer := 0;
+begin
+  if v_sync_key = '' or char_length(v_sync_key) > 600
+    or v_account_email = '' or char_length(v_account_email) > 320
+    or v_folder = '' or char_length(v_folder) > 200
+    or position('|' in v_account_email) > 0
+    or position('|' in v_folder) > 0
+    or v_sync_key is distinct from (v_account_email || '|' || v_folder) then
+    raise exception using errcode = '22023',
+      message = 'MAILBOX_SYNC_LOCK_IDENTITY_INVALID';
+  end if;
+
+  new.sync_key := v_sync_key;
+  new.account_email := v_account_email;
+  new.folder := v_folder;
+
+  if new.status = 'syncing' then
+    if v_lock_token = '' or char_length(v_lock_token) > 200
+      or new.lock_expires_at is null
+      or new.lock_expires_at <= clock_timestamp() then
+      raise exception using errcode = '22023',
+        message = 'MAILBOX_SYNC_LOCK_LEASE_INVALID';
+    end if;
+    new.lock_token := v_lock_token;
+
+    -- Old runtime versions used direct UPSERTs. They may renew the exact same
+    -- lease, but force can never replace another still-active token.
+    if tg_op = 'UPDATE'
+      and old.status = 'syncing'
+      and nullif(btrim(old.lock_token), '') is not null
+      and old.lock_expires_at > clock_timestamp()
+      and btrim(old.lock_token) is distinct from v_lock_token then
+      raise exception 'MAILBOX_SYNC_ACTIVE_LOCK'
+        using errcode = 'P0001', detail = 'een actieve mailboxlease kan niet worden overgenomen';
+    end if;
+
+    select count(*)::integer into v_active_count
+    from public.softora_mailbox_sync_state as active_sync
+    where active_sync.status = 'syncing'
+      and nullif(btrim(active_sync.lock_token), '') is not null
+      and active_sync.lock_expires_at > clock_timestamp()
+      and active_sync.sync_key <> v_sync_key;
+    if v_active_count >= 3 then
+      raise exception 'MAILBOX_SYNC_GLOBAL_CAP_REACHED'
+        using errcode = 'P0001', detail = 'maximaal drie mailboxleases mogen tegelijk actief zijn';
+    end if;
+  elsif new.lock_token is not null or new.lock_expires_at is not null then
+    raise exception using errcode = '22023',
+      message = 'MAILBOX_SYNC_LOCK_RELEASE_INVALID';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists softora_mailbox_sync_lock_guard
+  on public.softora_mailbox_sync_state;
+create trigger softora_mailbox_sync_lock_guard
+before insert or update of sync_key, account_email, folder, status, lock_token, lock_expires_at
+on public.softora_mailbox_sync_state
+for each row execute function public.softora_guard_mailbox_sync_lock();
+
+-- New runtime versions claim through this RPC. p_force remains in the stable
+-- API shape, but never bypasses an active lease or the global capacity limit.
+create or replace function public.softora_claim_mailbox_sync_lock(
+  p_sync_key text,
+  p_account_email text,
+  p_folder text,
+  p_lock_token text,
+  p_lock_ttl_seconds integer default 90,
+  p_force boolean default false
+)
+returns table (
+  acquired boolean,
+  locked boolean,
+  claimed_lock_token text,
+  lock_expires_at timestamptz
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_sync_key text := lower(btrim(coalesce(p_sync_key, '')));
+  v_account_email text := lower(btrim(coalesce(p_account_email, '')));
+  v_folder text := lower(btrim(coalesce(p_folder, '')));
+  v_lock_token text := btrim(coalesce(p_lock_token, ''));
+  v_current public.softora_mailbox_sync_state%rowtype;
+  v_active_count integer := 0;
+begin
+  if v_sync_key = '' or char_length(v_sync_key) > 600
+    or v_account_email = '' or char_length(v_account_email) > 320
+    or v_folder = '' or char_length(v_folder) > 200
+    or v_lock_token = '' or char_length(v_lock_token) > 200
+    or position('|' in v_account_email) > 0
+    or position('|' in v_folder) > 0
+    or v_sync_key is distinct from (v_account_email || '|' || v_folder) then
+    raise exception using errcode = '22023',
+      message = 'MAILBOX_SYNC_LOCK_IDENTITY_INVALID';
+  end if;
+
+  perform pg_advisory_xact_lock(824031, 3);
+  select * into v_current
+  from public.softora_mailbox_sync_state as current_sync
+  where current_sync.sync_key = v_sync_key
+  for update;
+
+  if found
+    and v_current.status = 'syncing'
+    and nullif(btrim(v_current.lock_token), '') is not null
+    and v_current.lock_expires_at > clock_timestamp() then
+    if btrim(v_current.lock_token) = v_lock_token then
+      return query select true, false, v_lock_token, v_current.lock_expires_at;
+    else
+      return query select false, true, null::text, v_current.lock_expires_at;
+    end if;
+    return;
+  end if;
+
+  select count(*)::integer into v_active_count
+  from public.softora_mailbox_sync_state as active_sync
+  where active_sync.status = 'syncing'
+    and nullif(btrim(active_sync.lock_token), '') is not null
+    and active_sync.lock_expires_at > clock_timestamp()
+    and active_sync.sync_key <> v_sync_key;
+  if v_active_count >= 3 then
+    return query select false, true, null::text, null::timestamptz;
+    return;
+  end if;
+
+  insert into public.softora_mailbox_sync_state as stored_sync (
+    sync_key, account_email, folder, status, sync_started_at,
+    lock_token, lock_expires_at, last_error, updated_at
+  ) values (
+    v_sync_key, v_account_email, v_folder, 'syncing', clock_timestamp(),
+    v_lock_token,
+    clock_timestamp() + make_interval(
+      secs => greatest(10, least(300, coalesce(p_lock_ttl_seconds, 90)))
+    ),
+    null, clock_timestamp()
+  )
+  on conflict (sync_key) do update set
+    account_email = excluded.account_email,
+    folder = excluded.folder,
+    status = excluded.status,
+    sync_started_at = excluded.sync_started_at,
+    lock_token = excluded.lock_token,
+    lock_expires_at = excluded.lock_expires_at,
+    last_error = null,
+    updated_at = excluded.updated_at
+  returning stored_sync.* into v_current;
+
+  return query select true, false, v_lock_token, v_current.lock_expires_at;
+end;
+$$;
+
+comment on function public.softora_claim_mailbox_sync_lock(text, text, text, text, integer, boolean)
+  is 'Atomically claims one of at most three global mailbox sync leases; force never steals an active lease.';
+
+revoke all on function public.softora_lock_mailbox_sync_capacity()
+  from public, anon, authenticated;
+revoke all on function public.softora_guard_mailbox_sync_lock()
+  from public, anon, authenticated;
+revoke all on function public.softora_claim_mailbox_sync_lock(text, text, text, text, integer, boolean)
+  from public, anon, authenticated;
+grant execute on function public.softora_lock_mailbox_sync_capacity()
+  to service_role;
+grant execute on function public.softora_guard_mailbox_sync_lock()
+  to service_role;
+grant execute on function public.softora_claim_mailbox_sync_lock(text, text, text, text, integer, boolean)
+  to service_role;
+-- mailbox-sync-lock-hardening:end
+
+-- mailbox-campaign-consistency:start
+create table if not exists public.softora_mailbox_campaign_consistency (
+  scope text primary key default 'campaign' check (scope = 'campaign'),
+  content_version bigint not null default 0 check (content_version >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.softora_mailbox_campaign_mutations (
+  mutation_id uuid primary key,
+  scope text not null default 'campaign'
+    references public.softora_mailbox_campaign_consistency (scope),
+  request_key text not null check (char_length(btrim(request_key)) between 1 and 200),
+  mutation_kind text not null check (char_length(btrim(mutation_kind)) between 1 and 120),
+  account_email text,
+  folder text,
+  status text not null default 'pending'
+    check (status in ('pending', 'completed', 'abandoned')),
+  started_content_version bigint not null check (started_content_version >= 0),
+  completed_content_version bigint,
+  lease_expires_at timestamptz not null,
+  completed_at timestamptz,
+  result jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint softora_mailbox_campaign_mutations_scope_request_key_key
+    unique (scope, request_key),
+  check (
+    (status = 'pending' and completed_at is null and completed_content_version is null)
+    or (
+      status in ('completed', 'abandoned')
+      and completed_at is not null
+      and completed_content_version is not null
+      and completed_content_version >= started_content_version
+    )
+  )
+);
+
+create index if not exists softora_mailbox_campaign_mutations_pending_lease_idx
+  on public.softora_mailbox_campaign_mutations (lease_expires_at, mutation_id)
+  where status = 'pending';
+
+insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+values ('campaign', 0)
+on conflict (scope) do nothing;
+
+create or replace function public.softora_is_campaign_mailbox_message(
+  p_account_email text,
+  p_folder text,
+  p_payload jsonb
+)
+returns boolean
+language sql
+immutable
+security invoker
+set search_path = ''
+as $$
+  select (
+    lower(btrim(coalesce(p_account_email, ''))) = any (array[
+      'serve@softora.nl', 'servecreusen@softora.nl', 'servec321@gmail.com',
+      'serve290@gmail.com', 'servecreusen7@gmail.com', 'martijn@softora.nl',
+      'martijnvandeven@softora.nl', 'martijnven123@gmail.com',
+      'contact.venvisuals@gmail.com'
+    ]::text[])
+    and lower(btrim(coalesce(p_folder, '')))
+      = any (array['inbox', 'sent', 'coldmail']::text[])
+  ) or (
+    lower(btrim(coalesce(p_folder, ''))) = 'instantly'
+    and lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'providerOwner', '')))
+      = any (array['serve', 'martijn']::text[])
+  );
+$$;
+
+create or replace function public.softora_track_mailbox_campaign_message_change()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_affects_campaign boolean := false;
+begin
+  if coalesce(current_setting('softora.mailbox_campaign_version_bumped', true), '') = '1' then
+    return null;
+  elsif tg_op = 'TRUNCATE' then
+    v_affects_campaign := true;
+  elsif tg_op = 'INSERT' then
+    select exists (
+      select 1 from softora_mailbox_campaign_new_rows as new_row
+      where public.softora_is_campaign_mailbox_message(
+        new_row.account_email, new_row.folder, new_row.payload
+      )
+    ) into v_affects_campaign;
+  elsif tg_op = 'DELETE' then
+    select exists (
+      select 1 from softora_mailbox_campaign_old_rows as old_row
+      where public.softora_is_campaign_mailbox_message(
+        old_row.account_email, old_row.folder, old_row.payload
+      )
+    ) into v_affects_campaign;
+  else
+    select exists (
+      select 1
+      from softora_mailbox_campaign_old_rows as old_row
+      full join softora_mailbox_campaign_new_rows as new_row
+        on new_row.message_key = old_row.message_key
+      where (
+        public.softora_is_campaign_mailbox_message(
+          old_row.account_email, old_row.folder, old_row.payload
+        ) or public.softora_is_campaign_mailbox_message(
+          new_row.account_email, new_row.folder, new_row.payload
+        )
+      ) and row(
+        old_row.message_key, old_row.account_email, old_row.folder, old_row.uid,
+        old_row.provider_id, old_row.message_id, old_row.in_reply_to, old_row.references_text,
+        old_row.sender_name, old_row.sender_email, old_row.recipients_text, old_row.subject,
+        old_row.preview, old_row.body_text, old_row.body_truncated, old_row.has_body,
+        old_row.date, old_row.internal_date, old_row.unread, old_row.softora_read_at,
+        old_row.starred, old_row.reply_dismissed_at, old_row.payload, old_row.deleted_at
+      ) is distinct from row(
+        new_row.message_key, new_row.account_email, new_row.folder, new_row.uid,
+        new_row.provider_id, new_row.message_id, new_row.in_reply_to, new_row.references_text,
+        new_row.sender_name, new_row.sender_email, new_row.recipients_text, new_row.subject,
+        new_row.preview, new_row.body_text, new_row.body_truncated, new_row.has_body,
+        new_row.date, new_row.internal_date, new_row.unread, new_row.softora_read_at,
+        new_row.starred, new_row.reply_dismissed_at, new_row.payload, new_row.deleted_at
+      )
+    ) into v_affects_campaign;
+  end if;
+
+  if v_affects_campaign then
+    perform set_config('softora.mailbox_campaign_version_bumped', '1', true);
+    insert into public.softora_mailbox_campaign_consistency (
+      scope, content_version, created_at, updated_at
+    ) values ('campaign', 1, clock_timestamp(), clock_timestamp())
+    on conflict (scope) do update set
+      content_version = public.softora_mailbox_campaign_consistency.content_version + 1,
+      updated_at = clock_timestamp();
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists softora_track_mailbox_campaign_message_change
+  on public.softora_mailbox_messages;
+drop trigger if exists softora_track_mailbox_campaign_message_insert on public.softora_mailbox_messages;
+drop trigger if exists softora_track_mailbox_campaign_message_update on public.softora_mailbox_messages;
+drop trigger if exists softora_track_mailbox_campaign_message_delete on public.softora_mailbox_messages;
+drop trigger if exists softora_track_mailbox_campaign_message_truncate on public.softora_mailbox_messages;
+create trigger softora_track_mailbox_campaign_message_insert
+after insert on public.softora_mailbox_messages
+referencing new table as softora_mailbox_campaign_new_rows
+for each statement execute function public.softora_track_mailbox_campaign_message_change();
+create trigger softora_track_mailbox_campaign_message_update
+after update on public.softora_mailbox_messages
+referencing old table as softora_mailbox_campaign_old_rows
+  new table as softora_mailbox_campaign_new_rows
+for each statement execute function public.softora_track_mailbox_campaign_message_change();
+create trigger softora_track_mailbox_campaign_message_delete
+after delete on public.softora_mailbox_messages
+referencing old table as softora_mailbox_campaign_old_rows
+for each statement execute function public.softora_track_mailbox_campaign_message_change();
+create trigger softora_track_mailbox_campaign_message_truncate
+after truncate on public.softora_mailbox_messages
+for each statement execute function public.softora_track_mailbox_campaign_message_change();
+
+create or replace function public.softora_begin_mailbox_campaign_mutation(
+  p_mutation_id uuid,
+  p_request_key text,
+  p_mutation_kind text,
+  p_account_email text default null,
+  p_folder text default null,
+  p_lease_seconds integer default 120
+)
+returns table (
+  mutation_id uuid, request_key text, mutation_status text,
+  started_content_version bigint, completed_content_version bigint,
+  current_content_version bigint, lease_expires_at timestamptz, replayed boolean
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_state public.softora_mailbox_campaign_consistency%rowtype;
+  v_mutation public.softora_mailbox_campaign_mutations%rowtype;
+  v_inserted boolean := false;
+  v_request_key text := btrim(coalesce(p_request_key, ''));
+  v_kind text := lower(btrim(coalesce(p_mutation_kind, '')));
+  v_account text := nullif(lower(btrim(coalesce(p_account_email, ''))), '');
+  v_folder text := nullif(lower(btrim(coalesce(p_folder, ''))), '');
+  v_lease integer := greatest(15, least(coalesce(p_lease_seconds, 120), 900));
+begin
+  if p_mutation_id is null or char_length(v_request_key) not between 1 and 200
+    or char_length(v_kind) not between 1 and 120 then
+    raise exception using errcode = '22023', message = 'Ongeldige mailboxmutatie';
+  end if;
+
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0) on conflict (scope) do nothing;
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+
+  insert into public.softora_mailbox_campaign_mutations (
+    mutation_id, scope, request_key, mutation_kind, account_email, folder,
+    started_content_version, lease_expires_at
+  ) values (
+    p_mutation_id, 'campaign', v_request_key, v_kind, v_account, v_folder,
+    v_state.content_version, clock_timestamp() + make_interval(secs => v_lease)
+  )
+  on conflict on constraint softora_mailbox_campaign_mutations_scope_request_key_key do nothing
+  returning * into v_mutation;
+  v_inserted := found;
+
+  if not v_inserted then
+    select * into strict v_mutation
+    from public.softora_mailbox_campaign_mutations as existing_mutation
+    where existing_mutation.scope = 'campaign'
+      and existing_mutation.request_key = v_request_key
+    for update;
+    if v_mutation.mutation_kind is distinct from v_kind
+      or v_mutation.account_email is distinct from v_account
+      or v_mutation.folder is distinct from v_folder then
+      raise exception using errcode = '22023',
+        message = 'request_key hoort al bij een andere mailboxmutatie';
+    end if;
+  end if;
+
+  return query select
+    v_mutation.mutation_id, v_mutation.request_key, v_mutation.status,
+    v_mutation.started_content_version, v_mutation.completed_content_version,
+    v_state.content_version, v_mutation.lease_expires_at, not v_inserted;
+end;
+$$;
+
+create or replace function public.softora_complete_mailbox_campaign_mutation(
+  p_mutation_id uuid,
+  p_request_key text,
+  p_result jsonb default '{}'::jsonb
+)
+returns table (
+  mutation_id uuid, mutation_status text, started_content_version bigint,
+  completed_content_version bigint, current_content_version bigint, replayed boolean
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_state public.softora_mailbox_campaign_consistency%rowtype;
+  v_mutation public.softora_mailbox_campaign_mutations%rowtype;
+  v_replayed boolean := false;
+begin
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+  select * into strict v_mutation
+  from public.softora_mailbox_campaign_mutations as selected_mutation
+  where selected_mutation.mutation_id = p_mutation_id for update;
+
+  if v_mutation.request_key is distinct from btrim(coalesce(p_request_key, '')) then
+    raise exception using errcode = '22023',
+      message = 'mutation_id en request_key horen niet bij elkaar';
+  elsif v_mutation.status = 'pending' then
+    update public.softora_mailbox_campaign_mutations as pending_mutation set
+      status = 'completed',
+      completed_content_version = v_state.content_version,
+      completed_at = clock_timestamp(),
+      result = coalesce(p_result, '{}'::jsonb),
+      updated_at = clock_timestamp()
+    where pending_mutation.mutation_id = p_mutation_id
+      and pending_mutation.status = 'pending'
+    returning * into v_mutation;
+  else
+    v_replayed := true;
+  end if;
+
+  return query select
+    v_mutation.mutation_id, v_mutation.status, v_mutation.started_content_version,
+    v_mutation.completed_content_version, v_state.content_version, v_replayed;
+end;
+$$;
+
+create or replace function public.softora_get_mailbox_campaign_fence(
+  p_reap_expired boolean default true
+)
+returns table (
+  content_version bigint, pending_count bigint, ready boolean,
+  reaped_count bigint, checked_at timestamptz
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_state public.softora_mailbox_campaign_consistency%rowtype;
+  v_pending bigint := 0;
+  v_reaped bigint := 0;
+  v_checked_at timestamptz := clock_timestamp();
+begin
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0) on conflict (scope) do nothing;
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+
+  if coalesce(p_reap_expired, true) then
+    with reaped as (
+      update public.softora_mailbox_campaign_mutations set
+        status = 'abandoned',
+        completed_content_version = v_state.content_version,
+        completed_at = v_checked_at,
+        updated_at = v_checked_at
+      where scope = 'campaign' and status = 'pending'
+        and lease_expires_at <= v_checked_at
+      returning 1
+    ) select count(*) into v_reaped from reaped;
+  end if;
+  select count(*) into v_pending
+  from public.softora_mailbox_campaign_mutations
+  where scope = 'campaign' and status = 'pending';
+
+  return query select
+    v_state.content_version, v_pending, v_pending = 0, v_reaped, v_checked_at;
+end;
+$$;
+
+alter table public.softora_mailbox_campaign_consistency enable row level security;
+alter table public.softora_mailbox_campaign_mutations enable row level security;
+revoke all privileges on table public.softora_mailbox_campaign_consistency
+  from public, anon, authenticated, service_role;
+revoke all privileges on table public.softora_mailbox_campaign_mutations
+  from public, anon, authenticated, service_role;
+grant select, insert, update on table public.softora_mailbox_campaign_consistency to service_role;
+grant select, insert, update on table public.softora_mailbox_campaign_mutations to service_role;
+
+revoke all on function public.softora_is_campaign_mailbox_message(text, text, jsonb)
+  from public, anon, authenticated;
+revoke all on function public.softora_track_mailbox_campaign_message_change()
+  from public, anon, authenticated;
+revoke all on function public.softora_begin_mailbox_campaign_mutation(uuid, text, text, text, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.softora_complete_mailbox_campaign_mutation(uuid, text, jsonb)
+  from public, anon, authenticated;
+revoke all on function public.softora_get_mailbox_campaign_fence(boolean)
+  from public, anon, authenticated;
+grant execute on function public.softora_is_campaign_mailbox_message(text, text, jsonb)
+  to service_role;
+grant execute on function public.softora_track_mailbox_campaign_message_change()
+  to service_role;
+grant execute on function public.softora_begin_mailbox_campaign_mutation(uuid, text, text, text, text, integer)
+  to service_role;
+grant execute on function public.softora_complete_mailbox_campaign_mutation(uuid, text, jsonb)
+  to service_role;
+grant execute on function public.softora_get_mailbox_campaign_fence(boolean)
+  to service_role;
+-- mailbox-campaign-consistency:end
+
+-- mailbox-campaign-atomic-commit:start
+-- Forward-only companion to the already deployed mailbox consistency foundation.
+-- Every direct writer locks campaign state before touching message rows; the atomic RPC
+-- keeps message rows, content-version and journal completion in one transaction.
+create or replace function public.softora_is_campaign_mailbox_message(
+  p_account_email text,
+  p_folder text,
+  p_payload jsonb
+)
+returns boolean
+language sql
+immutable
+security invoker
+set search_path = ''
+as $$
+  select (
+    lower(btrim(coalesce(p_account_email, ''))) = any (array[
+      'serve@softora.nl', 'servecreusen@softora.nl', 'servec321@gmail.com',
+      'serve290@gmail.com', 'servecreusen7@gmail.com', 'martijn@softora.nl',
+      'martijnvandeven@softora.nl', 'martijnven123@gmail.com',
+      'contact.venvisuals@gmail.com'
+    ]::text[])
+    and lower(btrim(coalesce(p_folder, '')))
+      = any (array['inbox', 'sent', 'coldmail']::text[])
+  ) or (
+    lower(btrim(coalesce(p_folder, ''))) = 'instantly'
+    and lower(btrim(coalesce(p_account_email, '')))
+      = lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'providerAccountEmail', '')))
+    and (
+      (
+        lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'providerOwner', ''))) = 'serve'
+        and lower(btrim(coalesce(p_account_email, ''))) = any (array[
+          'serve@websoftora.com', 'servecreusen@websoftora.com'
+        ]::text[])
+      ) or (
+        lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'providerOwner', ''))) = 'martijn'
+        and lower(btrim(coalesce(p_account_email, ''))) = any (array[
+          'martijn@websoftora.com', 'martijnven@websoftora.com'
+        ]::text[])
+      )
+    )
+  );
+$$;
+
+alter table public.softora_mailbox_messages
+  drop constraint if exists softora_mailbox_instantly_owner_account_check;
+alter table public.softora_mailbox_messages
+  add constraint softora_mailbox_instantly_owner_account_check
+  check (
+    lower(btrim(coalesce(folder, ''))) <> 'instantly'
+    or public.softora_is_campaign_mailbox_message(account_email, folder, payload)
+  ) not valid;
+alter table public.softora_mailbox_messages
+  validate constraint softora_mailbox_instantly_owner_account_check;
+
+create or replace function public.softora_enforce_mailbox_message_identity_immutable()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+begin
+  if old.message_key is distinct from new.message_key
+    or lower(btrim(old.account_email)) is distinct from lower(btrim(new.account_email))
+    or lower(btrim(old.folder)) is distinct from lower(btrim(new.folder))
+    or old.uid is distinct from new.uid
+    or old.provider_id is distinct from new.provider_id then
+    raise exception using errcode = '23505',
+      message = 'Bestaande mailboxidentiteit mag niet van account of provider wisselen';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists softora_enforce_mailbox_message_identity_immutable
+  on public.softora_mailbox_messages;
+create trigger softora_enforce_mailbox_message_identity_immutable
+before update on public.softora_mailbox_messages
+for each row
+execute function public.softora_enforce_mailbox_message_identity_immutable();
+
+create or replace function public.softora_lock_mailbox_campaign_consistency_before_write()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+begin
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0) on conflict (scope) do nothing;
+  perform 1
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+  return null;
+end;
+$$;
+
+drop trigger if exists softora_lock_mailbox_campaign_consistency_before_write
+  on public.softora_mailbox_messages;
+create trigger softora_lock_mailbox_campaign_consistency_before_write
+before insert or update or delete or truncate on public.softora_mailbox_messages
+for each statement
+execute function public.softora_lock_mailbox_campaign_consistency_before_write();
+
+create or replace function public.softora_commit_mailbox_campaign_messages(
+  p_mutation_id uuid,
+  p_request_key text,
+  p_rows jsonb,
+  p_result jsonb default '{}'::jsonb
+)
+returns table (
+  mutation_id uuid, mutation_status text, started_content_version bigint,
+  completed_content_version bigint, current_content_version bigint,
+  upserted_count integer, replayed boolean
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_state public.softora_mailbox_campaign_consistency%rowtype;
+  v_mutation public.softora_mailbox_campaign_mutations%rowtype;
+  v_upserted integer := 0;
+begin
+  if p_mutation_id is null
+    or char_length(btrim(coalesce(p_request_key, ''))) not between 1 and 200
+    or jsonb_typeof(p_rows) is distinct from 'array' then
+    raise exception using errcode = '22023',
+      message = 'Ongeldige atomische mailboxmutatie';
+  end if;
+  if jsonb_array_length(p_rows) not between 1 and 2000 then
+    raise exception using errcode = '22023',
+      message = 'Ongeldige atomische mailboxmutatie';
+  end if;
+
+  -- Keep the same lock order as begin, complete and fence: state first, mutation second.
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+  select * into strict v_mutation
+  from public.softora_mailbox_campaign_mutations as selected_mutation
+  where selected_mutation.mutation_id = p_mutation_id for update;
+
+  if v_mutation.request_key is distinct from btrim(p_request_key) then
+    raise exception using errcode = '22023',
+      message = 'mutation_id en request_key horen niet bij elkaar';
+  elsif v_mutation.status = 'completed' then
+    return query select
+      v_mutation.mutation_id, v_mutation.status, v_mutation.started_content_version,
+      v_mutation.completed_content_version, v_state.content_version,
+      case when coalesce(v_mutation.result->>'upserted', '') ~ '^\d+$'
+        then least((v_mutation.result->>'upserted')::bigint, 2147483647)::integer
+        else 0 end,
+      true;
+    return;
+  elsif v_mutation.status <> 'pending' then
+    raise exception using errcode = '55000',
+      message = 'Mailboxmutatie is niet meer schrijfbaar';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_rows) as candidate(row_data)
+    where jsonb_typeof(candidate.row_data) is distinct from 'object'
+      or not public.softora_is_campaign_mailbox_message(
+        candidate.row_data->>'account_email',
+        candidate.row_data->>'folder',
+        candidate.row_data->'payload'
+      )
+      or (
+        v_mutation.mutation_kind = 'imap-sync'
+        and (
+          lower(btrim(coalesce(candidate.row_data->>'account_email', '')))
+            is distinct from v_mutation.account_email
+          or lower(btrim(coalesce(candidate.row_data->>'folder', '')))
+            is distinct from v_mutation.folder
+        )
+      )
+      or (
+        v_mutation.mutation_kind = 'instantly-upsert'
+        and (
+          lower(btrim(coalesce(candidate.row_data->>'folder', ''))) <> 'instantly'
+          or lower(btrim(coalesce(candidate.row_data->>'account_email', '')))
+            is distinct from v_mutation.account_email
+          or lower(btrim(coalesce(
+            candidate.row_data->'payload'->>'providerAccountEmail', ''
+          ))) is distinct from lower(btrim(coalesce(
+            candidate.row_data->>'account_email', ''
+          )))
+        )
+      )
+  ) or v_mutation.mutation_kind not in ('imap-sync', 'instantly-upsert') then
+    raise exception using errcode = '22023',
+      message = 'Mailboxrijen horen niet bij de gereserveerde mutatie';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_rows) as candidate(row_data)
+    join public.softora_mailbox_messages as existing_message
+      on existing_message.message_key = candidate.row_data->>'message_key'
+    where lower(btrim(existing_message.account_email))
+        is distinct from lower(btrim(coalesce(candidate.row_data->>'account_email', '')))
+      or lower(btrim(existing_message.folder))
+        is distinct from lower(btrim(coalesce(candidate.row_data->>'folder', '')))
+      or existing_message.provider_id
+        is distinct from coalesce(candidate.row_data->>'provider_id', '')
+  ) then
+    raise exception using errcode = '23505',
+      message = 'Bestaande mailboxidentiteit mag niet van account of provider wisselen';
+  end if;
+
+  insert into public.softora_mailbox_messages as stored_message (
+    message_key, account_email, folder, uid, provider_id, message_id,
+    in_reply_to, references_text, sender_name, sender_email, recipients_text,
+    subject, preview, body_text, body_truncated, has_body, date, internal_date,
+    unread, starred, payload, updated_at
+  )
+  select
+    incoming.message_key, incoming.account_email, incoming.folder, incoming.uid,
+    incoming.provider_id, incoming.message_id, incoming.in_reply_to,
+    incoming.references_text, incoming.sender_name, incoming.sender_email,
+    incoming.recipients_text, incoming.subject, incoming.preview, incoming.body_text,
+    incoming.body_truncated, incoming.has_body, incoming.date, incoming.internal_date,
+    incoming.unread, incoming.starred, incoming.payload, incoming.updated_at
+  from jsonb_to_recordset(p_rows) as incoming(
+    message_key text, account_email text, folder text, uid bigint, provider_id text,
+    message_id text, in_reply_to text, references_text text, sender_name text,
+    sender_email text, recipients_text text, subject text, preview text, body_text text,
+    body_truncated boolean, has_body boolean, date timestamptz,
+    internal_date timestamptz, unread boolean, starred boolean, payload jsonb,
+    updated_at timestamptz
+  )
+  on conflict (message_key) do update set
+    account_email = excluded.account_email,
+    folder = excluded.folder,
+    uid = excluded.uid,
+    provider_id = excluded.provider_id,
+    message_id = excluded.message_id,
+    in_reply_to = excluded.in_reply_to,
+    references_text = excluded.references_text,
+    sender_name = excluded.sender_name,
+    sender_email = excluded.sender_email,
+    recipients_text = excluded.recipients_text,
+    subject = excluded.subject,
+    preview = excluded.preview,
+    body_text = excluded.body_text,
+    body_truncated = excluded.body_truncated,
+    has_body = excluded.has_body,
+    date = excluded.date,
+    internal_date = excluded.internal_date,
+    unread = excluded.unread,
+    starred = excluded.starred,
+    payload = excluded.payload,
+    updated_at = excluded.updated_at;
+  get diagnostics v_upserted = row_count;
+
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign';
+  update public.softora_mailbox_campaign_mutations as pending_mutation set
+    status = 'completed',
+    completed_content_version = v_state.content_version,
+    completed_at = clock_timestamp(),
+    result = coalesce(p_result, '{}'::jsonb)
+      || jsonb_build_object('ok', true, 'upserted', v_upserted),
+    updated_at = clock_timestamp()
+  where pending_mutation.mutation_id = p_mutation_id
+    and pending_mutation.status = 'pending'
+  returning * into strict v_mutation;
+
+  return query select
+    v_mutation.mutation_id, v_mutation.status, v_mutation.started_content_version,
+    v_mutation.completed_content_version, v_state.content_version, v_upserted, false;
+end;
+$$;
+
+revoke all privileges on table public.softora_mailbox_messages
+  from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.softora_mailbox_messages
+  to service_role;
+revoke all on function public.softora_lock_mailbox_campaign_consistency_before_write()
+  from public, anon, authenticated, service_role;
+grant execute on function public.softora_lock_mailbox_campaign_consistency_before_write()
+  to service_role;
+revoke all on function public.softora_enforce_mailbox_message_identity_immutable()
+  from public, anon, authenticated, service_role;
+grant execute on function public.softora_enforce_mailbox_message_identity_immutable()
+  to service_role;
+revoke all on function public.softora_commit_mailbox_campaign_messages(uuid, text, jsonb, jsonb)
+  from public, anon, authenticated, service_role;
+grant execute on function public.softora_commit_mailbox_campaign_messages(uuid, text, jsonb, jsonb)
+  to service_role;
+-- mailbox-campaign-atomic-commit:end
+
 create table if not exists public.softora_mailbox_send_provenance (
   intent_id text primary key,
   idempotency_key text not null unique,
@@ -505,3 +1376,593 @@ grant execute on function public.softora_queue_company_website_video(text, text,
 grant execute on function public.softora_claim_company_website_video(text, integer) to service_role;
 revoke all on function public.softora_queue_company_website_video(text, text, text, boolean) from public, anon, authenticated;
 revoke all on function public.softora_claim_company_website_video(text, integer) from public, anon, authenticated;
+
+-- mailbox-uidvalidity-generation:start
+alter table public.softora_mailbox_messages
+  add column if not exists uid_validity bigint;
+alter table public.softora_mailbox_messages
+  add column if not exists generation_superseded_at timestamptz;
+alter table public.softora_mailbox_sync_state
+  add column if not exists uid_validity bigint;
+alter table public.softora_mailbox_sync_state
+  add column if not exists uid_validity_reset_at timestamptz;
+
+alter table public.softora_mailbox_messages
+  drop constraint if exists softora_mailbox_messages_account_email_folder_uid_key;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'softora_mailbox_messages_uid_validity_check'
+      and conrelid = 'public.softora_mailbox_messages'::regclass
+  ) then
+    alter table public.softora_mailbox_messages
+      add constraint softora_mailbox_messages_uid_validity_check
+      check (uid_validity is null or uid_validity between 1 and 4294967295);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'softora_mailbox_sync_state_uid_validity_check'
+      and conrelid = 'public.softora_mailbox_sync_state'::regclass
+  ) then
+    alter table public.softora_mailbox_sync_state
+      add constraint softora_mailbox_sync_state_uid_validity_check
+      check (uid_validity is null or uid_validity between 1 and 4294967295);
+  end if;
+end;
+$$;
+
+create unique index if not exists softora_mailbox_messages_generation_uid_key
+  on public.softora_mailbox_messages (account_email, folder, uid_validity, uid)
+  where uid_validity is not null;
+create index if not exists softora_mailbox_messages_generation_superseded_idx
+  on public.softora_mailbox_messages (generation_superseded_at)
+  where generation_superseded_at is not null;
+
+-- Rolling-deploy compatibility for an old runtime that still inserts the
+-- legacy account|folder|uid key. Before the first real generation reset, the
+-- database can safely coerce that row into the adopted generation. After a
+-- reset, a generation-less row is ambiguous and must fail closed rather than
+-- overwrite a reused UID in the new mailbox generation.
+create or replace function public.softora_coerce_mailbox_uid_generation()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_account_email text := lower(btrim(coalesce(new.account_email, '')));
+  v_folder text := lower(btrim(coalesce(new.folder, '')));
+  v_current_uid_validity bigint;
+  v_reset_at timestamptz;
+begin
+  if coalesce(new.uid, 0) <= 0 then
+    return new;
+  end if;
+  if v_account_email = '' or char_length(v_account_email) > 320
+    or v_folder = '' or char_length(v_folder) > 200
+    or position('|' in v_account_email) > 0
+    or position('|' in v_folder) > 0 then
+    raise exception using errcode = '22023',
+      message = 'MAILBOX_UIDVALIDITY_INVALID';
+  end if;
+
+  select sync_state.uid_validity, sync_state.uid_validity_reset_at
+    into v_current_uid_validity, v_reset_at
+  from public.softora_mailbox_sync_state as sync_state
+  where sync_state.sync_key = v_account_email || '|' || v_folder;
+  if not found or v_current_uid_validity is null then
+    return new;
+  end if;
+
+  if new.uid_validity is null then
+    if v_reset_at is not null then
+      raise exception using errcode = '55000',
+        message = 'MAILBOX_UIDVALIDITY_REQUIRED';
+    end if;
+    new.uid_validity := v_current_uid_validity;
+  elsif new.uid_validity is distinct from v_current_uid_validity then
+    raise exception using errcode = '55000',
+      message = 'MAILBOX_UIDVALIDITY_STALE_GENERATION';
+  end if;
+
+  new.account_email := v_account_email;
+  new.folder := v_folder;
+  new.message_key := v_account_email || '|' || v_folder || '|uv:'
+    || v_current_uid_validity::text || '|' || new.uid::text;
+  return new;
+end;
+$$;
+
+drop trigger if exists softora_mailbox_messages_coerce_uid_generation
+  on public.softora_mailbox_messages;
+create trigger softora_mailbox_messages_coerce_uid_generation
+before insert on public.softora_mailbox_messages
+for each row execute function public.softora_coerce_mailbox_uid_generation();
+
+create or replace function public.softora_apply_mailbox_uid_validity(
+  p_account_email text,
+  p_folder text,
+  p_uid_validity bigint,
+  p_lock_token text
+)
+returns table (
+  previous_uid_validity bigint,
+  current_uid_validity bigint,
+  reset_detected boolean,
+  adopted_legacy boolean,
+  superseded_count integer
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_account_email text := lower(btrim(coalesce(p_account_email, '')));
+  v_folder text := lower(btrim(coalesce(p_folder, '')));
+  v_lock_token text := btrim(coalesce(p_lock_token, ''));
+  v_previous bigint;
+  v_adopted integer := 0;
+  v_superseded integer := 0;
+  v_changed integer := 0;
+begin
+  if v_account_email = '' or char_length(v_account_email) > 320
+    or v_folder = '' or char_length(v_folder) > 200
+    or position('|' in v_account_email) > 0
+    or position('|' in v_folder) > 0
+    or v_lock_token = '' or char_length(v_lock_token) > 200
+    or coalesce(p_uid_validity, 0) not between 1 and 4294967295 then
+    raise exception using errcode = '22023',
+      message = 'MAILBOX_UIDVALIDITY_INVALID';
+  end if;
+
+  perform pg_advisory_xact_lock(824031, 3);
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0) on conflict (scope) do nothing;
+  perform 1 from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+  select sync_state.uid_validity into v_previous
+  from public.softora_mailbox_sync_state as sync_state
+  where sync_state.sync_key = v_account_email || '|' || v_folder
+    and sync_state.account_email = v_account_email
+    and sync_state.folder = v_folder
+    and sync_state.status = 'syncing'
+    and sync_state.lock_token = v_lock_token
+    and sync_state.lock_expires_at > clock_timestamp()
+  for update;
+  if not found then
+    raise exception using errcode = '55000',
+      message = 'MAILBOX_UIDVALIDITY_LEASE_INVALID';
+  end if;
+
+  if v_previous is not null and v_previous is distinct from p_uid_validity then
+    update public.softora_mailbox_messages as old_generation set
+      deleted_at = coalesce(old_generation.deleted_at, clock_timestamp()),
+      generation_superseded_at = coalesce(
+        old_generation.generation_superseded_at,
+        clock_timestamp()
+      ),
+      updated_at = clock_timestamp()
+    where old_generation.account_email = v_account_email
+      and old_generation.folder = v_folder
+      and old_generation.uid_validity is distinct from p_uid_validity
+      and old_generation.generation_superseded_at is null;
+    get diagnostics v_superseded = row_count;
+
+    update public.softora_mailbox_sync_state as sync_state set
+      uid_validity = p_uid_validity,
+      uid_validity_reset_at = coalesce(
+        sync_state.uid_validity_reset_at,
+        clock_timestamp()
+      ),
+      last_uid = 0,
+      message_count = 0,
+      last_synced_at = null,
+      updated_at = clock_timestamp()
+    where sync_state.sync_key = v_account_email || '|' || v_folder;
+  else
+    -- During a rolling deploy an old runtime may still have written a legacy
+    -- key. If the generation row already exists, retire the legacy duplicate;
+    -- otherwise rekey it into the proven current generation while preserving
+    -- its read and user-tombstone state.
+    update public.softora_mailbox_messages as legacy set
+      deleted_at = coalesce(legacy.deleted_at, clock_timestamp()),
+      generation_superseded_at = coalesce(
+        legacy.generation_superseded_at,
+        clock_timestamp()
+      ),
+      updated_at = clock_timestamp()
+    where legacy.account_email = v_account_email
+      and legacy.folder = v_folder
+      and legacy.uid_validity is null
+      and legacy.generation_superseded_at is null
+      and exists (
+        select 1 from public.softora_mailbox_messages as current_generation
+        where current_generation.account_email = legacy.account_email
+          and current_generation.folder = legacy.folder
+          and current_generation.uid = legacy.uid
+          and current_generation.uid_validity = p_uid_validity
+      );
+    get diagnostics v_changed = row_count;
+    v_superseded := v_superseded + v_changed;
+
+    update public.softora_mailbox_messages as legacy set
+      uid_validity = p_uid_validity,
+      message_key = v_account_email || '|' || v_folder || '|uv:'
+        || p_uid_validity::text || '|' || legacy.uid::text,
+      updated_at = clock_timestamp()
+    where legacy.account_email = v_account_email
+      and legacy.folder = v_folder
+      and legacy.uid_validity is null
+      and legacy.generation_superseded_at is null;
+    get diagnostics v_adopted = row_count;
+
+    update public.softora_mailbox_sync_state as sync_state set
+      uid_validity = p_uid_validity,
+      updated_at = clock_timestamp()
+    where sync_state.sync_key = v_account_email || '|' || v_folder;
+  end if;
+
+  return query select v_previous, p_uid_validity,
+    v_previous is not null and v_previous is distinct from p_uid_validity,
+    v_adopted > 0, v_superseded;
+end;
+$$;
+
+create or replace function public.softora_prepare_mailbox_uid_validity(
+  p_sync_key text,
+  p_lock_token text,
+  p_uid_validity bigint
+)
+returns table (
+  applied boolean,
+  lock_lost boolean,
+  previous_uid_validity bigint,
+  current_uid_validity bigint,
+  reset_detected boolean,
+  adopted_legacy boolean,
+  superseded_count integer
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_sync_key text := lower(btrim(coalesce(p_sync_key, '')));
+  v_lock_token text := btrim(coalesce(p_lock_token, ''));
+  v_sync public.softora_mailbox_sync_state%rowtype;
+  v_result record;
+begin
+  if v_sync_key = '' or char_length(v_sync_key) > 600
+    or v_lock_token = '' or char_length(v_lock_token) > 200
+    or coalesce(p_uid_validity, 0) not between 1 and 4294967295 then
+    raise exception using errcode = '22023',
+      message = 'MAILBOX_UIDVALIDITY_INVALID';
+  end if;
+
+  perform pg_advisory_xact_lock(824031, 3);
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0) on conflict (scope) do nothing;
+  perform 1 from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+  select * into v_sync
+  from public.softora_mailbox_sync_state as sync_state
+  where sync_state.sync_key = v_sync_key
+    and sync_state.status = 'syncing'
+    and sync_state.lock_token = v_lock_token
+    and sync_state.lock_expires_at > clock_timestamp()
+  for update;
+  if not found then
+    return query select false, true, null::bigint, null::bigint,
+      false, false, 0;
+    return;
+  end if;
+
+  select * into strict v_result
+  from public.softora_apply_mailbox_uid_validity(
+    v_sync.account_email, v_sync.folder, p_uid_validity, v_lock_token
+  );
+  return query select true, false,
+    v_result.previous_uid_validity,
+    v_result.current_uid_validity,
+    v_result.reset_detected,
+    v_result.adopted_legacy,
+    v_result.superseded_count;
+end;
+$$;
+
+-- UID-aware replacement of the currently deployed atomic commit. Legacy
+-- callers remain compatible until a generation has been adopted; new callers
+-- prove the exact sync lease and prepare/reset the generation in this same
+-- message+journal transaction, including when the provider folder is empty.
+create or replace function public.softora_commit_mailbox_campaign_messages(
+  p_mutation_id uuid,
+  p_request_key text,
+  p_rows jsonb,
+  p_result jsonb default '{}'::jsonb
+)
+returns table (
+  mutation_id uuid, mutation_status text, started_content_version bigint,
+  completed_content_version bigint, current_content_version bigint,
+  upserted_count integer, replayed boolean
+)
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_state public.softora_mailbox_campaign_consistency%rowtype;
+  v_mutation public.softora_mailbox_campaign_mutations%rowtype;
+  v_sync public.softora_mailbox_sync_state%rowtype;
+  v_uid_result record;
+  v_upserted integer := 0;
+  v_uid_validity bigint := 0;
+  v_sync_lock_token text := btrim(coalesce(p_result->>'syncLockToken', ''));
+  v_uid_requested boolean := false;
+begin
+  if p_mutation_id is null
+    or char_length(btrim(coalesce(p_request_key, ''))) not between 1 and 200
+    or jsonb_typeof(p_rows) is distinct from 'array'
+    or jsonb_array_length(p_rows) > 2000 then
+    raise exception using errcode = '22023',
+      message = 'Ongeldige atomische mailboxmutatie';
+  end if;
+  v_uid_requested := coalesce(p_result, '{}'::jsonb) ? 'uidValidity'
+    or exists (
+      select 1 from jsonb_array_elements(p_rows) as candidate(row_data)
+      where candidate.row_data ? 'uid_validity'
+    );
+
+  -- Always enter through the same global lock as lease transitions. Whether
+  -- this is an IMAP mutation is durable journal state, so lock ordering must
+  -- never depend on caller-controlled result metadata.
+  perform pg_advisory_xact_lock(824031, 3);
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign' for update;
+  select * into strict v_mutation
+  from public.softora_mailbox_campaign_mutations as selected_mutation
+  where selected_mutation.mutation_id = p_mutation_id for update;
+
+  if v_mutation.request_key is distinct from btrim(p_request_key) then
+    raise exception using errcode = '22023',
+      message = 'mutation_id en request_key horen niet bij elkaar';
+  elsif v_mutation.status = 'completed' then
+    return query select
+      v_mutation.mutation_id, v_mutation.status, v_mutation.started_content_version,
+      v_mutation.completed_content_version, v_state.content_version,
+      case when coalesce(v_mutation.result->>'upserted', '') ~ '^\d+$'
+        then least((v_mutation.result->>'upserted')::bigint, 2147483647)::integer
+        else 0 end,
+      true;
+    return;
+  elsif v_mutation.status <> 'pending' then
+    raise exception using errcode = '55000',
+      message = 'Mailboxmutatie is niet meer schrijfbaar';
+  end if;
+
+  if v_mutation.mutation_kind = 'imap-sync' then
+    select * into v_sync
+    from public.softora_mailbox_sync_state as sync_state
+    where sync_state.sync_key = v_mutation.account_email || '|' || v_mutation.folder
+    for update;
+    if v_uid_requested then
+      if (case when coalesce(p_result->>'uidValidity', '') ~ '^\d+$'
+          then (p_result->>'uidValidity')::numeric between 1 and 4294967295
+          else false end) is not true
+        or v_sync_lock_token = '' or char_length(v_sync_lock_token) > 200
+        or not found
+        or v_sync.status <> 'syncing'
+        or v_sync.lock_token is distinct from v_sync_lock_token
+        or v_sync.lock_expires_at <= clock_timestamp() then
+        raise exception using errcode = '55000',
+          message = 'MAILBOX_UIDVALIDITY_LEASE_INVALID';
+      end if;
+      v_uid_validity := (p_result->>'uidValidity')::bigint;
+      if exists (
+        select 1 from jsonb_array_elements(p_rows) as candidate(row_data)
+        where (case when coalesce(candidate.row_data->>'uid_validity', '') ~ '^\d+$'
+            then (candidate.row_data->>'uid_validity')::numeric = v_uid_validity::numeric
+            else false end) is not true
+          or (case when coalesce(candidate.row_data->>'uid', '') ~ '^\d+$'
+            then (candidate.row_data->>'uid')::numeric between 1 and 9223372036854775807
+            else false end) is not true
+          or candidate.row_data->>'message_key' is distinct from
+            v_mutation.account_email || '|' || v_mutation.folder || '|uv:'
+            || v_uid_validity::text || '|' || candidate.row_data->>'uid'
+      ) then
+        raise exception using errcode = '22023',
+          message = 'MAILBOX_UIDVALIDITY_ROW_MISMATCH';
+      end if;
+      select * into strict v_uid_result
+      from public.softora_apply_mailbox_uid_validity(
+        v_mutation.account_email, v_mutation.folder, v_uid_validity,
+        v_sync_lock_token
+      );
+    -- A warm pre-UIDVALIDITY runtime is safe to coerce only while this folder
+    -- has never experienced a real generation reset. The BEFORE INSERT row
+    -- trigger rewrites those legacy keys to the adopted current generation.
+    -- After the first reset, generation-less provider data is ambiguous.
+    elsif not found or (
+      v_sync.uid_validity is not null
+      and v_sync.uid_validity_reset_at is not null
+    ) then
+      raise exception using errcode = '55000',
+        message = 'MAILBOX_UIDVALIDITY_REQUIRED';
+    end if;
+  elsif jsonb_array_length(p_rows) = 0 then
+    raise exception using errcode = '22023',
+      message = 'Ongeldige atomische mailboxmutatie';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_rows) as candidate(row_data)
+    where jsonb_typeof(candidate.row_data) is distinct from 'object'
+      or not public.softora_is_campaign_mailbox_message(
+        candidate.row_data->>'account_email',
+        candidate.row_data->>'folder',
+        candidate.row_data->'payload'
+      )
+      or (
+        v_mutation.mutation_kind = 'imap-sync'
+        and (
+          lower(btrim(coalesce(candidate.row_data->>'account_email', '')))
+            is distinct from v_mutation.account_email
+          or lower(btrim(coalesce(candidate.row_data->>'folder', '')))
+            is distinct from v_mutation.folder
+        )
+      )
+      or (
+        v_mutation.mutation_kind = 'instantly-upsert'
+        and (
+          lower(btrim(coalesce(candidate.row_data->>'folder', ''))) <> 'instantly'
+          or lower(btrim(coalesce(candidate.row_data->>'account_email', '')))
+            is distinct from v_mutation.account_email
+          or lower(btrim(coalesce(
+            candidate.row_data->'payload'->>'providerAccountEmail', ''
+          ))) is distinct from lower(btrim(coalesce(
+            candidate.row_data->>'account_email', ''
+          )))
+        )
+      )
+  ) or v_mutation.mutation_kind not in ('imap-sync', 'instantly-upsert') then
+    raise exception using errcode = '22023',
+      message = 'Mailboxrijen horen niet bij de gereserveerde mutatie';
+  end if;
+
+  insert into public.softora_mailbox_messages as stored_message (
+    message_key, account_email, folder, uid, uid_validity, provider_id, message_id,
+    in_reply_to, references_text, sender_name, sender_email, recipients_text,
+    subject, preview, body_text, body_truncated, has_body, date, internal_date,
+    unread, starred, payload, updated_at
+  )
+  select
+    incoming.message_key, incoming.account_email, incoming.folder, incoming.uid,
+    incoming.uid_validity, incoming.provider_id, incoming.message_id,
+    incoming.in_reply_to, incoming.references_text, incoming.sender_name,
+    incoming.sender_email, incoming.recipients_text, incoming.subject,
+    incoming.preview, incoming.body_text, incoming.body_truncated,
+    incoming.has_body, incoming.date, incoming.internal_date, incoming.unread,
+    incoming.starred, incoming.payload, incoming.updated_at
+  from jsonb_to_recordset(p_rows) as incoming(
+    message_key text, account_email text, folder text, uid bigint,
+    uid_validity bigint, provider_id text, message_id text, in_reply_to text,
+    references_text text, sender_name text, sender_email text,
+    recipients_text text, subject text, preview text, body_text text,
+    body_truncated boolean, has_body boolean, date timestamptz,
+    internal_date timestamptz, unread boolean, starred boolean, payload jsonb,
+    updated_at timestamptz
+  )
+  on conflict (message_key) do update set
+    account_email = excluded.account_email,
+    folder = excluded.folder,
+    uid = excluded.uid,
+    uid_validity = excluded.uid_validity,
+    provider_id = excluded.provider_id,
+    message_id = excluded.message_id,
+    in_reply_to = excluded.in_reply_to,
+    references_text = excluded.references_text,
+    sender_name = excluded.sender_name,
+    sender_email = excluded.sender_email,
+    recipients_text = excluded.recipients_text,
+    subject = excluded.subject,
+    preview = excluded.preview,
+    body_text = excluded.body_text,
+    body_truncated = excluded.body_truncated,
+    has_body = excluded.has_body,
+    date = excluded.date,
+    internal_date = excluded.internal_date,
+    unread = excluded.unread,
+    starred = excluded.starred,
+    payload = excluded.payload,
+    updated_at = excluded.updated_at;
+  get diagnostics v_upserted = row_count;
+
+  select * into strict v_state
+  from public.softora_mailbox_campaign_consistency
+  where scope = 'campaign';
+  update public.softora_mailbox_campaign_mutations as pending_mutation set
+    status = 'completed',
+    completed_content_version = v_state.content_version,
+    completed_at = clock_timestamp(),
+    result = (coalesce(p_result, '{}'::jsonb) - 'syncLockToken')
+      || jsonb_build_object('ok', true, 'upserted', v_upserted),
+    updated_at = clock_timestamp()
+  where pending_mutation.mutation_id = p_mutation_id
+    and pending_mutation.status = 'pending'
+  returning * into strict v_mutation;
+
+  return query select
+    v_mutation.mutation_id, v_mutation.status, v_mutation.started_content_version,
+    v_mutation.completed_content_version, v_state.content_version, v_upserted, false;
+end;
+$$;
+
+revoke all on function public.softora_apply_mailbox_uid_validity(text, text, bigint, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.softora_coerce_mailbox_uid_generation()
+  from public, anon, authenticated, service_role;
+revoke all on function public.softora_prepare_mailbox_uid_validity(text, text, bigint)
+  from public, anon, authenticated, service_role;
+revoke all on function public.softora_commit_mailbox_campaign_messages(uuid, text, jsonb, jsonb)
+  from public, anon, authenticated, service_role;
+grant execute on function public.softora_apply_mailbox_uid_validity(text, text, bigint, text)
+  to service_role;
+grant execute on function public.softora_coerce_mailbox_uid_generation()
+  to service_role;
+grant execute on function public.softora_prepare_mailbox_uid_validity(text, text, bigint)
+  to service_role;
+grant execute on function public.softora_commit_mailbox_campaign_messages(uuid, text, jsonb, jsonb)
+  to service_role;
+-- mailbox-uidvalidity-generation:end
+
+-- mailbox-uidvalidity-identity-adoption:start
+create or replace function public.softora_enforce_mailbox_message_identity_immutable()
+returns trigger
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  v_account_email text := lower(btrim(coalesce(old.account_email, '')));
+  v_folder text := lower(btrim(coalesce(old.folder, '')));
+  v_generation_adoption boolean := false;
+begin
+  v_generation_adoption :=
+    old.uid_validity is null
+    and new.uid_validity between 1 and 4294967295
+    and lower(btrim(new.account_email)) = v_account_email
+    and lower(btrim(new.folder)) = v_folder
+    and new.uid is not distinct from old.uid
+    and new.provider_id is not distinct from old.provider_id
+    and old.message_key = v_account_email || '|' || v_folder || '|' || old.uid::text
+    and new.message_key = v_account_email || '|' || v_folder || '|uv:'
+      || new.uid_validity::text || '|' || old.uid::text;
+
+  if old.message_key is distinct from new.message_key
+    or lower(btrim(old.account_email)) is distinct from lower(btrim(new.account_email))
+    or lower(btrim(old.folder)) is distinct from lower(btrim(new.folder))
+    or old.uid is distinct from new.uid
+    or old.uid_validity is distinct from new.uid_validity
+    or old.provider_id is distinct from new.provider_id then
+    if not v_generation_adoption then
+      raise exception using errcode = '23505',
+        message = 'Bestaande mailboxidentiteit mag niet van account of provider wisselen';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.softora_enforce_mailbox_message_identity_immutable()
+  from public, anon, authenticated, service_role;
+grant execute on function public.softora_enforce_mailbox_message_identity_immutable()
+  to service_role;
+-- mailbox-uidvalidity-identity-adoption:end

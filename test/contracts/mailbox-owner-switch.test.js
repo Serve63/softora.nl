@@ -9,9 +9,15 @@ const {
 } = require('../../server/services/mailbox-instantly-integration');
 
 function response(payload) {
+  const contentAt = payload?.contentAt || new Date().toISOString();
   return {
     ok: true,
-    json: async () => payload,
+    json: async () => ({
+      ...payload,
+      contentAt,
+      complete: payload?.complete !== false,
+      sync: { ...(payload?.sync || {}), contentAt, origin: payload?.origin || 'live-api' },
+    }),
   };
 }
 
@@ -39,6 +45,43 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'outreach' }), true);
   assert.equal(session.isCurrent(token, { owner: 'martijn', account: '', folder: 'outreach' }), false);
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
+});
+
+test('BFCache-pauze annuleert de actieve lijstload en blokkeert een late same-scope commit', async () => {
+  let messages = [{ id: 'zichtbaar' }];
+  let resolveLoad;
+  let requestOptions;
+  const pendingLoad = new Promise((resolve) => { resolveLoad = resolve; });
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      load(_folder, _normalize, _fetch, options) {
+        requestOptions = options;
+        return pendingLoad;
+      },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    filterDeleted: (value) => value,
+    getListElement: () => ({ setAttribute() {} }),
+    setSync() {},
+    setStatus() {},
+  });
+
+  const loading = view.load({ preserveOnError: true });
+  assert.equal(requestOptions.signal.aborted, false);
+  view.cancelActive();
+  assert.equal(requestOptions.signal.aborted, true);
+  resolveLoad({
+    contentAt: new Date().toISOString(),
+    complete: true,
+    messages: [{ id: 'late' }],
+    sync: {},
+  });
+
+  assert.equal(await loading, false);
+  assert.deepEqual(messages.map((message) => message.id), ['zichtbaar']);
 });
 
 test('gekozen campagne-eigenaar blijft na een refresh dezelfde servervoorkeur houden', async () => {
@@ -144,6 +187,152 @@ test('tijdelijke indexfout bewaart de huidige mailbox en hervat afgebroken detai
   assert.deepEqual(toasts, []);
 });
 
+test('vastgelopen gewone inboxlijst wordt hard begrensd en laat een volgende refresh vrij', async () => {
+  const messages = [{ id: 'bestaand-inboxbericht' }];
+  const statuses = [];
+  const busyStates = [];
+  let timeoutHandler;
+  let requestSignal;
+  let requestAborted = false;
+  const view = ownerSession.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: {
+      async load() { return null; },
+      filterMessages: (value) => value,
+    },
+    fetch(_url, init) {
+      requestSignal = init.signal;
+      requestSignal.addEventListener('abort', () => { requestAborted = true; }, { once: true });
+      return new Promise(() => {});
+    },
+    getMessages: () => messages,
+    setMessages() { throw new Error('een timeout mag zichtbare mail niet vervangen'); },
+    filterDeleted: (value) => value,
+    getActiveMail: () => messages[0].id,
+    getListElement: () => ({ setAttribute(_name, value) { busyStates.push(value); } }),
+    renderList() {},
+    openMail() {},
+    setSync() {},
+    setStatus: (value) => statuses.push(value),
+    setTimeout(handler) { timeoutHandler = handler; return 1; },
+    clearTimeout() {},
+  });
+
+  const pending = view.load({ preserveOnError: true, openLatest: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(typeof timeoutHandler, 'function');
+  assert.equal(requestSignal.aborted, false);
+  timeoutHandler();
+
+  assert.equal(await pending, false);
+  assert.equal(requestSignal.aborted, true);
+  assert.equal(requestAborted, true);
+  assert.deepEqual(messages.map((message) => message.id), ['bestaand-inboxbericht']);
+  assert.equal(statuses.at(-1), ownerSession.MAILBOX_STALE_STATUS);
+  assert.equal(busyStates.at(-1), 'false');
+
+  const second = view.load({ preserveOnError: true, openLatest: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  timeoutHandler();
+  assert.equal(await second, false);
+});
+
+test('een oudere degraded response kan een nieuwere zichtbare mailbox nooit overschrijven', async () => {
+  const newerAt = new Date(Date.now() - 30_000).toISOString();
+  const olderAt = new Date(Date.now() - 90_000).toISOString();
+  let messages = [{ id: 'nieuwste-reactie', accountEmail: 'serve@softora.nl', uid: 101 }];
+  let sync = { contentAt: newerAt, contentVersion: '12', origin: 'live-api' };
+  const statuses = [];
+  let writes = 0;
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() {
+        return {
+          origin: 'live-api',
+          contentAt: olderAt,
+          contentVersion: '12',
+          complete: false,
+          degraded: true,
+          messages: [{ id: 'oude-cache', accountEmail: 'serve@softora.nl', uid: 88 }],
+          sync: { contentAt: olderAt, contentVersion: '12', origin: 'live-api', stale: true },
+        };
+      },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: () => { writes += 1; },
+    getSync: () => sync,
+    setSync: (value) => { sync = value; },
+    filterDeleted: (value) => value,
+    getListElement: () => ({ setAttribute() {} }),
+    setStatus: (value) => statuses.push(value),
+  });
+
+  assert.equal(await view.load({ preserveOnError: true }), false);
+  assert.equal(writes, 0);
+  assert.deepEqual(messages.map((message) => message.id), ['nieuwste-reactie']);
+  assert.equal(statuses.at(-1), ownerSession.MAILBOX_STALE_STATUS);
+});
+
+test('een nieuwere degraded response voegt alleen toe en een complete nieuwere response mag vervangen', async () => {
+  const initialAt = new Date(Date.now() - 20 * 60_000).toISOString();
+  const degradedAt = new Date(Date.now() - 60_000).toISOString();
+  const completeAt = new Date(Date.now() - 10_000).toISOString();
+  let messages = [{
+    id: 'bestaand', accountEmail: 'serve@softora.nl', uid: 101, body: 'volledig', bodyLoaded: true, unread: false,
+    threadMessages: [{ id: 't1', body: 'volledig' }, { id: 't2', body: 'blijft staan' }],
+  }];
+  let sync = { contentAt: initialAt, contentVersion: '12', origin: 'live-api' };
+  const statuses = [];
+  const results = [
+    {
+      origin: 'live-api', contentAt: degradedAt, contentVersion: '13', complete: false, degraded: true,
+      messages: [
+        { id: 'nieuw', accountEmail: 'serve@softora.nl', uid: 102 },
+        {
+          id: 'bestaand', accountEmail: 'serve@softora.nl', uid: 101, unread: true,
+          threadMessages: [{ id: 't1', body: 'afgekapt' }],
+        },
+      ],
+      sync: { contentAt: degradedAt, contentVersion: '13', origin: 'live-api', stale: true },
+    },
+    {
+      origin: 'live-api', contentAt: completeAt, contentVersion: '14', complete: true, messages: [],
+      sync: { contentAt: completeAt, contentVersion: '14', origin: 'live-api' },
+    },
+  ];
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() { return results.shift(); },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getSync: () => sync,
+    setSync: (value) => { sync = value; },
+    filterDeleted: (value) => value,
+    getListElement: () => ({ setAttribute() {} }),
+    renderList() {},
+    resetDetail() {},
+    setActiveMail() {},
+    setStatus: (value) => statuses.push(value),
+  });
+
+  assert.equal(await view.load({ openLatest: false }), false);
+  assert.deepEqual(messages.map((message) => message.id), ['nieuw', 'bestaand']);
+  assert.equal(messages[1].unread, false);
+  assert.deepEqual(messages[1].threadMessages.map((message) => message.id), ['t1', 't2']);
+  assert.equal(statuses.at(-1), ownerSession.MAILBOX_STALE_STATUS);
+  assert.equal(sync.stale, true);
+
+  assert.equal(await view.load({ openLatest: false }), true);
+  assert.deepEqual(messages, []);
+  assert.equal(statuses.at(-1), '');
+  assert.equal(sync.contentAt, completeAt);
+});
+
 test('eerste tijdelijke indexfout toont nooit een technische foutmelding', async () => {
   let messages = [];
   const statuses = [];
@@ -230,7 +419,8 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   assert.equal(activeMail, 'actueel');
 });
 
-test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen berichten bij wisselen', async () => {
+test('een gecombineerde serverbootstrap filtert serve martijn en both zonder cross-owner lek', async () => {
+  const bootstrapContentAt = new Date().toISOString();
   const previousDocument = globalThis.document;
   const previousBootstrapSession = globalThis.SoftoraPageBootstrapSession;
   const previousApi = globalThis.SoftoraMailboxCampaignInbox;
@@ -243,13 +433,25 @@ test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen ber
           session: { authenticated: true, userId: 'user-1', email: 'serve@softora.nl' },
           mailbox: {
             ok: true,
+            owner: 'both',
+            contentAt: bootstrapContentAt,
+            contentVersion: '12',
+            complete: true,
+            origin: 'server-bootstrap',
             messages: [
               { id: 'serve-imap', accountEmail: 'serve@softora.nl' },
               { id: 'martijn-imap', accountEmail: 'martijn@softora.nl' },
               { id: 'serve-instantly', provider: 'instantly', providerOwner: 'serve' },
               { id: 'martijn-instantly', provider: 'instantly', providerOwner: 'martijn' },
+              { id: 'unknown-imap', accountEmail: 'info@softora.nl' },
+              { id: 'unknown-instantly', provider: 'instantly', providerOwner: 'both' },
             ],
-            sync: { source: 'campaign-replies-snapshot' },
+            sync: {
+              source: 'campaign-replies-snapshot',
+              contentAt: bootstrapContentAt,
+              contentVersion: '12',
+              origin: 'server-bootstrap',
+            },
           },
         }),
       };
@@ -317,15 +519,15 @@ test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gesc
   try {
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('serve'),
-      'mailbox_campaign_replies_v16:user-1:serve'
+      'mailbox_campaign_replies_v17:user-1:serve'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('martijn'),
-      'mailbox_campaign_replies_v16:user-1:martijn'
+      'mailbox_campaign_replies_v17:user-1:martijn'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('both'),
-      'mailbox_campaign_replies_v16:user-1:both'
+      'mailbox_campaign_replies_v17:user-1:both'
     );
   } finally {
     global.SoftoraPageBootstrapSession = previousSession;
@@ -425,8 +627,8 @@ test('server response isoleert IMAP en Instantly records exact op geselecteerde 
     'imap-martijn',
     'martijn-bcc-copy-in-serve',
     'instantly-serve',
-    'instantly-martijn',
   ]));
+  assert.equal(result.snapshotComplete, false);
   assert.equal(getMailboxMessageOwner(baseReplies[0]), 'serve');
   assert.equal(getMailboxMessageOwner(baseReplies[1]), 'martijn');
   assert.equal(getMailboxMessageOwner(baseReplies[2]), 'martijn');

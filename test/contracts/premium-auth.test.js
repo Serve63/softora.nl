@@ -341,6 +341,58 @@ test('password-register API guard rejects token fallback and requests fresh hydr
   });
 });
 
+test('mailbox token fallback is exact read-only and marks the request as non-writing', async () => {
+  const tokenFallback = {
+    configured: true,
+    authenticated: true,
+    isAdmin: true,
+    tokenFallback: true,
+    token: 'signed-session-token',
+    userId: 'usr_owner_test',
+    email: 'owner@example.test',
+    expired: false,
+    revoked: false,
+    user: null,
+  };
+  const guard = createPremiumApiAccessGuard({
+    normalizeString,
+    getRequestPathname: (req) => req.path,
+    getResolvedPremiumAuthState: async () => tokenFallback,
+  });
+  function response() {
+    return {
+      statusCode: 200,
+      body: null,
+      setHeader() {},
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.body = payload; return this; },
+    };
+  }
+  const readRequest = {
+    method: 'GET',
+    path: '/api/mailbox/campaign-replies',
+    premiumAuth: tokenFallback,
+    get: () => '',
+  };
+  let readNext = 0;
+  await guard.requirePremiumAdminApiAccess(readRequest, response(), () => { readNext += 1; });
+
+  const writeRequest = {
+    method: 'POST',
+    path: '/api/mailbox/send',
+    premiumAuth: tokenFallback,
+    get: () => '',
+  };
+  const writeResponse = response();
+  let writeNext = 0;
+  await guard.requirePremiumAdminApiAccess(writeRequest, writeResponse, () => { writeNext += 1; });
+
+  assert.equal(readNext, 1);
+  assert.equal(readRequest.premiumReadOnlyTokenFallback, true);
+  assert.equal(writeNext, 0);
+  assert.equal(writeResponse.statusCode, 403);
+});
+
 test('password-register API guard clears an expired session before returning 401', async () => {
   let cleared = 0;
   let nextCalls = 0;

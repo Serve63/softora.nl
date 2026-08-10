@@ -39,6 +39,13 @@ const {
 } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
+const {
+  CAMPAIGN_EXACT_PARENT_EVIDENCE,
+  getExactSentCampaignParent,
+  getMessageReferenceIds,
+  getMessageReferenceLookupValues,
+  normalizeMessageId,
+} = require('./mailbox-campaign-reply-lineage');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -87,12 +94,6 @@ function selectSnapshotConversations(conversations, limit) {
     if (!getCampaignConversationOwner(message)) selected.add(index);
   });
   return source.filter((_message, index) => selected.has(index));
-}
-
-function normalizeMessageId(value) {
-  return normalizeText(value)
-    .toLowerCase()
-    .replace(/^<+|>+$/g, '');
 }
 
 function normalizeSubject(value) {
@@ -154,37 +155,6 @@ function getConversationTimestamp(message) {
 function messageReferencesId(message, messageId) {
   if (!messageId) return false;
   return getMessageReferenceIds(message).includes(messageId);
-}
-
-function getMessageReferenceIds(message) {
-  return Array.from(new Set([
-    message && message.references,
-    message && message.inReplyTo,
-  ].flatMap((value) => {
-    const source = normalizeText(value).toLowerCase();
-    if (!source) return [];
-    return source.match(/<[^<>]+>/g) || source.split(/[,\s]+/);
-  }).map(normalizeMessageId).filter(Boolean)));
-}
-
-function getMessageReferenceLookupValues(messages) {
-  const values = new Set();
-  (Array.isArray(messages) ? messages : []).forEach((message) => {
-    [message && message.messageId, message && message.inReplyTo, message && message.references].forEach((rawValue) => {
-      const source = normalizeText(rawValue);
-      if (!source) return;
-      const tokens = source.match(/<[^<>]+>/g) || source.split(/\s+/);
-      tokens.forEach((token) => {
-        const raw = normalizeText(token);
-        const bare = raw.replace(/^<+|>+$/g, '');
-        if (!bare) return;
-        values.add(raw);
-        values.add(bare);
-        values.add(`<${bare}>`);
-      });
-    });
-  });
-  return Array.from(values).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
 }
 
 async function listExactSentDescendants({
@@ -855,6 +825,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
     mailboxIndexStore = null,
     dataOpsStore = null,
     mailboxSendProvenanceStore = null,
+    logger = console,
   } = deps;
 
   async function listRepliesWithSnapshot({
@@ -877,12 +848,6 @@ function createMailboxCampaignRepliesService(deps = {}) {
       error.status = 503;
       throw error;
     }
-    if (!dataOpsStore || typeof dataOpsStore.listCustomersByEmails !== 'function') {
-      const error = new Error('Klantkoppeling voor campagnereacties is niet beschikbaar.');
-      error.status = 503;
-      throw error;
-    }
-
     const recentMessages = await listMessagesAcrossFolders({
       mailboxIndexStore,
       method: 'listMessagesForAccounts',
@@ -931,16 +896,24 @@ function createMailboxCampaignRepliesService(deps = {}) {
     const senderEmails = Array.from(
       new Set(campaignMessages.map((message) => normalizeEmail(message && message.email)).filter(Boolean))
     );
-    const customers = await dataOpsStore.listCustomersByEmails({
-      emails: senderEmails,
-      bypassReadFailureCooldown: true,
-      suppressReadFailureCooldown: true,
-      suppressTransientReadFailureLog: true,
-    });
-    if (!Array.isArray(customers)) {
-      const error = new Error('Klantkoppeling voor campagnereacties kon niet worden gelezen.');
-      error.status = 503;
-      throw error;
+    const warnings = [];
+    let customers = [];
+    if (!dataOpsStore || typeof dataOpsStore.listCustomersByEmails !== 'function') {
+      warnings.push('campaign_customer_link_unavailable');
+    } else {
+      try {
+        const customerResult = await dataOpsStore.listCustomersByEmails({
+          emails: senderEmails,
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+        });
+        if (Array.isArray(customerResult)) customers = customerResult;
+        else warnings.push('campaign_customer_link_unavailable');
+      } catch (error) {
+        warnings.push('campaign_customer_link_unavailable');
+        logger?.warn?.('[Mailbox][CampaignCustomerLink]', error?.message || error);
+      }
     }
 
     const campaignCustomerByEmail = new Map();
@@ -951,17 +924,45 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
+    const lineageCandidates = campaignMessages.filter((message) => (
+      !campaignCustomerByEmail.has(normalizeEmail(message && message.email)) &&
+      !isCampaignReplySubject(message) &&
+      !hasCampaignLabelProvenance(message)
+    ));
+    const candidateParentMessageIds = Array.from(new Set([
+      ...getMessageReferenceLookupValues(lineageCandidates.map((message) => ({ inReplyTo: message?.inReplyTo || message?.references }))),
+      ...getMessageReferenceLookupValues(campaignMessages),
+    ])).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
+    const candidateParentMessagesResult = candidateParentMessageIds.length &&
+      typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
+      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
+          accountEmails: campaignMailboxAccounts,
+          folder: 'sent',
+          messageIds: candidateParentMessageIds,
+        }).catch(() => [])
+      : [];
+    const allowedCampaignAccounts = new Set(campaignMailboxAccounts.map(normalizeEmail));
+
     const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
-        if (
-          !customer &&
-          !isCampaignReplySubject(message) &&
-          !hasCampaignLabelProvenance(message)
-        ) {
+        const hasDirectCampaignEvidence = Boolean(
+          customer || isCampaignReplySubject(message) || hasCampaignLabelProvenance(message)
+        );
+        const exactParent = hasDirectCampaignEvidence
+          ? null
+          : getExactSentCampaignParent(message, candidateParentMessagesResult, allowedCampaignAccounts);
+        if (!hasDirectCampaignEvidence && !exactParent) {
           return null;
         }
-        return buildCampaignReply(message, customer || null);
+        const provenMessage = exactParent
+          ? {
+              ...message,
+              threadCorrelationEvidence: CAMPAIGN_EXACT_PARENT_EVIDENCE,
+              threadCorrelationParentMessageId: normalizeMessageId(exactParent.messageId),
+            }
+          : message;
+        return buildCampaignReply(provenMessage, customer || null);
       })
       .filter(Boolean);
 
@@ -985,14 +986,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
               limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
             })
     ).catch(() => []);
-    const parentMessageIds = getMessageReferenceLookupValues(replies);
-    const targetedParentMessagesResult = parentMessageIds.length &&
-      typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
-      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
-          accountEmails: campaignMailboxAccounts,
-          folder: 'sent',
-          messageIds: parentMessageIds,
-        }).catch(() => [])
+    const acceptedParentMessageIds = new Set(replies.flatMap(getMessageReferenceIds));
+    const targetedParentMessagesResult = Array.isArray(candidateParentMessagesResult)
+      ? candidateParentMessagesResult.filter((message) => (
+          acceptedParentMessageIds.has(normalizeMessageId(message && message.messageId))
+        ))
       : [];
     const targetedSentDescendantsResult = await listExactSentDescendants({
       mailboxIndexStore,
@@ -1107,6 +1105,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       // The bootstrap needs complete metadata, not hundreds of eagerly loaded
       // bodies. Detail bodies are fetched by exact message identity on open.
       snapshotMessages: snapshotConversations,
+      warnings: Array.from(new Set(warnings)),
     };
   }
 

@@ -1,0 +1,16 @@
+.end-game-card-subtitle {
+  position: relative;
+  z-index: 2;
+  margin-top: .46rem;
+  padding: .28rem .55rem .22rem;
+  border: 1px solid rgba(227, 213, 181, .46);
+  border-radius: 999px;
+  background: rgba(8, 20, 18, .76);
+  color: rgba(244, 239, 228, .94);
+  font-family: var(--font-display);
+  font-size: .57rem;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .82);
+}

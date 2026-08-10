@@ -6,8 +6,10 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v16';
-  const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const requestDeadline = global.SoftoraMailboxRequestDeadline || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-request-deadline.js') : null
+  );
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v17';
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
@@ -27,6 +29,10 @@
   const ownerPreferenceApi = global.SoftoraMailboxOwnerPreference || (
     typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-owner-preference.js') : null
   );
+  const snapshotFreshness = global.PremiumMailboxSnapshotFreshness || global.SoftoraMailboxSnapshotFreshness || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-snapshot-freshness.js') : null
+  );
+  const MAILBOX_SESSION_CACHE_MAX_AGE_MS = snapshotFreshness?.MAX_SNAPSHOT_AGE_MS || 15 * 60 * 1000;
   const ownerPreference = ownerPreferenceApi?.create?.() || null;
   const pageBootstrapConsumedOwners = new Set();
 
@@ -846,12 +852,13 @@
     const mailbox = payload?.mailbox;
     if (!mailbox || mailbox.ok === false || !Array.isArray(mailbox.messages)) return null;
     const snapshotOwner = isOwner(mailbox.owner) ? normalizeOwner(mailbox.owner) : '';
-    if (snapshotOwner && snapshotOwner !== requestedOwner) return null;
-    return {
+    if (snapshotOwner && snapshotOwner !== 'both' && snapshotOwner !== requestedOwner) return null;
+    return snapshotFreshness?.normalizeSnapshot?.({
       ...mailbox,
       owner: requestedOwner,
+      origin: 'server-bootstrap',
       messages: filterMessages(mailbox.messages, requestedOwner),
-    };
+    }, { origin: 'server-bootstrap' }) || null;
   }
 
   function getMailboxTabCacheKey(value) {
@@ -865,15 +872,31 @@
     const cache = global.SoftoraPageBootstrapSession?.cache;
     const cacheKey = getMailboxTabCacheKey(value);
     const mailbox = cache?.read?.(cacheKey, MAILBOX_SESSION_CACHE_MAX_AGE_MS);
-    return mailbox && Array.isArray(mailbox.messages) ? mailbox : null;
+    const snapshot = snapshotFreshness?.normalizeSnapshot?.(mailbox, { origin: 'session-cache' });
+    if (!snapshot) return null;
+    return { ...snapshot, complete: false, degraded: true,
+      sync: { ...snapshot.sync, stale: true, refreshRecommended: true },
+      messages: snapshotFreshness.applyTombstones(snapshot.messages, snapshot.tombstones, snapshot.contentAt, { authoritative: false }) };
   }
-
   function writeSessionMailboxSnapshot(data, value) {
     const cache = global.SoftoraPageBootstrapSession?.cache;
     const owner = normalizeOwner(value == null ? activeOwner : value);
     const cacheKey = getMailboxTabCacheKey(owner);
     if (!cache || !cacheKey || !data || !Array.isArray(data.messages)) return false;
-    const messages = data.messages.slice(0, 200).map((message) => {
+    const incoming = snapshotFreshness?.normalizeSnapshot?.(data, {
+      origin: data.origin || data.sync?.origin || 'live-api',
+    });
+    if (!incoming) return false;
+    const existing = readSessionMailboxSnapshot(owner);
+    const action = existing ? snapshotFreshness.decideSnapshotUpdate(existing, incoming) : 'replace';
+    if (action === 'reject') return false;
+    const tombstones = snapshotFreshness.sanitizeTombstones([...(existing?.tombstones || []), ...(incoming.tombstones || [])])
+      .filter((entry) => incoming.complete !== true || Date.parse(entry.hiddenAt) > Date.parse(incoming.contentAt));
+    const sourceMessages = action === 'merge-additive'
+      ? snapshotFreshness.mergeSnapshotMessagesAdditively(existing, incoming, tombstones)
+      : snapshotFreshness.applyTombstones(incoming.messages, tombstones, incoming.contentAt, { authoritative: incoming.complete });
+    const messages = sourceMessages
+      .slice(0, 200).map((message) => {
       const source = message && typeof message === 'object' ? message : {};
       const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
       const bodyImages = sourceBodyImages.filter((image) => {
@@ -903,20 +926,20 @@
       };
     });
     return cache.write(cacheKey, {
-      ok: data.ok !== false,
-      savedAt: Number.isFinite(Date.parse(String(data.savedAt || '')))
-        ? new Date(data.savedAt).toISOString()
-        : new Date().toISOString(),
+      ok: incoming.ok !== false,
+      savedAt: incoming.savedAt, contentAt: incoming.contentAt,
       owner,
       messages,
-      sync: data.sync && typeof data.sync === 'object' ? data.sync : null,
+      origin: incoming.origin, complete: incoming.complete,
+      degraded: incoming.degraded === true,
+      tombstones, sync: incoming.sync,
     });
   }
 
   function readInitialMailboxSnapshot(value) {
     const pageSnapshot = readPageBootstrap(value);
     const sessionSnapshot = readSessionMailboxSnapshot(value);
-    return pageSnapshot || sessionSnapshot;
+    return snapshotFreshness?.selectSnapshot?.(pageSnapshot, sessionSnapshot) || null;
   }
 
   function getDeletionIdentity(mail) {
@@ -946,11 +969,10 @@
       const snapshot = readSessionMailboxSnapshot(cacheOwner);
       if (!snapshot) return;
       const messages = snapshot.messages.filter((candidate) => !matchesMessageIdentity(candidate, mail));
-      if (messages.length === snapshot.messages.length) return;
       updated = writeSessionMailboxSnapshot({
         ...snapshot,
-        savedAt: new Date().toISOString(),
         messages,
+        tombstones: snapshotFreshness.addTombstone(snapshot.tombstones, mail),
       }, cacheOwner) || updated;
     });
     return updated;
@@ -1012,7 +1034,7 @@
       if (nextActiveId) options.openMail?.(nextActiveId, { skipBodyFetch: true });
       else options.resetDetail?.();
     });
-    global.addEventListener?.('pagehide', unsubscribe, { once: true });
+    global.addEventListener?.('pagehide', (event) => { if (!event?.persisted) unsubscribe(); });
     return unsubscribe;
   }
 
@@ -1029,24 +1051,33 @@
 
   function normalizeLoadResult(data, normalizeMessage, fromBootstrap, value) {
     const owner = normalizeOwner(value == null ? activeOwner : value);
+    const origin = String(data?.origin || (fromBootstrap ? 'server-bootstrap' : 'live-api'));
+    const snapshot = snapshotFreshness?.normalizeSnapshot?.(data, { origin });
+    if (!snapshot) throw new Error('De mailboxresponse heeft geen geldige actualiteitstijd.');
     const result = {
       owner,
       messages: filterMessages(
-        (Array.isArray(data && data.messages) ? data.messages : []).map(normalizeMessage),
+        snapshotFreshness.applyTombstones(snapshot.messages, snapshot.tombstones, snapshot.contentAt, { authoritative: snapshot.complete })
+          .map(normalizeMessage),
         owner
       ),
-      sync: data?.sync && typeof data.sync === 'object'
-        ? data.sync
-        : {
+      sync: {
+        ...(snapshot.sync && typeof snapshot.sync === 'object' ? snapshot.sync : {
             indexed: true,
             stale: false,
             source: 'campaign-replies-index',
             refreshRecommended: false,
             warming: false,
-          },
-      fromBootstrap: Boolean(fromBootstrap),
+          }),
+        contentAt: snapshot.contentAt,
+        origin: snapshot.origin,
+      },
+      origin: snapshot.origin, contentAt: snapshot.contentAt, complete: snapshot.complete,
+      fromBootstrap: Boolean(fromBootstrap), fromCache: snapshot.origin === 'session-cache' || snapshot.complete === false,
     };
-    writeSessionMailboxSnapshot({ ...data, owner, messages: result.messages, sync: result.sync }, owner);
+    if (snapshot.origin !== 'session-cache') {
+      writeSessionMailboxSnapshot({ ...snapshot, owner, messages: result.messages, sync: result.sync }, owner);
+    }
     return result;
   }
 
@@ -1064,7 +1095,12 @@
         source: 'campaign-replies-session-cache',
         refreshRecommended: true,
         warming: false,
+        contentAt: snapshot.contentAt,
+        origin: 'session-cache',
       },
+      origin: 'session-cache',
+      contentAt: snapshot.contentAt,
+      complete: false,
       fromBootstrap: false,
       fromCache: true,
     };
@@ -1084,16 +1120,14 @@
     const params = new URLSearchParams({
       limit: '200',
       owner: owner === 'both' ? '' : owner,
-      refreshInstantly: options && options.refreshInstantly === false ? '0' : '1',
+      refreshInstantly: '0',
     });
     try {
-      const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-        ...(options && options.signal ? { signal: options.signal } : {}),
-      });
-      const data = await response.json().catch(() => ({}));
+      const { response, data } = await requestDeadline.requestCampaignReplies(
+        request,
+        `/api/mailbox/campaign-replies?${params.toString()}`,
+        options
+      );
       if (!response.ok || !data?.ok) {
         throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
       }
@@ -1102,7 +1136,7 @@
       }
       return normalizeLoadResult(data, normalizeMessage, false, owner);
     } catch (error) {
-      if (options?.signal?.aborted || error?.name === 'AbortError') throw error;
+      if (options?.signal?.aborted) throw error;
       const fallback = getSessionFallback(owner);
       if (fallback) return fallback;
       throw error;

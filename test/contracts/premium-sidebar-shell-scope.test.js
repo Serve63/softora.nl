@@ -387,12 +387,24 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809b/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
     /\.company-directory-shell-page \.sidebar\s*\{[^}]*bottom:\s*0 !important;[^}]*height:\s*auto !important;[^}]*min-height:\s*0 !important;[^}]*max-height:\s*none !important;/s
+  );
+  assert.match(directoryStyleSource, /height:\s*calc\(100dvh - 48px\)/);
+  assert.match(directoryStyleSource, /margin:\s*24px auto/);
+  assert.match(
+    directoryStyleSource,
+    /\.dashboard-layout\[data-sidebar-shell="canonical"\] > main\.company-directory-shell__content\s*\{[^}]*height:\s*100dvh;[^}]*min-height:\s*0 !important;[^}]*padding:\s*0 !important;/s
+  );
+  assert.match(directoryStyleSource, /grid-template-columns:\s*minmax\(300px, 390px\) minmax\(0, 1fr\)/);
+  assert.ok(
+    directoryShellSource.indexOf('class="search-field company-directory__search"') <
+      directoryShellSource.indexOf('class="company-directory__connection"'),
+    'de zoekbalk hoort links voor de verbindingsstatus te staan'
   );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
@@ -585,7 +597,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-reply \{[^}]*border:\s*1px solid rgba\(155,35,85,\.34\);[^}]*border-radius:\s*6px;[^}]*padding:\s*8px 14px;/);
   assert.match(pageSource, /\.detail-footer \{[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*0;/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260806d"><\/script><script src="assets\/premium-mailbox-owner-preference\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260806b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260806c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260806c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260806e"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260806f"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260810a"><\/script><script src="assets\/premium-mailbox-owner-preference\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260806b"><\/script><script src="assets\/premium-mailbox-snapshot-freshness\.js\?v=20260810a"><\/script><script src="assets\/premium-mailbox-request-deadline\.js\?v=20260809a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260810a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260806c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260810a"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260806e"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260809a"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {
