@@ -144,7 +144,35 @@ function createMemorySupabase(initialTables = {}) {
     };
     return builder;
   }
-  return { from, tables };
+
+  async function rpc(name, args = {}) {
+    if (name !== 'softora_claim_whoop_sync_lock') {
+      return { data: null, error: new Error(`unsupported rpc ${name}`) };
+    }
+    const connection = tables.softora_health_whoop_connections
+      .find((row) => row.owner_key === args.p_owner_key);
+    const currentTime = Date.now();
+    const activeUntil = new Date(connection?.sync_lock_until || 0).getTime();
+    if (!connection || connection.status !== 'connected' || (
+      connection.sync_lock_id && Number.isFinite(activeUntil) && activeUntil > currentTime
+    )) {
+      return {
+        data: [{ acquired: false, claimed_lock_id: null, lock_expires_at: connection?.sync_lock_until || null }],
+        error: null,
+      };
+    }
+    connection.sync_lock_id = args.p_lock_id;
+    connection.sync_lock_until = new Date(
+      currentTime + Math.max(60, Number(args.p_lock_ttl_seconds || 900)) * 1000
+    ).toISOString();
+    connection.updated_at = new Date(currentTime).toISOString();
+    return {
+      data: [{ acquired: true, claimed_lock_id: args.p_lock_id, lock_expires_at: connection.sync_lock_until }],
+      error: null,
+    };
+  }
+
+  return { from, rpc, tables };
 }
 
 function encryptWhoopTokens(tokens, secret) {
@@ -581,6 +609,15 @@ test('WHOOP migrations permit hardened connection, sync and queue states', () =>
   assert.match(migration, /'daily', 'backfill', 'manual', 'webhook', 'reconcile'/);
   assert.match(migration, /'pending', 'processing', 'retry', 'processed', 'dead'/);
   assert.match(migration, /check \(attempts >= 0\)/);
+
+  const lockMigration = fs.readFileSync(path.join(
+    __dirname,
+    '../../supabase/migrations/20260810144500_claim_whoop_sync_lock_atomically.sql'
+  ), 'utf8');
+  assert.match(lockMigration, /create or replace function public\.softora_claim_whoop_sync_lock/);
+  assert.match(lockMigration, /pg_advisory_xact_lock/);
+  assert.match(lockMigration, /for update/);
+  assert.match(lockMigration, /grant execute on function public\.softora_claim_whoop_sync_lock/);
 });
 
 test('health dossier has no manual WHOOP or spreadsheet controls', () => {
