@@ -147,6 +147,12 @@ async function syncMailboxRequest({
       isRequestFlagEnabled(params.fastRefresh)
     )
   );
+  const defaultCronRequest = Boolean(
+    String(method || '').toUpperCase() === 'GET' &&
+    !accountEmail &&
+    !folderParam &&
+    !campaignOnly
+  );
   const result = await syncMailbox({
     accountEmail,
     owner,
@@ -155,14 +161,9 @@ async function syncMailboxRequest({
     force,
     campaignOnly,
     incrementalOnly,
-    maxConcurrentAccounts: fastRefresh ? 2 : 1,
+    maxConcurrentAccounts: fastRefresh || defaultCronRequest ? 2 : 1,
   });
-  if (
-    String(method || '').toUpperCase() === 'GET' &&
-    !accountEmail &&
-    !folderParam &&
-    !campaignOnly
-  ) {
+  if (defaultCronRequest) {
     const campaignHistoryResult = await syncMailbox({
       folders: ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER],
       limit: Number(requestedLimit) || fallbackLimit,

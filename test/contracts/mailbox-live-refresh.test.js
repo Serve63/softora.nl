@@ -119,7 +119,7 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
   );
 });
 
-test('mailbox cron voegt begrensde incrementele campaign-inboxrecovery toe', async () => {
+test('mailbox cron houdt normale sync binnen runtime en voegt campaign-inboxrecovery toe', async () => {
   const calls = [];
   const result = await syncMailboxRequest({
     method: 'GET',
@@ -141,7 +141,7 @@ test('mailbox cron voegt begrensde incrementele campaign-inboxrecovery toe', asy
       force: false,
       campaignOnly: false,
       incrementalOnly: false,
-      maxConcurrentAccounts: 1,
+      maxConcurrentAccounts: 2,
     },
     {
       folders: ['inbox', 'coldmail'],
