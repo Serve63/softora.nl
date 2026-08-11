@@ -94,8 +94,11 @@
     const mail = options.mail;
     if (!mail) return { ok: false };
     if (action === 'mark-read') {
+      const requestedMailId = String(mail.id || '');
+      const activeMailIdAtRequest = String(options.getActiveMail?.() || '');
       return options.dismissReply?.(mail, { render() {
         options.renderList?.({ openLatest: false });
+        if (!requestedMailId || requestedMailId !== activeMailIdAtRequest || String(options.getActiveMail?.() || '') !== activeMailIdAtRequest) return;
         options.openMail?.(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
       } });
     }

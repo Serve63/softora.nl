@@ -4298,6 +4298,32 @@ test('gelezen status blijft direct stabiel bij traag succes, stale cache en pagi
   assert.equal(afterPageRefresh.softoraReadConfirmed, true);
 });
 
+test('late gelezen reactie opent geen oude mail opnieuw na navigatie', async () => {
+  let activeMail = 'inbox:42';
+  const opened = [];
+  const rendered = [];
+  const mail = { id: 'inbox:42' };
+  let lateRender;
+
+  const result = await uiStateModule.handleReadAction('mark-read', {
+    mail,
+    dismissReply: async (_mail, hooks) => {
+      hooks.render();
+      lateRender = hooks.render;
+      activeMail = 'inbox:43';
+      lateRender();
+      return { ok: true };
+    },
+    renderList: () => rendered.push(activeMail),
+    getActiveMail: () => activeMail,
+    openMail: (id) => opened.push(id),
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(opened, ['inbox:42']);
+  assert.deepEqual(rendered, ['inbox:42', 'inbox:43']);
+});
+
 test('mislukte gelezen actie rolt exact terug en biedt een zichtbare retry', async () => {
   const toasts = [];
   const controller = readModule.create({
