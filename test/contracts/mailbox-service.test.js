@@ -3654,9 +3654,10 @@ test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail c
   );
 });
 
-test('mailbox cron supplements normal folders with the Gmail campaign label', async () => {
+test('mailbox cron supplements normal folders with bounded campaign recovery', async () => {
   const requestedFolders = [];
   const service = createMailboxService({
+    env: {},
     mailConfig: {},
     mailboxAccountsRaw: JSON.stringify([{
       email: 'servec321@gmail.com',
@@ -3670,7 +3671,7 @@ test('mailbox cron supplements normal folders with the Gmail campaign label', as
       listMessages: async () => [],
       acquireSyncLock: async ({ folder }) => {
         requestedFolders.push(folder);
-        return { ok: false, locked: true };
+        return { ok: false, locked: false };
       },
     },
   });
@@ -3683,7 +3684,13 @@ test('mailbox cron supplements normal folders with the Gmail campaign label', as
   }, response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(requestedFolders, ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]);
+  assert.deepEqual(requestedFolders, [
+    'inbox',
+    'sent',
+    'inbox',
+    'sent',
+    CAMPAIGN_GMAIL_LABEL_FOLDER,
+  ]);
 });
 
 test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gmail label', async () => {

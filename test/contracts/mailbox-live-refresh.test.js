@@ -119,6 +119,41 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
   );
 });
 
+test('global mailbox cron adds bounded campaign contact recovery to the normal sync', async () => {
+  const calls = [];
+  const result = await syncMailboxRequest({
+    method: 'GET',
+    body: {},
+    query: {},
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    syncMailbox: async (input) => {
+      calls.push(input);
+      return { ok: true, results: [] };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [{
+    accountEmail: '',
+    owner: '',
+    folders: ['inbox', 'sent'],
+    limit: 30,
+    force: false,
+    campaignOnly: false,
+    incrementalOnly: false,
+    maxConcurrentAccounts: 1,
+  }, {
+    accountEmail: '',
+    owner: '',
+    folders: ['inbox', 'sent'],
+    limit: 30,
+    force: false,
+    campaignOnly: true,
+    incrementalOnly: true,
+    maxConcurrentAccounts: 1,
+  }]);
+});
+
 test('incremental IMAP refresh skips expensive history scans but retains exact UID dedupe', async () => {
   const fetches = [];
   let historyCalls = 0;
