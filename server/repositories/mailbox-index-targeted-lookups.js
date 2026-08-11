@@ -1,14 +1,26 @@
 'use strict';
 
-const RECIPIENT_LOOKUP_BATCH_SIZE = 25;
+const RECIPIENT_LOOKUP_CONCURRENCY = 25;
+const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
-function buildRecipientCandidateFilter(recipientEmails) {
-  return (Array.isArray(recipientEmails) ? recipientEmails : [])
-    // PostgREST's ilike wildcard is `%`. Keep this in the same form as the
-    // other targeted OR lookups; the exact lower-case match below remains the
-    // ownership-safe verifier for the candidate rows.
-    .map((email) => `recipients_text.ilike.%${email}%`)
-    .join(',');
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const values = Array(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, Number(concurrency) || 1), items.length);
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      values[index] = await mapper(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return values;
+}
+
+function rowContainsRecipientEmail(row, recipientEmails, normalizeString) {
+  const addresses = normalizeString(row && row.recipients_text).toLowerCase().match(EMAIL_PATTERN) || [];
+  return addresses.some((address) => recipientEmails.has(address));
 }
 
 function createMailboxIndexTargetedLookups({
@@ -66,37 +78,32 @@ function createMailboxIndexTargetedLookups({
     if (!normalizedAccounts.length || !normalizedRecipients.length) return [];
     const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 1000)));
     const rowsByKey = new Map();
-    // Query the recipient predicate in bounded PostgREST OR batches. A local
-    // top-N mailbox slice is not sufficient: older valid Sent messages can be
-    // just beyond that slice (the Karoena history was such a case). Batching
-    // keeps the old targeted-search semantics without one request per contact
-    // and quotes every email before it enters the PostgREST filter grammar.
-    const recipientBatches = [];
-    for (let offset = 0; offset < normalizedRecipients.length; offset += RECIPIENT_LOOKUP_BATCH_SIZE) {
-      recipientBatches.push(normalizedRecipients.slice(offset, offset + RECIPIENT_LOOKUP_BATCH_SIZE));
-    }
-    const batches = await Promise.all(recipientBatches.map((recipientBatch, index) => {
-      const candidateFilter = buildRecipientCandidateFilter(recipientBatch);
-      return run(`list-messages-by-recipient-emails:${index}`, (client) => {
-        const query = client
+    // Keep the proven single-recipient PostgREST predicate: the combined OR
+    // form looks equivalent but has returned no rows in production for valid
+    // historical Sent records. Run that lookup in a bounded pool so older
+    // history is still reached without recreating the former sequential
+    // serverless timeout. The local email extraction is the exact verifier for
+    // candidate rows and avoids substring false positives.
+    const batches = await mapWithConcurrency(
+      normalizedRecipients,
+      RECIPIENT_LOOKUP_CONCURRENCY,
+      (recipientEmail, index) => run(`list-messages-by-recipient-email:${index}`, (client) =>
+        client
           .from(tableName)
           .select(metadataColumns)
           .in('account_email', normalizedAccounts)
           .eq('folder', normalizeFolder(folder))
-          .or(candidateFilter)
+          .ilike('recipients_text', `%${recipientEmail}%`)
           .is('deleted_at', null)
           .order('date', { ascending: false })
-          .order('message_key', { ascending: false });
-        return query.limit(safeLimit);
-      });
-    }));
+          .order('message_key', { ascending: false })
+          .limit(safeLimit)
+      )
+    );
     if (batches.some((result) => !result.ok)) return null;
-    const recipientNeedles = normalizedRecipients.map((email) => email.toLowerCase());
+    const recipientNeedles = new Set(normalizedRecipients.map((email) => email.toLowerCase()));
     batches.flatMap((result) => Array.isArray(result.data) ? result.data : [])
-      .filter((row) => {
-        const recipientsText = normalizeString(row && row.recipients_text).toLowerCase();
-        return recipientsText && recipientNeedles.some((email) => recipientsText.includes(email));
-      })
+      .filter((row) => rowContainsRecipientEmail(row, recipientNeedles, normalizeString))
       .forEach((row) => {
         const key = normalizeString(row && row.message_key);
         if (key && !rowsByKey.has(key)) rowsByKey.set(key, row);

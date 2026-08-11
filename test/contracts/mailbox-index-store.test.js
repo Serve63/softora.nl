@@ -1172,11 +1172,13 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
     ['in', 'account_email', ['martijnven123@gmail.com']],
     ['in', 'sender_email', ['info@praktijkkaroena.nl']],
     ['in', 'account_email', ['martijnven123@gmail.com']],
+    ['in', 'account_email', ['martijnven123@gmail.com']],
   ]);
-  assert.equal(calls.filter((call) => call[0] === 'ilike').length, 0);
-  const recipientFilter = calls.find((call) => call[0] === 'or');
-  assert.match(recipientFilter[1], /recipients_text\.ilike\.%info@praktijkkaroena\.nl%/);
-  assert.match(recipientFilter[1], /recipients_text\.ilike\.%unrelated@example\.nl%/);
+  assert.deepEqual(calls.filter((call) => call[0] === 'ilike'), [
+    ['ilike', 'recipients_text', '%info@praktijkkaroena.nl%'],
+    ['ilike', 'recipients_text', '%unrelated@example.nl%'],
+  ]);
+  assert.equal(calls.filter((call) => call[0] === 'or').length, 0);
 });
 
 test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id op', async () => {
