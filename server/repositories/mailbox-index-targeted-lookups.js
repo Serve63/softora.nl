@@ -55,25 +55,38 @@ function createMailboxIndexTargetedLookups({
     if (!normalizedAccounts.length || !normalizedRecipients.length) return [];
     const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 1000)));
     const rowsByKey = new Map();
-    for (const recipientEmail of normalizedRecipients) {
-      const result = await run('list-messages-by-recipient-email', (client) =>
+    // The previous implementation made one Supabase request per participant.
+    // A normal campaign view can contain hundreds of participants, so the
+    // sequential lookup made the history request exceed the serverless
+    // request window before it reached older Sent messages. Read the bounded
+    // Sent slice once per selected mailbox instead and apply the same
+    // case-insensitive recipient match locally. This keeps the lookup
+    // direction-aware without constructing an unsafe PostgREST OR expression
+    // from user-controlled email text.
+    const batches = await Promise.all(normalizedAccounts.map((accountEmail) =>
+      run('list-messages-by-recipient-account', (client) =>
         client
           .from(tableName)
           .select(metadataColumns)
-          .in('account_email', normalizedAccounts)
+          .in('account_email', [accountEmail])
           .eq('folder', normalizeFolder(folder))
-          .ilike('recipients_text', `%${recipientEmail}%`)
           .is('deleted_at', null)
           .order('date', { ascending: false })
           .order('message_key', { ascending: false })
           .limit(safeLimit)
-      );
-      if (!result.ok) return null;
-      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+      )
+    ));
+    if (batches.some((result) => !result.ok)) return null;
+    const recipientNeedles = normalizedRecipients.map((email) => email.toLowerCase());
+    batches.flatMap((result) => Array.isArray(result.data) ? result.data : [])
+      .filter((row) => {
+        const recipientsText = normalizeString(row && row.recipients_text).toLowerCase();
+        return recipientsText && recipientNeedles.some((email) => recipientsText.includes(email));
+      })
+      .forEach((row) => {
         const key = normalizeString(row && row.message_key);
         if (key && !rowsByKey.has(key)) rowsByKey.set(key, row);
       });
-    }
     return Array.from(rowsByKey.values())
       .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
       .slice(0, safeLimit)

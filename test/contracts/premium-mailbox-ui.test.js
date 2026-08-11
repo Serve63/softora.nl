@@ -566,6 +566,52 @@ test('historische inkomende en uitgaande kaarten tonen hun eigen bewezen Aan-rou
   assert.equal((html.match(/data-mailbox-routing-kind="direct"/g) || []).length, 3);
 });
 
+test('premium mailbox rendert meerdere opgeslagen Karoena-berichten als losse kaarten', () => {
+  const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character]));
+  const sentMessages = [1, 2, 3, 4].map((index) => ({
+    id: `sent:karoena-${index}`,
+    folder: 'sent',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijnven123@gmail.com',
+    to: 'info@praktijkkaroena.nl',
+    date: `2026-05-${String(26 + index).padStart(2, '0')}T10:00:00.000Z`,
+    body: `Afzonderlijk antwoord ${index}.\n\n> Geciteerde vorige tekst ${index}.`,
+    hasBody: true,
+    bodyLoaded: true,
+    messageId: `<karoena-sent-${index}@example.nl>`,
+  }));
+  const html = campaignInboxModule.renderThreadMessages({
+    id: 'inbox:karoena',
+    accountEmail: 'martijnven123@gmail.com',
+    receivedAt: '2026-04-27T10:05:28.000Z',
+    threadMessages: [
+      ...sentMessages,
+      {
+        id: 'inbox:karoena-follow-up',
+        folder: 'inbox',
+        accountEmail: 'martijnven123@gmail.com',
+        from: 'Praktijk Karoena',
+        email: 'info@praktijkkaroena.nl',
+        to: 'martijnven123@gmail.com',
+        date: '2026-05-30T11:00:00.000Z',
+        body: 'Afzonderlijke ontvangen vervolgreactie.',
+        hasBody: true,
+        bodyLoaded: true,
+        messageId: '<karoena-inbound-follow-up@example.nl>',
+      },
+    ],
+  }, escapeHtml, () => ({ date: '30 mei', time: '11:00' }), { chronological: true });
+
+  assert.equal((html.match(/detail-mail-section detail-mail-section-sent/g) || []).length, 4);
+  assert.equal((html.match(/detail-mail-section detail-mail-section-received/g) || []).length, 1);
+  [1, 2, 3, 4].forEach((index) => assert.match(html, new RegExp(`Afzonderlijk antwoord ${index}`)));
+  assert.match(html, /Afzonderlijke ontvangen vervolgreactie/);
+  assert.doesNotMatch(html, /Geciteerde vorige tekst/);
+});
+
 test('gerichte threadhydratie vult Aan uit exacte indexprovenance zonder de body te verbergen', async () => {
   const helpers = loadMailboxHelpersForTest();
   const message = {
