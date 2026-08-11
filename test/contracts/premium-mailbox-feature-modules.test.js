@@ -19,6 +19,7 @@ function assetSource(filename) {
 test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duurzaam af', async () => {
   const renders = [];
   const requests = [];
+  const toasts = [];
   const latestReply = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '' };
   const mail = { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T14:00:00.000Z', unread: false, replyDismissedAt: '', threadMessages: [latestReply] };
   const controller = mailboxRead.create({
@@ -34,6 +35,7 @@ test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duu
         json: async () => ({ ok: true, result: { replyDismissedAt: '2026-08-04T15:10:00.000Z' } }),
       };
     },
+    toast: (message) => toasts.push(message),
   });
 
   const result = await controller.dismissReply(mail, {
@@ -56,6 +58,7 @@ test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duu
     },
   }]);
   assert.equal(renders.length, 2);
+  assert.deepEqual(toasts, ['Gesprek wordt als gelezen verwerkt…', 'Gesprek als gelezen afgehandeld']);
 });
 
 test('mailbox featuremodules bepalen reply of nieuw bericht uit de nieuwste echte message', () => {

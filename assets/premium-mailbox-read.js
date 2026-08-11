@@ -142,6 +142,7 @@
       const target = getDismissTarget(mail);
       if (!target || target.replyDismissedAt || target.replyDismissPending) return { ok: false };
       const previous = { unread: Boolean(target.unread), replyDismissedAt: String(target.replyDismissedAt || '') };
+      options.toast?.('Gesprek wordt als gelezen verwerkt…');
       target.replyDismissPending = true;
       target.readPending = true;
       target.readError = '';
