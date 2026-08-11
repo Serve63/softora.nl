@@ -1096,6 +1096,59 @@ test('chatbot-offertegids normaliseert voorstellen met bewijs en twee verschille
   ]);
 });
 
+test('CRM-adoptiegids maakt werkafspraken en herstel per rol controleerbaar', () => {
+  const now = new Date('2026-08-11T12:00:00.000Z');
+  const item = getSeoContentItem('blog', 'crm-adoptie-medewerkers-mkb', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const taskHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-taken-reminders-automatiseren-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const costHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-systeem-kosten-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-11');
+  assert.equal(item.targetMoneyPage, '/crm-systeem-op-maat');
+  assert.ok(item.informationGain.includes('vier terugvalsignalen'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualFamily, 'documentary-crm-role-rehearsal');
+  assert.equal(item.visualBrief.support.visualFamily, 'paper-cut-adoption-feedback-loop');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.src, '/assets/seo-content/crm-adoptie-rollentest-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/crm-adoptie-feedbacklus-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/crm-adoptie-medewerkers-mkb">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"datePublished":"2026-08-11"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Gebruik een feedbackwachtrij in plaats van directe scopegroei/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM-systeem op maat<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-crm-datakwaliteit">CRM-datakwaliteit<\/a>/);
+  assert.match(html, /href="\/blog\/crm-taken-reminders-automatiseren-mkb">CRM-taken en reminders<\/a>/);
+  assert.match(taskHtml, /href="\/blog\/crm-adoptie-medewerkers-mkb">CRM-adoptie per rol<\/a>/);
+  assert.match(costHtml, /href="\/blog\/crm-adoptie-medewerkers-mkb">praktische CRM-adoptieroute<\/a>/);
+  assert.doesNotMatch(html, /adoptiegarantie|garandeert adoptie|garandeert besparing|iedere medewerker zal/i);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/crm-adoptie-medewerkers-mkb');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/crm-adoptie-rollentest-softora.jpg',
+    '/assets/seo-content/crm-adoptie-feedbacklus-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));
