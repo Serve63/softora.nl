@@ -1673,6 +1673,7 @@
       "status": "shipped",
       "shippedAt": "2026-08-11",
       "shippedPath": "/blog/crm-adoptie-medewerkers-mkb",
+      "shippedPr": 1561,
       "path": "/blog/crm-adoptie-medewerkers-mkb",
       "contentType": "blog",
       "cluster": "software-crm",
