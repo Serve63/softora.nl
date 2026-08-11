@@ -18,6 +18,7 @@ async function loadMailboxCampaignContactHistory({
   incomingFolders = ['coldmail', 'inbox'],
   incomingLimit = 250,
   sentLimit = 2000,
+  participantPriorityMessages = [],
   dedupeCampaignMessages,
   collectCampaignThreadParticipantEmails,
 } = {}) {
@@ -48,10 +49,11 @@ async function loadMailboxCampaignContactHistory({
   }
   const seedSentMessages = dedupeCampaignMessages(seedSentMessagesResult);
   // The incoming folders are fetched in batches (coldmail first, inbox
-  // second). Do not let that transport order decide which participants fit the
-  // bounded targeted-history lookup: an older inbox reply must not disappear
-  // simply because the coldmail batch filled the cap first.
+  // second), and the unfiltered recent scan can contain unrelated mail. Keep
+  // subject-matched campaign messages first so a real historical reply is not
+  // evicted by recent noise before the bounded targeted-history lookup runs.
   const campaignParticipantEmails = collectCampaignThreadParticipantEmails([
+    ...sortMessagesNewestFirst(participantPriorityMessages),
     ...sortMessagesNewestFirst(messages),
     ...sortMessagesNewestFirst(seedSentMessages),
   ]);
