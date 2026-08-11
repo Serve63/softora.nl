@@ -1915,6 +1915,7 @@ test('campaign reply service toont elk opgeslagen Karoena-bericht naast de ontva
       : `<karoena-original@example.nl> <karoena-inbound@example.nl> <karoena-sent-${index - 1}@example.nl>`,
   }));
   const targetedLookups = [];
+  const referenceLookups = [];
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {
       listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [inbound] : [],
@@ -1922,10 +1923,15 @@ test('campaign reply service toont elk opgeslagen Karoena-bericht naast de ontva
       listMessagesBySenderEmailsForAccounts: async ({ folder }) => folder === 'inbox' ? [inbound] : [],
       listMessagesByRecipientEmailsForAccounts: async (options) => {
         targetedLookups.push(options);
-        return sentMessages;
+        return [];
       },
       listMessagesByMessageIdsForAccounts: async () => [],
-      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      listMessagesReferencingMessageIdsForAccounts: async (options) => {
+        referenceLookups.push(options);
+        return options.messageIds.some((messageId) => String(messageId).includes('karoena-original@example.nl'))
+          ? sentMessages
+          : [];
+      },
       listUnthreadedSentCandidatesForConversations: async () => [],
       hydrateMessageBodies: async ({ messages }) => messages,
     },
@@ -1944,6 +1950,9 @@ test('campaign reply service toont elk opgeslagen Karoena-bericht naast de ontva
 
   assert.equal(targetedLookups.length, 1);
   assert.deepEqual(targetedLookups[0].recipientEmails, ['info@praktijkkaroena.nl']);
+  assert.equal(referenceLookups.some((options) => (
+    options.messageIds.some((messageId) => String(messageId).includes('karoena-original@example.nl'))
+  )), true);
   assert.equal(replies.length, 1);
   assert.equal(replies[0].id, inbound.id);
   assert.deepEqual(
