@@ -39,6 +39,7 @@ const listModule = require('../../assets/premium-mailbox-list.js');
 const deleteModule = require('../../assets/premium-mailbox-delete.js');
 const readModule = require('../../assets/premium-mailbox-read.js');
 const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
+const bodySectionModule = require('../../assets/premium-mailbox-body-section.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -117,7 +118,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260810a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260811b/);
+  assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260811b/);
+  assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
@@ -199,6 +202,7 @@ function loadMailboxHelpersForTest(options = {}) {
     SoftoraMailboxUiState: uiStateModule,
     SoftoraMailboxList: listModule,
     SoftoraMailboxImages: options.SoftoraMailboxImages || imagesModule,
+    SoftoraMailboxBodySection: bodySectionModule,
     SoftoraUiStateClient: null,
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
@@ -857,11 +861,17 @@ test('Salon TOF staat als één grijze inkomende kaart en maakt van het Gmail-ci
   assert.match(html, /detail-mail-section-received/);
   assert.match(html, /Met welk programma werk je\? Wij hebben nu Webflow\./);
   assert.match(html, /detail-mail-section-history/);
-  assert.doesNotMatch(html, /detail-mail-section-history-sent|detail-mail-section-label">Eerdere mail/);
+  assert.match(html, /detail-mail-section-history-sent/);
+  assert.match(html, /Jouw bericht \(citaat · niet ontvangen\)/);
+  assert.match(html, /Eerder verzonden bericht, niet ontvangen/);
   assert.match(
     html,
-    /detail-mail-section-received[\s\S]*Met welk programma werk je\?[\s\S]*<div class="detail-footer">[\s\S]*data-mailbox-action="reply-mail"[\s\S]*<\/div>\s*<\/section>/
+    /detail-mail-section-received[\s\S]*Met welk programma werk je\?[\s\S]*<div class="detail-footer">[\s\S]*data-mailbox-action="reply-mail"[\s\S]*<\/div>\s*<\/section>[\s\S]*detail-mail-section-history-sent/
   );
+  const receivedStart = html.indexOf('data-mailbox-message-direction="incoming"');
+  const quoteStart = html.indexOf('detail-mail-section-history-sent');
+  assert.ok(receivedStart >= 0 && quoteStart > receivedStart);
+  assert.ok(html.lastIndexOf('</section>', quoteStart) > receivedStart);
 
   const pageSource = readPage();
   assert.match(
@@ -872,6 +882,31 @@ test('Salon TOF staat als één grijze inkomende kaart en maakt van het Gmail-ci
     pageSource,
     /\.detail-mail-section-received \{[^}]*rgba\(155,35,85/
   );
+});
+
+test('onbewezen citaat in een inkomend bericht blijft neutraal en niet-ontvangen', () => {
+  const html = renderMailboxBodyForTest([
+    'Dit is de nieuwe ontvangen tekst.',
+    '',
+    'On 20 Jul 2026, John Example wrote:',
+    '',
+    'Original message.',
+  ].join('\n'), [], {
+    replyMailId: 'inbox:neutral-quote',
+    mail: {
+      id: 'inbox:neutral-quote',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-07-24T11:54:00.000Z',
+      threadMessages: [],
+    },
+  });
+
+  assert.match(html, /data-mailbox-message-direction="incoming"/);
+  assert.match(html, /detail-mail-section-history/);
+  assert.doesNotMatch(html, /detail-mail-section-history-sent/);
+  assert.match(html, /Citaat uit eerdere mail \(niet ontvangen\)/);
+  assert.match(html, /aria-label="Ingesloten berichtgeschiedenis"/);
 });
 
 test('beantwoorden staat in de nieuwste inkomende grijze threadkaart en nergens los eronder', () => {
@@ -2859,9 +2894,9 @@ test('mailbox voegt vergelijkbare coldmails voor verschillende websites nooit sa
   );
 
   assert.match(html, /detail-mail-section-history/);
-  assert.doesNotMatch(html, /detail-mail-section-history-sent/);
-  assert.doesNotMatch(html, /Eerdere mail/);
-  assert.doesNotMatch(html, /Jouw eerdere mail/i);
+  assert.match(html, /detail-mail-section-history-sent/);
+  assert.match(html, /Jouw bericht \(citaat · niet ontvangen\)/);
+  assert.match(html, /Eerder verzonden bericht, niet ontvangen/);
   assert.match(html, /Afgelopen week kwam ik jullie website ander-bedrijf\.nl tegen\./);
 });
 
@@ -2900,9 +2935,9 @@ test('mailbox laat een inhoudelijk andere eerdere eigen mail wel staan', () => {
 
   assert.match(html, /Jouw bericht/);
   assert.match(html, /detail-mail-section-history/);
-  assert.doesNotMatch(html, /detail-mail-section-history-sent/);
-  assert.doesNotMatch(html, /Eerdere mail/);
-  assert.doesNotMatch(html, /Jouw eerdere mail/i);
+  assert.match(html, /detail-mail-section-history-sent/);
+  assert.match(html, /Jouw bericht \(citaat · niet ontvangen\)/);
+  assert.match(html, /Eerder verzonden bericht, niet ontvangen/);
   assert.match(html, /Hierbij stuur ik een nieuw voorstel met een andere prijs en planning\./);
 });
 
@@ -2927,7 +2962,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260810a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260811b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
@@ -3025,7 +3060,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260810a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260811b/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -4279,11 +4314,13 @@ test('premium mailbox bewaart gelezen status optimistisch zonder mailboxreload',
   assert.match(scriptSource, /uid: message\.uid,/);
   assert.match(readSource, /async function persist\(mail, persistOptions = \{\}\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
   assert.match(readSource, /body: JSON\.stringify\(\{[\s\S]*account,[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder:/);
-  assert.match(readSource, /async function markRead\(mail, hooks = \{\}\) \{[\s\S]*mail\.unread = false;[\s\S]*mail\.readPending = true;[\s\S]*const outcome = await persist\(mail\)/);
+  assert.match(readSource, /async function markRead\(mail, hooks = \{\}\) \{[\s\S]*const targets = getConversationTargets\(mail\)[\s\S]*target\.unread = false;[\s\S]*target\.readPending = true;[\s\S]*const outcome = await persist\(mail\)/);
   assert.match(readSource, /function setFailure\([\s\S]*target\.unread = previous\.unread;[\s\S]*target\.readError =/);
   assert.match(readSource, /function applyConfirmedState\(mail\)[\s\S]*mail\.unread = false/);
   assert.doesNotMatch(readSource, /loadMailboxMessages|campaign-replies/);
   assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*SoftoraMailboxUiState\.markReadOnOpen\(/);
+  assert.match(scriptSource, /const listScrollTop = Number\.isFinite\(Number\(wrap\.scrollTop\)\)/);
+  assert.match(scriptSource, /const detailScrollTop = previousDetailBody && Number\.isFinite\(Number\(previousDetailBody\.scrollTop\)\)/);
   assert.match(uiStateSource, /class="detail-mark-read[\s\S]*is-pending[\s\S]*aria-busy=/);
   assert.match(uiStateSource, /data-mailbox-action="retry-read"/);
   assert.match(readSource, /Gelezen status opslaan mislukt/);
@@ -4331,6 +4368,102 @@ test('gelezen status blijft direct stabiel bij traag succes, stale cache en pagi
   createController(async () => ({ ok: true, json: async () => ({ ok: true }) })).reconcile(afterPageRefresh);
   assert.equal(afterPageRefresh.unread, false);
   assert.equal(afterPageRefresh.softoraReadConfirmed, true);
+});
+
+test('afhandelen blijft optimistic op gesprek en reply bij stale poll en vertraagde backend', async () => {
+  let resolveRequest;
+  let requestCount = 0;
+  const latestReply = {
+    id: 'inbox:reply-43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '',
+  };
+  const mail = {
+    id: 'inbox:conversation-42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    date: '2026-08-04T14:00:00.000Z', unread: false, threadMessages: [latestReply],
+  };
+  const controller = readModule.create({
+    getAccount: (message) => message.accountEmail,
+    getFolder: (message) => message.folder,
+    getOwner: (message) => message.owner,
+    getRequestId: (message) => message.id,
+    getConversationAction: (conversation) => ({ kind: 'reply', isRoot: false, message: conversation.threadMessages[0] }),
+    fetch: async () => {
+      requestCount += 1;
+      return new Promise((resolve) => { resolveRequest = resolve; });
+    },
+  });
+
+  const request = controller.dismissReply(mail, { render() {} });
+  assert.equal(requestCount, 1);
+  assert.equal(mail.unread, false);
+  assert.equal(mail.readPending, true);
+  assert.equal(latestReply.unread, false);
+  assert.equal(latestReply.readPending, true);
+  assert.equal(latestReply.replyDismissPending, true);
+  const optimisticTimestamp = latestReply.replyDismissedAt;
+  assert.ok(optimisticTimestamp);
+  assert.equal((await controller.dismissReply(mail)).ok, false);
+  assert.equal(requestCount, 1);
+
+  const stale = {
+    ...mail,
+    unread: true,
+    readPending: false,
+    threadMessages: [{ ...latestReply, unread: true, readPending: false, replyDismissedAt: '' }],
+  };
+  controller.reconcile(stale);
+  assert.equal(stale.unread, false);
+  assert.equal(stale.readPending, true);
+  assert.equal(stale.threadMessages[0].unread, false);
+  assert.equal(stale.threadMessages[0].readPending, true);
+  assert.equal(stale.threadMessages[0].replyDismissPending, true);
+  assert.equal(stale.threadMessages[0].replyDismissedAt, optimisticTimestamp);
+
+  resolveRequest({ ok: true, json: async () => ({ ok: true, result: { replyDismissedAt: '2026-08-04T15:10:00.000Z' } }) });
+  assert.equal((await request).ok, true);
+  assert.equal(mail.unread, false);
+  assert.equal(mail.readPending, false);
+  assert.equal(latestReply.readPending, false);
+  assert.equal(latestReply.replyDismissPending, false);
+  assert.equal(latestReply.replyDismissedAt, '2026-08-04T15:10:00.000Z');
+  controller.reconcile(stale);
+  assert.equal(stale.unread, false);
+  assert.equal(stale.readPending, false);
+  assert.equal(stale.threadMessages[0].replyDismissedAt, '2026-08-04T15:10:00.000Z');
+  assert.equal(stale.threadMessages[0].replyDismissPending, false);
+});
+
+test('afhandelen rolt gesprek en reply eenmalig terug bij backendfout', async () => {
+  const toasts = [];
+  const latestReply = {
+    id: 'inbox:reply-failed', uid: 51, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    unread: true, replyDismissedAt: '',
+  };
+  const mail = {
+    id: 'inbox:conversation-failed', uid: 50, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    unread: false, threadMessages: [latestReply],
+  };
+  const controller = readModule.create({
+    getAccount: (message) => message.accountEmail,
+    getFolder: (message) => message.folder,
+    getOwner: (message) => message.owner,
+    getRequestId: (message) => message.id,
+    getConversationAction: (conversation) => ({ kind: 'reply', isRoot: false, message: conversation.threadMessages[0] }),
+    fetch: async () => ({ ok: false, json: async () => ({ detail: 'Mailbox tijdelijk niet bereikbaar' }) }),
+    toast: (message) => toasts.push(message),
+  });
+
+  const result = await controller.dismissReply(mail, { render() {} });
+  assert.equal(result.ok, false);
+  assert.equal(mail.unread, false);
+  assert.equal(mail.readPending, false);
+  assert.match(mail.readError, /Mailbox tijdelijk niet bereikbaar/);
+  assert.equal(latestReply.unread, true);
+  assert.equal(latestReply.readPending, false);
+  assert.equal(latestReply.replyDismissPending, false);
+  assert.equal(latestReply.replyDismissedAt, '');
+  assert.match(latestReply.readError, /Mailbox tijdelijk niet bereikbaar/);
+  assert.equal(toasts.filter((message) => /probeer opnieuw/.test(message)).length, 1);
 });
 
 test('late gelezen reactie opent geen oude mail opnieuw na navigatie', async () => {
@@ -4419,7 +4552,7 @@ test('gelezen status is eigenaargebonden en synchroniseert bevestigd tussen tabs
   const martijn = { ...serve, owner: 'martijn', unread: true };
 
   assert.equal((await first.markRead(serve, { render() {} })).ok, true);
-  assert.equal(externalUpdates, 1);
+  assert.equal(externalUpdates, 2);
   const staleServe = { ...serve, unread: true, softoraReadConfirmed: false };
   second.reconcile(staleServe);
   second.reconcile(martijn);

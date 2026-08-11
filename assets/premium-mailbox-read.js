@@ -10,6 +10,8 @@
   function create(options = {}) {
     const BroadcastChannelImpl = options.BroadcastChannel || (global.document ? global.BroadcastChannel : null);
     const confirmedStates = new Map();
+    const pendingStates = new Map();
+    const rejectedStates = new Map();
     let channel = null;
 
     function getIdentity(mail) {
@@ -27,38 +29,198 @@
       return [normalize(source.owner), normalize(source.account), normalize(source.folder), String(source.id || '').trim()].join('|');
     }
 
+    function getConversationTargets(mail) {
+      const candidates = [mail];
+      const action = options.getConversationAction?.(mail);
+      if (action?.kind === 'reply' && action.message && action.message !== mail) candidates.push(action.message);
+      const seen = new Set();
+      return candidates.filter((target) => {
+        if (!target || typeof target !== 'object') return false;
+        const identity = getIdentity(target);
+        const key = identity ? getIdentityKey(identity) : '';
+        if (key) {
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }
+        if (seen.has(target)) return false;
+        seen.add(target);
+        return true;
+      });
+    }
+
+    function getStateFor(target) {
+      const identity = getIdentity(target);
+      if (!identity) return null;
+      const key = getIdentityKey(identity);
+      return pendingStates.get(key) || confirmedStates.get(key) || rejectedStates.get(key) || null;
+    }
+
+    function applyStateToTarget(target, state) {
+      if (!target || !state) return false;
+      const identity = getIdentity(target);
+      const targetKey = identity ? getIdentityKey(identity) : '';
+      if (state.failed) {
+        target.unread = state.unread;
+        target.readPending = false;
+        target.readError = String(state.readError || 'Gelezen status opslaan mislukt');
+        if (state.dismissReply && (!state.targetKey || state.targetKey === targetKey)) {
+          target.replyDismissedAt = String(state.replyDismissedAt || '');
+          target.replyDismissPending = false;
+        }
+        return true;
+      }
+      target.unread = false;
+      target.readPending = state.pending === true;
+      target.readError = '';
+      if (state.dismissReply) {
+        if (!state.targetKey || state.targetKey === targetKey) {
+          if (state.replyDismissedAt) target.replyDismissedAt = state.replyDismissedAt;
+          target.replyDismissPending = state.pending === true;
+        }
+      }
+      if (!state.pending) target.softoraReadConfirmed = true;
+      return true;
+    }
+
     function applyConfirmedState(mail) {
-      const identity = getIdentity(mail);
-      const state = identity ? confirmedStates.get(getIdentityKey(identity)) : null;
+      const targets = getConversationTargets(mail);
+      let applied = false;
+      targets.forEach((target) => {
+        const state = getStateFor(target);
+        if (state) applied = applyStateToTarget(target, state) || applied;
+      });
       const persistedReadAt = String(mail && (mail.softoraReadAt || mail.readAt) || '').trim();
-      if (!state && !persistedReadAt) return mail;
-      mail.unread = false;
-      mail.readPending = false;
-      mail.readError = '';
-      mail.softoraReadConfirmed = true;
-      if (state?.replyDismissedAt) mail.replyDismissedAt = state.replyDismissedAt;
+      if (!applied && !persistedReadAt) return mail;
+      if (persistedReadAt && !applied) {
+        mail.unread = false;
+        mail.readPending = false;
+        mail.readError = '';
+        mail.softoraReadConfirmed = true;
+      }
       return mail;
     }
 
-    function publishConfirmedState(state) {
+    function publishStates(type, states) {
       if (!channel || typeof channel.postMessage !== 'function') return;
       try {
-        channel.postMessage({ type: 'mailbox-read-confirmed', state });
+        const safeStates = Array.isArray(states) ? states.filter(Boolean) : [];
+        if (!safeStates.length) return;
+        channel.postMessage({ type, state: safeStates[0], states: safeStates });
       } catch (_) {}
     }
 
     function rememberConfirmedState(mail, result = {}, settings = {}) {
       const identity = getIdentity(mail);
       if (!identity) return false;
+      const replyDismissedAt = Object.prototype.hasOwnProperty.call(settings, 'replyDismissedAt')
+        ? String(settings.replyDismissedAt || '')
+        : String(result.replyDismissedAt || mail.replyDismissedAt || '');
       const state = {
         identity,
         unread: false,
-        replyDismissedAt: String(result.replyDismissedAt || mail.replyDismissedAt || ''),
+        pending: false,
+        dismissReply: settings.dismissReply === true || Boolean(replyDismissedAt),
+        targetKey: String(settings.targetKey || getIdentityKey(identity)),
+        replyDismissedAt,
         savedAt: Date.now(),
       };
+      pendingStates.delete(getIdentityKey(identity));
+      rejectedStates.delete(getIdentityKey(identity));
       confirmedStates.set(getIdentityKey(identity), state);
-      if (settings.broadcast !== false) publishConfirmedState(state);
+      if (settings.broadcast !== false) publishStates('mailbox-read-confirmed', [state]);
       return true;
+    }
+
+    function rememberConfirmedStates(targets, result = {}, settings = {}) {
+      const safeTargets = Array.isArray(targets) ? targets : [];
+      const targetKey = String(settings.targetKey || '');
+      const states = safeTargets.map((target) => {
+        const identity = getIdentity(target);
+        if (!identity) return null;
+        const key = getIdentityKey(identity);
+        const isDismissTarget = !targetKey || key === targetKey;
+        const replyDismissedAt = settings.dismissReply === true && isDismissTarget
+          ? String(result.replyDismissedAt || target.replyDismissedAt || '')
+          : '';
+        rememberConfirmedState(target, result, {
+          broadcast: false,
+          dismissReply: settings.dismissReply === true && isDismissTarget,
+          targetKey,
+          replyDismissedAt,
+        });
+        return confirmedStates.get(key);
+      }).filter(Boolean);
+      if (settings.broadcast !== false) publishStates('mailbox-read-confirmed', states);
+      return states;
+    }
+
+    function setPendingStates(targets, settings = {}) {
+      const targetKey = String(settings.targetKey || '');
+      const states = (Array.isArray(targets) ? targets : []).map((target) => {
+        const identity = getIdentity(target);
+        if (!identity) return null;
+        const state = {
+          identity,
+          unread: false,
+          pending: true,
+          dismissReply: settings.dismissReply === true,
+          targetKey,
+          replyDismissedAt: String(settings.replyDismissedAt || ''),
+          savedAt: Date.now(),
+        };
+        const key = getIdentityKey(identity);
+        rejectedStates.delete(key);
+        pendingStates.set(key, state);
+        return state;
+      }).filter(Boolean);
+      if (settings.broadcast !== false) publishStates('mailbox-read-pending', states);
+      return states;
+    }
+
+    function clearPendingStates(targets) {
+      (Array.isArray(targets) ? targets : []).forEach((target) => {
+        const identity = getIdentity(target);
+        if (identity) pendingStates.delete(getIdentityKey(identity));
+      });
+    }
+
+    function clearRejectedStates(targets) {
+      (Array.isArray(targets) ? targets : []).forEach((target) => {
+        const identity = getIdentity(target);
+        if (identity) rejectedStates.delete(getIdentityKey(identity));
+      });
+    }
+
+    function rememberRejectedStates(targets, snapshots, error, settings = {}) {
+      const errorText = String(error?.message || error || 'Gelezen status opslaan mislukt');
+      const targetKey = String(settings.targetKey || '');
+      const states = (Array.isArray(targets) ? targets : []).map((target) => {
+        const identity = getIdentity(target);
+        if (!identity) return null;
+        const key = getIdentityKey(identity);
+        const snapshot = (Array.isArray(snapshots) ? snapshots : []).find((candidate) => candidate.target === target);
+        const isDismissTarget = !targetKey || key === targetKey;
+        const state = {
+          identity,
+          unread: snapshot ? snapshot.unread : Boolean(target.unread),
+          pending: false,
+          failed: true,
+          readError: errorText,
+          dismissReply: settings.dismissReply === true && isDismissTarget,
+          targetKey,
+          replyDismissedAt: settings.dismissReply === true && isDismissTarget
+            ? String(snapshot?.replyDismissedAt || '')
+            : '',
+          savedAt: Date.now(),
+        };
+        pendingStates.delete(key);
+        confirmedStates.delete(key);
+        rejectedStates.set(key, state);
+        return state;
+      }).filter(Boolean);
+      if (settings.broadcast !== false) publishStates('mailbox-read-rollback', states);
+      return states;
     }
 
     async function persist(mail, persistOptions = {}) {
@@ -96,36 +258,78 @@
       if (typeof hooks.render === 'function') hooks.render(mail, target);
     }
 
-    function setFailure(target, previous, error, hooks, mail) {
+    function snapshotTargets(targets) {
+      return (Array.isArray(targets) ? targets : []).map((target) => ({
+        target,
+        unread: target.unread,
+        readPending: target.readPending,
+        readError: target.readError,
+        replyDismissedAt: target.replyDismissedAt,
+        replyDismissPending: target.replyDismissPending,
+        softoraReadConfirmed: target.softoraReadConfirmed,
+      }));
+    }
+
+    function restoreSnapshots(snapshots) {
+      (Array.isArray(snapshots) ? snapshots : []).forEach((snapshot) => {
+        if (!snapshot?.target) return;
+        snapshot.target.unread = snapshot.unread;
+        snapshot.target.readPending = snapshot.readPending;
+        snapshot.target.readError = snapshot.readError;
+        snapshot.target.replyDismissedAt = snapshot.replyDismissedAt;
+        snapshot.target.replyDismissPending = snapshot.replyDismissPending;
+        snapshot.target.softoraReadConfirmed = snapshot.softoraReadConfirmed;
+      });
+    }
+
+    function setFailure(target, previous, error, hooks, mail, snapshots = [], settings = {}) {
+      restoreSnapshots(snapshots);
       target.unread = previous.unread;
       target.replyDismissedAt = previous.replyDismissedAt;
       target.readPending = false;
       target.replyDismissPending = false;
       target.readError = String(error?.message || error || 'Gelezen status opslaan mislukt');
+      if (mail && mail !== target) {
+        mail.readPending = false;
+        mail.readError = target.readError;
+      }
+      rememberRejectedStates(
+        snapshots.map((snapshot) => snapshot.target),
+        snapshots,
+        target.readError,
+        settings
+      );
       render(hooks, mail, target);
       options.toast?.(`${target.readError} · probeer opnieuw`);
     }
 
     async function markRead(mail, hooks = {}) {
-      if (!mail || mail.readPending) return { ok: false };
-      if (!mail.unread && !mail.readError) return { ok: true, skipped: true };
-      const previous = {
-        unread: Boolean(mail.unread),
-        replyDismissedAt: String(mail.replyDismissedAt || ''),
-      };
-      mail.unread = false;
-      mail.readPending = true;
-      mail.readError = '';
+      if (!mail) return { ok: false };
+      const targets = getConversationTargets(mail);
+      if (targets.some((target) => target.readPending || getStateFor(target)?.pending)) return { ok: false, pending: true };
+      if (!targets.some((target) => Boolean(target.unread) || Boolean(target.readError))) return { ok: true, skipped: true };
+      clearRejectedStates(targets);
+      const snapshots = snapshotTargets(targets);
+      const previous = snapshots.find((snapshot) => snapshot.target === mail) || snapshots[0] || { unread: false, replyDismissedAt: '' };
+      targets.forEach((target) => {
+        target.unread = false;
+        target.readPending = true;
+        target.readError = '';
+      });
+      setPendingStates(targets, { dismissReply: false });
       render(hooks, mail, mail);
       const outcome = await persist(mail);
+      clearPendingStates(targets);
       if (!outcome.ok) {
-        setFailure(mail, previous, outcome.error, hooks, mail);
+        setFailure(mail, previous, outcome.error, hooks, mail, snapshots, { dismissReply: false });
         return { ok: false, error: outcome.error };
       }
-      mail.readPending = false;
-      mail.readError = '';
-      mail.softoraReadConfirmed = true;
-      rememberConfirmedState(mail, outcome.result || {});
+      targets.forEach((target) => {
+        target.readPending = false;
+        target.readError = '';
+        target.softoraReadConfirmed = true;
+      });
+      rememberConfirmedStates(targets, outcome.result || {});
       render(hooks, mail, mail);
       return { ok: true, result: outcome.result };
     }
@@ -141,25 +345,42 @@
     async function dismissReply(mail, hooks = {}) {
       const target = getDismissTarget(mail);
       if (!target || target.replyDismissedAt || target.replyDismissPending) return { ok: false };
-      const previous = { unread: Boolean(target.unread), replyDismissedAt: String(target.replyDismissedAt || '') };
+      const targets = getConversationTargets(mail);
+      if (!targets.includes(target)) targets.push(target);
+      if (targets.some((candidate) => candidate.readPending || candidate.replyDismissPending || getStateFor(candidate)?.pending)) return { ok: false, pending: true };
+      const snapshots = snapshotTargets(targets);
+      const previous = snapshots.find((snapshot) => snapshot.target === target) || { unread: Boolean(target.unread), replyDismissedAt: String(target.replyDismissedAt || '') };
+      const targetKey = getIdentityKey(getIdentity(target));
+      const optimisticReplyDismissedAt = new Date().toISOString();
       options.toast?.('Gesprek wordt als gelezen verwerkt…');
+      clearRejectedStates(targets);
+      targets.forEach((candidate) => {
+        candidate.readPending = true;
+        candidate.readError = '';
+        candidate.unread = false;
+      });
       target.replyDismissPending = true;
-      target.readPending = true;
-      target.readError = '';
-      target.unread = false;
-      target.replyDismissedAt = new Date().toISOString();
+      target.replyDismissedAt = optimisticReplyDismissedAt;
+      setPendingStates(targets, {
+        dismissReply: true,
+        targetKey,
+        replyDismissedAt: optimisticReplyDismissedAt,
+      });
       render(hooks, mail, target);
       const outcome = await persist(target, { dismissReply: true });
-      target.replyDismissPending = false;
-      target.readPending = false;
+      clearPendingStates(targets);
       if (!outcome.ok || !outcome.result?.replyDismissedAt) {
-        setFailure(target, previous, outcome.error, hooks, mail);
+        setFailure(target, previous, outcome.error || new Error('Gelezen status opslaan mislukt'), hooks, mail, snapshots, { dismissReply: true, targetKey });
         return { ok: false, error: outcome.error };
       }
+      targets.forEach((candidate) => {
+        candidate.readPending = false;
+        candidate.readError = '';
+        candidate.softoraReadConfirmed = true;
+      });
+      target.replyDismissPending = false;
       target.replyDismissedAt = outcome.result.replyDismissedAt;
-      target.readError = '';
-      target.softoraReadConfirmed = true;
-      rememberConfirmedState(target, outcome.result);
+      rememberConfirmedStates(targets, outcome.result, { dismissReply: true, targetKey });
       render(hooks, mail, target);
       options.toast?.('Gesprek als gelezen afgehandeld');
       return { ok: true, result: outcome.result };
@@ -170,17 +391,50 @@
         channel = new BroadcastChannelImpl(READ_STATE_CHANNEL);
         channel.addEventListener?.('message', (event) => {
           const payload = event && event.data;
-          const state = payload && payload.type === 'mailbox-read-confirmed' ? payload.state : null;
-          const identity = state && state.identity;
-          const key = getIdentityKey(identity);
-          if (!key || state.unread !== false) return;
-          confirmedStates.set(key, {
-            identity,
-            unread: false,
-            replyDismissedAt: String(state.replyDismissedAt || ''),
-            savedAt: Number(state.savedAt) || Date.now(),
+          const type = String(payload?.type || '');
+          const states = Array.isArray(payload?.states)
+            ? payload.states
+            : payload?.state ? [payload.state] : [];
+          if (!states.length) return;
+          if (type === 'mailbox-read-pending') {
+            states.forEach((state) => {
+              const key = getIdentityKey(state && state.identity);
+              if (!key) return;
+              rejectedStates.delete(key);
+              pendingStates.set(key, { ...state, pending: true });
+            });
+            options.onExternalState?.(states[0].identity);
+            return;
+          }
+          if (type === 'mailbox-read-rollback') {
+            states.forEach((state) => {
+              const key = getIdentityKey(state && state.identity);
+              if (!key) return;
+              pendingStates.delete(key);
+              confirmedStates.delete(key);
+              rejectedStates.set(key, { ...state, pending: false, failed: true });
+            });
+            options.onExternalState?.(states[0].identity);
+            return;
+          }
+          if (type !== 'mailbox-read-confirmed') return;
+          states.forEach((state) => {
+            const identity = state && state.identity;
+            const key = getIdentityKey(identity);
+            if (!key || state.unread !== false) return;
+            pendingStates.delete(key);
+            rejectedStates.delete(key);
+            confirmedStates.set(key, {
+              identity,
+              unread: false,
+              pending: false,
+              dismissReply: state.dismissReply === true,
+              targetKey: String(state.targetKey || key),
+              replyDismissedAt: String(state.replyDismissedAt || ''),
+              savedAt: Number(state.savedAt) || Date.now(),
+            });
           });
-          options.onExternalState?.(identity);
+          options.onExternalState?.(states[0].identity);
         });
       } catch (_) {
         channel = null;
@@ -190,6 +444,7 @@
     return {
       dismissReply,
       getIdentity,
+      getConversationTargets,
       markRead,
       persist,
       reconcile: applyConfirmedState,

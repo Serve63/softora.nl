@@ -43,7 +43,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-vakantieradar\.css\?v=20260810a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260728a"/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260810a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260810d" defer><\/script>/);
@@ -330,6 +330,11 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /Zoek op icoon of betekenis/);
   assert.match(iconCatalogJs, /\['bed-exit', 'Uit bed', 'uit bed uit bed stappen opstaan wakker bed verlaten ochtend voeten op de vloer', 'out-of-bed'\]/);
   assert.match(iconCatalogJs, /'bed-exit': '<path d="M2 11v9" \/>/);
+  assert.match(iconCatalogJs, /\['footprints', 'Filmwaarschuwing \(voetjes\)'/);
+  assert.match(iconCatalogJs, /\['ban', 'Verbod'/);
+  assert.match(iconCatalogJs, /\['tooth', 'Gebit'/);
+  assert.match(iconCatalogJs, /ban: '<circle cx="12" cy="12" r="9" \/>/);
+  assert.match(iconCatalogJs, /tooth: '<path d="M8\.5 3C5\.7 1\.4/);
   assert.match(iconCatalogJs, /markup: customIconMarkup\[source\] \|\| iconMarkup\[source\] \|\| iconMarkup\.circle/);
   assert.match(js, /Workout/);
   assert.match(js, /90 min deep work/);
@@ -528,6 +533,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /className = 'goal-icon-button'/);
   assert.match(js, /iconKey:\s*goal\.iconKey/);
   assert.match(js, /row\.dataset\.iconKey = icon\.key/);
+  assert.match(js, /iconKey: goal\.iconKey/);
+  assert.match(js, /iconKey: row\.dataset\.iconKey \|\| defaultGoal\?\.iconKey/);
+  assert.match(js, /const normalizedGoals = parsed\.goals\.slice\(0, MAX_GOALS\)\.map\(normalizeGoal\)/);
   assert.match(js, /markStateChanged\(\);[\s\S]*closeIconPicker\(\);/);
   assert.doesNotMatch(js, /habit-add-cell|habit-add/);
   assert.match(js, /is-untracked/);

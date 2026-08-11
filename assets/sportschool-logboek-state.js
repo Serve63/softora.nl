@@ -4,6 +4,35 @@
   if (root) root.SoftoraSportschoolLogbookState = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   const SOURCE_FIELDS = ['title', 'notes', 'sets', 'reps', 'kg'];
+  const COMPLETION_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+  function normalizeCompletionDates(value) {
+    const candidates = Array.isArray(value)
+      ? value
+      : value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.entries(value).filter(([, completed]) => completed).map(([dateKey]) => dateKey)
+        : [];
+    return [...new Set(candidates.map((dateKey) => String(dateKey || '').trim()))]
+      .filter((dateKey) => COMPLETION_DATE_PATTERN.test(dateKey))
+      .sort();
+  }
+
+  function isCompletedOnDate(exercise = {}, dateKey) {
+    const normalizedDateKey = String(dateKey || '').trim();
+    return normalizeCompletionDates(exercise.completedDates).includes(normalizedDateKey);
+  }
+
+  function setCompletedOnDate(exercise = {}, dateKey, completed) {
+    const normalizedDateKey = String(dateKey || '').trim();
+    const dates = normalizeCompletionDates(exercise.completedDates);
+    if (!COMPLETION_DATE_PATTERN.test(normalizedDateKey)) {
+      return { ...exercise, completedDates: dates };
+    }
+    const nextDates = completed
+      ? [...new Set([...dates, normalizedDateKey])].sort()
+      : dates.filter((storedDateKey) => storedDateKey !== normalizedDateKey);
+    return { ...exercise, completedDates: nextDates };
+  }
 
   function hasOwnSource(sources, exerciseKey) {
     return Boolean(
@@ -64,9 +93,12 @@
   }
 
   return {
+    isCompletedOnDate,
     mergeExerciseSource,
+    normalizeCompletionDates,
     readCanonicalExerciseSource,
     reconcileExerciseSources,
+    setCompletedOnDate,
     sourceValuesEqual,
   };
 });

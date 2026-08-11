@@ -200,7 +200,7 @@ input:focus-visible {
   border-radius: 12px;
   background: var(--softora-white);
   touch-action: pan-y;
-  transition: transform 180ms ease;
+  transition: transform 180ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
   will-change: transform;
 }
 
@@ -223,9 +223,19 @@ input:focus-visible {
   box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
 }
 
+.exercise-card.is-complete {
+  border-color: rgba(61, 148, 92, 0.46);
+  background: linear-gradient(105deg, rgba(226, 248, 233, 0.96), rgba(248, 255, 250, 0.98));
+}
+
+.exercise-card.is-complete .exercise-title,
+.exercise-card.is-complete .exercise-notes {
+  color: #2f7749;
+}
+
 .exercise-top {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto 44px;
   gap: 5px;
   align-items: center;
 }
@@ -233,8 +243,9 @@ input:focus-visible {
 .drag-handle {
   display: grid;
   gap: 2px;
-  width: 14px;
-  height: 28px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
   place-content: center;
   padding: 0;
   border: 0;
@@ -262,12 +273,42 @@ input:focus-visible {
   outline-offset: 1px;
 }
 
+.exercise-complete {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(155, 35, 85, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--softora-purple);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.exercise-complete[aria-pressed="true"] {
+  border-color: rgba(61, 148, 92, 0.5);
+  background: #d9f3e2;
+  color: #287644;
+}
+
+.exercise-complete:focus-visible {
+  outline: 2px solid rgba(61, 148, 92, 0.5);
+  outline-offset: 2px;
+}
+
 .exercise-title,
 .exercise-notes,
 .metric-input {
   border: 0;
   outline: 0;
   background: transparent;
+  touch-action: manipulation;
 }
 
 .exercise-title {
@@ -295,15 +336,16 @@ input:focus-visible {
 .metric {
   display: grid;
   justify-items: center;
-  width: 32px;
-  padding: 3px 2px 2px;
+  width: 44px;
+  min-height: 44px;
+  padding: 4px 2px 3px;
   border: 1px solid rgba(240, 220, 230, 0.86);
   border-radius: 8px;
   background: rgba(252, 248, 251, 0.75);
 }
 
 .metric-kg {
-  width: 46px;
+  width: 54px;
 }
 
 .metric:focus-within {
@@ -314,7 +356,7 @@ input:focus-visible {
 .metric-input {
   width: 100%;
   min-width: 0;
-  height: 15px;
+  height: 27px;
   padding: 0;
   color: var(--softora-ink);
   font-family: Oswald, Inter, sans-serif;
@@ -338,6 +380,7 @@ input:focus-visible {
 .exercise-notes {
   width: 100%;
   min-width: 0;
+  min-height: 28px;
   color: var(--softora-muted);
   font-size: 11px;
   font-weight: 700;
