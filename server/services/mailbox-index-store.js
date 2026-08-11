@@ -1077,32 +1077,29 @@ function createMailboxIndexStore(deps = {}) {
 
   async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS }) {
     const syncKey = buildSyncKey(accountEmail, folder);
-    const current = await getSyncState({ accountEmail, folder });
-    const currentLockExpiresAt = Date.parse(normalizeString(current && current.lock_expires_at));
-    if (!force && Number.isFinite(currentLockExpiresAt) && currentLockExpiresAt > now().getTime()) {
-      return { ok: false, locked: true, syncKey };
-    }
-
     const lockToken = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-    const startedAt = isoNow();
-    const lockExpiresAt = new Date(now().getTime() + Math.max(10_000, Number(lockTtlMs) || SYNC_LOCK_TTL_MS)).toISOString();
     const result = await run('acquire-sync-lock', (client) =>
-      client.from(MAILBOX_INDEX_TABLES.syncState).upsert(
-        {
-          sync_key: syncKey,
-          account_email: normalizeEmail(accountEmail),
-          folder: normalizeFolder(folder),
-          status: 'syncing',
-          sync_started_at: startedAt,
-          lock_token: lockToken,
-          lock_expires_at: lockExpiresAt,
-          updated_at: startedAt,
-        },
-        { onConflict: 'sync_key' }
-      )
+      client.rpc('softora_claim_mailbox_sync_lock', {
+        p_sync_key: syncKey,
+        p_account_email: normalizeEmail(accountEmail),
+        p_folder: normalizeFolder(folder),
+        p_lock_token: lockToken,
+        p_lock_ttl_seconds: Math.ceil(Math.max(10_000, Number(lockTtlMs) || SYNC_LOCK_TTL_MS) / 1000),
+        p_force: Boolean(force),
+      })
     );
     if (!result.ok) return { ok: false, locked: false, syncKey, error: result.error };
-    return { ok: true, locked: false, syncKey, lockToken };
+    const claim = Array.isArray(result.data) ? result.data[0] : result.data;
+    if (!claim || claim.acquired !== true) {
+      const lockExpiresAt = normalizeString(claim && claim.lock_expires_at);
+      return { ok: false, locked: Boolean(claim && claim.locked), syncKey,
+        contention: lockExpiresAt ? 'active_lock' : 'capacity',
+        ...(lockExpiresAt ? { lockExpiresAt } : {}),
+      };
+    }
+    return { ok: true, locked: false, syncKey,
+      lockToken: normalizeString(claim.claimed_lock_token) || lockToken,
+    };
   }
 
   async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '' }) {
