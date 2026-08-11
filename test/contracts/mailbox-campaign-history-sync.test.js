@@ -10,6 +10,78 @@ const {
 const {
   collectCampaignThreadRecipientTerms,
 } = require('../../server/services/mailbox-campaign-sync');
+const {
+  createMailboxIndexTargetedLookups,
+  selectCampaignSeedMessages,
+} = require('../../server/repositories/mailbox-index-targeted-lookups');
+
+test('campaign history seed bewaart oude deelnemers uit elke map en onderwerpstroom binnen de cap', () => {
+  const recentQuestionMessages = Array.from({ length: 140 }, (_item, index) => ({
+    id: `inbox:question-${index}`,
+    messageId: `<question-${index}@example.nl>`,
+    date: new Date(Date.UTC(2026, 7, 11, 12, 0, -index)).toISOString(),
+  }));
+  const olderWebdesignMessages = Array.from({ length: 75 }, (_item, index) => ({
+    id: `inbox:webdesign-${index}`,
+    messageId: index === 68
+      ? '<karoena-history-seed@praktijkkaroena.nl>'
+      : `<webdesign-${index}@example.nl>`,
+    date: new Date(Date.UTC(2026, 3, 30, 12, 0, -index)).toISOString(),
+  }));
+
+  const selected = selectCampaignSeedMessages({
+    batches: [recentQuestionMessages, olderWebdesignMessages],
+    limit: 150,
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  assert.equal(selected.length, 150);
+  assert.ok(selected.some((message) =>
+    message.messageId === '<karoena-history-seed@praktijkkaroena.nl>'
+  ));
+  assert.deepEqual(
+    selected.filter((message) => message.id.startsWith('inbox:question-')).map((message) => message.id),
+    recentQuestionMessages.slice(0, 75).map((message) => message.id)
+  );
+  assert.deepEqual(
+    selected.filter((message) => message.id.startsWith('inbox:webdesign-')).map((message) => message.id),
+    olderWebdesignMessages.map((message) => message.id)
+  );
+});
+
+test('campaign history seed leest iedere map en onderwerpstroom als eigen begrensde bron', async () => {
+  const calls = [];
+  const lookups = createMailboxIndexTargetedLookups({
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    listMatchingMessagesForAccounts: async (options) => {
+      calls.push(options);
+      return [{
+        id: `${options.folder}:${options.subjectTerms[0]}`,
+        messageId: `<${options.folder}-${options.subjectTerms[0]}@example.nl>`,
+        date: '2026-05-01T12:00:00.000Z',
+      }];
+    },
+  });
+
+  const selected = await lookups.listCampaignSeedMessagesForAccount({
+    accountEmail: 'martijnven123@gmail.com',
+    folders: ['inbox', 'sent'],
+    subjectTerms: ['Kleine vraag', 'Nieuw webdesign'],
+    limit: 4,
+  });
+
+  assert.equal(calls.length, 4);
+  assert.deepEqual(calls.map((call) => [call.folder, call.subjectTerms]), [
+    ['inbox', ['Kleine vraag']],
+    ['inbox', ['Nieuw webdesign']],
+    ['sent', ['Kleine vraag']],
+    ['sent', ['Nieuw webdesign']],
+  ]);
+  assert.equal(selected.length, 4);
+  assert.ok(selected.some((message) => message.id === 'inbox:Nieuw webdesign'));
+});
 
 test('campaign history sync derives sent-recipient searches from normalized indexed messages', () => {
   assert.deepEqual(
