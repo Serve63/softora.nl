@@ -935,6 +935,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       mailboxIndexStore,
       campaignMailboxAccounts,
       messages: indexedMessages,
+      participantPriorityMessages: matchingMessages,
       campaignSubjectTerms: CAMPAIGN_SUBJECT_TERMS,
       incomingFolders: CAMPAIGN_INCOMING_FOLDERS,
       incomingLimit: CAMPAIGN_MESSAGE_SCAN_LIMIT,

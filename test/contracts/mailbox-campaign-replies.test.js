@@ -56,6 +56,44 @@ test('campaign contact history ordent deelnemers globaal over coldmail en inbox 
   assert.equal(recipientLookups[0].includes('info@praktijkkaroena.nl'), true);
 });
 
+test('campaign contact history prioriteert onderwerp-matches boven recente ruis vóór de participant-cap', async () => {
+  const baseMs = Date.parse('2026-01-01T00:00:00.000Z');
+  const recentNoise = Array.from({ length: 401 }, (_value, index) => ({
+    id: `recent-noise:${index}`,
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    email: `recent-noise-${index}@example.nl`,
+    date: new Date(baseMs + (2 * 24 * 60 * 60_000) + index * 60_000).toISOString(),
+  }));
+  const matchedHistoricalReply = {
+    id: 'inbox:karoena-historical',
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    email: 'info@praktijkkaroena.nl',
+    subject: 'Re: Nieuw webdesign gemaakt voor jullie website!',
+    date: new Date(baseMs).toISOString(),
+  };
+  const recipientLookups = [];
+  await loadMailboxCampaignContactHistory({
+    mailboxIndexStore: {
+      listMatchingMessagesForAccounts: async () => [],
+      listMessagesBySenderEmailsForAccounts: async () => [],
+      listMessagesByRecipientEmailsForAccounts: async ({ recipientEmails }) => {
+        recipientLookups.push(recipientEmails);
+        return [];
+      },
+    },
+    campaignMailboxAccounts: ['martijnven123@gmail.com'],
+    messages: [...recentNoise, matchedHistoricalReply],
+    participantPriorityMessages: [matchedHistoricalReply],
+    dedupeCampaignMessages: (messages) => messages,
+    collectCampaignThreadParticipantEmails,
+  });
+
+  assert.equal(recipientLookups.length, 1);
+  assert.equal(recipientLookups[0].includes('info@praktijkkaroena.nl'), true);
+});
+
 test('campaign mailbox applies the selected owner before limiting older conversations', async () => {
   const serveAccounts = [
     'serve@softora.nl',
