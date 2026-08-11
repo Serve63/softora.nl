@@ -358,6 +358,13 @@ function createMailboxSyncService({
         oldestIndexedCampaignUid,
         threadReferenceIds,
         threadRecipientTerms,
+        // Incremental recovery already knows the exact campaign participants.
+        // Searching every historical Message-ID again can expand into dozens of
+        // sequential IMAP HEADER queries and outlive the fenced database lease.
+        // Full/manual history hydration keeps the reference fallback, while an
+        // incremental run without participant evidence also retains it.
+        includeThreadReferenceSearch: !incrementalOnly || !threadRecipientTerms.length,
+        logImapOperation: true,
         indexedUids,
       });
       const saved = await mailboxIndexStore.upsertMessages({

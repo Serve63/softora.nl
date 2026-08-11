@@ -278,3 +278,43 @@ test('campaign incremental inbox sync searches known campaign participants by se
     },
   ]);
 });
+
+test('campaign incremental inbox recovery skips expensive reference fan-out when participant evidence exists', async () => {
+  const queries = [];
+  const client = {
+    async search(query, options) {
+      queries.push({ query, options });
+      if (query.all) return [1, 2, 3, 4, 5];
+      return [4, 5];
+    },
+  };
+
+  const selected = await resolveMailboxSyncUids({
+    client,
+    limit: 4,
+    folder: 'inbox',
+    campaignHistory: false,
+    includeThreadReferenceSearch: false,
+    threadReferenceIds: Array.from(
+      { length: 410 },
+      (_item, index) => `<campaign-${index}@example.test>`
+    ),
+    threadRecipientTerms: ['info@praktijkkaroena.nl', 'praktijkkaroena.nl'],
+    indexedUids: [1, 2, 3],
+  });
+
+  assert.deepEqual(selected, [5, 4]);
+  assert.deepEqual(queries, [
+    { query: { all: true }, options: { uid: true } },
+    {
+      query: {
+        since: CAMPAIGN_HISTORY_SINCE,
+        or: [
+          { from: 'info@praktijkkaroena.nl' },
+          { from: 'praktijkkaroena.nl' },
+        ],
+      },
+      options: { uid: true },
+    },
+  ]);
+});

@@ -3840,6 +3840,98 @@ test('campaign Gmail label sync records a failure and succeeds on the next force
   assert.equal(finished[1].error, undefined);
 });
 
+test('mailbox sync aborts a hanging IMAP operation before its database lease can expire', async () => {
+  const calls = [];
+  const finished = [];
+  let rejectSearch = null;
+  const client = {
+    usable: true,
+    async connect() {
+      calls.push('connect');
+    },
+    async list() {
+      return [{ path: 'INBOX' }];
+    },
+    async getMailboxLock() {
+      calls.push('lock');
+      return { release: () => calls.push('release') };
+    },
+    search() {
+      calls.push('search');
+      return new Promise((_resolve, reject) => {
+        rejectSearch = reject;
+      });
+    },
+    close() {
+      calls.push('close');
+      this.usable = false;
+      rejectSearch?.(new Error('connection closed by deadline'));
+    },
+    async logout() {
+      calls.push('logout');
+    },
+  };
+  const service = createMailboxService({
+    mailConfig: {},
+    runMailboxImapOperationWithDeadline: async ({
+      client: deadlineClient,
+      operation,
+      accountEmail,
+      folder,
+    }) => {
+      const operationPromise = Promise.resolve().then(operation);
+      operationPromise.catch(() => null);
+      await new Promise((resolve) => setImmediate(resolve));
+      const error = new Error(
+        `IMAP-operatie timeout na 70000ms voor ${accountEmail} (${folder}).`
+      );
+      error.code = 'MAILBOX_IMAP_OPERATION_TIMEOUT';
+      error.status = 504;
+      deadlineClient.close();
+      throw error;
+    },
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'martijnven123@gmail.com',
+      name: 'Martijn',
+      imapHost: 'imap.gmail.com',
+      imapUser: 'martijnven123@gmail.com',
+      imapPass: 'app-password',
+    }]),
+    createImapClient: () => client,
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'deadline-lock' }),
+      upsertMessages: async () => {
+        throw new Error('timed-out IMAP data mag niet worden opgeslagen');
+      },
+      finishSync: async (options) => {
+        finished.push(options);
+        return { ok: true };
+      },
+    },
+    logger: { error() {}, info() {}, warn() {} },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse({
+    method: 'POST',
+    query: {},
+    body: {
+      account: 'martijnven123@gmail.com',
+      folder: 'inbox',
+    },
+  }, response);
+
+  assert.equal(response.statusCode, 207);
+  assert.equal(response.body.ok, false);
+  assert.match(response.body.results[0].error, /IMAP-operatie timeout/i);
+  assert.deepEqual(calls, ['connect', 'lock', 'search', 'close', 'release']);
+  assert.equal(finished.length, 1);
+  assert.equal(finished[0].lockToken, 'deadline-lock');
+  assert.match(finished[0].error, /IMAP-operatie timeout/i);
+});
+
 test('mailbox cron sync indexes a lightweight sent batch by default', async () => {
   const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
     uid: index + 1,

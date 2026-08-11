@@ -30,11 +30,14 @@ async function searchThreadReplyUids({
   client,
   threadReferenceIds = [],
   threadRecipientTerms = [],
+  includeThreadReferenceSearch = true,
   logger = console,
   accountEmail = '',
   folder = '',
 } = {}) {
-  const referenceIds = normalizeMessageIdList(threadReferenceIds);
+  const referenceIds = includeThreadReferenceSearch
+    ? normalizeMessageIdList(threadReferenceIds)
+    : [];
   const recipientTerms = normalizeMessageIdList(threadRecipientTerms);
   const normalizedFolder = String(folder || '').trim().toLowerCase();
   const participantSearchField = normalizedFolder === 'sent'
@@ -145,6 +148,7 @@ async function resolveMailboxSyncUids({
   oldestIndexedCampaignUid = 0,
   threadReferenceIds = [],
   threadRecipientTerms = [],
+  includeThreadReferenceSearch = true,
   indexedUids = [],
   logger = console,
   accountEmail = '',
@@ -157,6 +161,7 @@ async function resolveMailboxSyncUids({
           client,
           threadReferenceIds,
           threadRecipientTerms,
+          includeThreadReferenceSearch,
           logger,
           accountEmail,
           folder,
@@ -195,6 +200,7 @@ async function resolveMailboxSyncUids({
     client,
     threadReferenceIds,
     threadRecipientTerms,
+    includeThreadReferenceSearch,
     logger,
     accountEmail,
     folder,

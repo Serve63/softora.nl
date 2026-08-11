@@ -250,6 +250,7 @@ test('incremental campaign refresh carries known contact participants and header
     '<karoena-inbound@example.nl>',
     '<karoena-outbound@example.nl>',
   ]);
+  assert.equal(fetches[0].includeThreadReferenceSearch, false);
 });
 
 test('incremental refresh waits for transient mailbox lock contention instead of silently skipping', async () => {
