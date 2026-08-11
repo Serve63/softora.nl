@@ -2,13 +2,12 @@
 
 const RECIPIENT_LOOKUP_BATCH_SIZE = 25;
 
-function quotePostgrestFilterValue(value) {
-  return `"${String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-}
-
 function buildRecipientCandidateFilter(recipientEmails) {
   return (Array.isArray(recipientEmails) ? recipientEmails : [])
-    .map((email) => `recipients_text.ilike.${quotePostgrestFilterValue(`*${email}*`)}`)
+    // PostgREST's ilike wildcard is `%`. Keep this in the same form as the
+    // other targeted OR lookups; the exact lower-case match below remains the
+    // ownership-safe verifier for the candidate rows.
+    .map((email) => `recipients_text.ilike.%${email}%`)
     .join(',');
 }
 
