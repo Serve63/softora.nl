@@ -120,10 +120,10 @@ function createMailboxIndexStore(deps = {}) {
     }
   }
 
-  async function run(label, operation) {
+  async function run(label, operation, { bypassFailureCooldown = false } = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
-    if (isFailureCooldownActive()) {
+    if (isFailureCooldownActive() && !bypassFailureCooldown) {
       return { ok: false, unavailable: false, data: null, error: createFailureCooldownError() };
     }
     try {
@@ -1083,12 +1083,14 @@ function createMailboxIndexStore(deps = {}) {
       updated_at: isoNow(),
     };
     if (!failed) patch.last_synced_at = isoNow();
-    return run('finish-sync', (client) =>
-      client
+    return run(
+      'finish-sync',
+      (client) => client
         .from(MAILBOX_INDEX_TABLES.syncState)
         .update(patch)
         .eq('sync_key', syncKey)
-        .eq('lock_token', normalizeString(lockToken))
+        .eq('lock_token', normalizeString(lockToken)),
+      { bypassFailureCooldown: true }
     );
   }
 

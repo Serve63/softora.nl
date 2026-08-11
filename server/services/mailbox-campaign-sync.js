@@ -18,6 +18,7 @@ const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
 const CAMPAIGN_GMAIL_ALL_MAIL_FOLDER = 'allmail';
 const CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT = 8;
+const MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS = 45;
 const CAMPAIGN_HISTORY_SEED_FOLDERS = Object.freeze([
   'inbox',
   'sent',
@@ -301,6 +302,9 @@ function createMailboxSyncService({
             ? collectMissingCampaignThreadReferenceIds(indexedCampaignMessages)
             : collectCampaignThreadReferenceIds(indexedCampaignMessages);
           threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedCampaignMessages);
+          if (incrementalOnly) {
+            threadRecipientTerms = threadRecipientTerms.slice(0, MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS);
+          }
         } else if (
           hydrateCampaignHistory &&
           normalizedFolder === 'sent' &&
@@ -503,6 +507,7 @@ module.exports = {
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
   INCREMENTAL_LOCK_RETRY_ATTEMPTS,
   INCREMENTAL_LOCK_RETRY_DELAY_MS,
+  MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   collectMissingCampaignThreadReferenceIds,
