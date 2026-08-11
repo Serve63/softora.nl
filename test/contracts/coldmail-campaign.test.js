@@ -1049,6 +1049,40 @@ test('coldmail live stats never overwrite reliable totals with a transient guard
   assert.equal(latestCache.stats.totalSent, 1);
 });
 
+test('coldmail live stats preserve a proven all-time total when a later reliable read regresses', async () => {
+  let clockMs = Date.parse('2026-08-04T15:00:00.000Z');
+  let readCount = 0;
+  const makeGroups = (count) => Array.from({ length: count }, (_, index) => ({
+    reservation_id: `counter-regression-${count}-${index}`,
+    recipient_email: `counter-${count}-${index}@example.test`,
+    recipient_id: `counter-${count}-${index}`,
+    sender_email: 'serve@softora.nl',
+    provider: 'softora',
+    channel: 'coldmail',
+    source: 'softora-coldmail-pre-send',
+    updated_at: '2026-08-04T09:00:00.000Z',
+  }));
+  const { service } = createService({
+    now: () => new Date(clockMs),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        readCount += 1;
+        return makeGroups(readCount === 1 ? 2328 : 58);
+      },
+    },
+    dataOpsStore: { async listMailboxMessages() { return []; } },
+  });
+
+  const first = await service.getColdmailLiveStats();
+  assert.equal(first.stats.systemTotalSent, 2328);
+  clockMs += 31 * 1000;
+  const second = await service.getColdmailLiveStats();
+
+  assert.equal(second.stats.systemTotalSent, 2328);
+  assert.equal(second.stats.totalSent, 2328);
+  assert.equal(second.stats.authoritativeStatsStaleReason, 'cumulative_total_regressed');
+});
+
 test('coldmail live stats reconcile a stale durable zero with current-day central guards before first paint', async () => {
   const calls = [];
   const sentGroups = Array.from({ length: 11 }, (_, index) => ({

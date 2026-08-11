@@ -959,7 +959,7 @@
     function pruneDeprecatedSidebarLinks(sidebar) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const legacyAnalyticsLinks = sidebar.querySelectorAll(
-            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"]'
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="websitegenerator"], a[data-sidebar-key="bookkeeping"]'
         );
         legacyAnalyticsLinks.forEach(function (link) {
             if (link && link.parentNode) {

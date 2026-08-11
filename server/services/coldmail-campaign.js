@@ -16,6 +16,7 @@ const autopilotResilience = require('./coldmail-autopilot-resilience');
 const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-reconciliation');
 const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation'); const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
+const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
   fitWebdesignPreviewForEmail,
@@ -3619,82 +3620,14 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  function hasReliableColdmailLiveTotals(payload) {
-    const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
-    const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
-    return stats.reliable === true &&
-      normalizeString(stats.dateKey) === expectedDateKey &&
-      Number.isFinite(Number(stats.systemTotalSent ?? stats.totalSent));
-  }
-
-  function preserveReliableColdmailLiveStats(payload, previousPayload) {
-    if (!hasReliableColdmailLiveTotals(previousPayload)) return payload;
-    const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
-    const previous = previousPayload.stats;
-    const mergedStats = { ...stats };
-    let changed = false;
-    if (!hasReliableColdmailLiveTotals(payload)) {
-      [
-        'sentToday',
-        'systemSentToday',
-        'centralGuardSentToday',
-        'systemTotalSent',
-        'centralGuardTotalSent',
-        'totalSent',
-        'webdesignTotalSent',
-        'webdesignSentToday',
-        'lastSuccessfulSendAt',
-        'lastSenderEmail',
-      ].forEach((field) => {
-        mergedStats[field] = previous[field];
-      });
-      mergedStats.reliable = true;
-      mergedStats.source = previous.source;
-      mergedStats.authoritativeSource = previous.authoritativeSource;
-      mergedStats.authoritativeStatsStale = true;
-      mergedStats.authoritativeStatsUpdatedAt = previous.authoritativeStatsUpdatedAt || previous.updatedAt || '';
-      changed = true;
-    }
-    if (
-      (stats.mailboxBounceStatsAvailable === false || stats.bounceStatsReliable === false) &&
-      previous.mailboxBounceStatsAvailable !== false &&
-      previous.bounceStatsReliable !== false
-    ) {
-      [
-        'bounces',
-        'totalBounces',
-        'bounceStatsSource',
-        'bounceStatsReliable',
-        'bounceDeduplication',
-        'mailboxBounces',
-        'mailboxBouncesToday',
-        'mailboxBounceMessages',
-        'mailboxBounceMatchedMessages',
-        'mailboxBounceUnresolvedMessages',
-        'mailboxBounceDuplicateNotices',
-        'mailboxBounceStatsAvailable',
-        'mailboxBounceStatsUnavailableReason',
-        'bounceTypes',
-        'bounceItems',
-        'bouncesToday',
-        'todayBounces',
-        'bounceTypesToday',
-        'bounceItemsToday',
-      ].forEach((field) => {
-        mergedStats[field] = previous[field];
-      });
-      changed = true;
-    }
-    return changed ? { ...payload, stats: mergedStats } : payload;
-  }
-
   function refreshColdmailLiveStats() {
     if (!coldmailLiveStatsPromise) {
       coldmailLiveStatsPromise = loadFreshColdmailLiveStats()
         .then(async (payload) => {
           const stablePayload = preserveReliableColdmailLiveStats(
             payload,
-            coldmailLiveStatsCache && coldmailLiveStatsCache.payload
+            coldmailLiveStatsCache && coldmailLiveStatsCache.payload,
+            getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE)
           );
           coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload: stablePayload };
           await persistDurableColdmailLiveStats(stablePayload);

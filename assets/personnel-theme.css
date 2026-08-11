@@ -44,7 +44,7 @@
 
 /* Houd de sidebar visueel vast tijdens echte documentnavigatie tussen premium pagina's. */
 @view-transition {
-    navigation: auto;
+    navigation: none;
 }
 
 @media (min-width: 901px) {

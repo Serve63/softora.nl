@@ -424,6 +424,71 @@ test('WHOOP serializes concurrent syncs and rotates the refresh token once', asy
   assert.notEqual(supabase.tables.softora_health_whoop_connections[0].encrypted_tokens, previousEncryptedTokens);
 });
 
+test('WHOOP reclaims an expired token-refresh lease without replaying a refresh token', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      token_refresh_lock_id: 'stale-lease',
+      token_refresh_lock_until: '2026-08-09T07:00:00.000Z',
+    })],
+  });
+  let tokenCalls = 0;
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => {
+      if (String(url).includes('/oauth/oauth2/token')) {
+        tokenCalls += 1;
+        return createJsonResponse(200, { access_token: 'access-reclaimed', refresh_token: 'refresh-rotated', expires_in: 3600 });
+      }
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const result = await service.sync({ mode: 'manual', targetDay: '2026-08-10' });
+  assert.equal(result.ok, true);
+  assert.equal(tokenCalls, 1);
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].status, 'connected');
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].token_refresh_lock_id, null);
+});
+
+test('WHOOP status distinguishes an active lease from a stale running status', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      last_sync_status: 'running',
+      token_refresh_lock_id: 'active-refresh',
+      token_refresh_lock_until: '2026-08-10T08:05:00.000Z',
+      sync_lock_id: null,
+      sync_lock_until: null,
+    })],
+  });
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    now: () => new Date('2026-08-10T08:00:00.000Z'),
+    config: { clientId: 'id', clientSecret: 'secret', redirectUri: 'https://www.softora.nl/callback', tokenEncryptionKey },
+  });
+  const active = await service.getStatus();
+  assert.equal(active.tokenRefreshInProgress, true);
+  assert.equal(active.syncState, 'token_refreshing');
+
+  supabase.tables.softora_health_whoop_connections[0].token_refresh_lock_id = null;
+  supabase.tables.softora_health_whoop_connections[0].token_refresh_lock_until = null;
+  const stale = await service.getStatus();
+  assert.equal(stale.staleSyncStatus, true);
+  assert.equal(stale.syncState, 'stale');
+
+  supabase.tables.softora_health_whoop_connections[0].last_sync_status = 'failed';
+  supabase.tables.softora_health_whoop_connections[0].last_sync_error = 'WHOOP-tokenvernieuwing is nog bezig; probeer de sync zo opnieuw.';
+  const staleBusyFailure = await service.getStatus();
+  assert.equal(staleBusyFailure.staleSyncStatus, true);
+  assert.equal(staleBusyFailure.syncState, 'stale');
+});
+
 test('WHOOP backfill starts after the last completed day and remains bounded', async () => {
   const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
   const supabase = createMemorySupabase({
@@ -627,4 +692,8 @@ test('health dossier has no manual WHOOP or spreadsheet controls', () => {
     assert.doesNotMatch(html, new RegExp(selector));
     assert.doesNotMatch(script, new RegExp(selector));
   });
+  assert.match(script, /tokenRefreshInProgress/);
+  assert.match(script, /staleSyncStatus/);
+  assert.match(script, /laatst bevestigde gegevens/);
+  assert.doesNotMatch(script, /laatste sync gaf:/);
 });
