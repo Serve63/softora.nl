@@ -397,13 +397,16 @@ function createMailboxSyncService({
         throw saved?.error || new Error('Mailbox-index opslaan mislukt');
       }
       const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
-      await mailboxIndexStore.finishSync({
+      const finalized = await mailboxIndexStore.finishSync({
         accountEmail: account.email,
         folder: normalizedFolder,
         lockToken: lock.lockToken,
         messageCount: messages.length,
         lastUid,
       });
+      if (!finalized?.ok) {
+        throw finalized?.error || new Error('Mailbox-syncstatus afronden mislukt');
+      }
       return {
         ok: true,
         account: account.email,
