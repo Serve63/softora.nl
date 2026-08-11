@@ -4076,6 +4076,7 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
     or: [
       { header: { references: indexedInboxMessageId } },
       { header: { 'in-reply-to': indexedInboxMessageId } },
+      { header: { 'message-id': indexedInboxMessageId } },
     ],
   });
   assert.deepEqual(client.searchQueries[4], {

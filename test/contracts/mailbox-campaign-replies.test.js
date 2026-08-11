@@ -1803,6 +1803,140 @@ test('targeted later-Sent recovery fails closed when two same-thread candidates 
   assert.deepEqual(result.threadMessages, []);
 });
 
+test('campaign reply service herstelt vervolgcontact met gewijzigde onderwerpregel via contactidentiteit', async () => {
+  const firstReply = {
+    id: 'inbox:karoena-first',
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Praktijk Karoena',
+    email: 'info@praktijkkaroena.nl',
+    to: 'martijnven123@gmail.com',
+    subject: 'Re: Nieuw webdesign gemaakt voor jullie website!',
+    preview: 'Ik ga er nog even rustig verder naar kijken.',
+    date: '2026-04-27T10:05:28.000Z',
+    messageId: '<karoena-first@example.nl>',
+    inReplyTo: '<karoena-original@gmail.com>',
+    references: '<karoena-original@gmail.com>',
+  };
+  const changedSubjectReply = {
+    id: 'inbox:karoena-second',
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Praktijk Karoena',
+    email: 'info@praktijkkaroena.nl',
+    to: 'martijnven123@gmail.com',
+    subject: 'Voorstel samenwerking: rebranding website',
+    preview: 'Toen jij jouw nieuwe webdesign stuurde...',
+    date: '2026-05-20T10:07:00.000Z',
+    messageId: '<karoena-second@example.nl>',
+  };
+  const latestChangedSubjectReply = {
+    ...changedSubjectReply,
+    id: 'inbox:karoena-latest',
+    preview: 'Fijn, ik heb 12 juni om 10.00 uur genoteerd.',
+    date: '2026-05-28T14:14:00.000Z',
+    messageId: '<karoena-latest@example.nl>',
+    inReplyTo: changedSubjectReply.messageId,
+    references: changedSubjectReply.messageId,
+  };
+  const original = {
+    id: 'sent:karoena-original',
+    folder: 'sent',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijnven123@gmail.com',
+    to: 'info@praktijkkaroena.nl',
+    subject: 'Nieuw webdesign gemaakt voor jullie website!',
+    preview: 'Afgelopen week kwam ik jullie website tegen.',
+    date: '2026-04-23T17:38:00.000Z',
+    messageId: '<karoena-original@gmail.com>',
+    originalCampaignOutbound: true,
+  };
+  const followUp = {
+    id: 'sent:karoena-follow-up',
+    folder: 'sent',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijnven123@gmail.com',
+    to: 'info@praktijkkaroena.nl',
+    subject: 'Voorstel samenwerking: rebranding website',
+    preview: 'Dank voor je reactie.',
+    date: '2026-05-29T10:07:19.000Z',
+    messageId: '<karoena-follow-up@gmail.com>',
+    inReplyTo: latestChangedSubjectReply.messageId,
+    references: latestChangedSubjectReply.messageId,
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [firstReply] : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => (
+        folder === 'sent' ? [original] : [firstReply]
+      ),
+      listMessagesBySenderEmailsForAccounts: async ({ folder }) => (
+        folder === 'inbox' ? [changedSubjectReply, latestChangedSubjectReply] : []
+      ),
+      listMessagesByRecipientEmailsForAccounts: async () => [followUp],
+      listMessagesByMessageIdsForAccounts: async () => [original],
+      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'praktijk-karoena',
+        bedrijf: 'Praktijk Karoena',
+        email: 'info@praktijkkaroena.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].id, latestChangedSubjectReply.id);
+  const thread = [replies[0], ...replies[0].threadMessages];
+  assert.deepEqual(new Set(thread.map((message) => message.id)), new Set([
+    firstReply.id,
+    changedSubjectReply.id,
+    latestChangedSubjectReply.id,
+    original.id,
+    followUp.id,
+  ]));
+  assert.equal(thread.filter((message) => message.folder === 'inbox').length, 3);
+  assert.equal(thread.filter((message) => message.folder === 'sent').length, 2);
+  assert.equal(replies[0].latestOutboundAt, followUp.date);
+});
+
+test('campaign reply service faalt gesloten wanneer gerichte contacthistorie niet leesbaar is', async () => {
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [{
+        id: 'inbox:karoena',
+        folder: 'inbox',
+        accountEmail: 'martijnven123@gmail.com',
+        email: 'info@praktijkkaroena.nl',
+        subject: 'Re: Nieuw webdesign',
+        date: '2026-05-20T10:07:00.000Z',
+      }] : [],
+      listMatchingMessagesForAccounts: async () => [],
+      listMessagesBySenderEmailsForAccounts: async () => null,
+      listMessagesByRecipientEmailsForAccounts: async () => [],
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        email: 'info@praktijkkaroena.nl',
+        campaignType: 'webdesign',
+      }],
+    },
+  });
+
+  await assert.rejects(
+    service.listReplies({ limit: 100, owner: 'martijn' }),
+    (error) => error && error.status === 503 && /incoming/.test(error.message)
+  );
+});
+
 test('campaign reply service hydrateert alleen de zichtbare conversatieroots en niet alle threadbodies', async () => {
   const hydratedIds = [];
   const replies = Array.from({ length: 140 }, (_item, index) => ({

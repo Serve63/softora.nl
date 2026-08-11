@@ -22,11 +22,19 @@ test('campaign history sync derives sent-recipient searches from normalized inde
         email: 'contact@gmail.com',
         subject: 'Re: Nieuw webdesign',
       },
+      {
+        folder: 'sent',
+        email: 'martijn@softora.nl',
+        to: 'Praktijk Karoena <info@praktijkkaroena.nl>',
+        subject: 'Nieuw webdesign',
+      },
     ]),
     [
       'info@joeyscardetailing.nl',
       'joeyscardetailing.nl',
       'contact@gmail.com',
+      'info@praktijkkaroena.nl',
+      'praktijkkaroena.nl',
     ]
   );
 });
@@ -146,6 +154,11 @@ test('campaign history sync prioritizes missing sent replies linked by thread he
           'in-reply-to': '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>',
         },
       },
+      {
+        header: {
+          'message-id': '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>',
+        },
+      },
     ],
   });
   assert.equal(selected.filter((uid) => uid === 42).length, 1);
@@ -157,4 +170,39 @@ test('campaign history sync prioritizes missing sent replies linked by thread he
       { to: 'vangestelsteigerbouw.nl' },
     ],
   });
+});
+
+test('campaign incremental inbox sync searches known campaign participants by sender', async () => {
+  const queries = [];
+  const client = {
+    async search(query, options) {
+      queries.push({ query, options });
+      if (query.all) return [1, 2, 3, 4];
+      return [4];
+    },
+  };
+
+  const selected = await resolveMailboxSyncUids({
+    client,
+    limit: 2,
+    folder: 'inbox',
+    campaignHistory: false,
+    threadRecipientTerms: ['info@praktijkkaroena.nl', 'praktijkkaroena.nl'],
+    indexedUids: [1, 2, 3],
+  });
+
+  assert.deepEqual(selected, [4]);
+  assert.deepEqual(queries, [
+    { query: { all: true }, options: { uid: true } },
+    {
+      query: {
+        since: CAMPAIGN_HISTORY_SINCE,
+        or: [
+          { from: 'info@praktijkkaroena.nl' },
+          { from: 'praktijkkaroena.nl' },
+        ],
+      },
+      options: { uid: true },
+    },
+  ]);
 });

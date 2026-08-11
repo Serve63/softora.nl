@@ -39,6 +39,8 @@ const {
 } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
+const { collectCampaignThreadParticipantEmails } = require('./mailbox-campaign-participants');
+const { loadMailboxCampaignContactHistory } = require('./mailbox-campaign-contact-history');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -128,6 +130,10 @@ function getCampaignCounterpartyEmail(message) {
 function getStableCampaignThreadKey(message) {
   const account = normalizeEmail(message && message.accountEmail);
   const counterparty = getCampaignCounterpartyEmail(message);
+  const campaignThreadKey = normalizeText(message && message.campaign && message.campaign.threadKey);
+  if (account && counterparty && campaignThreadKey) {
+    return `${account}|${counterparty}|${campaignThreadKey}`;
+  }
   const subject = getCanonicalCampaignSubject(message && message.subject);
   return account && counterparty && subject
     ? `${account}|${counterparty}|${subject}`
@@ -508,7 +514,12 @@ function mergeCampaignConversationsByStableIdentity(conversations, sentMessages)
     // Equal subjects are not thread proof. Multiple disjoint conversations must
     // remain isolated unless each segment has its own exact parent/reply proof
     // and the segments form one non-overlapping inbound -> outbound sequence.
-    if (!canMergeProvenConversationSegments(groupedConversations)) return groupedConversations;
+    const hasExplicitCampaignIdentity = groupedConversations.every((conversation) => (
+      normalizeText(conversation && conversation.campaign && conversation.campaign.threadKey)
+    ));
+    if (!hasExplicitCampaignIdentity && !canMergeProvenConversationSegments(groupedConversations)) {
+      return groupedConversations;
+    }
     const stableSentMessages = sentByStableKey.get(stableKey) || [];
     const fallbackSentMessages = [];
     const groupedMessages = groupedConversations.flatMap((conversation) => {
@@ -836,6 +847,7 @@ function buildCampaignReply(message, customer) {
       company,
       account,
       customerId,
+      threadKey: 'webdesign-contact',
       status,
       actionRequired,
     },
@@ -911,14 +923,25 @@ function createMailboxCampaignRepliesService(deps = {}) {
             },
           })
         : [];
-    const messages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
+    const indexedMessages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
       ? dedupeCampaignMessages([...recentMessages, ...matchingMessages])
       : null;
-    if (!Array.isArray(messages)) {
+    if (!Array.isArray(indexedMessages)) {
       const error = new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.');
       error.status = 503;
       throw error;
     }
+    const { messages, sentMessages: allSeedSentMessages } = await loadMailboxCampaignContactHistory({
+      mailboxIndexStore,
+      campaignMailboxAccounts,
+      messages: indexedMessages,
+      campaignSubjectTerms: CAMPAIGN_SUBJECT_TERMS,
+      incomingFolders: CAMPAIGN_INCOMING_FOLDERS,
+      incomingLimit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+      sentLimit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+      dedupeCampaignMessages,
+      collectCampaignThreadParticipantEmails,
+    });
     if (!messages.length) return { messages: [], snapshotMessages: [] };
 
     const campaignMessages = dedupeCampaignMessages(
@@ -965,26 +988,6 @@ function createMailboxCampaignRepliesService(deps = {}) {
       })
       .filter(Boolean);
 
-    const sentMessagesResult = await (
-      typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
-        ? mailboxIndexStore.listMatchingMessagesForAccounts({
-            accountEmails: campaignMailboxAccounts,
-            folder: 'sent',
-            subjectTerms: CAMPAIGN_SUBJECT_TERMS,
-            limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-          })
-        : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-          ? mailboxIndexStore.listAllMessagesForAccounts({
-              accountEmails: campaignMailboxAccounts,
-              folder: 'sent',
-              limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-            })
-          : mailboxIndexStore.listMessagesForAccounts({
-              accountEmails: campaignMailboxAccounts,
-              folder: 'sent',
-              limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-            })
-    ).catch(() => []);
     const parentMessageIds = getMessageReferenceLookupValues(replies);
     const targetedParentMessagesResult = parentMessageIds.length &&
       typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
@@ -1010,7 +1013,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
         }).catch(() => [])
       : [];
     const sentMessages = dedupeCampaignMessages([
-      ...(Array.isArray(sentMessagesResult) ? sentMessagesResult : []),
+      ...allSeedSentMessages,
       ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
       ...targetedSentDescendantsResult,
       ...(Array.isArray(acceptedSendIntents) ? acceptedSendIntents.map(buildAcceptedProvenanceMessage) : []),

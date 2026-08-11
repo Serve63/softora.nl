@@ -1069,6 +1069,81 @@ test('mailbox index store filtert campagneberichten in SQL en dedupliceert overl
   assert.deepEqual(ranges, [[0, 499], [0, 499]]);
 });
 
+test('mailbox index store haalt vervolgberichten gericht op afzender en ontvanger op', async () => {
+  const calls = [];
+  const client = {
+    from() {
+      const query = {
+        select() { return query; },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        eq(column, value) {
+          calls.push(['eq', column, value]);
+          return query;
+        },
+        ilike(column, value) {
+          calls.push(['ilike', column, value]);
+          return query;
+        },
+        is() { return query; },
+        order() { return query; },
+        limit() {
+          return Promise.resolve({
+            data: [{
+              message_key: 'martijnven123@gmail.com|inbox|35057',
+              account_email: 'martijnven123@gmail.com',
+              folder: 'inbox',
+              uid: 35057,
+              provider_id: 'inbox:35057',
+              message_id: '<karoena-reply@example.nl>',
+              sender_name: 'Praktijk Karoena',
+              sender_email: 'info@praktijkkaroena.nl',
+              recipients_text: 'martijnven123@gmail.com',
+              subject: 'Voorstel samenwerking: rebranding website',
+              date: '2026-05-28T12:52:58.000Z',
+            }],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const incoming = await store.listMessagesBySenderEmailsForAccounts({
+    accountEmails: ['martijnven123@gmail.com'],
+    folder: 'inbox',
+    senderEmails: ['info@praktijkkaroena.nl'],
+    limit: 20,
+  });
+  const sent = await store.listMessagesByRecipientEmailsForAccounts({
+    accountEmails: ['martijnven123@gmail.com'],
+    folder: 'sent',
+    recipientEmails: ['info@praktijkkaroena.nl'],
+    limit: 20,
+  });
+
+  assert.equal(incoming.length, 1);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(calls.filter((call) => call[0] === 'in'), [
+    ['in', 'account_email', ['martijnven123@gmail.com']],
+    ['in', 'sender_email', ['info@praktijkkaroena.nl']],
+    ['in', 'account_email', ['martijnven123@gmail.com']],
+  ]);
+  assert.deepEqual(calls.filter((call) => call[0] === 'ilike').at(-1), [
+    'ilike',
+    'recipients_text',
+    '%info@praktijkkaroena.nl%',
+  ]);
+});
+
 test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id op', async () => {
   const calls = [];
   const client = {

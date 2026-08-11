@@ -36,12 +36,19 @@ async function searchThreadReplyUids({
 } = {}) {
   const referenceIds = normalizeMessageIdList(threadReferenceIds);
   const recipientTerms = normalizeMessageIdList(threadRecipientTerms);
+  const normalizedFolder = String(folder || '').trim().toLowerCase();
+  const participantSearchField = normalizedFolder === 'sent'
+    ? 'to'
+    : ['inbox', 'coldmail'].includes(normalizedFolder)
+      ? 'from'
+      : 'to';
   const replyUids = [];
   for (let offset = 0; offset < referenceIds.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = referenceIds.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
     const alternatives = batch.flatMap((messageId) => [
       { header: { references: messageId } },
       { header: { 'in-reply-to': messageId } },
+      { header: { 'message-id': messageId } },
     ]);
     try {
       const found = await client.search(
@@ -64,7 +71,7 @@ async function searchThreadReplyUids({
   }
   for (let offset = 0; offset < recipientTerms.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = recipientTerms.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
-    const alternatives = batch.map((term) => ({ to: term }));
+    const alternatives = batch.map((term) => ({ [participantSearchField]: term }));
     const query =
       alternatives.length === 1
         ? {
@@ -145,8 +152,19 @@ async function resolveMailboxSyncUids({
 } = {}) {
   const allUids = await client.search({ all: true }, { uid: true });
   if (!campaignHistory) {
+    const targetedUids = threadReferenceIds.length || threadRecipientTerms.length
+      ? await searchThreadReplyUids({
+          client,
+          threadReferenceIds,
+          threadRecipientTerms,
+          logger,
+          accountEmail,
+          folder,
+        })
+      : [];
     return selectMailboxSyncUids({
       allUids,
+      priorityUids: targetedUids,
       indexedUids,
       limit,
     });
