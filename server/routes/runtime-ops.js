@@ -22,7 +22,23 @@ function rejectLegacyPasswordRegisterRead(req, res, next) {
   });
 }
 
+function rejectUnwiredPremiumAdminGuard(_req, res) {
+  return res.status(503).json({
+    ok: false,
+    code: 'PREMIUM_ADMIN_SECURITY_NOT_WIRED',
+    error: 'Premium admin-beveiliging is tijdelijk niet beschikbaar.',
+  });
+}
+
+function getUiStateScope(req) {
+  return String(req?.params?.scope || req?.query?.scope || '').trim().toLowerCase();
+}
+
 function registerRuntimeOpsRoutes(app, deps) {
+  const requirePremiumAdminApiAccess =
+    typeof deps.requirePremiumAdminApiAccess === 'function'
+      ? deps.requirePremiumAdminApiAccess
+      : rejectUnwiredPremiumAdminGuard;
   const requireFreshPasswordRegisterApiAccess =
     typeof deps.requireFreshPasswordRegisterApiAccess === 'function'
       ? deps.requireFreshPasswordRegisterApiAccess
@@ -35,6 +51,10 @@ function registerRuntimeOpsRoutes(app, deps) {
     typeof deps.requirePasswordRegisterAccessProof === 'function'
       ? deps.requirePasswordRegisterAccessProof
       : rejectUnwiredPasswordRegisterGuard;
+  const requireSensitiveUiStateAccess = (req, res, next) => {
+    if (getUiStateScope(req) !== 'sportschool_logboek') return next();
+    return requirePremiumAdminApiAccess(req, res, next);
+  };
   app.get('/api/dashboard/activity', (req, res) =>
     deps.coordinator.sendDashboardActivityResponse(req, res)
   );
@@ -48,36 +68,41 @@ function registerRuntimeOpsRoutes(app, deps) {
     '/api/ui-state/:scope',
     requireFreshPasswordRegisterApiAccess,
     rejectLegacyPasswordRegisterRead,
+    requireSensitiveUiStateAccess,
     async (req, res) => deps.coordinator.sendUiStateGetResponse(req, res, req.params.scope)
   );
   app.get(
     '/api/ui-state-get',
     requireFreshPasswordRegisterApiAccess,
     rejectLegacyPasswordRegisterRead,
+    requireSensitiveUiStateAccess,
     async (req, res) => deps.coordinator.sendUiStateGetResponse(req, res, req.query.scope)
   );
   app.post(
     '/api/ui-state-read',
     requireFreshPasswordRegisterApiAccess,
     requirePasswordRegisterAccessProof,
+    requireSensitiveUiStateAccess,
     async (req, res) => deps.coordinator.sendUiStateGetResponse(req, res, req.query.scope)
   );
   app.post(
     '/api/ui-state/:scope',
     requireFreshPasswordRegisterApiAccess,
     requirePasswordRegisterWriteProof,
+    requireSensitiveUiStateAccess,
     async (req, res) => deps.coordinator.sendUiStateSetResponse(req, res, req.params.scope)
   );
   app.post(
     '/api/ui-state-set',
     requireFreshPasswordRegisterApiAccess,
     requirePasswordRegisterWriteProof,
+    requireSensitiveUiStateAccess,
     async (req, res) => deps.coordinator.sendUiStateSetResponse(req, res, req.query.scope)
   );
-  app.get('/api/sportschool-logboek', async (req, res) =>
+  app.get('/api/sportschool-logboek', requirePremiumAdminApiAccess, async (req, res) =>
     deps.coordinator.sendSportschoolLogbookGetResponse(req, res)
   );
-  app.post('/api/sportschool-logboek', async (req, res) =>
+  app.post('/api/sportschool-logboek', requirePremiumAdminApiAccess, async (req, res) =>
     deps.coordinator.sendSportschoolLogbookSetResponse(req, res)
   );
   app.post('/api/dashboard/activity', (req, res) =>

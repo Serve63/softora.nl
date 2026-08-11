@@ -69,6 +69,45 @@ create table if not exists public.softora_sportschool_logbook_history (
 alter table public.softora_sportschool_logbook enable row level security;
 alter table public.softora_sportschool_logbook_history enable row level security;
 
+revoke all privileges on table public.softora_sportschool_logbook
+  from public, anon, authenticated;
+revoke all privileges on table public.softora_sportschool_logbook_history
+  from public, anon, authenticated;
+revoke all privileges on sequence public.softora_sportschool_logbook_history_history_id_seq
+  from public, anon, authenticated;
+
+grant select, insert, update, delete on table public.softora_sportschool_logbook
+  to service_role;
+grant select, insert, update, delete on table public.softora_sportschool_logbook_history
+  to service_role;
+grant usage, select on sequence public.softora_sportschool_logbook_history_history_id_seq
+  to service_role;
+
+drop policy if exists softora_sportschool_logbook_public_insert
+  on public.softora_sportschool_logbook;
+drop policy if exists softora_sportschool_logbook_public_select
+  on public.softora_sportschool_logbook;
+drop policy if exists softora_sportschool_logbook_public_update
+  on public.softora_sportschool_logbook;
+
+drop policy if exists softora_sportschool_logbook_service_role_all
+  on public.softora_sportschool_logbook;
+create policy softora_sportschool_logbook_service_role_all
+  on public.softora_sportschool_logbook
+  for all
+  to service_role
+  using (true)
+  with check (true);
+
+drop policy if exists softora_sportschool_logbook_history_service_role_all
+  on public.softora_sportschool_logbook_history;
+create policy softora_sportschool_logbook_history_service_role_all
+  on public.softora_sportschool_logbook_history
+  for all
+  to service_role
+  using (true)
+  with check (true);
+
 create index if not exists idx_softora_sportschool_logbook_history_logbook_saved_at
   on public.softora_sportschool_logbook_history (logbook_id, saved_at desc);
 

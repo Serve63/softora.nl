@@ -292,6 +292,11 @@ create trigger softora_mailbox_messages_preserve_read_state
 before update on public.softora_mailbox_messages
 for each row execute function public.softora_preserve_mailbox_read_state();
 
+revoke execute on function public.softora_preserve_mailbox_read_state()
+  from public, anon, authenticated;
+grant execute on function public.softora_preserve_mailbox_read_state()
+  to service_role;
+
 create table if not exists public.softora_mailbox_sync_state (
   sync_key text primary key,
   account_email text not null,
@@ -1363,6 +1368,7 @@ revoke all on table public.softora_outbound_recipient_guards from authenticated;
 
 grant select, insert, update, delete on public.softora_customer_identity_keys to service_role;
 grant select, insert, update, delete on public.softora_mailbox_messages to service_role;
+revoke all on table public.softora_mailbox_sync_state from public, anon, authenticated;
 grant select, insert, update, delete on public.softora_mailbox_sync_state to service_role;
 revoke all on table public.softora_mailbox_send_provenance from public, anon, authenticated;
 revoke all on function public.softora_find_mailbox_unthreaded_sent_candidates(jsonb, integer)
