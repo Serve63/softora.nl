@@ -590,6 +590,36 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
   assert.equal(nodes.mailRoiRatio.textContent, '1 op 3');
 });
 
+test('premium database all-time mail counter never regresses after a partial 58 response', async () => {
+  const nodes = {
+    softoraCustomersBootstrap: {
+      textContent: JSON.stringify({ mailStats: { totalSent: 2328 } }),
+    },
+    systemMailSentTodayCount: { textContent: '' },
+    systemMailBouncesTodayCount: { textContent: '' },
+    systemMailSentCount: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const client = loadDatabaseSystemMailCountClient({
+    document: {
+      hidden: false,
+      getElementById: (id) => nodes[id] || null,
+      querySelectorAll: () => [],
+    },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ ok: true, stats: { systemTotalSent: 58, totalSent: 58 } }),
+    }),
+    setInterval: () => 0,
+  });
+
+  client.render([], { dataLoading: false });
+  await client.refreshTodaySentCount();
+
+  assert.equal(nodes.systemMailSentCount.textContent, '2.328');
+});
+
 test('premium database mail ROI calculator toont vandaag verstuurd en uitsluitend harde bounces', async () => {
   const requestedUrls = [];
   const nodes = {
@@ -2369,7 +2399,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617d/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260727a/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2648,7 +2678,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260727a"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260811a"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);

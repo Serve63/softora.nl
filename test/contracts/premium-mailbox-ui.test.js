@@ -4203,6 +4203,41 @@ test('gecombineerde mailbox verstuurt via het concrete account en niet met owner
   assert.equal(requests[0].account, 'serve@softora.nl');
 });
 
+test('reply normaliseert een stale sender naar de bewezen thread-account en weigert een verkeerde owner', async () => {
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      { accountEmail: 'serve@softora.nl', email: 'bestuur@example.nl' },
+      'martijn@softora.nl',
+      'both'
+    ),
+    'serve@softora.nl'
+  );
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      { accountEmail: 'serve@softora.nl', email: 'bestuur@example.nl' },
+      'martijn@softora.nl',
+      'serve'
+    ),
+    'serve@softora.nl'
+  );
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      { accountEmail: 'martijn@softora.nl', email: 'bestuur@example.nl' },
+      'serve@softora.nl',
+      'serve'
+    ),
+    ''
+  );
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      { providerOwner: 'serve', email: 'bestuur@example.nl' },
+      'martijn@softora.nl',
+      'both'
+    ),
+    ''
+  );
+});
+
 test('mislukte reply voegt geen roze bericht toe en herstelt de composer exact', async () => {
   const fields = new Map();
   ['c-to', 'c-subject', 'c-body', 'c-cc', 'c-bcc', 'compose-overlay'].forEach((id) => {

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const extraModules = require('../../assets/premium-extra-modules.js');
 
 test('premium instellingen gebruikt delegated actions zonder inline handlers', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8');
@@ -107,7 +108,8 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /openLockedWinningModuleFromUrl/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260804a/);
+  assert.match(source, /premium-extra-modules\.js\?v=20260811a/);
+  assert.match(source, /premium-user-management\.js\?v=20260811b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);
@@ -131,4 +133,17 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(source, /oninput=/);
   assert.doesNotMatch(source, /onchange=/);
   assert.doesNotMatch(userManagementSource, /\.settings-extra-card\{min-height:140px/);
+});
+
+test('EXTRA-kaarten sorteren stabiel op toegang: eerst unlocked, daarna locked', () => {
+  const items = [
+    { label: 'locked-a', unlocked: false },
+    { label: 'open-a', unlocked: true },
+    { label: 'locked-b', unlocked: false },
+    { label: 'open-b', unlocked: true },
+  ];
+  assert.deepEqual(
+    extraModules.sortExtraSettingsItems(items).map((item) => item.label),
+    ['open-a', 'open-b', 'locked-a', 'locked-b']
+  );
 });

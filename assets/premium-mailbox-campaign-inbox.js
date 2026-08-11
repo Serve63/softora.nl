@@ -495,6 +495,36 @@
     return normalizeEmail(mail && mail.accountEmail) || normalizeEmail(fallbackAccount);
   }
 
+  function resolveReplyAccount(mail, fallbackAccount, selectedOwner) {
+    const selectedRaw = String(selectedOwner || '').trim().toLowerCase();
+    const selected = ['serve', 'servé', 'martijn', 'both', 'all'].includes(selectedRaw)
+      ? normalizeOwner(selectedRaw)
+      : '';
+    const directCandidates = [
+      mail && mail.accountEmail,
+      mail && mail.campaign && mail.campaign.account,
+      mail && mail.providerAccountEmail,
+      mail && mail.copyContext && mail.copyContext.evidenceKnown === true
+        ? mail.copyContext.sourceAccountEmail
+        : '',
+    ].map(normalizeEmail).filter(Boolean);
+    for (const account of directCandidates) {
+      const owner = getOwnerByAccount(account);
+      if (!owner) continue;
+      if (!selected || selected === 'both' || owner === selected) return account;
+      return '';
+    }
+
+    const provenOwner = getMessageOwner(mail);
+    const fallback = normalizeEmail(fallbackAccount);
+    const fallbackOwner = getOwnerByAccount(fallback);
+    if (!fallbackOwner) return '';
+    if (selected === 'both' && !provenOwner) return '';
+    if (selected && selected !== 'both' && fallbackOwner !== selected) return '';
+    if (provenOwner && provenOwner !== fallbackOwner) return '';
+    return fallback;
+  }
+
   function getRequestId(mail) {
     return String(mail && (mail.mailboxId || mail.id) || '').trim();
   }
@@ -1114,6 +1144,7 @@
     decorateMessage,
     filterMessages,
     getAccount,
+    resolveReplyAccount,
     getConversationId,
     getStableCampaignConversationId,
     getConversationAction,

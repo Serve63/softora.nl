@@ -296,6 +296,18 @@ function mountExtraSettingsCategory() {
     'OMZETWERK',
     'Ruben’s Trading System',
   ];
+  var sortableExtraItems = extraItems.map(function (label) {
+    var isWinning = label === 'Winnen';
+    var isDatabase = label === 'Database';
+    var isHealth = label === "Servé's gezondheidsdossier";
+    var isOmzetwerk = label === 'OMZETWERK';
+    return { label: label, unlocked: isWinning || isDatabase || isHealth || isOmzetwerk };
+  });
+  var extraItemsForRender = window.SoftoraPremiumExtraModules &&
+    typeof window.SoftoraPremiumExtraModules.sortExtraSettingsItems === 'function'
+    ? window.SoftoraPremiumExtraModules.sortExtraSettingsItems(sortableExtraItems)
+    : sortableExtraItems.filter(function (item) { return item.unlocked; })
+      .concat(sortableExtraItems.filter(function (item) { return !item.unlocked; }));
 
   if (!document.getElementById('settings-extra-style')) {
     var style = document.createElement('style');
@@ -421,7 +433,8 @@ function mountExtraSettingsCategory() {
 
   var extraGrid = document.createElement('div');
   extraGrid.className = 'settings-extra-grid';
-  extraItems.forEach(function (label, index) {
+  extraItemsForRender.forEach(function (item, index) {
+    var label = item.label;
     var number = String(index + 1).padStart(2, '0');
     var isWinning = label === 'Winnen';
     var isDatabase = label === 'Database';

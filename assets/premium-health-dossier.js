@@ -163,7 +163,13 @@
       setStatus('error', 'WHOOP kon een tokenvernieuwing niet veilig bevestigen en wordt zonder token-replay opnieuw gekoppeld.');
     } else if (status.needsReauthorization) setStatus('error', 'WHOOP heeft de toegang geweigerd en wordt opnieuw gekoppeld.');
     else if (!status.connected) setStatus('', 'WHOOP is nog niet gekoppeld.');
-    else if (status.lastSyncError) setStatus('error', 'WHOOP is gekoppeld, maar de laatste sync gaf: ' + status.lastSyncError);
+    else if (status.tokenRefreshInProgress || status.syncInProgress || status.syncState === 'running' || status.syncState === 'token_refreshing') {
+      setStatus('', 'WHOOP-sync is bezig; de getoonde waarden zijn de laatst bevestigde gegevens.');
+    } else if (status.syncState === 'stale' || status.staleSyncStatus) {
+      setStatus('error', 'De vorige WHOOP-sync stopte zonder bevestiging; de getoonde waarden zijn de laatst bevestigde gegevens.');
+    } else if (status.lastSyncError) {
+      setStatus('error', 'WHOOP is gekoppeld, maar de laatste sync mislukte: ' + status.lastSyncError + ' De getoonde waarden zijn de laatst bevestigde gegevens.');
+    }
     else setStatus('connected', 'WHOOP gekoppeld · je recovery wordt zodra WHOOP hem berekent automatisch bijgewerkt; 12:00 is het vangnet.');
     if (status.connected) renderData(await request('/api/health/whoop/data?days=90'));
     return status;

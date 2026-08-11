@@ -187,8 +187,8 @@
             if (sentToday !== null) lastTodaySentCount = sentToday;
             if (hardBounces !== null) lastHardBouncesCount = hardBounces;
             if (totalSent !== null) {
-                lastStatsMailCount = totalSent;
-                lastRenderedMailCount = totalSent;
+                lastStatsMailCount = lastStatsMailCount === null ? totalSent : Math.max(lastStatsMailCount, totalSent);
+                lastRenderedMailCount = lastRenderedMailCount === null ? totalSent : Math.max(lastRenderedMailCount, totalSent);
             }
             if (dealCount !== null && !roiDirtySinceLoad) roiDealsCount = dealCount;
         } catch (_error) {
@@ -419,9 +419,12 @@
             renderRoiCalculator(null, true);
             return;
         }
-        lastRenderedMailCount = count;
-        element.textContent = count.toLocaleString("nl-NL");
-        renderRoiCalculator(count, false);
+        // Dit is een all-time teller: een tijdelijke/partiële response mag een
+        // eerder bewezen cumulatief totaal nooit zichtbaar terugzetten.
+        const stableCount = lastRenderedMailCount === null ? count : Math.max(lastRenderedMailCount, count);
+        lastRenderedMailCount = stableCount;
+        element.textContent = stableCount.toLocaleString("nl-NL");
+        renderRoiCalculator(stableCount, false);
     }
 
     function refreshTodaySentCount() {
@@ -453,7 +456,9 @@
             renderTodaySentCount(sentToday, false);
             renderHardBouncesCount(hardBounces, false);
             if (systemMailCount !== null) {
-                lastStatsMailCount = systemMailCount;
+                lastStatsMailCount = lastStatsMailCount === null
+                    ? systemMailCount
+                    : Math.max(lastStatsMailCount, systemMailCount);
                 renderSystemMailCount(systemMailCount, false);
             }
             return sentToday;

@@ -99,7 +99,7 @@ test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => 
 
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-health-dossier.css?v=20260716a') < asideEnd);
-  assert.ok(source.indexOf('assets/premium-health-dossier.js?v=20260810a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-health-dossier.js?v=20260811a') > asideEnd);
   assert.match(source, /data-health-dossier/);
   const healthScript = readRepoFile('assets/premium-health-dossier.js');
   assert.match(healthScript, /\/api\/health\/whoop\/status/);
@@ -119,6 +119,22 @@ test('gezondheidsdossier blijft bereikbaar zonder item in de premium-sidebar', (
   assert.doesNotMatch(themeSource, /getHealthDossierSidebarLink/);
   assert.doesNotMatch(themeSource, /label: "Gezondheidsdossier"/);
   assert.match(themeSource, /a\[data-sidebar-key="health_dossier"\]/);
+});
+
+test('verborgen premium-sidebar-items behouden hun deep-link pagina en onderliggende assets', () => {
+  const hiddenItems = [
+    ['agenda', 'premium-personeel-agenda.html', '/premium-personeel-agenda'],
+    ['websitegenerator', 'premium-websitegenerator.html', '/premium-websitegenerator'],
+    ['bookkeeping', 'premium-boekhouding.html', '/premium-boekhouding'],
+  ];
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+
+  for (const [key, pageFile, href] of hiddenItems) {
+    const pageSource = readRepoFile(pageFile);
+    assert.ok(fs.existsSync(path.join(__dirname, '../..', pageFile)), `${pageFile} mag niet zijn verwijderd`);
+    assert.match(pageSource, new RegExp(`href="${href}"`), `${pageFile} moet direct bereikbaar blijven`);
+    assert.match(themeSource, new RegExp(`data-sidebar-key="${key}"`), `${key} blijft in de gedeelde bron beschikbaar`);
+  }
 });
 
 test('OMZETWERK behoudt de canonical premium-sidebar en markeert Instellingen actief', () => {
@@ -207,10 +223,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
   assert.match(themeSource, /font-family:\s*'SoftoraSidebarOswald';[\s\S]*font-display:\s*block;[\s\S]*oswald-latin\.woff2\?v=20260409a/);
   assert.match(themeSource, /font-family:\s*'SoftoraSidebarInter';[\s\S]*font-display:\s*block;[\s\S]*inter-latin\.woff2\?v=20260409a/);
-  assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
+  assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*none;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
   assert.match(themeSource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
-  assert.match(stabilitySource, /@view-transition\s*\{[\s\S]*navigation:\s*auto;/);
+  assert.match(stabilitySource, /@view-transition\s*\{[\s\S]*navigation:\s*none;/);
   assert.match(stabilitySource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
   assert.match(stabilitySource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
   assert.match(stabilitySource, /::view-transition-old\(root\),[\s\S]*::view-transition-new\(root\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
@@ -325,7 +341,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260715b'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260811a'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260811a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
@@ -343,7 +360,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.js\?v=/);
   assert.match(htmlPagesSource, /premium-dashboard-ai-chat-scope\.js\?v=/);
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
-  assert.match(htmlPagesSource, /@view-transition\{navigation:auto;\}/);
+  assert.match(htmlPagesSource, /@view-transition\{navigation:none;\}/);
   assert.match(htmlPagesSource, /view-transition-name:softora-premium-sidebar !important;/);
   assert.match(htmlPagesSource, /LIVE_MOMENTUM_VIEW_TRANSITION_OPTOUT/);
   assert.match(htmlPagesSource, /@view-transition\{navigation:none;\}/);
@@ -355,6 +372,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     themeJsSource,
     /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s
   );
+  assert.match(themeJsSource, /a\[data-sidebar-key="agenda"\][\s\S]*a\[data-sidebar-key="websitegenerator"\][\s\S]*a\[data-sidebar-key="bookkeeping"\]/);
+  assert.match(htmlPagesSource, /coldmailing\|agenda\|websitegenerator\|bookkeeping/);
+  assert.match(stabilitySource, /navigation:\s*none/);
 });
 
 test('canonical premium pages opt into the shared sidebar shell', () => {

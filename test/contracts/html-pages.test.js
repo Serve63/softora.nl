@@ -132,6 +132,9 @@ test('html page coordinator strips internal coldmailing navigation before render
   const source = [
     '<aside class="sidebar">',
     '<a href="/premium-bevestigingsmails" class="sidebar-link" data-sidebar-key="coldmailing"><span>Coldmailing</span></a>',
+    '<a href="/premium-personeel-agenda" class="sidebar-link" data-sidebar-key="agenda"><span>Agenda</span></a>',
+    '<a href="/premium-websitegenerator" class="sidebar-link" data-sidebar-key="websitegenerator"><span>Webdesign</span></a>',
+    '<a href="/premium-boekhouding" class="sidebar-link" data-sidebar-key="bookkeeping"><span>Boekhouding</span></a>',
     '<a href="/premium-database" class="sidebar-link" data-sidebar-key="database"><span>Database</span></a>',
     '</aside>',
   ].join('');
@@ -140,6 +143,12 @@ test('html page coordinator strips internal coldmailing navigation before render
 
   assert.doesNotMatch(rendered, /data-sidebar-key="coldmailing"/);
   assert.doesNotMatch(rendered, />Coldmailing</);
+  assert.doesNotMatch(rendered, /data-sidebar-key="agenda"|>Agenda</);
+  assert.doesNotMatch(rendered, /data-sidebar-key="websitegenerator"|>Webdesign</);
+  assert.doesNotMatch(rendered, /data-sidebar-key="bookkeeping"|>Boekhouding</);
+  assert.match(source, /href="\/premium-personeel-agenda"/);
+  assert.match(source, /href="\/premium-websitegenerator"/);
+  assert.match(source, /href="\/premium-boekhouding"/);
   assert.match(rendered, /data-sidebar-key="database"/);
 });
 
@@ -333,12 +342,12 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260715b/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260715b/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260811a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260811a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.css\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.js\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-dashboard-ai-chat-scope\.js\?v=20260611a/);
-  assert.match(res.body, /@view-transition\{navigation:auto;\}/);
+  assert.match(res.body, /@view-transition\{navigation:none;\}/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\]\{width:var\(--premium-sidebar-width,320px\) !important;display:flex !important;/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-nav\{[\s\S]*scrollbar-width:none !important;[\s\S]*scrollbar-gutter:auto !important;/);
   assert.match(res.body, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link:focus,[\s\S]*\.sidebar\[data-static-sidebar="1"\] \.sidebar-link:focus-visible\{outline:none !important;box-shadow:none !important;/);

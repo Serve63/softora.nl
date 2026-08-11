@@ -190,6 +190,7 @@ function createWhoopHealthService(deps = {}) {
   }
 
   async function waitForPeerRefresh(previousEncryptedTokens) {
+    let observedActiveLease = false;
     for (let attempt = 0; attempt < 80; attempt += 1) {
       await sleep(250);
       const fresh = await getConnection();
@@ -209,7 +210,17 @@ function createWhoopHealthService(deps = {}) {
         if (Number(tokens.expires_at || 0) > Date.now() + 30000) return tokens.access_token;
       }
       const lockUntil = new Date(fresh.token_refresh_lock_until || 0).getTime();
-      if (!Number.isFinite(lockUntil) || lockUntil <= Date.now()) break;
+      if (Number.isFinite(lockUntil) && lockUntil > Date.now()) {
+        observedActiveLease = true;
+        continue;
+      }
+      const leaseError = new Error(
+        observedActiveLease
+          ? 'WHOOP-tokenvernieuwing verloor de lease zonder bevestigde token; de sync probeert veilig opnieuw te claimen.'
+          : 'WHOOP-tokenvernieuwing had geen actieve lease meer; de sync probeert veilig opnieuw te claimen.'
+      );
+      leaseError.code = 'WHOOP_REFRESH_LEASE_EXPIRED';
+      throw leaseError;
     }
     const error = new Error('WHOOP-tokenvernieuwing is nog bezig; probeer de sync zo opnieuw.');
     error.code = 'WHOOP_REFRESH_BUSY';
@@ -237,48 +248,58 @@ function createWhoopHealthService(deps = {}) {
     const initialTokens = decryptTokens(connection.encrypted_tokens);
     if (Number(initialTokens.expires_at || 0) > Date.now() + 120000) return initialTokens.access_token;
 
-    const lock = await claimTokenRefreshLock();
-    if (!lock) return waitForPeerRefresh(connection.encrypted_tokens);
-
-    try {
-      const lockedConnection = lock.connection || await getConnection();
-      const lockedTokens = decryptTokens(lockedConnection.encrypted_tokens);
-      if (Number(lockedTokens.expires_at || 0) > Date.now() + 120000) return lockedTokens.access_token;
-
-      let refreshed;
-      try {
-        refreshed = await exchangeToken({
-          grant_type: 'refresh_token',
-          refresh_token: lockedTokens.refresh_token,
-          client_id: clientId,
-          client_secret: clientSecret,
-          scope: 'offline',
-        });
-      } catch (error) {
-        if (error?.code === 'WHOOP_TOKEN_ERROR' && isPermanentRefreshTokenError(error)) {
-          await updateWhileTokenRefreshLocked(lock.lockId, {
-            status: 'reauthorization_required',
-            last_sync_error: String(error.message || error).slice(0, 1000),
-          });
-        } else if (error?.code === 'WHOOP_TOKEN_ERROR' && error.outcomeUnknown) {
-          await updateWhileTokenRefreshLocked(lock.lockId, {
-            status: 'refresh_uncertain',
-            last_sync_error: String(error.message || error).slice(0, 1000),
-          });
+    for (let claimAttempt = 0; claimAttempt < 2; claimAttempt += 1) {
+      const lock = await claimTokenRefreshLock();
+      if (!lock) {
+        try {
+          return await waitForPeerRefresh(connection.encrypted_tokens);
+        } catch (error) {
+          if (error?.code === 'WHOOP_REFRESH_LEASE_EXPIRED' && claimAttempt === 0) continue;
+          throw error;
         }
-        throw error;
       }
 
-      const next = normalizeTokens(refreshed, lockedTokens);
-      await updateWhileTokenRefreshLocked(lock.lockId, {
-        encrypted_tokens: encryptTokens(next),
-        status: 'connected',
-        last_sync_error: null,
-      });
-      return next.access_token;
-    } finally {
-      await releaseTokenRefreshLock(lock.lockId);
+      try {
+        const lockedConnection = lock.connection || await getConnection();
+        const lockedTokens = decryptTokens(lockedConnection.encrypted_tokens);
+        if (Number(lockedTokens.expires_at || 0) > Date.now() + 120000) return lockedTokens.access_token;
+
+        let refreshed;
+        try {
+          refreshed = await exchangeToken({
+            grant_type: 'refresh_token',
+            refresh_token: lockedTokens.refresh_token,
+            client_id: clientId,
+            client_secret: clientSecret,
+            scope: 'offline',
+          });
+        } catch (error) {
+          if (error?.code === 'WHOOP_TOKEN_ERROR' && isPermanentRefreshTokenError(error)) {
+            await updateWhileTokenRefreshLocked(lock.lockId, {
+              status: 'reauthorization_required',
+              last_sync_error: String(error.message || error).slice(0, 1000),
+            });
+          } else if (error?.code === 'WHOOP_TOKEN_ERROR' && error.outcomeUnknown) {
+            await updateWhileTokenRefreshLocked(lock.lockId, {
+              status: 'refresh_uncertain',
+              last_sync_error: String(error.message || error).slice(0, 1000),
+            });
+          }
+          throw error;
+        }
+
+        const next = normalizeTokens(refreshed, lockedTokens);
+        await updateWhileTokenRefreshLocked(lock.lockId, {
+          encrypted_tokens: encryptTokens(next),
+          status: 'connected',
+          last_sync_error: null,
+        });
+        return next.access_token;
+      } finally {
+        await releaseTokenRefreshLock(lock.lockId);
+      }
     }
+    throw new Error('WHOOP-tokenvernieuwing kon binnen de veilige leasegrens niet worden bevestigd.');
   }
 
   async function whoopRequest(path, token) {
@@ -739,6 +760,26 @@ function createWhoopHealthService(deps = {}) {
 
   async function getStatus() {
     const connection = await getConnection();
+    const nowMs = now().getTime();
+    const tokenRefreshLockUntil = new Date(connection?.token_refresh_lock_until || 0).getTime();
+    const syncLockUntil = new Date(connection?.sync_lock_until || 0).getTime();
+    const tokenRefreshInProgress = Boolean(
+      connection?.token_refresh_lock_id && Number.isFinite(tokenRefreshLockUntil) && tokenRefreshLockUntil > nowMs
+    );
+    const syncInProgress = Boolean(
+      connection?.sync_lock_id && Number.isFinite(syncLockUntil) && syncLockUntil > nowMs
+    );
+    const staleSyncStatus = !syncInProgress && (
+      connection?.last_sync_status === 'running' ||
+      /WHOOP-tokenvernieuwing is nog bezig/i.test(String(connection?.last_sync_error || ''))
+    );
+    const syncState = tokenRefreshInProgress
+      ? 'token_refreshing'
+      : syncInProgress
+        ? 'running'
+        : staleSyncStatus
+          ? 'stale'
+          : (connection?.last_sync_status || 'idle');
     return {
       configured: Boolean(clientId && clientSecret && redirectUri && encryptionSecret),
       connected: Boolean(connection?.status === 'connected' && connection.encrypted_tokens),
@@ -751,6 +792,12 @@ function createWhoopHealthService(deps = {}) {
       lastSyncStartedAt: connection?.last_sync_started_at || null,
       lastSyncCompletedAt: connection?.last_sync_completed_at || null,
       lastSyncStatus: connection?.last_sync_status || '', lastSyncError: connection?.last_sync_error || '',
+      syncState,
+      syncInProgress,
+      tokenRefreshInProgress,
+      tokenRefreshLockUntil: tokenRefreshInProgress ? connection.token_refresh_lock_until : null,
+      syncLockUntil: syncInProgress ? connection.sync_lock_until : null,
+      staleSyncStatus,
       lastSyncedDay: connection?.last_synced_day || null, spreadsheetUrl: sheetService.getSpreadsheetUrl(),
       deliveryMode: 'recovery_webhook_with_morning_reconciliation_and_noon_fallback',
     };

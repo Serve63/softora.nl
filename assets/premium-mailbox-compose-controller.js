@@ -53,9 +53,20 @@
       return options.normalizeEmail(account || '');
     }
 
-    function resolveOwnerForMail(mail) {
+    function getReplyAccount(mail, fallbackAccount) {
+      if (typeof options.campaignInbox?.resolveReplyAccount === 'function') {
+        return options.normalizeEmail(options.campaignInbox.resolveReplyAccount(
+          mail,
+          fallbackAccount == null ? options.getAccount?.() : fallbackAccount,
+          options.getOwner?.()
+        ) || '');
+      }
+      return getMailAccount(mail);
+    }
+
+    function resolveOwnerForMail(mail, accountOverride = '') {
       const accountOwner = typeof options.campaignInbox?.getOwnerByAccount === 'function'
-        ? normalize(options.campaignInbox.getOwnerByAccount(getMailAccount(mail)))
+        ? normalize(options.campaignInbox.getOwnerByAccount(accountOverride || getMailAccount(mail)))
         : '';
       if (isPersonalOwner(accountOwner)) return accountOwner;
       const provenOwner = normalize(options.campaignInbox?.getMessageOwner?.(mail));
@@ -101,14 +112,22 @@
     }
 
     function setReplyContext(mail) {
+      if (!mail) {
+        replyContext = null;
+        replyOwner = '';
+        return;
+      }
+      const replyAccount = getReplyAccount(mail);
+      if (!replyAccount) throw new Error('Deze conversatie heeft geen veilige afzender voor de geselecteerde mailbox.');
       replyContext = mail
         ? options.compose.buildReplyContext(mail, {
             activeFolder: options.getActiveFolder(),
-            fallbackAccount: options.getAccount(),
-            getAccount: options.campaignInbox.getAccount,
+            fallbackAccount: replyAccount,
+            getAccount: () => replyAccount,
           })
         : null;
-      replyOwner = mail ? resolveOwnerForMail(mail) : '';
+      replyContext.accountEmail = replyAccount;
+      replyOwner = resolveOwnerForMail(mail, replyAccount);
     }
 
     function assertReplyOwner(accountEmail = '') {
@@ -132,13 +151,14 @@
     function buildRewriteContext() {
       if (!replyContext) return null;
       const currentMail = options.findMail(replyContext.id);
-      return currentMail
-        ? options.compose.buildReplyContext(currentMail, {
+      if (!currentMail) return { ...replyContext };
+      const currentAccount = getReplyAccount(currentMail, replyContext.accountEmail);
+      if (!currentAccount) throw new Error('De geselecteerde mailbox hoort niet bij deze conversatie.');
+      return options.compose.buildReplyContext(currentMail, {
             activeFolder: options.getActiveFolder(),
-            fallbackAccount: options.getAccount(),
-            getAccount: options.campaignInbox.getAccount,
-          })
-        : { ...replyContext };
+            fallbackAccount: currentAccount,
+            getAccount: () => currentAccount,
+          });
     }
 
     function open(optionsOverride = {}) {
@@ -166,7 +186,12 @@
     function reply(mail) {
       if (!mail) return;
       options.compose.resetOptionalFields();
-      setReplyContext(mail);
+      try {
+        setReplyContext(mail);
+      } catch (error) {
+        options.toast(String(error?.message || error));
+        return;
+      }
       const toField = documentRef?.getElementById('c-to');
       const subjectField = documentRef?.getElementById('c-subject');
       if (toField) {
@@ -282,7 +307,13 @@
       }
       try {
         const contextAtSend = replyContext ? { ...replyContext } : null;
-        const account = options.normalizeEmail(contextAtSend && contextAtSend.accountEmail) || options.getAccount();
+        const currentMail = contextAtSend && options.findMail(contextAtSend.id);
+        const account = contextAtSend
+          ? getReplyAccount(currentMail || contextAtSend, contextAtSend.accountEmail)
+          : options.normalizeEmail(options.getAccount());
+        if (!account) throw new Error('Het afzenderaccount past niet bij de geselecteerde mailbox; open de reply opnieuw.');
+        if (contextAtSend) contextAtSend.accountEmail = account;
+        if (replyContext) replyContext.accountEmail = account;
         assertReplyOwner(account);
         const sendOwner = replyOwner;
         const sendMode = contextAtSend?.mode === 'reply' ? 'reply' : 'new-message';
