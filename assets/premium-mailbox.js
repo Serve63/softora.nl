@@ -447,41 +447,17 @@ function renderMailboxInlineImage(image) {
   return window.SoftoraMailboxImages?.renderInlineImage?.(image, escapeHtml) || '';
 }
 function renderMailboxBodySection(section, imageState, leadingHtml = '', options = {}) {
-  const sectionLead = String(leadingHtml || '');
-  const embeddedIncoming = options && options.embeddedIncoming === true;
-  if (!section || !Array.isArray(section.lines)) {
-    return `<section class="detail-mail-section">${sectionLead}<p>Geen inhoud.</p></section>`;
-  }
-  if (section.type === 'quote') {
-    const firstLine = String(section.lines[0] || '').trim();
-    const hasMeta = isMailboxReplyHeaderLine(firstLine);
-    const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
-    const isOwnQuote = !embeddedIncoming && hasMeta && isMailboxOwnReplyHeaderLine(firstLine);
-    const quoteLabel = isOwnQuote ? '<div class="detail-mail-section-label">Eerdere mail</div>' : '';
-    const quoteLines = window.SoftoraMailboxDisplay.trimOwnQuotedMailLines(hasMeta ? section.lines.slice(1) : section.lines, isOwnQuote ? MAILBOX_OWN_REPLY_AUTHOR_PATTERN : null);
-    const preparedImages = isOwnQuote && imageState.quoteImages.length
-      ? window.SoftoraMailboxImages.prepareOwnQuote(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage)
-      : { imageState, html: '' };
-    return `
-      <section class="detail-mail-section ${isOwnQuote ? 'detail-mail-section-history-sent' : 'detail-mail-section-history'}" aria-label="Ingesloten berichtgeschiedenis">
-        ${sectionLead}
-        ${quoteLabel}
-        ${quoteMeta}
-        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: preparedImages.imageState.images, optOutUrl: preparedImages.imageState.optOutUrl, senderEmail: preparedImages.imageState.senderEmail, usedImages: preparedImages.imageState.usedImages })}${preparedImages.html}</div>
-      </section>`;
-  }
-  if (section.type === 'signature') {
-    return `
-      <section class="detail-mail-section detail-mail-section-signature">
-        ${sectionLead}
-        ${renderMailboxParagraphs(section.lines, imageState)}
-      </section>`;
-  }
-  return `
-    <section class="detail-mail-section">
-      ${sectionLead}
-      ${renderMailboxParagraphs(section.lines, imageState)}
-    </section>`;
+  return window.SoftoraMailboxBodySection.render(section, imageState, leadingHtml, {
+    ...options,
+    escapeHtml,
+    isReplyHeaderLine: isMailboxReplyHeaderLine,
+    isOwnReplyHeaderLine: isMailboxOwnReplyHeaderLine,
+    ownReplyAuthorPattern: MAILBOX_OWN_REPLY_AUTHOR_PATTERN,
+    trimQuotedLines: window.SoftoraMailboxDisplay.trimOwnQuotedMailLines,
+    prepareOwnQuote: window.SoftoraMailboxImages.prepareOwnQuote,
+    renderInlineImage: renderMailboxInlineImage,
+    renderParagraphs: renderMailboxParagraphs,
+  });
 }
 function normalizeMailboxBodyImages(images) {
   return window.SoftoraMailboxImages?.normalize?.(images) || [];
@@ -580,8 +556,25 @@ function renderMailBody(value, images, options) {
   let insertedReplyAction = false;
   let insertedOlderThreadMessages = false;
   let insertedRootIncomingMeta = false;
+  let rootIncomingOpen = rootIncoming;
   if (rootIncoming) renderedSections.push('<section class="detail-mail-section detail-mail-section-received" data-mailbox-message-direction="incoming">');
   sections.forEach((section) => {
+    if (rootIncoming && rootIncomingOpen && section && section.type === 'quote') {
+      if (!insertedRootIncomingMeta && rootIncomingMeta) {
+        renderedSections.push(rootIncomingMeta);
+        insertedRootIncomingMeta = true;
+      }
+      if (rootAttachmentsHtml && !injectedAttachments) {
+        renderedSections.push(rootAttachmentsHtml);
+        injectedAttachments = true;
+      }
+      if (!insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
+        renderedSections.push(rootActionHtml);
+        insertedReplyAction = true;
+      }
+      renderedSections.push('</section>');
+      rootIncomingOpen = false;
+    }
     if (!rootIncoming && !insertedReplyAction && rootActionHtml && section && section.type === 'quote') {
       if (rootAttachmentsHtml && !injectedAttachments) {
         renderedSections.push(rootAttachmentsHtml);
@@ -600,11 +593,15 @@ function renderMailBody(value, images, options) {
       injectedImages = true;
     }
     const sectionLead = !insertedRootIncomingMeta && rootIncomingMeta ? rootIncomingMeta : '';
-    renderedSections.push(renderMailboxBodySection(section, imageState, sectionLead, { embeddedIncoming: rootIncoming }));
+    renderedSections.push(renderMailboxBodySection(section, imageState, sectionLead, {
+      embeddedIncoming: rootIncoming && rootIncomingOpen,
+      rootIncomingQuote: rootIncoming && !rootIncomingOpen && section && section.type === 'quote',
+    }));
     if (sectionLead) insertedRootIncomingMeta = true;
   });
   if (!insertedRootIncomingMeta && rootIncomingMeta) {
-    renderedSections.push(`<section class="detail-mail-section">${rootIncomingMeta}</section>`);
+    renderedSections.push(rootIncomingOpen ? rootIncomingMeta : `<section class="detail-mail-section">${rootIncomingMeta}</section>`);
+    insertedRootIncomingMeta = true;
   }
   if (!injectedImages) {
     const imagesHtml = window.SoftoraMailboxImages?.renderUnused?.(imageState, renderMailboxInlineImage) || '';
@@ -614,11 +611,11 @@ function renderMailBody(value, images, options) {
     renderedSections.push(rootAttachmentsHtml);
     injectedAttachments = true;
   }
-  if (rootIncoming && !insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
+  if (rootIncomingOpen && !insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
     renderedSections.push(rootActionHtml);
     insertedReplyAction = true;
   }
-  if (rootIncoming) renderedSections.push('</section>');
+  if (rootIncomingOpen) renderedSections.push('</section>');
   if (!insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
     renderedSections.push(rootActionHtml);
     if (!isProvenMailboxCopy && olderThreadMessagesHtml) {
@@ -904,10 +901,12 @@ function renderList(options = {}) {
   const displayOptions = { activeFolder, account: getMailboxAccount() };
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
+  const listScrollTop = Number.isFinite(Number(wrap.scrollTop)) ? Number(wrap.scrollTop) : 0;
   syncInboxBadgeFromCurrentFolder();
   if (!list.length) {
     const emptyText = mailboxSyncState?.warming ? 'Mailbox wordt bijgewerkt…' : 'Geen e-mails gevonden.';
     wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(emptyText)}</div>`;
+    wrap.scrollTop = listScrollTop;
     return;
   }
   const hasVisibleActiveMail = activeMail != null && list.some((mail) => String(mail.id) === String(activeMail));
@@ -915,6 +914,7 @@ function renderList(options = {}) {
   wrap.innerHTML = list.map(m => window.SoftoraMailboxList.renderItem(m, {
     activeMail, displayOptions, escapeHtml, display: window.SoftoraMailboxDisplay,
   })).join('');
+  wrap.scrollTop = listScrollTop;
   if (!activeMail && options.openLatest !== false) openMail(list[0].id);
 }
 async function loadMailboxMessageBody(id) {
@@ -948,6 +948,10 @@ function openMail(id, options = {}) {
   if (!m) return;
   const token = mailboxOwnerView.ensureToken();
   if (!isMailboxViewCurrent(token)) return;
+  const detailElement = document.getElementById('mail-detail');
+  const preserveDetailScroll = String(activeMail || '') === String(m.id || '');
+  const previousDetailBody = preserveDetailScroll ? detailElement?.querySelector?.('.detail-body') : null;
+  const detailScrollTop = previousDetailBody && Number.isFinite(Number(previousDetailBody.scrollTop)) ? Number(previousDetailBody.scrollTop) : 0;
   const wasUnread = m.unread;
   activeMail = m.id;
   if (wasUnread) window.SoftoraMailboxUiState.markReadOnOpen({ mail: m, skipReadPersist: options.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail });
@@ -969,7 +973,7 @@ function openMail(id, options = {}) {
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
   const readState = window.SoftoraMailboxUiState.getReadState(m, window.SoftoraMailboxCampaignInbox);
-  document.getElementById('mail-detail').innerHTML = `
+  detailElement.innerHTML = `
     <div class="detail-body">
       <article class="detail-mail-block">
         <div class="detail-header">
@@ -995,7 +999,12 @@ function openMail(id, options = {}) {
         <div class="detail-divider" aria-hidden="true"></div>
         <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending }))}</div>
       </article>
-    </div>`; window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: m.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail });
+    </div>`;
+  if (preserveDetailScroll) {
+    const nextDetailBody = detailElement.querySelector?.('.detail-body');
+    if (nextDetailBody) nextDetailBody.scrollTop = detailScrollTop;
+  }
+  window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: m.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail });
 }
 async function deleteMail(id) {
   const m = findMailById(id);

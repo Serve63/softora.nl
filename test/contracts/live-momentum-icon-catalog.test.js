@@ -21,6 +21,14 @@ test('live momentum exposes a safe and searchable icon catalog', () => {
   assert.ok(categories.size >= 16);
   assert.ok(Array.from(categories.values()).every((count) => count >= 16));
   assert.deepEqual(Array.from(catalog.slice(0, 4), (icon) => icon.key), ['dumbbell', 'book', 'target', 'heart']);
+  const requestedIcons = new Map(catalog.map((icon) => [icon.key, icon]));
+  assert.equal(requestedIcons.get('film-warning-feet')?.label, 'Filmwaarschuwing (voetjes)');
+  assert.match(requestedIcons.get('film-warning-feet')?.keywords || '', /voeten/);
+  assert.match(requestedIcons.get('film-warning-feet')?.markup || '', /<path/);
+  assert.equal(requestedIcons.get('ban')?.label, 'Verbod');
+  assert.match(requestedIcons.get('ban')?.markup || '', /<circle/);
+  assert.equal(requestedIcons.get('tooth')?.label, 'Gebit');
+  assert.match(requestedIcons.get('tooth')?.markup || '', /<path/);
   assert.ok(catalog.some((icon) => icon.key === 'teeth' && icon.keywords.includes('tandenpoetsen')));
   assert.ok(catalog.some((icon) => icon.key === 'piggy-bank' && icon.keywords.includes('sparen')));
   assert.ok(catalog.some((icon) => icon.key === 'flower-2' && icon.keywords.includes('meditatie')));

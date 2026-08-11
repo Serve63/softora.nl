@@ -72,7 +72,8 @@
   if (!app) return;
   const logbookSync = window.SoftoraSportschoolLogbookSync;
   const logbookStateApi = window.SoftoraSportschoolLogbookState;
-  if (!logbookSync || !logbookStateApi) return;
+  const logbookInputApi = window.SoftoraSportschoolLogbookInput;
+  if (!logbookSync || !logbookStateApi || !logbookInputApi) return;
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
@@ -97,6 +98,7 @@
   let logbookState = createDefaultState();
   let cleanedLegacyNotesDuringLoad = false;
   let shouldPersistLoadedSnapshot = false;
+  let lastRenderedDateKey = currentDateKey();
 
   addButton.disabled = true;
 
@@ -137,6 +139,13 @@
 
   function currentWeekday() {
     return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()];
+  }
+
+  function currentDateKey(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   function storageDay(day) {
@@ -190,7 +199,7 @@
           const normalized = normalizeExerciseSource(day, exercise.order, exercise);
           const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, exercise.order));
           if (!sources[exerciseKey]) sources[exerciseKey] = normalized;
-          return [String(exercise.order), { exerciseKey, ...normalized }];
+          return [String(exercise.order), { exerciseKey, ...normalized, completedDates: [] }];
         })
       ),
     };
@@ -259,7 +268,7 @@
         const normalized = normalizeExerciseSource(day, order);
         const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, order));
         ensureExerciseSources()[exerciseKey] = normalized;
-        dayState.exercises[key] = { exerciseKey, ...normalized };
+        dayState.exercises[key] = { exerciseKey, ...normalized, completedDates: [] };
         changed = true;
       }
     });
@@ -270,7 +279,8 @@
     const dayState = getDayState(day);
     const stored = dayState.exercises?.[String(order)] || {};
     const { exerciseKey, source } = getExerciseSource(day, order, stored);
-    dayState.exercises[String(order)] = { exerciseKey, ...source };
+    const completedDates = logbookStateApi.normalizeCompletionDates(stored.completedDates);
+    dayState.exercises[String(order)] = { exerciseKey, ...source, completedDates };
     return {
       order,
       exerciseKey,
@@ -279,7 +289,21 @@
       sets: source.sets,
       reps: source.reps,
       kg: source.kg,
+      completedDates,
+      completed: logbookStateApi.isCompletedOnDate({ completedDates }, currentDateKey()),
     };
+  }
+
+  function setExerciseCompleted(day, order, completed) {
+    const dayState = getDayState(day);
+    const key = String(order);
+    const current = readExercise(day, order);
+    const next = logbookStateApi.setCompletedOnDate(current, currentDateKey(), completed);
+    const previousDates = logbookStateApi.normalizeCompletionDates(dayState.exercises[key]?.completedDates);
+    if (JSON.stringify(previousDates) === JSON.stringify(next.completedDates)) return current;
+    dayState.exercises[key] = { ...dayState.exercises[key], completedDates: next.completedDates };
+    markStateChanged();
+    return readExercise(day, order);
   }
 
   function writeField(day, order, field, value) {
@@ -298,7 +322,11 @@
         { ...previousExercise, title },
         normalizeExerciseSource(day, order)
       );
-      const nextExercise = { exerciseKey: nextExerciseKey, ...sources[nextExerciseKey] };
+      const nextExercise = {
+        exerciseKey: nextExerciseKey,
+        ...sources[nextExerciseKey],
+        completedDates: logbookStateApi.normalizeCompletionDates(previousExercise.completedDates),
+      };
       changed =
         previousExercise.exerciseKey !== nextExercise.exerciseKey ||
         previousExercise.title !== nextExercise.title ||
@@ -312,7 +340,11 @@
       const nextValue = targetField === 'notes' ? upper(value) : value;
       changed = String(source[targetField] ?? '') !== String(nextValue ?? '');
       source[targetField] = nextValue;
-      dayState.exercises[key] = { exerciseKey, ...source };
+      dayState.exercises[key] = {
+        exerciseKey,
+        ...source,
+        completedDates: logbookStateApi.normalizeCompletionDates(dayState.exercises[key]?.completedDates),
+      };
     }
     if (changed) markStateChanged();
   }
@@ -347,6 +379,7 @@
                 sets: exercise.sets,
                 reps: exercise.reps,
                 kg: exercise.kg,
+                completedDates: exercise.completedDates,
               },
             ];
           })
@@ -420,13 +453,19 @@
             exerciseKey,
             source: normalized,
             fallback: normalizeExerciseSource(day, order),
+            completedDates: logbookStateApi.normalizeCompletionDates(stored.completedDates),
           });
           if (!stored.exerciseKey) shouldPersistLoadedSnapshot = true;
+          if (!Array.isArray(stored.completedDates)) shouldPersistLoadedSnapshot = true;
         });
       });
       const reconciled = logbookStateApi.reconcileExerciseSources(canonicalSources, entries);
-      reconciled.entries.forEach(({ day, order, exerciseKey, source }) => {
-        nextDays[day].exercises[String(order)] = { exerciseKey, ...source };
+      reconciled.entries.forEach(({ day, order, exerciseKey, source, completedDates }) => {
+        nextDays[day].exercises[String(order)] = {
+          exerciseKey,
+          ...source,
+          completedDates: logbookStateApi.normalizeCompletionDates(completedDates),
+        };
       });
       if (reconciled.repaired) shouldPersistLoadedSnapshot = true;
       logbookState = { version: 2, exerciseSources: reconciled.exerciseSources, days: nextDays };
@@ -606,7 +645,8 @@
     return (
       stateRevision !== lastSavedRevision ||
       pendingRemoteSave ||
-      remoteSaveInFlight
+      remoteSaveInFlight ||
+      logbookInputApi.isExerciseInputActive(document, list)
     );
   }
 
@@ -775,6 +815,11 @@
     input.className = 'metric-input';
     input.type = 'text';
     input.inputMode = inputMode;
+    input.enterKeyHint = 'next';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.dataset.exerciseField = field;
+    input.dataset.exerciseOrder = String(exercise.order);
     input.value = exercise[field] || '';
     input.placeholder = field === 'kg' ? '' : '0';
     input.setAttribute('aria-label', `${label} ${exercise.title}`);
@@ -808,6 +853,7 @@
 
     const card = document.createElement('article');
     card.className = 'exercise-card';
+    card.dataset.exerciseKey = exercise.exerciseKey;
 
     const top = document.createElement('div');
     top.className = 'exercise-top';
@@ -825,8 +871,15 @@
     title.placeholder = 'OEFENING';
     title.autocomplete = 'off';
     title.spellcheck = false;
+    title.enterKeyHint = 'next';
+    title.dataset.exerciseField = 'title';
+    title.dataset.exerciseOrder = String(exercise.order);
     title.addEventListener('input', () => {
-      title.value = upper(title.value);
+      writeField(day, exercise.order, 'name', title.value);
+    });
+    title.addEventListener('blur', () => {
+      const normalized = upper(title.value);
+      if (title.value !== normalized) title.value = normalized;
       writeField(day, exercise.order, 'name', title.value);
     });
 
@@ -845,17 +898,51 @@
     notes.placeholder = '';
     notes.autocomplete = 'off';
     notes.spellcheck = false;
+    notes.enterKeyHint = 'next';
+    notes.dataset.exerciseField = 'notes';
+    notes.dataset.exerciseOrder = String(exercise.order);
     notes.addEventListener('input', () => {
-      notes.value = upper(notes.value);
+      writeField(day, exercise.order, 'notes', notes.value);
+    });
+    notes.addEventListener('blur', () => {
+      const normalized = upper(notes.value);
+      if (notes.value !== normalized) notes.value = normalized;
       writeField(day, exercise.order, 'notes', notes.value);
     });
 
-    top.append(dragHandle, title, metricGroup);
+    const completeButton = document.createElement('button');
+    completeButton.type = 'button';
+    completeButton.className = 'exercise-complete';
+    completeButton.dataset.exerciseComplete = 'true';
+    completeButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const nextExercise = setExerciseCompleted(
+        day,
+        exercise.order,
+        completeButton.getAttribute('aria-pressed') !== 'true'
+      );
+      syncExerciseCompletion(card, completeButton, nextExercise);
+    });
+
+    top.append(dragHandle, title, metricGroup, completeButton);
     card.append(top, notes);
     swipe.append(deleteButton, card);
     bindReorder(swipe, card, dragHandle, day, exercise.order);
     bindSwipe(swipe, card);
+    syncExerciseCompletion(card, completeButton, exercise);
     return swipe;
+  }
+
+  function syncExerciseCompletion(card, button, exercise) {
+    const completed = Boolean(exercise.completed);
+    const action = completed ? 'weer openzetten' : 'afvinken';
+    const label = `${exercise.title} ${action}`;
+    card.classList.toggle('is-complete', completed);
+    button.setAttribute('aria-label', label);
+    button.setAttribute('aria-pressed', String(completed));
+    button.title = completed ? 'Oefening weer openzetten' : 'Oefening afvinken';
+    button.textContent = completed ? '✓' : '○';
   }
 
   function targetIndexForPointer(pointerY, draggedSwipe) {
@@ -952,12 +1039,13 @@
 
     swipe.addEventListener('pointerdown', (event) => {
       if (event.target.closest?.('.drag-handle')) return;
+      if (event.target.closest?.('input, textarea, button, select, [contenteditable="true"]')) return;
       active = true;
       dragging = false;
       startX = event.clientX;
       startY = event.clientY;
       startOffset = offset;
-      targetInput = event.target instanceof HTMLInputElement ? event.target : null;
+      targetInput = null;
       card.setPointerCapture(event.pointerId);
     });
 
@@ -990,7 +1078,9 @@
       }
 
       if (!dragging) {
-        if (offset > 0 && !(event.target instanceof HTMLInputElement)) setOffset(0, true);
+        if (offset > 0 && !event.target.closest?.('input, textarea, button, select, [contenteditable="true"]')) {
+          setOffset(0, true);
+        }
         return;
       }
 
@@ -1010,6 +1100,7 @@
   }
 
   function render() {
+    const focusState = logbookInputApi.captureActiveExerciseInput(document, list);
     const title = upper(dayTitle(selectedDay));
     dayTrigger.textContent = title;
     const exercises = readOrders(selectedDay).map((order) => readExercise(selectedDay, order));
@@ -1018,6 +1109,8 @@
     restDay.hidden = exercises.length > 0;
     restDay.textContent = `${title} IS EEN RUSTDAG`;
     renderDayChoices();
+    lastRenderedDateKey = currentDateKey();
+    logbookInputApi.restoreActiveExerciseInput(list, focusState);
   }
 
   function openDayPicker() {
@@ -1045,6 +1138,11 @@
 
   dayTrigger.addEventListener('click', openDayPicker);
   closeDays.addEventListener('click', closeDayPicker);
+  list.addEventListener('focusout', () => {
+    window.setTimeout(() => {
+      if (!logbookInputApi.isExerciseInputActive(document, list) && resumeRevalidator) resumeRevalidator.notifyLocalStateSettled();
+    }, 0);
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeDayPicker();
   });
@@ -1063,7 +1161,10 @@
   logbookSync.bindResumeEvents({
     windowTarget: window,
     documentTarget: document,
-    requestRefresh: (source) => resumeRevalidator.requestRefresh(source),
+    requestRefresh: (source) => {
+      if (lastRenderedDateKey !== currentDateKey() && !logbookInputApi.isExerciseInputActive(document, list)) render();
+      return resumeRevalidator.requestRefresh(source);
+    },
     onHidden: flushRemoteSave,
   });
 
