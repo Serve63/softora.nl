@@ -157,22 +157,23 @@ async function syncMailboxRequest({
     incrementalOnly,
     maxConcurrentAccounts: fastRefresh ? 2 : 1,
   });
-  if (
-    String(method || '').toUpperCase() === 'GET' &&
-    !accountEmail &&
-    !folderParam &&
-    !campaignOnly
-  ) {
-    const coldmailResult = await syncMailbox({
-      folders: [CAMPAIGN_GMAIL_LABEL_FOLDER],
+  const isGlobalMailboxCron = String(method || '').toUpperCase() === 'GET' &&
+    !accountEmail && !folderParam && !campaignOnly;
+  if (isGlobalMailboxCron) {
+    const campaignResult = await syncMailbox({
+      accountEmail: '',
+      owner: '',
+      folders,
       limit: Number(requestedLimit) || fallbackLimit,
       force,
       campaignOnly: true,
+      incrementalOnly: true,
+      maxConcurrentAccounts: 1,
     });
-    result.ok = result.ok && coldmailResult.ok;
+    result.ok = result.ok && campaignResult.ok;
     result.results = [
       ...(Array.isArray(result.results) ? result.results : []),
-      ...(Array.isArray(coldmailResult.results) ? coldmailResult.results : []),
+      ...(Array.isArray(campaignResult.results) ? campaignResult.results : []),
     ];
   }
   return result;
