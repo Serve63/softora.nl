@@ -16,6 +16,45 @@ const {
   isAutomatedCampaignReply,
   shouldShowCampaignConversation,
 } = require('../../server/services/mailbox-campaign-replies');
+const { loadMailboxCampaignContactHistory } = require('../../server/services/mailbox-campaign-contact-history');
+const { collectCampaignThreadParticipantEmails } = require('../../server/services/mailbox-campaign-participants');
+
+test('campaign contact history ordent deelnemers globaal over coldmail en inbox vóór de cap', async () => {
+  const baseMs = Date.parse('2026-01-01T00:00:00.000Z');
+  const coldmailMessages = Array.from({ length: 401 }, (_value, index) => ({
+    id: `coldmail:${index}`,
+    folder: 'coldmail',
+    accountEmail: 'martijnven123@gmail.com',
+    email: `coldmail-${index}@example.nl`,
+    date: new Date(baseMs + index * 60_000).toISOString(),
+  }));
+  const olderInboxReply = {
+    id: 'inbox:karoena',
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    email: 'info@praktijkkaroena.nl',
+    date: new Date(baseMs + 250 * 60_000).toISOString(),
+  };
+  const recipientLookups = [];
+  const history = await loadMailboxCampaignContactHistory({
+    mailboxIndexStore: {
+      listMatchingMessagesForAccounts: async () => [],
+      listMessagesBySenderEmailsForAccounts: async () => [],
+      listMessagesByRecipientEmailsForAccounts: async ({ recipientEmails }) => {
+        recipientLookups.push(recipientEmails);
+        return [];
+      },
+    },
+    campaignMailboxAccounts: ['martijnven123@gmail.com'],
+    messages: [...coldmailMessages, olderInboxReply],
+    dedupeCampaignMessages: (messages) => messages,
+    collectCampaignThreadParticipantEmails,
+  });
+
+  assert.deepEqual(history.sentMessages, []);
+  assert.equal(recipientLookups.length, 1);
+  assert.equal(recipientLookups[0].includes('info@praktijkkaroena.nl'), true);
+});
 
 test('campaign mailbox applies the selected owner before limiting older conversations', async () => {
   const serveAccounts = [
