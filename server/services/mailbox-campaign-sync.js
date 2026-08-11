@@ -6,64 +6,18 @@ const {
   CAMPAIGN_HISTORY_SINCE,
   CAMPAIGN_HISTORY_SUBJECT_TERMS,
 } = require('./mailbox-campaign-history-sync');
+const {
+  collectCampaignThreadRecipientTerms,
+  collectCampaignThreadReferenceIds,
+} = require('./mailbox-campaign-participants');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
 const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
+const CAMPAIGN_HISTORY_SEED_FOLDERS = Object.freeze(['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]);
 const INCREMENTAL_LOCK_RETRY_ATTEMPTS = 12;
 const INCREMENTAL_LOCK_RETRY_DELAY_MS = 500;
-
-const PERSONAL_MAILBOX_DOMAINS = new Set([
-  'aol.com',
-  'gmail.com',
-  'googlemail.com',
-  'hotmail.com',
-  'icloud.com',
-  'live.com',
-  'mac.com',
-  'me.com',
-  'msn.com',
-  'outlook.com',
-  'proton.me',
-  'protonmail.com',
-  'tuta.com',
-  'tutamail.com',
-  'yahoo.com',
-  'ymail.com',
-]);
-
-function isCampaignSubject(message = {}) {
-  const subject = String(message?.subject || '').toLowerCase();
-  return CAMPAIGN_HISTORY_SUBJECT_TERMS.some((term) => subject.includes(term.toLowerCase()));
-}
-
-function collectCampaignThreadReferenceIds(messages = []) {
-  return Array.from(
-    new Set(
-      (Array.isArray(messages) ? messages : [])
-        .filter(isCampaignSubject)
-        .map((message) => String(message?.messageId || '').trim())
-        .filter(Boolean)
-    )
-  );
-}
-
-function collectCampaignThreadRecipientTerms(messages = []) {
-  const terms = new Set();
-  (Array.isArray(messages) ? messages : []).filter(isCampaignSubject).forEach((message) => {
-    const emailMatch = String(message?.email || message?.senderEmail || '')
-      .trim()
-      .toLowerCase()
-      .match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
-    const email = emailMatch ? emailMatch[0] : '';
-    if (!email) return;
-    terms.add(email);
-    const domain = email.split('@')[1] || '';
-    if (domain && !PERSONAL_MAILBOX_DOMAINS.has(domain)) terms.add(domain);
-  });
-  return Array.from(terms);
-}
 
 function selectMailboxSyncAccounts({
   accountEmail = '',
@@ -245,6 +199,7 @@ function createMailboxSyncService({
     force = false,
     campaignOnly = false,
     incrementalOnly = false,
+    campaignSeedCache = null,
   } = {}) {
     const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder);
@@ -309,7 +264,27 @@ function createMailboxSyncService({
               limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
             })) || [];
         }
-        if (
+        if (typeof mailboxIndexStore.listCampaignSeedMessagesForAccount === 'function') {
+          const cache = campaignSeedCache instanceof Map ? campaignSeedCache : new Map();
+          const cacheKey = normalizeEmail(account.email);
+          let indexedCampaignMessages = cache.get(cacheKey);
+          if (!indexedCampaignMessages) {
+            indexedCampaignMessages = await mailboxIndexStore.listCampaignSeedMessagesForAccount({
+              accountEmail: account.email,
+              folders: CAMPAIGN_HISTORY_SEED_FOLDERS,
+              subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
+              limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+            });
+            if (!Array.isArray(indexedCampaignMessages)) {
+              const error = new Error('Mailbox-index voor campagnecontacten kon niet worden gelezen.');
+              error.status = 503;
+              throw error;
+            }
+            cache.set(cacheKey, indexedCampaignMessages);
+          }
+          threadReferenceIds = collectCampaignThreadReferenceIds(indexedCampaignMessages);
+          threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedCampaignMessages);
+        } else if (
           hydrateCampaignHistory &&
           normalizedFolder === 'sent' &&
           typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
@@ -345,8 +320,14 @@ function createMailboxSyncService({
               .map((message) => Number(message?.uid) || 0)
               .filter(Boolean);
           }
-          threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
-          threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
+          threadReferenceIds = collectCampaignThreadReferenceIds([
+            ...indexedInboxMessages,
+            ...indexedSentMessages,
+          ]);
+          threadRecipientTerms = collectCampaignThreadRecipientTerms([
+            ...indexedInboxMessages,
+            ...indexedSentMessages,
+          ]);
         }
         if (
           hydrateCampaignHistory &&
@@ -436,6 +417,7 @@ function createMailboxSyncService({
     const requestedFolders = Array.from(
       new Set((Array.isArray(folders) && folders.length ? folders : defaultFolders).map(normalizeFolder))
     );
+    const campaignSeedCache = new Map();
     const accountResults = await mapWithConcurrency(
       accounts,
       Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
@@ -456,6 +438,7 @@ function createMailboxSyncService({
               force,
               campaignOnly,
               incrementalOnly,
+              campaignSeedCache,
             }));
           } catch (error) {
             logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);

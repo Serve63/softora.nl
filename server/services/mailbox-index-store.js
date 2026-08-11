@@ -6,6 +6,7 @@ const {
   createMailboxMessageReferenceLookup,
 } = require('../repositories/mailbox-message-reference-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
+const { createMailboxIndexTargetedLookups } = require('../repositories/mailbox-index-targeted-lookups');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -914,39 +915,6 @@ function createMailboxIndexStore(deps = {}) {
       .filter(Boolean);
   }
 
-  async function getOldestMatchingMessageUid({
-    accountEmail,
-    folder = 'inbox',
-    subjectTerms = [],
-  } = {}) {
-    const terms = Array.from(
-      new Set(
-        (Array.isArray(subjectTerms) ? subjectTerms : [])
-          .map(normalizeString)
-          .filter(Boolean)
-      )
-    );
-    if (!terms.length) return 0;
-
-    let oldestUid = 0;
-    for (const term of terms) {
-      const result = await run(`get-oldest-matching-message-uid:${normalizeFolder(folder)}`, (client) =>
-        client
-          .from(MAILBOX_INDEX_TABLES.messages)
-          .select('uid')
-          .eq('account_email', normalizeEmail(accountEmail))
-          .eq('folder', normalizeFolder(folder))
-          .ilike('subject', `%${term}%`)
-          .order('uid', { ascending: true })
-          .limit(1)
-      );
-      if (!result.ok) return 0;
-      const uid = Number(result.data?.[0]?.uid) || 0;
-      if (uid > 0 && (!oldestUid || uid < oldestUid)) oldestUid = uid;
-    }
-    return oldestUid;
-  }
-
   async function upsertMessages({ accountEmail, folder = 'inbox', messages = [] }) {
     const rows = (Array.isArray(messages) ? messages : [])
       .map((message, index) => buildMessageRow(message, accountEmail, folder, index))
@@ -1140,6 +1108,16 @@ function createMailboxIndexStore(deps = {}) {
     normalizeMessageRow,
   });
   const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
+  const targetedLookups = createMailboxIndexTargetedLookups({
+    run,
+    tableName: MAILBOX_INDEX_TABLES.messages,
+    metadataColumns: MAILBOX_MESSAGE_METADATA_COLUMNS,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeString,
+    normalizeMessageRow,
+    listMatchingMessagesForAccounts,
+  });
 
   return {
     BODY_MAX_CHARS,
@@ -1155,7 +1133,6 @@ function createMailboxIndexStore(deps = {}) {
     finishSync,
     getMessage,
     getProviderMessage,
-    getOldestMatchingMessageUid,
     getSyncState,
     hydrateMessageBodies,
     isAvailable,
@@ -1179,6 +1156,7 @@ function createMailboxIndexStore(deps = {}) {
     stableProviderUid,
     upsertMessages,
     upsertProviderMessages,
+    ...targetedLookups,
   };
 }
 

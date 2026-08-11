@@ -160,6 +160,62 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
   assert.equal(result.results[0].incrementalOnly, true);
 });
 
+test('incremental campaign refresh carries known contact participants and headers into IMAP search', async () => {
+  const fetches = [];
+  const selected = account('martijn@softora.nl');
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      finishSync: async () => ({ ok: true }),
+      listMessageUidsForAccount: async () => [90, 91],
+      listCampaignSeedMessagesForAccount: async () => [{
+        folder: 'inbox',
+        accountEmail: selected.email,
+        email: 'info@praktijkkaroena.nl',
+        subject: 'Re: Nieuw webdesign',
+        messageId: '<karoena-inbound@example.nl>',
+      }, {
+        folder: 'sent',
+        accountEmail: selected.email,
+        email: selected.email,
+        to: 'info@praktijkkaroena.nl',
+        subject: 'Nieuw webdesign',
+        messageId: '<karoena-outbound@example.nl>',
+        inReplyTo: '<karoena-inbound@example.nl>',
+      }],
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async (input) => { fetches.push(input); return []; },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    logger: { error() {} },
+  });
+
+  await service.syncMailbox({
+    owner: 'martijn',
+    folders: ['inbox'],
+    limit: 4,
+    campaignOnly: true,
+    incrementalOnly: true,
+    maxConcurrentAccounts: 1,
+  });
+
+  assert.equal(fetches.length, 1);
+  assert.equal(fetches[0].campaignHistory, false);
+  assert.deepEqual(fetches[0].threadRecipientTerms, [
+    'info@praktijkkaroena.nl',
+    'praktijkkaroena.nl',
+  ]);
+  assert.deepEqual(fetches[0].threadReferenceIds, [
+    '<karoena-inbound@example.nl>',
+    '<karoena-outbound@example.nl>',
+  ]);
+});
+
 test('incremental refresh waits for transient mailbox lock contention instead of silently skipping', async () => {
   const selected = account('serve@softora.nl');
   const waits = [];
