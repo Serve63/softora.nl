@@ -21,8 +21,8 @@ const MAILBOX_INDEX_PAGE_SIZE = 1000;
 const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
-const SYNC_FINALIZE_CLIENT_TIMEOUT_MS = 8_000;
-const SYNC_FINALIZE_QUERY_TIMEOUT_MS = 10_000;
+const DURABLE_WRITE_CLIENT_TIMEOUT_MS = 8_000;
+const DURABLE_WRITE_QUERY_TIMEOUT_MS = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
   'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,softora_read_at,starred,reply_dismissed_at,has_body,body_truncated,payload';
 
@@ -156,6 +156,19 @@ function createMailboxIndexStore(deps = {}) {
       }
       return { ok: false, unavailable: isUnavailableError(error), data: null, error };
     }
+  }
+
+  async function runDurableWrite(label, operation) {
+    const execute = () => run(label, operation, {
+      bypassFailureCooldown: true,
+      clientOptions: {
+        timeoutMs: DURABLE_WRITE_CLIENT_TIMEOUT_MS,
+        ignoreFailureCooldown: true, suppressFailureCooldown: true,
+      },
+      queryTimeoutMs: DURABLE_WRITE_QUERY_TIMEOUT_MS,
+    });
+    const first = await execute();
+    return first.ok || !isSoftIndexError(first.error) ? first : execute();
   }
 
   function isoNow() {
@@ -933,7 +946,7 @@ function createMailboxIndexStore(deps = {}) {
       .map((message, index) => buildMessageRow(message, accountEmail, folder, index))
       .filter((row) => row.uid > 0);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run('upsert-messages', (client) =>
+    const result = await runDurableWrite('upsert-messages', (client) =>
       client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
         onConflict: 'message_key',
         defaultToNull: false,
@@ -1096,26 +1109,14 @@ function createMailboxIndexStore(deps = {}) {
       updated_at: isoNow(),
     };
     if (!failed) patch.last_synced_at = isoNow();
-    const finalize = () => run(
+    return runDurableWrite(
       'finish-sync',
       (client) => client
         .from(MAILBOX_INDEX_TABLES.syncState)
         .update(patch)
         .eq('sync_key', syncKey)
-        .eq('lock_token', normalizeString(lockToken)),
-      {
-        bypassFailureCooldown: true,
-        clientOptions: {
-          timeoutMs: SYNC_FINALIZE_CLIENT_TIMEOUT_MS,
-          ignoreFailureCooldown: true,
-          suppressFailureCooldown: true,
-        },
-        queryTimeoutMs: SYNC_FINALIZE_QUERY_TIMEOUT_MS,
-      }
+        .eq('lock_token', normalizeString(lockToken))
     );
-    const first = await finalize();
-    if (first.ok || !isSoftIndexError(first.error)) return first;
-    return finalize();
   }
 
   function isSyncStateStale(state, maxAgeMs) {

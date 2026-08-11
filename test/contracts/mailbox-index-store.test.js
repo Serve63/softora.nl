@@ -1753,6 +1753,80 @@ test('mailbox index store opens a short cooldown after Supabase index timeouts',
   );
 });
 
+test('mailbox index store durably persists fetched messages despite another index timeout', async () => {
+  let readCalls = 0;
+  let upsertCalls = 0;
+  const requestedClientOptions = [];
+  const transientError = new Error('Supabase client timeout na 8000ms');
+  transientError.name = 'AbortError';
+  const client = {
+    from(table) {
+      if (table === 'softora_mailbox_sync_state') {
+        return {
+          select() {
+            return {
+              eq() { return this; },
+              limit() { return this; },
+              maybeSingle() {
+                readCalls += 1;
+                return new Promise(() => {});
+              },
+            };
+          },
+        };
+      }
+      return {
+        async upsert() {
+          upsertCalls += 1;
+          if (upsertCalls === 1) return { data: null, error: transientError };
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return { data: [], error: null };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options);
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  await store.getSyncState({ accountEmail: 'first@softora.nl', folder: 'inbox' });
+  const result = await store.upsertMessages({
+    accountEmail: 'second@softora.nl',
+    folder: 'allmail',
+    messages: [{
+      id: 'allmail:42',
+      uid: 42,
+      messageId: '<durable-write@example.test>',
+      body: 'Reeds via IMAP opgehaald',
+      date: '2026-08-11T22:00:00.000Z',
+    }],
+  });
+
+  assert.equal(readCalls, 1);
+  assert.equal(result.ok, true);
+  assert.equal(result.upserted, 1);
+  assert.equal(upsertCalls, 2);
+  assert.deepEqual(requestedClientOptions.slice(-2), [
+    {
+      timeoutMs: 8000,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    },
+    {
+      timeoutMs: 8000,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    },
+  ]);
+});
+
 test('mailbox index store finalizes a fenced sync even while the read/write circuit is open', async () => {
   let finishCalls = 0;
   const requestedClientOptions = [];
