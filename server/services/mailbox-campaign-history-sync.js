@@ -40,11 +40,13 @@ async function searchThreadReplyUids({
     : [];
   const recipientTerms = normalizeMessageIdList(threadRecipientTerms);
   const normalizedFolder = String(folder || '').trim().toLowerCase();
-  const participantSearchField = normalizedFolder === 'sent'
-    ? 'to'
-    : ['inbox', 'coldmail'].includes(normalizedFolder)
-      ? 'from'
-      : 'to';
+  const participantSearchFields = normalizedFolder === 'allmail'
+    ? ['from', 'to']
+    : [normalizedFolder === 'sent'
+        ? 'to'
+        : ['inbox', 'coldmail'].includes(normalizedFolder)
+          ? 'from'
+          : 'to'];
   const replyUids = [];
   for (let offset = 0; offset < referenceIds.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = referenceIds.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
@@ -74,7 +76,9 @@ async function searchThreadReplyUids({
   }
   for (let offset = 0; offset < recipientTerms.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = recipientTerms.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
-    const alternatives = batch.map((term) => ({ [participantSearchField]: term }));
+    const alternatives = batch.flatMap((term) =>
+      participantSearchFields.map((field) => ({ [field]: term }))
+    );
     const query =
       alternatives.length === 1
         ? {
@@ -108,6 +112,7 @@ function selectMailboxSyncUids({
   indexedUids = [],
   oldestIndexedCampaignUid = 0,
   limit = 50,
+  prioritizeTargetedUids = false,
 } = {}) {
   const safeLimit = Math.max(1, Number(limit) || 50);
   const normalizedAll = normalizeUidList(allUids);
@@ -134,8 +139,9 @@ function selectMailboxSyncUids({
     seen.add(uid);
     selected.push(uid);
   };
+  if (prioritizeTargetedUids) missingPriorityUids.forEach(addUid);
   unindexedAll.slice(-recentCount).reverse().forEach(addUid);
-  missingPriorityUids.forEach(addUid);
+  if (!prioritizeTargetedUids) missingPriorityUids.forEach(addUid);
   olderCampaignUids.slice().reverse().forEach(addUid);
   unindexedAll.slice().reverse().forEach(addUid);
   return selected;
@@ -153,6 +159,7 @@ async function resolveMailboxSyncUids({
   logger = console,
   accountEmail = '',
   folder = '',
+  prioritizeTargetedUids = false,
 } = {}) {
   const allUids = await client.search({ all: true }, { uid: true });
   if (!campaignHistory) {
@@ -172,6 +179,7 @@ async function resolveMailboxSyncUids({
       priorityUids: targetedUids,
       indexedUids,
       limit,
+      prioritizeTargetedUids,
     });
   }
 
@@ -212,6 +220,7 @@ async function resolveMailboxSyncUids({
     indexedUids,
     oldestIndexedCampaignUid,
     limit,
+    prioritizeTargetedUids,
   });
 }
 

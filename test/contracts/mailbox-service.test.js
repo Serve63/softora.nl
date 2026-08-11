@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const { createMailboxService: createRawMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
 const {
+  CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT,
+  CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
   CAMPAIGN_GMAIL_LABEL_FOLDER,
   CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
@@ -1389,6 +1391,51 @@ test('mailbox service resolves sent folders through IMAP special-use metadata', 
   assert.equal(messages[0].from, 'Serve');
   assert.equal(messages[0].email, 'serve@softora.nl');
   assert.equal(messages[0].to, 'klant@example.nl');
+});
+
+test('mailbox service resolves Gmail All Mail through IMAP special-use metadata', async () => {
+  const receivedDate = new Date('2026-05-28T11:15:00.000Z');
+  const client = createFakeImapClient({
+    boxes: [
+      { path: 'INBOX' },
+      { path: '[Gmail]/Alle berichten', specialUse: '\\All' },
+    ],
+    messagesByMailbox: {
+      '[Gmail]/Alle berichten': [{
+        uid: 84,
+        flags: ['\\Seen'],
+        internalDate: receivedDate,
+        source: {
+          date: receivedDate,
+          text: 'Historisch antwoord',
+          subject: 'Re: Nieuw webdesign',
+          from: { value: [{ name: 'Klant', address: 'klant@example.nl' }] },
+          to: { value: [{ name: 'Martijn', address: 'martijnven123@gmail.com' }] },
+        },
+      }],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'martijnven123@gmail.com',
+      name: 'Martijn',
+      imapHost: 'imap.gmail.com',
+      imapUser: 'martijnven123@gmail.com',
+      imapPass: 'secret',
+    }]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({
+    accountEmail: 'martijnven123@gmail.com',
+    folder: CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
+  });
+
+  assert.deepEqual(client.lockedMailboxes, ['[Gmail]/Alle berichten']);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].folder, CAMPAIGN_GMAIL_ALL_MAIL_FOLDER);
+  assert.equal(messages[0].subject, 'Re: Nieuw webdesign');
 });
 
 test('mailbox service resolves Dutch sent folders without special-use metadata', async () => {
@@ -3631,7 +3678,7 @@ test('campaign mailbox sync skips configured accounts outside the campaign', asy
   assert.deepEqual(requestedAccounts, ['serve@softora.nl', 'serve@softora.nl']);
 });
 
-test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail campaign accounts', () => {
+test('campaign mailbox sync adds Gmail recovery folders only to incremental Gmail accounts', () => {
   const normalizeFolder = (value) => String(value || '').trim().toLowerCase();
 
   assert.deepEqual(
@@ -3645,8 +3692,18 @@ test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail c
   );
   assert.deepEqual(
     getMailboxSyncFoldersForAccount({
+      account: { email: 'servec321@gmail.com', imapHost: 'imap.gmail.com' },
+      folders: ['inbox', 'sent'],
+      campaignOnly: true,
+      incrementalOnly: true,
+      normalizeFolder,
+    }),
+    ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER, CAMPAIGN_GMAIL_ALL_MAIL_FOLDER]
+  );
+  assert.deepEqual(
+    getMailboxSyncFoldersForAccount({
       account: { email: 'serve@softora.nl', imapHost: 'imap.strato.com' },
-      folders: ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER],
+      folders: ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER, CAMPAIGN_GMAIL_ALL_MAIL_FOLDER],
       campaignOnly: true,
       normalizeFolder,
     }),
@@ -3688,7 +3745,75 @@ test('mailbox cron supplements normal folders with campaign inbox recovery and t
     'sent',
     'inbox',
     CAMPAIGN_GMAIL_LABEL_FOLDER,
+    CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
   ]);
+});
+
+test('incremental Gmail All Mail recovery fetches only exact missing references and then stops', async () => {
+  const fetches = [];
+  const upserts = [];
+  const selected = {
+    email: 'martijnven123@gmail.com',
+    imapHost: 'imap.gmail.com',
+    imapConfigured: true,
+  };
+  let seeds = [{
+    folder: 'inbox',
+    accountEmail: selected.email,
+    email: 'info@praktijkkaroena.nl',
+    messageId: '<known-inbound@example.nl>',
+  }, {
+    folder: 'sent',
+    accountEmail: selected.email,
+    email: selected.email,
+    to: 'info@praktijkkaroena.nl',
+    messageId: '<known-outbound@example.nl>',
+    inReplyTo: '<missing-inbound@example.nl>',
+  }];
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'allmail-lock' }),
+      finishSync: async () => ({ ok: true }),
+      listMessageUidsForAccount: async () => [],
+      listCampaignSeedMessagesForAccount: async () => seeds,
+      upsertMessages: async (input) => { upserts.push(input); return { ok: true, upserted: 0 }; },
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async (input) => { fetches.push(input); return []; },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    logger: { error() {} },
+  });
+
+  await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
+    limit: 30,
+    campaignOnly: true,
+    incrementalOnly: true,
+  });
+
+  assert.equal(fetches.length, 1);
+  assert.equal(fetches[0].limit, CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT);
+  assert.deepEqual(fetches[0].threadReferenceIds, ['<missing-inbound@example.nl>']);
+  assert.deepEqual(fetches[0].threadRecipientTerms, []);
+  assert.equal(fetches[0].prioritizeTargetedUids, true);
+
+  seeds = [{ messageId: '<known-only@example.nl>' }];
+  await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
+    limit: 30,
+    campaignOnly: true,
+    incrementalOnly: true,
+  });
+
+  assert.equal(fetches.length, 1);
+  assert.equal(upserts.length, 2);
+  assert.deepEqual(upserts[1].messages, []);
 });
 
 test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gmail label', async () => {

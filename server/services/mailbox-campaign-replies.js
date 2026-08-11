@@ -23,7 +23,7 @@ const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
   'Kleine vraag over jullie website',
   'Nieuw webdesign',
 ]);
-const CAMPAIGN_INCOMING_FOLDERS = Object.freeze(['coldmail', 'inbox']);
+const CAMPAIGN_INCOMING_FOLDERS = Object.freeze(['coldmail', 'inbox', 'allmail']);
 const {
   getMailboxMessageDirection,
   getMessageSourceFolders,

@@ -497,12 +497,19 @@ test('campaign mailbox prefers exact Gmail label provenance over a stale Inbox c
       accountEmail: 'servec321@gmail.com',
       messageId: '<same-filtered-reply@example.com>',
     },
+    {
+      id: 'allmail:102',
+      uid: 102,
+      folder: 'allmail',
+      accountEmail: 'servec321@gmail.com',
+      messageId: '<same-filtered-reply@example.com>',
+    },
   ]);
 
-  assert.deepEqual(CAMPAIGN_INCOMING_FOLDERS, ['coldmail', 'inbox']);
+  assert.deepEqual(CAMPAIGN_INCOMING_FOLDERS, ['coldmail', 'inbox', 'allmail']);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].id, 'coldmail:91');
-  assert.deepEqual(messages[0].sourceFolders.sort(), ['coldmail', 'inbox']);
+  assert.deepEqual(messages[0].sourceFolders.sort(), ['allmail', 'coldmail', 'inbox']);
 });
 
 test('campaign reply service shows filtered replies and bounces once without exposing labeled own sent mail', async () => {
@@ -1023,14 +1030,17 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
   const replies = await service.listReplies({ limit: 100 });
 
   assert.deepEqual(requestedFolders.sort(), [
+    'allmail',
     'coldmail',
     'inbox',
+    'matching:allmail',
     'matching:coldmail',
     'matching:inbox',
     'matching:sent',
   ]);
   assert.equal(requestedLimits.coldmail, CAMPAIGN_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits.inbox, CAMPAIGN_MESSAGE_SCAN_LIMIT);
+  assert.equal(requestedLimits.allmail, CAMPAIGN_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits['matching:coldmail'], CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits['matching:inbox'], CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits['matching:sent'], CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT);
@@ -1303,8 +1313,10 @@ test('campaign reply service koppelt alleen exact bewezen historische vervolgrea
   assert.deepEqual(requestedMethods, [
     ['recent:coldmail', CAMPAIGN_MESSAGE_SCAN_LIMIT],
     ['recent:inbox', CAMPAIGN_MESSAGE_SCAN_LIMIT],
+    ['recent:allmail', CAMPAIGN_MESSAGE_SCAN_LIMIT],
     ['matching:coldmail', CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT],
     ['matching:inbox', CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT],
+    ['matching:allmail', CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT],
     ['matching:sent', CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT],
   ]);
   assert.equal(replies.length, 1);

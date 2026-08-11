@@ -869,7 +869,7 @@ function createMailboxService(deps = {}) {
 
   function normalizeFolder(value) {
     const folder = normalizeString(value).toLowerCase();
-    return FOLDER_ALIASES[folder] ? folder : 'inbox';
+    return FOLDER_ALIASES[folder] || folder === 'allmail' ? folder : 'inbox';
   }
 
   function parseMessageReference(input = {}) {

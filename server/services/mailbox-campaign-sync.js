@@ -16,7 +16,14 @@ const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
 const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
 const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
-const CAMPAIGN_HISTORY_SEED_FOLDERS = Object.freeze(['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]);
+const CAMPAIGN_GMAIL_ALL_MAIL_FOLDER = 'allmail';
+const CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT = 8;
+const CAMPAIGN_HISTORY_SEED_FOLDERS = Object.freeze([
+  'inbox',
+  'sent',
+  CAMPAIGN_GMAIL_LABEL_FOLDER,
+  CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
+]);
 const INCREMENTAL_LOCK_RETRY_ATTEMPTS = 12;
 const INCREMENTAL_LOCK_RETRY_DELAY_MS = 500;
 
@@ -88,6 +95,7 @@ function getMailboxSyncFoldersForAccount({
   account,
   folders = [],
   campaignOnly = false,
+  incrementalOnly = false,
   normalizeFolder = (value) => String(value || '').trim().toLowerCase(),
 } = {}) {
   const normalizedFolders = (Array.isArray(folders) ? folders : [])
@@ -95,11 +103,14 @@ function getMailboxSyncFoldersForAccount({
     .filter(Boolean);
   if (campaignOnly && !isGmailImapAccount(account)) {
     return Array.from(new Set(
-      normalizedFolders.filter((folder) => folder !== CAMPAIGN_GMAIL_LABEL_FOLDER)
+      normalizedFolders.filter((folder) =>
+        ![CAMPAIGN_GMAIL_LABEL_FOLDER, CAMPAIGN_GMAIL_ALL_MAIL_FOLDER].includes(folder)
+      )
     ));
   }
   if (campaignOnly) {
     normalizedFolders.push(CAMPAIGN_GMAIL_LABEL_FOLDER);
+    if (incrementalOnly) normalizedFolders.push(CAMPAIGN_GMAIL_ALL_MAIL_FOLDER);
   }
   return Array.from(new Set(normalizedFolders));
 }
@@ -350,21 +361,26 @@ function createMailboxSyncService({
           indexedUids = indexedMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
         }
       }
-      const messages = await fetchMessagesFromImap({
+      const recoverGmailAllMail = campaignOnly && normalizedFolder === CAMPAIGN_GMAIL_ALL_MAIL_FOLDER;
+      const messages = recoverGmailAllMail && !threadReferenceIds.length ? [] : await fetchMessagesFromImap({
         account,
         folder: normalizedFolder,
         limit: campaignOnly
-          ? Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
+          ? Math.min(
+              getSafeLimit(limit),
+              recoverGmailAllMail ? CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT : CAMPAIGN_SYNC_FETCH_LIMIT
+            )
           : getSafeLimit(limit),
         campaignHistory:
           hydrateCampaignHistory && normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER,
         oldestIndexedCampaignUid,
         threadReferenceIds,
-        threadRecipientTerms,
+        threadRecipientTerms: recoverGmailAllMail ? [] : threadRecipientTerms,
         // Incremental recovery receives only referenced Message-ID values that
         // are absent from the index. This keeps the exact header fallback while
         // bounding it to at most three IMAP batches per pass.
         includeThreadReferenceSearch: threadReferenceIds.length > 0,
+        prioritizeTargetedUids: recoverGmailAllMail,
         logImapOperation: true,
         indexedUids,
       });
@@ -438,6 +454,7 @@ function createMailboxSyncService({
           account,
           folders: requestedFolders,
           campaignOnly,
+          incrementalOnly,
           normalizeFolder,
         });
         for (const folder of folderList) {
@@ -479,6 +496,8 @@ function createMailboxSyncService({
 
 module.exports = {
   CAMPAIGN_GMAIL_LABEL_FOLDER,
+  CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT,
+  CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
   CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
