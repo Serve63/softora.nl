@@ -10,8 +10,45 @@ const {
 
 function createMailboxIndexClient() {
   const stateRows = new Map();
+  const rpcCalls = [];
   return {
     stateRows,
+    rpcCalls,
+    async rpc(name, args) {
+      rpcCalls.push([name, args]);
+      const current = stateRows.get(args.p_sync_key);
+      if (current && current.status === 'syncing' && current.lock_token) {
+        return {
+          data: [{
+            acquired: false,
+            locked: true,
+            claimed_lock_token: null,
+            lock_expires_at: current.lock_expires_at,
+          }],
+          error: null,
+        };
+      }
+      const row = {
+        sync_key: args.p_sync_key,
+        account_email: args.p_account_email,
+        folder: args.p_folder,
+        status: 'syncing',
+        lock_token: args.p_lock_token,
+        lock_expires_at: new Date(
+          Date.parse('2026-05-20T12:00:00.000Z') + args.p_lock_ttl_seconds * 1000
+        ).toISOString(),
+      };
+      stateRows.set(row.sync_key, row);
+      return {
+        data: [{
+          acquired: true,
+          locked: false,
+          claimed_lock_token: args.p_lock_token,
+          lock_expires_at: row.lock_expires_at,
+        }],
+        error: null,
+      };
+    },
     from(table) {
       if (table !== 'softora_mailbox_sync_state') {
         return {
@@ -1442,6 +1479,17 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
 
   assert.equal(first.ok, true);
   assert.equal(second.locked, true);
+  assert.equal(second.contention, 'active_lock');
+  assert.equal(client.rpcCalls.length, 2);
+  assert.equal(client.rpcCalls[0][0], 'softora_claim_mailbox_sync_lock');
+  assert.deepEqual(client.rpcCalls[0][1], {
+    p_sync_key: 'info@softora.nl|inbox',
+    p_account_email: 'info@softora.nl',
+    p_folder: 'inbox',
+    p_lock_token: first.lockToken,
+    p_lock_ttl_seconds: 90,
+    p_force: false,
+  });
 
   await store.finishSync({
     accountEmail: 'info@softora.nl',

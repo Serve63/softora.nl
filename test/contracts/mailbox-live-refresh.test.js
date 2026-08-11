@@ -252,6 +252,49 @@ test('incremental refresh reports persistent lock contention as retryable and in
   });
 });
 
+test('incremental refresh coalesces an already-running sync for the same mailbox folder', async () => {
+  const selected = account('serve@softora.nl');
+  let lockAttempts = 0;
+  let fetches = 0;
+  let waits = 0;
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => {
+        lockAttempts += 1;
+        return { ok: false, locked: true, contention: 'active_lock' };
+      },
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => {
+      fetches += 1;
+      return [];
+    },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    waitForIncrementalLockRetry: async () => { waits += 1; },
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailbox({
+    owner: 'serve',
+    folders: ['inbox'],
+    limit: 4,
+    campaignOnly: true,
+    incrementalOnly: true,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(lockAttempts, 1);
+  assert.equal(fetches, 0);
+  assert.equal(waits, 0);
+  assert.deepEqual(result.results, [
+    { ok: true, skipped: true, reason: 'coalesced' },
+  ]);
+});
+
 test('Instantly fast refresh supports exact owners and both owners without mixing', async () => {
   const calls = [];
   let activeSyncs = 0;

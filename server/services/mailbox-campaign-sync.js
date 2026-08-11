@@ -256,6 +256,9 @@ function createMailboxSyncService({
       folder: normalizedFolder,
       force,
     });
+    if (incrementalOnly && !lock.ok && lock.locked && lock.contention === 'active_lock') {
+      return { ok: true, skipped: true, reason: 'coalesced' };
+    }
     if (incrementalOnly) {
       for (let attempt = 1; attempt < INCREMENTAL_LOCK_RETRY_ATTEMPTS && !lock.ok; attempt += 1) {
         const retryableContention = lock.locked || isMailboxSyncCapacityError(lock.error);
@@ -266,6 +269,9 @@ function createMailboxSyncService({
           folder: normalizedFolder,
           force,
         });
+        if (!lock.ok && lock.locked && lock.contention === 'active_lock') {
+          return { ok: true, skipped: true, reason: 'coalesced' };
+        }
       }
     }
     if (!lock.ok) {
