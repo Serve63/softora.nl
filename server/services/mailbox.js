@@ -7,7 +7,7 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
-const { fetchSelectedMailboxMessages } = require('./mailbox-imap-fetch');
+const { createMailboxImapFetcher } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
@@ -1949,52 +1949,21 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, ...historySyncOptions }) {
-    const normalizedFolder = normalizeFolder(folder);
-    const safeLimit = getSafeLimit(limit);
-    const client = createClient(account);
-    try {
-      await client.connect();
-      const mailboxName = await resolveMailboxName(client, normalizedFolder);
-      if (!mailboxName) return [];
-      const lock = await client.getMailboxLock(mailboxName);
-      try {
-        let selectedUids = Array.isArray(uids) && uids.length
-          ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
-          : null;
-        if (!selectedUids) {
-          selectedUids = await resolveMailboxSyncUids({
-            client,
-            limit: safeLimit,
-            campaignHistory,
-            oldestIndexedCampaignUid,
-            ...historySyncOptions,
-            logger,
-            accountEmail: account.email,
-            folder: normalizedFolder,
-          });
-        }
-        if (!selectedUids.length) return [];
-        return await fetchSelectedMailboxMessages({
-          account,
-          buildMailboxBodyImages,
-          client,
-          folder: normalizedFolder,
-          normalizeString,
-          parseMailSource,
-          sanitizeMailboxDisplayText,
-          selectedUids,
-          toClientMessage,
-        });
-      } finally {
-        lock.release();
-      }
-    } finally {
-      try {
-        if (client.usable) await client.logout();
-      } catch (_) {}
-    }
-  }
+  const fetchMessagesFromImap = createMailboxImapFetcher({
+    buildMailboxBodyImages,
+    createClient,
+    defaultLimit: DEFAULT_SYNC_LIMIT,
+    getSafeLimit,
+    logger,
+    normalizeFolder,
+    normalizeString,
+    parseMailSource,
+    resolveMailboxName,
+    resolveMailboxSyncUids,
+    runWithDeadline: deps.runMailboxImapOperationWithDeadline,
+    sanitizeMailboxDisplayText,
+    toClientMessage,
+  });
 
   async function fetchMessageFromImapById({ account, folder = 'inbox', id = '' }) {
     const uid = Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
