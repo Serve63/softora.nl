@@ -179,6 +179,37 @@ test('campaign history sync bounds each run and imports the newest missing targe
   assert.ok(selected.indexOf(199) < selected.indexOf(187));
 });
 
+test('Gmail All Mail recovery gives exact missing references priority over unrelated recent mail', () => {
+  const selected = selectMailboxSyncUids({
+    allUids: Array.from({ length: 100 }, (_item, index) => index + 1),
+    priorityUids: [42, 55],
+    limit: 2,
+    prioritizeTargetedUids: true,
+  });
+
+  assert.deepEqual(selected, [55, 42]);
+});
+
+test('Gmail All Mail participant fallback covers received and sent directions', async () => {
+  const queries = [];
+  await resolveMailboxSyncUids({
+    client: {
+      async search(query, options) {
+        queries.push({ query, options });
+        return query.all ? [1, 2] : [2];
+      },
+    },
+    folder: 'allmail',
+    limit: 1,
+    threadRecipientTerms: ['info@praktijkkaroena.nl'],
+  });
+
+  assert.deepEqual(queries[1].query.or, [
+    { from: 'info@praktijkkaroena.nl' },
+    { to: 'info@praktijkkaroena.nl' },
+  ]);
+});
+
 test('campaign history sync searches both coldmail subjects from campaign start', async () => {
   const queries = [];
   const options = [];
