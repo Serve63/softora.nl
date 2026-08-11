@@ -2,8 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  isTrainingExerciseCompleted,
+  normalizeTrainingDayCompletions,
   readCanonicalExerciseSource,
   reconcileExerciseSources,
+  trainingDateKey,
+  updateTrainingExerciseCompletion,
 } = require('../../assets/sportschool-logboek-state');
 
 function exercise(kg, overrides = {}) {
@@ -69,4 +73,48 @@ test('oude snapshots zonder gekoppelde bron behouden de niet-standaard trainings
 
   assert.equal(reconciled.exerciseSources['name:LEG EXTENSIONS'].kg, '104');
   assert.deepEqual(reconciled.entries.map((entry) => entry.source.kg), ['104', '104']);
+});
+
+test('afvinken gebruikt de exacte kalenderdatum binnen de huidige Nederlandse trainingsweek', () => {
+  const thursday = new Date(2026, 7, 6, 12);
+  const sunday = new Date(2026, 7, 9, 12);
+
+  assert.equal(trainingDateKey('thursday', thursday), '2026-08-06');
+  assert.equal(trainingDateKey('tuesday', thursday), '2026-08-04');
+  assert.equal(trainingDateKey('sunday', thursday), '2026-08-09');
+  assert.equal(trainingDateKey('monday', sunday), '2026-08-03');
+  assert.equal(trainingDateKey('sunday', sunday), '2026-08-09');
+});
+
+test('afvinken en ongedaan maken blijven beperkt tot oefening en trainingsdatum', () => {
+  const first = updateTrainingExerciseCompletion({}, '2026-08-06', 2, true);
+  assert.equal(first.changed, true);
+  assert.deepEqual(first.completions, {
+    '2026-08-06': { day: 'thursday', exercises: { 2: true } },
+  });
+  assert.equal(isTrainingExerciseCompleted(first.completions, '2026-08-06', 2), true);
+  assert.equal(isTrainingExerciseCompleted(first.completions, '2026-08-13', 2), false);
+
+  const second = updateTrainingExerciseCompletion(first.completions, '2026-08-06', 4, true);
+  const unchecked = updateTrainingExerciseCompletion(second.completions, '2026-08-06', 2, false);
+  assert.deepEqual(unchecked.completions, {
+    '2026-08-06': { day: 'thursday', exercises: { 4: true } },
+  });
+
+  const cleared = updateTrainingExerciseCompletion(unchecked.completions, '2026-08-06', 4, false);
+  assert.equal(cleared.changed, true);
+  assert.deepEqual(cleared.completions, {});
+});
+
+test('ongeldige of vervuilde afvinkdata kan niet in de centrale snapshot blijven staan', () => {
+  assert.deepEqual(
+    normalizeTrainingDayCompletions({
+      '2026-02-30': { day: 'monday', exercises: { 1: true } },
+      '2026-08-06': { day: 'monday', exercises: { 1: true, 2: false, x: true } },
+      rommel: ['1'],
+    }),
+    {
+      '2026-08-06': { day: 'thursday', exercises: { 1: true } },
+    }
+  );
 });

@@ -192,6 +192,9 @@ test('drieweg-merge bewaart lokale conflicten en neemt onafhankelijke nieuwere r
       chest: { title: 'CHEST PRESS', kg: '82', reps: '8' },
       row: { title: 'SEATED ROW', kg: '73', reps: '8' },
     },
+    trainingDayCompletions: {
+      '2026-08-06': { day: 'thursday', exercises: { 1: true } },
+    },
     days: { monday: { orders: [1, 2] } },
   };
   const local = {
@@ -201,6 +204,9 @@ test('drieweg-merge bewaart lokale conflicten en neemt onafhankelijke nieuwere r
       ...base.exerciseSources,
       chest: { ...base.exerciseSources.chest, kg: '86' },
     },
+    trainingDayCompletions: {
+      '2026-08-06': { day: 'thursday', exercises: {} },
+    },
   };
   const remote = {
     ...base,
@@ -208,6 +214,9 @@ test('drieweg-merge bewaart lokale conflicten en neemt onafhankelijke nieuwere r
     exerciseSources: {
       chest: { ...base.exerciseSources.chest, kg: '84' },
       row: { ...base.exerciseSources.row, reps: '10' },
+    },
+    trainingDayCompletions: {
+      '2026-08-06': { day: 'thursday', exercises: { 1: true, 2: true } },
     },
   };
 
@@ -220,5 +229,8 @@ test('drieweg-merge bewaart lokale conflicten en neemt onafhankelijke nieuwere r
 
   assert.equal(merged.exerciseSources.chest.kg, '86');
   assert.equal(merged.exerciseSources.row.reps, '10');
+  assert.deepEqual(merged.trainingDayCompletions, {
+    '2026-08-06': { day: 'thursday', exercises: { 2: true } },
+  });
   assert.equal(merged.updatedAt, '2026-07-24T10:03:00.000Z');
 });
