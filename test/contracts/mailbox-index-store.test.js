@@ -1755,6 +1755,7 @@ test('mailbox index store opens a short cooldown after Supabase index timeouts',
 
 test('mailbox index store finalizes a fenced sync even while the read/write circuit is open', async () => {
   let finishCalls = 0;
+  const requestedClientOptions = [];
   const client = {
     from() {
       return {
@@ -1770,6 +1771,7 @@ test('mailbox index store finalizes a fenced sync even while the read/write circ
             eq() {
               return {
                 async eq() {
+                  await new Promise((resolve) => setTimeout(resolve, 50));
                   finishCalls += 1;
                   return { data: [], error: null };
                 },
@@ -1782,7 +1784,10 @@ test('mailbox index store finalizes a fenced sync even while the read/write circ
   };
   const store = createMailboxIndexStore({
     isSupabaseConfigured: () => true,
-    getSupabaseClient: () => client,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options);
+      return client;
+    },
     mailboxIndexQueryTimeoutMs: 25,
     mailboxIndexFailureCooldownMs: 1000,
     logger: { error() {}, info() {} },
@@ -1798,6 +1803,52 @@ test('mailbox index store finalizes a fenced sync even while the read/write circ
 
   assert.equal(result.ok, true);
   assert.equal(finishCalls, 1);
+  assert.deepEqual(requestedClientOptions.at(-1), {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  });
+});
+
+test('mailbox index store safely retries a transient fenced sync finalization failure', async () => {
+  let finishCalls = 0;
+  const transientError = new Error('Supabase client timeout na 8000ms');
+  transientError.name = 'AbortError';
+  const client = {
+    from() {
+      return {
+        update() {
+          return {
+            eq() {
+              return {
+                async eq() {
+                  finishCalls += 1;
+                  return finishCalls === 1
+                    ? { data: null, error: transientError }
+                    : { data: [], error: null };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const result = await store.finishSync({
+    accountEmail: 'info@softora.nl',
+    folder: 'inbox',
+    lockToken: 'retry-fenced-lock',
+    error: 'upsert response timeout',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(finishCalls, 2);
 });
 
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {

@@ -21,6 +21,8 @@ const MAILBOX_INDEX_PAGE_SIZE = 1000;
 const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
+const SYNC_FINALIZE_CLIENT_TIMEOUT_MS = 8_000;
+const SYNC_FINALIZE_QUERY_TIMEOUT_MS = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
   'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,softora_read_at,starred,reply_dismissed_at,has_body,body_truncated,payload';
 
@@ -38,9 +40,9 @@ function createMailboxIndexStore(deps = {}) {
   let failureCooldownUntilMs = 0;
   let failureCooldownReason = '';
 
-  function getClient() {
+  function getClient(options = {}) {
     if (!isSupabaseConfigured()) return null;
-    return getSupabaseClient();
+    return getSupabaseClient(options);
   }
 
   function isAvailable() {
@@ -98,21 +100,28 @@ function createMailboxIndexStore(deps = {}) {
     logSoftIndexError('circuit-open', failureCooldownReason);
   }
 
-  function createTimeoutError(label) {
-    const timeoutMs = Math.max(250, Math.min(10_000, Number(mailboxIndexQueryTimeoutMs) || 2500));
+  function getSafeQueryTimeoutMs(timeoutOverrideMs = null) {
+    const rawTimeout = timeoutOverrideMs === null || timeoutOverrideMs === undefined
+      ? mailboxIndexQueryTimeoutMs
+      : timeoutOverrideMs;
+    return Math.max(250, Math.min(10_000, Number(rawTimeout) || 2500));
+  }
+
+  function createTimeoutError(label, timeoutOverrideMs = null) {
+    const timeoutMs = getSafeQueryTimeoutMs(timeoutOverrideMs);
     const error = new Error(`Mailbox index ${label} timeout na ${timeoutMs}ms`);
     error.code = 'MAILBOX_INDEX_TIMEOUT';
     return error;
   }
 
-  async function withQueryTimeout(promise, label) {
-    const timeoutMs = Math.max(250, Math.min(10_000, Number(mailboxIndexQueryTimeoutMs) || 2500));
+  async function withQueryTimeout(promise, label, timeoutOverrideMs = null) {
+    const timeoutMs = getSafeQueryTimeoutMs(timeoutOverrideMs);
     let timeoutId = null;
     try {
       return await Promise.race([
         Promise.resolve(promise),
         new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(createTimeoutError(label)), timeoutMs);
+          timeoutId = setTimeout(() => reject(createTimeoutError(label, timeoutOverrideMs)), timeoutMs);
         }),
       ]);
     } finally {
@@ -120,14 +129,18 @@ function createMailboxIndexStore(deps = {}) {
     }
   }
 
-  async function run(label, operation, { bypassFailureCooldown = false } = {}) {
-    const client = getClient();
+  async function run(
+    label,
+    operation,
+    { bypassFailureCooldown = false, clientOptions = {}, queryTimeoutMs = null } = {}
+  ) {
+    const client = getClient(clientOptions);
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
     if (isFailureCooldownActive() && !bypassFailureCooldown) {
       return { ok: false, unavailable: false, data: null, error: createFailureCooldownError() };
     }
     try {
-      const result = await withQueryTimeout(operation(client), label);
+      const result = await withQueryTimeout(operation(client), label, queryTimeoutMs);
       if (result && result.error) throw result.error;
       failureCooldownUntilMs = 0;
       failureCooldownReason = '';
@@ -1083,15 +1096,26 @@ function createMailboxIndexStore(deps = {}) {
       updated_at: isoNow(),
     };
     if (!failed) patch.last_synced_at = isoNow();
-    return run(
+    const finalize = () => run(
       'finish-sync',
       (client) => client
         .from(MAILBOX_INDEX_TABLES.syncState)
         .update(patch)
         .eq('sync_key', syncKey)
         .eq('lock_token', normalizeString(lockToken)),
-      { bypassFailureCooldown: true }
+      {
+        bypassFailureCooldown: true,
+        clientOptions: {
+          timeoutMs: SYNC_FINALIZE_CLIENT_TIMEOUT_MS,
+          ignoreFailureCooldown: true,
+          suppressFailureCooldown: true,
+        },
+        queryTimeoutMs: SYNC_FINALIZE_QUERY_TIMEOUT_MS,
+      }
     );
+    const first = await finalize();
+    if (first.ok || !isSoftIndexError(first.error)) return first;
+    return finalize();
   }
 
   function isSyncStateStale(state, maxAgeMs) {
