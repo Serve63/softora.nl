@@ -9,6 +9,7 @@ const {
 const {
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
+  collectMissingCampaignThreadReferenceIds,
 } = require('./mailbox-campaign-participants');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
@@ -285,7 +286,9 @@ function createMailboxSyncService({
             }
             cache.set(cacheKey, indexedCampaignMessages);
           }
-          threadReferenceIds = collectCampaignThreadReferenceIds(indexedCampaignMessages);
+          threadReferenceIds = incrementalOnly
+            ? collectMissingCampaignThreadReferenceIds(indexedCampaignMessages)
+            : collectCampaignThreadReferenceIds(indexedCampaignMessages);
           threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedCampaignMessages);
         } else if (
           hydrateCampaignHistory &&
@@ -358,12 +361,10 @@ function createMailboxSyncService({
         oldestIndexedCampaignUid,
         threadReferenceIds,
         threadRecipientTerms,
-        // Incremental recovery already knows the exact campaign participants.
-        // Searching every historical Message-ID again can expand into dozens of
-        // sequential IMAP HEADER queries and outlive the fenced database lease.
-        // Full/manual history hydration keeps the reference fallback, while an
-        // incremental run without participant evidence also retains it.
-        includeThreadReferenceSearch: !incrementalOnly || !threadRecipientTerms.length,
+        // Incremental recovery receives only referenced Message-ID values that
+        // are absent from the index. This keeps the exact header fallback while
+        // bounding it to at most three IMAP batches per pass.
+        includeThreadReferenceSearch: threadReferenceIds.length > 0,
         logImapOperation: true,
         indexedUids,
       });
@@ -485,6 +486,7 @@ module.exports = {
   INCREMENTAL_LOCK_RETRY_DELAY_MS,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
+  collectMissingCampaignThreadReferenceIds,
   createMailboxSyncService,
   getMailboxSyncFoldersForAccount,
   isRequestFlagEnabled,

@@ -217,7 +217,8 @@ test('incremental campaign refresh carries known contact participants and header
         to: 'info@praktijkkaroena.nl',
         subject: 'Nieuw webdesign',
         messageId: '<karoena-outbound@example.nl>',
-        inReplyTo: '<karoena-inbound@example.nl>',
+        inReplyTo: '<karoena-missing@example.nl>',
+        references: '<karoena-inbound@example.nl> <karoena-missing@example.nl>',
       }],
       upsertMessages: async () => ({ ok: true, upserted: 0 }),
     },
@@ -247,10 +248,9 @@ test('incremental campaign refresh carries known contact participants and header
     'praktijkkaroena.nl',
   ]);
   assert.deepEqual(fetches[0].threadReferenceIds, [
-    '<karoena-inbound@example.nl>',
-    '<karoena-outbound@example.nl>',
+    '<karoena-missing@example.nl>',
   ]);
-  assert.equal(fetches[0].includeThreadReferenceSearch, false);
+  assert.equal(fetches[0].includeThreadReferenceSearch, true);
 });
 
 test('incremental refresh waits for transient mailbox lock contention instead of silently skipping', async () => {

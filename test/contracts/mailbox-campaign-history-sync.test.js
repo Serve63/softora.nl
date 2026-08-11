@@ -8,6 +8,7 @@ const {
   selectMailboxSyncUids,
 } = require('../../server/services/mailbox-campaign-history-sync');
 const {
+  collectMissingCampaignThreadReferenceIds,
   collectCampaignThreadRecipientTerms,
 } = require('../../server/services/mailbox-campaign-sync');
 const {
@@ -108,6 +109,42 @@ test('campaign history sync derives sent-recipient searches from normalized inde
       'info@praktijkkaroena.nl',
       'praktijkkaroena.nl',
     ]
+  );
+});
+
+test('campaign recovery keeps only stable referenced-but-unindexed Message-ID values', () => {
+  const messages = [{
+    messageId: '<known-root@example.test>',
+    inReplyTo: '<missing-first@example.test>',
+    references: '<known-root@example.test> <missing-first@example.test>',
+  }, {
+    messageId: '<known-sent@example.test>',
+    inReplyTo: '<missing-second@example.test>',
+    references: '<KNOWN-ROOT@example.test> <missing-first@example.test> <missing-second@example.test>',
+  }];
+
+  assert.deepEqual(collectMissingCampaignThreadReferenceIds(messages), [
+    '<missing-first@example.test>',
+    '<missing-second@example.test>',
+  ]);
+  assert.deepEqual(
+    collectMissingCampaignThreadReferenceIds(messages, { limit: 1 }),
+    ['<missing-first@example.test>']
+  );
+});
+
+test('campaign recovery reduces hundreds of indexed headers to the small missing reference set', () => {
+  const indexed = Array.from({ length: 410 }, (_item, index) => ({
+    messageId: `<indexed-${index}@example.test>`,
+  }));
+  indexed[0].references = [
+    ...indexed.map((message) => message.messageId),
+    ...Array.from({ length: 8 }, (_item, index) => `<missing-${index}@example.test>`),
+  ].join(' ');
+
+  assert.deepEqual(
+    collectMissingCampaignThreadReferenceIds(indexed),
+    Array.from({ length: 8 }, (_item, index) => `<missing-${index}@example.test>`)
   );
 });
 
@@ -279,7 +316,7 @@ test('campaign incremental inbox sync searches known campaign participants by se
   ]);
 });
 
-test('campaign incremental inbox recovery skips expensive reference fan-out when participant evidence exists', async () => {
+test('campaign incremental inbox recovery bounds missing reference lookup before participant search', async () => {
   const queries = [];
   const client = {
     async search(query, options) {
@@ -294,9 +331,9 @@ test('campaign incremental inbox recovery skips expensive reference fan-out when
     limit: 4,
     folder: 'inbox',
     campaignHistory: false,
-    includeThreadReferenceSearch: false,
+    includeThreadReferenceSearch: true,
     threadReferenceIds: Array.from(
-      { length: 410 },
+      { length: 8 },
       (_item, index) => `<campaign-${index}@example.test>`
     ),
     threadRecipientTerms: ['info@praktijkkaroena.nl', 'praktijkkaroena.nl'],
@@ -304,17 +341,17 @@ test('campaign incremental inbox recovery skips expensive reference fan-out when
   });
 
   assert.deepEqual(selected, [5, 4]);
-  assert.deepEqual(queries, [
-    { query: { all: true }, options: { uid: true } },
-    {
-      query: {
-        since: CAMPAIGN_HISTORY_SINCE,
-        or: [
-          { from: 'info@praktijkkaroena.nl' },
-          { from: 'praktijkkaroena.nl' },
-        ],
-      },
-      options: { uid: true },
+  assert.equal(queries.length, 3);
+  assert.deepEqual(queries[0], { query: { all: true }, options: { uid: true } });
+  assert.equal(queries[1].query.or.length, 24);
+  assert.deepEqual(queries[2], {
+    query: {
+      since: CAMPAIGN_HISTORY_SINCE,
+      or: [
+        { from: 'info@praktijkkaroena.nl' },
+        { from: 'praktijkkaroena.nl' },
+      ],
     },
-  ]);
+    options: { uid: true },
+  });
 });
