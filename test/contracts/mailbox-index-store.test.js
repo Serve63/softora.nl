@@ -1175,8 +1175,8 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
   ]);
   assert.equal(calls.filter((call) => call[0] === 'ilike').length, 0);
   const recipientFilter = calls.find((call) => call[0] === 'or');
-  assert.match(recipientFilter[1], /recipients_text\.ilike\.\"\*info@praktijkkaroena\.nl\*\"/);
-  assert.match(recipientFilter[1], /recipients_text\.ilike\.\"\*unrelated@example\.nl\*\"/);
+  assert.match(recipientFilter[1], /recipients_text\.ilike\.%info@praktijkkaroena\.nl%/);
+  assert.match(recipientFilter[1], /recipients_text\.ilike\.%unrelated@example\.nl%/);
 });
 
 test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id op', async () => {
