@@ -2230,7 +2230,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Automatiseer de voorbereiding, niet de relatie',
         paragraphs: Object.freeze([
-          'Goede CRM automatisering neemt niet de hele klantrelatie over. De winst zit vooral in voorbereiden: taak aanmaken, samenvatting tonen, ontbrekende informatie signaleren en het juiste moment zichtbaar maken.',
+          Object.freeze({ text: 'Goede CRM automatisering neemt niet de hele klantrelatie over. De winst zit vooral in voorbereiden: taak aanmaken, samenvatting tonen, ontbrekende informatie signaleren en het juiste moment zichtbaar maken. Leg eerst de CRM-adoptie per rol vast, zodat iedere taak aansluit op een werkafspraak die het team begrijpt en kan herstellen.', links: Object.freeze([Object.freeze({ anchor: 'CRM-adoptie per rol', href: '/blog/crm-adoptie-medewerkers-mkb', availableFrom: '2026-08-11' })]) }),
           'Een medewerker blijft bepalen wat de beste vervolgstap is. Dat houdt opvolging persoonlijk en voorkomt dat klanten generieke berichten krijgen die niet passen bij het gesprek.',
         ]),
       }),
@@ -2622,7 +2622,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Adoptie is een kostenpost én een ontwerpcriterium',
         paragraphs: Object.freeze([
-          'Een systeem dat niet consequent wordt gebruikt, blijft duur ongeacht de aanschafprijs. Reserveer daarom tijd voor werkinstructies, training per rol, begeleiding tijdens de eerste weken en het herstellen van onduidelijke velden of stappen. Controleer ook wie na livegang nieuwe medewerkers uitlegt hoe de pipeline en datanormen werken.',
+          Object.freeze({ text: 'Een systeem dat niet consequent wordt gebruikt, blijft duur ongeacht de aanschafprijs. Reserveer daarom tijd voor werkinstructies, training per rol, begeleiding tijdens de eerste weken en het herstellen van onduidelijke velden of stappen. De praktische CRM-adoptieroute werkt uit hoe je dit koppelt aan minimale invoer, een feedbackwachtrij en controleerbare terugvalsignalen. Controleer ook wie na livegang nieuwe medewerkers uitlegt hoe de pipeline en datanormen werken.', links: Object.freeze([Object.freeze({ anchor: 'praktische CRM-adoptieroute', href: '/blog/crm-adoptie-medewerkers-mkb', availableFrom: '2026-08-11' })]) }),
           'Adoptie begint niet bij een trainingsmiddag, maar bij het ontwerp. Vraag alleen informatie die iemand echt kan weten en die later wordt gebruikt. Maak de volgende actie zichtbaar, beperk dubbele invoer en laat uitzonderingen niet verdwijnen in losse notities. Een kleiner CRM dat het team begrijpt kan daardoor financieel verstandiger zijn dan een uitgebreider systeem met lage gebruiksdiscipline.',
         ]),
       }),

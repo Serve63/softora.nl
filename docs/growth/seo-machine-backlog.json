@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10",
+  "updatedAt": "2026-08-11",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1670,7 +1670,9 @@
     },
     {
       "id": "crm-adoption-018",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-11",
+      "shippedPath": "/blog/crm-adoptie-medewerkers-mkb",
       "path": "/blog/crm-adoptie-medewerkers-mkb",
       "contentType": "blog",
       "cluster": "software-crm",
@@ -1682,26 +1684,32 @@
       "clusterRole": "Gebruikersadoptie tussen CRM-keuze en stabiel dagelijks gebruik",
       "demandEvidence": [
         {
-          "type": "serp-and-cluster-gap",
-          "source": "Nederlandse CRM-kosten-SERP en Softora CRM-contentinventaris",
-          "observedAt": "2026-07-19",
-          "detail": "Actuele kostenartikelen noemen training en adoptie als aparte kostenpost, terwijl Softora wel CRM-keuze, taken en datakwaliteit behandelt maar geen praktische invoeringsroute voor medewerkers heeft."
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP voor CRM adoptie medewerkers en CRM implementatie",
+          "observedAt": "2026-08-11",
+          "detail": "Actuele Nederlandse resultaten behandelen terugval naar Excel, training per dagelijkse taak, betrokkenheid van gebruikers, verwachtingen na livegang en het meten van werkelijk gebruik. De resultaten bestaan vooral uit leveranciersadvies en algemene implementatiestappen."
+        },
+        {
+          "type": "primary-source",
+          "source": "Microsoft Learn Dynamics 365 adoption overview en training plan",
+          "observedAt": "2026-08-11",
+          "detail": "Microsoft beschrijft adoptie als een doorlopend proces van trainingsbehoefte, materiaal, uitvoering, ondersteuning, meten en verbeteren en onderscheidt training voor verschillende gebruikersrollen. Softora vertaalde dit naar een leveranciersneutrale werkafspraak en herstelroute voor het MKB."
         }
       ],
       "competitorPatterns": [
-        "Algemene verandermanagementtips rond CRM",
-        "Leveranciersartikelen over training en ambassadeurs",
-        "Implementatiechecklists waarin adoptie slechts één stap is"
+        "Algemene verandermanagementtips zonder controleerbare taak per gebruikersrol",
+        "Leveranciersartikelen over training en ambassadeurs die snel naar het eigen product leiden",
+        "Meetlijsten met logins en volledigheid zonder diagnose tussen afspraak, training, data, rechten en techniek"
       ],
       "overlap": {
-        "checkedAt": "2026-07-19",
+        "checkedAt": "2026-08-11",
         "closestPaths": [
           "/blog/crm-taken-reminders-automatiseren-mkb",
           "/kennisbank/wat-is-crm-datakwaliteit",
           "/vergelijkingen/crm-op-maat-vs-standaard-crm"
         ],
         "decision": "distinct",
-        "rationale": "De kandidaat behandelt rollen, werkafspraken, training, feedback en gebruikscontrole na CRM-keuze; bestaande pagina's behandelen functies, datakwaliteit of leverancierskeuze."
+        "rationale": "De reminderpagina behandelt taakautomatisering, de datakwaliteitspagina behandelt bruikbare gegevens en de vergelijking behandelt de oplossingskeuze. Deze publicatie behandelt na die keuzes de minimale werkafspraak per rol, praktijktraining, feedbackwachtrij en terugvalsignalen."
       },
       "scores": {
         "businessFit": 5,
@@ -1749,7 +1757,7 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Controleer actuele buyer language en schrijf een praktische adoptieroute zonder generieke verandermanagementclaims."
+      "nextAction": "Controleer indexatie en de eerste niet-merkgebonden impressies op 2026-08-25, 2026-09-08 en 2026-10-06; toets daarna of de pagina een aantoonbare route naar /crm-systeem-op-maat ondersteunt."
     },
     {
       "id": "crm-requirements-019",
@@ -1918,6 +1926,94 @@
         ]
       },
       "nextAction": "Controleer actuele buyer questions en werk zonder ongeverifieerde prijsbanden uit wat ieder onderhoudsonderdeel aantoonbaar omvat."
+    },
+    {
+      "id": "crm-roles-rights-024",
+      "status": "ready",
+      "path": "/kennisbank/crm-rollen-rechten-inrichten-mkb",
+      "contentType": "kennisbank",
+      "cluster": "software-crm",
+      "primaryQuery": "crm rollen en rechten instellen",
+      "intent": "CRM-toegang per functie afbakenen voordat gebruikers worden ingericht",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Toegangs- en verantwoordelijkheidsmatrix tussen CRM-eisen, gebruikersadoptie en technische inrichting",
+      "demandEvidence": [
+        {
+          "type": "current-serp",
+          "source": "Nederlandse SERP voor CRM rollen en rechten instellen",
+          "observedAt": "2026-08-11",
+          "detail": "Actuele resultaten zijn vooral productspecifieke helpartikelen over gebruikersrollen, modulevinkjes en beheerrechten. Er ontbreekt een leveranciersneutrale MKB-methode die eerst klanttaken, gegevensbereik, mutatierechten, uitzonderingen en periodieke controle afbakent."
+        },
+        {
+          "type": "primary-source",
+          "source": "Microsoft Learn over Dynamics 365 security roles en Power Platform access",
+          "observedAt": "2026-08-11",
+          "detail": "Microsoft documenteert dat rollen toegang tot data en handelingen begrenzen, dat meerdere rollen cumulatief kunnen werken en dat teams rechten kunnen erven. Dit ondersteunt vraagtaal over rolontwerp, maar de kandidaat blijft platformneutraal en doet geen absolute securityclaim."
+        }
+      ],
+      "competitorPatterns": [
+        "Productspecifieke klikhandleidingen zonder voorafgaande proces- of databeslissing",
+        "Brede beheerdersrollen die gemak boven minimale toegang plaatsen",
+        "Eenmalige inrichting zonder controle bij functiewijziging, vertrek of uitbreiding"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-11",
+        "closestPaths": [
+          "/blog/crm-adoptie-medewerkers-mkb",
+          "/blog/crm-eisen-wensenlijst-mkb",
+          "/kennisbank/wat-is-crm-datakwaliteit"
+        ],
+        "decision": "distinct",
+        "rationale": "De adoptiepagina legt werkafspraken en training per rol vast, de eisenpagina prioriteert scenario's en de datakwaliteitspagina behandelt gegevensbruikbaarheid. Deze kandidaat maakt uitsluitend de toegangsmatrix voor bekijken, wijzigen, goedkeuren, exporteren en herstellen controleerbaar."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "CRM-rollen en rechten inrichten voor het MKB",
+        "metaDescription": "Bepaal per CRM-rol welke klantdata iemand ziet, wijzigt, goedkeurt, exporteert en herstelt en controleer rechten bij iedere functiewijziging.",
+        "h1": "Hoe richt je CRM-rollen en rechten goed in?",
+        "outline": [
+          "Begin bij klanttaken en gegevensbereik",
+          "Scheid bekijken, wijzigen, goedkeuren, exporteren en herstellen",
+          "Beperk uitzonderingen en gecombineerde rollen",
+          "Test rechten met normale en foutscenario's",
+          "Controleer toegang bij onboarding, functiewijziging en vertrek"
+        ],
+        "buyerQuestions": [
+          "Welke CRM-rechten heeft een verkoper of manager nodig?",
+          "Hoe voorkom je te brede beheerrechten?",
+          "Wanneer moeten CRM-rollen opnieuw worden gecontroleerd?"
+        ],
+        "incomingLinks": [
+          "/blog/crm-adoptie-medewerkers-mkb",
+          "/blog/crm-eisen-wensenlijst-mkb"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/kennisbank/wat-is-crm-datakwaliteit"
+        ],
+        "conversionPath": "Van een controleerbare rollenmatrix naar een CRM-scopegesprek over procesfit, gegevensbereik en beheersbare inrichting.",
+        "claimRisk": "Geen absolute beveiliging, compliance of juridisch juiste toegang beloven; benoem platformafhankelijkheid, menselijke goedkeuring en periodieke controle.",
+        "visualConcepts": [
+          "Rollenmatrix voor klanttaak, gegevensbereik en toegestane handelingen",
+          "Toegangscontrole bij instroom, functiewijziging, tijdelijke vervanging en vertrek"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer platformneutrale buyer questions en schrijf de toegangsmatrix zonder productspecifieke instellingen of absolute securityclaims."
     }
   ]
 }
