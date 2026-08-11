@@ -1803,6 +1803,80 @@ test('targeted later-Sent recovery fails closed when two same-thread candidates 
   assert.deepEqual(result.threadMessages, []);
 });
 
+test('campaign reply service toont elk opgeslagen Karoena-bericht naast de ontvangen mail', async () => {
+  const inbound = {
+    id: 'inbox:karoena-history',
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Praktijk Karoena',
+    email: 'info@praktijkkaroena.nl',
+    to: 'martijnven123@gmail.com',
+    subject: 'Re: Nieuw webdesign gemaakt voor jullie website!',
+    preview: 'De ontvangen reactie blijft een eigen berichtgrens.',
+    body: 'De ontvangen reactie.\n\n> Dit is alleen geciteerde tekst.',
+    date: '2026-04-27T10:05:28.000Z',
+    messageId: '<karoena-inbound@example.nl>',
+    inReplyTo: '<karoena-original@example.nl>',
+    references: '<karoena-original@example.nl>',
+  };
+  const sentMessages = [1, 2, 3, 4].map((index) => ({
+    id: `sent:karoena-${index}`,
+    folder: 'sent',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijnven123@gmail.com',
+    to: 'info@praktijkkaroena.nl',
+    subject: 'Re: Voorstel samenwerking: rebranding website',
+    body: `Afzonderlijk verzonden bericht ${index}.\n\n> Vorige mail als citaat ${index}.`,
+    date: new Date(Date.UTC(2026, 4, 26 + index, 10, index)).toISOString(),
+    messageId: `<karoena-sent-${index}@example.nl>`,
+    inReplyTo: index === 1
+      ? '<karoena-inbound@example.nl>'
+      : `<karoena-sent-${index - 1}@example.nl>`,
+    references: index === 1
+      ? '<karoena-original@example.nl> <karoena-inbound@example.nl>'
+      : `<karoena-original@example.nl> <karoena-inbound@example.nl> <karoena-sent-${index - 1}@example.nl>`,
+  }));
+  const targetedLookups = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [inbound] : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'sent' ? [] : [inbound],
+      listMessagesBySenderEmailsForAccounts: async ({ folder }) => folder === 'inbox' ? [inbound] : [],
+      listMessagesByRecipientEmailsForAccounts: async (options) => {
+        targetedLookups.push(options);
+        return sentMessages;
+      },
+      listMessagesByMessageIdsForAccounts: async () => [],
+      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      listUnthreadedSentCandidatesForConversations: async () => [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'praktijk-karoena',
+        bedrijf: 'Praktijk Karoena',
+        email: 'info@praktijkkaroena.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
+
+  assert.equal(targetedLookups.length, 1);
+  assert.deepEqual(targetedLookups[0].recipientEmails, ['info@praktijkkaroena.nl']);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].id, inbound.id);
+  assert.deepEqual(
+    replies[0].threadMessages.map((message) => message.id),
+    ['sent:karoena-4', 'sent:karoena-3', 'sent:karoena-2', 'sent:karoena-1']
+  );
+  assert.equal(replies[0].threadMessages.every((message) => message.folder === 'sent'), true);
+  assert.equal(replies[0].body.includes('geciteerde tekst'), true);
+});
+
 test('campaign reply service herstelt vervolgcontact met gewijzigde onderwerpregel via contactidentiteit', async () => {
   const firstReply = {
     id: 'inbox:karoena-first',

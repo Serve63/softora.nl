@@ -1073,37 +1073,68 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
   const calls = [];
   const client = {
     from() {
+      const filters = {};
       const query = {
         select() { return query; },
         in(column, values) {
           calls.push(['in', column, values]);
+          filters[column] = values;
           return query;
         },
         eq(column, value) {
           calls.push(['eq', column, value]);
+          filters[column] = value;
           return query;
         },
         ilike(column, value) {
           calls.push(['ilike', column, value]);
+          filters[column] = value;
           return query;
         },
         is() { return query; },
         order() { return query; },
         limit() {
+          const sent = filters.folder === 'sent';
           return Promise.resolve({
-            data: [{
-              message_key: 'martijnven123@gmail.com|inbox|35057',
-              account_email: 'martijnven123@gmail.com',
-              folder: 'inbox',
-              uid: 35057,
-              provider_id: 'inbox:35057',
-              message_id: '<karoena-reply@example.nl>',
-              sender_name: 'Praktijk Karoena',
-              sender_email: 'info@praktijkkaroena.nl',
-              recipients_text: 'martijnven123@gmail.com',
-              subject: 'Voorstel samenwerking: rebranding website',
-              date: '2026-05-28T12:52:58.000Z',
-            }],
+            data: sent
+              ? [{
+                  message_key: 'martijnven123@gmail.com|sent|361',
+                  account_email: 'martijnven123@gmail.com',
+                  folder: 'sent',
+                  uid: 361,
+                  provider_id: 'sent:361',
+                  message_id: '<karoena-follow-up@example.nl>',
+                  sender_name: 'Martijn van de Ven',
+                  sender_email: 'martijnven123@gmail.com',
+                  recipients_text: 'Praktijk Karoena <info@praktijkkaroena.nl>',
+                  subject: 'Voorstel samenwerking: rebranding website',
+                  date: '2026-05-28T12:52:58.000Z',
+                }, {
+                  message_key: 'martijnven123@gmail.com|sent|362',
+                  account_email: 'martijnven123@gmail.com',
+                  folder: 'sent',
+                  uid: 362,
+                  provider_id: 'sent:362',
+                  message_id: '<other-contact@example.nl>',
+                  sender_name: 'Martijn van de Ven',
+                  sender_email: 'martijnven123@gmail.com',
+                  recipients_text: 'ander-contact@example.nl',
+                  subject: 'Andere mail',
+                  date: '2026-05-28T11:52:58.000Z',
+                }]
+              : [{
+                  message_key: 'martijnven123@gmail.com|inbox|35057',
+                  account_email: 'martijnven123@gmail.com',
+                  folder: 'inbox',
+                  uid: 35057,
+                  provider_id: 'inbox:35057',
+                  message_id: '<karoena-reply@example.nl>',
+                  sender_name: 'Praktijk Karoena',
+                  sender_email: 'info@praktijkkaroena.nl',
+                  recipients_text: 'martijnven123@gmail.com',
+                  subject: 'Voorstel samenwerking: rebranding website',
+                  date: '2026-05-28T12:52:58.000Z',
+                }],
             error: null,
           });
         },
@@ -1126,7 +1157,7 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
   const sent = await store.listMessagesByRecipientEmailsForAccounts({
     accountEmails: ['martijnven123@gmail.com'],
     folder: 'sent',
-    recipientEmails: ['info@praktijkkaroena.nl'],
+    recipientEmails: ['info@praktijkkaroena.nl', 'unrelated@example.nl'],
     limit: 20,
   });
 
@@ -1137,11 +1168,7 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
     ['in', 'sender_email', ['info@praktijkkaroena.nl']],
     ['in', 'account_email', ['martijnven123@gmail.com']],
   ]);
-  assert.deepEqual(calls.filter((call) => call[0] === 'ilike').at(-1), [
-    'ilike',
-    'recipients_text',
-    '%info@praktijkkaroena.nl%',
-  ]);
+  assert.equal(calls.filter((call) => call[0] === 'ilike').length, 0);
 });
 
 test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id op', async () => {
