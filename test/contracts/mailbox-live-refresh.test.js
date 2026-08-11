@@ -5,6 +5,7 @@ const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
   createMailboxSyncService,
   INCREMENTAL_LOCK_RETRY_ATTEMPTS,
+  MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
   syncMailboxRequest,
@@ -251,6 +252,45 @@ test('incremental campaign refresh carries known contact participants and header
     '<karoena-missing@example.nl>',
   ]);
   assert.equal(fetches[0].includeThreadReferenceSearch, true);
+});
+
+test('incremental campaign refresh bounds participant fallback before IMAP', async () => {
+  const fetches = [];
+  const selected = account('martijn@softora.nl');
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      finishSync: async () => ({ ok: true }),
+      listMessageUidsForAccount: async () => [],
+      listCampaignSeedMessagesForAccount: async () => Array.from(
+        { length: 100 },
+        (_item, index) => ({
+          folder: 'inbox',
+          accountEmail: selected.email,
+          email: `contact-${index}@example-${index}.nl`,
+          messageId: `<campaign-${index}@example.test>`,
+        })
+      ),
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async (input) => { fetches.push(input); return []; },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    logger: { error() {} },
+  });
+
+  await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: 'inbox',
+    campaignOnly: true,
+    incrementalOnly: true,
+  });
+
+  assert.equal(fetches[0].threadRecipientTerms.length, MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS);
 });
 
 test('incremental refresh waits for transient mailbox lock contention instead of silently skipping', async () => {

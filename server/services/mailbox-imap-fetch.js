@@ -1,5 +1,11 @@
 const DEFAULT_MAILBOX_IMAP_OPERATION_TIMEOUT_MS = 70_000;
 
+async function closeMailboxClientQuietly(client) {
+  try {
+    await client?.close?.();
+  } catch (_) {}
+}
+
 async function runMailboxImapOperationWithDeadline({
   client,
   operation,
@@ -16,9 +22,7 @@ async function runMailboxImapOperationWithDeadline({
       error.code = 'MAILBOX_IMAP_OPERATION_TIMEOUT';
       error.status = 504;
       reject(error);
-      try {
-        client?.close?.();
-      } catch (_) {}
+      void closeMailboxClientQuietly(client);
     }, 70_000);
   });
   try {
@@ -180,6 +184,7 @@ function createMailboxImapFetcher({
 }
 
 module.exports = {
+  closeMailboxClientQuietly,
   createMailboxImapFetcher,
   fetchSelectedMailboxMessages,
   runMailboxImapOperationWithDeadline,

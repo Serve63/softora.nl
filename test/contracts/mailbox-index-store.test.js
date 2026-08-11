@@ -1753,6 +1753,53 @@ test('mailbox index store opens a short cooldown after Supabase index timeouts',
   );
 });
 
+test('mailbox index store finalizes a fenced sync even while the read/write circuit is open', async () => {
+  let finishCalls = 0;
+  const client = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() { return this; },
+            limit() { return this; },
+            maybeSingle() { return new Promise(() => {}); },
+          };
+        },
+        update() {
+          return {
+            eq() {
+              return {
+                async eq() {
+                  finishCalls += 1;
+                  return { data: [], error: null };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  await store.getSyncState({ accountEmail: 'info@softora.nl', folder: 'inbox' });
+  const result = await store.finishSync({
+    accountEmail: 'info@softora.nl',
+    folder: 'inbox',
+    lockToken: 'fenced-lock',
+    error: 'upsert response timeout',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(finishCalls, 1);
+});
+
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {
   const schema = fs.readFileSync(
     path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),

@@ -13,6 +13,7 @@ const {
   getMailboxSyncFoldersForAccount,
 } = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
+const { closeMailboxClientQuietly } = require('../../server/services/mailbox-imap-fetch');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -4055,6 +4056,12 @@ test('mailbox sync aborts a hanging IMAP operation before its database lease can
   assert.equal(finished.length, 1);
   assert.equal(finished[0].lockToken, 'deadline-lock');
   assert.match(finished[0].error, /IMAP-operatie timeout/i);
+});
+
+test('mailbox IMAP deadline absorbs an async close rejection', async () => {
+  await assert.doesNotReject(() => closeMailboxClientQuietly({
+    close: async () => { throw new Error('Connection not available'); },
+  }));
 });
 
 test('mailbox cron sync indexes a lightweight sent batch by default', async () => {
