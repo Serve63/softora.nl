@@ -1,5 +1,15 @@
 'use strict';
 
+function sortMessagesNewestFirst(messages = []) {
+  return (Array.isArray(messages) ? messages : [])
+    .slice()
+    .sort((left, right) => {
+      const dateDelta = Date.parse(right?.date || 0) - Date.parse(left?.date || 0);
+      if (dateDelta) return dateDelta;
+      return String(left?.id || left?.messageId || '').localeCompare(String(right?.id || right?.messageId || ''));
+    });
+}
+
 async function loadMailboxCampaignContactHistory({
   mailboxIndexStore,
   campaignMailboxAccounts = [],
@@ -37,9 +47,13 @@ async function loadMailboxCampaignContactHistory({
     throw error;
   }
   const seedSentMessages = dedupeCampaignMessages(seedSentMessagesResult);
+  // The incoming folders are fetched in batches (coldmail first, inbox
+  // second). Do not let that transport order decide which participants fit the
+  // bounded targeted-history lookup: an older inbox reply must not disappear
+  // simply because the coldmail batch filled the cap first.
   const campaignParticipantEmails = collectCampaignThreadParticipantEmails([
-    ...messages,
-    ...seedSentMessages,
+    ...sortMessagesNewestFirst(messages),
+    ...sortMessagesNewestFirst(seedSentMessages),
   ]);
   let targetedIncomingMessages = [];
   if (campaignParticipantEmails.length &&
