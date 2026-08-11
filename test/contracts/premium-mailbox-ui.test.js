@@ -12,7 +12,6 @@ const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-ou
 const quotedThreadScriptPath = path.join(__dirname, '../../assets/premium-mailbox-quoted-thread.js');
 const campaignInboxScriptPath = path.join(__dirname, '../../assets/premium-mailbox-campaign-inbox.js');
 const imagesScriptPath = path.join(__dirname, '../../assets/premium-mailbox-images.js');
-const bodySectionScriptPath = path.join(__dirname, '../../assets/premium-mailbox-body-section.js');
 const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-refresh.js');
 const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
 const composeWindowScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-window.js');
@@ -40,6 +39,7 @@ const listModule = require('../../assets/premium-mailbox-list.js');
 const deleteModule = require('../../assets/premium-mailbox-delete.js');
 const readModule = require('../../assets/premium-mailbox-read.js');
 const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
+const bodySectionModule = require('../../assets/premium-mailbox-body-section.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -71,10 +71,6 @@ function readQuotedThreadScript() {
 
 function readImagesScript() {
   return fs.readFileSync(imagesScriptPath, 'utf8');
-}
-
-function readBodySectionScript() {
-  return fs.readFileSync(bodySectionScriptPath, 'utf8');
 }
 
 function readRefreshScript() {
@@ -206,7 +202,7 @@ function loadMailboxHelpersForTest(options = {}) {
     SoftoraMailboxUiState: uiStateModule,
     SoftoraMailboxList: listModule,
     SoftoraMailboxImages: options.SoftoraMailboxImages || imagesModule,
-    SoftoraMailboxBodySection: null,
+    SoftoraMailboxBodySection: bodySectionModule,
     SoftoraUiStateClient: null,
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
@@ -239,7 +235,6 @@ function loadMailboxHelpersForTest(options = {}) {
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
   vm.runInContext(readIndexScript(), context);
-  vm.runInContext(readBodySectionScript(), context);
   vm.runInContext(source, context);
   return context.window.__mailboxTest;
 }
