@@ -163,16 +163,18 @@ async function syncMailboxRequest({
     !folderParam &&
     !campaignOnly
   ) {
-    const coldmailResult = await syncMailbox({
-      folders: [CAMPAIGN_GMAIL_LABEL_FOLDER],
+    const campaignHistoryResult = await syncMailbox({
+      folders: ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER],
       limit: Number(requestedLimit) || fallbackLimit,
       force,
       campaignOnly: true,
+      incrementalOnly: true,
+      maxConcurrentAccounts: 2,
     });
-    result.ok = result.ok && coldmailResult.ok;
+    result.ok = result.ok && campaignHistoryResult.ok;
     result.results = [
       ...(Array.isArray(result.results) ? result.results : []),
-      ...(Array.isArray(coldmailResult.results) ? coldmailResult.results : []),
+      ...(Array.isArray(campaignHistoryResult.results) ? campaignHistoryResult.results : []),
     ];
   }
   return result;
