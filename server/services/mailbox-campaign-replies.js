@@ -209,7 +209,17 @@ async function listExactSentDescendants({
   const allDescendants = [];
   const seenMessageIdentities = new Set();
   const queriedReferences = new Set();
-  let frontier = dedupeCampaignMessages(seedMessages).filter((message) => (
+  let frontier = dedupeCampaignMessages(
+    (Array.isArray(seedMessages) ? seedMessages : []).flatMap((message) => [
+      message,
+      ...getMessageReferenceIds(message).map((referenceId) => ({
+        ...message,
+        messageId: `<${referenceId}>`,
+        inReplyTo: '',
+        references: '',
+      })),
+    ])
+  ).filter((message) => (
     allowedAccounts.has(normalizeEmail(message && message.accountEmail)) &&
     normalizeMessageId(message && message.messageId)
   ));
