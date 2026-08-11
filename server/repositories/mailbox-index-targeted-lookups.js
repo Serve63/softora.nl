@@ -1,5 +1,17 @@
 'use strict';
 
+const RECIPIENT_LOOKUP_BATCH_SIZE = 25;
+
+function quotePostgrestFilterValue(value) {
+  return `"${String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function buildRecipientCandidateFilter(recipientEmails) {
+  return (Array.isArray(recipientEmails) ? recipientEmails : [])
+    .map((email) => `recipients_text.ilike.${quotePostgrestFilterValue(`*${email}*`)}`)
+    .join(',');
+}
+
 function createMailboxIndexTargetedLookups({
   run,
   tableName,
@@ -55,27 +67,30 @@ function createMailboxIndexTargetedLookups({
     if (!normalizedAccounts.length || !normalizedRecipients.length) return [];
     const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 1000)));
     const rowsByKey = new Map();
-    // The previous implementation made one Supabase request per participant.
-    // A normal campaign view can contain hundreds of participants, so the
-    // sequential lookup made the history request exceed the serverless
-    // request window before it reached older Sent messages. Read the bounded
-    // Sent slice once per selected mailbox instead and apply the same
-    // case-insensitive recipient match locally. This keeps the lookup
-    // direction-aware without constructing an unsafe PostgREST OR expression
-    // from user-controlled email text.
-    const batches = await Promise.all(normalizedAccounts.map((accountEmail) =>
-      run('list-messages-by-recipient-account', (client) =>
-        client
+    // Query the recipient predicate in bounded PostgREST OR batches. A local
+    // top-N mailbox slice is not sufficient: older valid Sent messages can be
+    // just beyond that slice (the Karoena history was such a case). Batching
+    // keeps the old targeted-search semantics without one request per contact
+    // and quotes every email before it enters the PostgREST filter grammar.
+    const recipientBatches = [];
+    for (let offset = 0; offset < normalizedRecipients.length; offset += RECIPIENT_LOOKUP_BATCH_SIZE) {
+      recipientBatches.push(normalizedRecipients.slice(offset, offset + RECIPIENT_LOOKUP_BATCH_SIZE));
+    }
+    const batches = await Promise.all(recipientBatches.map((recipientBatch, index) => {
+      const candidateFilter = buildRecipientCandidateFilter(recipientBatch);
+      return run(`list-messages-by-recipient-emails:${index}`, (client) => {
+        const query = client
           .from(tableName)
           .select(metadataColumns)
-          .in('account_email', [accountEmail])
+          .in('account_email', normalizedAccounts)
           .eq('folder', normalizeFolder(folder))
+          .or(candidateFilter)
           .is('deleted_at', null)
           .order('date', { ascending: false })
-          .order('message_key', { ascending: false })
-          .limit(safeLimit)
-      )
-    ));
+          .order('message_key', { ascending: false });
+        return query.limit(safeLimit);
+      });
+    }));
     if (batches.some((result) => !result.ok)) return null;
     const recipientNeedles = normalizedRecipients.map((email) => email.toLowerCase());
     batches.flatMap((result) => Array.isArray(result.data) ? result.data : [])
