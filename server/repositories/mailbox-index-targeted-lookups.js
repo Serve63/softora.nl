@@ -3,6 +3,40 @@
 const RECIPIENT_LOOKUP_CONCURRENCY = 25;
 const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
+function selectCampaignSeedMessages({ batches = [], limit = 500, normalizeString = String } = {}) {
+  const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 500)));
+  const sources = (Array.isArray(batches) ? batches : [])
+    .filter(Array.isArray)
+    .map((batch) => batch.slice().sort((left, right) => {
+      const dateDelta = Date.parse(right && right.date || 0) - Date.parse(left && left.date || 0);
+      if (dateDelta) return dateDelta;
+      return normalizeString(left && (left.message_key || left.messageId || left.id))
+        .localeCompare(normalizeString(right && (right.message_key || right.messageId || right.id)));
+    }));
+  const cursors = sources.map(() => 0);
+  const selected = [];
+  const seen = new Set();
+
+  while (selected.length < safeLimit) {
+    let advanced = false;
+    for (let sourceIndex = 0; sourceIndex < sources.length && selected.length < safeLimit; sourceIndex += 1) {
+      const source = sources[sourceIndex];
+      while (cursors[sourceIndex] < source.length) {
+        const message = source[cursors[sourceIndex]];
+        cursors[sourceIndex] += 1;
+        advanced = true;
+        const identity = normalizeString(message && (message.messageId || message.id));
+        if (!identity || seen.has(identity)) continue;
+        seen.add(identity);
+        selected.push(message);
+        break;
+      }
+    }
+    if (!advanced) break;
+  }
+  return selected;
+}
+
 async function mapWithConcurrency(items, concurrency, mapper) {
   const values = Array(items.length);
   let nextIndex = 0;
@@ -124,21 +158,16 @@ function createMailboxIndexTargetedLookups({
       new Set((Array.isArray(folders) ? folders : []).map(normalizeFolder).filter(Boolean))
     );
     if (!normalizeEmail(accountEmail) || !normalizedFolders.length || !subjectTerms.length) return [];
-    const batches = await Promise.all(normalizedFolders.map((folder) => listMatchingMessagesForAccounts({
-      accountEmails: [accountEmail],
-      folder,
-      subjectTerms,
-      limit,
-    })));
+    const batches = await Promise.all(normalizedFolders.flatMap((folder) =>
+      subjectTerms.map((subjectTerm) => listMatchingMessagesForAccounts({
+        accountEmails: [accountEmail],
+        folder,
+        subjectTerms: [subjectTerm],
+        limit,
+      }))
+    ));
     if (batches.some((batch) => !Array.isArray(batch))) return null;
-    const rowsByIdentity = new Map();
-    batches.flat().forEach((message) => {
-      const identity = normalizeString(message && (message.messageId || message.id));
-      if (identity && !rowsByIdentity.has(identity)) rowsByIdentity.set(identity, message);
-    });
-    return Array.from(rowsByIdentity.values())
-      .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
-      .slice(0, Math.max(1, Math.min(4000, Math.floor(Number(limit) || 500))));
+    return selectCampaignSeedMessages({ batches, limit, normalizeString });
   }
 
   async function getOldestMatchingMessageUid({
@@ -179,4 +208,7 @@ function createMailboxIndexTargetedLookups({
   };
 }
 
-module.exports = { createMailboxIndexTargetedLookups };
+module.exports = {
+  createMailboxIndexTargetedLookups,
+  selectCampaignSeedMessages,
+};
