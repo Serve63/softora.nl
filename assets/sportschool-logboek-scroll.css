@@ -1,0 +1,17 @@
+.gym-app {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 760px) {
+  .gym-app {
+    height: calc(100vh - 44px);
+    height: calc(100dvh - 44px);
+    min-height: calc(100vh - 44px);
+    min-height: calc(100dvh - 44px);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}
