@@ -9,38 +9,10 @@
   const REORDER_START_THRESHOLD = 6;
   const DRAFT_EXERCISE_TITLE = 'NIEUWE OEFENING';
   const DEFAULT_DAY_EXERCISES = {
-    monday: [
-      { order: 1, title: 'Chest Press', notes: '', sets: '3', reps: '8', kg: '82' },
-      { order: 2, title: 'Lat Pulldown', notes: '', sets: '3', reps: '8', kg: '68' },
-      { order: 3, title: 'Incline Chest Press', notes: '', sets: '3', reps: '8', kg: '70' },
-      { order: 4, title: 'Seated Row', notes: '', sets: '3', reps: '8', kg: '73' },
-      { order: 5, title: 'Overhead Tricep', notes: '', sets: '3', reps: '8', kg: '58/59' },
-      { order: 6, title: 'Tricep Dip', notes: '', sets: '3', reps: '8', kg: '104' },
-    ],
-    tuesday: [
-      { order: 1, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100' },
-      { order: 2, title: 'Seated Leg Curl', notes: '', sets: '3', reps: '8', kg: '91' },
-      { order: 3, title: 'Shoulder Press Machine', notes: '', sets: '3', reps: '8', kg: '50' },
-      { order: 4, title: 'Lateral Shoulder Machine', notes: '', sets: '3', reps: '8', kg: '68' },
-      { order: 5, title: 'Shrugs', notes: '', sets: '3', reps: '8', kg: '36' },
-      { order: 6, title: 'Abdominal Machine', notes: '', sets: '3', reps: '8', kg: '73' },
-    ],
-    wednesday: [
-      { order: 1, title: 'Incline Chest Press', notes: '', sets: '3', reps: '8', kg: '70' },
-      { order: 2, title: 'Seated Row', notes: '', sets: '3', reps: '8', kg: '73' },
-      { order: 3, title: 'Chest Press', notes: '', sets: '3', reps: '8', kg: '82' },
-      { order: 4, title: 'Lat Pulldown', notes: '', sets: '3', reps: '8', kg: '68' },
-      { order: 5, title: 'Hammer Curls', notes: '', sets: '3', reps: '8', kg: '50' },
-      { order: 6, title: 'Sitting Bicep', notes: '', sets: '3', reps: '8', kg: '14' },
-    ],
-    thursday: [
-      { order: 1, title: 'Seated Leg Curl', notes: '', sets: '3', reps: '8', kg: '91' },
-      { order: 2, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100' },
-      { order: 3, title: 'Lateral Shoulder Machine', notes: '', sets: '3', reps: '8', kg: '68' },
-      { order: 4, title: 'Shoulder Press Machine', notes: '', sets: '3', reps: '8', kg: '50' },
-      { order: 5, title: 'Shrugs', notes: '', sets: '3', reps: '8', kg: '36' },
-      { order: 6, title: 'Abdominal Machine', notes: '', sets: '3', reps: '8', kg: '73' },
-    ],
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
     friday: [],
     saturday: [],
     sunday: [],

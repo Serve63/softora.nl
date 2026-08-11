@@ -60,7 +60,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek-sync\.js\?v=20260724a/);
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260811b/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260812a/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -129,12 +129,11 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /day\.id === currentWeekday\(\) \? 'Vandaag' : day\.title/);
   assert.doesNotMatch(scriptSource, /\{\s*id:\s*'today'/);
   assert.match(scriptSource, /DEFAULT_DAY_EXERCISES/);
-  assert.match(scriptSource, /Chest Press/);
-  assert.match(scriptSource, /Leg Extensions/);
-  assert.match(scriptSource, /title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100'/);
-  assert.doesNotMatch(scriptSource, /title: 'Leg Extensions'[\s\S]*?kg: '100\/104'/);
-  assert.match(scriptSource, /Hammer Curls/);
-  assert.match(scriptSource, /Abdominal Machine/);
+  assert.match(
+    scriptSource,
+    /DEFAULT_DAY_EXERCISES = \{\s*monday: \[\],\s*tuesday: \[\],\s*wednesday: \[\],\s*thursday: \[\],\s*friday: \[\],\s*saturday: \[\],\s*sunday: \[\],\s*\}/
+  );
+  assert.doesNotMatch(scriptSource, /Chest Press|Leg Extensions|Hammer Curls|Abdominal Machine/);
   assert.match(scriptSource, /LEGACY_NOTE_TEXTS/);
   assert.match(scriptSource, /cleanNotes/);
   assert.match(scriptSource, /markLegacyNotes/);
