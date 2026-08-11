@@ -11,6 +11,7 @@ const PREMIUM_ADMIN_ONLY_HTML_FILE_NAMES = Object.freeze([
   'premium-omzetwerk.html',
   'live-momentum.html',
   'live-momentum-access.html',
+  'sportschool.html',
 ]);
 
 function createPremiumAdminOnlyHtmlFilesSet() {

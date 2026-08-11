@@ -2,6 +2,9 @@ const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
+const PERMISSIONS_POLICY_HEADER =
+  'accelerometer=(), autoplay=(self), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()';
+
 function applyAppMiddleware(app, deps = {}) {
   const {
     express,
@@ -187,6 +190,9 @@ function applyAppMiddleware(app, deps = {}) {
   });
 
   app.use((req, res, next) => {
+    if (typeof res.setHeader === 'function') {
+      res.setHeader('Permissions-Policy', PERMISSIONS_POLICY_HEADER);
+    }
     const pathname = getRequestPathname(req);
     if (req.method === 'POST' && pathname === '/api/website-preview-library') {
       return jsonBodyParserPreviewLibrary(req, res, next);

@@ -443,6 +443,14 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     true
   );
   assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/sportschool-logboek' }),
+    false
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/sportschool-logboek' }),
+    false
+  );
+  assert.equal(
     manager.isPremiumPublicApiRequest({
       method: 'POST',
       originalUrl: '/api/retell/functions/agenda/availability',

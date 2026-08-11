@@ -283,6 +283,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
     requireFreshPasswordRegisterApiAccess:
       premiumRouteRuntime?.requireFreshPasswordRegisterApiAccess,
     requirePasswordRegisterWriteProof:

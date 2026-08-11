@@ -2,8 +2,6 @@
   const REMOTE_SCOPE = 'sportschool_logboek';
   const REMOTE_STATE_KEY = 'sportschool_logboek_v1';
   const REMOTE_LOGBOOK_ENDPOINT = '/api/sportschool-logboek';
-  const DIRECT_SUPABASE_TABLE = 'softora_sportschool_logbook';
-  const DIRECT_SUPABASE_ROW_ID = 'serve_logbook';
   const REMOTE_SAVE_DELAY_MS = 450;
   const REMOTE_RETRY_DELAY_MS = 1800;
   const REMOTE_REFRESH_DEDUPE_MS = 900;
@@ -475,69 +473,6 @@
     }
   }
 
-  function getDirectSupabaseConfig() {
-    const config = window.SoftoraSportschoolSupabase || {};
-    const url = String(config.url || '').replace(/\/+$/, '');
-    const key = String(config.publishableKey || config.anonKey || '');
-    return url && key ? { url, key } : null;
-  }
-
-  function buildDirectSupabaseHeaders(config) {
-    return {
-      apikey: config.key,
-      Authorization: `Bearer ${config.key}`,
-      'Content-Type': 'application/json',
-    };
-  }
-
-  async function fetchDirectSupabaseState(config) {
-    const endpoint =
-      `${config.url}/rest/v1/${DIRECT_SUPABASE_TABLE}` +
-      `?id=eq.${encodeURIComponent(DIRECT_SUPABASE_ROW_ID)}&select=payload,updated_at`;
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: buildDirectSupabaseHeaders(config),
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`Sportschool Supabase laden mislukt (${response.status})`);
-    const rows = await response.json().catch(() => []);
-    const row = Array.isArray(rows) ? rows[0] : null;
-    return {
-      ok: true,
-      scope: REMOTE_SCOPE,
-      values: row?.payload ? { [REMOTE_STATE_KEY]: JSON.stringify(row.payload) } : {},
-      source: 'supabase:sportschool',
-      updatedAt: row?.updated_at || null,
-    };
-  }
-
-  async function saveDirectSupabaseState(config, snapshotJson, options = {}) {
-    const endpoint =
-      `${config.url}/rest/v1/${DIRECT_SUPABASE_TABLE}?on_conflict=id`;
-    const updatedAt = new Date().toISOString();
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      keepalive: options.keepalive === true,
-      headers: {
-        ...buildDirectSupabaseHeaders(config),
-        Prefer: 'resolution=merge-duplicates',
-      },
-      body: JSON.stringify({
-        id: DIRECT_SUPABASE_ROW_ID,
-        payload: JSON.parse(snapshotJson),
-        updated_at: updatedAt,
-      }),
-    });
-    if (!response.ok) throw new Error(`Sportschool Supabase opslaan mislukt (${response.status})`);
-    return {
-      ok: true,
-      scope: REMOTE_SCOPE,
-      values: { [REMOTE_STATE_KEY]: snapshotJson },
-      source: 'supabase:sportschool',
-      updatedAt,
-    };
-  }
-
   async function fetchRemoteState() {
     const response = await fetch(REMOTE_LOGBOOK_ENDPOINT, {
       method: 'GET',
@@ -547,9 +482,6 @@
     if (response.status !== 404) {
       throw new Error(`Sportschool opslag laden mislukt (${response.status})`);
     }
-
-    const directConfig = getDirectSupabaseConfig();
-    if (directConfig) return fetchDirectSupabaseState(directConfig);
 
     if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === 'function') {
       return window.SoftoraUiStateClient.get(REMOTE_SCOPE);
@@ -587,9 +519,6 @@
     if (response.status !== 404) {
       throw new Error(`Sportschool opslag opslaan mislukt (${response.status})`);
     }
-
-    const directConfig = getDirectSupabaseConfig();
-    if (directConfig) return saveDirectSupabaseState(directConfig, snapshotJson, options);
 
     if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
       return window.SoftoraUiStateClient.set(REMOTE_SCOPE, body, options);

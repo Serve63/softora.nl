@@ -13,6 +13,10 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /assets\/personnel-theme\.css\?v=[^"'\\s]+/);
   assert.match(pageSource, /assets\/personnel-theme\.js\?v=[^"'\\s]+/);
   assert.match(pageSource, /assets\/premium-pdfs-builder\.js\?v=20260427a/);
+  assert.match(
+    pageSource,
+    /jspdf\.umd\.min\.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO\/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous" referrerpolicy="no-referrer"/
+  );
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
   assert.match(pageSource, /body \{[\s\S]*font-family:\s*'Inter', sans-serif;[\s\S]*min-height:\s*100vh;/);
   assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);

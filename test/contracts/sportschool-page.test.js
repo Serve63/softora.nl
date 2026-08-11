@@ -26,7 +26,6 @@ test('sportschool logboek page is available as installable pretty page', () => {
   const inputScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-input.js'), 'utf8');
   const stateScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-state.js'), 'utf8');
   const syncScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-sync.js'), 'utf8');
-  const migrationSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-program-migration.js'), 'utf8');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const prettyPages = createKnownPrettyPageSlugToFile(new Set(['sportschool.html']));
 
@@ -56,13 +55,13 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260811a/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
-  assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
+  assert.doesNotMatch(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek-sync\.js\?v=20260724a/);
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260811a/);
-  assert.match(pageSource, /assets\/sportschool-program-migration\.js\?v=20260711a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260811b/);
+  assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
   assert.match(pageSource, /data-exercise-list/);
@@ -78,8 +77,10 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.day-picker-backdrop/);
   assert.match(scriptSource, /sportschool_logboek/);
   assert.match(scriptSource, /REMOTE_LOGBOOK_ENDPOINT = '\/api\/sportschool-logboek'/);
-  assert.match(scriptSource, /softora_sportschool_logbook/);
-  assert.match(scriptSource, /SoftoraSportschoolSupabase/);
+  assert.doesNotMatch(scriptSource, /softora_sportschool_logbook/);
+  assert.doesNotMatch(scriptSource, /SoftoraSportschoolSupabase/);
+  assert.doesNotMatch(scriptSource, /\/rest\/v1\//);
+  assert.doesNotMatch(scriptSource, /getDirectSupabaseConfig/);
   assert.match(scriptSource, /SoftoraUiStateClient/);
   assert.match(scriptSource, /fetch\(REMOTE_LOGBOOK_ENDPOINT/);
   assert.match(scriptSource, /snapshot: JSON\.parse\(snapshotJson\)/);
@@ -165,12 +166,4 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /:focus-within/);
   assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
 
-  assert.match(migrationSource, /monday:[\s\S]*Overhead Tricep[\s\S]*Tricep Dip/);
-  assert.match(migrationSource, /tuesday:[\s\S]*Leg Press[\s\S]*Hammer Curls/);
-  assert.match(migrationSource, /wednesday:[\s\S]*Cable Pushdown[\s\S]*Overhead Tricep/);
-  assert.match(migrationSource, /thursday:[\s\S]*Leg Press[\s\S]*Sitting Bicep/);
-  assert.match(migrationSource, /programAlreadyInstalled/);
-  assert.match(migrationSource, /collectExistingSources/);
-  assert.match(migrationSource, /Prefer: 'resolution=merge-duplicates'/);
-  assert.match(migrationSource, /if \(writeResponse\.ok\) window\.location\.reload\(\)/);
 });

@@ -330,7 +330,7 @@ test('dedicated password-register read route requires fresh auth and access proo
   assert.ok(route);
   assert.equal(route.handlers[0], fresh);
   assert.equal(route.handlers[1], proof);
-  assert.equal(route.handlers.length, 3);
+  assert.equal(route.handlers.length, 4);
 });
 
 test('both password-register write aliases require fresh auth and body proof before CAS', () => {
@@ -354,7 +354,7 @@ test('both password-register write aliases require fresh auth and body proof bef
     assert.ok(route);
     assert.equal(route.handlers[0], fresh);
     assert.equal(route.handlers[1], proof);
-    assert.equal(route.handlers.length, 3);
+    assert.equal(route.handlers.length, 4);
   }
 });
 

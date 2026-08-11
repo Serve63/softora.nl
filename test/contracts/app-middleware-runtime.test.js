@@ -275,3 +275,28 @@ test('app middleware geeft audio-notitie uploads een grotere JSON-limiet', async
 
   assert.equal(selectedLimits.at(-1), '34mb');
 });
+
+test('app middleware emits the declared permissions policy header', async () => {
+  const app = createAppRecorder();
+  const headers = {};
+
+  applyAppMiddleware(app, createDeps());
+
+  const bodyParserSelector = app.uses[2][0];
+  await new Promise((resolve) => {
+    bodyParserSelector(
+      { method: 'GET', path: '/logboek' },
+      {
+        setHeader(name, value) {
+          headers[name] = value;
+        },
+      },
+      resolve
+    );
+  });
+
+  assert.equal(
+    headers['Permissions-Policy'],
+    'accelerometer=(), autoplay=(self), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
+  );
+});
