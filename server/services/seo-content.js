@@ -2102,55 +2102,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-een-crm-integratie',
-    title: 'Wat is een CRM integratie?',
-    description:
-      'Een praktische uitleg van CRM-integraties: hoe websites, formulieren, mailboxen en automatisering klantdata naar CRM brengen.',
-    category: 'CRM',
-    intent: 'Uitleg',
-    publishedAt: '2026-06-26',
-    updatedAt: '2026-06-26',
-    image: Object.freeze({
-      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
-      alt: 'CRM-dashboard met gekoppelde websiteaanvragen, klantdata en opvolgtaken voor een duidelijke integratie.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Een CRM integratie zorgt dat klantinformatie automatisch op de juiste plek komt, zodat opvolging minder afhankelijk is van handwerk.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'De simpele betekenis',
-        paragraphs: Object.freeze([
-          'Een CRM integratie is een koppeling tussen CRM en andere systemen. Denk aan je website, contactformulier, mailbox, agenda, chatbot, AI telefonist of dashboard.',
-          'Het doel is dat informatie niet steeds handmatig overgetypt hoeft te worden. Een aanvraag kan bijvoorbeeld direct een nieuw contact, taak, notitie of pipelinefase in CRM aanmaken.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Welke gegevens meestal worden gekoppeld',
-        paragraphs: Object.freeze([
-          'De basis bestaat vaak uit naam, bedrijf, e-mail, telefoonnummer, vraag, bronpagina, gewenste dienst en status. Voor commerciële opvolging zijn ook eigenaar, timing, prioriteit en volgende actie belangrijk.',
-          'Bij AI automatisering kan daar een samenvatting of kwalificatiesignaal bijkomen. Dat moet wel controleerbaar blijven: het team moet kunnen zien waar de informatie vandaan komt en wat nog ontbreekt.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Waarom integratie sterker is dan losse exports',
-        paragraphs: Object.freeze([
-          'Losse exports en spreadsheets kunnen tijdelijk helpen, maar ze maken opvolging kwetsbaar. Gegevens raken verouderd, taken worden vergeten of meerdere medewerkers werken met verschillende versies.',
-          'Een goede CRM integratie houdt de route korter. De website verzamelt de vraag, CRM bewaart de status en automatisering helpt om de volgende stap klaar te zetten.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'Website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
-      Object.freeze({ label: 'Website laten maken in Tilburg', href: '/blog/website-laten-maken-tilburg-leadgeneratie' }),
-      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'branches',
     slug: 'adviesbureaus',
     schemaType: 'Service',

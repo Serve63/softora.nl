@@ -971,6 +971,45 @@ test('interne-linkgids gebruikt native quality v2 zonder generieke opvulling', (
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 });
 
+test('CRM-integratiegids gebruikt een toetsbaar contract en twee verschillende beelden', () => {
+  const item = getSeoContentItem('kennisbank', 'wat-is-een-crm-integratie', {
+    now: new Date('2026-08-12T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-08-12');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.targetMoneyPage, '/crm-systeem-op-maat');
+  assert.ok(item.informationGain.includes('integratiecontract'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualFamily, 'technical-integration-patchbay-object-study');
+  assert.equal(item.visualBrief.support.visualFamily, 'risograph-integration-recovery-loop');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.src, '/assets/seo-content/crm-integratie-patchpaneel-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/crm-integratie-foutafhandeling-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-crm-integratie">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"dateModified":"2026-08-12"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Ontwerp de foutwachtrij vóór de succesroute live gaat/);
+  assert.match(html, /Wijs per gegeven één leidend systeem aan/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM-systeem op maat<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-crm-datakwaliteit">CRM-datakwaliteit<\/a>/);
+  assert.match(html, /href="\/blog\/maatwerk-software-offerte-beoordelen">maatwerksoftware-offerte beoordeelt<\/a>/);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+});
+
 test('chatbot-vs-livechat gebruikt quality v2 als unieke beslispagina', () => {
   const item = getSeoContentItem('vergelijkingen', 'chatbot-vs-livechat', {
     now: new Date('2026-08-07T12:00:00.000Z'),
