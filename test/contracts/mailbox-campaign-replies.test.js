@@ -2080,6 +2080,55 @@ test('campaign reply service herstelt vervolgcontact met gewijzigde onderwerpreg
   assert.equal(replies[0].latestOutboundAt, followUp.date);
 });
 
+test('campaign reply service behoudt exact gekoppelde All Mail-inbound zonder actuele klantmatch', async () => {
+  const originalId = '<karoena-original@gmail.com>';
+  const firstReply = {
+    id: 'inbox:karoena-first', folder: 'inbox', accountEmail: 'martijnven123@gmail.com',
+    from: 'Praktijk Karoena', email: 'info@praktijkkaroena.nl', to: 'martijnven123@gmail.com',
+    subject: 'Re: Nieuw webdesign gemaakt voor jullie website!',
+    date: '2026-04-27T10:05:28.000Z', messageId: '<karoena-first@example.nl>',
+    inReplyTo: originalId, references: originalId,
+  };
+  const changedSubjectReply = {
+    id: 'allmail:karoena-second', folder: 'allmail', accountEmail: firstReply.accountEmail,
+    from: 'Praktijk Karoena', email: firstReply.email, to: firstReply.to,
+    subject: 'Voorstel samenwerking: rebranding website',
+    date: '2026-05-20T10:07:00.000Z', messageId: '<karoena-second@example.nl>',
+    inReplyTo: originalId, references: originalId,
+  };
+  const sentReply = {
+    id: 'sent:karoena', folder: 'sent', accountEmail: firstReply.accountEmail,
+    from: 'Martijn van de Ven', email: firstReply.accountEmail, to: firstReply.email,
+    subject: 'Re: Voorstel samenwerking: rebranding website',
+    date: '2026-05-27T09:12:41.000Z', messageId: '<karoena-sent@example.nl>',
+    inReplyTo: changedSubjectReply.messageId,
+    references: `${originalId} ${changedSubjectReply.messageId}`,
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [firstReply] : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [firstReply] : [],
+      listMessagesBySenderEmailsForAccounts: async ({ folder }) => (
+        folder === 'allmail' ? [changedSubjectReply] : []
+      ),
+      listMessagesByRecipientEmailsForAccounts: async () => [sentReply],
+      listMessagesByMessageIdsForAccounts: async () => [],
+      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      listUnthreadedSentCandidatesForConversations: async () => [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
+
+  assert.equal(replies.length, 1);
+  assert.deepEqual(new Set([
+    replies[0].id,
+    ...replies[0].threadMessages.map((message) => message.id),
+  ]), new Set([firstReply.id, changedSubjectReply.id, sentReply.id]));
+});
+
 test('campaign reply service faalt gesloten wanneer gerichte contacthistorie niet leesbaar is', async () => {
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {

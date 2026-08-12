@@ -11,6 +11,7 @@ const {
   collectCampaignThreadReferenceIds,
   collectMissingCampaignThreadReferenceIds,
 } = require('./mailbox-campaign-participants');
+const { expandCampaignSyncSeeds } = require('./mailbox-campaign-sync-seeds');
 
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
@@ -295,6 +296,16 @@ function createMailboxSyncService({
               const error = new Error('Mailbox-index voor campagnecontacten kon niet worden gelezen.');
               error.status = 503;
               throw error;
+            }
+            if (incrementalOnly) {
+              indexedCampaignMessages = await expandCampaignSyncSeeds({
+                mailboxIndexStore,
+                accountEmail: account.email,
+                seedMessages: indexedCampaignMessages,
+                incomingFolders: CAMPAIGN_HISTORY_SEED_FOLDERS.filter((folder) => folder !== 'sent'),
+                collectCampaignThreadReferenceIds,
+                collectMissingCampaignThreadReferenceIds,
+              });
             }
             cache.set(cacheKey, indexedCampaignMessages);
           }
