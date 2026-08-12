@@ -1642,6 +1642,8 @@ test('interactive refresh reuses a recent durable Instantly sync instead of hitt
 
 test('suggested replies use the exact Instantly owner identity instead of falling back to Servé', async () => {
   let promptPayload = null;
+  let modelCalls = 0;
+  const ownershipChecks = [];
   const coordinator = createMailboxService({
     getOpenAiApiKey: () => 'openai-test-key',
     instantlyMailboxService: {
@@ -1651,8 +1653,25 @@ test('suggested replies use the exact Instantly owner identity instead of fallin
           : [];
       },
       getStatus: () => ({ configured: true, owners: {} }),
+      async assertStoredMessageOwnership(input) {
+        ownershipChecks.push({ ...input });
+        if (input.providerThreadId === 'wrong-thread') {
+          const error = new Error('wrong thread');
+          error.status = 403;
+          error.code = 'INSTANTLY_MESSAGE_OWNER_MISMATCH';
+          throw error;
+        }
+        return {
+          provider: 'instantly',
+          providerOwner: input.owner,
+          providerAccountEmail: input.accountEmail,
+          providerMessageId: input.providerMessageId,
+          providerThreadId: input.providerThreadId,
+        };
+      },
     },
     fetchJsonWithTimeout: async (_url, options) => {
+      modelCalls += 1;
       const request = JSON.parse(options.body);
       promptPayload = JSON.parse(request.messages[1].content);
       return {
@@ -1669,14 +1688,17 @@ test('suggested replies use the exact Instantly owner identity instead of fallin
   });
 
   const result = await coordinator.rewriteDraft({
-    accountEmail: 'martijn-sender@example.com',
+    accountEmail: 'serve@softora.nl',
     to: 'prospect@example.org',
     subject: 'Re: Website',
     body: '',
     context: {
       provider: 'instantly',
       providerOwner: 'martijn',
-      accountEmail: 'martijn-sender@example.com',
+      accountEmail: 'serve@softora.nl',
+      providerAccountEmail: 'martijn-sender@example.com',
+      providerMessageId: 'instantly-message-1',
+      providerThreadId: 'instantly-thread-1',
       from: 'Prospect',
       email: 'prospect@example.org',
       subject: 'Re: Website',
@@ -1685,7 +1707,14 @@ test('suggested replies use the exact Instantly owner identity instead of fallin
     },
   });
   assert.equal(promptPayload.afzenderContext.naam, 'Martijn van de Ven');
+  assert.equal(promptPayload.afzenderContext.accountEmail, 'martijn-sender@example.com');
   assert.match(result.text, /Met vriendelijke groet,\nMartijn van de Ven$/);
+  assert.deepEqual(ownershipChecks, [{
+    owner: 'martijn',
+    accountEmail: 'martijn-sender@example.com',
+    providerMessageId: 'instantly-message-1',
+    providerThreadId: 'instantly-thread-1',
+  }]);
 
   await assert.rejects(
     coordinator.rewriteDraft({
@@ -1697,11 +1726,35 @@ test('suggested replies use the exact Instantly owner identity instead of fallin
         provider: 'instantly',
         providerOwner: 'serve',
         accountEmail: 'martijn-sender@example.com',
+        providerAccountEmail: 'martijn-sender@example.com',
+        providerMessageId: 'instantly-message-1',
+        providerThreadId: 'instantly-thread-1',
         body: 'Test',
       },
     }),
     { code: 'INSTANTLY_REPLY_IDENTITY_MISMATCH' }
   );
+  assert.equal(modelCalls, 1);
+
+  await assert.rejects(
+    coordinator.rewriteDraft({
+      accountEmail: 'serve@softora.nl',
+      to: 'prospect@example.org',
+      subject: 'Re: Website',
+      body: '',
+      context: {
+        provider: 'instantly',
+        providerOwner: 'martijn',
+        accountEmail: 'serve@softora.nl',
+        providerAccountEmail: 'martijn-sender@example.com',
+        providerMessageId: 'instantly-message-1',
+        providerThreadId: 'wrong-thread',
+        body: 'Test',
+      },
+    }),
+    { code: 'INSTANTLY_MESSAGE_OWNER_MISMATCH' }
+  );
+  assert.equal(modelCalls, 1);
 });
 
 test('Instantly mailbox gap-closing poll is registered as a protected five-minute cron', () => {

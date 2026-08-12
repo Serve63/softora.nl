@@ -31,6 +31,7 @@ function createMemorySupabase(initialTables = {}) {
     ...structuredClone(initialTables),
   };
   let generatedId = 0;
+  const rpcCalls = [];
 
   function from(tableName) {
     const state = {
@@ -146,33 +147,140 @@ function createMemorySupabase(initialTables = {}) {
   }
 
   async function rpc(name, args = {}) {
-    if (name !== 'softora_claim_whoop_sync_lock') {
-      return { data: null, error: new Error(`unsupported rpc ${name}`) };
-    }
+    rpcCalls.push([name, structuredClone(args)]);
     const connection = tables.softora_health_whoop_connections
       .find((row) => row.owner_key === args.p_owner_key);
     const currentTime = Date.now();
-    const activeUntil = new Date(connection?.sync_lock_until || 0).getTime();
-    if (!connection || connection.status !== 'connected' || (
-      connection.sync_lock_id && Number.isFinite(activeUntil) && activeUntil > currentTime
-    )) {
+
+    if (name === 'softora_claim_whoop_sync_run') {
+      const activeUntil = new Date(connection?.sync_lock_until || 0).getTime();
+      if (!connection || connection.status !== 'connected' || (
+        connection.sync_lock_id && Number.isFinite(activeUntil) && activeUntil > currentTime
+      )) {
+        return {
+          data: [{ acquired: false, claimed_lock_id: null, lock_expires_at: connection?.sync_lock_until || null, run_id: null }],
+          error: null,
+        };
+      }
+      const runId = `run-${++generatedId}`;
+      const startedAt = new Date(currentTime).toISOString();
+      const run = {
+        id: runId,
+        owner_key: args.p_owner_key,
+        target_day: args.p_target_day,
+        mode: args.p_mode,
+        status: 'running',
+        started_at: startedAt,
+        lock_id: args.p_lock_id,
+        attempt: Number(args.p_attempt || 1),
+      };
+      tables.softora_health_sync_runs.push(run);
+      Object.assign(connection, {
+        sync_lock_id: args.p_lock_id,
+        sync_lock_until: new Date(
+          currentTime + Math.max(60, Number(args.p_lock_ttl_seconds || 900)) * 1000
+        ).toISOString(),
+        last_sync_run_id: runId,
+        last_sync_started_at: startedAt,
+        last_sync_status: 'running',
+        last_sync_error: null,
+        last_sync_error_code: null,
+        last_sync_attempt: Number(args.p_attempt || 1),
+        next_retry_at: null,
+        updated_at: startedAt,
+      });
       return {
-        data: [{ acquired: false, claimed_lock_id: null, lock_expires_at: connection?.sync_lock_until || null }],
+        data: [{
+          acquired: true,
+          claimed_lock_id: args.p_lock_id,
+          lock_expires_at: connection.sync_lock_until,
+          run_id: runId,
+        }],
         error: null,
       };
     }
-    connection.sync_lock_id = args.p_lock_id;
-    connection.sync_lock_until = new Date(
-      currentTime + Math.max(60, Number(args.p_lock_ttl_seconds || 900)) * 1000
-    ).toISOString();
-    connection.updated_at = new Date(currentTime).toISOString();
-    return {
-      data: [{ acquired: true, claimed_lock_id: args.p_lock_id, lock_expires_at: connection.sync_lock_until }],
-      error: null,
-    };
+
+    if (name === 'softora_finish_whoop_sync_run') {
+      const run = tables.softora_health_sync_runs.find((row) => row.id === args.p_run_id);
+      if (!connection || !run || connection.sync_lock_id !== args.p_lock_id
+        || connection.last_sync_run_id !== args.p_run_id || run.lock_id !== args.p_lock_id
+        || run.status !== 'running') return { data: false, error: null };
+      const completedAt = new Date(currentTime).toISOString();
+      Object.assign(run, {
+        status: args.p_status,
+        records_seen: Number(args.p_records_seen || 0),
+        records_upserted: Number(args.p_records_upserted || 0),
+        error_code: args.p_error_code || null,
+        error: args.p_error_message || null,
+        next_retry_at: args.p_next_retry_at || null,
+        completed_at: completedAt,
+      });
+      Object.assign(connection, {
+        sync_lock_id: null,
+        sync_lock_until: null,
+        last_sync_status: args.p_status,
+        last_sync_error_code: args.p_error_code || null,
+        last_sync_error: args.p_error_message || null,
+        next_retry_at: args.p_next_retry_at || null,
+        updated_at: completedAt,
+      });
+      if (args.p_status === 'completed') {
+        connection.last_sync_completed_at = completedAt;
+        if (args.p_last_synced_day) connection.last_synced_day = args.p_last_synced_day;
+        if (args.p_whoop_user_id) connection.whoop_user_id = args.p_whoop_user_id;
+      }
+      return { data: true, error: null };
+    }
+
+    if (name === 'softora_claim_whoop_refresh_lock') {
+      const activeUntil = new Date(connection?.token_refresh_lock_until || 0).getTime();
+      if (!connection || connection.status !== 'connected' || (
+        connection.token_refresh_lock_id && Number.isFinite(activeUntil) && activeUntil > currentTime
+      )) {
+        return {
+          data: [{ acquired: false, claimed_lock_id: null, lock_expires_at: connection?.token_refresh_lock_until || null }],
+          error: null,
+        };
+      }
+      connection.token_refresh_lock_id = args.p_lock_id;
+      connection.token_refresh_lock_until = new Date(
+        currentTime + Math.max(30, Number(args.p_lock_ttl_seconds || 60)) * 1000
+      ).toISOString();
+      return {
+        data: [{
+          acquired: true,
+          claimed_lock_id: args.p_lock_id,
+          lock_expires_at: connection.token_refresh_lock_until,
+          encrypted_tokens: connection.encrypted_tokens,
+          connection_status: connection.status,
+        }],
+        error: null,
+      };
+    }
+
+    if (name === 'softora_finish_whoop_refresh') {
+      if (!connection || connection.token_refresh_lock_id !== args.p_lock_id) return { data: false, error: null };
+      const activeUntil = new Date(connection.token_refresh_lock_until || 0).getTime();
+      if (args.p_outcome === 'completed' && (
+        !args.p_encrypted_tokens || !Number.isFinite(activeUntil) || activeUntil <= currentTime
+      )) return { data: false, error: null };
+      if (args.p_outcome === 'completed') {
+        connection.encrypted_tokens = args.p_encrypted_tokens;
+        connection.status = 'connected';
+      } else if (args.p_outcome === 'reauthorization_required' || args.p_outcome === 'refresh_uncertain') {
+        connection.status = args.p_outcome;
+      }
+      connection.last_sync_error_code = args.p_error_code || null;
+      connection.last_sync_error = args.p_error_message || null;
+      connection.token_refresh_lock_id = null;
+      connection.token_refresh_lock_until = null;
+      return { data: true, error: null };
+    }
+
+    return { data: null, error: new Error(`unsupported rpc ${name}`) };
   }
 
-  return { from, rpc, tables };
+  return { from, rpc, rpcCalls, tables };
 }
 
 function encryptWhoopTokens(tokens, secret) {
@@ -422,6 +530,9 @@ test('WHOOP serializes concurrent syncs and rotates the refresh token once', asy
   assert.equal(results.filter((result) => result.reason === 'sync_in_progress').length, 1);
   assert.equal(supabase.tables.softora_health_sync_runs.length, 1);
   assert.notEqual(supabase.tables.softora_health_whoop_connections[0].encrypted_tokens, previousEncryptedTokens);
+  assert.equal(supabase.rpcCalls.filter(([name]) => name === 'softora_claim_whoop_sync_run').length, 2);
+  assert.equal(supabase.rpcCalls.filter(([name]) => name === 'softora_claim_whoop_refresh_lock').length, 1);
+  assert.equal(supabase.rpcCalls.filter(([name]) => name === 'softora_finish_whoop_refresh').length, 1);
 });
 
 test('WHOOP reclaims an expired token-refresh lease without replaying a refresh token', async () => {
@@ -474,7 +585,7 @@ test('WHOOP status distinguishes an active lease from a stale running status', a
   });
   const active = await service.getStatus();
   assert.equal(active.tokenRefreshInProgress, true);
-  assert.equal(active.syncState, 'token_refreshing');
+  assert.equal(active.syncState, 'syncing');
 
   supabase.tables.softora_health_whoop_connections[0].token_refresh_lock_id = null;
   supabase.tables.softora_health_whoop_connections[0].token_refresh_lock_until = null;
@@ -561,6 +672,173 @@ test('WHOOP webhook workers atomically claim one event across concurrent invocat
   assert.equal(supabase.tables.softora_health_sync_runs.length, 1);
   assert.equal(supabase.tables.softora_health_whoop_webhook_events[0].status, 'processed');
   assert.equal(supabase.tables.softora_health_whoop_webhook_events[0].attempts, 1);
+});
+
+test('WHOOP fenced completion cannot let an expired sync owner overwrite a newer run', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const connection = createConnectedWhoopState(tokenEncryptionKey, {
+    encrypted_tokens: encryptWhoopTokens({
+      access_token: 'access-valid', refresh_token: 'refresh-valid',
+      expires_at: Date.now() + 3600000, scope: 'offline',
+    }, tokenEncryptionKey),
+  });
+  const supabase = createMemorySupabase({ softora_health_whoop_connections: [connection] });
+  let fenceStolen = false;
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async () => {
+      if (!fenceStolen) {
+        fenceStolen = true;
+        supabase.tables.softora_health_whoop_connections[0].sync_lock_id = 'newer-lock';
+        supabase.tables.softora_health_whoop_connections[0].last_sync_run_id = 'newer-run';
+      }
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
+    now: () => new Date('2026-08-12T16:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  await assert.rejects(
+    service.sync({ mode: 'daily', targetDay: '2026-08-12' }),
+    (error) => error.code === 'WHOOP_SYNC_LOCK_FENCE_LOST'
+  );
+  assert.equal(supabase.tables.softora_health_sync_runs[0].status, 'running');
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].sync_lock_id, 'newer-lock');
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].last_sync_run_id, 'newer-run');
+});
+
+test('WHOOP retries idempotent provider reads on 429 without retrying token refresh', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: Date.now() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+      last_synced_day: '2026-08-11',
+    })],
+  });
+  let cycleCalls = 0;
+  const sleeps = [];
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    sleep: async (delay) => sleeps.push(delay),
+    random: () => 0,
+    fetchImpl: async (url) => {
+      if (String(url).includes('/cycle?')) {
+        cycleCalls += 1;
+        if (cycleCalls === 1) return createJsonResponse(429, { error: 'rate_limited' });
+      }
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
+    now: () => new Date('2026-08-12T16:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const result = await service.sync({ mode: 'daily', targetDay: '2026-08-12' });
+  assert.equal(result.ok, true);
+  assert.equal(cycleCalls, 2);
+  assert.deepEqual(sleeps, [250]);
+  assert.equal(supabase.rpcCalls.filter(([name]) => name === 'softora_claim_whoop_refresh_lock').length, 0);
+});
+
+test('WHOOP provider 5xx schedules bounded retry and preserves stored data', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const existingRecord = {
+    owner_key: 'serve', whoop_user_id: 23320184, source_type: 'recovery',
+    source_id: 'existing-recovery', local_day: '2026-08-10', score_state: 'SCORED',
+  };
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: Date.now() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+      last_synced_day: '2026-08-10',
+    })],
+    softora_health_whoop_records: [existingRecord],
+  });
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    sleep: async () => {},
+    random: () => 0,
+    fetchImpl: async () => createJsonResponse(503, { error: 'temporarily_unavailable' }),
+    now: () => new Date('2026-08-12T16:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  await assert.rejects(
+    service.sync({ mode: 'backfill', targetDay: '2026-08-12' }),
+    (error) => error.code === 'WHOOP_PROVIDER_UNAVAILABLE'
+  );
+  const connection = supabase.tables.softora_health_whoop_connections[0];
+  assert.equal(connection.last_sync_status, 'failed');
+  assert.equal(connection.last_sync_error_code, 'WHOOP_PROVIDER_UNAVAILABLE');
+  assert.ok(new Date(connection.next_retry_at).getTime() > new Date('2026-08-12T16:00:00.000Z').getTime());
+  assert.deepEqual(supabase.tables.softora_health_whoop_records, [existingRecord]);
+
+  const status = await service.getStatus();
+  assert.equal(status.syncState, 'provider_unavailable');
+  assert.equal(status.retryScheduled, true);
+  assert.equal(status.providerUnavailable, true);
+  assert.deepEqual(status.alerts.sort(), ['expected_day_missing', 'provider_unavailable', 'stale_sync_state']);
+});
+
+test('WHOOP worker automatically backfills a missing expected day through the shared claim RPC', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: Date.now() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+      last_synced_day: '2026-08-10',
+      last_sync_status: 'completed',
+    })],
+  });
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => createJsonResponse(200, {
+      records: String(url).includes('/cycle?') ? [{
+        id: 1707000000,
+        user_id: 23320184,
+        start: '2026-08-12T08:00:00.000Z',
+        updated_at: '2026-08-12T09:00:00.000Z',
+        score_state: 'SCORED',
+        score: { strain: 8.1 },
+      }] : [],
+      next_token: '',
+    }),
+    now: () => new Date('2026-08-12T16:00:00.000Z'),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const worker = await service.processWebhookQueue({ limit: 5 });
+  assert.equal(worker.processed, 0);
+  assert.equal(worker.monitoring.ok, true);
+  assert.equal(worker.monitoring.result.targetDayStored, true);
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].last_synced_day, '2026-08-12');
+  assert.equal(supabase.tables.softora_health_whoop_records.length, 1);
+  assert.equal(supabase.rpcCalls.filter(([name]) => name === 'softora_claim_whoop_sync_run').length, 1);
+
+  const status = await service.getStatus();
+  assert.equal(status.current, true);
+  assert.equal(status.syncState, 'current');
+  assert.equal(status.expectedDay, '2026-08-12');
+  assert.equal(Object.hasOwn(status, 'profile'), false);
+  assert.equal(Object.hasOwn(status, 'bodyMeasurement'), false);
 });
 
 test('Google health sheet service replaces the five managed data ranges', async () => {
@@ -683,6 +961,32 @@ test('WHOOP migrations permit hardened connection, sync and queue states', () =>
   assert.match(lockMigration, /pg_advisory_xact_lock/);
   assert.match(lockMigration, /for update/);
   assert.match(lockMigration, /grant execute on function public\.softora_claim_whoop_sync_lock/);
+
+  const stateMachineMigration = fs.readFileSync(path.join(
+    __dirname,
+    '../../supabase/migrations/20260812183000_harden_whoop_atomic_state_machine.sql'
+  ), 'utf8');
+  [
+    'softora_claim_whoop_sync_run',
+    'softora_finish_whoop_sync_run',
+    'softora_claim_whoop_refresh_lock',
+    'softora_finish_whoop_refresh',
+  ].forEach((functionName) => {
+    assert.match(stateMachineMigration, new RegExp(`create or replace function public\\.${functionName}`));
+  });
+  assert.match(stateMachineMigration, /pg_advisory_xact_lock\(824031, 5\)/);
+  assert.match(stateMachineMigration, /pg_advisory_xact_lock\(824031, 6\)/);
+  assert.match(stateMachineMigration, /last_sync_run_id is distinct from p_run_id/);
+  assert.match(stateMachineMigration, /token_refresh_lock_id is distinct from v_lock_id/);
+  assert.match(stateMachineMigration, /grant execute on function public\.softora_claim_whoop_refresh_lock[\s\S]*to service_role/);
+  assert.match(stateMachineMigration, /where status = 'dead'[\s\S]*WHOOP-tokenvernieuwing had geen actieve lease meer/);
+
+  const serviceSource = fs.readFileSync(path.join(__dirname, '../../server/services/whoop-health.js'), 'utf8');
+  assert.match(serviceSource, /rpc\('softora_claim_whoop_sync_run'/);
+  assert.match(serviceSource, /rpc\('softora_finish_whoop_sync_run'/);
+  assert.match(serviceSource, /rpc\('softora_claim_whoop_refresh_lock'/);
+  assert.match(serviceSource, /rpc\('softora_finish_whoop_refresh'/);
+  assert.doesNotMatch(serviceSource, /\.or\(`token_refresh_lock_until/);
 });
 
 test('health dossier has no manual WHOOP or spreadsheet controls', () => {
@@ -694,6 +998,8 @@ test('health dossier has no manual WHOOP or spreadsheet controls', () => {
   });
   assert.match(script, /tokenRefreshInProgress/);
   assert.match(script, /staleSyncStatus/);
+  assert.match(script, /retry_scheduled/);
+  assert.match(script, /provider_unavailable/);
   assert.match(script, /laatst bevestigde gegevens/);
   assert.doesNotMatch(script, /laatste sync gaf:/);
 });

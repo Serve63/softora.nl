@@ -127,7 +127,7 @@ async function markInstantlyMessageRead({
   };
 }
 
-function resolveReplyIdentity({
+async function resolveReplyIdentity({
   context,
   accountEmail,
   getAccount,
@@ -137,6 +137,7 @@ function resolveReplyIdentity({
   cleanPromptText,
 }) {
   const contextAccountEmail = normalizeEmail(context && context.accountEmail);
+  const contextProviderAccountEmail = normalizeEmail(context && context.providerAccountEmail);
   const contextProvider = normalizeString(context && context.provider).toLowerCase();
   const contextProviderOwner = normalizeString(context && context.providerOwner).toLowerCase();
   let resolvedAccountEmail = getAccount(contextAccountEmail)
@@ -150,16 +151,37 @@ function resolveReplyIdentity({
     error.code = 'INSTANTLY_REPLY_IDENTITY_MISMATCH';
     throw error;
   }
+  const providerAccountEmail = contextProviderAccountEmail || contextAccountEmail;
+  const providerMessageId = normalizeString(context && context.providerMessageId);
+  const providerThreadId = normalizeString(context && context.providerThreadId);
+  if (!providerAccountEmail || !providerMessageId || !providerThreadId) {
+    const error = new Error('De Instantly-threadidentiteit is onvolledig; open het bericht opnieuw.');
+    error.status = 403;
+    error.code = 'INSTANTLY_REPLY_IDENTITY_MISMATCH';
+    throw error;
+  }
   const providerAccounts = instantlyMailboxService?.getConfiguredAccounts?.(contextProviderOwner) || [];
   if (!providerAccounts.some(
-    (providerAccount) => normalizeEmail(providerAccount?.email) === contextAccountEmail
+    (providerAccount) => normalizeEmail(providerAccount?.email) === providerAccountEmail
   )) {
     const error = new Error('Het Instantly-afzenderaccount hoort niet bij de geselecteerde mailbox.');
     error.status = 403;
     error.code = 'INSTANTLY_REPLY_IDENTITY_MISMATCH';
     throw error;
   }
-  resolvedAccountEmail = contextAccountEmail;
+  if (typeof instantlyMailboxService?.assertStoredMessageOwnership !== 'function') {
+    const error = new Error('De duurzame Instantly-threadcontrole ontbreekt.');
+    error.status = 503;
+    error.code = 'INSTANTLY_REPLY_IDENTITY_UNAVAILABLE';
+    throw error;
+  }
+  await instantlyMailboxService.assertStoredMessageOwnership({
+    owner: contextProviderOwner,
+    accountEmail: providerAccountEmail,
+    providerMessageId,
+    providerThreadId,
+  });
+  resolvedAccountEmail = providerAccountEmail;
   accountSenderName = contextProviderOwner === 'martijn'
     ? 'Martijn van de Ven'
     : 'Servé Creusen';

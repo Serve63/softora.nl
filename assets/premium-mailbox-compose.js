@@ -166,6 +166,7 @@
       ...(String(mail.provider || '').trim()
         ? {
             provider: String(mail.provider || '').trim().toLowerCase(),
+            providerAccountEmail: String(mail.providerAccountEmail || '').trim().toLowerCase(),
             providerMessageId: String(mail.providerMessageId || '').trim(),
             providerThreadId: String(mail.providerThreadId || '').trim(),
             providerOwner: String(mail.providerOwner || '').trim().toLowerCase(),
@@ -211,6 +212,7 @@
       ...(String(latest.provider || mail.provider || '').trim()
         ? {
             provider: String(latest.provider || mail.provider || '').trim().toLowerCase(),
+            providerAccountEmail: String(latest.providerAccountEmail || mail.providerAccountEmail || '').trim().toLowerCase(),
             providerMessageId: String(latest.providerMessageId || mail.providerMessageId || '').trim(),
             providerThreadId: String(latest.providerThreadId || mail.providerThreadId || '').trim(),
             providerOwner: String(latest.providerOwner || mail.providerOwner || '').trim().toLowerCase(),

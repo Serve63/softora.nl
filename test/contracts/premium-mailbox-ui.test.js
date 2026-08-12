@@ -124,7 +124,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260810a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h/);
+  assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b/);
+  assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260812a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
 });
 
@@ -3010,7 +3012,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260811b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -4317,6 +4319,119 @@ test('reply normaliseert een stale sender naar de bewezen thread-account en weig
     ),
     ''
   );
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      {
+        provider: 'instantly',
+        providerOwner: 'serve',
+        providerAccountEmail: 'servecreusen@websoftora.com',
+        accountEmail: 'serve@softora.nl',
+        email: 'bestuur@mhcbe.nl',
+      },
+      'martijn@softora.nl',
+      'both'
+    ),
+    'servecreusen@websoftora.com'
+  );
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      {
+        provider: 'instantly',
+        providerOwner: 'serve',
+        providerAccountEmail: 'servecreusen@websoftora.com',
+        accountEmail: 'serve@softora.nl',
+      },
+      'serve@softora.nl',
+      'martijn'
+    ),
+    ''
+  );
+  assert.equal(
+    campaignInboxModule.resolveReplyAccount(
+      { provider: 'instantly', providerOwner: 'serve', accountEmail: 'serve@softora.nl' },
+      'serve@softora.nl',
+      'both'
+    ),
+    ''
+  );
+});
+
+test('voorgestelde Instantly-reactie gebruikt providerprovenance zonder een send-effect', async () => {
+  const fields = new Map();
+  ['c-to', 'c-subject', 'c-body', 'compose-overlay'].forEach((id) => {
+    fields.set(id, {
+      value: '', textContent: '', disabled: false,
+      classList: { add() {}, remove() {} },
+      setAttribute() {}, removeAttribute() {}, addEventListener() {},
+    });
+  });
+  const rewriteButton = { textContent: 'Voorgestelde reactie', disabled: false };
+  const sendButton = { disabled: false };
+  const requests = [];
+  const loadedProfiles = [];
+  const mail = {
+    id: 'servecreusen@websoftora.com|instantly:message-1',
+    mailboxId: 'instantly:message-1',
+    accountEmail: 'serve@softora.nl',
+    provider: 'instantly',
+    providerOwner: 'serve',
+    providerAccountEmail: 'servecreusen@websoftora.com',
+    providerMessageId: 'message-1',
+    providerThreadId: 'thread-1',
+    email: 'bestuur@mhcbe.nl',
+    from: 'Bestuur MHCBE',
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Bedankt voor jullie bericht.',
+    folder: 'instantly',
+  };
+  const controller = composeControllerModule.create({
+    document: {
+      getElementById: (id) => fields.get(id) || null,
+      querySelector: (selector) => selector === '[data-mailbox-action="rewrite-compose"]'
+        ? rewriteButton
+        : (selector === '.btn-send' ? sendButton : null),
+    },
+    fetch: async (url, options) => {
+      requests.push({ url, payload: JSON.parse(options.body) });
+      return { ok: true, json: async () => ({ ok: true, text: 'Veilige voorgestelde reactie.' }) };
+    },
+    loadSenderProfile: async (account) => {
+      loadedProfiles.push(account);
+      return { name: 'Servé Creusen' };
+    },
+    compose: {
+      buildReplyContext: composeModule.buildReplyContext,
+      resetOptionalFields() {}, reset() {}, getAttachments: () => [], isUsed: () => false,
+      complete() {}, finish() {},
+    },
+    campaignInbox: campaignInboxModule,
+    display: {
+      getReplyToAddress: () => mail.email,
+      formatDetailSubject: (value) => value,
+    },
+    getActiveFolder: () => 'outreach',
+    getAccount: () => 'martijn@softora.nl',
+    getOwner: () => 'both',
+    findMail: () => mail,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    composeWindow: { reset() {} },
+    toast() {},
+  });
+
+  controller.reply(mail);
+  await controller.rewrite();
+
+  assert.deepEqual(loadedProfiles, ['servecreusen@websoftora.com']);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, '/api/mailbox/rewrite');
+  assert.equal(requests.some((request) => request.url === '/api/mailbox/send'), false);
+  assert.equal(requests[0].payload.account, 'servecreusen@websoftora.com');
+  assert.equal(requests[0].payload.context.accountEmail, 'servecreusen@websoftora.com');
+  assert.equal(requests[0].payload.context.providerAccountEmail, 'servecreusen@websoftora.com');
+  assert.equal(requests[0].payload.context.providerOwner, 'serve');
+  assert.equal(requests[0].payload.context.providerMessageId, 'message-1');
+  assert.equal(requests[0].payload.context.providerThreadId, 'thread-1');
+  assert.equal(fields.get('c-body').value, 'Veilige voorgestelde reactie.');
 });
 
 test('mislukte reply voegt geen roze bericht toe en herstelt de composer exact', async () => {

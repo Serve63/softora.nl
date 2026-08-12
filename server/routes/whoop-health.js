@@ -11,6 +11,16 @@ function hasCronAccess(req, cronSecret) {
   );
 }
 
+function safeErrorPayload(error) {
+  return {
+    ok: false,
+    errorCode: String(error?.code || 'WHOOP_REQUEST_FAILED').slice(0, 120),
+    error: String(error?.message || error)
+      .replace(/[A-Za-z0-9_-]{40,}/g, '[afgeschermd]')
+      .slice(0, 500),
+  };
+}
+
 function registerWhoopHealthPublicRoutes(app, deps = {}) {
   const service = deps.service;
   const cronSecret = String(deps.cronSecret || process.env.CRON_SECRET || '').trim();
@@ -55,7 +65,7 @@ function registerWhoopHealthPublicRoutes(app, deps = {}) {
         : service.sync({ mode: 'daily' });
       return res.json(await run);
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 
@@ -67,7 +77,7 @@ function registerWhoopHealthPublicRoutes(app, deps = {}) {
     try {
       return res.json(await service.reconcileToday({ enforceSchedule: true }));
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 
@@ -79,7 +89,7 @@ function registerWhoopHealthPublicRoutes(app, deps = {}) {
     try {
       return res.json(await service.processWebhookQueue({ limit: 5 }));
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 }
@@ -95,7 +105,7 @@ function registerWhoopHealthProtectedRoutes(app, deps = {}) {
     try {
       return res.json({ ok: true, ...(await service.getStatus()) });
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 
@@ -103,7 +113,7 @@ function registerWhoopHealthProtectedRoutes(app, deps = {}) {
     try {
       return res.json({ ok: true, authorizationUrl: await service.createAuthorizationUrl() });
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 
@@ -111,7 +121,7 @@ function registerWhoopHealthProtectedRoutes(app, deps = {}) {
     try {
       return res.json({ ok: true, ...(await service.getDashboard(req.query?.days)) });
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 
@@ -120,7 +130,7 @@ function registerWhoopHealthProtectedRoutes(app, deps = {}) {
       const mode = req.body?.mode === 'backfill' ? 'backfill' : 'manual';
       return res.json(await service.sync({ mode, targetDay: req.body?.targetDay }));
     } catch (error) {
-      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 500) });
+      return res.status(500).json(safeErrorPayload(error));
     }
   });
 }
