@@ -187,17 +187,123 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     return mailboxRefreshPromise;
   }
 
+  function getMailboxSnapshotSavedAtMs(snapshot) {
+    const savedAtMs = Date.parse(String(snapshot && snapshot.savedAt || ''));
+    return Number.isFinite(savedAtMs) ? savedAtMs : 0;
+  }
+
+  function shouldPreferPersistedMailboxSnapshot(persistedSnapshot, cachedSnapshot) {
+    if (!persistedSnapshot) return false;
+    if (!cachedSnapshot) return true;
+    const persistedSavedAtMs = getMailboxSnapshotSavedAtMs(persistedSnapshot);
+    const cachedSavedAtMs = getMailboxSnapshotSavedAtMs(cachedSnapshot);
+    if (!persistedSavedAtMs && cachedSavedAtMs) return false;
+    if (persistedSavedAtMs && cachedSavedAtMs) return persistedSavedAtMs >= cachedSavedAtMs;
+    return true;
+  }
+
+  function getMailboxMessageIdentityKey(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    const accountEmail = String(source.accountEmail || '').trim().toLowerCase();
+    const folder = String(source.storageFolder || source.folder || 'inbox').trim().toLowerCase();
+    const uid = Number(source.storageUid || source.uid) || 0;
+    if (!accountEmail || !folder) return '';
+    if (uid > 0) return `${accountEmail}|${folder}|uid:${uid}`;
+    const id = String(source.mailboxId || source.id || source.providerMessageId || '').trim();
+    return id ? `${accountEmail}|${folder}|id:${id}` : '';
+  }
+
+  function getLatestMailboxStateTimestamp(first, second) {
+    const candidates = [first, second]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .sort((left, right) => (Date.parse(left) || 0) - (Date.parse(right) || 0));
+    return candidates.at(-1) || '';
+  }
+
+  function reconcileMailboxSnapshotReadState(baseSnapshot, durableSnapshot) {
+    if (!baseSnapshot || !durableSnapshot) return baseSnapshot;
+    const durableStates = new Map();
+    const remember = (message) => {
+      const key = getMailboxMessageIdentityKey(message);
+      const readAt = String(message && message.readAt || '').trim();
+      const replyDismissedAt = String(message && message.replyDismissedAt || '').trim();
+      if (key && (readAt || replyDismissedAt)) {
+        const current = durableStates.get(key) || {};
+        durableStates.set(key, {
+          unread: false,
+          readAt: getLatestMailboxStateTimestamp(current.readAt, readAt),
+          replyDismissedAt: getLatestMailboxStateTimestamp(
+            current.replyDismissedAt,
+            replyDismissedAt
+          ),
+        });
+      }
+      (Array.isArray(message && message.threadMessages) ? message.threadMessages : []).forEach(remember);
+    };
+    (Array.isArray(durableSnapshot.messages) ? durableSnapshot.messages : []).forEach(remember);
+    if (!durableStates.size) return baseSnapshot;
+    const apply = (message) => {
+      const state = durableStates.get(getMailboxMessageIdentityKey(message));
+      const threadMessages = (Array.isArray(message && message.threadMessages)
+        ? message.threadMessages
+        : []).map(apply);
+      if (!state) return { ...message, threadMessages };
+      return {
+        ...message,
+        unread: false,
+        readAt: getLatestMailboxStateTimestamp(message.readAt, state.readAt),
+        replyDismissedAt: getLatestMailboxStateTimestamp(
+          message.replyDismissedAt,
+          state.replyDismissedAt
+        ),
+        threadMessages,
+      };
+    };
+    return {
+      ...baseSnapshot,
+      messages: (Array.isArray(baseSnapshot.messages) ? baseSnapshot.messages : []).map(apply),
+    };
+  }
+
   async function readMailboxSnapshot(fileName) {
     if (normalizeFileName(fileName) !== 'premium-mailbox.html') return null;
-    const cacheAgeMs = mailboxCache ? Math.max(0, Date.now() - mailboxCache.cachedAt) : Infinity;
-    if (mailboxCache && cacheAgeMs <= Math.max(0, Number(freshCacheMs) || 0)) {
-      return mailboxCache.snapshot;
-    }
-    if (mailboxCache && cacheAgeMs <= Math.max(0, Number(staleCacheMs) || 0)) {
-      void refreshMailboxSnapshot();
-      return mailboxCache.snapshot;
-    }
+    const cachedEntry = mailboxCache;
+    const cacheAgeMs = cachedEntry ? Math.max(0, Date.now() - cachedEntry.cachedAt) : Infinity;
     const persistedSnapshot = await readPersistedMailboxSnapshot();
+    if (persistedSnapshot && cachedEntry?.snapshot) {
+      const preferPersisted = shouldPreferPersistedMailboxSnapshot(
+        persistedSnapshot,
+        cachedEntry.snapshot
+      );
+      const baseSnapshot = preferPersisted ? persistedSnapshot : cachedEntry.snapshot;
+      const durableSnapshot = preferPersisted ? cachedEntry.snapshot : persistedSnapshot;
+      const reconciledSnapshot = reconcileMailboxSnapshotReadState(
+        baseSnapshot,
+        durableSnapshot
+      );
+      mailboxCache = {
+        snapshot: reconciledSnapshot,
+        cachedAt: preferPersisted ? Date.now() : cachedEntry.cachedAt,
+      };
+      if (cacheAgeMs > Math.max(0, Number(freshCacheMs) || 0)) {
+        void refreshMailboxSnapshot();
+      }
+      return reconciledSnapshot;
+    }
+    if (shouldPreferPersistedMailboxSnapshot(persistedSnapshot, cachedEntry?.snapshot)) {
+      if (!cachedEntry || cacheAgeMs > Math.max(0, Number(freshCacheMs) || 0)) {
+        void refreshMailboxSnapshot();
+      }
+      return persistedSnapshot;
+    }
+    if (cachedEntry && cacheAgeMs <= Math.max(0, Number(staleCacheMs) || 0)) {
+      mailboxCache = cachedEntry;
+      if (cacheAgeMs > Math.max(0, Number(freshCacheMs) || 0)) {
+        void refreshMailboxSnapshot();
+      }
+      return cachedEntry.snapshot;
+    }
     if (persistedSnapshot) {
       void refreshMailboxSnapshot();
       return persistedSnapshot;
