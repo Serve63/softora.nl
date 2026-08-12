@@ -2202,7 +2202,7 @@ function createMailboxService(deps = {}) {
     }
 
     const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
-    const { resolvedAccountEmail, accountSenderName } = resolveReplyIdentity({ context, accountEmail, getAccount, instantlyMailboxService, normalizeEmail, normalizeString, cleanPromptText });
+    const { resolvedAccountEmail, accountSenderName } = await resolveReplyIdentity({ context, accountEmail, getAccount, instantlyMailboxService, normalizeEmail, normalizeString, cleanPromptText });
     const payload = buildMailboxReplyPromptPayload({
       accountEmail: resolvedAccountEmail,
       senderName: accountSenderName,

@@ -163,10 +163,14 @@
       setStatus('error', 'WHOOP kon een tokenvernieuwing niet veilig bevestigen en wordt zonder token-replay opnieuw gekoppeld.');
     } else if (status.needsReauthorization) setStatus('error', 'WHOOP heeft de toegang geweigerd en wordt opnieuw gekoppeld.');
     else if (!status.connected) setStatus('', 'WHOOP is nog niet gekoppeld.');
-    else if (status.tokenRefreshInProgress || status.syncInProgress || status.syncState === 'running' || status.syncState === 'token_refreshing') {
+    else if (status.tokenRefreshInProgress || status.syncInProgress || status.syncState === 'syncing') {
       setStatus('', 'WHOOP-sync is bezig; de getoonde waarden zijn de laatst bevestigde gegevens.');
+    } else if (status.syncState === 'retry_scheduled' || status.retryScheduled) {
+      setStatus('', 'WHOOP-data is nog niet volledig bevestigd; Softora probeert het automatisch opnieuw. De getoonde waarden blijven de laatst bevestigde gegevens.');
+    } else if (status.syncState === 'provider_unavailable' || status.providerUnavailable) {
+      setStatus('error', 'WHOOP is tijdelijk niet bereikbaar; Softora bewaart je bestaande gegevens en probeert het automatisch opnieuw.');
     } else if (status.syncState === 'stale' || status.staleSyncStatus) {
-      setStatus('error', 'De vorige WHOOP-sync stopte zonder bevestiging; de getoonde waarden zijn de laatst bevestigde gegevens.');
+      setStatus('error', 'De verwachte WHOOP-dag is nog niet bevestigd; de getoonde waarden zijn de laatst bewezen gegevens.');
     } else if (status.lastSyncError) {
       setStatus('error', 'WHOOP is gekoppeld, maar de laatste sync mislukte: ' + status.lastSyncError + ' De getoonde waarden zijn de laatst bevestigde gegevens.');
     }
