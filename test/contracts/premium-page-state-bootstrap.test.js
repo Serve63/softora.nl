@@ -287,6 +287,70 @@ test('mailbox-bootstrap leest bij een koude server eerst het duurzame snapshot',
   assert.equal(mailboxReads, 1);
 });
 
+test('mailbox-bootstrap verzoent verse procescache met duurzame afgehandeld-status', async () => {
+  let mailboxReads = 0;
+  let persisted = '';
+  const initialMessage = {
+    id: 'inbox:66',
+    uid: 66,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'dansschoolkix@gmail.com',
+    unread: true,
+    replyDismissedAt: '',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-08-11T19:48:55.000Z',
+  };
+  const newerCachedMessage = {
+    id: 'inbox:67',
+    uid: 67,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'nieuw@example.test',
+    unread: true,
+    subject: 'Nieuw bericht dat niet uit de procescache mag verdwijnen',
+    date: '2026-08-12T00:23:00.000Z',
+  };
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async (scope) => scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+      ? { values: persisted ? { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted } : {}, source: 'supabase' }
+      : { values: {}, source: 'supabase' },
+    mailboxCoordinator: {
+      listCampaignReplies: async () => {
+        mailboxReads += 1;
+        return {
+          ok: true,
+          messages: [initialMessage, newerCachedMessage],
+          sync: { source: 'campaign-replies-index' },
+        };
+      },
+    },
+  });
+
+  const first = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+  assert.equal(first.mailbox.messages[0].replyDismissedAt, '');
+  assert.equal(mailboxReads, 1);
+
+  persisted = serializeMailboxCampaignSnapshot(
+    {
+      ok: true,
+      messages: [{
+        ...initialMessage,
+        unread: false,
+        replyDismissedAt: '2026-08-12T00:22:29.095Z',
+      }],
+      sync: { source: 'campaign-replies-index' },
+    },
+    { savedAt: '2026-08-12T00:22:29.095Z' }
+  );
+  const reloaded = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+
+  assert.equal(reloaded.mailbox.messages[0].unread, false);
+  assert.equal(reloaded.mailbox.messages[0].replyDismissedAt, '2026-08-12T00:22:29.095Z');
+  assert.equal(reloaded.mailbox.messages[1].id, 'inbox:67');
+  assert.equal(mailboxReads, 1);
+});
+
 test('mailbox-bootstrap weigert oude provenance-loze cache en laadt Ramon direct opnieuw', async () => {
   let mailboxReads = 0;
   const staleVersionThreeSnapshot = JSON.stringify({
