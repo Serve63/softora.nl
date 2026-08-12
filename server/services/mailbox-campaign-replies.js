@@ -985,13 +985,32 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
+    const campaignThreadSet = createConversationDisjointSet([
+      ...campaignMessages,
+      ...allSeedSentMessages,
+    ]);
+    const provenCampaignConversationIds = new Set(
+      [...campaignMessages, ...allSeedSentMessages]
+        .filter((message) => (
+          isCampaignReplySubject(message) ||
+          hasCampaignLabelProvenance(message) ||
+          message?.originalCampaignOutbound === true
+        ))
+        .map((message) => getCampaignConversationId(message, campaignThreadSet))
+        .filter(Boolean)
+    );
+
     const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
+        const exactCampaignThread = provenCampaignConversationIds.has(
+          getCampaignConversationId(message, campaignThreadSet)
+        );
         if (
           !customer &&
           !isCampaignReplySubject(message) &&
-          !hasCampaignLabelProvenance(message)
+          !hasCampaignLabelProvenance(message) &&
+          !exactCampaignThread
         ) {
           return null;
         }

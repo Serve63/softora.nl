@@ -10,7 +10,9 @@ const {
 const {
   collectMissingCampaignThreadReferenceIds,
   collectCampaignThreadRecipientTerms,
+  collectCampaignThreadReferenceIds,
 } = require('../../server/services/mailbox-campaign-sync');
+const { expandCampaignSyncSeeds } = require('../../server/services/mailbox-campaign-sync-seeds');
 const {
   createMailboxIndexTargetedLookups,
   selectCampaignSeedMessages,
@@ -146,6 +148,67 @@ test('campaign recovery reduces hundreds of indexed headers to the small missing
     collectMissingCampaignThreadReferenceIds(indexed),
     Array.from({ length: 8 }, (_item, index) => `<missing-${index}@example.test>`)
   );
+});
+
+test('campaign sync expands changed-subject Sent chains before selecting missing All Mail messages', async () => {
+  const root = {
+    id: 'inbox:root', folder: 'inbox', accountEmail: 'martijnven123@gmail.com',
+    messageId: '<campaign-reply@example.test>',
+    inReplyTo: '<campaign-original@example.test>',
+    references: '<campaign-original@example.test>',
+  };
+  const changedSubjectSent = {
+    id: 'sent:follow-up', folder: 'sent', accountEmail: root.accountEmail,
+    messageId: '<sent-follow-up@example.test>',
+    inReplyTo: '<missing-inbound@example.test>',
+    references: [
+      '<campaign-original@example.test>',
+      '<known-allmail@example.test>',
+      '<missing-inbound@example.test>',
+    ].join(' '),
+  };
+  const knownAllMail = {
+    id: 'allmail:known', folder: 'allmail', accountEmail: root.accountEmail,
+    messageId: '<known-allmail@example.test>',
+    inReplyTo: '<campaign-original@example.test>',
+    references: '<campaign-original@example.test>',
+  };
+  const referenceLookups = [];
+  const exactLookups = [];
+
+  const expanded = await expandCampaignSyncSeeds({
+    mailboxIndexStore: {
+      listMessagesReferencingMessageIdsForAccounts: async (options) => {
+        referenceLookups.push(options);
+        return referenceLookups.length === 1 ? [changedSubjectSent] : [];
+      },
+      listMessagesByMessageIdsForAccounts: async (options) => {
+        exactLookups.push(options);
+        return options.folder === 'allmail' ? [knownAllMail] : [];
+      },
+    },
+    accountEmail: root.accountEmail,
+    seedMessages: [root],
+    collectCampaignThreadReferenceIds,
+    collectMissingCampaignThreadReferenceIds,
+  });
+
+  assert.equal(referenceLookups.length, 2);
+  assert.equal(referenceLookups[0].messageIds.includes('<campaign-original@example.test>'), true);
+  assert.deepEqual(exactLookups.map((lookup) => lookup.folder), ['inbox', 'coldmail', 'allmail']);
+  assert.equal(exactLookups.every((lookup) => (
+    lookup.messageIds.includes('<known-allmail@example.test>') &&
+    lookup.messageIds.includes('<missing-inbound@example.test>')
+  )), true);
+  assert.deepEqual(new Set(expanded.map((message) => message.id)), new Set([
+    root.id,
+    changedSubjectSent.id,
+    knownAllMail.id,
+  ]));
+  assert.deepEqual(collectMissingCampaignThreadReferenceIds(expanded), [
+    '<campaign-original@example.test>',
+    '<missing-inbound@example.test>',
+  ]);
 });
 
 test('campaign history sync reserves capacity for newest and older campaign mail', () => {
