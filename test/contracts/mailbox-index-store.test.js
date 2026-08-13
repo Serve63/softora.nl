@@ -1753,6 +1753,76 @@ test('mailbox index store opens a short cooldown after Supabase index timeouts',
   );
 });
 
+test('exact provider provenance bypasses an unrelated mailbox index cooldown', async () => {
+  let syncReadCalls = 0;
+  let providerReadCalls = 0;
+  const requestedClientOptions = [];
+  const providerRow = {
+    account_email: 'servecreusen@websoftora.com',
+    folder: 'instantly',
+    uid: 1,
+    provider_id: 'instantly:provider-message-1',
+    sender_email: 'prospect@example.org',
+    recipients_text: 'servecreusen@websoftora.com',
+    subject: 'Re: Kleine vraag',
+    date: '2026-08-13T08:00:00.000Z',
+    payload: {
+      source: 'instantly',
+      provider: 'instantly',
+      providerOwner: 'serve',
+      providerAccountEmail: 'servecreusen@websoftora.com',
+      providerMessageId: 'provider-message-1',
+      providerThreadId: 'provider-thread-1',
+      direction: 'received',
+    },
+  };
+  const client = {
+    from(table) {
+      return {
+        select() {
+          return {
+            eq() { return this; },
+            is() { return this; },
+            limit() { return this; },
+            maybeSingle() {
+              if (table === 'softora_mailbox_sync_state') {
+                syncReadCalls += 1;
+                return new Promise(() => {});
+              }
+              providerReadCalls += 1;
+              return Promise.resolve({ data: providerRow, error: null });
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options || {});
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error: () => {}, info: () => {} },
+  });
+
+  assert.equal(await store.getSyncState({ accountEmail: 'serve@softora.nl', folder: 'inbox' }), null);
+  const message = await store.getProviderMessage({
+    provider: 'instantly',
+    providerMessageId: 'provider-message-1',
+    accountEmail: 'servecreusen@websoftora.com',
+  });
+
+  assert.equal(syncReadCalls, 1);
+  assert.equal(providerReadCalls, 1);
+  assert.equal(message.providerOwner, 'serve');
+  assert.equal(message.providerThreadId, 'provider-thread-1');
+  assert.equal(requestedClientOptions.at(-1).ignoreFailureCooldown, true);
+  assert.equal(requestedClientOptions.at(-1).suppressFailureCooldown, true);
+});
+
 test('mailbox index store durably persists fetched messages despite another index timeout', async () => {
   let readCalls = 0;
   let upsertCalls = 0;

@@ -83,6 +83,18 @@ test('Winnen is bewust fullscreen en laadt geen premium-sidebarketen', () => {
   assert.match(pageSource, /<main class="main-content momentum-page"/);
 });
 
+test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar', () => {
+  const pageSource = readRepoFile('premium-wachtwoordenregister.html');
+  const themeSource = readRepoFile('assets/personnel-theme.css');
+
+  assert.match(pageSource, /<body data-sidebar-nav-ready="1">/);
+  assert.doesNotMatch(pageSource, /assets\/personnel-theme\.js/);
+  assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\][\s\S]*?\.sidebar a\.sidebar-link[\s\S]*?pointer-events:\s*auto/);
+  assert.match(themeSource, /\.sidebar-link\.sidebar-link--coming-soon[\s\S]*?pointer-events:\s*none\s*!important/);
+  assert.match(pageSource, /<main class="main-content">[\s\S]*?<div id="screen-pin">/);
+  assert.doesNotMatch(pageSource.match(/<div id="screen-pin">[\s\S]*?<\/main>/)[0], /aria-modal="true"|\binert\b/);
+});
+
 test('premium database consistency assets stay outside the static sidebar', () => {
   const source = readRepoFile('premium-database.html');
   const asideEnd = source.indexOf('</aside>');

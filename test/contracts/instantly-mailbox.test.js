@@ -1530,6 +1530,33 @@ test('reply uses the exact stored account/thread and rejects cross-owner, recipi
   assert.equal(store.rows.some((message) => message.providerMessageId === 'sent-reply-1'), true);
 });
 
+test('reply reports unavailable provenance instead of a false owner mismatch during index failure', async () => {
+  const store = createStore();
+  store.getProviderMessage = async () => {
+    const error = new Error('Mailbox index tijdelijk overgeslagen na timeout');
+    error.code = 'MAILBOX_INDEX_COOLDOWN';
+    throw error;
+  };
+  const { service, requests } = buildService({ store });
+
+  await assert.rejects(
+    service.reply({
+      owner: 'serve',
+      accountEmail: 'serve-sender@example.com',
+      providerMessageId: 'incoming-serve-1',
+      providerThreadId: 'thread-serve',
+      to: 'prospect@example.org',
+      subject: 'Re: Kleine vraag',
+      text: 'Antwoord',
+    }),
+    {
+      code: 'INSTANTLY_MESSAGE_PROVENANCE_UNAVAILABLE',
+      status: 503,
+    }
+  );
+  assert.equal(requests.length, 0);
+});
+
 test('official Instantly lifecycle fields retain direction, unread state and attachments', () => {
   const { service } = buildService();
   const received = service.normalizeInstantlyMessage(incoming({
