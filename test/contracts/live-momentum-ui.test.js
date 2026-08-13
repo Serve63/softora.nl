@@ -32,8 +32,9 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/winnen">/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
-  assert.doesNotMatch(html, /personnel-theme|premium-sidebar/);
-  assert.doesNotMatch(html, /data-personnel-loading|data-sidebar-shell|data-static-sidebar/);
+  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
+  assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813a" defer><\/script>/);
+  assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260729a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -51,10 +52,10 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260729a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-focus-mode\.js\?v=20260813a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
-  assert.match(html, /<div class="momentum-layout">/);
-  assert.doesNotMatch(html, /<aside\b/);
-  assert.doesNotMatch(html, /data-live-momentum-sidebar-host/);
+  assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical" data-live-momentum-shell>/);
+  assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">/);
   assert.match(html, /class="momentum-persistence-status" role="status" aria-live="polite" aria-atomic="true"/);
@@ -72,6 +73,9 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /class="momentum-mobile-logo" href="\/"/);
   assert.match(html, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
   assert.match(html, /<p>Back on Track\.<\/p>/);
+  assert.match(html, /class="momentum-focus-toggle"[^>]*data-momentum-focus-toggle[^>]*aria-label="Vergrote weergave openen"[^>]*aria-pressed="false"/);
+  assert.match(html, /data-momentum-focus-icon="expand"/);
+  assert.match(html, /data-momentum-focus-icon="restore"/);
   assert.match(html, /class="momentum-video-trigger"[^>]*aria-label="Motivatievideo openen"[^>]*aria-haspopup="dialog"/);
   assert.doesNotMatch(html, /momentum-video-trigger-dot/);
   assert.match(html, /<dialog class="momentum-video-dialog" id="momentum-video-dialog" aria-labelledby="momentum-video-title">/);

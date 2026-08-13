@@ -75,12 +75,23 @@ const staticSidebarPages = [
   'premium-socialmedia.html',
 ];
 
-test('Winnen is bewust fullscreen en laadt geen premium-sidebarketen', () => {
+test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmodus', () => {
   const pageSource = readRepoFile('live-momentum.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const focusSource = readRepoFile('assets/live-momentum-focus-mode.js');
 
-  assert.doesNotMatch(pageSource, /<aside\b|data-sidebar-shell|data-static-sidebar/);
-  assert.doesNotMatch(pageSource, /personnel-theme|premium-sidebar/);
+  assert.match(pageSource, /data-sidebar-shell="canonical"/);
+  assert.match(pageSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
+  assert.match(pageSource, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.match(pageSource, /<main class="main-content momentum-page"/);
+  assert.match(pageSource, /data-momentum-focus-toggle/);
+  assert.match(themeSource, /pathname === "\/winnen"/);
+  assert.match(themeSource, /return p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard";/);
+  assert.match(themeSource, /key: "live_momentum", href: "\/winnen", label: "Winnen"/);
+  assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "extra", getLiveMomentumSidebarLink\(\)/);
+  assert.match(focusSource, /body\.classList\.toggle\("momentum-focus-mode", next\)/);
+  assert.match(focusSource, /event\.key !== "Escape"/);
+  assert.doesNotMatch(focusSource, /localStorage|sessionStorage|location\.(?:assign|replace|reload)/);
 });
 
 test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar', () => {
@@ -203,7 +214,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   );
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
   assert.match(themeJsSource, /const isPremiumPersonnelContext = [^;]*pathname === "\/mailbox"/);
-  assert.match(themeJsSource, /targetUrl\.pathname === "\/mailbox" \|\| targetUrl\.pathname\.indexOf\("\/premium-"\) === 0/);
+  assert.match(themeJsSource, /targetUrl\.pathname === "\/mailbox" \|\| targetUrl\.pathname === "\/winnen" \|\| targetUrl\.pathname\.indexOf\("\/premium-"\) === 0/);
   assert.match(prefillSource, /if \(p === "\/mailbox" \|\| p\.indexOf\("\/premium-mailbox"\) === 0\) return "mailbox";/);
   assert.match(stabilityJsSource, /path\.indexOf\("\/premium-"\) === 0 \|\| path === "\/mailbox"/);
   assert.doesNotMatch(
@@ -218,10 +229,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   );
   assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
   assert.match(themeJsSource, /function isSidebarNavigationCurrentTarget\(href\) \{/);
-  assert.match(themeJsSource, /pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);
-  assert.match(themeJsSource, /return p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard"/);
-  assert.match(prefillSource, /p === "\/live-momentum" \|\| p === "\/live-momentum\.html"\) return "live_momentum"/);
-  assert.match(stabilityJsSource, /path === "\/live-momentum" \|\| path === "\/live-momentum\.html"/);
+  assert.match(themeJsSource, /pathname === "\/winnen" \|\| pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);
+  assert.match(themeJsSource, /return p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard"/);
+  assert.match(prefillSource, /p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html"\) return "live_momentum"/);
+  assert.match(stabilityJsSource, /path === "\/winnen" \|\| path === "\/live-momentum" \|\| path === "\/live-momentum\.html"/);
   assert.match(themeJsSource, /anchor\.dataset\.sidebarHref = normalizeSidebarNavigationTarget\(href\);[\s\S]*anchor\.setAttribute\("href", anchor\.dataset\.sidebarHref\);/);
   assert.doesNotMatch(themeJsSource, /window\.location\.assign\(href\);/);
   assert.doesNotMatch(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);

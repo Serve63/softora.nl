@@ -1,6 +1,6 @@
 (function () {
     const pathname = (window.location.pathname || "").toLowerCase();
-    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/kvk-database-bedrijven" || pathname === "/kvk-database-bedrijven.html" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
+    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/kvk-database-bedrijven" || pathname === "/kvk-database-bedrijven.html" || pathname === "/winnen" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
     const personnelStorageKey = isPremiumPersonnelContext
         ? "softora_premium_personnel_theme_mode"
         : "softora_software_personnel_theme_mode";
@@ -538,7 +538,7 @@
             return "monthly_costs";
         }
         if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
-        return p === "/live-momentum" || p === "/live-momentum.html" ? "live_momentum" : "dashboard";
+        return p === "/winnen" || p === "/live-momentum" || p === "/live-momentum.html" ? "live_momentum" : "dashboard";
     }
 
     function renderSidebarLink(link, activeKey) {
@@ -564,14 +564,7 @@
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>',
         };
     }
-    function getWebsitePreviewSidebarLink() {
-        return {
-            key: "websitegenerator",
-            href: "/premium-websitegenerator",
-            label: "Webdesign",
-            icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
-        };
-    }
+    function getLiveMomentumSidebarLink() { return { key: "live_momentum", href: "/winnen", label: "Winnen", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 20V10m0 0 6-3v6l8-3V4m0 0-3 2m3-2 2 3"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3 20h18"></path></svg>' }; }
     function getDatabaseSidebarLink() {
         return {
             key: "database",
@@ -776,12 +769,6 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>',
             },
             {
-                key: "agenda",
-                href: "/premium-personeel-agenda",
-                label: "Agenda",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg>',
-            },
-            {
                 key: "leads",
                 href: "/premium-leads",
                 label: "Leads",
@@ -799,7 +786,6 @@
         const managementLinks = [
             getCustomersSidebarLink(),
             getMailboxSidebarLink(),
-            getWebsitePreviewSidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -883,17 +869,11 @@
             },
         ];
 
-        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([{
+        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([getLiveMomentumSidebarLink(), {
                 key: "monthly_costs",
                 href: "/premium-vaste-lasten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg>',
                 label: "Terugkerende kosten",
-            },
-            {
-                key: "bookkeeping",
-                href: "/premium-boekhouding",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg>',
-                label: "Boekhouding",
             },
             {
                 key: "notepad",
@@ -1128,6 +1108,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
+        ensureStaticSidebarLink(sidebar, "extra", getLiveMomentumSidebarLink(), ["monthly_costs", "notepad", "word", "settings"]);
         syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar); activateFacebookAdsSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
@@ -1289,7 +1270,7 @@
             const targetUrl = new URL(href, window.location.origin);
             if (targetUrl.origin !== window.location.origin) return false;
             if (targetUrl.pathname === window.location.pathname && targetUrl.hash === window.location.hash) return false;
-            return targetUrl.pathname === "/mailbox" || targetUrl.pathname.indexOf("/premium-") === 0;
+            return targetUrl.pathname === "/mailbox" || targetUrl.pathname === "/winnen" || targetUrl.pathname.indexOf("/premium-") === 0;
         } catch (_) {
             return false;
         }
