@@ -1,5 +1,9 @@
 const { createInstantlyMailboxService } = require('./instantly-mailbox');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const {
+  createMailboxReconcileRequiredError,
+  isAmbiguousMailboxProviderError,
+} = require('./mailbox-send-provenance-store');
 
 const INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS = 3 * 60 * 1000;
 
@@ -125,67 +129,6 @@ async function markInstantlyMessageRead({
     readAt: result.readAt,
     sourceMailboxMutated: false,
   };
-}
-
-async function resolveReplyIdentity({
-  context,
-  accountEmail,
-  getAccount,
-  instantlyMailboxService,
-  normalizeEmail,
-  normalizeString,
-  cleanPromptText,
-}) {
-  const contextAccountEmail = normalizeEmail(context && context.accountEmail);
-  const contextProviderAccountEmail = normalizeEmail(context && context.providerAccountEmail);
-  const contextProvider = normalizeString(context && context.provider).toLowerCase();
-  const contextProviderOwner = normalizeString(context && context.providerOwner).toLowerCase();
-  let resolvedAccountEmail = getAccount(contextAccountEmail)
-    ? contextAccountEmail
-    : normalizeEmail(accountEmail);
-  let accountSenderName = cleanPromptText(getAccount(resolvedAccountEmail)?.name, 120) || resolvedAccountEmail;
-  if (contextProvider !== 'instantly') return { resolvedAccountEmail, accountSenderName };
-  if (!['serve', 'martijn'].includes(contextProviderOwner)) {
-    const error = new Error('De Instantly-afzenderidentiteit ontbreekt.');
-    error.status = 403;
-    error.code = 'INSTANTLY_REPLY_IDENTITY_MISMATCH';
-    throw error;
-  }
-  const providerAccountEmail = contextProviderAccountEmail || contextAccountEmail;
-  const providerMessageId = normalizeString(context && context.providerMessageId);
-  const providerThreadId = normalizeString(context && context.providerThreadId);
-  if (!providerAccountEmail || !providerMessageId || !providerThreadId) {
-    const error = new Error('De Instantly-threadidentiteit is onvolledig; open het bericht opnieuw.');
-    error.status = 403;
-    error.code = 'INSTANTLY_REPLY_IDENTITY_MISMATCH';
-    throw error;
-  }
-  const providerAccounts = instantlyMailboxService?.getConfiguredAccounts?.(contextProviderOwner) || [];
-  if (!providerAccounts.some(
-    (providerAccount) => normalizeEmail(providerAccount?.email) === providerAccountEmail
-  )) {
-    const error = new Error('Het Instantly-afzenderaccount hoort niet bij de geselecteerde mailbox.');
-    error.status = 403;
-    error.code = 'INSTANTLY_REPLY_IDENTITY_MISMATCH';
-    throw error;
-  }
-  if (typeof instantlyMailboxService?.assertStoredMessageOwnership !== 'function') {
-    const error = new Error('De duurzame Instantly-threadcontrole ontbreekt.');
-    error.status = 503;
-    error.code = 'INSTANTLY_REPLY_IDENTITY_UNAVAILABLE';
-    throw error;
-  }
-  await instantlyMailboxService.assertStoredMessageOwnership({
-    owner: contextProviderOwner,
-    accountEmail: providerAccountEmail,
-    providerMessageId,
-    providerThreadId,
-  });
-  resolvedAccountEmail = providerAccountEmail;
-  accountSenderName = contextProviderOwner === 'martijn'
-    ? 'Martijn van de Ven'
-    : 'Servé Creusen';
-  return { resolvedAccountEmail, accountSenderName };
 }
 
 async function mergeCampaignReplies({
@@ -433,8 +376,12 @@ async function sendMailboxMessage({
     error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
     throw error;
   }
+  if (typeof mailboxSendProvenanceStore.startDispatch === 'function') {
+    await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
+  }
+  let result;
   try {
-    const result = await instantlyMailboxService.reply({
+    result = await instantlyMailboxService.reply({
       owner: body.owner,
       accountEmail: body.account,
       providerMessageId: body.providerMessageId,
@@ -446,6 +393,16 @@ async function sendMailboxMessage({
       text: body.body || body.text || '',
       attachments: body.attachments,
     });
+  } catch (error) {
+    if (isAmbiguousMailboxProviderError(error) && typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+      await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, { sentReconcileRequired: true })
+        .catch(() => null);
+      throw createMailboxReconcileRequiredError(error);
+    }
+    await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+    throw error;
+  }
+  try {
     const accepted = await mailboxSendProvenanceStore.accept(threadProvenance.intentId, {
       messageId: result.sentMessage?.messageId,
       providerMessageId: result.providerMessageId,
@@ -464,8 +421,14 @@ async function sendMailboxMessage({
       },
     };
   } catch (error) {
-    await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-    throw error;
+    if (typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+      await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, {
+        messageId: result?.sentMessage?.messageId,
+        providerMessageId: result?.providerMessageId,
+        sentReconcileRequired: true,
+      }).catch(() => null);
+    }
+    throw createMailboxReconcileRequiredError(error);
   }
 }
 
@@ -479,7 +442,6 @@ module.exports = {
   markInstantlyMessageRead,
   mergeCampaignReplies,
   listMailboxCampaignReplySets,
-  resolveReplyIdentity,
   sendMailboxMessage,
   syncInstantlyMailboxResponse,
 };

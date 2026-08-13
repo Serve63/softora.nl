@@ -45,6 +45,18 @@ function createMailboxService(deps = {}) {
     listAcceptedMessages: async () => [],
   };
   const mailboxComposeThreadContext = deps.mailboxComposeThreadContext || {
+    resolveReplyIdentity: async ({ body = {}, accountEmail, provider, mode }) => {
+      const resolvedAccount = body.replyIdentity?.accountEmail || body.context?.accountEmail || accountEmail;
+      const owner = body.owner || (/martijn|venvisuals/i.test(resolvedAccount) ? 'martijn' : 'serve');
+      return {
+        version: 1,
+        provider: String(provider || body.provider || 'smtp').toLowerCase(),
+        owner,
+        senderName: owner === 'martijn' ? 'Martijn van de Ven' : 'Servé Creusen',
+        accountEmail: resolvedAccount,
+        mode,
+      };
+    },
     resolve: async ({ body = {}, accountEmail, recipientEmail, provider }) => ({
       intentId: `test-send:${++provenanceSequence}`,
       idempotencyKey: body.idempotencyKey || `test-idempotency:${provenanceSequence}`,
@@ -1120,7 +1132,7 @@ test('mailbox service refuses manual webdesign sends when the central guard is u
   assert.equal(sent.length, 0);
 });
 
-test('mailbox service fails webdesign sends when central guard confirm updates no rows after SMTP accept', async () => {
+test('mailbox service marks provider acceptance as reconcile-required when guard finalization fails', async () => {
   const sent = [];
   const guardCalls = [];
   const service = createMailboxService({
@@ -1155,9 +1167,9 @@ test('mailbox service fails webdesign sends when central guard confirm updates n
         text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor confirm-empty.example.',
       }),
     (error) => {
-      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED');
-      assert.equal(error.status, 502);
-      assert.match(error.message, /bevestigde geen bestaande reservering/);
+      assert.equal(error.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+      assert.equal(error.status, 409);
+      assert.match(error.message, /provideruitkomst/i);
       return true;
     }
   );
@@ -3476,6 +3488,7 @@ test('mailbox routes expose accounts, messages, send, local hide restore and rew
       markMessageReadResponse() {},
       hideConversationResponse() {},
       restoreConversationResponse() {},
+      preflightMessageResponse() {},
       sendMessageResponse() {},
       rewriteDraftResponse() {},
     },
@@ -3490,6 +3503,7 @@ test('mailbox routes expose accounts, messages, send, local hide restore and rew
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/hide'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/restore'));
   assert.ok(!routes.some(([, path]) => path === '/api/mailbox/messages/delete'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send/preflight'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
 });

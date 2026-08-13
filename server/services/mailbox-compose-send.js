@@ -2,6 +2,10 @@ const {
   MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION,
   renderMailboxComposeEmailHtml,
 } = require('./mailbox-compose-email-renderer');
+const {
+  createMailboxReconcileRequiredError,
+  isAmbiguousMailboxProviderError,
+} = require('./mailbox-send-provenance-store');
 
 const MAX_COMPOSE_ATTACHMENTS = 5;
 const MAX_COMPOSE_ATTACHMENT_BYTES = 4 * 1024 * 1024;
@@ -212,6 +216,7 @@ function createMailboxComposeSend(deps = {}) {
       body: webdesignParts?.text || normalizedText,
       cc: normalizedCc.join(', '),
       bcc: normalizedBcc.join(', '),
+      attachments: outboundAttachments,
     });
     if (!provenanceReservation.created) {
       if (provenanceReservation.intent.status === 'accepted') {
@@ -257,25 +262,44 @@ function createMailboxComposeSend(deps = {}) {
       error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
       throw error;
     }
+    if (typeof mailboxSendProvenanceStore.startDispatch === 'function') {
+      await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
+    }
     let info;
     try {
       info = await transporter.sendMail(mail);
     } catch (error) {
+      if (isAmbiguousMailboxProviderError(error) && typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+        await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, { sentReconcileRequired: true })
+          .catch((markError) => logger.error('[MailboxSendProvenance][Unknown]', markError?.message || markError));
+        throw createMailboxReconcileRequiredError(error);
+      }
       await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
       throw error;
     }
-    if (webdesignParts) {
-      await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
-        messageId: normalizeString(info?.messageId || ''),
-        email: normalizedTo,
-        subject: cleanSubject,
-      });
-    }
     const sentAt = now();
-    const acceptedProvenance = await acceptProvenanceWithRetry(threadProvenance.intentId, {
-      messageId: normalizeString(info?.messageId || threadProvenance.messageId),
-      acceptedAt: sentAt.toISOString(),
-    });
+    let acceptedProvenance;
+    try {
+      if (webdesignParts) {
+        await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
+          messageId: normalizeString(info?.messageId || ''),
+          email: normalizedTo,
+          subject: cleanSubject,
+        });
+      }
+      acceptedProvenance = await acceptProvenanceWithRetry(threadProvenance.intentId, {
+        messageId: normalizeString(info?.messageId || threadProvenance.messageId),
+        acceptedAt: sentAt.toISOString(),
+      });
+    } catch (error) {
+      if (typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+        await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, {
+          messageId: normalizeString(info?.messageId || threadProvenance.messageId),
+          sentReconcileRequired: true,
+        }).catch((markError) => logger.error('[MailboxSendProvenance][Unknown]', markError?.message || markError));
+      }
+      throw createMailboxReconcileRequiredError(error);
+    }
     const sentCopySaved = await appendSentMessage({
       account,
       createImapClient,

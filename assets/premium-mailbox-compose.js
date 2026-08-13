@@ -146,6 +146,9 @@
   function buildReplyContext(mail, options = {}) {
     if (!mail) return null;
     const getAccount = typeof options.getAccount === 'function' ? options.getAccount : () => '';
+    const accountEmail = getAccount(mail, options.fallbackAccount);
+    const owner = typeof options.getOwner === 'function' ? options.getOwner(mail, accountEmail) : mail.providerOwner;
+    const replyIdentity = global.SoftoraMailboxReplyIdentity?.createReplyIdentity?.(mail, accountEmail, owner) || null;
     return {
       id: mail.id,
       from: mail.from,
@@ -162,7 +165,8 @@
       inReplyTo: String(mail.inReplyTo || '').trim(),
       references: String(mail.references || '').trim(),
       conversationId: String(mail.conversationId || '').trim(),
-      accountEmail: getAccount(mail, options.fallbackAccount),
+      accountEmail,
+      ...(replyIdentity ? { replyIdentity } : {}),
       ...(String(mail.provider || '').trim()
         ? {
             provider: String(mail.provider || '').trim().toLowerCase(),

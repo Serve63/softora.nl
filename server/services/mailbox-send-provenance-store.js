@@ -35,6 +35,21 @@ function createMailboxPayloadFingerprint(input = {}, normalizeString = (value) =
   ]);
 }
 
+function createMailboxAttachmentsFingerprint(attachments = []) {
+  const normalized = (Array.isArray(attachments) ? attachments : []).map((attachment) => {
+    const content = Buffer.isBuffer(attachment?.content)
+      ? attachment.content
+      : Buffer.from(String(attachment?.content || attachment?.contentBase64 || ''), 'base64');
+    return createCanonicalMailboxHash([
+      String(attachment?.filename || attachment?.name || '').trim(),
+      String(attachment?.contentType || '').trim().toLowerCase(),
+      String(content.length),
+      crypto.createHash('sha256').update(content).digest('hex'),
+    ]);
+  });
+  return normalized.length ? createCanonicalMailboxHash(normalized) : '';
+}
+
 function createMailboxSendIdentityKey(input = {}, normalizeString = (value) => String(value || '').trim()) {
   const mode = normalizeString(input.mode).toLowerCase();
   const scope = createMailboxSendScopeKey(input, normalizeString);
@@ -42,6 +57,22 @@ function createMailboxSendIdentityKey(input = {}, normalizeString = (value) => S
   const payloadFingerprint = normalizeString(input.payloadFingerprint)
     || createMailboxPayloadFingerprint(input, normalizeString);
   return `new-message:${createCanonicalMailboxHash([scope, payloadFingerprint])}`;
+}
+
+function isAmbiguousMailboxProviderError(error) {
+  const code = String(error?.code || '').trim().toUpperCase();
+  const status = Number(error?.status || error?.statusCode || error?.responseCode || 0);
+  return ['ETIMEDOUT', 'ESOCKET', 'ECONNRESET', 'ECONNABORTED', 'EPIPE'].includes(code)
+    || status === 429
+    || status >= 500;
+}
+
+function createMailboxReconcileRequiredError(cause) {
+  const error = new Error('De provideruitkomst is niet eenduidig bevestigd; controleer de verzendstatus vóór opnieuw proberen.');
+  error.status = 409;
+  error.code = 'MAILBOX_SEND_RECONCILE_REQUIRED';
+  error.cause = cause;
+  return error;
 }
 
 function createMailboxSendProvenanceStore(deps = {}) {
@@ -67,6 +98,8 @@ function createMailboxSendProvenanceStore(deps = {}) {
   function normalizeRow(row = {}) {
     return {
       intentId: normalizeString(row.intent_id), idempotencyKey: normalizeString(row.idempotency_key),
+      sendIdentityKey: normalizeString(row.send_identity_key), sendScopeKey: normalizeString(row.send_scope_key),
+      payloadFingerprint: normalizeString(row.payload_fingerprint), attachmentsFingerprint: normalizeString(row.attachments_fingerprint),
       owner: normalizeString(row.owner).toLowerCase(), accountEmail: normalizeEmail(row.account_email),
       recipientEmail: normalizeEmail(row.recipient_email), mode: normalizeString(row.mode).toLowerCase(),
       conversationId: normalizeString(row.conversation_id), replyTargetMessageId: normalizeString(row.reply_target_message_id),
@@ -76,14 +109,26 @@ function createMailboxSendProvenanceStore(deps = {}) {
       subject: normalizeString(row.subject), body: normalizeString(row.body_text),
       cc: normalizeString(row.cc_text), bcc: normalizeString(row.bcc_text),
       status: normalizeString(row.status).toLowerCase(), error: normalizeString(row.error_text),
+      dispatchState: normalizeString(row.dispatch_state).toLowerCase(),
+      dispatchStartedAt: normalizeString(row.dispatch_started_at),
+      dispatchLeaseExpiresAt: normalizeString(row.dispatch_lease_expires_at),
+      reconcileRequired: row.reconcile_required === true,
+      sentReconcileRequired: row.sent_reconcile_required === true,
       acceptedAt: normalizeString(row.accepted_at), createdAt: normalizeString(row.created_at),
       updatedAt: normalizeString(row.updated_at),
     };
   }
 
   function buildPreparedRow(input = {}) {
+    const attachmentsFingerprint = normalizeString(input.attachmentsFingerprint)
+      || createMailboxAttachmentsFingerprint(input.attachments);
+    const payloadFingerprint = createMailboxPayloadFingerprint({ ...input, attachmentsFingerprint }, normalizeString);
+    const sendScopeKey = createMailboxSendScopeKey(input, normalizeString);
+    const sendIdentityKey = createMailboxSendIdentityKey({ ...input, payloadFingerprint }, normalizeString);
     return {
       intent_id: normalizeString(input.intentId), idempotency_key: normalizeString(input.idempotencyKey),
+      send_identity_key: sendIdentityKey, send_scope_key: sendScopeKey,
+      payload_fingerprint: payloadFingerprint, attachments_fingerprint: attachmentsFingerprint,
       owner: normalizeString(input.owner).toLowerCase(), account_email: normalizeEmail(input.accountEmail),
       recipient_email: normalizeEmail(input.recipientEmail), mode: normalizeString(input.mode).toLowerCase(),
       conversation_id: normalizeString(input.conversationId) || null,
@@ -95,12 +140,17 @@ function createMailboxSendProvenanceStore(deps = {}) {
       sender_name: normalizeString(input.senderName) || null,
       subject: normalizeString(input.subject), body_text: normalizeString(input.body),
       cc_text: normalizeString(input.cc) || null, bcc_text: normalizeString(input.bcc) || null,
-      status: 'prepared', error_text: null, updated_at: now().toISOString(),
+      status: 'prepared', dispatch_state: 'reserved', dispatch_started_at: null,
+      dispatch_lease_expires_at: null, reconcile_required: false, sent_reconcile_required: false,
+      error_text: null, updated_at: now().toISOString(),
     };
   }
 
   function assertPreparedRow(row) {
-    const required = [row.intent_id, row.idempotency_key, row.owner, row.account_email, row.recipient_email, row.mode, row.subject];
+    const required = [
+      row.intent_id, row.idempotency_key, row.send_identity_key, row.send_scope_key,
+      row.payload_fingerprint, row.owner, row.account_email, row.recipient_email, row.mode, row.subject,
+    ];
     if (required.some((value) => !value) || !['serve', 'martijn'].includes(row.owner)) {
       const error = new Error('De exacte afzender- of threadcontext ontbreekt; verzending is veilig gestopt.');
       error.status = 400;
@@ -128,13 +178,48 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return result.data ? normalizeRow(result.data) : null;
   }
 
+  async function findByColumn(column, value, statuses = []) {
+    let query = requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
+      .eq(column, normalizeString(value));
+    if (statuses.length) query = query.in('status', statuses);
+    const result = await query.maybeSingle();
+    if (result.error) throw result.error;
+    return result.data ? normalizeRow(result.data) : null;
+  }
+
+  async function findReservationConflict(row) {
+    const byIdempotency = await findByIdempotencyKey(row.idempotency_key);
+    if (byIdempotency) return byIdempotency;
+    const byIdentity = await findByColumn(
+      'send_identity_key',
+      row.send_identity_key,
+      ['prepared', 'unknown', 'accepted']
+    );
+    if (byIdentity) return byIdentity;
+    return row.mode === 'new-message'
+      ? findByColumn('send_scope_key', row.send_scope_key, ['prepared', 'unknown'])
+      : null;
+  }
+
+  function preview(input = {}) {
+    const row = buildPreparedRow(input);
+    assertPreparedRow(row);
+    return normalizeRow(row);
+  }
+
+  async function preflight(input = {}) {
+    const row = buildPreparedRow(input);
+    assertPreparedRow(row);
+    return { intent: normalizeRow(row), conflict: await findReservationConflict(row) };
+  }
+
   async function reserve(input = {}) {
     const row = buildPreparedRow(input);
     assertPreparedRow(row);
     const result = await requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).insert(row).select('*').single();
     if (!result.error && result.data) return { created: true, intent: normalizeRow(result.data) };
     if (normalizeString(result.error && result.error.code) === '23505') {
-      const existing = await findByIdempotencyKey(row.idempotency_key);
+      const existing = await findReservationConflict(row);
       if (existing) return { created: false, intent: existing };
     }
     const error = result.error || new Error('Threadregistratie kon niet worden voorbereid.');
@@ -143,9 +228,12 @@ function createMailboxSendProvenanceStore(deps = {}) {
     throw error;
   }
 
-  async function updateIntent(intentId, values, label) {
-    const result = await requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE)
-      .update({ ...values, updated_at: now().toISOString() }).eq('intent_id', normalizeString(intentId)).select('*').single();
+  async function updateIntent(intentId, values, label, filters = {}) {
+    let query = requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE)
+      .update({ ...values, updated_at: now().toISOString() }).eq('intent_id', normalizeString(intentId));
+    if (Array.isArray(filters.statuses) && filters.statuses.length) query = query.in('status', filters.statuses);
+    if (filters.dispatchState) query = query.eq('dispatch_state', filters.dispatchState);
+    const result = await query.select('*').single();
     if (!result.error && result.data) return normalizeRow(result.data);
     const error = result.error || new Error(`Threadregistratie kon niet als ${label} worden opgeslagen.`);
     error.status = Number(error.status) || 503;
@@ -153,19 +241,39 @@ function createMailboxSendProvenanceStore(deps = {}) {
     throw error;
   }
 
+  const startDispatch = (intentId, leaseMs = 120_000) => {
+    const startedAt = now();
+    return updateIntent(intentId, {
+      dispatch_state: 'started', dispatch_started_at: startedAt.toISOString(),
+      dispatch_lease_expires_at: new Date(startedAt.getTime() + Math.max(30_000, Number(leaseMs) || 120_000)).toISOString(),
+    }, 'gestart', { statuses: ['prepared'], dispatchState: 'reserved' });
+  };
+
   const accept = (intentId, values = {}) => updateIntent(intentId, {
     status: 'accepted', sent_message_id: normalizeString(values.messageId) || null,
     provider_message_id: normalizeString(values.providerMessageId) || null,
     provider_thread_id: normalizeString(values.providerThreadId) || null,
     accepted_at: normalizeString(values.acceptedAt) || now().toISOString(), error_text: null,
-  }, 'verzonden');
+    dispatch_state: 'finished', dispatch_lease_expires_at: null,
+    reconcile_required: false, sent_reconcile_required: false,
+  }, 'verzonden', { statuses: ['prepared', 'unknown'] });
+
+  const markUnknown = (intentId, errorValue, values = {}) => updateIntent(intentId, {
+    status: 'unknown', dispatch_state: 'started', dispatch_lease_expires_at: null,
+    reconcile_required: true, sent_reconcile_required: values.sentReconcileRequired === true,
+    provider_message_id: normalizeString(values.providerMessageId) || null,
+    sent_message_id: normalizeString(values.messageId) || null,
+    error_text: normalizeString(errorValue && (errorValue.message || errorValue)).slice(0, 1000)
+      || 'Providerresultaat vereist reconciliatie',
+  }, 'onzeker', { statuses: ['prepared'] });
 
   async function fail(intentId, errorValue) {
     try {
       return await updateIntent(intentId, {
         status: 'failed',
+        dispatch_state: 'finished', dispatch_lease_expires_at: null,
         error_text: normalizeString(errorValue && (errorValue.message || errorValue)).slice(0, 1000) || 'Verzending mislukt',
-      }, 'mislukt');
+      }, 'mislukt', { statuses: ['prepared'] });
     } catch (error) {
       logger.error('[MailboxSendProvenance][Fail]', error?.message || error);
       return null;
@@ -186,13 +294,27 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return (Array.isArray(result.data) ? result.data : []).map(normalizeRow);
   }
 
-  return { accept, fail, findByIdempotencyKey, isAvailable: () => Boolean(getClient()), listAcceptedMessages, reserve };
+  return {
+    accept,
+    fail,
+    findByIdempotencyKey,
+    isAvailable: () => Boolean(getClient()),
+    listAcceptedMessages,
+    markUnknown,
+    preflight,
+    preview,
+    reserve,
+    startDispatch,
+  };
 }
 
 module.exports = {
   MAILBOX_SEND_PROVENANCE_TABLE,
+  createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
   createMailboxSendIdentityKey,
   createMailboxSendProvenanceStore,
   createMailboxSendScopeKey,
+  createMailboxReconcileRequiredError,
+  isAmbiguousMailboxProviderError,
 };

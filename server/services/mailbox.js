@@ -12,7 +12,7 @@ const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
 const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
 const { createMailboxWebdesignOutboundGuard } = require('./mailbox-webdesign-outbound-guard');
-const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, resolveReplyIdentity, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
+const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const { createMailboxReadMessageService } = require('./mailbox-read-message');
@@ -597,16 +597,14 @@ function createMailboxService(deps = {}) {
       logger,
       normalizeString,
     }),
-    mailboxComposeThreadContext = createMailboxComposeThreadContext({
-      mailboxIndexStore,
-    }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
+    mailboxComposeThreadContext = createMailboxComposeThreadContext({ mailboxIndexStore, instantlyMailboxService }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
     mailboxCampaignRepliesService = createMailboxCampaignRepliesService({
       mailboxIndexStore,
       dataOpsStore,
       mailboxSendProvenanceStore,
     }),
-    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
@@ -2168,7 +2166,7 @@ function createMailboxService(deps = {}) {
   const hideConversation = mailboxVisibility.hideConversation;
   const restoreConversation = mailboxVisibility.restoreConversation;
 
-  const { sendMessage, sendMessageResponse } = createMailboxComposeRuntime({
+  const { preflightMessageResponse, resolveRewriteIdentity, sendMessage, sendMessageResponse } = createMailboxComposeRuntime({
     composeSendDependencies: {
       getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
@@ -2202,7 +2200,7 @@ function createMailboxService(deps = {}) {
     }
 
     const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
-    const { resolvedAccountEmail, accountSenderName } = await resolveReplyIdentity({ context, accountEmail, getAccount, instantlyMailboxService, normalizeEmail, normalizeString, cleanPromptText });
+    const { resolvedAccountEmail, accountSenderName } = await resolveRewriteIdentity({ context, accountEmail, recipientEmail: to, isReply: hasReplyContext });
     const payload = buildMailboxReplyPromptPayload({
       accountEmail: resolvedAccountEmail,
       senderName: accountSenderName,
@@ -2492,6 +2490,7 @@ function createMailboxService(deps = {}) {
     getMessageResponse,
     getMessageImageResponse,
     listMessagesResponse,
+    preflightMessageResponse,
     sendMessageResponse,
     markMessageReadResponse,
     hideConversationResponse,
