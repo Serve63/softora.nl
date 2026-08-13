@@ -36,6 +36,7 @@ test('Softora Read Archive publishes specific deletion instructions and scope', 
 
 test('Softora Read Archive legal pages are registered as public canonical pages', () => {
   const {
+    applyPublicSeoHeadDefaults,
     getIndexablePublicHtmlFileFromPath,
     getIndexablePublicPathFromHtmlFile,
   } = require('../../server/services/public-seo');
@@ -47,4 +48,18 @@ test('Softora Read Archive legal pages are registered as public canonical pages'
   assert.equal(getIndexablePublicPathFromHtmlFile('whatsapp-data-deletion.html'), '/whatsapp-data-deletion');
   assert.equal(createPremiumPublicHtmlFilesSet().has('whatsapp-privacy.html'), true);
   assert.equal(createPremiumPublicHtmlFilesSet().has('whatsapp-data-deletion.html'), true);
+
+  for (const [fileName, pagePath] of [
+    ['whatsapp-privacy.html', '/whatsapp-privacy'],
+    ['whatsapp-data-deletion.html', '/whatsapp-data-deletion'],
+  ]) {
+    const rendered = applyPublicSeoHeadDefaults(readPage(fileName), fileName);
+    assert.match(rendered, /href="mailto:serve@softora\.nl/);
+    assert.match(rendered, new RegExp(`data-softora-conversion-page="${pagePath}"`));
+    assert.match(rendered, /data-softora-conversion-target="mailto"/);
+    assert.doesNotMatch(
+      rendered,
+      /href="https:\/\/wa\.me\/31643262792"[^>]*>serve@softora\.nl<\/a>/
+    );
+  }
 });

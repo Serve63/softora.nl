@@ -463,6 +463,12 @@ test('publieke SEO-pagina CTAs zijn meetbaar van landing tot leadactie', () => {
   const blog = pages.find((page) => page.path === '/blog');
 
   assert.deepEqual(issues, []);
+  for (const archivePath of ['/whatsapp-privacy', '/whatsapp-data-deletion']) {
+    const archivePage = pages.find((page) => page.path === archivePath);
+    assert.ok(archivePage, `${archivePath} ontbreekt in de publieke paginacontrole.`);
+    assert.match(archivePage.html, /href="mailto:serve@softora\.nl/);
+    assert.match(archivePage.html, /data-softora-conversion-target="mailto"/);
+  }
   assert.match(diensten.html, /data-softora-conversion="public-cta"/);
   assert.match(diensten.html, /data-softora-conversion-page="\/diensten"/);
   assert.match(diensten.html, /href="https:\/\/wa\.me\/31643262792"/);
