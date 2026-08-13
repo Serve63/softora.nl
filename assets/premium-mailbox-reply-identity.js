@@ -44,6 +44,24 @@
     return fallback;
   }
 
-  global.SoftoraMailboxReplyIdentity = { resolveReplyAccount };
+  function createReplyIdentity(mail, accountEmail, owner) {
+    const provider = String(mail && mail.provider || '').trim().toLowerCase() || 'smtp';
+    const account = String(accountEmail || mail && (mail.providerAccountEmail || mail.accountEmail) || '').trim().toLowerCase();
+    return {
+      version: 1,
+      provider,
+      owner: String(owner || mail && mail.providerOwner || '').trim().toLowerCase(),
+      accountEmail: account,
+      providerAccountEmail: provider === 'instantly'
+        ? String(mail && mail.providerAccountEmail || account).trim().toLowerCase()
+        : '',
+      providerMessageId: provider === 'instantly' ? String(mail && mail.providerMessageId || '').trim() : '',
+      providerThreadId: provider === 'instantly' ? String(mail && mail.providerThreadId || '').trim() : '',
+      sourceMessageId: String(mail && mail.messageId || '').trim(),
+      conversationId: String(mail && mail.conversationId || '').trim(),
+    };
+  }
+
+  global.SoftoraMailboxReplyIdentity = { createReplyIdentity, resolveReplyAccount };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxReplyIdentity;
 })(typeof window !== 'undefined' ? window : globalThis);

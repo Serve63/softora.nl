@@ -3,6 +3,9 @@ const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
 const normalizeText = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalizeText(value).toLowerCase();
+const PERSONAL_OWNERS = new Set(['serve', 'martijn']);
+const AGGREGATE_OWNERS = new Set(['both', 'all']);
+const REPLY_IDENTITY_VERSION = 1;
 
 function normalizeMessageId(value) {
   const text = normalizeText(value);
@@ -20,7 +23,12 @@ function createPlannedMessageId(accountEmail, randomUUID = crypto.randomUUID) {
 }
 
 function createMailboxComposeThreadContext(deps = {}) {
-  const { mailboxIndexStore = null, getOwnerIdentity = getOutboundSenderIdentity, randomUUID = crypto.randomUUID } = deps;
+  const {
+    mailboxIndexStore = null,
+    instantlyMailboxService = null,
+    getOwnerIdentity = getOutboundSenderIdentity,
+    randomUUID = crypto.randomUUID,
+  } = deps;
 
   function inputError(message, code, status = 400) {
     const error = new Error(message);
@@ -40,6 +48,100 @@ function createMailboxComposeThreadContext(deps = {}) {
     return { owner, senderName: normalizeText(identity && identity.name) || normalizeEmail(accountEmail) };
   }
 
+  function requestedOwnerMatches(owner, requestedOwner) {
+    const requested = normalizeText(requestedOwner).toLowerCase();
+    return !requested || AGGREGATE_OWNERS.has(requested) || requested === owner;
+  }
+
+  function normalizeReplyIdentity(body = {}, fallbackProvider = 'smtp') {
+    const context = body.context && typeof body.context === 'object' ? body.context : {};
+    const source = body.replyIdentity && typeof body.replyIdentity === 'object'
+      ? body.replyIdentity
+      : context.replyIdentity && typeof context.replyIdentity === 'object'
+        ? context.replyIdentity
+        : {};
+    const provider = normalizeText(source.provider || context.provider || body.provider || fallbackProvider || 'smtp').toLowerCase();
+    const accountEmail = normalizeEmail(
+      source.accountEmail || source.providerAccountEmail || context.providerAccountEmail || context.accountEmail || body.account
+    );
+    return {
+      version: REPLY_IDENTITY_VERSION,
+      provider,
+      owner: normalizeText(source.owner || context.providerOwner || body.owner).toLowerCase(),
+      accountEmail,
+      providerAccountEmail: normalizeEmail(source.providerAccountEmail || context.providerAccountEmail || accountEmail),
+      providerMessageId: normalizeText(source.providerMessageId || context.providerMessageId || body.providerMessageId),
+      providerThreadId: normalizeText(source.providerThreadId || context.providerThreadId || body.providerThreadId),
+      sourceMessageId: normalizeMessageId(source.sourceMessageId || context.messageId),
+      conversationId: normalizeText(source.conversationId || context.conversationId).slice(0, 2000),
+    };
+  }
+
+  async function resolveReplyIdentity({ body = {}, accountEmail, recipientEmail, provider = 'smtp', mode = 'reply' } = {}) {
+    const normalizedMode = normalizeText(mode || body.mode || 'reply').toLowerCase();
+    const identity = normalizeReplyIdentity(body, provider);
+    if (normalizedMode !== 'reply') {
+      const account = normalizeEmail(accountEmail || body.account);
+      const resolved = resolveOwner(account, body.owner);
+      return {
+        ...identity,
+        provider: 'smtp',
+        owner: resolved.owner,
+        senderName: resolved.senderName,
+        accountEmail: account,
+        providerAccountEmail: '',
+        providerMessageId: '',
+        providerThreadId: '',
+      };
+    }
+    if (identity.provider === 'instantly') {
+      const owner = identity.owner;
+      const providerAccountEmail = identity.providerAccountEmail || identity.accountEmail;
+      if (!PERSONAL_OWNERS.has(owner) || !requestedOwnerMatches(owner, body.owner)) {
+        throw inputError('De Instantly-afzenderidentiteit hoort niet bij de geselecteerde mailbox.', 'INSTANTLY_REPLY_IDENTITY_MISMATCH', 403);
+      }
+      if (!providerAccountEmail || !identity.providerMessageId || !identity.providerThreadId) {
+        throw inputError('De Instantly-threadidentiteit is onvolledig; open het bericht opnieuw.', 'INSTANTLY_REPLY_IDENTITY_MISMATCH', 403);
+      }
+      const configuredAccounts = instantlyMailboxService?.getConfiguredAccounts?.(owner) || [];
+      if (!configuredAccounts.some((account) => normalizeEmail(account?.email) === providerAccountEmail)) {
+        throw inputError('Het Instantly-afzenderaccount hoort niet bij de geselecteerde mailbox.', 'INSTANTLY_REPLY_IDENTITY_MISMATCH', 403);
+      }
+      if (typeof instantlyMailboxService?.assertStoredMessageOwnership !== 'function') {
+        throw inputError('De duurzame Instantly-threadcontrole ontbreekt.', 'INSTANTLY_REPLY_IDENTITY_UNAVAILABLE', 503);
+      }
+      const stored = await instantlyMailboxService.assertStoredMessageOwnership({
+        owner,
+        accountEmail: providerAccountEmail,
+        providerMessageId: identity.providerMessageId,
+        providerThreadId: identity.providerThreadId,
+      });
+      const recipient = normalizeEmail(recipientEmail);
+      if (recipient && normalizeEmail(stored?.email) && normalizeEmail(stored.email) !== recipient) {
+        throw inputError('De ontvanger wijkt af van het bewezen Instantly-bericht.', 'INSTANTLY_REPLY_RECIPIENT_MISMATCH', 409);
+      }
+      return {
+        ...identity,
+        owner,
+        senderName: owner === 'martijn' ? 'Martijn van de Ven' : 'Servé Creusen',
+        accountEmail: providerAccountEmail,
+        providerAccountEmail,
+      };
+    }
+    const account = identity.accountEmail || normalizeEmail(accountEmail || body.account);
+    const resolved = resolveOwner(account, body.owner);
+    return {
+      ...identity,
+      provider: 'smtp',
+      owner: resolved.owner,
+      senderName: resolved.senderName,
+      accountEmail: account,
+      providerAccountEmail: '',
+      providerMessageId: '',
+      providerThreadId: '',
+    };
+  }
+
   function baseContext({ account, recipient, owner, senderName, mode, conversationId, idempotencyKey, provider }) {
     return {
       accountEmail: account, recipientEmail: recipient, owner, senderName, mode, conversationId, idempotencyKey,
@@ -51,11 +153,12 @@ function createMailboxComposeThreadContext(deps = {}) {
   async function resolve({ body = {}, accountEmail, recipientEmail, provider = 'smtp' } = {}) {
     const mode = normalizeText(body.mode || 'new-message').toLowerCase();
     if (!['reply', 'new-message'].includes(mode)) throw inputError('Ongeldige verzendmodus.', 'MAILBOX_SEND_MODE_INVALID');
-    const account = normalizeEmail(accountEmail);
     const recipient = normalizeEmail(recipientEmail);
-    const { owner, senderName } = resolveOwner(account, body.owner);
+    const replyIdentity = await resolveReplyIdentity({ body, accountEmail, recipientEmail, provider, mode });
+    const account = replyIdentity.accountEmail;
+    const { owner, senderName } = replyIdentity;
     const context = body.context && typeof body.context === 'object' ? body.context : {};
-    const conversationId = normalizeText(context.conversationId).slice(0, 2000);
+    const conversationId = normalizeText(replyIdentity.conversationId || context.conversationId).slice(0, 2000);
     const idempotencyKey = normalizeText(body.idempotencyKey).slice(0, 240);
     if (!idempotencyKey) throw inputError('Een veilige verzend-ID ontbreekt.', 'MAILBOX_SEND_IDEMPOTENCY_REQUIRED');
     const base = baseContext({ account, recipient, owner, senderName, mode, conversationId, idempotencyKey, provider });
@@ -65,9 +168,9 @@ function createMailboxComposeThreadContext(deps = {}) {
     if (!conversationId) {
       throw inputError('De gekozen conversatie mist een exacte thread-ID.', 'MAILBOX_REPLY_CONVERSATION_REQUIRED', 409);
     }
-    if (normalizeText(provider).toLowerCase() === 'instantly') {
-      const providerMessageId = normalizeText(body.providerMessageId);
-      const providerThreadId = normalizeText(body.providerThreadId);
+    if (replyIdentity.provider === 'instantly') {
+      const providerMessageId = replyIdentity.providerMessageId;
+      const providerThreadId = replyIdentity.providerThreadId;
       if (!providerMessageId || !providerThreadId) {
         throw inputError('De exacte Instantly-thread ontbreekt.', 'INSTANTLY_REPLY_THREAD_REQUIRED', 409);
       }
@@ -95,7 +198,13 @@ function createMailboxComposeThreadContext(deps = {}) {
     return { ...base, provider: 'smtp', providerThreadId: '', replyTargetMessageId: storedMessageId, references };
   }
 
-  return { resolve };
+  return { normalizeReplyIdentity, resolve, resolveReplyIdentity };
 }
 
-module.exports = { createMailboxComposeThreadContext, createPlannedMessageId, normalizeMessageId, parseReferences };
+module.exports = {
+  REPLY_IDENTITY_VERSION,
+  createMailboxComposeThreadContext,
+  createPlannedMessageId,
+  normalizeMessageId,
+  parseReferences,
+};

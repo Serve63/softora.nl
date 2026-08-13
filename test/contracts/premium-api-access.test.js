@@ -448,6 +448,9 @@ test('premium admin api guard never extends mailbox body fallback to writes or e
   const write = await run({ method: 'POST', path: '/api/mailbox/send' });
   assert.equal(write.nextCalled, false);
   assert.equal(write.res.statusCode, 403);
+  const preflight = await run({ method: 'POST', path: '/api/mailbox/send/preflight' });
+  assert.equal(preflight.nextCalled, false);
+  assert.equal(preflight.res.statusCode, 403);
   const readMutation = await run({ method: 'POST', path: '/api/mailbox/messages/read' });
   assert.equal(readMutation.nextCalled, false);
   assert.equal(readMutation.res.statusCode, 403);

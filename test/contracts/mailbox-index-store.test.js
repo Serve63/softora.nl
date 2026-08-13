@@ -1950,4 +1950,18 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   assert.match(schema, /grant select, insert, update, delete on public\.softora_mailbox_sync_state to service_role;/);
   assert.match(schema, /grant select, insert, update on table public\.softora_mailbox_send_provenance to service_role;/);
   assert.match(schema, /revoke all on table public\.softora_mailbox_send_provenance from public, anon, authenticated;/);
+  assert.match(schema, /softora_mailbox_send_provenance_identity_format_check/);
+  assert.match(schema, /softora_mailbox_send_provenance_scope_format_check/);
+  assert.match(schema, /softora_mailbox_send_provenance_payload_format_check/);
+});
+
+test('mailbox send identity migration strengthens keys without weakening NOT NULL or service-role access', () => {
+  const migration = fs.readFileSync(
+    path.resolve(__dirname, '../../supabase/migrations/20260813083803_enforce_mailbox_send_identity_nonempty.sql'),
+    'utf8'
+  );
+  assert.match(migration, /send_identity_key !~ '\^\(smtp-reply\|instantly-reply\|new-message\):\[0-9a-f\]\{64\}\$'/);
+  assert.match(migration, /add constraint softora_mailbox_send_provenance_identity_format_check/);
+  assert.doesNotMatch(migration, /drop not null|alter column send_identity_key drop not null/i);
+  assert.doesNotMatch(migration, /grant .*anon|grant .*authenticated/i);
 });

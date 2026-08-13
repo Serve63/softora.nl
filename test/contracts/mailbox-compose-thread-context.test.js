@@ -5,7 +5,7 @@ const {
   createMailboxComposeThreadContext,
 } = require('../../server/services/mailbox-compose-thread-context');
 
-function createResolver(message) {
+function createResolver(message, overrides = {}) {
   let sequence = 0;
   return createMailboxComposeThreadContext({
     mailboxIndexStore: {
@@ -15,7 +15,20 @@ function createResolver(message) {
       profileKey: email === 'martijn@softora.nl' ? 'martijn' : 'serve',
       name: email === 'martijn@softora.nl' ? 'Martijn van de Ven' : 'Servé Creusen',
     }),
+    instantlyMailboxService: {
+      getConfiguredAccounts: (owner) => [{
+        email: owner === 'martijn' ? 'martijn@websoftora.com' : 'servecreusen@websoftora.com',
+      }],
+      assertStoredMessageOwnership: async ({ owner, accountEmail, providerMessageId, providerThreadId }) => ({
+        providerOwner: owner,
+        providerAccountEmail: accountEmail,
+        providerMessageId,
+        providerThreadId,
+        email: 'lead@example.nl',
+      }),
+    },
     randomUUID: () => `uuid-${++sequence}`,
+    ...overrides,
   });
 }
 
@@ -56,7 +69,7 @@ test('mailbox reply context fails closed across owners accounts and recipients',
   const resolver = createResolver({
     id: 'inbox:25',
     folder: 'inbox',
-    accountEmail: 'serve@softora.nl',
+    accountEmail: 'servecreusen@websoftora.com',
     email: 'lead@example.nl',
     messageId: '<lead@example.nl>',
   });
@@ -122,6 +135,16 @@ test('Instantly reply requires the exact provider thread and new message does no
       idempotencyKey: 'instantly-1',
       providerMessageId: 'provider-message-1',
       providerThreadId: 'provider-thread-1',
+      replyIdentity: {
+        version: 1,
+        provider: 'instantly',
+        owner: 'serve',
+        accountEmail: 'servecreusen@websoftora.com',
+        providerAccountEmail: 'servecreusen@websoftora.com',
+        providerMessageId: 'provider-message-1',
+        providerThreadId: 'provider-thread-1',
+        conversationId: 'conversation:instantly:provider-thread-1',
+      },
       context: { conversationId: 'conversation:instantly:provider-thread-1' },
     },
   });

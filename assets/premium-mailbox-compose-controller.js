@@ -119,15 +119,30 @@
       }
       const replyAccount = getReplyAccount(mail);
       if (!replyAccount) throw new Error('Deze conversatie heeft geen veilige afzender voor de geselecteerde mailbox.');
+      const resolvedOwner = resolveOwnerForMail(mail, replyAccount);
       replyContext = mail
         ? options.compose.buildReplyContext(mail, {
             activeFolder: options.getActiveFolder(),
             fallbackAccount: replyAccount,
             getAccount: () => replyAccount,
+            getOwner: () => resolvedOwner,
           })
         : null;
       replyContext.accountEmail = replyAccount;
-      replyOwner = resolveOwnerForMail(mail, replyAccount);
+      replyOwner = resolvedOwner;
+      replyContext.replyIdentity = {
+        version: 1,
+        provider: String(replyContext.replyIdentity?.provider || replyContext.provider || 'smtp').trim().toLowerCase(),
+        owner: String(replyContext.replyIdentity?.owner || replyOwner).trim().toLowerCase(),
+        accountEmail: options.normalizeEmail(replyContext.replyIdentity?.accountEmail || replyAccount),
+        providerAccountEmail: options.normalizeEmail(
+          replyContext.replyIdentity?.providerAccountEmail || replyContext.providerAccountEmail || ''
+        ),
+        providerMessageId: String(replyContext.replyIdentity?.providerMessageId || replyContext.providerMessageId || '').trim(),
+        providerThreadId: String(replyContext.replyIdentity?.providerThreadId || replyContext.providerThreadId || '').trim(),
+        sourceMessageId: String(replyContext.replyIdentity?.sourceMessageId || replyContext.messageId || '').trim(),
+        conversationId: String(replyContext.replyIdentity?.conversationId || replyContext.conversationId || '').trim(),
+      };
     }
 
     function assertReplyOwner(accountEmail = '') {
@@ -154,11 +169,14 @@
       if (!currentMail) return { ...replyContext };
       const currentAccount = getReplyAccount(currentMail, replyContext.accountEmail);
       if (!currentAccount) throw new Error('De geselecteerde mailbox hoort niet bij deze conversatie.');
-      return options.compose.buildReplyContext(currentMail, {
+      const rebuilt = options.compose.buildReplyContext(currentMail, {
             activeFolder: options.getActiveFolder(),
             fallbackAccount: currentAccount,
             getAccount: () => currentAccount,
+            getOwner: () => replyOwner,
           });
+      rebuilt.replyIdentity = { ...replyContext.replyIdentity };
+      return rebuilt;
     }
 
     function open(optionsOverride = {}) {
@@ -308,8 +326,13 @@
       try {
         const contextAtSend = replyContext ? { ...replyContext } : null;
         const currentMail = contextAtSend && options.findMail(contextAtSend.id);
-        const account = contextAtSend
-          ? getReplyAccount(currentMail || contextAtSend, contextAtSend.accountEmail)
+        const canonicalIdentity = contextAtSend?.replyIdentity && typeof contextAtSend.replyIdentity === 'object'
+          ? { ...contextAtSend.replyIdentity }
+          : null;
+        const account = contextAtSend?.mode === 'reply' && canonicalIdentity?.accountEmail
+          ? options.normalizeEmail(canonicalIdentity.accountEmail)
+          : contextAtSend
+            ? getReplyAccount(currentMail || contextAtSend, contextAtSend.accountEmail)
           : options.normalizeEmail(options.getAccount());
         if (!account) throw new Error('Het afzenderaccount past niet bij de geselecteerde mailbox; open de reply opnieuw.');
         if (contextAtSend) contextAtSend.accountEmail = account;
@@ -323,7 +346,7 @@
           Math.random().toString(36).slice(2),
         ].join(':');
         if (replyContext) replyContext.sendIdempotencyKey = idempotencyKey;
-        const provider = String(replyContext && replyContext.provider || '').trim().toLowerCase();
+        const provider = String(canonicalIdentity?.provider || replyContext && replyContext.provider || '').trim().toLowerCase();
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
           throw new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
@@ -338,6 +361,7 @@
             owner: sendOwner,
             mode: sendMode,
             idempotencyKey,
+            ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
             context: {
               conversationId: String(contextAtSend?.conversationId || '').trim(),
               id: String(contextAtSend?.mailboxId || contextAtSend?.id || '').trim(),
@@ -345,12 +369,13 @@
               uid: Number(contextAtSend?.uid || 0) || 0,
               messageId: String(contextAtSend?.messageId || '').trim(),
               references: String(contextAtSend?.references || '').trim(),
+              ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
             },
             ...(provider
               ? {
                   provider,
-                  providerMessageId: String(replyContext && replyContext.providerMessageId || '').trim(),
-                  providerThreadId: String(replyContext && replyContext.providerThreadId || '').trim(),
+                  providerMessageId: String(canonicalIdentity?.providerMessageId || replyContext && replyContext.providerMessageId || '').trim(),
+                  providerThreadId: String(canonicalIdentity?.providerThreadId || replyContext && replyContext.providerThreadId || '').trim(),
                 }
               : {}),
             to,

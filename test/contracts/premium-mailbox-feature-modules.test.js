@@ -267,9 +267,10 @@ test('gecombineerde mailbox verstuurt een Instantly-antwoord uitsluitend via de 
     id: 'instantly:reply-1',
     provider: 'instantly',
     providerOwner: 'serve',
+    providerAccountEmail: 'servecreusen@websoftora.com',
     providerMessageId: 'message-1',
     providerThreadId: 'thread-1',
-    accountEmail: 'serve@softora.nl',
+    accountEmail: 'servecreusen@websoftora.com',
     email: 'prospect@example.nl',
     subject: 'Re: Website',
   };
@@ -283,6 +284,8 @@ test('gecombineerde mailbox verstuurt een Instantly-antwoord uitsluitend via de 
         id: mail.id,
         accountEmail: mail.accountEmail,
         provider: mail.provider,
+        providerOwner: mail.providerOwner,
+        providerAccountEmail: mail.providerAccountEmail,
         providerMessageId: mail.providerMessageId,
         providerThreadId: mail.providerThreadId,
       }),
@@ -315,7 +318,20 @@ test('gecombineerde mailbox verstuurt een Instantly-antwoord uitsluitend via de 
   await controller.send();
   assert.equal(requests.length, 1);
   assert.equal(requests[0].url, '/api/mailbox/send');
-  assert.equal(JSON.parse(requests[0].options.body).owner, 'serve');
+  const payload = JSON.parse(requests[0].options.body);
+  assert.equal(payload.owner, 'serve');
+  assert.equal(payload.account, 'servecreusen@websoftora.com');
+  assert.deepEqual(payload.replyIdentity, {
+    version: 1,
+    provider: 'instantly',
+    owner: 'serve',
+    accountEmail: 'servecreusen@websoftora.com',
+    providerAccountEmail: 'servecreusen@websoftora.com',
+    providerMessageId: 'message-1',
+    providerThreadId: 'thread-1',
+    sourceMessageId: '',
+    conversationId: '',
+  });
 });
 
 test('composevenster is sleepbaar en scrolt de mailbox achter de overlay', () => {
