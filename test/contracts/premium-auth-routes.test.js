@@ -261,6 +261,43 @@ test('premium auth session refreshes a thin token fallback before returning prof
   ]);
 });
 
+test('premium auth session does not repeat a failed cold hydration in the same request', async () => {
+  const resolverCalls = [];
+  const { coordinator, cookieClears } = createFixture({
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      return {
+        configured: true,
+        authenticated: true,
+        tokenFallback: true,
+        hydrationUnavailable: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_serve',
+        role: 'admin',
+        isAdmin: true,
+        expiresAt: Date.now() + 60_000,
+        displayName: 'serve@softora.nl',
+        user: null,
+      };
+    },
+  });
+  const req = createRequest({ originalUrl: '/api/auth/session' });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSessionResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.authenticated, true);
+  assert.equal(res.body.displayName, 'serve@softora.nl');
+  assert.equal(cookieClears.length, 0);
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
+    },
+  ]);
+});
+
 test('premium auth login returns 503 when auth is not fully configured', async () => {
   const { auditEvents, coordinator } = createFixture({
     sessionSecret: '',

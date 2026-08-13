@@ -47,7 +47,11 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       allowAnonymousWithoutHydration: true,
       allowTokenFallbackWithoutHydration: true,
     });
-    if (authState?.authenticated && authState?.tokenFallback) {
+    if (
+      authState?.authenticated &&
+      authState?.tokenFallback &&
+      !authState?.hydrationUnavailable
+    ) {
       const refreshedAuthState = await getResolvedPremiumAuthState(req, {
         allowAnonymousWithoutHydration: true,
         allowTokenFallbackWithoutHydration: false,
