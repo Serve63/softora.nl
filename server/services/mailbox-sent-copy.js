@@ -2,7 +2,14 @@ const { simpleParser } = require('mailparser');
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
-  coldmail: ['Softora / Coldmail', 'Softora/Coldmail'],
+  coldmail: [
+    'Softora / Coldmail',
+    'Softora/Coldmail',
+    'Softora - Coldmail',
+    'INBOX/Softora - Coldmail',
+    'Coldmail - Delivery',
+    'INBOX/Coldmail - Delivery',
+  ],
   allmail: ['[Gmail]/All Mail', '[Google Mail]/All Mail', '[Gmail]/Alle berichten'],
   sent: [
     'Sent',

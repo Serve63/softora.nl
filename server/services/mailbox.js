@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const {
+  FOLDER_ALIASES,
   appendSentMessage,
   publicListErrorMessage,
   resolveMailboxName,
@@ -107,63 +108,6 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
   'proton.me',
   'protonmail.com',
 ]);
-
-const FOLDER_ALIASES = {
-  inbox: ['INBOX'],
-  coldmail: ['Softora / Coldmail', 'Softora/Coldmail'],
-  sent: [
-    'Sent',
-    'Sent Items',
-    'Sent Mail',
-    'Sent Messages',
-    'INBOX.Sent',
-    'INBOX.Sent Items',
-    'INBOX.Sent Mail',
-    'INBOX.Sent Messages',
-    'INBOX/Sent',
-    'INBOX/Sent Items',
-    'INBOX/Sent Mail',
-    'Sent objects',
-    'Sent-mails',
-    'Sent Mails',
-    'SentMail',
-    'Gesendet',
-    'Verzonden',
-    'Verzonden items',
-    'Verzonden berichten',
-    'Verstuurd',
-    'Verstuurde items',
-    'Verstuurde berichten',
-    'INBOX.Verzonden',
-    'INBOX.Verzonden items',
-    'INBOX.Verstuurd',
-    'INBOX.Verstuurde items',
-    'INBOX/Verzonden',
-    'INBOX/Verzonden items',
-    'INBOX/Verstuurd',
-    'INBOX/Verstuurde items',
-  ],
-  drafts: ['Drafts', 'Draft', 'Concepts', 'INBOX.Drafts', 'INBOX.Concepts', 'Concepten'],
-  spam: ['Spam', 'Junk', 'Junk E-mail', 'INBOX.Spam', 'INBOX.Junk'],
-  trash: ['Trash', 'Deleted', 'Deleted Items', 'Deleted Messages', 'Bin', 'INBOX.Trash', 'Prullenbak'],
-};
-
-const FOLDER_SPECIAL_USES = {
-  inbox: ['inbox'],
-  sent: ['sent'],
-  drafts: ['drafts'],
-  spam: ['junk'],
-  trash: ['trash'],
-};
-
-const FOLDER_LABELS = {
-  inbox: 'Inbox',
-  coldmail: 'Softora / Coldmail',
-  sent: 'Verzonden',
-  drafts: 'Concepten',
-  spam: 'Spam',
-  trash: 'Prullenbak',
-};
 
 const TRACKING_HOST_PATTERNS = [
   /(^|\.)sendgrid\.net$/i,
