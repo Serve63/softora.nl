@@ -138,7 +138,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809e/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813a/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -497,13 +497,15 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.doesNotMatch(controlSource, /method: 'POST'/);
   assert.doesNotMatch(controlSource, /addEventListener\('click'/);
   assert.doesNotMatch(controlSource, /JSON\.stringify\(\{ enabled:/);
-  assert.match(controlSource, /statusLabel = workerState === 'error' \? 'FOUT' : ''/);
-  assert.doesNotMatch(controlSource, /'BEZIG'/);
-  assert.doesNotMatch(controlSource, /'WACHT'/);
-  assert.match(controlSource, /const accessibleStatusLabel = workerState === 'error'/);
+  assert.match(controlSource, /const statusLabel = enabled \? 'AAN' : 'UIT'/);
+  assert.match(controlSource, /const accessibleStatusLabel = enabled \? 'aan' : 'uit'/);
+  assert.doesNotMatch(controlSource, /'FOUT'|'BEZIG'|'WACHT'/);
+  assert.doesNotMatch(pageSource, />\s*(?:FOUT|BEZIG|WACHT)\s*</);
   assert.match(controlSource, /enabled:\s*false,[\s\S]*workerState:\s*'error'/);
-  assert.match(controlSource, /fillButtonLabel\.hidden = !statusLabel/);
-  assert.match(pageSource, /id="database-fill-toggle-label"[^>]*hidden><\/strong>/);
+  assert.match(controlSource, /fillButtonLabel\.hidden = false/);
+  assert.doesNotMatch(controlSource, /classList\.toggle\('is-error'/);
+  assert.match(pageSource, /id="database-fill-toggle-label"[^>]*>UIT<\/strong>/);
+  assert.doesNotMatch(pageSource, /id="database-fill-toggle-label"[^>]*hidden/);
   assert.match(controlSource, /uitsluitend via de Codex-chat/);
   assert.match(controlSource, /\['vuller', 'controle', 'goedgekeurd'\]/);
   assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
@@ -525,7 +527,7 @@ test('kvk framed content uses the same solid background as the surrounding page'
 
   assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260809a/);
   assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260809a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260809e/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813a/);
   assert.match(
     frameStyleSource,
     /html\[data-softora-sidebar-content-frame="1"\][\s\S]*background:\s*#f4f1ed !important;/
