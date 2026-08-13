@@ -174,7 +174,7 @@ test('premium auth manager resolves authenticated user and session payload', asy
   const sessionPayload = manager.buildPremiumAuthSessionPayload(resolved);
   assert.equal(sessionPayload.ok, true);
   assert.equal(sessionPayload.authenticated, true);
-  assert.equal(sessionPayload.mfaEnabled, true);
+  assert.equal(sessionPayload.mfaEnabled, false);
   assert.equal(sessionPayload.canManageUsers, true);
 });
 

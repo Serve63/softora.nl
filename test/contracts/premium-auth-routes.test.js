@@ -2,8 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createPremiumAuthRouteCoordinator } = require('../../server/services/premium-auth');
-const { createPremiumMfaService } = require('../../server/security/premium-mfa');
-const { decodeBase32Secret, generateTotpCodeForTime } = require('../../server/security/totp');
 
 function createResponseRecorder() {
   return {
@@ -129,25 +127,6 @@ function createFixture(options = {}) {
     premiumUsersStore,
     normalizePremiumSessionEmail: (value) => normalizeString(value).toLowerCase(),
     normalizeString,
-    premiumMfaService: options.premiumMfaService || {
-      isConfigured: () => options.mfaServiceConfigured !== false,
-      isEnrolled: (user) => Boolean(user?.mfa?.enabled),
-      createEnrollment: () => ({
-        mfa: { enabled: false, encryptedSecret: 'pending', recoveryCodeHashes: ['hash'] },
-        setupKey: 'SETUPKEY',
-        otpauthUri: 'otpauth://totp/Softora:test',
-        recoveryCodes: ['ABCD-EFGH-IJKL'],
-      }),
-      completeEnrollment: (user, code) => code === (options.validOtp || '123456')
-        ? { ...user.mfa, enabled: true }
-        : null,
-      verifyLoginCode: (user, code) => ({
-        ok: code === (options.validOtp || '123456'),
-        usedRecoveryCode: false,
-        recoveryCodeHash: '',
-        mfa: user.mfa,
-      }),
-    },
     getSafePremiumRedirectPath: (value) => {
       const target = normalizeString(value);
       return target.startsWith('/') && !target.startsWith('//') && !target.includes('://')
@@ -653,7 +632,7 @@ test('premium auth login does not overwrite managed users with bootstrap credent
   assert.equal(fixture.premiumUsersStore.persistCalls.length, 0);
 });
 
-test('premium auth login rejects inactive users and invalid mfa codes', async () => {
+test('premium auth login rejects inactive users', async () => {
   const inactiveFixture = createFixture({
     users: [
       {
@@ -675,17 +654,6 @@ test('premium auth login rejects inactive users and invalid mfa codes', async ()
   assert.equal(inactiveRes.statusCode, 403);
   assert.equal(inactiveRes.body.error, 'Dit account is gedeactiveerd.');
 
-  const mfaFixture = createFixture({ validOtp: '654321' });
-  const mfaReq = createRequest({
-    body: { email: 'admin@softora.nl', password: 'secret123', otp: '000000' },
-  });
-  const mfaRes = createResponseRecorder();
-
-  await mfaFixture.coordinator.loginResponse(mfaReq, mfaRes);
-
-  assert.equal(mfaRes.statusCode, 401);
-  assert.equal(mfaRes.body.error, 'Ongeldige, ontbrekende, verlopen of al gebruikte 2FA-code.');
-  assert.equal(mfaRes.body.mfaRequired, true);
 });
 
 test('premium auth login sets a remembered session cookie and returns next path', async () => {
@@ -694,7 +662,6 @@ test('premium auth login sets a remembered session cookie and returns next path'
     body: {
       email: 'admin@softora.nl',
       password: 'secret123',
-      otp: '123456',
       remember: 'true',
       next: '/premium-users',
     },
@@ -710,21 +677,15 @@ test('premium auth login sets a remembered session cookie and returns next path'
   assert.equal(res.body.next, '/premium-users');
   assert.equal(tokenCalls.length, 1);
   assert.equal(tokenCalls[0].maxAgeMs, 7 * 24 * 60 * 60 * 1000);
-  assert.equal(tokenCalls[0].mfaVerified, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(tokenCalls[0], 'mfaVerified'), false);
   assert.equal(tokenCalls[0].authVersion, 1);
   assert.equal(cookieSets.length, 1);
   assert.equal(cookieSets[0].maxAgeMs, 7 * 24 * 60 * 60 * 1000);
   assert.equal(auditEvents.at(-1).reason, 'security_login_success');
 });
 
-test('premium auth issues no cookie until personal MFA enrollment is durably completed', async () => {
-  const nowMs = 1_700_000_000_000;
-  const premiumMfaService = createPremiumMfaService({
-    sessionSecret: 'secret',
-    now: () => nowMs,
-  });
+test('premium auth logs in with password only and never returns MFA setup material', async () => {
   const fixture = createFixture({
-    premiumMfaService,
     users: [{
       id: 'usr_admin',
       email: 'admin@softora.nl',
@@ -734,116 +695,21 @@ test('premium auth issues no cookie until personal MFA enrollment is durably com
       mfa: { enabled: false, encryptedSecret: '', recoveryCodeHashes: [] },
     }],
   });
-  const enrollmentResponse = createResponseRecorder();
+  const response = createResponseRecorder();
 
   await fixture.coordinator.loginResponse(createRequest({
-    body: { email: 'admin@softora.nl', password: 'secret123' },
-  }), enrollmentResponse);
+    body: { email: 'admin@softora.nl', password: 'secret123', otp: 'ignored-legacy-field' },
+  }), response);
 
-  assert.equal(enrollmentResponse.statusCode, 202);
-  assert.equal(enrollmentResponse.body.mfaEnrollmentRequired, true);
-  assert.equal(enrollmentResponse.body.recoveryCodes.length, 8);
-  assert.equal(fixture.cookieSets.length, 0);
-
-  const otp = generateTotpCodeForTime(
-    decodeBase32Secret(enrollmentResponse.body.setupKey),
-    nowMs
-  );
-  const loginResponse = createResponseRecorder();
-  await fixture.coordinator.loginResponse(createRequest({
-    body: { email: 'admin@softora.nl', password: 'secret123', otp },
-  }), loginResponse);
-
-  assert.equal(loginResponse.statusCode, 200);
-  assert.equal(loginResponse.body.authenticated, true);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.authenticated, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(response.body, 'mfaRequired'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(response.body, 'mfaEnrollmentRequired'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(response.body, 'setupKey'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(response.body, 'recoveryCodes'), false);
   assert.equal(fixture.cookieSets.length, 1);
-  assert.equal(fixture.tokenCalls[0].mfaVerified, true);
-  assert.equal(fixture.tokenCalls[0].authVersion, 2);
-  assert.equal(fixture.premiumUsersStore.mutateCalls.length, 2);
-});
-
-test('concurrent premium logins can issue only one session for the same TOTP counter', async () => {
-  const baseTimeMs = 1_700_000_000_000;
-  let nowMs = baseTimeMs;
-  const premiumMfaService = createPremiumMfaService({
-    sessionSecret: 'secret',
-    now: () => nowMs,
-  });
-  const enrollment = premiumMfaService.createEnrollment({ email: 'admin@softora.nl' });
-  const enrollmentOtp = generateTotpCodeForTime(
-    decodeBase32Secret(enrollment.setupKey),
-    baseTimeMs
-  );
-  const enrolledMfa = premiumMfaService.completeEnrollment({ mfa: enrollment.mfa }, enrollmentOtp);
-  const databaseState = {
-    user: {
-      id: 'usr_admin',
-      email: 'admin@softora.nl',
-      role: 'admin',
-      status: 'active',
-      passwordHash: 'hash:secret123',
-      authVersion: 2,
-      mfa: enrolledMfa,
-    },
-  };
-
-  function createInstanceStore() {
-    const snapshot = structuredClone(databaseState.user);
-    return {
-      async ensureUsersHydrated() {
-        return { source: 'supabase', users: [structuredClone(snapshot)] };
-      },
-      getCachedUsers() {
-        return [structuredClone(snapshot)];
-      },
-      findUserByEmail(users, email) {
-        return users.find((user) => user.email === email) || null;
-      },
-      findUserById(users, id) {
-        return users.find((user) => user.id === id) || null;
-      },
-      normalizeUserStatus() {
-        return 'active';
-      },
-      verifyPasswordHash(password, passwordHash) {
-        return passwordHash === `hash:${password}`;
-      },
-      async mutateMfaState(matchedUser, mutation) {
-        await new Promise((resolve) => setImmediate(resolve));
-        if (
-          databaseState.user.authVersion !== matchedUser.authVersion ||
-          databaseState.user.mfa.lastTotpCounter !== matchedUser.mfa.lastTotpCounter
-        ) {
-          return { source: 'conflict', user: null, reason: 'stale_state' };
-        }
-        databaseState.user = {
-          ...databaseState.user,
-          mfa: mutation.mfa,
-        };
-        return { source: 'supabase', user: structuredClone(databaseState.user) };
-      },
-    };
-  }
-
-  nowMs += 30_000;
-  const nextOtp = generateTotpCodeForTime(decodeBase32Secret(enrollment.setupKey), nowMs);
-  const first = createFixture({ premiumMfaService, premiumUsersStore: createInstanceStore() });
-  const second = createFixture({ premiumMfaService, premiumUsersStore: createInstanceStore() });
-
-  const firstResponse = createResponseRecorder();
-  const secondResponse = createResponseRecorder();
-  await Promise.all([
-    first.coordinator.loginResponse(createRequest({
-      body: { email: 'admin@softora.nl', password: 'secret123', otp: nextOtp },
-    }), firstResponse),
-    second.coordinator.loginResponse(createRequest({
-      body: { email: 'admin@softora.nl', password: 'secret123', otp: nextOtp },
-    }), secondResponse),
-  ]);
-
-  assert.deepEqual([firstResponse.statusCode, secondResponse.statusCode].sort(), [200, 401]);
-  assert.equal(first.cookieSets.length + second.cookieSets.length, 1);
-  assert.equal(first.tokenCalls.length + second.tokenCalls.length, 1);
+  assert.equal(fixture.tokenCalls[0].authVersion, 1);
+  assert.equal(fixture.premiumUsersStore.mutateCalls.length, 0);
 });
 
 test('premium auth logout clears session cookie and returns anonymous state', async () => {

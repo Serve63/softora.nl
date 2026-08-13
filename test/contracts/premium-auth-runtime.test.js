@@ -34,7 +34,6 @@ test('premium auth runtime wraps session cookies and token verification', () => 
     userId: 'usr_123',
     role: 'ADMIN',
     authVersion: 2,
-    mfaVerified: true,
   });
   const verification = runtime.verifyPremiumSessionToken(token);
 
@@ -50,6 +49,7 @@ test('premium auth runtime wraps session cookies and token verification', () => 
   assert.equal(verification.ok, true);
   assert.equal(verification.payload.email, 'info@softora.nl');
   assert.equal(verification.payload.av, 2);
+  assert.deepEqual(verification.payload.amr, ['pwd']);
   assert.equal(runtime.isPremiumMfaConfigured(), false);
   assert.equal(runtime.isPremiumMfaCodeValid('123456'), true);
   assert.equal(appended.length, 2);

@@ -83,7 +83,7 @@ function createPremiumAuthStateManager(options = {}) {
       userId: truncateText(normalizeString(verification?.payload?.uid || ''), 120),
       role: truncateText(normalizeString(verification?.payload?.role || ''), 40).toLowerCase(),
       authVersion: Math.max(0, Math.floor(Number(verification?.payload?.av) || 0)),
-      mfaVerified: verification?.payload?.mfa === true,
+      authMethods: Array.isArray(verification?.payload?.amr) ? verification.payload.amr : [],
       expiresAt: Number(verification?.payload?.exp || 0) || null,
       token,
     };
@@ -124,8 +124,6 @@ function createPremiumAuthStateManager(options = {}) {
   function isUserCompatibleWithSession(basicAuthState, user) {
     return Boolean(
       basicAuthState?.authenticated &&
-        basicAuthState?.mfaVerified &&
-        user?.mfa?.enabled &&
         Math.max(1, Math.floor(Number(user?.authVersion) || 1)) === basicAuthState.authVersion
     );
   }
@@ -302,7 +300,7 @@ function createPremiumAuthStateManager(options = {}) {
       ok: true,
       configured: authState.configured,
       authenticated: authState.authenticated,
-      mfaEnabled: isPremiumMfaConfigured(),
+      mfaEnabled: false,
       email: authState.authenticated ? authState.email : '',
       userId: authState.authenticated ? authState.userId : '',
       role: authState.authenticated ? authState.role : '',

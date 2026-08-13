@@ -6,7 +6,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     premiumUsersStore,
     normalizePremiumSessionEmail = (value) => String(value || '').trim().toLowerCase(),
     normalizeString = (value) => String(value || '').trim(),
-    premiumMfaService = null,
     getSafePremiumRedirectPath = (value) => value,
     getResolvedPremiumAuthState = async () => ({
       configured: false,
@@ -142,21 +141,9 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     return premiumUsersStore.findUserByEmail(savedUsers, email) || nextUser;
   }
 
-  async function persistMatchedUserMfaState(matchedUser, mfa, action, recoveryCodeHash = '') {
-    if (typeof premiumUsersStore.mutateMfaState !== 'function') {
-      return { source: 'unavailable', user: null, reason: 'atomic_mfa_store_missing' };
-    }
-    return premiumUsersStore.mutateMfaState(matchedUser, {
-      action,
-      mfa,
-      recoveryCodeHash,
-    });
-  }
-
   async function loginResponse(req, res) {
     const email = normalizePremiumSessionEmail(req.body?.email || '');
     const password = String(req.body?.password || '');
-    const otp = normalizeString(req.body?.otp || '').replace(/\s+/g, '');
     const remember = /^(1|true|yes|on)$/i.test(String(req.body?.remember || ''));
     const nextPath = getSafePremiumRedirectPath(req.body?.next || req.query?.next || '');
 
@@ -297,159 +284,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    if (!premiumMfaService || !premiumMfaService.isConfigured()) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'login_rejected',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Premium login geweigerd omdat per-account MFA niet beschikbaar is.',
-        },
-        'security_login_rejected'
-      );
-      return res.status(503).json({
-        ok: false,
-        error: 'Veilige tweestapsverificatie is tijdelijk niet beschikbaar.',
-      });
-    }
-
-    if (!premiumMfaService.isEnrolled(matchedUser)) {
-      if (!otp) {
-        const enrollment = premiumMfaService.createEnrollment(matchedUser);
-        const enrollmentMutation = enrollment
-          ? await persistMatchedUserMfaState(
-              matchedUser,
-              enrollment.mfa,
-              'enrollment_start'
-            )
-          : { source: 'unavailable', user: null };
-        if (!enrollmentMutation?.user) {
-          return res.status(enrollmentMutation?.source === 'conflict' ? 409 : 503).json({
-            ok: false,
-            error: '2FA-instelling kon niet veilig in Supabase worden opgeslagen.',
-          });
-        }
-        appendAuditEvent(
-          req,
-          {
-            type: 'login_mfa_enrollment_started',
-            severity: 'info',
-            success: true,
-            email,
-            detail: 'Per-account tweestapsverificatie gestart; nog geen sessie uitgegeven.',
-          },
-          'security_login_mfa_enrollment_started'
-        );
-        return res.status(202).json({
-          ok: false,
-          authenticated: false,
-          mfaRequired: true,
-          mfaEnrollmentRequired: true,
-          setupKey: enrollment.setupKey,
-          otpauthUri: enrollment.otpauthUri,
-          recoveryCodes: enrollment.recoveryCodes,
-          error: 'Stel eerst je persoonlijke authenticator in en vul daarna de 6-cijferige code in.',
-        });
-      }
-
-      const completedMfa = premiumMfaService.completeEnrollment(matchedUser, otp);
-      if (!completedMfa) {
-        appendAuditEvent(
-          req,
-          {
-            type: 'login_mfa_failed',
-            severity: 'warning',
-            success: false,
-            email,
-            detail: '2FA-enrollmentcode ongeldig of verlopen.',
-          },
-          'security_login_mfa_failed'
-        );
-        return res.status(401).json({
-          ok: false,
-          error: 'Ongeldige of verlopen 2FA-code.',
-          mfaRequired: true,
-          mfaEnrollmentRequired: true,
-        });
-      }
-
-      const enrollmentMutation = await persistMatchedUserMfaState(
-        matchedUser,
-        completedMfa,
-        'enrollment_complete'
-      );
-      matchedUser = enrollmentMutation?.user || null;
-      if (!matchedUser) {
-        return res.status(enrollmentMutation?.source === 'conflict' ? 401 : 503).json({
-          ok: false,
-          error: enrollmentMutation?.source === 'conflict'
-            ? 'Deze 2FA-code is al gebruikt of de accountbeveiliging is intussen gewijzigd.'
-            : '2FA-activering kon niet veilig in Supabase worden opgeslagen.',
-          mfaRequired: true,
-          mfaEnrollmentRequired: true,
-        });
-      }
-    } else {
-      const verification = premiumMfaService.verifyLoginCode(matchedUser, otp);
-      if (!verification.ok) {
-        appendAuditEvent(
-          req,
-          {
-            type: 'login_mfa_failed',
-            severity: 'warning',
-            success: false,
-            email,
-            detail: '2FA-code ongeldig, ontbreekt, verlopen of al gebruikt.',
-          },
-          'security_login_mfa_failed'
-        );
-        return res.status(401).json({
-          ok: false,
-          error: 'Ongeldige, ontbrekende, verlopen of al gebruikte 2FA-code.',
-          mfaRequired: true,
-        });
-      }
-      const verificationMutation = await persistMatchedUserMfaState(
-        matchedUser,
-        verification.mfa,
-        verification.usedRecoveryCode
-          ? 'recovery'
-          : 'totp',
-        verification.recoveryCodeHash
-      );
-      matchedUser = verificationMutation?.user || null;
-      if (!matchedUser) {
-        return res.status(verificationMutation?.source === 'conflict' ? 401 : 503).json({
-          ok: false,
-          error: verificationMutation?.source === 'conflict'
-            ? 'Deze 2FA- of recoverycode is al gebruikt of de accountbeveiliging is intussen gewijzigd.'
-            : '2FA-controle kon niet veilig in Supabase worden vastgelegd.',
-          mfaRequired: true,
-        });
-      }
-    }
-
-    if (!premiumMfaService.isEnrolled(matchedUser)) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'login_mfa_failed',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Geen actieve per-account MFA na verificatie.',
-        },
-        'security_login_mfa_failed'
-      );
-      return res.status(401).json({
-        ok: false,
-        error: 'Veilige tweestapsverificatie kon niet worden bevestigd.',
-        mfaRequired: true,
-      });
-    }
-
     const sessionMaxAgeMs = remember
       ? Math.max(1, Math.min(7, Number(premiumSessionRememberTtlDays) || 7)) * 24 * 60 * 60 * 1000
       : Math.max(1, Math.min(12, Number(premiumSessionTtlHours) || 12)) * 60 * 60 * 1000;
@@ -459,7 +293,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       userId: matchedUser.id,
       role: matchedUser.role,
       authVersion: matchedUser.authVersion,
-      mfaVerified: true,
     });
     if (!sessionToken) {
       return res.status(503).json({ ok: false, error: 'Veilige sessie kon niet worden aangemaakt.' });
@@ -497,14 +330,14 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
         severity: 'warning',
         success: false,
         email: '',
-        detail: 'Legacy agenda-PIN-login geweigerd; gebruik de MFA-login.',
+        detail: 'Legacy agenda-PIN-login geweigerd; gebruik e-mail en wachtwoord.',
       },
       'security_agenda_app_pin_login_disabled'
     );
     return res.status(410).json({
       ok: false,
       authenticated: false,
-      error: 'Agenda-app PIN-login is uitgeschakeld. Log veilig in met e-mail, wachtwoord en 2FA.',
+      error: 'Agenda-app PIN-login is uitgeschakeld. Log in met je e-mailadres en wachtwoord.',
     });
   }
 
