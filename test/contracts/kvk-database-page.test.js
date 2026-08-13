@@ -501,6 +501,7 @@ test('kvk database renders a read-only live worker status controlled only by Cod
   assert.doesNotMatch(controlSource, /'BEZIG'/);
   assert.doesNotMatch(controlSource, /'WACHT'/);
   assert.match(controlSource, /const accessibleStatusLabel = workerState === 'error'/);
+  assert.match(controlSource, /enabled:\s*false,[\s\S]*workerState:\s*'error'/);
   assert.match(controlSource, /fillButtonLabel\.hidden = !statusLabel/);
   assert.match(pageSource, /id="database-fill-toggle-label"[^>]*hidden><\/strong>/);
   assert.match(controlSource, /uitsluitend via de Codex-chat/);

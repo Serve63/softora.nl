@@ -20,7 +20,7 @@ function createJsonResponse() {
   };
 }
 
-function createInMemoryService() {
+function createInMemoryService(overrides = {}) {
   const storedRows = new Map();
   let currentNow = new Date('2026-07-26T20:30:00.000Z');
   const service = createKvkDatabaseControlService({
@@ -32,6 +32,7 @@ function createInMemoryService() {
       return { ok: true };
     },
     now: () => currentNow,
+    ...overrides,
   });
   return {
     service,
@@ -164,32 +165,38 @@ test('all three visible database workers report independently and must be active
   assert.equal(poll.payload.control.workerState, 'running');
 });
 
-test('stale worker heartbeat is exposed as waiting for self-healing', async () => {
-  const { service, setNow } = createInMemoryService();
+test('a stale worker heartbeat durably switches the central control off', async () => {
+  const { service, getStoredRow, setNow } = createInMemoryService();
   await service.sendCommandControlResponse(
     { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
     createJsonResponse()
   );
-  await service.sendReportWorkerResponse(
-    {
-      headers: { authorization: 'Bearer worker-token' },
-      body: { workerKey: 'controle', workerState: 'running', workerMessage: 'Controlebatch loopt.' },
-    },
-    createJsonResponse()
-  );
+  for (const workerKey of ['vuller', 'controle', 'goedgekeurd']) {
+    await service.sendReportWorkerResponse(
+      {
+        headers: { authorization: 'Bearer worker-token' },
+        body: { workerKey, workerState: 'running', workerMessage: `${workerKey} loopt.` },
+      },
+      createJsonResponse()
+    );
+  }
 
   setNow('2026-07-26T20:33:00.001Z');
   const response = createJsonResponse();
   await service.sendGetControlResponse({}, response);
 
   assert.equal(response.statusCode, 200);
-  assert.equal(response.payload.control.workers.controle.workerState, 'waiting');
-  assert.equal(response.payload.control.workers.controle.stale, true);
-  assert.match(response.payload.control.workers.controle.workerMessage, /hervat automatisch/);
+  assert.equal(response.payload.control.enabled, false);
+  assert.equal(response.payload.control.revision, 2);
+  assert.equal(response.payload.control.workerState, 'error');
+  assert.equal(getStoredRow(service.controlStateKey).payload.enabled, false);
+  assert.match(response.payload.control.automaticStopReason, /heartbeat is verlopen/);
 });
 
-test('fresh heartbeats cannot hide a lane without persisted progress', async () => {
-  const { service, setNow } = createInMemoryService();
+test('fresh heartbeats cannot keep control on without persisted progress', async () => {
+  const { service, getStoredRow, setNow } = createInMemoryService({
+    workerStaleAfterMs: 60 * 60_000,
+  });
   await service.sendCommandControlResponse(
     { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
     createJsonResponse()
@@ -211,10 +218,76 @@ test('fresh heartbeats cannot hide a lane without persisted progress', async () 
     report
   );
 
-  assert.equal(report.payload.control.workers.vuller.workerState, 'waiting');
-  assert.equal(report.payload.control.workers.vuller.stalled, true);
-  assert.equal(report.payload.control.workerState, 'starting');
-  assert.match(report.payload.control.workers.vuller.workerMessage, /geen opgeslagen voortgang/);
+  assert.equal(report.payload.control.enabled, false);
+  assert.equal(report.payload.control.workerState, 'error');
+  assert.equal(getStoredRow(service.controlStateKey).payload.enabled, false);
+  assert.match(report.payload.control.automaticStopReason, /geen opgeslagen databasevoortgang/);
+});
+
+test('an explicit worker error immediately and durably switches control off', async () => {
+  const { service, getStoredRow } = createInMemoryService();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
+
+  const response = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'error',
+        workerMessage: 'no such column: usable_review_state',
+        queuePending: true,
+      },
+    },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload.control.enabled, false);
+  assert.equal(response.payload.control.workerState, 'error');
+  assert.equal(getStoredRow(service.controlStateKey).payload.enabled, false);
+  assert.match(response.payload.control.automaticStopReason, /no such column/);
+});
+
+test('missing startup heartbeats switch control off after the startup grace period', async () => {
+  const { service, getStoredRow, setNow } = createInMemoryService();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
+
+  setNow('2026-07-26T20:32:30.001Z');
+  const response = createJsonResponse();
+  await service.sendGetControlResponse({}, response);
+
+  assert.equal(response.payload.control.enabled, false);
+  assert.equal(getStoredRow(service.controlStateKey).payload.enabled, false);
+  assert.match(response.payload.control.automaticStopReason, /geen heartbeat ontvangen/);
+});
+
+test('a new start is not cancelled by an error report from the previous revision', async () => {
+  const { service, setNow } = createInMemoryService();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: { workerKey: 'vuller', workerState: 'error', workerMessage: 'Oude fout.' },
+    },
+    createJsonResponse()
+  );
+
+  setNow('2026-07-26T20:31:00.000Z');
+  const response = createJsonResponse();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    response
+  );
+
+  assert.equal(response.payload.control.enabled, true);
+  assert.equal(response.payload.control.workerState, 'starting');
+  assert.equal(response.payload.control.automaticStopReason, '');
 });
 
 test('a healthy empty lane is idle instead of pretending to be busy', async () => {
@@ -240,6 +313,30 @@ test('a healthy empty lane is idle instead of pretending to be busy', async () =
   assert.equal(report.payload.control.workers.goedgekeurd.workerState, 'idle');
   assert.equal(report.payload.control.workers.goedgekeurd.stalled, false);
   assert.match(report.payload.control.workers.goedgekeurd.workerMessage, /wachtrij leeg/);
+});
+
+test('completed work switches control off when every queue is empty', async () => {
+  const { service, getStoredRow } = createInMemoryService();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
+
+  let response;
+  for (const workerKey of ['vuller', 'controle', 'goedgekeurd']) {
+    response = createJsonResponse();
+    await service.sendReportWorkerResponse(
+      {
+        headers: { authorization: 'Bearer worker-token' },
+        body: { workerKey, workerState: 'idle', queuePending: false },
+      },
+      response
+    );
+  }
+
+  assert.equal(response.payload.control.enabled, false);
+  assert.equal(getStoredRow(service.controlStateKey).payload.enabled, false);
+  assert.match(response.payload.control.automaticStopReason, /is afgerond/);
 });
 
 test('kvk database control validates browser and worker payloads', async () => {
