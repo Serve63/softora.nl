@@ -81,6 +81,12 @@
     let activeController = null;
     let failureCount = 0;
 
+    function handleDetailPriority() {
+      if (!refreshInFlight) return;
+      refreshQueued = true;
+      activeController?.abort?.();
+    }
+
     function getScope() {
       return normalizeScope({ account: getAccount(), folder: getFolder(), owner: getOwner() });
     }
@@ -241,6 +247,10 @@
 
     async function refresh({ manual = false } = {}) {
       if (destroyed || paused) return false;
+      if (!manual && Number(global.SoftoraMailboxDetailState?.snapshot?.().inFlight) > 0) {
+        scheduleNext(1500);
+        return false;
+      }
       if (refreshInFlight) {
         refreshQueued = true;
         return false;
@@ -384,6 +394,7 @@
       windowRef?.addEventListener?.('online', requestImmediateRefresh);
       windowRef?.addEventListener?.('pagehide', handlePageHide);
       windowRef?.addEventListener?.('pageshow', handlePageShow);
+      windowRef?.addEventListener?.('softora:mailbox-detail-priority', handleDetailPriority);
       updateRefreshAge();
       scheduleNext(0);
     }
@@ -400,6 +411,7 @@
       windowRef?.removeEventListener?.('online', requestImmediateRefresh);
       windowRef?.removeEventListener?.('pagehide', handlePageHide);
       windowRef?.removeEventListener?.('pageshow', handlePageShow);
+      windowRef?.removeEventListener?.('softora:mailbox-detail-priority', handleDetailPriority);
     }
 
     if (button) button.addEventListener('click', () => void refresh({ manual: true }));

@@ -5,9 +5,10 @@ let syncInFlight = false;
 let lastBackgroundSyncAt = 0;
 const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_THREAD_HYDRATION_TARGETS = 40;
-const MAILBOX_BODY_FETCH_ATTEMPTS = 3;
-const MAILBOX_BODY_FETCH_TIMEOUT_MS = 6000;
-const MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS = 3800;
+const MAILBOX_BODY_FETCH_ATTEMPTS = 2;
+const MAILBOX_BODY_FETCH_TIMEOUT_MS = 75_000;
+const MAILBOX_BODY_REQUEST_DEADLINE_MS = 80_000;
+const MAILBOX_BODY_PARTIAL_STATUS_DELAY_MS = 1200;
 const visibleBodyLoadingDeadlines = new Map();
 const LEGACY_MAILBOX_MEDIA_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
@@ -31,12 +32,9 @@ function createBodyDeadlineError() {
 
 function createBodyLoadDeadline(parentSignal, requestedDeadlineMs) {
   const requested = Number(requestedDeadlineMs);
-  const deadlineMs = Math.min(
-    MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS,
-    Number.isFinite(requested) && requested > 0
-      ? requested
-      : MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS
-  );
+  const deadlineMs = Number.isFinite(requested) && requested > 0
+    ? requested
+    : MAILBOX_BODY_REQUEST_DEADLINE_MS;
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   let deadlineExpired = false;
   const abortFromParent = () => controller?.abort?.();
@@ -94,7 +92,7 @@ function guardVisibleBodyLoading({ id, getMail, getActiveMail, getDetailElement,
     if (candidateId !== key) clearVisibleBodyLoadingDeadline(candidateId);
   }
   const detail = typeof getDetailElement === 'function' ? getDetailElement() : null;
-  const loadingIsVisible = Boolean(detail && String(detail.innerHTML || '').includes('Volledig bericht laden…'));
+  const loadingIsVisible = Boolean(detail && String(detail.innerHTML || '').includes('Volledige inhoud wordt opgehaald…'));
   if (String(getActiveMail() || '') !== key || !loadingIsVisible) {
     clearVisibleBodyLoadingDeadline(key);
     return false;
@@ -106,28 +104,19 @@ function guardVisibleBodyLoading({ id, getMail, getActiveMail, getDetailElement,
     visibleBodyLoadingDeadlines.delete(key);
     if (String(getActiveMail() || '') !== key) return;
     const currentDetail = typeof getDetailElement === 'function' ? getDetailElement() : null;
-    if (!currentDetail || !String(currentDetail.innerHTML || '').includes('Volledig bericht laden…')) return;
+    if (!currentDetail || !String(currentDetail.innerHTML || '').includes('Volledige inhoud wordt opgehaald…')) return;
     const mail = getMail(key);
     if (!mail) return;
-    if (isRootBodyVisiblyPending(mail)) {
-      mail.bodyLoading = false;
-      mail.bodyLoaded = false;
-      mail.bodyLoadError = createBodyDeadlineError().message;
-    }
-    let threadExpired = false;
+    if (isRootBodyVisiblyPending(mail)) mail.bodyLoadState = 'partial';
     (Array.isArray(mail.threadMessages) ? mail.threadMessages : []).forEach((message) => {
-      if (!isThreadBodyVisiblyPending(message)) return;
-      message.bodyLoading = false;
-      message.bodyLoadError = createBodyDeadlineError().message;
-      threadExpired = true;
+      if (isThreadBodyVisiblyPending(message)) message.bodyLoadState = 'partial';
     });
-    if (threadExpired) mail.threadBodiesLoading = false;
     openMail?.(key, {
       skipBodyFetch: true,
       skipThreadBodyFetch: true,
       skipReadPersist: true,
     });
-  }, MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS);
+  }, MAILBOX_BODY_PARTIAL_STATUS_DELAY_MS);
   visibleBodyLoadingDeadlines.set(key, { timer });
   return true;
 }
@@ -245,6 +234,7 @@ function decorateMessage(mail, source) {
     bodyTruncated: Boolean(message.bodyTruncated),
     bodyImagesTruncated: Boolean(message.bodyImagesTruncated),
     bodyImageEvidenceKnown: Boolean(message.bodyImageEvidenceKnown),
+    safeBodyPreviewOnly: legacyMediaNeedsHydration,
     embeddedImageCount: Math.max(0, Math.min(8, Number(message.embeddedImageCount) || 0)),
     originalCampaignOutbound: Boolean(message.originalCampaignOutbound),
     webdesignLinkEvidenceKnown: Boolean(message.webdesignLinkEvidenceKnown),
@@ -316,16 +306,23 @@ async function loadBody({
 }) {
   const mail = getMail(id);
   if (!mail || mail.bodyLoading) return;
-  const bodyLoadDeadline = createBodyLoadDeadline(signal, bodyLoadDeadlineMs);
+  const detailState = window.SoftoraMailboxDetailState;
+  const flight = detailState?.begin?.(id, { partial: Boolean(normalizeText(mail.body || mail.preview)), signal });
+  if (flight?.duplicate) return;
+  const stillCurrent = () => (typeof isCurrent !== 'function' || isCurrent()) && (!flight || detailState.isCurrent(flight));
+  const bodyLoadDeadline = createBodyLoadDeadline(flight?.controller?.signal || signal, bodyLoadDeadlineMs);
   mail.bodyLoading = true;
+  mail.bodyLoadState = normalizeText(mail.body || mail.preview) ? 'partial' : 'loading';
   let exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
+  let retryableFailure = false;
+  let finalState = 'failed';
   try {
     try {
       const { response: indexedResponse, data: indexedData } = await fetchMailboxBodyJson(fetch, '/api/mailbox/messages/bodies', {
         method: 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Mailbox-Request-Id': `detail-${Number(flight?.generation) || 0}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}` },
         body: JSON.stringify({
           messages: [{ account, folder, id: String(requestId || id) }],
         }),
@@ -334,6 +331,7 @@ async function loadBody({
         ? indexedData.messages[0]
         : null;
       if (
+        stillCurrent() &&
         indexedResponse.ok &&
         indexedData?.ok &&
         indexedMessage &&
@@ -378,7 +376,7 @@ async function loadBody({
         if (exactBodyAvailable) {
           mail.bodyLoading = false;
           if (
-            (typeof isCurrent !== 'function' || isCurrent()) &&
+            stillCurrent() &&
             typeof getActiveMail === 'function' &&
             String(getActiveMail()) === String(id)
           ) {
@@ -402,7 +400,7 @@ async function loadBody({
       error.status = response.status;
       throw error;
     }
-    if (typeof isCurrent === 'function' && !isCurrent()) return;
+    if (!stillCurrent()) return;
     const body = normalizeText(data.message.body || '');
     mail.body = body;
     mail.bodyImages = normalizeBodyImages(data.message.bodyImages || mail.bodyImages);
@@ -431,22 +429,37 @@ async function loadBody({
     mail.recipientRoutingEvidenceKnown = data.message.recipientRoutingEvidenceKnown === true;
     mail.recipientRoutingNeedsHydration = !mail.recipientRoutingEvidenceKnown;
     mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
+    mail.bodyLoadError = '';
+    finalState = mail.bodyLoaded ? 'ready' : 'partial';
   } catch (error) {
-    if (typeof isCurrent === 'function' && !isCurrent()) return;
+    if (!stillCurrent()) return;
     if (bodyLoadDeadline.expired()) error = createBodyDeadlineError();
     mail.webdesignLinkHydrationAttempted = true;
-    if (exactBodyAvailable || (mail.bodyLoaded && normalizeText(mail.body))) {
+    retryableFailure = error?.name !== 'AbortError' && Number(error?.status) !== 404;
+    if (exactBodyAvailable || normalizeText(mail.body || mail.preview)) {
       mail.bodyLoadError = '';
-      mail.bodyLoaded = true;
+      finalState = 'partial';
     } else {
       mail.bodyLoadError = getBodyLoadError(error, error?.status);
       mail.bodyLoaded = false;
+      finalState = 'failed';
     }
   } finally {
     bodyLoadDeadline.cleanup();
     mail.bodyLoading = false;
+    if (mail.bodyLoaded) finalState = 'ready';
+    detailState?.finish?.(flight, finalState);
+    if (retryableFailure && detailState?.scheduleRetry?.(flight, () => {
+      mail.bodyLoadError = '';
+      void loadBody({ id, requestId, getMail, account, folder, normalizeBodyImages, normalizeOptOutUrl, getActiveMail, openMail, isCurrent, signal, bodyFetchTimeoutMs, bodyFetchRetryDelayMs, bodyLoadDeadlineMs });
+    })) {
+      mail.bodyLoadState = 'retryScheduled';
+      mail.bodyLoadError = '';
+    } else {
+      mail.bodyLoadState = finalState;
+    }
     if (
-      (typeof isCurrent !== 'function' || isCurrent()) &&
+      stillCurrent() &&
       typeof getActiveMail === 'function' &&
       String(getActiveMail()) === String(id)
     ) {

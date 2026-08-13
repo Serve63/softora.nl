@@ -7,6 +7,7 @@ const vm = require('vm');
 const pagePath = path.join(__dirname, '../../premium-mailbox.html');
 const scriptPath = path.join(__dirname, '../../assets/premium-mailbox.js');
 const indexScriptPath = path.join(__dirname, '../../assets/premium-mailbox-index.js');
+const detailStateScriptPath = path.join(__dirname, '../../assets/premium-mailbox-detail-state.js');
 const displayScriptPath = path.join(__dirname, '../../assets/premium-mailbox-display.js');
 const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-outreach.js');
 const quotedThreadScriptPath = path.join(__dirname, '../../assets/premium-mailbox-quoted-thread.js');
@@ -118,7 +119,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260811b/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260813a/);
   assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260811b/);
   assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
@@ -127,7 +128,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b/);
   assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260812a/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
+  assert.match(readPage(), /assets\/premium-mailbox-detail-state\.js\?v=20260813a/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -236,6 +238,7 @@ function loadMailboxHelpersForTest(options = {}) {
   );
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
+  vm.runInContext(fs.readFileSync(detailStateScriptPath, 'utf8'), context);
   vm.runInContext(readIndexScript(), context);
   vm.runInContext(source, context);
   return context.window.__mailboxTest;
@@ -1486,7 +1489,8 @@ test('mailbox toont legacy snapshotmedia nooit kort voordat de exacte body gelad
   mailbox.openMail(mail.id);
 
   const html = mailbox.getElement('mail-detail').innerHTML;
-  assert.match(html, /Volledig bericht laden…/);
+  assert.match(html, /Met welk programma werk je/);
+  assert.match(html, /Volledige inhoud wordt opgehaald…/);
   assert.doesNotMatch(html, /korte indruk van de eerste versie/);
   assert.doesNotMatch(html, /salontof\.nl-preview/);
 });
@@ -3010,10 +3014,10 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260811b/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260813a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -3108,7 +3112,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260811b/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260813a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -4889,7 +4893,7 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| ''\)/);
   assert.doesNotMatch(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview/);
-  assert.match(readDisplayScript(), /function renderDetailBody\(mail, content\)[\s\S]*Volledig bericht laden…/);
+  assert.match(readDisplayScript(), /function renderDetailBody\(mail, content\)[\s\S]*Volledige inhoud wordt opgehaald…/);
   assert.match(scriptSource, /renderMailBody\(detailBody, detailBodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
@@ -5198,9 +5202,51 @@ test('premium mailbox vervangt het oude detail direct wanneer een nieuwe mail no
 
   assert.equal(mailbox.getActiveMail(), next.id);
   assert.match(mailbox.getElement('mail-detail').innerHTML, /Nieuwe mail/);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledig bericht laden…/);
-  assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Dit is alvast de nieuwe mail\./);
+  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledige inhoud wordt opgehaald…/);
+  assert.match(mailbox.getElement('mail-detail').innerHTML, /Dit is alvast de nieuwe mail\./);
   assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Vorige mail|Dit is de oude mail\./);
+});
+
+test('trage detailresponse houdt preview zichtbaar en verrijkt daarna automatisch naar ready', async () => {
+  let releaseBody;
+  const slowBody = new Promise((resolve) => { releaseBody = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    setTimeout,
+    clearTimeout,
+    fetch: async (url) => {
+      if (String(url) === '/api/mailbox/messages/bodies') {
+        await slowBody;
+        return {
+          ok: true,
+          json: async () => ({ ok: true, messages: [{
+            id: 'coldmail:415', uid: 415, folder: 'coldmail', accountEmail: 'servec321@gmail.com',
+            resolved: true, body: 'Volledige Equans-inhoud.', hasBody: true, bodyTruncated: false,
+            recipientRoutingEvidenceKnown: true,
+          }] }),
+        };
+      }
+      throw new Error(`Onverwachte fallback: ${url}`);
+    },
+  });
+  const mail = {
+    id: 'servec321@gmail.com|coldmail:415', preview: 'Equans preview blijft zichtbaar.',
+    body: '', hasBody: true, bodyLoaded: false, bodyLoading: false,
+  };
+  const loading = mailbox.index.loadBody({
+    id: mail.id, requestId: 'coldmail:415', getMail: () => mail,
+    account: 'servec321@gmail.com', folder: 'coldmail',
+    normalizeBodyImages: (value) => value || [], normalizeOptOutUrl: String,
+    getActiveMail: () => mail.id, openMail() {}, bodyFetchTimeoutMs: 100, bodyLoadDeadlineMs: 150,
+  });
+
+  assert.match(mailbox.display.renderDetailBody(mail, 'Equans preview blijft zichtbaar.'), /Equans preview blijft zichtbaar/);
+  assert.match(mailbox.display.renderDetailBody(mail, 'Equans preview blijft zichtbaar.'), /Volledige inhoud wordt opgehaald/);
+  releaseBody();
+  await loading;
+  assert.equal(mail.body, 'Volledige Equans-inhoud.');
+  assert.equal(mail.bodyLoaded, true);
+  assert.equal(mail.bodyLoadState, 'ready');
+  assert.doesNotMatch(mailbox.display.renderDetailBody(mail, mail.body), /Laden duurde te lang|wordt opgehaald/);
 });
 
 test('premium mailbox opent oude ontvangen tekst direct uit de index zonder trage IMAP-detailvraag', async () => {
@@ -5389,7 +5435,7 @@ test('top-level body blijft zichtbaar wanneer alleen campagne-linkverrijking def
   assert.equal(mail.webdesignLinkHydrationAttempted, true);
 });
 
-test('top-level bodyloader eindigt begrensd met retry in plaats van oneindig laden', async () => {
+test('top-level bodyloader plant automatisch herstel zonder bekende inhoud te wissen', async () => {
   let calls = 0;
   const mailbox = loadMailboxHelpersForTest({
     setTimeout,
@@ -5431,15 +5477,17 @@ test('top-level bodyloader eindigt begrensd met retry in plaats van oneindig lad
   assert.equal(calls, 1);
   assert.equal(mail.bodyLoading, false);
   assert.equal(mail.bodyLoaded, false);
-  assert.equal(mail.bodyLoadError, 'Laden duurde te lang. Opnieuw proberen.');
+  assert.equal(mail.bodyLoadError, '');
+  assert.equal(mail.bodyLoadState, 'retryScheduled');
 });
 
-test('alle zichtbare mailbox bodyspinners hebben een harde grens onder vier seconden', () => {
-  assert.match(readIndexScript(), /const MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS = 3800;/);
-  assert.match(readIndexScript(), /Math\.min\(\s*MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS,/);
+test('client- en providerdeadline zijn gecoördineerd en tonen vroeg een partialstatus', () => {
+  assert.match(readIndexScript(), /const MAILBOX_BODY_FETCH_TIMEOUT_MS = 75_000;/);
+  assert.match(readIndexScript(), /const MAILBOX_BODY_REQUEST_DEADLINE_MS = 80_000;/);
+  assert.match(readIndexScript(), /const MAILBOX_BODY_PARTIAL_STATUS_DELAY_MS = 1200;/);
 });
 
-test('zichtbare bodyspinner houdt zijn viersecondenbudget tijdens bootstrap-tokenvervanging', () => {
+test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder terminale fout', () => {
   const timers = [];
   let nextTimerId = 0;
   const mailbox = loadMailboxHelpersForTest({
@@ -5469,11 +5517,10 @@ test('zichtbare bodyspinner houdt zijn viersecondenbudget tijdens bootstrap-toke
     skipBodyFetch: true,
     skipThreadBodyFetch: true,
   });
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledig bericht laden…/);
+  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledige inhoud wordt opgehaald…/);
 
-  const firstDeadline = timers.find((timer) => timer.delayMs === 3800 && !timer.cancelled);
-  assert.ok(firstDeadline, 'het zichtbare laadscherm moet zelf direct een deadline starten');
-  assert.ok(firstDeadline.delayMs < 4000);
+  const firstDeadline = timers.find((timer) => timer.delayMs === 1200 && !timer.cancelled);
+  assert.ok(firstDeadline, 'de partialstatus moet vroeg zichtbaar worden');
 
   const refreshedMail = makePendingMail();
   mailbox.setMails([refreshedMail]);
@@ -5482,18 +5529,17 @@ test('zichtbare bodyspinner houdt zijn viersecondenbudget tijdens bootstrap-toke
     skipThreadBodyFetch: true,
   });
   assert.equal(
-    timers.filter((timer) => timer.delayMs === 3800 && !timer.cancelled).length,
+    timers.filter((timer) => timer.delayMs === 1200 && !timer.cancelled).length,
     1,
     'een refresh mag het reeds lopende zichtbare budget niet opnieuw starten'
   );
 
   firstDeadline.callback();
   const html = mailbox.getElement('mail-detail').innerHTML;
-  assert.doesNotMatch(html, /Volledig bericht laden…/);
-  assert.match(html, /Laden duurde te lang\. Opnieuw proberen\./);
-  assert.match(html, /data-mailbox-action="retry-mail-body"/);
-  assert.equal(refreshedMail.bodyLoading, false);
-  assert.equal(refreshedMail.bodyLoadError, 'Laden duurde te lang. Opnieuw proberen.');
+  assert.match(html, /Volledige inhoud wordt opgehaald…/);
+  assert.doesNotMatch(html, /Laden duurde te lang/);
+  assert.equal(refreshedMail.bodyLoadError || '', '');
+  assert.equal(refreshedMail.bodyLoadState, 'partial');
 });
 
 test('bootstrapachtergrondrefresh annuleert een direct gestarte bodyhydratie niet', async () => {
@@ -5702,7 +5748,7 @@ test('top-level bodyfout vervangt de spinner en kan het bericht opnieuw laden', 
 
   const failedHtml = mailbox.getElement('mail-detail').innerHTML;
   assert.match(failedHtml, /data-mailbox-action="retry-mail-body"/);
-  assert.doesNotMatch(failedHtml, /Volledig bericht laden…/);
+  assert.doesNotMatch(failedHtml, /Volledige inhoud wordt opgehaald…/);
 
   assert.equal(mailbox.index.retryBody({
     id: mail.id,
@@ -5710,13 +5756,13 @@ test('top-level bodyfout vervangt de spinner en kan het bericht opnieuw laden', 
     loadMessageBody: mailbox.loadMailboxMessageBody,
     openMail: mailbox.openMail,
   }), true);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledig bericht laden…/);
+  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledige inhoud wordt opgehaald…/);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(mail.body, 'Hersteld volledig bericht.');
   assert.equal(mail.bodyLoaded, true);
   const recoveredHtml = mailbox.display.renderDetailBody(mail, mail.body);
   assert.match(recoveredHtml, /Hersteld volledig bericht\./);
-  assert.doesNotMatch(recoveredHtml, /detail-mail-load-error|Volledig bericht laden…/);
+  assert.doesNotMatch(recoveredHtml, /detail-mail-load-error|Volledige inhoud wordt opgehaald…/);
 });
 
 test('ownerwissel annuleert bodyhydratie zonder foutkaart of late render', async () => {
@@ -5890,16 +5936,15 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   const pageSource = readPage();
   const scriptSource = readScript();
 
-  assert.match(scriptSource, /const wasUnread = m\.unread;[\s\S]*activeMail = m\.id;[\s\S]*SoftoraMailboxUiState\.markReadOnOpen\([\s\S]*renderList\(\{ openLatest: false \}\);[\s\S]*if \(\(!m\.bodyLoaded \|\| m\.recipientRoutingNeedsHydration\) && !options\.skipBodyFetch\) void loadMailboxMessageBody\(m\.id\);/);
+  assert.match(scriptSource, /const wasUnread = m\.unread;[\s\S]*activeMail = m\.id;[\s\S]*SoftoraMailboxDetailState\?\.select\?\.\(m\.id\);[\s\S]*SoftoraMailboxUiState\.markReadOnOpen\([\s\S]*renderList\(\{ openLatest: false \}\);[\s\S]*if \(\(!m\.bodyLoaded \|\| m\.recipientRoutingNeedsHydration\) && !options\.skipBodyFetch\) void loadMailboxMessageBody\(m\.id\);/);
   assert.match(readIndexScript(), /function hasUnverifiedLegacyMedia\(message\)/);
   assert.match(readIndexScript(), /bodyLoaded:[\s\S]*Boolean\(message\.body\)[\s\S]*!legacyMediaNeedsHydration/);
   assert.match(readIndexScript(), /mail\.bodyImagesTruncated = false;/);
   assert.match(readIndexScript(), /String\(getActiveMail\(\)\) === String\(id\)/);
   assert.match(readIndexScript(), /function loadThreadBodies\(/);
   assert.match(scriptSource, /if \(!options\.skipThreadBodyFetch && activeFolder === 'outreach' && window\.SoftoraMailboxCampaignInbox\.isCampaignMail\(m\)\) void window\.SoftoraMailboxIndex\?\.loadThreadBodies\?\.\(\{ mail: m,/);
-  assert.match(scriptSource, /const detailBody = m\.body \|\| '';/);
-  assert.doesNotMatch(scriptSource, /const detailBody = m\.body \|\| m\.preview/);
-  assert.match(readDisplayScript(), /Volledig bericht laden…/);
+  assert.match(scriptSource, /const detailBody = m\.safeBodyPreviewOnly \? \(m\.preview \|\| ''\) : \(m\.body \|\| m\.preview \|\| ''\);/);
+  assert.match(readDisplayScript(), /Volledige inhoud wordt opgehaald…/);
 
   assert.match(scriptSource, /<article class="detail-mail-block">/);
   assert.match(scriptSource, /<div class="detail-subject-row">/);
