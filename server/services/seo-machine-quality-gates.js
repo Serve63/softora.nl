@@ -513,6 +513,15 @@ function isMartijnWhatsappHref(hrefRaw) {
   return /^https:\/\/wa\.me\/31643262792$/i.test(href);
 }
 
+function isPurposeLimitedArchiveContactLink(anchor, pathName) {
+  if (!['/whatsapp-privacy', '/whatsapp-data-deletion'].includes(pathName)) return false;
+  const href = String(anchor?.href || '').trim();
+  return (
+    /^mailto:serve@softora\.nl(?:\?|$)/i.test(href) &&
+    hasCompleteConversionTracking(anchor?.attrs, 'mailto')
+  );
+}
+
 function hasPrefilledWhatsappMessage(hrefRaw) {
   const href = String(hrefRaw || '').trim();
   return (
@@ -719,7 +728,10 @@ function auditConversionCtas({ pages = [] } = {}) {
       });
     }
     const nonWhatsappLinks = conversionLinks.filter(
-      (anchor) => !isMartijnWhatsappHref(anchor.href) && !hasPrefilledWhatsappMessage(anchor.href)
+      (anchor) =>
+        !isMartijnWhatsappHref(anchor.href) &&
+        !hasPrefilledWhatsappMessage(anchor.href) &&
+        !isPurposeLimitedArchiveContactLink(anchor, pathName)
     );
     if (nonWhatsappLinks.length > 0) {
       issues.push({
@@ -740,7 +752,10 @@ function auditConversionCtas({ pages = [] } = {}) {
     }
     const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label));
     const nonWhatsappLeadCtas = leadCtaLinks.filter(
-      (anchor) => !isMartijnWhatsappHref(anchor.href) && !hasPrefilledWhatsappMessage(anchor.href)
+      (anchor) =>
+        !isMartijnWhatsappHref(anchor.href) &&
+        !hasPrefilledWhatsappMessage(anchor.href) &&
+        !isPurposeLimitedArchiveContactLink(anchor, pathName)
     );
     if (nonWhatsappLeadCtas.length > 0) {
       issues.push({
