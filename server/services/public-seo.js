@@ -252,6 +252,22 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Lees hoe Softora omgaat met persoonsgegevens, privacy, beveiliging en gegevensverwerking binnen de dienstverlening.',
     kind: 'legal',
   },
+  {
+    fileName: 'whatsapp-privacy.html',
+    path: '/whatsapp-privacy',
+    title: 'Softora Read Archive privacy policy',
+    description:
+      'Read how Softora Read Archive securely processes one-to-one WhatsApp Business messages for its private read-only archive.',
+    kind: 'legal',
+  },
+  {
+    fileName: 'whatsapp-data-deletion.html',
+    path: '/whatsapp-data-deletion',
+    title: 'Delete data from Softora Read Archive',
+    description:
+      'Request deletion of messages and contact data stored in the private Softora Read Archive.',
+    kind: 'legal',
+  },
 ]);
 
 const INDEXABLE_PAGE_BY_FILE = new Map(

@@ -99,6 +99,24 @@ const publicSeoLegacyRedirectTargets = [
   { from: '/premium-privacy-policy', to: '/privacybeleid' },
 ];
 
+for (const target of [
+  { path: '/whatsapp-privacy', marker: 'Softora Read Archive Privacy Policy' },
+  { path: '/whatsapp-data-deletion', marker: 'Softora Read Archive deletion request' },
+]) {
+  test(`page smoke: ${target.path} is public and canonical`, async () => {
+    const response = await fetch(`${serverRef.baseUrl}${target.path}`, { cache: 'no-store' });
+    const html = await response.text();
+
+    assert.equal(response.status, 200, target.path);
+    assert.match(html, new RegExp(target.marker), `${target.path} mist de verwachte inhoud.`);
+    assert.match(
+      html,
+      new RegExp(`<link rel="canonical" href="https:\\/\\/www\\.softora\\.nl${target.path}">`),
+      `${target.path} mist de canonical.`
+    );
+  });
+}
+
 for (const target of publicSeoLegacyRedirectTargets) {
   test(`page smoke: ${target.from} redirects to clean SEO URL`, async () => {
     const response = await fetch(`${serverRef.baseUrl}${target.from}`, {
