@@ -7,7 +7,6 @@ const vm = require('vm');
 const pagePath = path.join(__dirname, '../../premium-mailbox.html');
 const scriptPath = path.join(__dirname, '../../assets/premium-mailbox.js');
 const indexScriptPath = path.join(__dirname, '../../assets/premium-mailbox-index.js');
-const detailStateScriptPath = path.join(__dirname, '../../assets/premium-mailbox-detail-state.js');
 const displayScriptPath = path.join(__dirname, '../../assets/premium-mailbox-display.js');
 const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-outreach.js');
 const quotedThreadScriptPath = path.join(__dirname, '../../assets/premium-mailbox-quoted-thread.js');
@@ -41,6 +40,7 @@ const deleteModule = require('../../assets/premium-mailbox-delete.js');
 const readModule = require('../../assets/premium-mailbox-read.js');
 const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
 const bodySectionModule = require('../../assets/premium-mailbox-body-section.js');
+const detailStateModule = require('../../assets/premium-mailbox-detail-state.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -208,6 +208,7 @@ function loadMailboxHelpersForTest(options = {}) {
     SoftoraMailboxImages: options.SoftoraMailboxImages || imagesModule,
     SoftoraMailboxBodySection: bodySectionModule,
     SoftoraUiStateClient: null,
+    SoftoraMailboxDetailState: detailStateModule.createMailboxDetailState(),
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
     confirm: options.confirm || (() => false),
@@ -238,7 +239,6 @@ function loadMailboxHelpersForTest(options = {}) {
   );
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
-  vm.runInContext(fs.readFileSync(detailStateScriptPath, 'utf8'), context);
   vm.runInContext(readIndexScript(), context);
   vm.runInContext(source, context);
   return context.window.__mailboxTest;
