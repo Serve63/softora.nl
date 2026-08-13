@@ -128,7 +128,7 @@ function createPremiumAuthStateManager(options = {}) {
     );
   }
 
-  function buildTokenFallbackState(basicAuthState) {
+  function buildTokenFallbackState(basicAuthState, options = {}) {
     if (!basicAuthState.authenticated) {
       return buildConfiguredAnonymousState(basicAuthState);
     }
@@ -157,14 +157,23 @@ function createPremiumAuthStateManager(options = {}) {
       return {
         ...buildAuthenticatedStateFromUser(basicAuthState, cachedUser),
         tokenFallback: true,
+        ...(options.hydrationUnavailable ? { hydrationUnavailable: true } : {}),
       };
     }
 
     return {
-      ...buildConfiguredAnonymousState(basicAuthState),
+      ...basicAuthState,
       configured: true,
-      revoked: true,
+      authenticated: true,
+      isAdmin: premiumUsersStore.isAdminRole(basicAuthState.role),
+      revoked: false,
+      user: null,
+      displayName: basicAuthState.email,
+      firstName: '',
+      lastName: '',
+      avatarDataUrl: '',
       tokenFallback: true,
+      ...(options.hydrationUnavailable ? { hydrationUnavailable: true } : {}),
     };
   }
 
@@ -194,7 +203,10 @@ function createPremiumAuthStateManager(options = {}) {
       }
     }
     if (basicAuthState.authenticated && allowTokenFallbackWithoutHydration) {
-      return buildTokenFallbackState(basicAuthState);
+      const cachedFallbackState = buildTokenFallbackState(basicAuthState);
+      if (cachedFallbackState.user || cachedFallbackState.revoked) {
+        return cachedFallbackState;
+      }
     }
     const timeoutMs = getSafeResolveTimeoutMs();
     let hydrated;
@@ -249,7 +261,15 @@ function createPremiumAuthStateManager(options = {}) {
     );
 
     if (hydrated?.source === 'timeout') {
-      return buildTokenFallbackState(basicAuthState);
+      return buildTokenFallbackState(basicAuthState, { hydrationUnavailable: true });
+    }
+
+    if (
+      basicAuthState.authenticated &&
+      allowTokenFallbackWithoutHydration &&
+      hydrated?.source === 'unavailable'
+    ) {
+      return buildTokenFallbackState(basicAuthState, { hydrationUnavailable: true });
     }
 
     if (!configured) {

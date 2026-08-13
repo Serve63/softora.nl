@@ -178,8 +178,17 @@ test('premium auth manager resolves authenticated user and session payload', asy
   assert.equal(sessionPayload.canManageUsers, true);
 });
 
-test('premium auth manager can resolve authenticated token requests without hydration wait', async () => {
+test('premium auth manager hydrates a cold authenticated session before trusting user state', async () => {
   let hydrateCalls = 0;
+  const users = [{
+    id: 'usr_1',
+    email: 'info@softora.nl',
+    role: 'admin',
+    status: 'active',
+    firstName: 'Serve',
+    lastName: 'Creusen',
+    authVersion: 1,
+  }];
   const manager = createPremiumAuthStateManager({
     sessionSecret: 'secret',
     normalizeString,
@@ -202,7 +211,50 @@ test('premium auth manager can resolve authenticated token requests without hydr
       ...createPremiumUsersStoreStub([]),
       async ensureUsersHydrated() {
         hydrateCalls += 1;
-        return { users: [], source: 'supabase' };
+        return { users, source: 'supabase' };
+      },
+      findUserById: createPremiumUsersStoreStub(users).findUserById,
+      findUserByEmail: createPremiumUsersStoreStub(users).findUserByEmail,
+    },
+    getRequestPathname: () => '/api/auth/session',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState(
+    {},
+    { allowTokenFallbackWithoutHydration: true }
+  );
+
+  assert.equal(hydrateCalls, 1);
+  assert.equal(resolved.authenticated, true);
+  assert.equal(resolved.revoked, false);
+  assert.equal(resolved.user?.id, 'usr_1');
+  assert.equal(resolved.tokenFallback, undefined);
+});
+
+test('premium auth manager keeps a valid cold session during temporary hydration failure', async () => {
+  let hydrateCalls = 0;
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => 'token',
+    verifySessionToken: () => ({
+      ok: true,
+      expired: false,
+      payload: {
+        email: 'INFO@SOFTORA.NL',
+        uid: 'usr_1',
+        role: 'ADMIN',
+        exp: Date.now() + 60_000,
+        av: 2,
+      },
+    }),
+    premiumUsersStore: {
+      ...createPremiumUsersStoreStub([]),
+      async ensureUsersHydrated() {
+        hydrateCalls += 1;
+        return { users: [], source: 'unavailable' };
       },
     },
     getRequestPathname: () => '/api/auth/session',
@@ -213,10 +265,17 @@ test('premium auth manager can resolve authenticated token requests without hydr
     { allowTokenFallbackWithoutHydration: true }
   );
 
-  assert.equal(hydrateCalls, 0);
-  assert.equal(resolved.authenticated, false);
-  assert.equal(resolved.revoked, true);
+  assert.equal(hydrateCalls, 1);
+  assert.equal(resolved.configured, true);
+  assert.equal(resolved.authenticated, true);
+  assert.equal(resolved.email, 'info@softora.nl');
+  assert.equal(resolved.userId, 'usr_1');
+  assert.equal(resolved.role, 'admin');
+  assert.equal(resolved.isAdmin, true);
+  assert.equal(resolved.revoked, false);
   assert.equal(resolved.user, null);
+  assert.equal(resolved.tokenFallback, true);
+  assert.equal(resolved.hydrationUnavailable, true);
 });
 
 test('premium auth manager can require a fresh Supabase user for password-register access', async () => {
