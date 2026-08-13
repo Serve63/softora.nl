@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const MAX_MAILBOX_BODY_BATCH_SIZE = 20;
 
 function normalizeText(value) {
@@ -148,13 +149,27 @@ function createMailboxMessageBodiesService({
   }
 
   async function getMessageBodiesResponse(req, res) {
+    const startedAt = Date.now();
+    const suppliedRequestId = normalizeText(req.headers && req.headers['x-mailbox-request-id']);
+    const requestId = /^[a-z0-9-]{8,80}$/i.test(suppliedRequestId) ? suppliedRequestId : crypto.randomUUID();
+    const targetHash = crypto.createHash('sha256').update(JSON.stringify(
+      (Array.isArray(req.body && req.body.messages) ? req.body.messages : []).map((message) => ({
+        account: normalizeText(message && message.account).toLowerCase(),
+        folder: normalizeText(message && message.folder).toLowerCase(),
+        id: normalizeText(message && message.id),
+      }))
+    )).digest('hex').slice(0, 16);
+    res.setHeader('X-Mailbox-Request-Id', requestId);
     try {
       const messages = await getMessageBodies({
         messages: req.body && req.body.messages,
       });
+      const durationMs = Date.now() - startedAt;
+      res.setHeader('Server-Timing', `mailbox-detail;dur=${durationMs}`);
+      logger.info?.(`[MailboxDetail] ${JSON.stringify({ requestId, targetHash, source: 'index-targeted', durationMs, count: messages.length, resolved: messages.filter((message) => message.resolved).length, truncated: messages.filter((message) => message.bodyTruncated).length })}`);
       return res.status(200).json({ ok: true, messages });
     } catch (error) {
-      logger.error('[Mailbox][MessageBodies]', error?.message || error);
+      logger.error(`[MailboxDetail] ${JSON.stringify({ requestId, targetHash, source: 'index-targeted', durationMs: Date.now() - startedAt, errorCode: normalizeText(error && (error.code || error.status)) || 'UNKNOWN' })}`);
       return res.status(error.status || 500).json({
         ok: false,
         error: 'Mailboxberichtinhoud laden mislukt',

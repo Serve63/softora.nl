@@ -1,0 +1,59 @@
+.momentum-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.momentum-focus-toggle {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(26, 26, 46, .1);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(26, 26, 46, .07);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.momentum-focus-toggle:hover {
+  border-color: rgba(35, 159, 88, .42);
+  color: var(--good-dark);
+}
+
+.momentum-focus-toggle:focus-visible {
+  outline: 3px solid rgba(46, 204, 113, .3);
+  outline-offset: 2px;
+}
+
+.momentum-focus-toggle svg {
+  width: 21px;
+  height: 21px;
+}
+
+.momentum-focus-toggle [data-momentum-focus-icon="restore"],
+.momentum-focus-toggle[aria-pressed="true"] [data-momentum-focus-icon="expand"] {
+  display: none;
+}
+
+.momentum-focus-toggle[aria-pressed="true"] [data-momentum-focus-icon="restore"] {
+  display: block;
+}
+
+body.momentum-focus-mode .momentum-layout > .sidebar {
+  display: none !important;
+}
+
+body.momentum-focus-mode .dashboard-layout[data-sidebar-shell="canonical"] > .momentum-page {
+  width: 100% !important;
+  margin-left: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .momentum-focus-toggle {
+    display: none;
+  }
+}

@@ -131,6 +131,31 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
   }]);
 });
 
+test('mailbox detailresponse logt alleen veilige correlatie en gerichte timing', async () => {
+  const logs = [];
+  const headers = {};
+  const service = createService({ logger: { info: (line) => logs.push(line), error: (line) => logs.push(line) } });
+  const response = {
+    statusCode: 0,
+    body: null,
+    setHeader(name, value) { headers[name.toLowerCase()] = String(value); },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+
+  await service.getMessageBodiesResponse({
+    headers: { 'x-mailbox-request-id': 'detail-equans-safe-1' },
+    body: { messages: [{ account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42' }] },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(headers['x-mailbox-request-id'], 'detail-equans-safe-1');
+  assert.match(headers['server-timing'], /^mailbox-detail;dur=\d+$/);
+  assert.match(logs[0], /"source":"index-targeted"/);
+  assert.match(logs[0], /"resolved":1/);
+  assert.doesNotMatch(logs.join('\n'), /serve@softora\.nl|Volledige inhoud/);
+});
+
 test('mailbox detail leest Instantly uitsluitend uit de providerindex', async () => {
   const service = createService();
 

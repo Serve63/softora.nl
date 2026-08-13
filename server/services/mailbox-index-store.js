@@ -132,7 +132,7 @@ function createMailboxIndexStore(deps = {}) {
   async function run(
     label,
     operation,
-    { bypassFailureCooldown = false, clientOptions = {}, queryTimeoutMs = null } = {}
+    { bypassFailureCooldown = false, suppressFailureCooldown = false, clientOptions = {}, queryTimeoutMs = null } = {}
   ) {
     const client = getClient(clientOptions);
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
@@ -142,13 +142,12 @@ function createMailboxIndexStore(deps = {}) {
     try {
       const result = await withQueryTimeout(operation(client), label, queryTimeoutMs);
       if (result && result.error) throw result.error;
-      failureCooldownUntilMs = 0;
-      failureCooldownReason = '';
+      if (!suppressFailureCooldown) { failureCooldownUntilMs = 0; failureCooldownReason = ''; }
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
       if (!isUnavailableError(error)) {
         if (isSoftIndexError(error)) {
-          openFailureCooldown(error);
+          if (!suppressFailureCooldown) openFailureCooldown(error);
           logSoftIndexError(label, error);
         } else {
           logger.error(`[MailboxIndex][${label}]`, error?.message || error);
@@ -780,17 +779,11 @@ function createMailboxIndexStore(deps = {}) {
 
   async function hydrateMessageBodies({ messages = [] } = {}) {
     const source = Array.isArray(messages) ? messages : [];
-    const messageKeys = Array.from(
-      new Set(
-        source
-          .map((message) => {
-            const uid = Number(message && message.uid) || 0;
-            if (!uid) return '';
-            return buildMessageKey(message.accountEmail, message.folder, uid);
-          })
-          .filter(Boolean)
-      )
-    ).slice(0, 100);
+    const imapReferences = source.map((message) => ({
+      accountEmail: normalizeEmail(message && message.accountEmail),
+      folder: normalizeFolder(message && message.folder),
+      uid: Number(message && message.uid) || 0,
+    })).filter((message) => message.uid && message.folder !== 'instantly').slice(0, 20);
     const providerReferences = source
       .filter((message) => normalizeFolder(message && message.folder) === 'instantly')
       .map((message) => ({
@@ -798,18 +791,18 @@ function createMailboxIndexStore(deps = {}) {
         providerId: normalizeString(message && message.id),
       }))
       .filter((message) => message.accountEmail && /^instantly:[a-z0-9-]+$/i.test(message.providerId));
-    if (!messageKeys.length && !providerReferences.length) return source;
+    if (!imapReferences.length && !providerReferences.length) return source;
 
-    const selectedColumns = 'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text';
+    const selectedColumns = 'message_key,account_email,provider_id,uid,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text,deleted_at';
+    const priorityReadOptions = { bypassFailureCooldown: true, suppressFailureCooldown: true, clientOptions: { ignoreFailureCooldown: true, suppressFailureCooldown: true }, queryTimeoutMs: 8_000 };
     const [messageResult, providerResult] = await Promise.all([
-      messageKeys.length
+      imapReferences.length
         ? run('hydrate-message-bodies', (client) =>
             client
               .from(MAILBOX_INDEX_TABLES.messages)
               .select(selectedColumns)
-              .in('message_key', messageKeys)
-              .is('deleted_at', null)
-          )
+              .or(imapReferences.map((message) => `and(account_email.eq.${message.accountEmail},folder.eq.${message.folder},uid.eq.${message.uid})`).join(','))
+              .is('generation_superseded_at', null), priorityReadOptions)
         : Promise.resolve({ ok: true, data: [] }),
       providerReferences.length
         ? run('hydrate-provider-message-bodies', (client) =>
@@ -819,14 +812,13 @@ function createMailboxIndexStore(deps = {}) {
               .eq('folder', 'instantly')
               .in('account_email', Array.from(new Set(providerReferences.map((message) => message.accountEmail))))
               .in('provider_id', Array.from(new Set(providerReferences.map((message) => message.providerId))))
-              .is('deleted_at', null)
-          )
+              .is('deleted_at', null), priorityReadOptions)
         : Promise.resolve({ ok: true, data: [] }),
     ]);
     if (!messageResult.ok && !providerResult.ok) return source;
 
-    const bodyByMessageKey = new Map(
-      (messageResult.data || []).map((row) => [normalizeString(row.message_key), row])
+    const bodyByMessageIdentity = new Map(
+      (messageResult.data || []).filter((row) => !row.deleted_at).map((row) => [`${normalizeEmail(row.account_email)}|${normalizeFolder(row.folder)}|${Number(row.uid) || 0}`, row])
     );
     const bodyByProviderIdentity = new Map(
       (providerResult.data || []).map((row) => [
@@ -837,13 +829,13 @@ function createMailboxIndexStore(deps = {}) {
     return source.map((message) => {
       const uid = Number(message && message.uid) || 0;
       const folder = normalizeFolder(message && message.folder);
-      const messageKey = uid && folder !== 'instantly'
-        ? buildMessageKey(message.accountEmail, folder, uid)
+      const messageIdentity = uid && folder !== 'instantly'
+        ? `${normalizeEmail(message.accountEmail)}|${folder}|${uid}`
         : '';
       const providerIdentity = folder === 'instantly'
         ? `${normalizeEmail(message && message.accountEmail)}|${normalizeString(message && message.id)}`
         : '';
-      const row = bodyByMessageKey.get(messageKey) || bodyByProviderIdentity.get(providerIdentity);
+      const row = bodyByMessageIdentity.get(messageIdentity) || bodyByProviderIdentity.get(providerIdentity);
       if (!row) return { ...message, bodyResolved: false };
       const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
       const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');

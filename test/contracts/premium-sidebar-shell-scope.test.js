@@ -75,12 +75,23 @@ const staticSidebarPages = [
   'premium-socialmedia.html',
 ];
 
-test('Winnen is bewust fullscreen en laadt geen premium-sidebarketen', () => {
+test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmodus', () => {
   const pageSource = readRepoFile('live-momentum.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const focusSource = readRepoFile('assets/live-momentum-focus-mode.js');
 
-  assert.doesNotMatch(pageSource, /<aside\b|data-sidebar-shell|data-static-sidebar/);
-  assert.doesNotMatch(pageSource, /personnel-theme|premium-sidebar/);
+  assert.match(pageSource, /data-sidebar-shell="canonical"/);
+  assert.match(pageSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
+  assert.match(pageSource, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.match(pageSource, /<main class="main-content momentum-page"/);
+  assert.match(pageSource, /data-momentum-focus-toggle/);
+  assert.match(themeSource, /pathname === "\/winnen"/);
+  assert.match(themeSource, /return p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard";/);
+  assert.match(themeSource, /key: "live_momentum", href: "\/winnen", label: "Winnen"/);
+  assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "extra", getLiveMomentumSidebarLink\(\)/);
+  assert.match(focusSource, /body\.classList\.toggle\("momentum-focus-mode", next\)/);
+  assert.match(focusSource, /event\.key !== "Escape"/);
+  assert.doesNotMatch(focusSource, /localStorage|sessionStorage|location\.(?:assign|replace|reload)/);
 });
 
 test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar', () => {
@@ -203,7 +214,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   );
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
   assert.match(themeJsSource, /const isPremiumPersonnelContext = [^;]*pathname === "\/mailbox"/);
-  assert.match(themeJsSource, /targetUrl\.pathname === "\/mailbox" \|\| targetUrl\.pathname\.indexOf\("\/premium-"\) === 0/);
+  assert.match(themeJsSource, /targetUrl\.pathname === "\/mailbox" \|\| targetUrl\.pathname === "\/winnen" \|\| targetUrl\.pathname\.indexOf\("\/premium-"\) === 0/);
   assert.match(prefillSource, /if \(p === "\/mailbox" \|\| p\.indexOf\("\/premium-mailbox"\) === 0\) return "mailbox";/);
   assert.match(stabilityJsSource, /path\.indexOf\("\/premium-"\) === 0 \|\| path === "\/mailbox"/);
   assert.doesNotMatch(
@@ -218,10 +229,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   );
   assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
   assert.match(themeJsSource, /function isSidebarNavigationCurrentTarget\(href\) \{/);
-  assert.match(themeJsSource, /pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);
-  assert.match(themeJsSource, /return p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard"/);
-  assert.match(prefillSource, /p === "\/live-momentum" \|\| p === "\/live-momentum\.html"\) return "live_momentum"/);
-  assert.match(stabilityJsSource, /path === "\/live-momentum" \|\| path === "\/live-momentum\.html"/);
+  assert.match(themeJsSource, /pathname === "\/winnen" \|\| pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);
+  assert.match(themeJsSource, /return p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard"/);
+  assert.match(prefillSource, /p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html"\) return "live_momentum"/);
+  assert.match(stabilityJsSource, /path === "\/winnen" \|\| path === "\/live-momentum" \|\| path === "\/live-momentum\.html"/);
   assert.match(themeJsSource, /anchor\.dataset\.sidebarHref = normalizeSidebarNavigationTarget\(href\);[\s\S]*anchor\.setAttribute\("href", anchor\.dataset\.sidebarHref\);/);
   assert.doesNotMatch(themeJsSource, /window\.location\.assign\(href\);/);
   assert.doesNotMatch(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);
@@ -632,7 +643,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-reply \{[^}]*border:\s*1px solid rgba\(155,35,85,\.34\);[^}]*border-radius:\s*6px;[^}]*padding:\s*8px 14px;/);
   assert.match(pageSource, /\.detail-footer \{[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*0;/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260810a"><\/script><script src="assets\/premium-mailbox-owner-preference\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260806b"><\/script><script src="assets\/premium-mailbox-reply-identity\.js\?v=20260812a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260806c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260810c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260812a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260806e"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260811b"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260811a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260811b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260810a"><\/script><script src="assets\/premium-mailbox-owner-preference\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260806b"><\/script><script src="assets\/premium-mailbox-reply-identity\.js\?v=20260812a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260813a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260813a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260813a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260810c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260812a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260806e"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260811b"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260811a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260813a"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {

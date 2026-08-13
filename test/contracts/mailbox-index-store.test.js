@@ -1410,7 +1410,7 @@ test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie'
   assert.deepEqual(calls.find((call) => call[0] === 'range'), ['range', 0, 499]);
 });
 
-test('mailbox index store hydrates only selected message bodies in one query', async () => {
+test('Equans detail hydrateert generation-aware exact zonder brede mailboxscan', async () => {
   const calls = [];
   const client = {
     from(table) {
@@ -1424,11 +1424,17 @@ test('mailbox index store hydrates only selected message bodies in one query', a
           calls.push(['in', column, values]);
           return this;
         },
+        or(value) {
+          calls.push(['or', value]);
+          return this;
+        },
         is(column, value) {
           calls.push(['is', column, value]);
           return Promise.resolve({
             data: [{
-              message_key: 'serve@softora.nl|inbox|42',
+              message_key: 'servec321@gmail.com|coldmail|uv:18|415',
+              account_email: 'servec321@gmail.com',
+              uid: 415,
               body_text: 'Dit is de volledige reactie.',
               has_body: true,
               body_truncated: false,
@@ -1442,10 +1448,10 @@ test('mailbox index store hydrates only selected message bodies in one query', a
                 deliveredTo: 'serve@softora.nl',
                 attachments: [{ filename: 'reactie.txt', contentType: 'text/plain', size: 12 }],
               },
-              recipients_text: 'serve@softora.nl',
-              folder: 'inbox',
-              subject: 'Re: Kleine vraag over jullie website',
-              preview: 'Dit is de korte preview.',
+              recipients_text: 'servec321@gmail.com',
+              folder: 'coldmail',
+              subject: 'RE: [External] Kleine vraag over jullie website',
+              preview: 'Equans preview.',
               in_reply_to: '<campaign@example.test>',
               references_text: '<campaign@example.test>',
             }],
@@ -1463,11 +1469,11 @@ test('mailbox index store hydrates only selected message bodies in one query', a
 
   const messages = await store.hydrateMessageBodies({
     messages: [{
-      id: 'inbox:42',
-      uid: 42,
-      accountEmail: 'serve@softora.nl',
-      folder: 'inbox',
-      preview: 'Dit is de korte preview.',
+      id: 'coldmail:415',
+      uid: 415,
+      accountEmail: 'servec321@gmail.com',
+      folder: 'coldmail',
+      preview: 'Equans preview.',
     }],
   });
 
@@ -1476,20 +1482,21 @@ test('mailbox index store hydrates only selected message bodies in one query', a
   assert.equal(messages[0].bodyImageEvidenceKnown, true);
   assert.equal(messages[0].embeddedImageCount, 0);
   assert.equal(messages[0].originalCampaignOutbound, false);
-  assert.equal(messages[0].to, 'serve@softora.nl');
+  assert.equal(messages[0].to, 'servec321@gmail.com');
   assert.equal(messages[0].toDisplay, 'Servé Creusen <serve@softora.nl>');
   assert.equal(messages[0].cc, 'team@example.nl');
   assert.equal(messages[0].recipientRoutingEvidenceKnown, true);
   assert.deepEqual(messages[0].attachments, [{ filename: 'reactie.txt', contentType: 'text/plain', size: 12 }]);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',
-    'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text',
+    'message_key,account_email,provider_id,uid,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text,deleted_at',
   ]);
-  assert.deepEqual(calls.find((call) => call[0] === 'in'), [
-    'in',
-    'message_key',
-    ['serve@softora.nl|inbox|42'],
+  assert.deepEqual(calls.find((call) => call[0] === 'or'), [
+    'or',
+    'and(account_email.eq.servec321@gmail.com,folder.eq.coldmail,uid.eq.415)',
   ]);
+  assert.equal(calls.filter((call) => call[0] === 'or').length, 1);
+  assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'generation_superseded_at', null]);
 });
 
 test('mailbox index store hydrateert Instantly-body alleen via exact account en provider-id', async () => {

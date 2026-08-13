@@ -689,6 +689,61 @@ test('visible, background, focus and reconnect scheduling keep refresh bounded',
   controller.destroy();
 });
 
+test('achtergrondrefresh wacht wanneer een user-detailrequest actief is', async () => {
+  const previousState = global.SoftoraMailboxDetailState;
+  const timers = [];
+  let fetchCalls = 0;
+  global.SoftoraMailboxDetailState = { snapshot: () => ({ inFlight: 1 }) };
+  try {
+    const controller = refreshModule.create({
+      autoStart: false,
+      getFolder: () => 'outreach',
+      getOwner: () => 'both',
+      fetch: async () => { fetchCalls += 1; return successfulResponse(); },
+      setTimeout(handler, delay) { timers.push({ handler, delay }); return timers.length; },
+      clearTimeout() {},
+    });
+    controller.start();
+    assert.equal(await controller.refresh(), false);
+    assert.equal(fetchCalls, 0);
+    assert.equal(timers.at(-1).delay, 1500);
+    controller.destroy();
+  } finally {
+    global.SoftoraMailboxDetailState = previousState;
+  }
+});
+
+test('nieuwe detailselectie onderbreekt lopende achtergrondproviderrefresh', async () => {
+  const windowListeners = new Map();
+  let requestSignal;
+  const windowRef = {
+    addEventListener(event, handler) { windowListeners.set(event, handler); },
+    removeEventListener(event) { windowListeners.delete(event); },
+  };
+  const controller = refreshModule.create({
+    autoStart: false,
+    window: windowRef,
+    document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: (_url, init) => new Promise((_resolve, reject) => {
+      requestSignal = init.signal;
+      init.signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error); }, { once: true });
+    }),
+    setTimeout: () => 1,
+    clearTimeout() {},
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+  controller.start();
+  const refresh = controller.refresh();
+  await Promise.resolve();
+  windowListeners.get('softora:mailbox-detail-priority')();
+  assert.equal(requestSignal.aborted, true);
+  assert.equal(await refresh, false);
+  controller.destroy();
+});
+
 test('BFCache return resumes one immediate mailbox refresh instead of leaving the page stale', async () => {
   const documentListeners = new Map();
   const windowListeners = new Map();

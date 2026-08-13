@@ -954,6 +954,7 @@ function openMail(id, options = {}) {
   const detailScrollTop = previousDetailBody && Number.isFinite(Number(previousDetailBody.scrollTop)) ? Number(previousDetailBody.scrollTop) : 0;
   const wasUnread = m.unread;
   activeMail = m.id;
+  window.SoftoraMailboxDetailState?.select?.(m.id);
   if (wasUnread) window.SoftoraMailboxUiState.markReadOnOpen({ mail: m, skipReadPersist: options.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail });
   renderList({ openLatest: false });
   if ((!m.bodyLoaded || m.recipientRoutingNeedsHydration) && !options.skipBodyFetch) void loadMailboxMessageBody(m.id);
@@ -969,7 +970,7 @@ function openMail(id, options = {}) {
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
-  const detailBody = m.body || '';
+  const detailBody = m.safeBodyPreviewOnly ? (m.preview || '') : (m.body || m.preview || '');
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
   const readState = window.SoftoraMailboxUiState.getReadState(m, window.SoftoraMailboxCampaignInbox);

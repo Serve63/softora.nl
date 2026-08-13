@@ -320,6 +320,7 @@
   function renderDetailBody(mail, content) {
     const source = mail && typeof mail === 'object' ? mail : {};
     const loadError = String(source.bodyLoadError || '').trim();
+    const visibleContent = String(content || '');
     if (loadError) {
       const escapeMarkup = (value) => String(value || '')
         .replace(/&/g, '&amp;')
@@ -327,7 +328,8 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-      return `<div class="detail-mail-load-error" role="alert"><span>${escapeMarkup(loadError)}</span><button type="button" data-mailbox-action="retry-mail-body" data-mailbox-id="${escapeMarkup(source.id)}">Opnieuw proberen</button></div>`;
+      const recovery = `<div class="detail-mail-load-error" role="alert"><span>${escapeMarkup(loadError)}</span><button type="button" data-mailbox-action="retry-mail-body" data-mailbox-id="${escapeMarkup(source.id)}">Opnieuw proberen</button></div>`;
+      return visibleContent ? `${visibleContent}${recovery}` : recovery;
     }
     const body = String(source.body || '').trim();
     const hasBody = Boolean(source.hasBody || body);
@@ -343,8 +345,8 @@
       )
     );
     return pending
-      ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
-      : String(content || '');
+      ? `${visibleContent}<div class="detail-mail-loading" role="status">Volledige inhoud wordt opgehaald…</div>`
+      : visibleContent;
   }
 
   global.SoftoraMailboxDisplay = {
