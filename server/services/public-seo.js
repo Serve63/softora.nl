@@ -259,6 +259,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Read how Softora Read Archive securely processes one-to-one WhatsApp Business messages for its private read-only archive.',
     kind: 'legal',
+    preserveDirectContactLinks: true,
   },
   {
     fileName: 'whatsapp-data-deletion.html',
@@ -267,6 +268,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Request deletion of messages and contact data stored in the private Softora Read Archive.',
     kind: 'legal',
+    preserveDirectContactLinks: true,
   },
 ]);
 
@@ -811,8 +813,17 @@ function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
   return html.replace(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>/gi, (match, attrs, href) => {
     const target = classifyConversionTarget(href);
     if (!target) return match;
+    const preserveDirectContactLink = entry.preserveDirectContactLinks && ['mailto', 'phone'].includes(target);
 
     let nextAttrs = String(attrs || '');
+    if (preserveDirectContactLink) {
+      if (!/data-softora-conversion=/i.test(nextAttrs)) {
+        nextAttrs = setHtmlAttribute(nextAttrs, 'data-softora-conversion', 'public-cta');
+      }
+      nextAttrs = setHtmlAttribute(nextAttrs, 'data-softora-conversion-page', entry.path);
+      nextAttrs = setHtmlAttribute(nextAttrs, 'data-softora-conversion-target', target);
+      return `<a${nextAttrs}>`;
+    }
     const rel = addSafeRelToken(addSafeRelToken(getAttrValue(nextAttrs, 'rel'), 'noopener'), 'noreferrer');
 
     nextAttrs = setHtmlAttribute(nextAttrs, 'href', MARTIJN_WHATSAPP_URL);
