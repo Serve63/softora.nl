@@ -16,6 +16,7 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   const coldcallingRoutes = readRepoFile('server/routes/coldcalling.js');
   const coldmailingRoutes = readRepoFile('server/routes/coldmailing.js');
   const instantlyRoutes = readRepoFile('server/routes/instantly.js');
+  const whatsappRoutes = readRepoFile('server/routes/whatsapp-read-only.js');
 
   assert.match(featureRoutes, /requirePremiumAdminApiAccess: premiumRouteRuntime\?\.requirePremiumAdminApiAccess/);
   assert.match(mailboxRoutes, /app\.get\('\/api\/mailbox\/accounts', requireAdmin,/);
@@ -50,6 +51,9 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/webhook', async \(req, res\)/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/recording-proxy', requireAdmin,/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/cost-summary', requireAdmin,/);
+  assert.match(whatsappRoutes, /app\.get\('\/api\/whatsapp\/messages', requireReadAccess,/);
+  assert.match(whatsappRoutes, /app\.get\('\/api\/whatsapp\/status', requireReadAccess,/);
+  assert.doesNotMatch(whatsappRoutes, /\/api\/whatsapp\/(send|reply|delete)/);
 });
 
 test('least privilege call data responses redact transcripts and recordings for non-admin users', () => {

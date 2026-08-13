@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "whatsapp-read-only": {
+      "cwd": ".",
+      "command": "node",
+      "args": ["./mcp/server.mjs"],
+      "env_vars": ["SOFTORA_WHATSAPP_READ_TOKEN", "SOFTORA_WHATSAPP_BASE_URL"]
+    }
+  }
+}

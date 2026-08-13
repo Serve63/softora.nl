@@ -545,6 +545,16 @@ function buildServerAppFeatureWiringRuntimeContext({
           spreadsheetId: env.GOOGLE_HEALTH_SHEET_ID || '',
         },
       },
+      whatsappReadOnly: {
+        getSupabaseClient: platformRuntime.getSupabaseClient,
+        config: {
+          appSecret: env.WHATSAPP_APP_SECRET || '',
+          verifyToken: env.WHATSAPP_VERIFY_TOKEN || '',
+          encryptionKey: env.WHATSAPP_ENCRYPTION_KEY || '',
+          readToken: env.WHATSAPP_READ_TOKEN || '',
+          ownerKey: env.WHATSAPP_OWNER_KEY || 'serve',
+        },
+      },
       kvkDatabaseSnapshot: {
         getSupabaseClient: platformRuntime.getSupabaseClient,
         fetchSupabaseRowByKeyViaRest: platformRuntime.fetchSupabaseRowByKeyViaRest,

@@ -47,6 +47,7 @@ const {
   registerWhoopHealthProtectedRoutes,
   registerWhoopHealthPublicRoutes,
 } = require('../routes/whoop-health');
+const { registerWhatsAppReadOnlyRoutes } = require('../routes/whatsapp-read-only');
 const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
@@ -71,6 +72,7 @@ const { createGoogleHealthSheetService } = require('./google-health-sheet');
 const { createWhoopHealthService } = require('./whoop-health');
 const { createGoogleAdsControlService } = require('./google-ads-control');
 const { createFacebookAdsControlService } = require('./facebook-ads-control');
+const { createWhatsAppReadOnlyService } = require('./whatsapp-read-only');
 
 function registerFeatureRoutes(app, deps = {}) {
   const {
@@ -102,6 +104,7 @@ function registerFeatureRoutes(app, deps = {}) {
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
     whoopHealth = {},
+    whatsappReadOnly = {},
   } = deps;
   const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
     dataOpsStore: deps.dataOpsStore,
@@ -173,6 +176,10 @@ function registerFeatureRoutes(app, deps = {}) {
     setUiStateValues: deps.setUiStateValues,
     env: deps.env || process.env,
   });
+  const whatsappReadOnlyService = createWhatsAppReadOnlyService({
+    config: whatsappReadOnly.config,
+    getSupabaseClient: whatsappReadOnly.getSupabaseClient,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -188,6 +195,11 @@ function registerFeatureRoutes(app, deps = {}) {
 
   registerWhoopHealthPublicRoutes(app, {
     service: whoopHealthService,
+    cronSecret: mailboxCronSecret,
+  });
+
+  registerWhatsAppReadOnlyRoutes(app, {
+    service: whatsappReadOnlyService,
     cronSecret: mailboxCronSecret,
   });
 

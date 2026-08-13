@@ -182,6 +182,12 @@ function applyAppMiddleware(app, deps = {}) {
       req.rawBody = buf;
     },
   });
+  const jsonBodyParserWhatsAppHistory = express.json({
+    limit: '18mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
   const jsonBodyParserAudioUpload = express.json({
     limit: '34mb',
     verify: (req, _res, buf) => {
@@ -196,6 +202,9 @@ function applyAppMiddleware(app, deps = {}) {
     const pathname = getRequestPathname(req);
     if (req.method === 'POST' && pathname === '/api/website-preview-library') {
       return jsonBodyParserPreviewLibrary(req, res, next);
+    }
+    if (req.method === 'POST' && pathname === '/api/whatsapp/webhook') {
+      return jsonBodyParserWhatsAppHistory(req, res, next);
     }
     if (
       req.method === 'POST' &&
