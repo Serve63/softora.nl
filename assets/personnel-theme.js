@@ -564,7 +564,6 @@
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>',
         };
     }
-    function getLiveMomentumSidebarLink() { return { key: "live_momentum", href: "/winnen", label: "Winnen", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 20V10m0 0 6-3v6l8-3V4m0 0-3 2m3-2 2 3"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3 20h18"></path></svg>' }; }
     function getDatabaseSidebarLink() {
         return {
             key: "database",
@@ -615,6 +614,7 @@
     }
 
     const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set(["passwords"]);
+    const PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set(["live_momentum"]);
 
     function getPremiumSidebarAdminExtraLinks() {
         return [
@@ -639,7 +639,7 @@
         const allowAdminOnlyLinks = isPremiumAdminSession(session);
         return (Array.isArray(links) ? links : []).filter(function (link) {
             const key = String(link && link.key || "").trim();
-            if (!PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS.has(key)) return true;
+            if (PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS.has(key)) return false; if (!PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS.has(key)) return true;
             return allowAdminOnlyLinks;
         });
     }
@@ -869,7 +869,7 @@
             },
         ];
 
-        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([getLiveMomentumSidebarLink(), {
+        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([{
                 key: "monthly_costs",
                 href: "/premium-vaste-lasten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg>',
@@ -939,7 +939,7 @@
     function pruneDeprecatedSidebarLinks(sidebar) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const legacyAnalyticsLinks = sidebar.querySelectorAll(
-            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="websitegenerator"], a[data-sidebar-key="bookkeeping"]'
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="websitegenerator"], a[data-sidebar-key="bookkeeping"], a[data-sidebar-key="live_momentum"], a[href="/winnen"], a[href="/live-momentum"], a[href="/live-momentum.html"]'
         );
         legacyAnalyticsLinks.forEach(function (link) {
             if (link && link.parentNode) {
@@ -1108,7 +1108,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
-        ensureStaticSidebarLink(sidebar, "extra", getLiveMomentumSidebarLink(), ["monthly_costs", "notepad", "word", "settings"]);
+        pruneDeprecatedSidebarLinks(sidebar);
         syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar); activateFacebookAdsSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();

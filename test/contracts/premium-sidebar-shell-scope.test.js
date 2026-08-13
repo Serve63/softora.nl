@@ -87,11 +87,33 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
   assert.match(pageSource, /data-momentum-focus-toggle/);
   assert.match(themeSource, /pathname === "\/winnen"/);
   assert.match(themeSource, /return p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard";/);
-  assert.match(themeSource, /key: "live_momentum", href: "\/winnen", label: "Winnen"/);
-  assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "extra", getLiveMomentumSidebarLink\(\)/);
+  assert.match(themeSource, /PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set\(\["live_momentum"\]\)/);
+  assert.match(themeSource, /PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS\.has\(key\)/);
+  assert.match(themeSource, /a\[data-sidebar-key="live_momentum"\][^']*a\[href="\/winnen"\]/);
+  assert.doesNotMatch(themeSource, /getLiveMomentumSidebarLink|label: "Winnen"/);
   assert.match(focusSource, /body\.classList\.toggle\("momentum-focus-mode", next\)/);
   assert.match(focusSource, /event\.key !== "Escape"/);
   assert.doesNotMatch(focusSource, /localStorage|sessionStorage|location\.(?:assign|replace|reload)/);
+});
+
+test('Winnen blijft deep-link-only en wordt door geen premium-sidebarvariant zichtbaar gemaakt', () => {
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const pageSource = readRepoFile('live-momentum.html');
+
+  assert.match(pageSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
+  assert.doesNotMatch(pageSource, /data-sidebar-key="live_momentum"|href="\/winnen"[^>]*sidebar-link|sidebar-link-text">Winnen/);
+  assert.doesNotMatch(
+    themeSource.match(/function buildUnifiedPremiumSidebarHtml\(activeKey\) \{[\s\S]*?function pruneDeprecatedSidebarLinks/)?.[0] || '',
+    /data-sidebar-key="live_momentum"|href="\/winnen"|sidebar-link-text">Winnen/
+  );
+  staticSidebarPages.forEach((fileName) => {
+    const source = readRepoFile(fileName);
+    assert.doesNotMatch(
+      source,
+      /data-sidebar-key="live_momentum"|href="\/winnen"[^>]*sidebar-link|sidebar-link-text">Winnen/,
+      `${fileName} mag geen zichtbare Winnen-entry bevatten`
+    );
+  });
 });
 
 test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar', () => {

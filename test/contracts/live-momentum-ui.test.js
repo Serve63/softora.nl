@@ -33,7 +33,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
-  assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813b" defer><\/script>/);
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260729a"/);
