@@ -923,11 +923,12 @@ function createInstantlyMailboxService(deps = {}) {
     const ownerRecord = accountOwnership.get(account);
     if (!ownerRecord) return null;
     if (typeof mailboxIndexStore.getProviderMessage === 'function') {
-      return mailboxIndexStore.getProviderMessage({
-        provider: 'instantly',
-        providerMessageId: id,
-        accountEmail: account,
-      });
+      try { return await mailboxIndexStore.getProviderMessage({ provider: 'instantly', providerMessageId: id, accountEmail: account }); }
+      catch (cause) {
+        const error = createInstantlyMailboxError('De Instantly-threadregistratie kon tijdelijk niet worden gecontroleerd; probeer het opnieuw.', 'INSTANTLY_MESSAGE_PROVENANCE_UNAVAILABLE', 503);
+        error.cause = cause;
+        throw error;
+      }
     }
     const rows = await mailboxIndexStore.listProviderMessages({
       provider: 'instantly',
