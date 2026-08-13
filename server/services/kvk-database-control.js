@@ -64,6 +64,9 @@ function createKvkDatabaseControlService(deps = {}) {
       revision: 0,
       requestedAt: '',
       updatedAt: '',
+      automaticStoppedAt: '',
+      automaticStopReason: '',
+      automaticStopWasFailure: false,
     };
   }
 
@@ -88,6 +91,9 @@ function createKvkDatabaseControlService(deps = {}) {
       revision: Math.max(0, Number(payload.revision || 0)),
       requestedAt: normalizeString(payload.requestedAt || ''),
       updatedAt: normalizeString(payload.updatedAt || ''),
+      automaticStoppedAt: normalizeString(payload.automaticStoppedAt || ''),
+      automaticStopReason: truncateText(payload.automaticStopReason || '', 240),
+      automaticStopWasFailure: payload.automaticStopWasFailure === true,
     };
   }
 
@@ -181,14 +187,86 @@ function createKvkDatabaseControlService(deps = {}) {
       .filter(Boolean);
     return {
       ...control,
-      workerState: combinedWorkerState(workers, control.enabled),
-      workerMessage: workerList
+      workerState: control.automaticStopReason && control.automaticStopWasFailure
+        ? 'error'
+        : combinedWorkerState(workers, control.enabled),
+      workerMessage: control.automaticStopReason || workerList
         .map((worker) => worker.workerMessage || `${WORKER_LABELS[worker.workerKey]}: ${worker.workerState}`)
         .join(' • '),
       workerHeartbeatAt: heartbeatValues.at(-1) || '',
       currentBatch: batches.join(' • '),
       workers,
     };
+  }
+
+  function automaticStopReason(control, workers) {
+    if (!control.enabled) return '';
+    const currentTime = now().getTime();
+    const requestedAt = Date.parse(control.requestedAt || '');
+    const startGraceExpired = !Number.isFinite(requestedAt)
+      || currentTime - requestedAt > workerStaleAfterMs;
+
+    const workerList = Object.values(workers);
+    const hasCurrentHeartbeat = (worker) => {
+      const heartbeatAt = Date.parse(worker.workerHeartbeatAt || '');
+      return Number.isFinite(heartbeatAt)
+        && (!Number.isFinite(requestedAt) || heartbeatAt >= requestedAt);
+    };
+    if (
+      workerList.every((worker) => hasCurrentHeartbeat(worker))
+      && workerList.every((worker) => worker.queuePending === false)
+    ) {
+      return {
+        reason: 'Alle databasewachtrijen zijn leeg; database vullen is afgerond.',
+        wasFailure: false,
+      };
+    }
+
+    for (const worker of Object.values(workers)) {
+      const label = WORKER_LABELS[worker.workerKey];
+      const heartbeatAt = Date.parse(worker.workerHeartbeatAt || '');
+      const heartbeatMissing = !Number.isFinite(heartbeatAt);
+      const heartbeatPredatesRequest = Number.isFinite(requestedAt) && heartbeatAt < requestedAt;
+      if (heartbeatMissing || heartbeatPredatesRequest) {
+        if (startGraceExpired) {
+          return { reason: `${label} is niet gestart: geen heartbeat ontvangen.`, wasFailure: true };
+        }
+        continue;
+      }
+      if (Number.isFinite(heartbeatAt) && currentTime - heartbeatAt > workerStaleAfterMs) {
+        return { reason: `${label} is gestopt: de heartbeat is verlopen.`, wasFailure: true };
+      }
+
+      if (worker.workerState === 'error') {
+        return {
+          reason: `${label} is door een fout gestopt${worker.workerMessage ? `: ${worker.workerMessage}` : '.'}`,
+          wasFailure: true,
+        };
+      }
+
+      if (worker.queuePending === true && ['offline', 'idle'].includes(worker.workerState)) {
+        return {
+          reason: `${label} is gestopt terwijl de wachtrij nog werk bevat.`,
+          wasFailure: true,
+        };
+      }
+
+      if (worker.queuePending === true) {
+        const progressAt = Date.parse(worker.workerProgressAt || '');
+        const progressMissingTooLong = !Number.isFinite(progressAt)
+          && Number.isFinite(requestedAt)
+          && currentTime - requestedAt > workerProgressStaleAfterMs;
+        const progressExpired = Number.isFinite(progressAt)
+          && currentTime - progressAt > workerProgressStaleAfterMs;
+        if (progressMissingTooLong || progressExpired) {
+          return {
+            reason: `${label} is gestopt: te lang geen opgeslagen databasevoortgang.`,
+            wasFailure: true,
+          };
+        }
+      }
+    }
+    return '';
   }
 
   async function readStateRow(stateKey, failureMessage) {
@@ -222,24 +300,41 @@ function createKvkDatabaseControlService(deps = {}) {
     if (!vullerResult.ok) return vullerResult;
     if (!controleResult.ok) return controleResult;
     if (!goedgekeurdResult.ok) return goedgekeurdResult;
-    const control = normalizeControlRequest({ ...defaultControl(), ...controlResult.payload });
-    const workers = {
-      vuller: effectiveWorker(
-        control,
-        normalizeWorker({ ...defaultWorker('vuller'), ...vullerResult.payload }, 'vuller')
-      ),
-      controle: effectiveWorker(
-        control,
-        normalizeWorker({ ...defaultWorker('controle'), ...controleResult.payload }, 'controle')
-      ),
-      goedgekeurd: effectiveWorker(
-        control,
-        normalizeWorker(
-          { ...defaultWorker('goedgekeurd'), ...goedgekeurdResult.payload },
-          'goedgekeurd'
-        )
+    let control = normalizeControlRequest({ ...defaultControl(), ...controlResult.payload });
+    const reportedWorkers = {
+      vuller: normalizeWorker({ ...defaultWorker('vuller'), ...vullerResult.payload }, 'vuller'),
+      controle: normalizeWorker({ ...defaultWorker('controle'), ...controleResult.payload }, 'controle'),
+      goedgekeurd: normalizeWorker(
+        { ...defaultWorker('goedgekeurd'), ...goedgekeurdResult.payload },
+        'goedgekeurd'
       ),
     };
+    const automaticStop = automaticStopReason(control, reportedWorkers);
+    if (automaticStop) {
+      const updatedAt = now().toISOString();
+      control = normalizeControlRequest({
+        ...control,
+        enabled: false,
+        revision: control.revision + 1,
+        requestedAt: updatedAt,
+        updatedAt,
+        automaticStoppedAt: updatedAt,
+        automaticStopReason: automaticStop.reason,
+        automaticStopWasFailure: automaticStop.wasFailure,
+      });
+      const saved = await writeStateRow(
+        controlStateKey,
+        control,
+        'Databasevulling kon na workeruitval niet automatisch worden uitgezet.'
+      );
+      if (!saved.ok) return saved;
+    }
+    const workers = Object.fromEntries(
+      Object.entries(reportedWorkers).map(([workerKey, worker]) => [
+        workerKey,
+        effectiveWorker(control, worker),
+      ])
+    );
     return {
       ok: true,
       control: combinedControl(control, workers),
@@ -283,6 +378,9 @@ function createKvkDatabaseControlService(deps = {}) {
       revision: current.control.revision + 1,
       requestedAt: updatedAt,
       updatedAt,
+      automaticStoppedAt: '',
+      automaticStopReason: '',
+      automaticStopWasFailure: false,
     });
     const saved = await writeStateRow(
       controlStateKey,

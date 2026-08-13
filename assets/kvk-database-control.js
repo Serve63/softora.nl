@@ -122,7 +122,12 @@
       state.control = payload.control;
       renderControl();
     } catch (error) {
-      state.control = { ...state.control, workerState: 'error', workerMessage: error.message || String(error) };
+      state.control = {
+        ...state.control,
+        enabled: false,
+        workerState: 'error',
+        workerMessage: error.message || String(error),
+      };
       renderControl();
     }
   }
