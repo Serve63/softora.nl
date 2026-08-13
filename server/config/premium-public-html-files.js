@@ -13,6 +13,8 @@ const PREMIUM_PUBLIC_HTML_FILE_NAMES = Object.freeze([
   'premium-algemene-voorwaarden.html',
   'premium-privacy-policy.html',
   'premium-over-softora.html',
+  'whatsapp-privacy.html',
+  'whatsapp-data-deletion.html',
 ]);
 
 function createPremiumPublicHtmlFilesSet() {
