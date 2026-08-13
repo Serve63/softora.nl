@@ -137,6 +137,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /data-pin-digit="1"/);
   assert.match(pageSource, /data-pin-action="clear"/);
   assert.match(pageSource, /data-pin-action="backspace"/);
+  assert.match(pageSource, /<body data-sidebar-nav-ready="1">/);
   assert.match(pageSource, /id="lock-register-btn"/);
   assert.match(appSource, /global\.SoftoraPasswordRegisterPin\.create/);
   assert.match(appSource, /onBeforeLock:\s*function \(\) \{\s*secureLockCleanup\(\)/);
@@ -844,6 +845,69 @@ test('premium wachtwoordenregister verifieert een verse rekey-PIN server-side en
     () => pinController.verifyFreshPin('123456'),
     /PIN verlopen/
   );
+});
+
+test('vergrendelde PIN-state onderschept sidebar, logout, touch en toetsenbordnavigatie niet', () => {
+  const listeners = new Map();
+  const pinMessage = { textContent: '' };
+  const pinScreen = { style: { display: 'flex' } };
+  const documentTarget = {
+    addEventListener(name, listener) {
+      if (!listeners.has(name)) listeners.set(name, []);
+      listeners.get(name).push(listener);
+    },
+  };
+  let fetchCount = 0;
+  const browserWindow = {
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    fetch: async () => {
+      fetchCount += 1;
+      throw new Error('PIN-endpoint mag niet worden aangeroepen door shellnavigatie');
+    },
+    document: {
+      getElementById(id) {
+        if (id === 'screen-pin') return pinScreen;
+        if (id === 'pin-msg') return pinMessage;
+        return null;
+      },
+      querySelectorAll: () => [],
+    },
+  };
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-pin.js');
+  try {
+    global.window = browserWindow;
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-pin.js');
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+
+  const pinController = browserWindow.SoftoraPasswordRegisterPin.create();
+  pinController.setMessage('Onjuist — nog 1 poging');
+  pinController.bindKeyboard(documentTarget);
+
+  for (const state of ['locked', 'failed-last-attempt', 'lockout', 'autolocked']) {
+    for (const key of ['Tab', 'Enter']) {
+      let prevented = false;
+      const event = {
+        key,
+        target: { closest: () => ({ href: state === 'lockout' ? '/premium-personeel-login?logout=1' : '/premium-personeel-dashboard' }) },
+        preventDefault() { prevented = true; },
+      };
+      for (const listener of listeners.get('keydown') || []) listener(event);
+      assert.equal(prevented, false, `${state}: ${key} moet de globale shell vrij laten`);
+    }
+  }
+
+  assert.equal(pinMessage.textContent, 'Onjuist — nog 1 poging');
+  assert.equal(fetchCount, 0, 'shellnavigatie mag nooit een PIN-poging verbruiken');
 });
 
 function loadPasswordRegisterSecurityModule() {

@@ -574,18 +574,17 @@ function createMailboxIndexStore(deps = {}) {
       : rawProviderMessageId;
     const normalizedAccountEmail = normalizeEmail(accountEmail);
     if (!normalizedProvider || !normalizedProviderMessageId || !normalizedAccountEmail) return null;
-    const result = await run(`get-provider-message:${normalizedProvider}`, (client) =>
-      client
-        .from(MAILBOX_INDEX_TABLES.messages)
-        .select('*')
-        .eq('account_email', normalizedAccountEmail)
-        .eq('folder', normalizedProvider)
-        .eq('provider_id', `${normalizedProvider}:${normalizedProviderMessageId}`)
-        .is('deleted_at', null)
-        .limit(1)
-        .maybeSingle()
-    );
-    if (!result.ok || !result.data) return null;
+    const result = await run(`get-provider-message:${normalizedProvider}`, (client) => client
+      .from(MAILBOX_INDEX_TABLES.messages).select('*')
+      .eq('account_email', normalizedAccountEmail).eq('folder', normalizedProvider)
+      .eq('provider_id', `${normalizedProvider}:${normalizedProviderMessageId}`)
+      .is('deleted_at', null).limit(1).maybeSingle(), {
+        bypassFailureCooldown: true,
+        clientOptions: { timeoutMs: DURABLE_WRITE_CLIENT_TIMEOUT_MS, ignoreFailureCooldown: true, suppressFailureCooldown: true },
+        queryTimeoutMs: DURABLE_WRITE_QUERY_TIMEOUT_MS,
+      });
+    if (!result.ok) throw result.error || new Error('Exact providerbericht kon niet worden gecontroleerd.');
+    if (!result.data) return null;
     return normalizeMessageRow(result.data, { includeBody: true });
   }
 
