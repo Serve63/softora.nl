@@ -29,12 +29,11 @@ function createPremiumSessionManager(options = {}) {
     truncateText = (value, maxLength) => defaultTruncateText(value, maxLength, normalizeString),
     normalizeSessionEmail = (value) => normalizeString(value).toLowerCase(),
     now = Date.now,
-    requiredSessionVersion = 2,
+    requiredSessionVersion = 3,
   } = options;
 
-  function createSessionToken({ email, maxAgeMs, userId = '', role = '', authVersion = 1, mfaVerified = false }) {
+  function createSessionToken({ email, maxAgeMs, userId = '', role = '', authVersion = 1 }) {
     if (!isAuthConfigured()) return '';
-    if (!mfaVerified) return '';
     const currentNow = Number(now()) || Date.now();
     const ttlMs = Math.max(60_000, Number(maxAgeMs) || defaultSessionTtlMs);
     const payload = {
@@ -43,7 +42,7 @@ function createPremiumSessionManager(options = {}) {
       role: truncateText(normalizeString(role || ''), 40).toLowerCase(),
       sv: Math.max(1, Math.floor(Number(requiredSessionVersion) || 1)),
       av: Math.max(1, Math.floor(Number(authVersion) || 1)),
-      mfa: Boolean(mfaVerified),
+      amr: ['pwd'],
       iat: currentNow,
       exp: currentNow + ttlMs,
     };
@@ -92,7 +91,8 @@ function createPremiumSessionManager(options = {}) {
         !Number.isFinite(expiresAtMs) ||
         sessionVersion !== requiredSessionVersion ||
         authVersion < 1 ||
-        payload?.mfa !== true
+        !Array.isArray(payload?.amr) ||
+        !payload.amr.includes('pwd')
       ) {
         return { ok: false, expired: false, payload: null };
       }
@@ -109,7 +109,7 @@ function createPremiumSessionManager(options = {}) {
           role,
           sv: sessionVersion,
           av: authVersion,
-          mfa: true,
+          amr: ['pwd'],
         },
       };
     } catch {

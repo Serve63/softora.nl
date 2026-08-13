@@ -111,7 +111,7 @@ function createSecurityRuntime(deps = {}) {
   const premiumMfaService = createPremiumMfaService({
     sessionSecret: premiumSessionSecret,
   });
-  const isPremiumMfaConfigured = () => premiumMfaService.isConfigured();
+  const isPremiumMfaConfigured = () => false;
 
   const {
     buildPremiumAuthSessionPayload,

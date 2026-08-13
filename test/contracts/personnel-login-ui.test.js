@@ -34,3 +34,13 @@ test('premium personeel login timeboxes auth requests and recovers the submit bu
   assert.match(source, /De server reageert te traag\. Probeer het opnieuw\./);
   assert.match(source, /finally \{[\s\S]*btn\.textContent = originalBtnText;[\s\S]*btn\.disabled = false;[\s\S]*\}/);
 });
+
+test('premium personeel login vraagt alleen e-mail en wachtwoord en toont nooit MFA-materiaal', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-personeel-login.html'), 'utf8');
+
+  assert.match(source, /name="email"/);
+  assert.match(source, /name="password"/);
+  assert.doesNotMatch(source, /name="otp"|id="otpGroup"|mfaEnrollment|mfaSetupKey|mfaRecoveryCodes/);
+  assert.doesNotMatch(source, /2FA-|authenticator-app|Recoverycodes|setupKey|recoveryCodes|mfaRequired/);
+  assert.doesNotMatch(source, /otp:\s*/);
+});
