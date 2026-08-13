@@ -36,6 +36,7 @@ const contractTargets = Object.freeze([
   { path: '/api/healthz', method: 'GET' },
   { path: '/api/health/baseline', method: 'GET' },
   { path: '/api/health/dependencies', method: 'GET' },
+  { path: '/api/whatsapp/status', method: 'GET' },
   { path: '/api/auth/session', method: 'GET' },
   { path: '/api/dashboard/customers', method: 'GET' },
   { path: '/api/agenda/appointments?limit=3', method: 'GET' },

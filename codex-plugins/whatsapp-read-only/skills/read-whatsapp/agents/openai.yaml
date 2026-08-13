@@ -1,0 +1,11 @@
+interface:
+  display_name: "WhatsApp lezen"
+  short_description: "Lees en doorzoek WhatsApp veilig"
+  default_prompt: "Gebruik $read-whatsapp om mijn recente WhatsApp-gesprekken te lezen."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "whatsapp-read-only"
+      description: "Persoonlijke read-only WhatsApp Business-koppeling"
+policy:
+  allow_implicit_invocation: true

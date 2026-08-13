@@ -1,0 +1,23 @@
+{
+  "name": "whatsapp-read-only",
+  "version": "0.1.0",
+  "description": "Strictly read and search Servé's encrypted WhatsApp Business archive from Codex.",
+  "author": {
+    "name": "Softora"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "WhatsApp Read Only",
+    "shortDescription": "Lees en doorzoek versleutelde WhatsApp-gesprekken.",
+    "longDescription": "Persoonlijke read-only koppeling waarmee Codex WhatsApp Business-gesprekken kan lezen en doorzoeken zonder berichten te versturen, te wijzigen of te verwijderen.",
+    "developerName": "Softora",
+    "category": "Productivity",
+    "capabilities": ["Read", "Search"],
+    "defaultPrompt": [
+      "Lees mijn recente WhatsApp-gesprekken.",
+      "Wat zegt deze contactpersoon op WhatsApp?",
+      "Zoek deze woorden in mijn WhatsApp."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}
