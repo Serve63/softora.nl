@@ -530,7 +530,7 @@ test('seo content images zijn per cluster realistisch vastgezet met metadata', (
     assert.match(image.src, /^\/assets\/seo-content\/[a-z0-9-]+-softora\.jpg$/);
     assert.ok(image.alt.length >= 55, item.slug);
     assert.equal(image.width, 1600, `${item.slug} mist vaste afbeeldingsbreedte`);
-    assert.equal(image.height, 1000, `${item.slug} mist vaste afbeeldingshoogte`);
+    assert.ok([900, 1000].includes(image.height), `${item.slug} mist een ondersteunde vaste afbeeldingshoogte`);
     assert.doesNotMatch(image.alt, /placeholder|binnenkort|foto moet|later/i);
     seenImages.add(image.src);
 

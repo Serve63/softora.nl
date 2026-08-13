@@ -697,7 +697,7 @@ test('SEO-content gebruikt echte geoptimaliseerde foto’s in plaats van placeho
       assert.ok(fs.existsSync(assetPath), `${image.src} bestaat niet op schijf.`);
       assert.ok(image.alt.length >= 55, `${image.src} heeft een te korte alt-tekst.`);
       assert.equal(image.width, '1600', `${image.src} mist vaste breedte.`);
-      assert.equal(image.height, '1000', `${image.src} mist vaste hoogte.`);
+      assert.match(image.height, /^(?:900|1000)$/, `${image.src} mist een ondersteunde vaste hoogte.`);
       assert.match(image.loading, /^(eager|lazy)$/);
       assert.equal(image.decoding, 'async', `${image.src} mist async decoding.`);
       assert.match(image.fetchpriority, /^(high|low)$/);

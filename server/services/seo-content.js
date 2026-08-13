@@ -358,7 +358,15 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         heading: 'De heldere uitleg',
         paragraphs: Object.freeze([
           'Bedrijfssoftware op maat is een digitaal systeem dat wordt gebouwd rondom de manier waarop jouw bedrijf werkt. Het kan gaan om een dashboard, CRM, planningstool, klantportaal, database, offertemodule of een combinatie daarvan.',
-          'Het verschil met standaard software is dat je niet hoeft te werken volgens vaste schermen en beperkingen van een pakket. De software volgt je proces, mits dat proces duidelijk genoeg is om te vertalen naar logica, schermen en gegevens.',
+          Object.freeze({
+            text: 'Het verschil met standaard software is dat je niet hoeft te werken volgens vaste schermen en beperkingen van een pakket. De software volgt je proces, mits dat proces duidelijk genoeg is om te vertalen naar logica, schermen en gegevens. Vergelijk maatwerk, standaard en een hybride route daarom per procesonderdeel voordat je een volledig systeem kiest.',
+            links: Object.freeze([
+              Object.freeze({
+                anchor: 'maatwerk, standaard en een hybride route',
+                href: '/vergelijkingen/maatwerk-software-vs-standaard-software',
+              }),
+            ]),
+          }),
         ]),
       }),
       Object.freeze({
@@ -667,48 +675,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         href: '/blog/ai-telefonist-voor-afspraakintake',
         availableFrom: '2026-05-29',
       }),
-    ]),
-  }),
-  Object.freeze({
-    collection: 'vergelijkingen',
-    slug: 'maatwerk-software-vs-standaard-software',
-    title: 'Maatwerk software vs standaard software: wat past beter?',
-    description:
-      'Een vergelijking tussen maatwerk en standaard software voor bedrijven die willen groeien zonder onnodige complexiteit.',
-    category: 'Bedrijfssoftware',
-    intent: 'Vergelijking',
-    publishedAt: '2026-05-24',
-    updatedAt: '2026-05-24',
-    readTime: '7 min',
-    summary:
-      'Standaard software is snel en betaalbaar, maar maatwerk wordt sterker zodra je proces uniek, schaalbaar of onderscheidend is.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Standaard software is vaak de beste eerste stap',
-        paragraphs: Object.freeze([
-          'Voor veel bedrijven is standaard software logisch. Je kunt snel starten, de kosten zijn voorspelbaar en je profiteert van functies die al gebouwd zijn.',
-          'Het nadeel is dat je je proces moet aanpassen aan het pakket. Dat is prima zolang de werkwijze eenvoudig blijft, maar kan gaan knellen bij groei.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Maatwerk wordt interessant bij eigen processen',
-        paragraphs: Object.freeze([
-          'Als jouw bedrijf werkt met eigen statussen, rollen, berekeningen, klantstromen of rapportages, kan maatwerk veel rust geven. Het systeem volgt dan de manier waarop je team echt werkt.',
-          'Ook koppelingen zijn vaak een reden. Denk aan CRM, agenda, klantportaal, offertes, AI automatisering en dashboards in één lijn.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'De slimste keuze kan hybride zijn',
-        paragraphs: Object.freeze([
-          'Je hoeft niet altijd alles zelf te bouwen. Vaak is een combinatie verstandig: standaard tools waar ze goed in zijn, met maatwerk voor de processen die jouw bedrijf uniek maken.',
-          'Softora kijkt daarom eerst naar de kernflow en kiest daarna pas welke delen maatwerk verdienen.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
     ]),
   }),
   Object.freeze({
@@ -2385,7 +2351,15 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Maak eerst dezelfde scope vergelijkbaar',
         paragraphs: Object.freeze([
-          'Twee voorstellen zijn pas eerlijk te vergelijken wanneer ze hetzelfde probleem en dezelfde eerste versie beschrijven. Laat daarom per offerte benoemen welke gebruikers, processen, schermen, rollen, rapportages en koppelingen binnen de scope vallen. Controleer ook welke onderdelen expliciet buiten de prijs blijven. Een lage totaalprijs zegt weinig als migratie, testen of belangrijke integraties later apart worden berekend.',
+          Object.freeze({
+            text: 'Twee voorstellen zijn pas eerlijk te vergelijken wanneer ze hetzelfde probleem en dezelfde eerste versie beschrijven. Bepaal eerst per procesonderdeel of standaardsoftware, een hybride koppeling of maatwerk logisch is. Laat daarna per offerte benoemen welke gebruikers, processen, schermen, rollen, rapportages en koppelingen binnen de scope vallen. Controleer ook welke onderdelen expliciet buiten de prijs blijven. Een lage totaalprijs zegt weinig als migratie, testen of belangrijke integraties later apart worden berekend.',
+            links: Object.freeze([
+              Object.freeze({
+                anchor: 'standaardsoftware, een hybride koppeling of maatwerk',
+                href: '/vergelijkingen/maatwerk-software-vs-standaard-software',
+              }),
+            ]),
+          }),
           'Werk bij voorkeur met een korte lijst van gewenste uitkomsten in plaats van alleen functies. Bijvoorbeeld: een verkoper ziet alle open opvolgtaken, een planner voorkomt dubbele afspraken en een manager kan de actuele pipeline controleren. Zo ontdek je sneller of leveranciers hetzelfde resultaat aanbieden of ieder een andere interpretatie hebben gemaakt.',
         ]),
       }),
