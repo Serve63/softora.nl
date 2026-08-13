@@ -3693,7 +3693,7 @@ test('campaign mailbox sync skips configured accounts outside the campaign', asy
   assert.deepEqual(requestedAccounts, ['serve@softora.nl', 'serve@softora.nl']);
 });
 
-test('campaign mailbox sync adds Gmail recovery folders only to incremental Gmail accounts', () => {
+test('campaign mailbox sync keeps the shared coldmail folder for STRATO and Gmail accounts', () => {
   const normalizeFolder = (value) => String(value || '').trim().toLowerCase();
 
   assert.deepEqual(
@@ -3722,7 +3722,7 @@ test('campaign mailbox sync adds Gmail recovery folders only to incremental Gmai
       campaignOnly: true,
       normalizeFolder,
     }),
-    ['inbox', 'sent']
+    ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]
   );
 });
 
@@ -3890,6 +3890,69 @@ test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gma
   assert.equal(upserts.length, 1);
   assert.equal(upserts[0].folder, CAMPAIGN_GMAIL_LABEL_FOLDER);
   assert.equal(upserts[0].messages[0].messageId, '<filtered-reply@example.nl>');
+  assert.equal(response.body.results[0].synced, 1);
+});
+
+test('campaign mailbox sync imports a STRATO reply from the Coldmail - Delivery folder', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Coldmail - Delivery' }],
+    messagesByMailbox: {
+      'INBOX/Coldmail - Delivery': [{
+        uid: 92,
+        flags: [],
+        internalDate: new Date('2026-08-13T10:00:00.000Z'),
+        source: Buffer.from(
+          'Message-ID: <strato-filtered-reply@example.nl>\r\n' +
+          'In-Reply-To: <softora-outbound@example.nl>\r\n' +
+          'Subject: Re: Kleine vraag over jullie website\r\n' +
+          'From: Klant <klant@example.nl>\r\n' +
+          'To: serve@softora.nl\r\n\r\n' +
+          'Neem volgende week contact op.'
+        ),
+      }],
+    },
+  });
+  const upserts = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      name: 'Servé',
+      imapHost: 'imap.strato.com',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'app-password',
+    }]),
+    createImapClient: () => client,
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'strato-folder-lock' }),
+      listMessageUidsForAccount: async () => [],
+      upsertMessages: async (options) => {
+        upserts.push(options);
+        return { ok: true, upserted: options.messages.length };
+      },
+      finishSync: async () => ({ ok: true }),
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse({
+    method: 'POST',
+    query: {},
+    body: {
+      account: 'serve@softora.nl',
+      folder: CAMPAIGN_GMAIL_LABEL_FOLDER,
+      campaignOnly: true,
+      force: true,
+    },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(client.lockedMailboxes, ['INBOX/Coldmail - Delivery']);
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].folder, CAMPAIGN_GMAIL_LABEL_FOLDER);
+  assert.equal(upserts[0].messages[0].messageId, '<strato-filtered-reply@example.nl>');
   assert.equal(response.body.results[0].synced, 1);
 });
 

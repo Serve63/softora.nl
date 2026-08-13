@@ -106,7 +106,7 @@ function getMailboxSyncFoldersForAccount({
   if (campaignOnly && !isGmailImapAccount(account)) {
     return Array.from(new Set(
       normalizedFolders.filter((folder) =>
-        ![CAMPAIGN_GMAIL_LABEL_FOLDER, CAMPAIGN_GMAIL_ALL_MAIL_FOLDER].includes(folder)
+        folder !== CAMPAIGN_GMAIL_ALL_MAIL_FOLDER
       )
     ));
   }
