@@ -224,6 +224,7 @@ function buildFeatureRoutesOptions({
   seoWriteCoordinator,
   kvkDatabaseSnapshot,
   whoopHealth,
+  whatsappReadOnly,
   getUiStateValues,
   setUiStateValues,
 }) {
@@ -257,6 +258,7 @@ function buildFeatureRoutesOptions({
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
     whoopHealth,
+    whatsappReadOnly,
     getUiStateValues,
     setUiStateValues,
   };

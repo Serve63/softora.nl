@@ -5,6 +5,7 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/api/health/baseline',
   '/api/health/dependencies',
   '/api/health/whoop/webhook',
+  '/api/whatsapp/webhook',
   '/api/twilio/voice',
   '/api/twilio/status',
   '/api/coldmailing/unsubscribe',

@@ -80,6 +80,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/whatsapp/webhook-worker",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/health/whoop/reconcile",
       "schedule": "*/15 3-11 * * *"
     },
