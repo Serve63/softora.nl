@@ -220,6 +220,43 @@ test('online KVK directory applies one exact server-side category to rows and to
   });
 });
 
+test('without-working-website includes unused rows before approval and hides transferred rows', async () => {
+  const filters = [];
+  const request = {
+    select() { return this; },
+    order() { return this; },
+    limit() { return this; },
+    eq(column, value) {
+      filters.push(['eq', column, value]);
+      return this;
+    },
+    in(column, values) {
+      filters.push(['in', column, values]);
+      return this;
+    },
+    then(resolve) {
+      return Promise.resolve({ data: [], error: null }).then(resolve);
+    },
+  };
+  const service = createKvkCompanyDirectoryService({
+    getSupabaseClient: () => ({ from: () => request }),
+  });
+
+  const result = await service.fetchDirectoryRows({ category: 'zonder-werkende-website' });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(filters, [
+    ['eq', 'lead_status', 'usable'],
+    ['eq', 'premium_database_transferred', false],
+    ['in', 'website_status', ['no_website', 'not_working']],
+  ]);
+  assert.equal(
+    filters.some(([, column]) => column === 'usable_review_state'),
+    false,
+    'pending approval must not hide an otherwise unused company without a working website'
+  );
+});
+
 test('online KVK directory never shows a false zero while category metadata is being built', async () => {
   const service = createKvkCompanyDirectoryService({
     fetchDirectoryRows: async () => ({ ok: true, rows: [] }),
