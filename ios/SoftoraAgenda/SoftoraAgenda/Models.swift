@@ -10,12 +10,14 @@ struct PremiumSession: Decodable {
     let error: String?
 }
 
-struct AgendaAppLoginResponse: Decodable {
+struct PremiumLoginResponse: Decodable {
     let ok: Bool
     let authenticated: Bool?
-    let who: String?
-    let email: String?
-    let displayName: String?
+    let mfaRequired: Bool?
+    let mfaEnrollmentRequired: Bool?
+    let setupKey: String?
+    let recoveryCodes: [String]?
+    let next: String?
     let error: String?
 }
 

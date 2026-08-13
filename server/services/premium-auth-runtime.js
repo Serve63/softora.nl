@@ -56,8 +56,8 @@ function createPremiumAuthRuntime(options = {}) {
     return premiumSessionManager;
   }
 
-  function createPremiumSessionToken({ email, maxAgeMs, userId = '', role = '' }) {
-    return getPremiumSessionManager().createSessionToken({ email, maxAgeMs, userId, role });
+  function createPremiumSessionToken({ email, maxAgeMs, userId = '', role = '', authVersion = 1, mfaVerified = false }) {
+    return getPremiumSessionManager().createSessionToken({ email, maxAgeMs, userId, role, authVersion, mfaVerified });
   }
 
   function readPremiumSessionTokenFromRequest(req) {

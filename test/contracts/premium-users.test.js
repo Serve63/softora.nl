@@ -83,6 +83,7 @@ function createPremiumUsersStoreStub(initialUsers = []) {
         source: 'supabase',
         users: state.users,
         updatedAt: state.updatedAt,
+        revision: 3,
       };
     },
     getCachedUsers() {
@@ -394,6 +395,7 @@ test('premium user coordinator persists profile updates and refreshes session pa
   assert.equal(res.body.user.lastName, 'Digital');
   assert.equal(res.body.session.displayName, 'Serve Digital');
   assert.equal(premiumUsersStore.state.persistCalls.length, 1);
+  assert.equal(premiumUsersStore.state.persistCalls[0].expectedRevision, 3);
   assert.equal(auditEvents.length, 1);
   assert.equal(auditEvents[0].reason, 'security_premium_profile_updated');
 });

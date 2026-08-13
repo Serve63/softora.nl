@@ -32,6 +32,8 @@ test('premium session manager creates and verifies a valid token', () => {
     email: 'INFO@SOFTORA.NL',
     userId: 'usr_123',
     role: 'ADMIN',
+    authVersion: 3,
+    mfaVerified: true,
   });
   const verification = manager.verifySessionToken(token);
 
@@ -40,6 +42,8 @@ test('premium session manager creates and verifies a valid token', () => {
   assert.equal(verification.payload.email, 'info@softora.nl');
   assert.equal(verification.payload.uid, 'usr_123');
   assert.equal(verification.payload.role, 'admin');
+  assert.equal(verification.payload.av, 3);
+  assert.equal(verification.payload.mfa, true);
 
   nowMs += 60 * 60 * 1000 + 1;
   const expired = manager.verifySessionToken(token);
@@ -62,6 +66,8 @@ test('premium session manager rejects invalid signatures and can read cookies', 
     email: 'info@softora.nl',
     userId: 'usr_123',
     role: 'admin',
+    authVersion: 1,
+    mfaVerified: true,
   });
   const tampered = `${token}x`;
 
@@ -73,6 +79,30 @@ test('premium session manager rejects invalid signatures and can read cookies', 
     },
   };
   assert.equal(manager.readSessionTokenFromRequest(req), token);
+});
+
+test('premium session manager refuses non-MFA and legacy session tokens', () => {
+  const manager = createPremiumSessionManager({
+    sessionSecret: 'secret',
+    isAuthConfigured: () => true,
+  });
+
+  assert.equal(manager.createSessionToken({ email: 'info@softora.nl' }), '');
+  const valid = manager.createSessionToken({
+    email: 'info@softora.nl',
+    userId: 'usr_1',
+    role: 'admin',
+    authVersion: 1,
+    mfaVerified: true,
+  });
+  const [encoded] = valid.split('.');
+  const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+  delete payload.sv;
+  const legacyEncoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const crypto = require('node:crypto');
+  const legacySignature = crypto.createHmac('sha256', 'secret').update(legacyEncoded).digest('base64url');
+
+  assert.equal(manager.verifySessionToken(`${legacyEncoded}.${legacySignature}`).ok, false);
 });
 
 test('premium session manager builds session and clear cookie headers', () => {

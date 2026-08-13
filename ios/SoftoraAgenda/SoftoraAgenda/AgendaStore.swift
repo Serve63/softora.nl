@@ -17,6 +17,10 @@ final class AgendaStore {
     var email = ""
     var selectedPlanner: Planner
     var alertMessage: String?
+    var mfaRequired = false
+    var mfaEnrollmentRequired = false
+    var mfaSetupKey = ""
+    var mfaRecoveryCodes: [String] = []
 
     init(
         apiClient: SoftoraAPIClient,
@@ -43,23 +47,32 @@ final class AgendaStore {
         }
     }
 
-    func unlock(pin: String, planner: Planner) async -> Bool {
+    func login(email: String, password: String, otp: String) async -> Bool {
         isUnlocking = true
         alertMessage = nil
         defer { isUnlocking = false }
 
         do {
-            let response = try await apiClient.unlockAgendaApp(
-                pin: pin.trimmingCharacters(in: .whitespacesAndNewlines),
-                who: planner
+            let response = try await apiClient.login(
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: password,
+                otp: otp.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             guard response.ok, response.authenticated == true else {
-                throw SoftoraAPIError.server(response.error ?? "Pincode klopt niet.")
+                mfaRequired = response.mfaRequired == true
+                mfaEnrollmentRequired = response.mfaEnrollmentRequired == true
+                if let setupKey = response.setupKey, !setupKey.isEmpty {
+                    mfaSetupKey = setupKey
+                }
+                if let recoveryCodes = response.recoveryCodes, !recoveryCodes.isEmpty {
+                    mfaRecoveryCodes = recoveryCodes
+                }
+                alertMessage = response.error ?? "Inloggen mislukt."
+                return false
             }
-            selectedPlanner = Planner(rawAPIValue: response.who ?? planner.apiValue)
-            accessStorage.selectedPlanner = selectedPlanner
             let session = try await apiClient.fetchSession()
             apply(session)
+            clearMfaEnrollmentData()
             await loadAppointments(fresh: true)
             return true
         } catch {
@@ -79,6 +92,7 @@ final class AgendaStore {
         email = ""
         appointments = []
         accessStorage.clear()
+        clearMfaEnrollmentData()
     }
 
     func loadAppointments(fresh: Bool) async {
@@ -125,6 +139,13 @@ final class AgendaStore {
         if !session.configured {
             alertMessage = "Softora-login is nog niet volledig ingesteld op de server."
         }
+    }
+
+    private func clearMfaEnrollmentData() {
+        mfaRequired = false
+        mfaEnrollmentRequired = false
+        mfaSetupKey = ""
+        mfaRecoveryCodes = []
     }
 }
 

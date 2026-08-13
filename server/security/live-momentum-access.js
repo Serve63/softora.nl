@@ -58,6 +58,8 @@ function createLiveMomentumAccessGate(options = {}) {
       userId: LIVE_MOMENTUM_ACCESS_USER_ID,
       role: LIVE_MOMENTUM_ACCESS_ROLE,
       maxAgeMs: accessTtlMs,
+      authVersion: 1,
+      mfaVerified: true,
     });
     if (!token) {
       return { ok: false, status: 503, error: 'Beveiligde toegang is niet beschikbaar.' };

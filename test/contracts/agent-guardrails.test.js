@@ -12,6 +12,7 @@ const {
   isBackendProductionPath,
   isFrontendProductionPath,
   isHighRiskPath,
+  isApprovedPremiumAuthUsersWriteFile,
   isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
@@ -473,6 +474,18 @@ test('agent guardrails block direct premium auth users writes', () => {
   assert.deepEqual(listAddedPremiumAuthUsersWriteRisks(allowedReadOnlyReference), []);
   assert.equal(isPremiumAuthUsersWriteScanPath('reports/premium-login-incident-2026-05-27.md'), false);
   assert.equal(isPremiumAuthUsersWriteScanPath('scripts/autopilot-proof.js'), true);
+
+  const approvedMigrationPath = 'supabase/migrations/20260813103910_atomic_premium_mfa_state.sql';
+  const approvedMigration = readRepoFile(approvedMigrationPath);
+  assert.equal(isApprovedPremiumAuthUsersWriteFile(approvedMigrationPath, approvedMigration), true);
+  assert.equal(
+    isApprovedPremiumAuthUsersWriteFile(approvedMigrationPath, `${approvedMigration}\n-- unreviewed mutation`),
+    false
+  );
+  assert.equal(
+    isApprovedPremiumAuthUsersWriteFile('supabase/migrations/20260813103911_copy.sql', approvedMigration),
+    false
+  );
 
   const violations = buildGuardrailViolations({
     changedFiles: ['scripts/autopilot-proof.js', 'test/contracts/agent-guardrails.test.js'],

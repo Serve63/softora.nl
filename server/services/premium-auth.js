@@ -1,25 +1,12 @@
-const { timingSafeEqualStrings } = require('../security/crypto-utils');
-
-const AGENDA_APP_IDENTITY_EMAILS = Object.freeze({
-  serve: 'serve@softora.nl',
-  martijn: 'martijn@softora.nl',
-});
-
 function createPremiumAuthRouteCoordinator(deps = {}) {
   const {
     sessionSecret = '',
     premiumSessionTtlHours = 12,
-    premiumSessionRememberTtlDays = 30,
-    agendaAppPin = '',
-    agendaAppPinHash = '',
-    agendaAppServeEmail = AGENDA_APP_IDENTITY_EMAILS.serve,
-    agendaAppMartijnEmail = AGENDA_APP_IDENTITY_EMAILS.martijn,
-    agendaAppSessionTtlDays = 3650,
+    premiumSessionRememberTtlDays = 7,
     premiumUsersStore,
     normalizePremiumSessionEmail = (value) => String(value || '').trim().toLowerCase(),
     normalizeString = (value) => String(value || '').trim(),
-    isPremiumMfaConfigured = () => false,
-    isPremiumMfaCodeValid = () => false,
+    premiumMfaService = null,
     getSafePremiumRedirectPath = (value) => value,
     getResolvedPremiumAuthState = async () => ({
       configured: false,
@@ -56,85 +43,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     );
   }
 
-  function normalizeAgendaAppIdentity(value) {
-    const normalized = normalizeString(value)
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-
-    if (normalized === 'martijn') return 'martijn';
-    if (normalized === 'serve' || normalized === 'serv') return 'serve';
-    return '';
-  }
-
-  function getAgendaAppIdentityEmail(identity) {
-    if (identity === 'martijn') return normalizePremiumSessionEmail(agendaAppMartijnEmail);
-    if (identity === 'serve') return normalizePremiumSessionEmail(agendaAppServeEmail);
-    return '';
-  }
-
-  function isAgendaAppPinConfigured() {
-    return Boolean(normalizeString(agendaAppPinHash) || normalizeString(agendaAppPin));
-  }
-
-  function isAgendaAppPinValid(pin) {
-    const rawPin = String(pin || '').trim();
-    if (!rawPin) return false;
-
-    const pinHash = normalizeString(agendaAppPinHash);
-    if (pinHash && premiumUsersStore.verifyPasswordHash(rawPin, pinHash)) {
-      return true;
-    }
-
-    const plainPin = normalizeString(agendaAppPin);
-    return Boolean(plainPin && timingSafeEqualStrings(rawPin, plainPin));
-  }
-
-  function getAgendaAppSessionMaxAgeMs() {
-    const days = Math.max(1, Math.min(3650, Number(agendaAppSessionTtlDays) || 3650));
-    return days * 24 * 60 * 60 * 1000;
-  }
-
-  function getUserDisplayName(user) {
-    if (typeof premiumUsersStore.buildUserDisplayName === 'function') {
-      return premiumUsersStore.buildUserDisplayName(user);
-    }
-    const firstName = normalizeString(user?.firstName || user?.voornaam || '');
-    const lastName = normalizeString(user?.lastName || user?.achternaam || '');
-    return `${firstName} ${lastName}`.trim() || normalizePremiumSessionEmail(user?.email || '');
-  }
-
-  function normalizeAgendaAppIdentityCandidate(value) {
-    const normalized = normalizeString(value)
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    const token = normalized.split(/[^a-z0-9]+/).find(Boolean) || normalized;
-    return normalizeAgendaAppIdentity(token);
-  }
-
-  function getAgendaAppUserIdentityCandidates(user) {
-    const email = normalizePremiumSessionEmail(user?.email || '');
-    const emailLocalPart = email.split('@')[0] || '';
-    return [
-      user?.firstName,
-      user?.voornaam,
-      getUserDisplayName(user),
-      emailLocalPart,
-    ]
-      .map((value) => normalizeAgendaAppIdentityCandidate(value))
-      .filter(Boolean);
-  }
-
-  function findAgendaAppUser(users, email, identity) {
-    const exactUser = premiumUsersStore.findUserByEmail(users, email);
-    if (exactUser) return exactUser;
-    if (!Array.isArray(users) || !identity) return null;
-    return (
-      users.find((user) => getAgendaAppUserIdentityCandidates(user).includes(identity)) || null
-    );
-  }
-
   async function sendSessionResponse(req, res) {
     let authState = await getResolvedPremiumAuthState(req, {
       allowAnonymousWithoutHydration: true,
@@ -164,6 +72,12 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     return Math.max(250, Math.min(900, Number(premiumLoginUsersReadTimeoutMs) || 450));
   }
 
+  function getAuthoritativeRevision(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const revision = Number(value);
+    return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+  }
+
   async function loadUsersForLogin() {
     const hydrated = await premiumUsersStore.ensureUsersHydrated({
       force: true,
@@ -175,10 +89,11 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     return {
       hydrated,
       users: hydratedUsers.length > 0 ? hydratedUsers : cachedUsers,
+      revision: getAuthoritativeRevision(hydrated?.revision),
     };
   }
 
-  async function recoverBootstrapLoginUser(req, users, email, password, matchedUser) {
+  async function recoverBootstrapLoginUser(req, users, email, password, matchedUser, expectedRevision) {
     if (!matchedUser) return null;
     if (normalizeString(matchedUser.source || '').toLowerCase() !== 'bootstrap_env') return null;
     if (typeof premiumUsersStore.findBootstrapUserByEmail !== 'function') return null;
@@ -204,10 +119,12 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
         source: 'premium_auth_bootstrap_recovery',
         reason: 'premium_login_bootstrap_password_sync',
         actorEmail: email,
+        expectedRevision,
       });
-      if (Array.isArray(saved?.users) && saved.users.length > 0) {
-        savedUsers = saved.users;
+      if (saved?.source !== 'supabase' || !Array.isArray(saved.users) || saved.users.length === 0) {
+        return null;
       }
+      savedUsers = saved.users;
     }
 
     appendAuditEvent(
@@ -223,6 +140,17 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     );
 
     return premiumUsersStore.findUserByEmail(savedUsers, email) || nextUser;
+  }
+
+  async function persistMatchedUserMfaState(matchedUser, mfa, action, recoveryCodeHash = '') {
+    if (typeof premiumUsersStore.mutateMfaState !== 'function') {
+      return { source: 'unavailable', user: null, reason: 'atomic_mfa_store_missing' };
+    }
+    return premiumUsersStore.mutateMfaState(matchedUser, {
+      action,
+      mfa,
+      recoveryCodeHash,
+    });
   }
 
   async function loginResponse(req, res) {
@@ -289,7 +217,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    const { hydrated, users } = await loadUsersForLogin();
+    const { hydrated, users, revision } = await loadUsersForLogin();
 
     if (users.length === 0) {
       const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
@@ -319,7 +247,14 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       ? premiumUsersStore.verifyPasswordHash(password, matchedUser.passwordHash)
       : false;
     if (!isPasswordValid) {
-      const recoveredUser = await recoverBootstrapLoginUser(req, users, email, password, matchedUser);
+      const recoveredUser = await recoverBootstrapLoginUser(
+        req,
+        users,
+        email,
+        password,
+        matchedUser,
+        revision
+      );
       if (recoveredUser) {
         matchedUser = recoveredUser;
         isPasswordValid = true;
@@ -362,7 +297,141 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    if (isPremiumMfaConfigured() && !isPremiumMfaCodeValid(otp)) {
+    if (!premiumMfaService || !premiumMfaService.isConfigured()) {
+      appendAuditEvent(
+        req,
+        {
+          type: 'login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: 'Premium login geweigerd omdat per-account MFA niet beschikbaar is.',
+        },
+        'security_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error: 'Veilige tweestapsverificatie is tijdelijk niet beschikbaar.',
+      });
+    }
+
+    if (!premiumMfaService.isEnrolled(matchedUser)) {
+      if (!otp) {
+        const enrollment = premiumMfaService.createEnrollment(matchedUser);
+        const enrollmentMutation = enrollment
+          ? await persistMatchedUserMfaState(
+              matchedUser,
+              enrollment.mfa,
+              'enrollment_start'
+            )
+          : { source: 'unavailable', user: null };
+        if (!enrollmentMutation?.user) {
+          return res.status(enrollmentMutation?.source === 'conflict' ? 409 : 503).json({
+            ok: false,
+            error: '2FA-instelling kon niet veilig in Supabase worden opgeslagen.',
+          });
+        }
+        appendAuditEvent(
+          req,
+          {
+            type: 'login_mfa_enrollment_started',
+            severity: 'info',
+            success: true,
+            email,
+            detail: 'Per-account tweestapsverificatie gestart; nog geen sessie uitgegeven.',
+          },
+          'security_login_mfa_enrollment_started'
+        );
+        return res.status(202).json({
+          ok: false,
+          authenticated: false,
+          mfaRequired: true,
+          mfaEnrollmentRequired: true,
+          setupKey: enrollment.setupKey,
+          otpauthUri: enrollment.otpauthUri,
+          recoveryCodes: enrollment.recoveryCodes,
+          error: 'Stel eerst je persoonlijke authenticator in en vul daarna de 6-cijferige code in.',
+        });
+      }
+
+      const completedMfa = premiumMfaService.completeEnrollment(matchedUser, otp);
+      if (!completedMfa) {
+        appendAuditEvent(
+          req,
+          {
+            type: 'login_mfa_failed',
+            severity: 'warning',
+            success: false,
+            email,
+            detail: '2FA-enrollmentcode ongeldig of verlopen.',
+          },
+          'security_login_mfa_failed'
+        );
+        return res.status(401).json({
+          ok: false,
+          error: 'Ongeldige of verlopen 2FA-code.',
+          mfaRequired: true,
+          mfaEnrollmentRequired: true,
+        });
+      }
+
+      const enrollmentMutation = await persistMatchedUserMfaState(
+        matchedUser,
+        completedMfa,
+        'enrollment_complete'
+      );
+      matchedUser = enrollmentMutation?.user || null;
+      if (!matchedUser) {
+        return res.status(enrollmentMutation?.source === 'conflict' ? 401 : 503).json({
+          ok: false,
+          error: enrollmentMutation?.source === 'conflict'
+            ? 'Deze 2FA-code is al gebruikt of de accountbeveiliging is intussen gewijzigd.'
+            : '2FA-activering kon niet veilig in Supabase worden opgeslagen.',
+          mfaRequired: true,
+          mfaEnrollmentRequired: true,
+        });
+      }
+    } else {
+      const verification = premiumMfaService.verifyLoginCode(matchedUser, otp);
+      if (!verification.ok) {
+        appendAuditEvent(
+          req,
+          {
+            type: 'login_mfa_failed',
+            severity: 'warning',
+            success: false,
+            email,
+            detail: '2FA-code ongeldig, ontbreekt, verlopen of al gebruikt.',
+          },
+          'security_login_mfa_failed'
+        );
+        return res.status(401).json({
+          ok: false,
+          error: 'Ongeldige, ontbrekende, verlopen of al gebruikte 2FA-code.',
+          mfaRequired: true,
+        });
+      }
+      const verificationMutation = await persistMatchedUserMfaState(
+        matchedUser,
+        verification.mfa,
+        verification.usedRecoveryCode
+          ? 'recovery'
+          : 'totp',
+        verification.recoveryCodeHash
+      );
+      matchedUser = verificationMutation?.user || null;
+      if (!matchedUser) {
+        return res.status(verificationMutation?.source === 'conflict' ? 401 : 503).json({
+          ok: false,
+          error: verificationMutation?.source === 'conflict'
+            ? 'Deze 2FA- of recoverycode is al gebruikt of de accountbeveiliging is intussen gewijzigd.'
+            : '2FA-controle kon niet veilig in Supabase worden vastgelegd.',
+          mfaRequired: true,
+        });
+      }
+    }
+
+    if (!premiumMfaService.isEnrolled(matchedUser)) {
       appendAuditEvent(
         req,
         {
@@ -370,26 +439,31 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
           severity: 'warning',
           success: false,
           email,
-          detail: '2FA-code ongeldig of ontbreekt.',
+          detail: 'Geen actieve per-account MFA na verificatie.',
         },
         'security_login_mfa_failed'
       );
       return res.status(401).json({
         ok: false,
-        error: 'Ongeldige of ontbrekende 2FA-code.',
+        error: 'Veilige tweestapsverificatie kon niet worden bevestigd.',
         mfaRequired: true,
       });
     }
 
     const sessionMaxAgeMs = remember
-      ? premiumSessionRememberTtlDays * 24 * 60 * 60 * 1000
-      : premiumSessionTtlHours * 60 * 60 * 1000;
+      ? Math.max(1, Math.min(7, Number(premiumSessionRememberTtlDays) || 7)) * 24 * 60 * 60 * 1000
+      : Math.max(1, Math.min(12, Number(premiumSessionTtlHours) || 12)) * 60 * 60 * 1000;
     const sessionToken = createPremiumSessionToken({
       email,
       maxAgeMs: sessionMaxAgeMs,
       userId: matchedUser.id,
       role: matchedUser.role,
+      authVersion: matchedUser.authVersion,
+      mfaVerified: true,
     });
+    if (!sessionToken) {
+      return res.status(503).json({ ok: false, error: 'Veilige sessie kon niet worden aangemaakt.' });
+    }
     setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
 
     appendAuditEvent(
@@ -415,177 +489,22 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   async function agendaAppLoginResponse(req, res) {
-    const pin = String(req.body?.pin || '');
-    const identity = normalizeAgendaAppIdentity(req.body?.who || req.body?.identity || '');
-    const email = getAgendaAppIdentityEmail(identity);
-
     res.setHeader('Cache-Control', 'no-store, private');
-
-    if (!sessionSecret) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_rejected',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Agenda-app login niet geconfigureerd: sessie-secret ontbreekt.',
-        },
-        'security_agenda_app_login_rejected'
-      );
-      return res.status(503).json({
-        ok: false,
-        error:
-          'Agenda-app toegang is nog niet volledig ingesteld op de server.',
-      });
-    }
-
-    if (!isAgendaAppPinConfigured()) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_rejected',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Agenda-app login niet geconfigureerd: pincode ontbreekt.',
-        },
-        'security_agenda_app_login_rejected'
-      );
-      return res.status(503).json({
-        ok: false,
-        error:
-          'Agenda-app toegang is nog niet volledig ingesteld op de server.',
-      });
-    }
-
-    if (!identity || !email) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_failed',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Agenda-app identiteit ontbreekt of is ongeldig.',
-        },
-        'security_agenda_app_login_failed'
-      );
-      return res.status(400).json({
-        ok: false,
-        error: 'Kies Martijn of Servé.',
-      });
-    }
-
-    if (!pin) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_failed',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Agenda-app pincode ontbreekt.',
-        },
-        'security_agenda_app_login_failed'
-      );
-      return res.status(400).json({
-        ok: false,
-        error: 'Vul je pincode in.',
-      });
-    }
-
-    const { hydrated, users } = await loadUsersForLogin();
-
-    if (users.length === 0) {
-      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_rejected',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: isTemporaryUserStoreFailure
-            ? 'Agenda-app login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
-            : 'Agenda-app login niet geconfigureerd: geen premium gebruikers gevonden.',
-        },
-        'security_agenda_app_login_rejected'
-      );
-      return res.status(503).json({
-        ok: false,
-        error: isTemporaryUserStoreFailure
-          ? 'Agenda-app toegang is tijdelijk niet beschikbaar. Probeer het zo opnieuw.'
-          : 'Agenda-app toegang is nog niet volledig ingesteld op de server.',
-      });
-    }
-
-    const matchedUser = findAgendaAppUser(users, email, identity);
-    if (!matchedUser || !isAgendaAppPinValid(pin)) {
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_failed',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Agenda-app pincode of gebruiker ongeldig.',
-        },
-        'security_agenda_app_login_failed'
-      );
-      return res.status(401).json({
-        ok: false,
-        error: 'Pincode klopt niet.',
-      });
-    }
-
-    if (premiumUsersStore.normalizeUserStatus(matchedUser.status) !== 'active') {
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_failed',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: 'Agenda-app login geweigerd omdat het account inactief is.',
-        },
-        'security_agenda_app_login_failed'
-      );
-      return res.status(403).json({
-        ok: false,
-        error: 'Dit account is gedeactiveerd.',
-      });
-    }
-
-    const sessionMaxAgeMs = getAgendaAppSessionMaxAgeMs();
-    const sessionEmail = normalizePremiumSessionEmail(matchedUser.email || email);
-    const sessionToken = createPremiumSessionToken({
-      email: sessionEmail,
-      maxAgeMs: sessionMaxAgeMs,
-      userId: matchedUser.id,
-      role: matchedUser.role,
-    });
-    setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
-
     appendAuditEvent(
       req,
       {
-        type: 'agenda_app_login_success',
-        severity: 'info',
-        success: true,
-        email: sessionEmail,
-        detail: 'Agenda-app login succesvol met langdurige sessie.',
+        type: 'agenda_app_pin_login_disabled',
+        severity: 'warning',
+        success: false,
+        email: '',
+        detail: 'Legacy agenda-PIN-login geweigerd; gebruik de MFA-login.',
       },
-      'security_agenda_app_login_success'
+      'security_agenda_app_pin_login_disabled'
     );
-
-    return res.status(200).json({
-      ok: true,
-      authenticated: true,
-      who: identity,
-      email: sessionEmail,
-      role: matchedUser.role,
-      displayName: getUserDisplayName(matchedUser),
+    return res.status(410).json({
+      ok: false,
+      authenticated: false,
+      error: 'Agenda-app PIN-login is uitgeschakeld. Log veilig in met e-mail, wachtwoord en 2FA.',
     });
   }
 

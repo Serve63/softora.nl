@@ -35,11 +35,28 @@ struct SoftoraAPIClient {
         try await get("/api/auth/session")
     }
 
-    func unlockAgendaApp(pin: String, who: Planner) async throws -> AgendaAppLoginResponse {
-        try await post(
-            "/api/agenda-app/login",
-            body: AgendaAppLoginPayload(pin: pin, who: who.apiValue)
-        )
+    func login(email: String, password: String, otp: String) async throws -> PremiumLoginResponse {
+        guard let url = URL(string: "/api/auth/login", relativeTo: baseURL) else {
+            throw SoftoraAPIError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(baseURL.origin, forHTTPHeaderField: "Origin")
+        request.httpBody = try encoder.encode(PremiumLoginPayload(
+            email: email,
+            password: password,
+            otp: otp,
+            remember: false,
+            next: "/premium-agenda"
+        ))
+        let (data, response) = try await urlSession.data(for: request)
+        guard response is HTTPURLResponse,
+              let decoded = try? decoder.decode(PremiumLoginResponse.self, from: data) else {
+            throw SoftoraAPIError.invalidResponse
+        }
+        return decoded
     }
 
     func logout() async throws {
@@ -135,9 +152,12 @@ struct SoftoraAPIClient {
     }
 }
 
-private struct AgendaAppLoginPayload: Encodable {
-    let pin: String
-    let who: String
+private struct PremiumLoginPayload: Encodable {
+    let email: String
+    let password: String
+    let otp: String
+    let remember: Bool
+    let next: String
 }
 
 private struct EmptyPayload: Encodable {}

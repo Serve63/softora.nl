@@ -104,7 +104,7 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   assert.equal(runtimeEnv.instantly.defaultSenderEmail, 'serve@softora.nl');
 });
 
-test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
+test('loadRuntimeEnv never reuses another confirmation pin for the legacy agenda login', () => {
   const fallbackRuntimeEnv = loadRuntimeEnv({
     PREMIUM_SETTINGS_CONFIRM_PIN: ' 123456 ',
   });
@@ -113,7 +113,7 @@ test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () =>
     AGENDA_APP_PIN: '654321',
   });
 
-  assert.equal(fallbackRuntimeEnv.premiumAuth.agendaAppPin, '123456');
+  assert.equal(fallbackRuntimeEnv.premiumAuth.agendaAppPin, '');
   assert.equal(explicitRuntimeEnv.premiumAuth.agendaAppPin, '654321');
 });
 
@@ -227,7 +227,7 @@ test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () =>
   assert.equal(runtimeEnv.activeOrderAutomation.githubPrivate, false);
   assert.equal(runtimeEnv.premiumAuth.enforceSameOriginRequests, true);
   assert.equal(runtimeEnv.premiumAuth.sessionTtlHours, 12);
-  assert.equal(runtimeEnv.premiumAuth.sessionRememberTtlDays, 365);
+  assert.equal(runtimeEnv.premiumAuth.sessionRememberTtlDays, 7);
   assert.equal(runtimeEnv.premiumAuth.agendaAppServeEmail, 'serve@softora.nl');
   assert.equal(runtimeEnv.premiumAuth.agendaAppMartijnEmail, 'martijn@softora.nl');
   assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 90);

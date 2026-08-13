@@ -10,9 +10,10 @@ const {
   isApprovedBrowserStoragePath,
   isBackendProductionPath,
   isBehaviorChangePath,
-  isFrontendProductionPath,
-  isHighRiskPath,
-  isPremiumAuthUsersWriteScanPath,
+    isFrontendProductionPath,
+    isHighRiskPath,
+    isApprovedPremiumAuthUsersWriteFile,
+    isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
   isTestPath,
@@ -417,7 +418,8 @@ const premiumAuthUsersWriteViolations = changedFiles
     (filePath) =>
       isPremiumAuthUsersWriteScanPath(filePath) &&
       !isTestPath(filePath) &&
-      !isProtectedQualityGatePath(filePath)
+      !isProtectedQualityGatePath(filePath) &&
+      !isApprovedPremiumAuthUsersWriteFile(filePath, readRepoFile(filePath))
   )
   .map((filePath) => {
     const diffArgs = getDiffArgsForPath(filePath);

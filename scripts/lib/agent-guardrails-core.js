@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const HIGH_RISK_PATH_PATTERNS = Object.freeze([
   /^server\.js$/,
   /^api\//,
@@ -100,6 +102,10 @@ const PREMIUM_AUTH_USERS_TARGET_PATTERN = /\bpremium_auth_users\b/i;
 const PREMIUM_AUTH_USERS_WRITE_CONTEXT_PATTERN =
   /\b(?:delete|insert|patch|persist|post|put|update|upsert|write)\b|(?:state_key|stateKey)\s*[:=]|\/rest\/v1\/|\.from\s*\(/i;
 const META_SOURCE_PATTERN = /\bsource\s*:\s*['"`]([^'"`]+)['"`]/g;
+const PREMIUM_AUTH_USERS_APPROVED_WRITE_FILE_HASHES = Object.freeze({
+  'supabase/migrations/20260813103910_atomic_premium_mfa_state.sql':
+    '0f9c35a562d78d7528b7e207a72ac69306e4616634e8906c38102a2456315352',
+});
 
 function normalizeRepoPath(filePath) {
   return String(filePath || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
@@ -149,6 +155,14 @@ function isPremiumAuthUsersWriteScanPath(filePath) {
     normalized.startsWith('.github/workflows/') ||
     /\.(?:cjs|env|html|js|json|jsx|mjs|sh|sql|ts|tsx|ya?ml)$/i.test(normalized)
   );
+}
+
+function isApprovedPremiumAuthUsersWriteFile(filePath, fileSource = '') {
+  const normalized = normalizeRepoPath(filePath);
+  const expectedHash = PREMIUM_AUTH_USERS_APPROVED_WRITE_FILE_HASHES[normalized];
+  if (!expectedHash) return false;
+  const actualHash = crypto.createHash('sha256').update(String(fileSource || '')).digest('hex');
+  return actualHash === expectedHash;
 }
 
 function isHighRiskPath(filePath) {
@@ -574,6 +588,7 @@ module.exports = {
   isFrontendProductionPath,
   isApprovedBrowserStoragePath,
   isHighRiskPath,
+  isApprovedPremiumAuthUsersWriteFile,
   isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,
   isProtectedQualityGatePath,
