@@ -82,6 +82,8 @@ function createPremiumAuthStateManager(options = {}) {
       email: normalizeSessionEmail(verification?.payload?.email || ''),
       userId: truncateText(normalizeString(verification?.payload?.uid || ''), 120),
       role: truncateText(normalizeString(verification?.payload?.role || ''), 40).toLowerCase(),
+      authVersion: Math.max(0, Math.floor(Number(verification?.payload?.av) || 0)),
+      mfaVerified: verification?.payload?.mfa === true,
       expiresAt: Number(verification?.payload?.exp || 0) || null,
       token,
     };
@@ -119,6 +121,15 @@ function createPremiumAuthStateManager(options = {}) {
     };
   }
 
+  function isUserCompatibleWithSession(basicAuthState, user) {
+    return Boolean(
+      basicAuthState?.authenticated &&
+        basicAuthState?.mfaVerified &&
+        user?.mfa?.enabled &&
+        Math.max(1, Math.floor(Number(user?.authVersion) || 1)) === basicAuthState.authVersion
+    );
+  }
+
   function buildTokenFallbackState(basicAuthState) {
     if (!basicAuthState.authenticated) {
       return buildConfiguredAnonymousState(basicAuthState);
@@ -130,7 +141,10 @@ function createPremiumAuthStateManager(options = {}) {
       premiumUsersStore.findUserByEmail(cachedUsers, basicAuthState.email);
 
     if (cachedUser) {
-      if (premiumUsersStore.normalizeUserStatus(cachedUser.status) !== 'active') {
+      if (
+        premiumUsersStore.normalizeUserStatus(cachedUser.status) !== 'active' ||
+        !isUserCompatibleWithSession(basicAuthState, cachedUser)
+      ) {
         return {
           ...basicAuthState,
           configured: true,
@@ -149,16 +163,9 @@ function createPremiumAuthStateManager(options = {}) {
     }
 
     return {
-      ...basicAuthState,
+      ...buildConfiguredAnonymousState(basicAuthState),
       configured: true,
-      authenticated: true,
-      isAdmin: premiumUsersStore.isAdminRole(basicAuthState.role),
-      revoked: false,
-      user: null,
-      displayName: '',
-      firstName: '',
-      lastName: '',
-      avatarDataUrl: '',
+      revoked: true,
       tokenFallback: true,
     };
   }
@@ -267,7 +274,11 @@ function createPremiumAuthStateManager(options = {}) {
       premiumUsersStore.findUserById(users, basicAuthState.userId) ||
       premiumUsersStore.findUserByEmail(users, basicAuthState.email);
 
-    if (!user || premiumUsersStore.normalizeUserStatus(user.status) !== 'active') {
+    if (
+      !user ||
+      premiumUsersStore.normalizeUserStatus(user.status) !== 'active' ||
+      !isUserCompatibleWithSession(basicAuthState, user)
+    ) {
       return {
         ...basicAuthState,
         configured: true,

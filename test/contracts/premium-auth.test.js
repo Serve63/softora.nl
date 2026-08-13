@@ -136,6 +136,8 @@ test('premium auth manager resolves authenticated user and session payload', asy
       firstName: 'Serve',
       lastName: 'Creusen',
       avatarDataUrl: 'data:image/png;base64,abc',
+      authVersion: 1,
+      mfa: { enabled: true, encryptedSecret: 'ciphertext' },
     },
   ];
 
@@ -152,7 +154,11 @@ test('premium auth manager resolves authenticated user and session payload', asy
         email: 'INFO@SOFTORA.NL',
         uid: 'usr_1',
         role: 'ADMIN',
+        av: 1,
+        mfa: true,
         exp: Date.now() + 60_000,
+        av: 1,
+        mfa: true,
       },
     }),
     premiumUsersStore: createPremiumUsersStoreStub(users),
@@ -188,6 +194,8 @@ test('premium auth manager can resolve authenticated token requests without hydr
         uid: 'usr_1',
         role: 'ADMIN',
         exp: Date.now() + 60_000,
+        av: 1,
+        mfa: true,
       },
     }),
     premiumUsersStore: {
@@ -206,9 +214,8 @@ test('premium auth manager can resolve authenticated token requests without hydr
   );
 
   assert.equal(hydrateCalls, 0);
-  assert.equal(resolved.authenticated, true);
-  assert.equal(resolved.email, 'info@softora.nl');
-  assert.equal(resolved.isAdmin, true);
+  assert.equal(resolved.authenticated, false);
+  assert.equal(resolved.revoked, true);
   assert.equal(resolved.user, null);
 });
 
@@ -219,6 +226,8 @@ test('premium auth manager can require a fresh Supabase user for password-regist
     role: 'admin',
     status: 'active',
     firstName: 'Owner',
+    authVersion: 1,
+    mfa: { enabled: true, encryptedSecret: 'ciphertext' },
   }];
   const hydrationOptions = [];
   const store = {
@@ -237,7 +246,7 @@ test('premium auth manager can require a fresh Supabase user for password-regist
     verifySessionToken: () => ({
       ok: true,
       expired: false,
-      payload: { email: 'owner@example.test', uid: 'usr_owner_test', role: 'admin' },
+      payload: { email: 'owner@example.test', uid: 'usr_owner_test', role: 'admin', av: 1, mfa: true },
     }),
     premiumUsersStore: store,
     getRequestPathname: () => '/premium-wachtwoordenregister',
@@ -259,6 +268,8 @@ test('premium auth manager rejects cached token claims when fresh hydration is u
     email: 'owner@example.test',
     role: 'admin',
     status: 'active',
+    authVersion: 1,
+    mfa: { enabled: true, encryptedSecret: 'ciphertext' },
   }];
   const manager = createPremiumAuthStateManager({
     sessionSecret: 'secret',
@@ -269,7 +280,7 @@ test('premium auth manager rejects cached token claims when fresh hydration is u
     verifySessionToken: () => ({
       ok: true,
       expired: false,
-      payload: { email: 'owner@example.test', uid: 'usr_owner_test', role: 'admin' },
+      payload: { email: 'owner@example.test', uid: 'usr_owner_test', role: 'admin', av: 1, mfa: true },
     }),
     premiumUsersStore: {
       ...createPremiumUsersStoreStub(cachedUsers),
@@ -535,6 +546,8 @@ test('premium auth manager falls back to cached or token auth state when user hy
       firstName: 'Serve',
       lastName: 'Creusen',
       avatarDataUrl: 'data:image/png;base64,abc',
+      authVersion: 1,
+      mfa: { enabled: true, encryptedSecret: 'ciphertext' },
     },
   ];
   const manager = createPremiumAuthStateManager({
@@ -552,6 +565,12 @@ test('premium auth manager falls back to cached or token auth state when user hy
         uid: 'usr_1',
         role: 'admin',
         exp: Date.now() + 60_000,
+        av: 1,
+        mfa: true,
+        av: 1,
+        mfa: true,
+        av: 1,
+        mfa: true,
       },
     }),
     premiumUsersStore: {
@@ -601,6 +620,8 @@ test('premium auth manager treats bootstrap-backed users as configured auth stat
       firstName: 'Serve',
       lastName: 'Creusen',
       avatarDataUrl: 'data:image/png;base64,abc',
+      authVersion: 1,
+      mfa: { enabled: true, encryptedSecret: 'ciphertext' },
     },
   ];
 
@@ -618,6 +639,8 @@ test('premium auth manager treats bootstrap-backed users as configured auth stat
         uid: 'usr_bootstrap',
         role: 'admin',
         exp: Date.now() + 60_000,
+        av: 1,
+        mfa: true,
       },
     }),
     premiumUsersStore: createPremiumUsersStoreStub(users, 'bootstrap_env'),

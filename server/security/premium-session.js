@@ -29,16 +29,21 @@ function createPremiumSessionManager(options = {}) {
     truncateText = (value, maxLength) => defaultTruncateText(value, maxLength, normalizeString),
     normalizeSessionEmail = (value) => normalizeString(value).toLowerCase(),
     now = Date.now,
+    requiredSessionVersion = 2,
   } = options;
 
-  function createSessionToken({ email, maxAgeMs, userId = '', role = '' }) {
+  function createSessionToken({ email, maxAgeMs, userId = '', role = '', authVersion = 1, mfaVerified = false }) {
     if (!isAuthConfigured()) return '';
+    if (!mfaVerified) return '';
     const currentNow = Number(now()) || Date.now();
     const ttlMs = Math.max(60_000, Number(maxAgeMs) || defaultSessionTtlMs);
     const payload = {
       email: normalizeSessionEmail(email),
       uid: truncateText(normalizeString(userId || ''), 120),
       role: truncateText(normalizeString(role || ''), 40).toLowerCase(),
+      sv: Math.max(1, Math.floor(Number(requiredSessionVersion) || 1)),
+      av: Math.max(1, Math.floor(Number(authVersion) || 1)),
+      mfa: Boolean(mfaVerified),
       iat: currentNow,
       exp: currentNow + ttlMs,
     };
@@ -80,7 +85,15 @@ function createPremiumSessionManager(options = {}) {
       const userId = truncateText(normalizeString(payload?.uid || ''), 120);
       const role = truncateText(normalizeString(payload?.role || ''), 40).toLowerCase();
       const expiresAtMs = Number(payload?.exp || 0);
-      if (!email || !Number.isFinite(expiresAtMs)) {
+      const sessionVersion = Math.max(0, Math.floor(Number(payload?.sv) || 0));
+      const authVersion = Math.max(0, Math.floor(Number(payload?.av) || 0));
+      if (
+        !email ||
+        !Number.isFinite(expiresAtMs) ||
+        sessionVersion !== requiredSessionVersion ||
+        authVersion < 1 ||
+        payload?.mfa !== true
+      ) {
         return { ok: false, expired: false, payload: null };
       }
       if (expiresAtMs <= (Number(now()) || Date.now())) {
@@ -94,6 +107,9 @@ function createPremiumSessionManager(options = {}) {
           email,
           uid: userId,
           role,
+          sv: sessionVersion,
+          av: authVersion,
+          mfa: true,
         },
       };
     } catch {

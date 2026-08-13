@@ -303,7 +303,7 @@ test('premium users store uses bootstrap users only when fallback is explicitly 
 });
 
 test('premium users store bootstraps only after Supabase confirms the users row is missing', async () => {
-  let upsertedRow = null;
+  let rpcArgs = null;
   const store = createFixture({
     client: {
       from() {
@@ -322,10 +322,22 @@ test('premium users store bootstraps only after Supabase confirms the users row 
               },
             };
           },
-          async upsert(row) {
-            upsertedRow = row;
-            return { error: null };
+          async upsert() {
+            throw new Error('direct upsert should not happen');
           },
+        };
+      },
+      async rpc(name, args) {
+        assert.equal(name, 'softora_replace_premium_auth_users');
+        rpcArgs = args;
+        return {
+          data: {
+            ok: true,
+            payload: args.p_payload,
+            revision: 0,
+            updatedAt: '2026-08-13T10:40:00.000Z',
+          },
+          error: null,
         };
       },
     },
@@ -336,8 +348,211 @@ test('premium users store bootstraps only after Supabase confirms the users row 
   assert.equal(hydrated.source, 'supabase');
   assert.equal(hydrated.users.length, 1);
   assert.equal(hydrated.users[0].email, 'servec321@gmail.com');
-  assert.equal(upsertedRow.state_key, 'premium_auth_users');
-  assert.equal(upsertedRow.meta.source, 'bootstrap_env');
+  assert.equal(rpcArgs.p_expected_revision, -1);
+  assert.equal(rpcArgs.p_allow_insert, true);
+  assert.equal(rpcArgs.p_meta.source, 'bootstrap_env');
+});
+
+test('premium users store persists MFA transitions exclusively through the atomic RPC', async () => {
+  const rpcCalls = [];
+  const originalUser = {
+    id: 'usr_admin',
+    email: 'admin@softora.nl',
+    role: 'admin',
+    status: 'active',
+    passwordHash: 'sha256:test-only-hash',
+    authVersion: 4,
+    mfa: {
+      enabled: true,
+      encryptedSecret: 'v1.iv.tag.ciphertext',
+      recoveryCodeHashes: ['hash-one', 'hash-two'],
+      lastTotpCounter: 100,
+    },
+  };
+  const nextUser = {
+    ...originalUser,
+    mfa: { ...originalUser.mfa, lastTotpCounter: 101 },
+  };
+  const store = createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return {
+                      data: {
+                        payload: { version: 1, users: [originalUser] },
+                        updated_at: '2026-08-13T10:40:00.000Z',
+                        revision: 7,
+                      },
+                      error: null,
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      async rpc(name, args) {
+        rpcCalls.push({ name, args });
+        return {
+          data: {
+            ok: true,
+            user: nextUser,
+            payload: { version: 1, users: [nextUser] },
+            revision: 8,
+            updatedAt: '2026-08-13T10:41:00.000Z',
+          },
+          error: null,
+        };
+      },
+    },
+  });
+  await store.ensureUsersHydrated();
+
+  const result = await store.mutateMfaState(originalUser, {
+    action: 'totp',
+    mfa: nextUser.mfa,
+  });
+
+  assert.equal(result.source, 'supabase');
+  assert.equal(result.user.mfa.lastTotpCounter, 101);
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, 'softora_mutate_premium_mfa_state');
+  assert.equal(rpcCalls[0].args.p_expected_auth_version, 4);
+  assert.equal(rpcCalls[0].args.p_expected_last_totp_counter, 100);
+  assert.equal(rpcCalls[0].args.p_action, 'totp');
+});
+
+test('premium users store treats a lost MFA compare-and-swap race as a hard conflict', async () => {
+  const user = {
+    id: 'usr_admin',
+    email: 'admin@softora.nl',
+    role: 'admin',
+    status: 'active',
+    passwordHash: 'sha256:test-only-hash',
+    authVersion: 4,
+    mfa: {
+      enabled: true,
+      encryptedSecret: 'v1.iv.tag.ciphertext',
+      recoveryCodeHashes: ['hash-one'],
+      lastTotpCounter: 100,
+    },
+  };
+  let winnerChosen = false;
+  const createConcurrentStore = () => createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return {
+                      data: {
+                        payload: { version: 1, users: [user] },
+                        updated_at: '2026-08-13T10:40:00.000Z',
+                        revision: 7,
+                      },
+                      error: null,
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      async rpc() {
+        if (winnerChosen) return { data: { ok: false, reason: 'stale_state' }, error: null };
+        winnerChosen = true;
+        return {
+          data: {
+            ok: true,
+            user: { ...user, mfa: { ...user.mfa, lastTotpCounter: 101 } },
+            payload: { version: 1, users: [{ ...user, mfa: { ...user.mfa, lastTotpCounter: 101 } }] },
+            revision: 8,
+            updatedAt: '2026-08-13T10:41:00.000Z',
+          },
+          error: null,
+        };
+      },
+    },
+  });
+  const first = createConcurrentStore();
+  const second = createConcurrentStore();
+  await Promise.all([first.ensureUsersHydrated(), second.ensureUsersHydrated()]);
+  const nextMfa = { ...user.mfa, lastTotpCounter: 101 };
+
+  const [firstResult, secondResult] = await Promise.all([
+    first.mutateMfaState(user, { action: 'totp', mfa: nextMfa }),
+    second.mutateMfaState(user, { action: 'totp', mfa: nextMfa }),
+  ]);
+
+  assert.deepEqual([firstResult.source, secondResult.source].sort(), ['conflict', 'supabase']);
+  assert.equal(secondResult.user, null);
+});
+
+test('premium users store requires the exact read revision for non-MFA writes', async () => {
+  const rpcCalls = [];
+  const store = createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return {
+                      data: {
+                        payload: {
+                          version: 1,
+                          users: [{
+                            id: 'usr_admin',
+                            email: 'admin@softora.nl',
+                            role: 'admin',
+                            status: 'active',
+                            passwordHash: 'sha256:test-only-hash',
+                          }],
+                        },
+                        updated_at: '2026-08-13T10:40:00.000Z',
+                        revision: 12,
+                      },
+                      error: null,
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      async rpc(name, args) {
+        rpcCalls.push({ name, args });
+        return { data: { ok: false, reason: 'state_conflict', revision: 13 }, error: null };
+      },
+    },
+  });
+  const hydrated = await store.ensureUsersHydrated();
+  assert.equal(hydrated.revision, 12);
+
+  const missingRevision = await store.persistUsersCollection(hydrated.users, {});
+  const staleRevision = await store.persistUsersCollection(hydrated.users, {
+    expectedRevision: hydrated.revision,
+  });
+
+  assert.equal(missingRevision.source, 'conflict');
+  assert.equal(missingRevision.reason, 'revision_unknown');
+  assert.equal(staleRevision.source, 'conflict');
+  assert.equal(staleRevision.revision, 13);
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].args.p_expected_revision, 12);
 });
 
 test('premium users store treats an existing empty users row as authoritative', async () => {

@@ -14,6 +14,12 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     return typeof req?.get === 'function' ? req.get('user-agent') : '';
   }
 
+  function getAuthoritativeRevision(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const revision = Number(value);
+    return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+  }
+
   function requireAuthenticatedPremiumAuthState(req, res) {
     const authState = req?.premiumAuth || null;
     if (!authState || !authState.authenticated) {
@@ -36,7 +42,11 @@ function createPremiumUserManagementCoordinator(deps = {}) {
   async function loadPremiumUsers(options = {}) {
     const hydrated = await premiumUsersStore.ensureUsersHydrated({ force: options.force !== false });
     const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
-    return { hydrated, users };
+    return {
+      hydrated,
+      users,
+      revision: getAuthoritativeRevision(hydrated?.revision),
+    };
   }
 
   async function resolveStoredUserForAuthState(authState) {
@@ -112,7 +122,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     const authState = requireAuthenticatedPremiumAuthState(req, res);
     if (!authState) return res;
 
-    const { users } = await loadPremiumUsers({ force: true });
+    const { users, revision } = await loadPremiumUsers({ force: true });
     const existingUser =
       premiumUsersStore.findUserById(users, authState.userId) ||
       premiumUsersStore.findUserByEmail(users, authState.email);
@@ -169,6 +179,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       source: 'premium_profile_update',
       reason: 'premium_profile_updated',
       actorEmail: authState.email,
+      expectedRevision: revision,
     });
     if (!saved || saved.source !== 'supabase') {
       return res.status(503).json({
@@ -218,7 +229,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     const authState = requireAdminPremiumAuthState(req, res);
     if (!authState) return res;
 
-    const { users } = await loadPremiumUsers({ force: true });
+    const { users, revision } = await loadPremiumUsers({ force: true });
     const email = premiumUsersStore.validateUserEmail(req.body?.email || '');
     const password = String(req.body?.password || '');
     const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames(req.body || {});
@@ -253,6 +264,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       source: 'premium_users_api_create',
       reason: 'premium_user_created',
       actorEmail: authState.email,
+      expectedRevision: revision,
     });
     if (!saved || saved.source !== 'supabase') {
       return res.status(503).json({
@@ -286,7 +298,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     if (!authState) return res;
 
     const userId = truncateText(normalizeString(userIdRaw || ''), 120);
-    const { users } = await loadPremiumUsers({ force: true });
+    const { users, revision } = await loadPremiumUsers({ force: true });
     const existingUser = premiumUsersStore.findUserById(users, userId);
     if (!existingUser) {
       return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
@@ -335,6 +347,12 @@ function createPremiumUserManagementCoordinator(deps = {}) {
 
     const nextUsers = users.map((user) => {
       if (user.id !== userId) return user;
+      const securityIdentityChanged = Boolean(
+        password ||
+          nextEmail !== user.email ||
+          role !== user.role ||
+          status !== user.status
+      );
       return premiumUsersStore.sanitizeUserRecord({
         ...user,
         firstName,
@@ -344,6 +362,9 @@ function createPremiumUserManagementCoordinator(deps = {}) {
         status,
         avatarDataUrl: nextAvatarDataUrl,
         passwordHash: password ? premiumUsersStore.createPasswordHash(password) : user.passwordHash,
+        authVersion: securityIdentityChanged
+          ? Math.max(1, Math.floor(Number(user.authVersion) || 1)) + 1
+          : user.authVersion,
         source: 'managed_ui',
         updatedAt: new Date().toISOString(),
       });
@@ -360,6 +381,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       source: 'premium_users_api_update',
       reason: 'premium_user_updated',
       actorEmail: authState.email,
+      expectedRevision: revision,
     });
     if (!saved || saved.source !== 'supabase') {
       return res.status(503).json({
@@ -411,7 +433,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     if (!authState) return res;
 
     const userId = truncateText(normalizeString(userIdRaw || ''), 120);
-    const { users } = await loadPremiumUsers({ force: true });
+    const { users, revision } = await loadPremiumUsers({ force: true });
     const existingUser = premiumUsersStore.findUserById(users, userId);
     if (!existingUser) {
       return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
@@ -429,6 +451,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       source: 'premium_users_api_delete',
       reason: 'premium_user_deleted',
       actorEmail: authState.email,
+      expectedRevision: revision,
     });
     if (!saved || saved.source !== 'supabase') {
       return res.status(503).json({

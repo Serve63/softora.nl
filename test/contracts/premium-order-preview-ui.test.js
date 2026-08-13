@@ -22,3 +22,13 @@ test('premium opdracht preview herstelt copy-knop zonder innerHTML', () => {
   assert.doesNotMatch(pageSource, /state\.copyBtn\.innerHTML/);
   assert.doesNotMatch(pageSource, /const originalLabel = state\.copyBtn\.innerHTML/);
 });
+
+test('premium opdracht preview isoleert gegenereerde html van de Softora-origin', () => {
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /sandbox="allow-scripts allow-forms"/);
+  assert.doesNotMatch(pageSource, /allow-same-origin/);
+  assert.doesNotMatch(pageSource, /allow-popups/);
+  assert.doesNotMatch(pageSource, /allow-downloads/);
+  assert.match(pageSource, /referrerpolicy="no-referrer"/);
+});

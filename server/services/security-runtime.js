@@ -14,6 +14,7 @@ const {
 } = require('../security/password-register-write-proof');
 const { createLeadOwnerService } = require('./lead-owners');
 const { createPremiumAuthRuntime } = require('./premium-auth-runtime');
+const { createPremiumMfaService } = require('../security/premium-mfa');
 
 function createSecurityRuntime(deps = {}) {
   const {
@@ -36,7 +37,6 @@ function createSecurityRuntime(deps = {}) {
     getNextLeadOwnerRotationIndex,
     setNextLeadOwnerRotationIndex,
     queueRuntimeStatePersist,
-    mfaTotpSecret,
     sessionCookieName,
     premiumSessionTtlHours,
     isProduction,
@@ -92,15 +92,12 @@ function createSecurityRuntime(deps = {}) {
   const isPremiumAuthConfigured = () => premiumUsersStore.hasConfiguredUsers();
 
   const {
-    isPremiumMfaConfigured,
-    isPremiumMfaCodeValid,
     createPremiumSessionToken,
     readPremiumSessionTokenFromRequest,
     verifyPremiumSessionToken,
     clearPremiumSessionCookie,
     setPremiumSessionCookie,
   } = createPremiumAuthRuntime({
-    mfaTotpSecret,
     sessionSecret: premiumSessionSecret,
     sessionCookieName,
     premiumSessionTtlHours,
@@ -111,6 +108,10 @@ function createSecurityRuntime(deps = {}) {
     truncateText,
     normalizePremiumSessionEmail,
   });
+  const premiumMfaService = createPremiumMfaService({
+    sessionSecret: premiumSessionSecret,
+  });
+  const isPremiumMfaConfigured = () => premiumMfaService.isConfigured();
 
   const {
     buildPremiumAuthSessionPayload,
@@ -229,12 +230,12 @@ function createSecurityRuntime(deps = {}) {
     getSafePremiumRedirectPath,
     getStateChangingApiProtectionDecision,
     isPremiumAuthConfigured,
-    isPremiumMfaCodeValid,
     isPremiumMfaConfigured,
     isPremiumPublicApiRequest,
     isPremiumAdminIpAllowed,
     normalizeLeadOwnerRecord,
     premiumUsersStore,
+    premiumMfaService,
     passwordRegisterOwnerPolicy,
     passwordRegisterWriteProofManager,
     readPremiumSessionTokenFromRequest,

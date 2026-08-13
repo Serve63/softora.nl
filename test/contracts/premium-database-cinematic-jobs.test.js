@@ -10,6 +10,7 @@ const {
 const {
   registerPremiumDatabaseCinematicJobRoutes,
 } = require('../../server/routes/premium-database-cinematic-jobs');
+const cinematicPagePath = path.join(__dirname, '../../premium-cinematic-website.html');
 
 function createResponseRecorder() {
   return {
@@ -82,6 +83,13 @@ test('premium database cinematic job routes expose start, status and video endpo
     ['GET', '/api/premium-database/cinematic-jobs/:jobId/frame/:frameIndex'],
     ['GET', '/api/premium-database/cinematic-jobs/:jobId'],
   ]);
+});
+
+test('cinematic preview is opaque-origin sandboxed', () => {
+  const pageSource = fs.readFileSync(cinematicPagePath, 'utf8');
+  assert.match(pageSource, /sandbox="allow-scripts"/);
+  assert.match(pageSource, /referrerpolicy="no-referrer"/);
+  assert.doesNotMatch(pageSource, /allow-same-origin/);
 });
 
 test('premium database cinematic routes require premium api access', async () => {
