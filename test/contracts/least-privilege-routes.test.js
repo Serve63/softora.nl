@@ -21,6 +21,7 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   assert.match(featureRoutes, /requirePremiumAdminApiAccess: premiumRouteRuntime\?\.requirePremiumAdminApiAccess/);
   assert.match(mailboxRoutes, /app\.get\('\/api\/mailbox\/accounts', requireAdmin,/);
   assert.match(mailboxRoutes, /app\.get\('\/api\/mailbox\/campaign-replies', requireAdmin,/);
+  assert.match(mailboxRoutes, /app\.post\('\/api\/mailbox\/provider-thread-audit', requireAdmin,/);
   assert.match(mailboxRoutes, /app\.get\('\/api\/mailbox\/messages', requireAdmin,/);
   assert.match(mailboxRoutes, /app\.post\('\/api\/mailbox\/send', requireAdmin,/);
   assert.match(openAiCostRoutes, /app\.get\('\/api\/openai-costs', requireAdmin,/);

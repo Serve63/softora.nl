@@ -28,7 +28,7 @@ const {
   createMailboxSyncService,
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
-const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
+const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies'); const { createMailboxProviderThreadAuditService } = require('./mailbox-provider-thread-audit');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
 const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list');
@@ -1963,7 +1963,7 @@ function createMailboxService(deps = {}) {
   });
   const { getInstantlyMessage, getMessageBodiesResponse } = createMailboxMessageBodiesService({
     mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, logger,
-  });
+  }); const { providerThreadAuditResponse } = createMailboxProviderThreadAuditService({ assertReadableAccount, fetchMessagesFromImap, isValidEmail, logger, mailboxIndexStore });
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);
   }
@@ -2433,7 +2433,7 @@ function createMailboxService(deps = {}) {
     getMessageBodiesResponse,
     getMessageResponse,
     getMessageImageResponse,
-    listMessagesResponse,
+    listMessagesResponse, providerThreadAuditResponse,
     preflightMessageResponse,
     sendMessageResponse,
     markMessageReadResponse,
