@@ -68,7 +68,7 @@ test('security migration removes current and future public database privileges',
   assert.doesNotMatch(migration, /alter default privileges for role supabase_admin/i);
 });
 
-test('latest security migration closes supabase-admin defaults for future public objects', () => {
+test('latest security migration closes hosted postgres defaults without an unauthorized role change', () => {
   const migration = fs.readFileSync(
     path.join(
       repoRoot,
@@ -79,24 +79,14 @@ test('latest security migration closes supabase-admin defaults for future public
 
   assert.match(
     migration,
-    /alter default privileges for role supabase_admin in schema public[\s\S]*?revoke all on tables from anon, authenticated, service_role;/i
-  );
-  assert.match(
-    migration,
-    /alter default privileges for role supabase_admin in schema public[\s\S]*?revoke all on sequences from anon, authenticated, service_role;/i
-  );
-  assert.match(
-    migration,
-    /alter default privileges for role supabase_admin in schema public[\s\S]*?revoke execute on functions from public, anon, authenticated, service_role;/i
-  );
-  assert.match(
-    migration,
     /alter default privileges for role postgres in schema public[\s\S]*?revoke all on tables from anon, authenticated, service_role;/i
   );
   assert.match(
     migration,
     /alter default privileges for role postgres in schema public[\s\S]*?revoke execute on functions from public, anon, authenticated, service_role;/i
   );
+  assert.doesNotMatch(migration, /alter default privileges for role supabase_admin/i);
+  assert.match(migration, /supabase_admin platform-owned/i);
 });
 
 test('premium MFA mutations are row-locked, compare-and-swap guarded, and service-role-only', () => {
