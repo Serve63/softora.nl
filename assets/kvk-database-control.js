@@ -1,7 +1,6 @@
 (() => {
   const refreshLabel = document.getElementById('last-refresh-time');
   const fillButton = document.getElementById('database-fill-toggle');
-  const fillButtonLabel = document.getElementById('database-fill-toggle-label');
   const state = {
     control: { enabled: false, workerState: 'offline', workerMessage: '', workers: {} },
     usableByPath: new Map(),
@@ -80,14 +79,11 @@
   }
 
   function renderControl() {
-    if (!fillButton || !fillButtonLabel) return;
+    if (!fillButton) return;
     const { enabled, workerState, workerMessage, workers = {} } = state.control;
     const running = ['starting', 'running', 'waiting'].includes(workerState);
     fillButton.classList.toggle('is-on', enabled);
-    const statusLabel = enabled ? 'AAN' : 'UIT';
     const accessibleStatusLabel = enabled ? 'aan' : 'uit';
-    fillButtonLabel.textContent = statusLabel;
-    fillButtonLabel.hidden = false;
     fillButton.setAttribute('aria-busy', enabled && running ? 'true' : 'false');
     fillButton.setAttribute('aria-label', `Database vullen: ${accessibleStatusLabel}. Alleen-lezen status.`);
     const workerLabels = {
