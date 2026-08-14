@@ -36,9 +36,9 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
     module.files.forEach((file) => {
       const source = read(file);
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
-      assert.match(source, /settings-module-back\.css\?v=20260814b/, file);
+      assert.match(source, /settings-module-back\.css\?v=20260814c/, file);
       assert.match(source, /settings-module-routes\.js\?v=20260814a/, file);
-      assert.match(source, /settings-module-back\.js\?v=20260814a/, file);
+      assert.match(source, /settings-module-back\.js\?v=20260814b/, file);
       assert.equal((source.match(/class="settings-module-back"/g) || []).length, 0, file);
     });
   });
@@ -54,6 +54,8 @@ test('gedeelde terugknop is deterministisch, toegankelijk, mobiel en niet histor
   assert.match(source, /document\.querySelector\('\.settings-module-back'\)/);
   assert.match(source, /link\.href = routes\.RETURN_HREF/);
   assert.match(source, /aria-label', 'Terug naar instellingen'/);
+  assert.match(source, /<span>Instellingen<\/span>/);
+  assert.doesNotMatch(source, /<span>Terug naar instellingen<\/span>|<span>Naar instellingen<\/span>/);
   assert.doesNotMatch(source, /history\.back|location\.reload|localStorage|sessionStorage/);
   assert.match(source, /stroke-width="1\.8"/);
   assert.match(styles, /original \.momentum-settings-back in ce8fd32d/);
@@ -68,6 +70,21 @@ test('gedeelde terugknop is deterministisch, toegankelijk, mobiel en niet histor
   assert.doesNotMatch(sharedRule, /border-radius:\s*14px|background:\s*#fff|padding:\s*0 14px/);
   assert.match(styles, /:focus-visible/);
   assert.match(styles, /@media \(max-width:\s*620px\)/);
+  assert.match(styles, /\[data-settings-module-back-host\]\s*\{[\s\S]*?justify-content:\s*flex-start;[\s\S]*?margin:\s*0 0 \.45rem;/);
+  assert.doesNotMatch(styles, /justify-content:\s*flex-end|margin-left:\s*auto|settings-module-back--access/);
+});
+
+test('Instellingen-link staat in de titelkolom en nooit in de rechter actiegroep', () => {
+  const winning = read('live-momentum.html');
+  const health = read('premium-gezondheidsdossier.html');
+  const revenue = read('premium-omzetwerk.html');
+  const locked = read('live-momentum-access.html');
+
+  assert.match(winning, /<div>\s*<span data-settings-module-back-host><\/span>\s*<h1 id="momentum-title">/);
+  assert.doesNotMatch(winning, /momentum-head-actions[\s\S]{0,120}data-settings-module-back-host/);
+  assert.match(health, /<div>\s*<span data-settings-module-back-host><\/span>\s*<p class="health-eyebrow">/);
+  assert.match(revenue, /<div class="hero-copy">\s*<span data-settings-module-back-host><\/span>\s*<p class="eyebrow">/);
+  assert.match(locked, /<header class="momentum-access-header">\s*<span data-settings-module-back-host><\/span>\s*<span class="momentum-access-brand">/);
 });
 
 test('locked en unlocked Winnen blijven één veilige gedeelde uitweg houden', () => {

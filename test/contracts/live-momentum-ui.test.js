@@ -37,7 +37,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260729a"/);
-  assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260814b"/);
+  assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260814c"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260804a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260804a"/);
@@ -59,7 +59,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">/);
-  assert.match(html, /data-settings-module-back-host/);
+  assert.match(html, /<span data-settings-module-back-host><\/span>[\s\S]*<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
+  assert.doesNotMatch(html, /<div class="momentum-head-actions">[\s\S]*data-settings-module-back-host/);
   assert.match(html, /class="momentum-persistence-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(html, /data-momentum-state="loading">Doelen laden…/);
   assert.match(html, /data-momentum-state="error">Laden of opslaan lukt nog niet\./);
@@ -148,7 +149,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-size:\s*2rem;/);
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*text-transform:\s*uppercase;/);
   assert.match(settingsBackCss, /\.settings-module-back\s*\{[\s\S]*min-height:\s*44px;[\s\S]*text-decoration:\s*none;/);
-  assert.match(settingsBackCss, /\.momentum-head-actions \[data-settings-module-back-host\]\s*\{[\s\S]*width:\s*100%;/);
+  assert.match(settingsBackCss, /\[data-settings-module-back-host\]\s*\{[\s\S]*justify-content:\s*flex-start;[\s\S]*margin:\s*0 0 \.45rem;/);
+  assert.doesNotMatch(settingsBackCss, /\.momentum-head-actions \[data-settings-module-back-host\]/);
   assert.doesNotMatch(css, /\.momentum-video-trigger|\.momentum-video-dialog|\.momentum-video-shell/);
   assert.match(videoCss, /\.momentum-video-trigger\s*\{[\s\S]*width:\s*46px;[\s\S]*height:\s*46px;[\s\S]*cursor:\s*pointer;/);
   assert.match(videoCss, /\.momentum-video-dialog::backdrop\s*\{[\s\S]*backdrop-filter:\s*blur\(12px\);/);
