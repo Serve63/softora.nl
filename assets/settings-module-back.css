@@ -5,39 +5,41 @@
   margin-left: auto;
 }
 
+/* Canonicalized from the original .momentum-settings-back in ce8fd32d (PR #1610). */
 .settings-module-back {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  border: 1px solid rgba(26, 26, 46, .11);
-  border-radius: 14px;
-  background: #fff;
-  color: #686675;
-  box-shadow: 0 8px 24px rgba(26, 26, 46, .07);
-  font: 600 12px/1 Inter, sans-serif;
+  gap: .35rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted-soft, #9694a2);
+  box-shadow: none;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
-  transition: color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: color .16s ease, transform .16s ease;
   touch-action: manipulation;
 }
 
-.settings-module-back:hover {
-  border-color: rgba(155, 35, 85, .34);
-  color: #9b2355;
+.settings-module-back:hover,
+.settings-module-back:focus-visible {
+  color: var(--ink, #1a1a2e);
   transform: translateX(-1px);
 }
 
 .settings-module-back:focus-visible {
-  outline: 3px solid rgba(155, 35, 85, .25);
-  outline-offset: 3px;
+  outline: 2px solid rgba(46, 204, 113, .35);
+  outline-offset: 4px;
 }
 
 .settings-module-back svg {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 17px;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
 }
 
 .settings-module-back--access {
@@ -59,8 +61,16 @@
 @media (max-width: 620px) {
   .settings-module-back {
     min-height: 44px;
-    padding-inline: 11px;
+    max-width: 60%;
+    padding: 0;
+    color: var(--muted, #777587);
     font-size: 11px;
+  }
+
+  .settings-module-back span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .settings-module-back--access {

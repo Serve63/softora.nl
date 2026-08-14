@@ -36,7 +36,7 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
     module.files.forEach((file) => {
       const source = read(file);
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
-      assert.match(source, /settings-module-back\.css\?v=20260814a/, file);
+      assert.match(source, /settings-module-back\.css\?v=20260814b/, file);
       assert.match(source, /settings-module-routes\.js\?v=20260814a/, file);
       assert.match(source, /settings-module-back\.js\?v=20260814a/, file);
       assert.equal((source.match(/class="settings-module-back"/g) || []).length, 0, file);
@@ -47,6 +47,7 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
 test('gedeelde terugknop is deterministisch, toegankelijk, mobiel en niet history-afhankelijk', () => {
   const source = read('assets/settings-module-back.js');
   const styles = read('assets/settings-module-back.css');
+  const sharedRule = styles.match(/\.settings-module-back\s*\{([^}]+)\}/)?.[1] || '';
 
   assert.match(source, /routes\?\.findByPath\?\.\(window\.location\.pathname\)/);
   assert.match(source, /hosts\.length !== 1/);
@@ -54,7 +55,17 @@ test('gedeelde terugknop is deterministisch, toegankelijk, mobiel en niet histor
   assert.match(source, /link\.href = routes\.RETURN_HREF/);
   assert.match(source, /aria-label', 'Terug naar instellingen'/);
   assert.doesNotMatch(source, /history\.back|location\.reload|localStorage|sessionStorage/);
+  assert.match(source, /stroke-width="1\.8"/);
+  assert.match(styles, /original \.momentum-settings-back in ce8fd32d/);
   assert.match(styles, /min-height:\s*44px/);
+  assert.match(styles, /gap:\s*\.35rem/);
+  assert.match(styles, /padding:\s*0/);
+  assert.match(styles, /border:\s*0/);
+  assert.match(styles, /background:\s*transparent/);
+  assert.match(styles, /box-shadow:\s*none/);
+  assert.match(styles, /font-size:\s*\.72rem/);
+  assert.match(styles, /width:\s*14px/);
+  assert.doesNotMatch(sharedRule, /border-radius:\s*14px|background:\s*#fff|padding:\s*0 14px/);
   assert.match(styles, /:focus-visible/);
   assert.match(styles, /@media \(max-width:\s*620px\)/);
 });
