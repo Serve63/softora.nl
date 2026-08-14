@@ -5,7 +5,6 @@
   const REMOTE_SAVE_DELAY_MS = 450;
   const REMOTE_RETRY_DELAY_MS = 1800;
   const REMOTE_REFRESH_DEDUPE_MS = 900;
-  const SWIPE_WIDTH = 108;
   const REORDER_START_THRESHOLD = 6;
   const DRAFT_EXERCISE_TITLE = 'NIEUWE OEFENING';
   const DEFAULT_DAY_EXERCISES = {
@@ -43,7 +42,8 @@
   const logbookSync = window.SoftoraSportschoolLogbookSync;
   const logbookStateApi = window.SoftoraSportschoolLogbookState;
   const logbookInputApi = window.SoftoraSportschoolLogbookInput;
-  if (!logbookSync || !logbookStateApi || !logbookInputApi) return;
+  const logbookGestureApi = window.SoftoraSportschoolLogbookGesture;
+  if (!logbookSync || !logbookStateApi || !logbookInputApi || !logbookGestureApi) return;
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
@@ -752,6 +752,10 @@
       persistRemoteSave();
     });
 
+    const completionAction = document.createElement('div');
+    completionAction.className = 'completion-action';
+    completionAction.setAttribute('aria-hidden', 'true');
+
     const card = document.createElement('article');
     card.className = 'exercise-card';
     card.dataset.exerciseKey = exercise.exerciseKey;
@@ -811,39 +815,21 @@
       writeField(day, exercise.order, 'notes', notes.value);
     });
 
-    const completeButton = document.createElement('button');
-    completeButton.type = 'button';
-    completeButton.className = 'exercise-complete';
-    completeButton.dataset.exerciseComplete = 'true';
-    completeButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const nextExercise = setExerciseCompleted(
-        day,
-        exercise.order,
-        completeButton.getAttribute('aria-pressed') !== 'true'
-      );
-      syncExerciseCompletion(card, completeButton, nextExercise);
-    });
-
-    top.append(dragHandle, title, metricGroup, completeButton);
+    top.append(dragHandle, title, metricGroup);
     card.append(top, notes);
-    swipe.append(deleteButton, card);
+    swipe.append(deleteButton, completionAction, card);
     bindReorder(swipe, card, dragHandle, day, exercise.order);
-    bindSwipe(swipe, card);
-    syncExerciseCompletion(card, completeButton, exercise);
+    bindSwipe(swipe, card, completionAction, day, exercise.order, exercise.completed);
+    syncExerciseCompletion(card, completionAction, exercise);
     return swipe;
   }
 
-  function syncExerciseCompletion(card, button, exercise) {
+  function syncExerciseCompletion(card, completionAction, exercise) {
     const completed = Boolean(exercise.completed);
-    const action = completed ? 'weer openzetten' : 'afvinken';
-    const label = `${exercise.title} ${action}`;
     card.classList.toggle('is-complete', completed);
-    button.setAttribute('aria-label', label);
-    button.setAttribute('aria-pressed', String(completed));
-    button.title = completed ? 'Oefening weer openzetten' : 'Oefening afvinken';
-    button.textContent = completed ? '✓' : '○';
+    card.dataset.completed = String(completed);
+    completionAction.dataset.action = completed ? 'undo' : 'complete';
+    completionAction.textContent = completed ? 'Ongedaan' : 'Afvinken';
   }
 
   function targetIndexForPointer(pointerY, draggedSwipe) {
@@ -921,56 +907,66 @@
     handle.addEventListener('click', stop);
   }
 
-  function bindSwipe(swipe, card) {
+  function bindSwipe(swipe, card, completionAction, day, order, initialCompleted) {
     let startX = 0;
     let startY = 0;
     let startOffset = 0;
     let offset = 0;
     let active = false;
     let dragging = false;
+    let intent = 'pending';
+    let completed = Boolean(initialCompleted);
+    let suppressClick = false;
     let targetInput = null;
 
     const setOffset = (nextOffset, animated = false) => {
-      offset = Math.max(0, Math.min(SWIPE_WIDTH, nextOffset));
+      offset = nextOffset;
       card.classList.toggle('is-swiping', !animated);
-      card.style.transition = animated ? 'transform 180ms ease' : 'none';
+      card.style.transition = animated ? '' : 'none';
       card.style.transform = `translateX(${offset}px)`;
       swipe.dataset.open = offset > 0 ? 'true' : 'false';
+      swipe.dataset.swipeIntent = offset < 0 ? 'complete' : offset > 0 ? 'delete' : '';
     };
 
     swipe.addEventListener('pointerdown', (event) => {
       if (event.target.closest?.('.drag-handle')) return;
-      if (event.target.closest?.('input, textarea, button, select, [contenteditable="true"]')) return;
       active = true;
       dragging = false;
+      intent = 'pending';
       startX = event.clientX;
       startY = event.clientY;
       startOffset = offset;
-      targetInput = null;
-      card.setPointerCapture(event.pointerId);
+      targetInput = event.target.closest?.('input, textarea, select, [contenteditable="true"]') || null;
     });
 
     swipe.addEventListener('pointermove', (event) => {
       if (!active) return;
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
+      const nextIntent = logbookGestureApi.classifySwipeIntent({ dx, dy, startOffset });
 
-      if (!dragging) {
-        if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
-          active = false;
-          return;
-        }
-        if (Math.abs(dx) < 9 || Math.abs(dx) <= Math.abs(dy)) return;
-        dragging = true;
-        if (targetInput) targetInput.blur();
+      if (nextIntent === 'scroll') {
+        active = false;
+        return;
       }
+      if (!dragging && nextIntent !== 'pending') {
+        dragging = true;
+        intent = nextIntent;
+        if (targetInput) targetInput.blur();
+        try {
+          card.setPointerCapture(event.pointerId);
+        } catch (_error) {
+          // De browser kan de pointer tijdens native scroll al hebben vrijgegeven.
+        }
+      }
+      if (!dragging) return;
 
       event.preventDefault();
-      setOffset(startOffset + dx, false);
+      setOffset(logbookGestureApi.swipeOffset({ intent, startOffset, dx }), false);
     });
 
-    const end = (event) => {
-      if (!active) return;
+    const end = (event, cancelled = false) => {
+      if (!active && !dragging) return;
       active = false;
       try {
         card.releasePointerCapture(event.pointerId);
@@ -978,23 +974,37 @@
         // De browser kan de pointer al vrijgegeven hebben.
       }
 
-      if (!dragging) {
-        if (offset > 0 && !event.target.closest?.('input, textarea, button, select, [contenteditable="true"]')) {
-          setOffset(0, true);
-        }
-        return;
-      }
-
       const dx = event.clientX - startX;
-      const shouldOpen = offset > 54 || dx > 26;
-      setOffset(shouldOpen ? SWIPE_WIDTH : 0, true);
-      window.setTimeout(() => card.classList.remove('is-swiping'), 190);
+      const result = logbookGestureApi.resolveSwipeEnd({
+        intent,
+        offset,
+        dx,
+        startOffset,
+        completed,
+        cancelled,
+      });
+      suppressClick = dragging;
+      if (suppressClick) {
+        window.setTimeout(() => {
+          suppressClick = false;
+        }, 350);
+      }
+      if (result.action === 'toggle-complete') {
+        const nextExercise = setExerciseCompleted(day, order, result.completed);
+        completed = Boolean(nextExercise.completed);
+        syncExerciseCompletion(card, completionAction, nextExercise);
+      }
+      setOffset(result.targetOffset, true);
+      dragging = false;
+      intent = 'pending';
+      window.setTimeout(() => card.classList.remove('is-swiping'), 230);
     };
 
     swipe.addEventListener('pointerup', end);
-    swipe.addEventListener('pointercancel', end);
+    swipe.addEventListener('pointercancel', (event) => end(event, true));
     swipe.addEventListener('click', (event) => {
-      if (!dragging) return;
+      if (!suppressClick) return;
+      suppressClick = false;
       event.preventDefault();
       event.stopPropagation();
     }, true);
