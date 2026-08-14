@@ -135,13 +135,28 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /<h1 id="momentum-access-title">Toegangscode<\/h1>/);
   assert.match(html, /data-momentum-access-dots/);
   assert.equal((html.match(/data-momentum-access-digit=/g) || []).length, 10);
-  assert.match(html, /live-momentum-access\.css\?v=20260804a/);
+  assert.match(html, /live-momentum-access\.css\?v=20260814b/);
   assert.match(html, /live-momentum-access\.js\?v=20260804a/);
+  assert.match(html, /data-sidebar-shell="canonical"/);
+  assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
+  assert.match(html, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.doesNotMatch(html, /data-live-momentum-page|live-momentum-endgame-cards|data-end-game-goal-track/);
+  assert.doesNotMatch(html, /ATTACK, ATTACK, ATTACK\.|THE END GAME IS TO WIN|momentum-access-art/i);
+  assert.doesNotMatch(css, /momentum-access-art|ATTACK, ATTACK, ATTACK|THE END GAME IS TO WIN/i);
   assert.match(css, /width:\s*min\(100%,\s*390px\)/);
   assert.match(css, /height:\s*52px/);
   assert.match(js, /fetch\('\/api\/live-momentum\/access'/);
   assert.match(js, /credentials:\s*'same-origin'/);
   assert.match(js, /window\.location\.replace\('\/winnen'\)/);
   assert.doesNotMatch(js, /808080/);
+});
+
+test('alleen de vergrendelde Winnen-weergave verbergt slogans; unlocked behoudt ze', () => {
+  const lockedHtml = fs.readFileSync(path.join(repoRoot, 'live-momentum-access.html'), 'utf8');
+  const unlockedHtml = fs.readFileSync(path.join(repoRoot, 'live-momentum.html'), 'utf8');
+
+  assert.doesNotMatch(lockedHtml, /ATTACK, ATTACK, ATTACK\.|THE END GAME IS TO WIN/i);
+  assert.match(unlockedHtml, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
+  assert.match(unlockedHtml, /<span class="momentum-art-quote is-end-game">The end game is to win<\/span>/);
+  assert.match(unlockedHtml, /<span class="momentum-art-quote is-attack">Attack, attack, attack<\/span>/);
 });

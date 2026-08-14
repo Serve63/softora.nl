@@ -54,7 +54,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260814a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260814b/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
@@ -172,4 +172,16 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /:focus-within/);
   assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
 
+});
+
+test('voltooide oefening dekt swipe-acties volledig af en toont verwijderen alleen bewust', () => {
+  const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
+
+  assert.match(stylesSource, /\.exercise-card\s*\{[\s\S]*?z-index:\s*1;/);
+  assert.match(stylesSource, /\.exercise-card\.is-complete\s*\{[\s\S]*?background:\s*linear-gradient\(105deg, #e2f8e9, #f8fffa\);/);
+  assert.doesNotMatch(stylesSource, /background:\s*linear-gradient\(105deg,\s*rgba\(/);
+  assert.match(stylesSource, /\.delete-action\s*\{[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;[\s\S]*?pointer-events:\s*none;/);
+  assert.match(stylesSource, /\.exercise-swipe\[data-swipe-intent="delete"\] \.delete-action,[\s\S]*?\.exercise-swipe\[data-open="true"\] \.delete-action\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?visibility:\s*visible;[\s\S]*?pointer-events:\s*auto;/);
+  assert.match(stylesSource, /\.completion-action\s*\{[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;[\s\S]*?pointer-events:\s*none;/);
+  assert.match(stylesSource, /\.exercise-swipe\[data-swipe-intent="complete"\] \.completion-action\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?visibility:\s*visible;/);
 });

@@ -27,6 +27,10 @@ body {
   font-family: var(--access-sans);
 }
 
+.momentum-access-layout {
+  min-height: 100dvh;
+}
+
 button,
 input {
   font: inherit;
@@ -50,37 +54,6 @@ input {
   background:
     radial-gradient(circle at 50% 36%, rgba(35, 159, 88, .075), transparent 34%),
     linear-gradient(135deg, rgba(255, 255, 255, .94), rgba(248, 247, 244, .9));
-}
-
-.momentum-access-art {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  font-family: var(--access-display);
-  font-weight: 700;
-  text-transform: uppercase;
-  color: transparent;
-  -webkit-text-stroke: 1px rgba(26, 26, 46, .055);
-}
-
-.momentum-access-art span {
-  position: absolute;
-  font-size: clamp(3rem, 8vw, 8rem);
-  line-height: .95;
-}
-
-.momentum-access-art span:first-child {
-  top: 8%;
-  left: 4%;
-}
-
-.momentum-access-art span:last-child {
-  right: 3%;
-  bottom: 4%;
-  max-width: 8ch;
-  text-align: right;
-  -webkit-text-stroke-color: rgba(35, 159, 88, .07);
 }
 
 .momentum-access-card {
@@ -274,9 +247,9 @@ input {
 }
 
 @media (max-width: 520px) {
-  .momentum-access-page {
+  .dashboard-layout[data-sidebar-shell="canonical"] > .momentum-access-page {
     align-items: center;
-    padding-inline: max(14px, env(safe-area-inset-left));
+    padding: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)) !important;
   }
 
   .momentum-access-card {

@@ -1,0 +1,96 @@
+[data-settings-module-back-host] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.settings-module-back {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(26, 26, 46, .11);
+  border-radius: 14px;
+  background: #fff;
+  color: #686675;
+  box-shadow: 0 8px 24px rgba(26, 26, 46, .07);
+  font: 600 12px/1 Inter, sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  touch-action: manipulation;
+}
+
+.settings-module-back:hover {
+  border-color: rgba(155, 35, 85, .34);
+  color: #9b2355;
+  transform: translateX(-1px);
+}
+
+.settings-module-back:focus-visible {
+  outline: 3px solid rgba(155, 35, 85, .25);
+  outline-offset: 3px;
+}
+
+.settings-module-back svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+.settings-module-back--access {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  z-index: 3;
+}
+
+.settings-module-route-header {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 64px;
+  padding: 10px 18px;
+  background: #fff;
+  border-bottom: 1px solid rgba(26, 26, 46, .08);
+}
+
+@media (max-width: 620px) {
+  .settings-module-back {
+    min-height: 44px;
+    padding-inline: 11px;
+    font-size: 11px;
+  }
+
+  .settings-module-back--access {
+    position: relative;
+    top: auto;
+    right: auto;
+    align-self: flex-end;
+    margin: 0 0 10px;
+  }
+}
+
+@media (max-width: 900px) {
+  .momentum-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .momentum-head-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .momentum-head-actions [data-settings-module-back-host] {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-module-back {
+    transition: none;
+  }
+}

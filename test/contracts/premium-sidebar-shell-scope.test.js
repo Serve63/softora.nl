@@ -77,6 +77,7 @@ const staticSidebarPages = [
 
 test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmodus', () => {
   const pageSource = readRepoFile('live-momentum.html');
+  const accessSource = readRepoFile('live-momentum-access.html');
   const themeSource = readRepoFile('assets/personnel-theme.js');
   const focusSource = readRepoFile('assets/live-momentum-focus-mode.js');
 
@@ -94,14 +95,20 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
   assert.match(focusSource, /body\.classList\.toggle\("momentum-focus-mode", next\)/);
   assert.match(focusSource, /event\.key !== "Escape"/);
   assert.doesNotMatch(focusSource, /localStorage|sessionStorage|location\.(?:assign|replace|reload)/);
+  assert.match(accessSource, /data-sidebar-shell="canonical"/);
+  assert.match(accessSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
+  assert.match(accessSource, /assets\/personnel-theme\.(?:css|js)\?v=/);
+  assert.doesNotMatch(accessSource, /ATTACK, ATTACK, ATTACK\.|THE END GAME IS TO WIN|momentum-access-art/i);
 });
 
 test('Winnen blijft deep-link-only en wordt door geen premium-sidebarvariant zichtbaar gemaakt', () => {
   const themeSource = readRepoFile('assets/personnel-theme.js');
   const pageSource = readRepoFile('live-momentum.html');
+  const accessSource = readRepoFile('live-momentum-access.html');
 
   assert.match(pageSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
   assert.doesNotMatch(pageSource, /data-sidebar-key="live_momentum"|href="\/winnen"[^>]*sidebar-link|sidebar-link-text">Winnen/);
+  assert.doesNotMatch(accessSource, /data-sidebar-key="live_momentum"|href="\/winnen"[^>]*sidebar-link|sidebar-link-text">Winnen/);
   assert.doesNotMatch(
     themeSource.match(/function buildUnifiedPremiumSidebarHtml\(activeKey\) \{[\s\S]*?function pruneDeprecatedSidebarLinks/)?.[0] || '',
     /data-sidebar-key="live_momentum"|href="\/winnen"|sidebar-link-text">Winnen/
