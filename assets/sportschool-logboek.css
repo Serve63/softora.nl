@@ -15,25 +15,26 @@
 }
 
 html {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--softora-white);
-  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
   color: var(--softora-ink);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow: visible;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -62,13 +63,12 @@ input:focus-visible {
 
 .gym-app {
   width: min(100%, 430px);
-  height: 100vh;
-  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
+  touch-action: pan-y;
 }
 
 .gym-header {
@@ -98,6 +98,7 @@ input:focus-visible {
 .exercise-notes,
 .metric-label,
 .delete-action,
+.completion-action,
 .day-choice,
 .rest-day {
   font-family: Oswald, Inter, sans-serif;
@@ -176,17 +177,33 @@ input:focus-visible {
   touch-action: pan-y;
 }
 
-.delete-action {
+.delete-action,
+.completion-action {
   position: absolute;
-  inset: 0 auto 0 0;
   width: 108px;
   border: 0;
   border-radius: 12px;
-  background: var(--softora-purple);
   color: var(--softora-white);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.6px;
+}
+
+.delete-action {
+  inset: 0 auto 0 0;
+  background: var(--softora-purple);
+}
+
+.completion-action {
+  inset: 0 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: #3d945c;
+  pointer-events: none;
+}
+
+.completion-action[data-action="undo"] {
+  background: #6d6370;
 }
 
 .exercise-card {
@@ -200,7 +217,11 @@ input:focus-visible {
   border-radius: 12px;
   background: var(--softora-white);
   touch-action: pan-y;
-  transition: transform 180ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
   will-change: transform;
 }
 
@@ -235,7 +256,7 @@ input:focus-visible {
 
 .exercise-top {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto 44px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   gap: 5px;
   align-items: center;
 }
@@ -273,42 +294,13 @@ input:focus-visible {
   outline-offset: 1px;
 }
 
-.exercise-complete {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid rgba(155, 35, 85, 0.2);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--softora-purple);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.exercise-complete[aria-pressed="true"] {
-  border-color: rgba(61, 148, 92, 0.5);
-  background: #d9f3e2;
-  color: #287644;
-}
-
-.exercise-complete:focus-visible {
-  outline: 2px solid rgba(61, 148, 92, 0.5);
-  outline-offset: 2px;
-}
-
 .exercise-title,
 .exercise-notes,
 .metric-input {
   border: 0;
   outline: 0;
   background: transparent;
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 
 .exercise-title {
