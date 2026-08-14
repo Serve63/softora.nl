@@ -37,6 +37,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260729a"/);
+  assert.match(html, /href="\/assets\/live-momentum-settings-back\.css\?v=20260814a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260804a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260804a"/);
@@ -58,6 +59,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">/);
+  assert.match(html, /<a class="momentum-settings-back momentum-settings-back--mobile" href="\/premium-instellingen" aria-label="Terug naar instellingen">[\s\S]*<span>Instellingen<\/span>/);
   assert.match(html, /class="momentum-persistence-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(html, /data-momentum-state="loading">Doelen laden…/);
   assert.match(html, /data-momentum-state="error">Laden of opslaan lukt nog niet\./);
@@ -72,6 +74,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /data-end-game-progress-value>0%<\/strong>/);
   assert.match(html, /class="momentum-mobile-logo" href="\/"/);
   assert.match(html, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
+  assert.match(html, /<a class="momentum-settings-back" href="\/premium-instellingen" aria-label="Terug naar instellingen">[\s\S]*<span>Terug naar instellingen<\/span>/);
   assert.match(html, /<p>Back on Track\.<\/p>/);
   assert.match(html, /class="momentum-focus-toggle"[^>]*data-momentum-focus-toggle[^>]*aria-label="Vergrote weergave openen"[^>]*aria-pressed="false"/);
   assert.match(html, /data-momentum-focus-icon="expand"/);
@@ -121,6 +124,7 @@ test('live momentum page renders the requested dashboard surface', () => {
 test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const css = read('assets/live-momentum.css');
   const mobileCss = read('assets/live-momentum-mobile.css');
+  const settingsBackCss = read('assets/live-momentum-settings-back.css');
   const progressCss = read('assets/live-momentum-endgame-progress.css');
   const endGameNumbersCss = read('assets/live-momentum-endgame-numbers.css');
   const checkpointCss = read('assets/live-momentum-endgame-checkpoint.css');
@@ -143,6 +147,10 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-family:\s*var\(--font-display\);/);
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-size:\s*2rem;/);
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*text-transform:\s*uppercase;/);
+  assert.match(settingsBackCss, /\.momentum-settings-back\s*\{[\s\S]*color:\s*var\(--muted-soft\);[\s\S]*font-size:\s*\.72rem;[\s\S]*text-decoration:\s*none;/);
+  assert.match(settingsBackCss, /\.momentum-mobile-nav\s*\{[\s\S]*justify-content:\s*space-between;[\s\S]*gap:\s*12px;/);
+  assert.match(settingsBackCss, /\.momentum-head \.momentum-settings-back\s*\{[\s\S]*display:\s*none;[\s\S]*\}/);
+  assert.match(settingsBackCss, /\.momentum-mobile-nav \.momentum-settings-back--mobile\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*font-size:\s*11px;/);
   assert.doesNotMatch(css, /\.momentum-video-trigger|\.momentum-video-dialog|\.momentum-video-shell/);
   assert.match(videoCss, /\.momentum-video-trigger\s*\{[\s\S]*width:\s*46px;[\s\S]*height:\s*46px;[\s\S]*cursor:\s*pointer;/);
   assert.match(videoCss, /\.momentum-video-dialog::backdrop\s*\{[\s\S]*backdrop-filter:\s*blur\(12px\);/);

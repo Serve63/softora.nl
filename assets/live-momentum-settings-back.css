@@ -1,0 +1,58 @@
+.momentum-settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin: 0 0 .82rem;
+  color: var(--muted-soft);
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition: color .16s ease, transform .16s ease;
+}
+
+.momentum-settings-back:hover,
+.momentum-settings-back:focus-visible {
+  color: var(--ink);
+  transform: translateX(-1px);
+}
+
+.momentum-settings-back:focus-visible {
+  outline: 2px solid rgba(46, 204, 113, .35);
+  outline-offset: 4px;
+}
+
+.momentum-settings-back svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.momentum-settings-back--mobile {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .momentum-mobile-nav {
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .momentum-head .momentum-settings-back {
+    display: none;
+  }
+
+  .momentum-mobile-nav .momentum-settings-back--mobile {
+    display: inline-flex;
+    max-width: 60%;
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .momentum-mobile-nav .momentum-settings-back--mobile span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
