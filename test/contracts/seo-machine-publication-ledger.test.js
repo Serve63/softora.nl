@@ -124,6 +124,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/blog/ai-automatisering-leadkwalificatie-mkb',
+        '2026-08-14',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });
