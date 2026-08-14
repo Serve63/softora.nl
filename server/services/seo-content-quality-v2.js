@@ -7,6 +7,7 @@ const { CHATBOT_OFFERTE_CONTENT_ITEM } = require('./seo-content-chatbot-offerte'
 const { CRM_ADOPTIE_CONTENT_ITEM } = require('./seo-content-crm-adoptie');
 const { CRM_INTEGRATIE_CONTENT_ITEM } = require('./seo-content-crm-integratie');
 const { SOFTWARE_CHOICE_CONTENT_ITEM } = require('./seo-content-software-choice');
+const { LEAD_QUALIFICATION_CONTENT_ITEM } = require('./seo-content-lead-qualification');
 
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
@@ -18,6 +19,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   CRM_ADOPTIE_CONTENT_ITEM,
   CRM_INTEGRATIE_CONTENT_ITEM,
   SOFTWARE_CHOICE_CONTENT_ITEM,
+  LEAD_QUALIFICATION_CONTENT_ITEM,
 ]);
 
 module.exports = {
