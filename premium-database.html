@@ -1464,7 +1464,7 @@
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-mass-research.js?v=20260629a"></script><script src="assets/premium-database-distance.js?v=20260616a"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-customers-loader.js?v=20260804a"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260805h"></script><script src="assets/premium-database-source-filter.js?v=20260804b"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-customers-loader.js?v=20260804a"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260805h"></script><script src="assets/premium-database-source-filter.js?v=20260814a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -2196,9 +2196,9 @@
                 const websiteHtml = websiteHref
                     ? "<a class=\"website-link\" href=\"" + escapeHtml(websiteHref) + "\" target=\"_blank\" rel=\"noopener\" aria-label=\"Website openen: " + escapeHtml(websiteValue) + "\" title=\"" + escapeHtml(websiteValue) + "\"><svg class=\"website-open-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/><path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/></svg></a>"
                     : escapeHtml(websiteValue);
-                const availableStatus = state.activeStatus === "beschikbaar" ? getAvailablePreparationStatus(customer) : null;
-                const statusClassName = availableStatus ? availableStatus.className : customer.status;
-                const statusLabel = availableStatus ? availableStatus.label : (((showOutreachActionColumn && outreachController.isTrackedOutreachCustomer(customer)) || outreachController.isWebdesignOutreachCustomer(customer)) ? outreachController.getStatusLabel(outreachController.getEffectiveStatus(customer)) : getStatusLabel(customer.status));
+                const availableStatus = state.activeStatus === "beschikbaar" ? getAvailablePreparationStatus(customer) : null, mailReadyStatus = databaseSourceFilter.getContextualStatusPresentation(state.activeStatus, state.mailReadySnapshotLoaded && window.SoftoraDatabaseMailReadySnapshot.isSnapshotMailReadyCustomer(customer) && isColdmailBaseLeadEligible(customer)), contextualStatus = availableStatus || mailReadyStatus;
+                const statusClassName = contextualStatus ? contextualStatus.className : customer.status;
+                const statusLabel = contextualStatus ? contextualStatus.label : (((showOutreachActionColumn && outreachController.isTrackedOutreachCustomer(customer)) || outreachController.isWebdesignOutreachCustomer(customer)) ? outreachController.getStatusLabel(outreachController.getEffectiveStatus(customer)) : getStatusLabel(customer.status));
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
                         "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div>" + outreachController.renderMeta(customer, showOutreachActionColumn && outreachController.isTrackedOutreachCustomer(customer)) + "</div></div></td>",
