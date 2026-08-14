@@ -672,7 +672,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-reply \{[^}]*border:\s*1px solid rgba\(155,35,85,\.34\);[^}]*border-radius:\s*6px;[^}]*padding:\s*8px 14px;/);
   assert.match(pageSource, /\.detail-footer \{[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*0;/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260814a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260813a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260814b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260814a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260813a"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {

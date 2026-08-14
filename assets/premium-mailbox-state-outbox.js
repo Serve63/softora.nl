@@ -35,140 +35,19 @@
     return 'Opslaan lukt nog niet. Controleer je verbinding en probeer opnieuw.';
   }
 
-  function createMemoryStore() {
-    const records = new Map();
-    return {
-      async putLatest(record) {
-        const current = records.get(record.resourceKey);
-        if (!current || Number(current.revision) <= Number(record.revision)) records.set(record.resourceKey, { ...record });
-        return records.get(record.resourceKey);
-      },
-      async get(resourceKey) { return records.get(resourceKey) || null; },
-      async list() { return Array.from(records.values()); },
-      async claim(resourceKey, owner, nowMs, force = false) {
-        const current = records.get(resourceKey);
-        if (!current || current.status === 'failed' || (!force && Number(current.nextAttemptAt) > nowMs)) return null;
-        if (current.leaseOwner && current.leaseOwner !== owner && Number(current.leaseUntil) > nowMs) return null;
-        const claimed = { ...current, leaseOwner: owner, leaseUntil: nowMs + LEASE_MS };
-        records.set(resourceKey, claimed);
-        return claimed;
-      },
-      async complete(resourceKey, mutationId) {
-        const current = records.get(resourceKey);
-        if (current?.mutationId !== mutationId) return false;
-        records.delete(resourceKey);
-        return true;
-      },
-      async update(resourceKey, mutationId, patch) {
-        const current = records.get(resourceKey);
-        if (current?.mutationId !== mutationId) return null;
-        const updated = { ...current, ...patch };
-        records.set(resourceKey, updated);
-        return updated;
-      },
-    };
-  }
-
-  function createIndexedDbStore(indexedDBImpl) {
-    if (!indexedDBImpl || typeof indexedDBImpl.open !== 'function') return createMemoryStore();
-    let dbPromise = null;
-    function open() {
-      if (dbPromise) return dbPromise;
-      dbPromise = new Promise((resolve, reject) => {
-        const request = indexedDBImpl.open(DB_NAME, 1);
-        request.onupgradeneeded = () => {
-          const db = request.result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'resourceKey' });
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error('Mailbox-outbox openen mislukt'));
-      });
-      return dbPromise;
-    }
-    function transaction(mode, operation) {
-      return open().then((db) => new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, mode);
-        const store = tx.objectStore(STORE_NAME);
-        let value;
-        tx.oncomplete = () => resolve(value);
-        tx.onerror = () => reject(tx.error || new Error('Mailbox-outbox transactie mislukt'));
-        tx.onabort = () => reject(tx.error || new Error('Mailbox-outbox transactie afgebroken'));
-        operation(store, (next) => { value = next; });
-      }));
-    }
-    return {
-      putLatest(record) {
-        return transaction('readwrite', (store, done) => {
-          const get = store.get(record.resourceKey);
-          get.onsuccess = () => {
-            const current = get.result;
-            const selected = !current || Number(current.revision) <= Number(record.revision) ? record : current;
-            store.put(selected);
-            done(selected);
-          };
-        });
-      },
-      get(resourceKey) {
-        return transaction('readonly', (store, done) => {
-          const request = store.get(resourceKey);
-          request.onsuccess = () => done(request.result || null);
-        });
-      },
-      list() {
-        return transaction('readonly', (store, done) => {
-          const request = store.getAll();
-          request.onsuccess = () => done(Array.isArray(request.result) ? request.result : []);
-        });
-      },
-      claim(resourceKey, owner, nowMs, force = false) {
-        return transaction('readwrite', (store, done) => {
-          const request = store.get(resourceKey);
-          request.onsuccess = () => {
-            const current = request.result;
-            if (!current || current.status === 'failed' || (!force && Number(current.nextAttemptAt) > nowMs) ||
-              (current.leaseOwner && current.leaseOwner !== owner && Number(current.leaseUntil) > nowMs)) {
-              done(null);
-              return;
-            }
-            const claimed = { ...current, leaseOwner: owner, leaseUntil: nowMs + LEASE_MS };
-            store.put(claimed);
-            done(claimed);
-          };
-        });
-      },
-      complete(resourceKey, mutationId) {
-        return transaction('readwrite', (store, done) => {
-          const request = store.get(resourceKey);
-          request.onsuccess = () => {
-            const current = request.result;
-            if (current?.mutationId !== mutationId) { done(false); return; }
-            store.delete(resourceKey);
-            done(true);
-          };
-        });
-      },
-      update(resourceKey, mutationId, patch) {
-        return transaction('readwrite', (store, done) => {
-          const request = store.get(resourceKey);
-          request.onsuccess = () => {
-            const current = request.result;
-            if (current?.mutationId !== mutationId) { done(null); return; }
-            const updated = { ...current, ...patch };
-            store.put(updated);
-            done(updated);
-          };
-        });
-      },
-    };
-  }
-
   function create(options = {}) {
     const target = options.global || global;
     const now = options.now || Date.now;
     const random = options.random || Math.random;
     const fetchImpl = options.fetch || target.fetch?.bind(target);
     const cryptoImpl = options.crypto || target.crypto;
-    const store = options.store || createIndexedDbStore(options.indexedDB || target.indexedDB);
+    const storage = options.storage || target.SoftoraPremiumBrowserStorage;
+    const store = options.store || storage?.createLatestRecordStore?.({
+      dbName: DB_NAME,
+      storeName: STORE_NAME,
+      leaseMs: LEASE_MS,
+    }) || storage?.createMemoryLatestRecordStore?.({ leaseMs: LEASE_MS });
+    if (!store) throw new Error('Duurzame mailboxopslag is niet beschikbaar.');
     const listeners = new Set();
     const inflight = new Set();
     const tabId = createMutationId(cryptoImpl, now(), 0, random);
@@ -379,7 +258,14 @@
     };
   }
 
-  const api = { create, createMemoryStore, isRetryableStatus };
+  const storage = global.SoftoraPremiumBrowserStorage || (typeof require === 'function'
+    ? require('./premium-browser-storage.js')
+    : null);
+  const api = {
+    create,
+    createMemoryStore: () => storage.createMemoryLatestRecordStore({ leaseMs: LEASE_MS }),
+    isRetryableStatus,
+  };
   global.SoftoraMailboxStateOutbox = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
