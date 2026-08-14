@@ -214,10 +214,12 @@ test('agent guardrails detect newly added browser storage in production frontend
 });
 
 test('agent guardrails allow browser storage only in central premium cache helpers', () => {
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-browser-storage.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-page-bootstrap-session.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/personnel-theme.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-sidebar-profile-prefill.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-campaign-inbox.js'), false);
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-state-outbox.js'), false);
 });
 
 test('agent guardrails block large inline scripts in html pages', () => {

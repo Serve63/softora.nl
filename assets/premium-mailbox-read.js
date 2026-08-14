@@ -12,6 +12,10 @@
     const confirmedStates = new Map();
     const pendingStates = new Map();
     const rejectedStates = new Map();
+    const pendingOperations = new Map();
+    const stateOutbox = options.outbox || global.SoftoraMailboxStateOutbox?.create?.({
+      fetch: options.fetch,
+    }) || null;
     let channel = null;
 
     function getIdentity(mail) {
@@ -229,20 +233,38 @@
       if (!mail || !requestId || !account) {
         return { ok: false, error: new Error('Gelezen status mist berichtprovenance') };
       }
+      const payload = {
+        account,
+        owner: options.getOwner?.(mail) || '',
+        id: requestId,
+        uid: mail.uid,
+        folder: options.getFolder?.(mail) || 'inbox',
+        unread: persistOptions.unread === true,
+        dismissReply: persistOptions.dismissReply === true,
+      };
+      if (stateOutbox && typeof stateOutbox.enqueue === 'function') {
+        const identity = getIdentity(mail);
+        const identities = getConversationTargets(persistOptions.conversation || mail)
+          .map(getIdentity)
+          .filter(Boolean);
+        try {
+          return await stateOutbox.enqueue(payload, {
+            resourceKey: getIdentityKey(identity),
+            identity,
+            identities,
+            previous: persistOptions.previous || null,
+          });
+        } catch (_) {
+          return { ok: false, error: new Error('Mailboxstatus kon niet in de veilige wachtrij worden geplaatst.') };
+        }
+      }
       try {
         const response = await options.fetch('/api/mailbox/messages/read', {
           method: 'POST',
           credentials: 'same-origin',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            account,
-            owner: options.getOwner?.(mail) || '',
-            id: requestId,
-            uid: mail.uid,
-            folder: options.getFolder?.(mail) || 'inbox',
-            dismissReply: persistOptions.dismissReply === true,
-          }),
+          body: JSON.stringify(payload),
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.ok) {
@@ -318,7 +340,16 @@
       });
       setPendingStates(targets, { dismissReply: false });
       render(hooks, mail, mail);
-      const outcome = await persist(mail);
+      const outcome = await persist(mail, {
+        conversation: mail,
+        previous: { unread: previous.unread, replyDismissedAt: previous.replyDismissedAt },
+      });
+      if (outcome.ok && outcome.pending && outcome.record) {
+        pendingOperations.set(outcome.record.mutationId, {
+          kind: 'read', mail, target: mail, targets, snapshots, previous, hooks,
+        });
+        return { ok: true, pending: true, mutationId: outcome.record.mutationId };
+      }
       clearPendingStates(targets);
       if (!outcome.ok) {
         setFailure(mail, previous, outcome.error, hooks, mail, snapshots, { dismissReply: false });
@@ -367,7 +398,17 @@
         replyDismissedAt: optimisticReplyDismissedAt,
       });
       render(hooks, mail, target);
-      const outcome = await persist(target, { dismissReply: true });
+      const outcome = await persist(target, {
+        dismissReply: true,
+        conversation: mail,
+        previous: { unread: previous.unread, replyDismissedAt: previous.replyDismissedAt },
+      });
+      if (outcome.ok && outcome.pending && outcome.record) {
+        pendingOperations.set(outcome.record.mutationId, {
+          kind: 'dismiss', mail, target, targets, snapshots, previous, hooks, targetKey,
+        });
+        return { ok: true, pending: true, mutationId: outcome.record.mutationId };
+      }
       clearPendingStates(targets);
       if (!outcome.ok || !outcome.result?.replyDismissedAt) {
         setFailure(target, previous, outcome.error || new Error('Gelezen status opslaan mislukt'), hooks, mail, snapshots, { dismissReply: true, targetKey });
@@ -385,6 +426,113 @@
       options.toast?.('Gesprek als gelezen afgehandeld');
       return { ok: true, result: outcome.result };
     }
+
+    function rememberOutboxRecord(record, type, detail = {}) {
+      const identities = (Array.isArray(record?.identities) && record.identities.length
+        ? record.identities
+        : [record?.identity]).filter(Boolean);
+      identities.forEach((identity) => {
+        const key = getIdentityKey(identity);
+        if (!key) return;
+        if (type === 'confirmed') {
+          pendingStates.delete(key);
+          rejectedStates.delete(key);
+          confirmedStates.set(key, {
+            identity,
+            unread: record?.unread === true,
+            pending: false,
+            dismissReply: record?.dismissReply === true,
+            targetKey: getIdentityKey(record?.identity) || key,
+            replyDismissedAt: String(detail.result?.replyDismissedAt || ''),
+            savedAt: Date.now(),
+          });
+          return;
+        }
+        if (type === 'failed') {
+          pendingStates.delete(key);
+          confirmedStates.delete(key);
+          rejectedStates.set(key, {
+            identity,
+            unread: Boolean(record?.previous?.unread),
+            pending: false,
+            failed: true,
+            readError: String(detail.message || record?.errorMessage || 'Opslaan lukt nog niet.'),
+            dismissReply: record?.dismissReply === true,
+            targetKey: getIdentityKey(record?.identity) || key,
+            replyDismissedAt: String(record?.previous?.replyDismissedAt || ''),
+            savedAt: Date.now(),
+          });
+          return;
+        }
+        rejectedStates.delete(key);
+        pendingStates.set(key, {
+          identity,
+          unread: record?.unread === true,
+          pending: true,
+          dismissReply: record?.dismissReply === true,
+          targetKey: getIdentityKey(record?.identity) || key,
+          replyDismissedAt: '',
+          savedAt: Date.now(),
+        });
+      });
+    }
+
+    function handleOutboxEvent(event = {}) {
+      const record = event.record;
+      if (!record?.mutationId) return;
+      const operation = pendingOperations.get(record.mutationId);
+      if (event.type === 'pending' || event.type === 'retry-scheduled') {
+        rememberOutboxRecord(record, 'pending', event);
+        options.onExternalState?.(record.identity);
+        return;
+      }
+      if (event.type === 'confirmed') {
+        rememberOutboxRecord(record, 'confirmed', event);
+        if (operation) {
+          pendingOperations.delete(record.mutationId);
+          clearPendingStates(operation.targets);
+          operation.targets.forEach((candidate) => {
+            candidate.unread = record.unread === true;
+            candidate.readPending = false;
+            candidate.readError = '';
+            candidate.softoraReadConfirmed = record.unread !== true;
+          });
+          if (operation.kind === 'dismiss') {
+            operation.target.replyDismissPending = false;
+            operation.target.replyDismissedAt = String(
+              event.result?.replyDismissedAt || operation.target.replyDismissedAt || new Date().toISOString()
+            );
+            rememberConfirmedStates(operation.targets, {
+              replyDismissedAt: operation.target.replyDismissedAt,
+            }, { dismissReply: true, targetKey: operation.targetKey });
+            options.toast?.('Gesprek als gelezen afgehandeld');
+          } else {
+            rememberConfirmedStates(operation.targets, event.result || {});
+          }
+          render(operation.hooks, operation.mail, operation.target);
+        }
+        options.onExternalState?.(record.identity);
+        return;
+      }
+      if (event.type !== 'failed') return;
+      rememberOutboxRecord(record, 'failed', event);
+      if (operation) {
+        pendingOperations.delete(record.mutationId);
+        clearPendingStates(operation.targets);
+        setFailure(
+          operation.target,
+          operation.previous,
+          new Error(event.message || record.errorMessage || 'Opslaan lukt nog niet.'),
+          operation.hooks,
+          operation.mail,
+          operation.snapshots,
+          { dismissReply: operation.kind === 'dismiss', targetKey: operation.targetKey || '' }
+        );
+      }
+      options.onExternalState?.(record.identity);
+    }
+
+    stateOutbox?.subscribe?.(handleOutboxEvent);
 
     if (typeof BroadcastChannelImpl === 'function') {
       try {

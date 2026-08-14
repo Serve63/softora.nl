@@ -66,6 +66,7 @@ const DISALLOWED_BROWSER_STORAGE_PATTERNS = Object.freeze([
 ]);
 
 const APPROVED_BROWSER_STORAGE_PATHS = Object.freeze([
+  'assets/premium-browser-storage.js',
   'assets/personnel-theme.js',
   'assets/premium-sidebar-profile-prefill.js',
   'assets/premium-page-bootstrap-session.js',

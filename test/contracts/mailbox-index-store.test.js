@@ -2002,6 +2002,56 @@ test('mailbox index store safely retries a transient fenced sync finalization fa
   assert.equal(finishCalls, 2);
 });
 
+test('mailbox index store gebruikt de duurzame state-RPC met genormaliseerde identiteit', async () => {
+  const rpcCalls = [];
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (_options) => ({
+      async rpc(name, input) {
+        rpcCalls.push([name, input]);
+        return {
+          data: [{
+            message_key: 'serve290@gmail.com|inbox|259',
+            state_revision: 20260814165202001,
+            state_mutation_key: 'a'.repeat(64),
+            unread: false,
+            reply_dismissed_at: '2026-08-14T14:52:02.000Z',
+          }],
+          error: null,
+        };
+      },
+    }),
+    logger: { error() {}, info() {} },
+  });
+
+  const result = await store.applyStateMutation({
+    accountEmail: ' SERVE290@GMAIL.COM ',
+    folder: 'INBOX',
+    id: 'inbox:259',
+    uid: 259,
+    mutationKey: 'a'.repeat(64),
+    revision: 20260814165202001,
+    unread: false,
+    dismissReply: true,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.row.state_revision, 20260814165202001);
+  assert.deepEqual(rpcCalls, [[
+    'softora_apply_mailbox_state_mutation',
+    {
+      p_account_email: 'serve290@gmail.com',
+      p_folder: 'inbox',
+      p_uid: 259,
+      p_provider_id: 'inbox:259',
+      p_mutation_key: 'a'.repeat(64),
+      p_revision: 20260814165202001,
+      p_unread: false,
+      p_dismiss_reply: true,
+    },
+  ]]);
+});
+
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {
   const schema = fs.readFileSync(
     path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
@@ -2011,6 +2061,13 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   assert.match(schema, /create table if not exists public\.softora_mailbox_messages/);
   assert.match(schema, /reply_dismissed_at timestamptz/);
   assert.match(schema, /softora_read_at timestamptz/);
+  assert.match(schema, /state_revision bigint not null default 0/);
+  assert.match(schema, /state_mutation_key text/);
+  assert.match(schema, /create or replace function public\.softora_apply_mailbox_state_mutation/);
+  assert.match(schema, /for update/);
+  assert.match(schema, /if v_row\.state_revision > p_revision/);
+  assert.match(schema, /revoke execute on function public\.softora_apply_mailbox_state_mutation[\s\S]*from public, anon, authenticated/);
+  assert.match(schema, /grant execute on function public\.softora_apply_mailbox_state_mutation[\s\S]*to service_role/);
   assert.match(schema, /create trigger softora_mailbox_messages_preserve_read_state/);
   assert.match(schema, /create table if not exists public\.softora_mailbox_sync_state/);
   assert.match(schema, /create table if not exists public\.softora_mailbox_send_provenance/);
@@ -2030,6 +2087,21 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   assert.match(schema, /softora_mailbox_send_provenance_identity_format_check/);
   assert.match(schema, /softora_mailbox_send_provenance_scope_format_check/);
   assert.match(schema, /softora_mailbox_send_provenance_payload_format_check/);
+});
+
+test('mailbox state mutation migration houdt revision en RPC service-role-only', () => {
+  const migration = fs.readFileSync(
+    path.resolve(__dirname, '../../supabase/migrations/20260814150135_mailbox_state_mutation_idempotency.sql'),
+    'utf8'
+  );
+  assert.match(migration, /state_revision bigint not null default 0/);
+  assert.match(migration, /state_mutation_key text/);
+  assert.match(migration, /state_mutation_key ~ '\^\[a-f0-9\]\{64\}\$'/);
+  assert.match(migration, /select m\.\*[\s\S]*for update/);
+  assert.match(migration, /v_row\.state_revision > p_revision/);
+  assert.match(migration, /v_row\.state_mutation_key = btrim\(p_mutation_key\)/);
+  assert.doesNotMatch(migration, /grant execute[\s\S]*to (?:public|anon|authenticated)/i);
+  assert.match(migration, /grant execute[\s\S]*to service_role/i);
 });
 
 test('mailbox send identity migration strengthens keys without weakening NOT NULL or service-role access', () => {
