@@ -1,0 +1,259 @@
+.momentum-history-trigger {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgba(26, 26, 46, .09);
+  border-radius: 15px;
+  background: #fff;
+  color: #1a1a2e;
+  box-shadow: 0 10px 28px rgba(26, 26, 46, .09);
+  cursor: pointer;
+}
+
+.momentum-history-trigger svg {
+  width: 24px;
+  height: 24px;
+}
+
+.momentum-history-trigger:hover {
+  border-color: rgba(155, 35, 85, .34);
+  color: #9b2355;
+  transform: translateY(-1px);
+}
+
+.momentum-history-trigger:focus-visible,
+.momentum-history-close:focus-visible,
+.momentum-history-point:focus-visible {
+  outline: 3px solid rgba(155, 35, 85, .28);
+  outline-offset: 3px;
+}
+
+.momentum-history-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  border: 0;
+  background: transparent;
+  overflow: auto;
+}
+
+.momentum-history-dialog[open] {
+  display: grid;
+  place-items: center;
+}
+
+.momentum-history-dialog::backdrop {
+  background: rgba(17, 17, 31, .58);
+  backdrop-filter: blur(10px);
+}
+
+.momentum-history-shell {
+  width: min(920px, 100%);
+  border: 1px solid rgba(155, 35, 85, .14);
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 32px 90px rgba(17, 17, 31, .24);
+  overflow: hidden;
+}
+
+.momentum-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px 16px;
+}
+
+.momentum-history-header span {
+  color: #9b2355;
+  font: 700 11px/1 Inter, sans-serif;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.momentum-history-header h2 {
+  margin: 5px 0 0;
+  color: #1a1a2e;
+  font: 700 clamp(24px, 4vw, 34px)/1 Oswald, Inter, sans-serif;
+  text-transform: uppercase;
+}
+
+.momentum-history-close {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid rgba(26, 26, 46, .1);
+  border-radius: 14px;
+  background: #fff;
+  color: #1a1a2e;
+  cursor: pointer;
+}
+
+.momentum-history-close svg {
+  width: 21px;
+  height: 21px;
+}
+
+.momentum-history-summary {
+  margin: 0;
+  padding: 0 24px 18px;
+  color: #777587;
+  font: 600 12px/1.5 Inter, sans-serif;
+}
+
+.momentum-history-empty {
+  margin: 0 24px 24px;
+  padding: 34px 22px;
+  border-radius: 18px;
+  background: #f8f5f7;
+  color: #6f6d7c;
+  text-align: center;
+}
+
+.momentum-history-viewport {
+  margin: 0 16px 20px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.momentum-history-plot {
+  position: relative;
+  min-width: max-content;
+}
+
+.momentum-history-plot svg {
+  display: block;
+}
+
+.momentum-history-grid line {
+  stroke: rgba(26, 26, 46, .08);
+  stroke-width: 1;
+}
+
+.momentum-history-grid text,
+.momentum-history-month-label {
+  fill: #868392;
+  font: 600 11px Inter, sans-serif;
+  text-anchor: middle;
+}
+
+.momentum-history-grid text {
+  text-anchor: end;
+}
+
+.momentum-history-month-label.is-current {
+  fill: #9b2355;
+  font-weight: 700;
+}
+
+.momentum-history-line {
+  fill: none;
+  stroke: #9b2355;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.momentum-history-points {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.momentum-history-point {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: #9b2355;
+  box-shadow: 0 0 0 2px #9b2355;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: help;
+}
+
+.momentum-history-point.is-current {
+  background: #3d945c;
+  box-shadow: 0 0 0 2px #3d945c;
+}
+
+.momentum-history-point > span {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 2;
+  display: grid;
+  width: max-content;
+  max-width: 190px;
+  padding: 9px 11px;
+  border-radius: 11px;
+  background: #1a1a2e;
+  color: #fff;
+  font: 600 11px/1.35 Inter, sans-serif;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+  pointer-events: none;
+}
+
+.momentum-history-point > span strong {
+  font-size: 15px;
+}
+
+.momentum-history-point > span small {
+  color: rgba(255, 255, 255, .72);
+}
+
+.momentum-history-point:hover > span,
+.momentum-history-point:focus-visible > span {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+body.momentum-history-open {
+  overflow: hidden;
+}
+
+@media (max-width: 520px) {
+  .momentum-history-trigger {
+    width: 44px;
+    height: 44px;
+  }
+
+  .momentum-history-dialog {
+    align-items: end;
+    padding-inline: max(10px, env(safe-area-inset-left));
+  }
+
+  .momentum-history-shell {
+    border-radius: 24px;
+  }
+
+  .momentum-history-header {
+    padding: 19px 18px 14px;
+  }
+
+  .momentum-history-summary {
+    padding-inline: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .momentum-history-trigger,
+  .momentum-history-point > span {
+    transition: none;
+  }
+}

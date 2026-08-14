@@ -16,6 +16,7 @@
   </script>
   <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
   <link rel="stylesheet" href="/assets/premium-omzetwerk.css?v=20260726c">
+  <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260814a">
   <title>OMZETWERK | Commandocentrum</title>
 </head>
 <body data-omzetwerk-page>
@@ -87,11 +88,8 @@
 
       <div class="command">
     <nav class="topbar" aria-label="Paginanavigatie">
-      <a class="back-link" href="/premium-instellingen">
-        <span aria-hidden="true">←</span>
-        Instellingen
-      </a>
       <div class="visibility"><span></span> Alleen zichtbaar voor Servé</div>
+      <span data-settings-module-back-host></span>
     </nav>
 
     <header class="hero">
@@ -280,5 +278,7 @@
       </div>
     </main>
   </div>
+  <script src="/assets/settings-module-routes.js?v=20260814a" defer></script>
+  <script src="/assets/settings-module-back.js?v=20260814a" defer></script>
 </body>
 </html>

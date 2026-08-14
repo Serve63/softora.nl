@@ -272,6 +272,9 @@ function backToInstellingenOverzicht() {
     closeOverlay('edit-overlay');
     closeOverlay('confirm-overlay');
   } catch (e) { /* ignore */ }
+  if (window.location.hash === '#extra') {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
   goTo('screen-overzicht');
 }
 
@@ -285,24 +288,10 @@ function mountExtraSettingsCategory() {
   var personnelTile = overviewScreen && overviewScreen.querySelector('.tegel[data-settings-action="open-pin"]');
   if (!overviewScreen || !personnelTile || document.getElementById('screen-extra')) return;
 
-  var extraItems = [
-    'Winnen',
-    'Database',
-    "Servé's gezondheidsdossier",
-    'Ruben zet toto',
-    'world watcher',
-    'Flynow',
-    'Transfermarkt',
-    'OMZETWERK',
-    'Ruben’s Trading System',
-  ];
-  var sortableExtraItems = extraItems.map(function (label) {
-    var isWinning = label === 'Winnen';
-    var isDatabase = label === 'Database';
-    var isHealth = label === "Servé's gezondheidsdossier";
-    var isOmzetwerk = label === 'OMZETWERK';
-    return { label: label, unlocked: isWinning || isDatabase || isHealth || isOmzetwerk };
-  });
+  var moduleRoutes = window.SoftoraSettingsModuleRoutes;
+  var sortableExtraItems = moduleRoutes && Array.isArray(moduleRoutes.EXTRA_MODULES)
+    ? moduleRoutes.EXTRA_MODULES.slice()
+    : [];
   var extraItemsForRender = window.SoftoraPremiumExtraModules &&
     typeof window.SoftoraPremiumExtraModules.sortExtraSettingsItems === 'function'
     ? window.SoftoraPremiumExtraModules.sortExtraSettingsItems(sortableExtraItems)
@@ -386,6 +375,7 @@ function mountExtraSettingsCategory() {
   );
   appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
   extraTile.addEventListener('click', function () {
+    window.location.hash = 'extra';
     extraGrid.hidden = false;
     headerTitle.textContent = 'Extra';
     headerSubtitle.textContent = 'Interne modules en placeholders';
@@ -436,18 +426,8 @@ function mountExtraSettingsCategory() {
   extraItemsForRender.forEach(function (item, index) {
     var label = item.label;
     var number = String(index + 1).padStart(2, '0');
-    var isWinning = label === 'Winnen';
-    var isDatabase = label === 'Database';
-    var isHealth = label === "Servé's gezondheidsdossier";
-    var isOmzetwerk = label === 'OMZETWERK';
-    var isLinkedModule = isWinning || isDatabase || isHealth || isOmzetwerk;
-    var moduleHref = isWinning
-      ? '/winnen'
-      : isDatabase
-        ? '/kvk-database'
-        : isHealth
-          ? '/premium-gezondheidsdossier'
-          : '/premium-omzetwerk';
+    var moduleHref = String(item.href || '');
+    var isLinkedModule = item.unlocked === true && Boolean(moduleHref);
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {
@@ -516,17 +496,7 @@ function mountExtraSettingsCategory() {
       card,
       'div',
       'tegel-desc',
-      isWinning
-          ? 'Live momentum voor dagelijkse doelen, discipline en voortgang.'
-          : isDatabase
-            ? 'Lokale database voor het scrapen en behandelen van bedrijven.'
-            : isHealth
-              ? 'WHOOP-herstel, slaap en trainingen, dagelijks automatisch bijgewerkt.'
-            : isOmzetwerk
-              ? 'Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1.000.000.'
-            : label === 'Flynow'
-              ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
-            : 'Interne template-module die later verder ingevuld kan worden.'
+      item.description || 'Interne template-module die later verder ingevuld kan worden.'
     );
     appendUserManagementTextElement(
       card,
@@ -538,6 +508,12 @@ function mountExtraSettingsCategory() {
   });
   extraScreen.appendChild(extraGrid);
   overviewScreen.insertAdjacentElement('afterend', extraScreen);
+  if (window.location.hash === '#extra') {
+    extraGrid.hidden = false;
+    headerTitle.textContent = 'Extra';
+    headerSubtitle.textContent = 'Interne modules en placeholders';
+    goTo('screen-extra');
+  }
 }
 
 function renderAccessDenied() {

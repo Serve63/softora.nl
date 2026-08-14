@@ -8,18 +8,19 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
+  <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
+  <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260814a">
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
-  <link rel="stylesheet" href="/assets/live-momentum-access.css?v=20260804a">
+  <link rel="stylesheet" href="/assets/live-momentum-access.css?v=20260814b">
+  <script src="/assets/personnel-theme.js?v=20260813b" defer></script>
 </head>
 <body data-live-momentum-access-page>
-  <main class="momentum-access-page" aria-labelledby="momentum-access-title">
-    <div class="momentum-access-art" aria-hidden="true">
-      <span>ATTACK, ATTACK, ATTACK.</span>
-      <span>THE END GAME IS TO WIN</span>
-    </div>
-
-    <section class="momentum-access-card" aria-describedby="momentum-access-description">
-      <a class="momentum-access-close" href="/premium-instellingen" aria-label="Terug naar instellingen">
+  <div class="dashboard-layout momentum-access-layout" data-sidebar-shell="canonical">
+    <aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"></aside>
+    <main class="main-content momentum-access-page" aria-labelledby="momentum-access-title">
+      <span class="settings-module-back--access" data-settings-module-back-host></span>
+      <section class="momentum-access-card" aria-describedby="momentum-access-description">
+      <a class="momentum-access-close" href="/premium-instellingen#extra" aria-label="Toegangsscherm sluiten">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
           <path d="M7 7l10 10M17 7 7 17"></path>
         </svg>
@@ -72,8 +73,11 @@
 
         <p class="momentum-access-message" data-momentum-access-message role="alert" aria-live="assertive"></p>
       </form>
-    </section>
-  </main>
+      </section>
+    </main>
+  </div>
+  <script src="/assets/settings-module-routes.js?v=20260814a" defer></script>
+  <script src="/assets/settings-module-back.js?v=20260814a" defer></script>
   <script src="/assets/live-momentum-access.js?v=20260804a" defer></script>
 </body>
 </html>

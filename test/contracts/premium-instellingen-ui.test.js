@@ -10,6 +10,10 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
     path.join(__dirname, '../../assets/premium-user-management.js'),
     'utf8'
   );
+  const moduleRoutesSource = fs.readFileSync(
+    path.join(__dirname, '../../assets/settings-module-routes.js'),
+    'utf8'
+  );
 
   assert.match(source, /<button type="button" class="settings-num-btn" data-settings-pin-digit="1">1<\/button>/);
   assert.match(source, /data-settings-pin-clear aria-label="Volledige PIN wissen"/);
@@ -78,14 +82,12 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /@media \(max-width:720px\)\{\.settings-tile-grid,\.settings-extra-grid\{grid-template-columns:minmax\(0,1fr\);max-width:100%;\}\.settings-tile-grid>\.tegel\{width:100%;\}\}/);
   assert.match(userManagementSource, /data-settings-extra-open/);
   assert.match(userManagementSource, /goTo\('screen-extra'\)/);
-  assert.match(userManagementSource, /var isWinning = label === 'Winnen';/);
-  assert.match(userManagementSource, /\? '\/winnen'/);
-  assert.match(userManagementSource, /var isDatabase = label === 'Database';/);
-  assert.match(userManagementSource, /var isHealth = label === "Servé's gezondheidsdossier";/);
-  assert.match(userManagementSource, /var isOmzetwerk = label === 'OMZETWERK';/);
-  assert.match(userManagementSource, /var isLinkedModule = isWinning \|\| isDatabase \|\| isHealth \|\| isOmzetwerk;/);
+  assert.match(userManagementSource, /window\.SoftoraSettingsModuleRoutes/);
+  assert.match(userManagementSource, /moduleRoutes\.EXTRA_MODULES\.slice\(\)/);
+  assert.match(userManagementSource, /var isLinkedModule = item\.unlocked === true && Boolean\(moduleHref\);/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
-  assert.match(userManagementSource, /\? '\/premium-gezondheidsdossier'[\s\S]*: '\/premium-omzetwerk';/);
+  assert.match(moduleRoutesSource, /href: '\/premium-gezondheidsdossier'/);
+  assert.match(moduleRoutesSource, /href: '\/premium-omzetwerk'/);
   assert.match(userManagementSource, /card\.classList\.add\('settings-extra-card--locked'\);/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-locked', 'true'\);/);
   assert.match(userManagementSource, /card\.setAttribute\('aria-disabled', 'true'\);/);
@@ -97,7 +99,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /document\.createElement\('iframe'\)/);
   assert.doesNotMatch(userManagementSource, /settings-local-database-frame/);
   assert.doesNotMatch(userManagementSource, /localDatabaseFrame/);
-  assert.doesNotMatch(userManagementSource, /: '\/premium-database';/);
+  assert.doesNotMatch(moduleRoutesSource, /href: '\/premium-database'/);
   assert.match(userManagementSource, /function navigateToSettingsModule\(moduleHref\)/);
   assert.doesNotMatch(userManagementSource, /function openWinningModule\(moduleHref\)/);
   assert.doesNotMatch(userManagementSource, /requestAdminActionPin\('Winnen openen'/);
@@ -109,20 +111,18 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /openLockedWinningModuleFromUrl/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
   assert.match(source, /premium-extra-modules\.js\?v=20260811a/);
-  assert.match(source, /premium-user-management\.js\?v=20260811b/);
+  assert.match(source, /settings-module-routes\.js\?v=20260814a/);
+  assert.match(source, /premium-user-management\.js\?v=20260814a/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
-  assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);
-  assert.match(userManagementSource, /Servé's gezondheidsdossier/);
-  assert.match(userManagementSource, /Ruben zet toto/);
-  assert.match(userManagementSource, /world watcher/);
-  assert.match(userManagementSource, /Flynow/);
-  assert.match(userManagementSource, /Transfermarkt/);
-  assert.match(userManagementSource, /OMZETWERK/);
-  assert.match(userManagementSource, /Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1\.000\.000\./);
-  assert.match(userManagementSource, /Ruben’s Trading System/);
-  assert.match(userManagementSource, /Winnen/);
-  assert.match(userManagementSource, /Database/);
+  assert.match(moduleRoutesSource, /label: 'Winnen'[\s\S]*label: 'Database'[\s\S]*label: "Servé's gezondheidsdossier"/);
+  assert.match(moduleRoutesSource, /Ruben zet toto/);
+  assert.match(moduleRoutesSource, /world watcher/);
+  assert.match(moduleRoutesSource, /Flynow/);
+  assert.match(moduleRoutesSource, /Transfermarkt/);
+  assert.match(moduleRoutesSource, /OMZETWERK/);
+  assert.match(moduleRoutesSource, /Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1\.000\.000\./);
+  assert.match(moduleRoutesSource, /Ruben’s Trading System/);
   assert.match(userManagementSource, /'9 onderdelen'/);
   assert.doesNotMatch(userManagementSource, /Net Worth Index/);
   assert.doesNotMatch(userManagementSource, /Pulse/);

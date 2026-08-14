@@ -31,6 +31,7 @@
   const ALL_ICON_CATEGORIES = 'Alle';
   const goalActionsApi = window.SoftoraMomentumGoalActions;
   const endGameCardsApi = window.SoftoraMomentumEndGameCards;
+  const historyStateApi = window.SoftoraMomentumHistoryState;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
     { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [], touchedDays: [] },
@@ -59,7 +60,7 @@
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let draggedGoalId = '';
-  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !endGameProgress || !goalActionsApi || !endGameCardsApi) {
+  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !endGameProgress || !goalActionsApi || !endGameCardsApi || !historyStateApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -111,6 +112,8 @@
     ]).filter((day) => day <= TODAY);
     const normalizedTrackedDays = touchedDays.filter((day) => !emptyDays.includes(day));
     const normalizedDoneDays = doneDays.filter((day) => normalizedTrackedDays.includes(day));
+    const evidenceDays = sanitizeDayList([...touchedDays, ...trackedDays, ...doneDays, ...emptyDays]);
+    const activeFromDay = historyState?.resolveActiveFromDay(goal, evidenceDays) || evidenceDays[0] || PERIOD.startDay;
     return {
       id,
       label,
@@ -119,9 +122,11 @@
       doneDays: normalizedDoneDays,
       emptyDays: emptyDays.filter((day) => !normalizedDoneDays.includes(day) && touchedDays.includes(day)),
       trackedDays: normalizedTrackedDays,
-      touchedDays
+      touchedDays,
+      activeFromDay
     };
   }
+  const historyState = historyStateApi.createController({ stateKey: STATE_KEY, maxRetiredGoals: MAX_GOALS * 4, period: PERIOD, periodKey: PERIOD_KEY, version: STATE_VERSION, normalizeGoal, getGoals: getCurrentGoals, getLegacyMissionState: endGameCards.getLegacyMissionState, getEndGameState: endGameCards.getState });
   function removeLegacyTrailingGoalPlaceholders(goals) {
     const cleanedGoals = [...goals];
     let needsMigration = false;
@@ -164,29 +169,12 @@
           doneDays: cells.filter(isChecked).map(getDay),
           emptyDays: cells.filter(isEmpty).map(getDay),
           trackedDays: cells.filter(isTracked).map(getDay),
-          touchedDays: cells.filter((cell) => isEmpty(cell) || isTracked(cell)).map(getDay)
+          touchedDays: cells.filter((cell) => isEmpty(cell) || isTracked(cell)).map(getDay),
+          activeFromDay: Number(row.dataset.activeFromDay || PERIOD.startDay)
         }, index)
       };
     }).filter((entry) => options.includeDraft === true || !entry.isDraft)
       .map((entry) => entry.goal);
-  }
-  function buildStateSnapshot() {
-    return {
-      version: STATE_VERSION,
-      period: PERIOD_KEY,
-      endGameMissionCard: endGameCards.getLegacyMissionState(),
-      endGameCards: endGameCards.getState(),
-      goals: getCurrentGoals().map((goal) => ({
-        id: goal.id,
-        label: goal.label,
-        iconKey: goal.iconKey,
-        doneDays: goal.doneDays,
-        emptyDays: goal.emptyDays,
-        trackedDays: goal.trackedDays,
-        touchedDays: goal.touchedDays
-      })),
-      updatedAt: new Date().toISOString()
-    };
   }
   function parseStoredState(rawValue, options = {}) {
     if (!rawValue) {
@@ -205,9 +193,11 @@
       }
       return {
         goals,
+        retiredGoals: (Array.isArray(parsed.retiredGoals) ? parsed.retiredGoals : []).slice(0, MAX_GOALS * 4).map(historyState.normalizeRetiredGoal).filter(Boolean),
         needsMigration:
           parsed.version !== STATE_VERSION ||
           needsMigration ||
+          parsed.goals.some((goal) => !Number.isInteger(Number(goal?.activeFromDay))) ||
           endGameCards.needsMigration(parsed.endGameCards),
         endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
       };
@@ -232,7 +222,8 @@
         doneDays: [],
         emptyDays: [],
         trackedDays: [],
-        touchedDays: []
+        touchedDays: [],
+        activeFromDay: PERIOD.startDay
       }, index));
       const { goals } = removeLegacyTrailingGoalPlaceholders(carriedGoals);
       if (!goals.length) {
@@ -240,6 +231,7 @@
       }
       return {
         goals,
+        retiredGoals: [],
         needsMigration: true,
         endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
       };
@@ -265,7 +257,7 @@
     const writeRevision = stateRevision;
     let writeSucceeded = false;
     setPersistenceState('saving');
-    const snapshot = buildStateSnapshot();
+    const snapshot = historyState.buildSnapshot();
     try {
       const response = await uiStateClient.set(STATE_SCOPE, {
         source: 'live-momentum',
@@ -275,6 +267,7 @@
         throw new Error('Supabase bevestigde de Live Momentum-opslag niet.');
       }
       writeSucceeded = true;
+      historyState.remember(snapshot);
       saveRetryCount = 0;
       if (stateRevision === writeRevision) {
         setPersistenceState('saved');
@@ -323,6 +316,7 @@
     stateDirty = true;
     saveRetryCount = 0;
     setPersistenceState('pending');
+    historyState.publish(stateReady);
     scheduleStateWrite();
   }
   function flushStateWrite() {
@@ -363,8 +357,9 @@
     cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${statusLabel}`);
   }
   function getDayScore(day) {
-    const statusCells = getStatusCells();
-    const cellsForDay = statusCells.filter((cell) => getDay(cell) === day);
+    const statusCells = getStatusCells(); const goalRows = getGoalRows();
+    const cellsForDay = statusCells.filter((cell) => getDay(cell) === day
+      && historyState.isActiveRow(goalRows[Number(cell.dataset.task || 0)], day));
     const checkedCount = cellsForDay.filter(isChecked).length;
     if (!cellsForDay.length) {
       return null;
@@ -754,6 +749,7 @@
     rowHeader.setAttribute('role', 'rowheader');
     rowHeader.dataset.goalId = goal.id;
     rowHeader.dataset.iconKey = goal.iconKey;
+    rowHeader.dataset.activeFromDay = String(goal.activeFromDay || PERIOD.startDay);
     if (goal.isDraft) {
       rowHeader.dataset.goalDraft = 'true';
     }
@@ -832,7 +828,8 @@
       doneDays: [],
       emptyDays: [],
       trackedDays: [],
-      touchedDays: []
+      touchedDays: [],
+      activeFromDay: TODAY || PERIOD.startDay
     }, goals.length);
     goals.push({ ...draftGoal, label: '', isDraft: true });
     renderGridShell(goals);
@@ -898,6 +895,7 @@
     if (nextGoals.length === goals.length) {
       return false;
     }
+    historyState.retire(goals.find((goal) => goal.id === goalId), TODAY);
     renderGridShell(nextGoals);
     refreshCellData();
     getLabels().forEach(bindLabel);
@@ -955,6 +953,7 @@
       return false;
     }
     const storedState = resolveStoredState(response.values || {});
+    historyState.hydrate(response.values, storedState?.retiredGoals);
     renderGridShell(storedState?.goals || getDefaultGoals());
     endGameCards.render(storedState?.endGameCards);
     refreshCellData();
@@ -964,6 +963,7 @@
     stateLoadRetryCount = 0;
     clearStateLoadRetry();
     setPersistenceState('saved');
+    historyState.publish(stateReady);
     if (storedState?.needsMigration) {
       markStateChanged();
     }
