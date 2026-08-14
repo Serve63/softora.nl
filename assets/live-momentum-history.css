@@ -126,7 +126,8 @@
 
 .momentum-history-plot {
   position: relative;
-  min-width: max-content;
+  min-width: 100%;
+  width: max-content;
 }
 
 .momentum-history-plot svg {
@@ -152,6 +153,14 @@
 .momentum-history-month-label.is-current {
   fill: #9b2355;
   font-weight: 700;
+}
+
+.momentum-history-month-label.is-first {
+  text-anchor: start;
+}
+
+.momentum-history-month-label.is-last {
+  text-anchor: end;
 }
 
 .momentum-history-line {
@@ -221,6 +230,27 @@
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
+}
+
+.momentum-history-point.is-first > span {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.momentum-history-point.is-first:hover > span,
+.momentum-history-point.is-first:focus-visible > span {
+  transform: translateX(0) translateY(0);
+}
+
+.momentum-history-point.is-last > span {
+  right: 0;
+  left: auto;
+  transform: translateX(0) translateY(4px);
+}
+
+.momentum-history-point.is-last:hover > span,
+.momentum-history-point.is-last:focus-visible > span {
+  transform: translateX(0) translateY(0);
 }
 
 body.momentum-history-open {

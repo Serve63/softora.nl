@@ -8,6 +8,6 @@
   link.className = 'settings-module-back';
   link.href = routes.RETURN_HREF;
   link.setAttribute('aria-label', 'Terug naar instellingen');
-  link.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg><span>Terug naar instellingen</span>';
+  link.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg><span>Instellingen</span>';
   hosts[0].replaceChildren(link);
 })();
