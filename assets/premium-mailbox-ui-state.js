@@ -68,7 +68,7 @@
     const pending = Boolean(source.readPending);
     const readError = String(source.readError || '');
     const safeId = html(id);
-    return `${readError ? `<button class="detail-read-retry" type="button" data-mailbox-action="retry-read" data-mailbox-id="${safeId}">Niet opgeslagen · opnieuw</button>` : ''}
+    return `${readError ? `<button class="detail-read-retry" type="button" data-mailbox-action="retry-read" data-mailbox-id="${safeId}">Niet opgeslagen · opnieuw</button>` : pending ? '<span class="detail-read-pending" role="status">Wordt opgeslagen…</span>' : ''}
       <button class="detail-mark-read ${handled ? 'is-complete' : ''} ${pending ? 'is-pending' : ''}" type="button" data-mailbox-action="mark-read" data-mailbox-id="${safeId}" aria-label="${pending ? 'Gelezen status wordt opgeslagen' : handled ? 'Gesprek vraagt geen antwoord' : 'Als gelezen afhandelen'}" title="${pending ? 'Gelezen status wordt opgeslagen' : handled ? 'Geen antwoord nodig' : 'Als gelezen afhandelen'}" aria-pressed="${handled ? 'true' : 'false'}" aria-busy="${pending ? 'true' : 'false'}" ${(handled || pending) ? 'disabled' : ''}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/><path d="m9 13.5 2 2 4-4"/></svg>
       </button>`;

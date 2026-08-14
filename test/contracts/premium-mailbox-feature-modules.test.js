@@ -54,7 +54,7 @@ test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duu
     url: '/api/mailbox/messages/read',
     body: {
       account: 'serve@softora.nl', owner: 'serve', id: 'inbox:43', uid: 43,
-      folder: 'inbox', dismissReply: true,
+      folder: 'inbox', unread: false, dismissReply: true,
     },
   }]);
   assert.equal(renders.length, 2);

@@ -17,6 +17,7 @@ const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, syncIn
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const { createMailboxReadMessageService } = require('./mailbox-read-message');
+const { createMailboxReadMessageResponses } = require('./mailbox-read-message-response');
 const {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   createMailboxCampaignRepliesService,
@@ -2086,7 +2087,7 @@ function createMailboxService(deps = {}) {
     return assertMailboxMessageVisible(live);
   }
 
-  const { markMessageRead } = createMailboxReadMessageService({
+  const { getMessageReadStatus, markMessageRead } = createMailboxReadMessageService({
     canUseMailboxIndex,
     mailboxIndexStore,
     getAccount,
@@ -2096,6 +2097,9 @@ function createMailboxService(deps = {}) {
     getUiStateValues,
     setUiStateValues,
     logger,
+  });
+  const { getMessageReadStatusResponse, markMessageReadResponse } = createMailboxReadMessageResponses({
+    getMessageReadStatus, markMessageRead, logger, normalizeString,
   });
 
   const mailboxVisibility = createMailboxVisibilityService({
@@ -2343,27 +2347,6 @@ function createMailboxService(deps = {}) {
   }
 
   async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString }); }
-  async function markMessageReadResponse(req, res) {
-    try {
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const result = await markMessageRead({
-        accountEmail: body.account,
-        id: body.id || body.messageId,
-        folder: body.folder,
-        uid: body.uid, owner: body.owner,
-        dismissReply: body.dismissReply === true,
-      });
-      return res.status(200).json({ ok: true, result });
-    } catch (error) {
-      logger.error('[Mailbox][Read]', error?.message || error);
-      return res.status(error.status || 500).json({
-        ok: false,
-        error: 'Gelezen status opslaan mislukt',
-        detail: String(error?.message || 'Onbekende fout'),
-      });
-    }
-  }
-
   async function hideConversationResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -2437,6 +2420,7 @@ function createMailboxService(deps = {}) {
     preflightMessageResponse,
     sendMessageResponse,
     markMessageReadResponse,
+    getMessageReadStatusResponse,
     hideConversationResponse,
     restoreConversationResponse,
     rewriteDraftResponse,
@@ -2447,6 +2431,7 @@ function createMailboxService(deps = {}) {
     listMessagesWithMeta,
     syncMailboxResponse, syncInstantlyMailboxResponse,
     markMessageRead,
+    getMessageReadStatus,
     hideConversation,
     restoreConversation,
     sendMessage,

@@ -65,6 +65,9 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/messages/read', requireAdmin, (req, res) =>
     coordinator.markMessageReadResponse(req, res)
   );
+  app.post('/api/mailbox/messages/read/status', requireAdmin, (req, res) =>
+    coordinator.getMessageReadStatusResponse(req, res)
+  );
   app.post('/api/mailbox/messages/hide', requireAdmin, (req, res) =>
     coordinator.hideConversationResponse(req, res)
   );

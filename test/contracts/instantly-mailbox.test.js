@@ -1879,9 +1879,17 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
     async listMessages() {
       return [];
     },
-    async markMessageRead(input) {
+    async applyStateMutation(input) {
       mutations.push({ operation: 'read', ...input });
-      return { ok: true, readAt: '2026-08-05T15:51:00.000Z' };
+      return {
+        ok: true,
+        row: {
+          unread: false,
+          softora_read_at: '2026-08-05T15:51:00.000Z',
+          reply_dismissed_at: null,
+          current_revision: input.revision,
+        },
+      };
     },
     async markMessageDeleted(input) {
       mutations.push({ operation: 'hide', ...input });

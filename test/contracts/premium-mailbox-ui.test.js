@@ -120,7 +120,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260813a/);
-  assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260811b/);
+  assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814a/);
+  assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260810a/);
@@ -4478,8 +4479,9 @@ test('premium mailbox bewaart gelezen status optimistisch zonder mailboxreload',
 
   assert.match(scriptSource, /uid: message\.uid,/);
   assert.match(readSource, /async function persist\(mail, persistOptions = \{\}\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
-  assert.match(readSource, /body: JSON\.stringify\(\{[\s\S]*account,[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder:/);
-  assert.match(readSource, /async function markRead\(mail, hooks = \{\}\) \{[\s\S]*const targets = getConversationTargets\(mail\)[\s\S]*target\.unread = false;[\s\S]*target\.readPending = true;[\s\S]*const outcome = await persist\(mail\)/);
+  assert.match(readSource, /const payload = \{[\s\S]*account,[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder:/);
+  assert.match(readSource, /stateOutbox\.enqueue\(payload,\s*\{/);
+  assert.match(readSource, /async function markRead\(mail, hooks = \{\}\) \{[\s\S]*const targets = getConversationTargets\(mail\)[\s\S]*target\.unread = false;[\s\S]*target\.readPending = true;[\s\S]*const outcome = await persist\(mail, \{/);
   assert.match(readSource, /function setFailure\([\s\S]*target\.unread = previous\.unread;[\s\S]*target\.readError =/);
   assert.match(readSource, /function applyConfirmedState\(mail\)[\s\S]*mail\.unread = false/);
   assert.doesNotMatch(readSource, /loadMailboxMessages|campaign-replies/);
