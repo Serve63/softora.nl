@@ -296,9 +296,30 @@ test('premium database source filter recognizes only durable KVK transfers', () 
   assert.equal(sourceFilter.getHeaderLabel('beschikbaar'), "Foto's");
   assert.equal(sourceFilter.getHeaderLabel('benaderbaar'), 'Mailklaar');
   assert.deepEqual(
+    { ...sourceFilter.getContextualStatusPresentation('benaderbaar', true) },
+    { className: 'benaderbaar', label: 'Mailklaar' }
+  );
+  assert.equal(sourceFilter.getContextualStatusPresentation('benaderbaar', false), null);
+  assert.equal(sourceFilter.getContextualStatusPresentation('beschikbaar', true), null);
+  assert.equal(sourceFilter.getContextualStatusPresentation('prospect', true), null);
+  assert.deepEqual(
     { ...sourceFilter.normalizeCustomerSourceFields({ bronDatabase: ' Softora Bedrijven Scraper ', kvk_nummer: '12345678' }) },
     { bronDatabase: 'Softora Bedrijven Scraper', kvkNummer: '12345678', premiumTransferRunId: '' }
   );
+});
+
+test('Mailklaar view maps only canonical eligible rows to the contextual Mailklaar badge', () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /getContextualStatusPresentation\(state\.activeStatus, state\.mailReadySnapshotLoaded && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) && isColdmailBaseLeadEligible\(customer\)\)/
+  );
+  assert.match(pageSource, /contextualStatus = availableStatus \|\| mailReadyStatus;/);
+  assert.match(pageSource, /const statusClassName = contextualStatus \? contextualStatus\.className : customer\.status;/);
+  assert.match(pageSource, /const statusLabel = contextualStatus \? contextualStatus\.label :/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260814a/);
 });
 
 test('premium database keeps bootstrap rows hidden until the canonical inventory is ready', () => {
@@ -2165,8 +2186,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, \(customers \|\| \[\]\)\.length\)/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto's nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
-  assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null;/);
-  assert.match(pageSource, /const statusClassName = availableStatus \? availableStatus\.className : customer\.status;/);
+  assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null, mailReadyStatus = databaseSourceFilter\.getContextualStatusPresentation/);
+  assert.match(pageSource, /contextualStatus = availableStatus \|\| mailReadyStatus;/);
+  assert.match(pageSource, /const statusClassName = contextualStatus \? contextualStatus\.className : customer\.status;/);
   assert.match(pageSource, /"<td><div class=\\"s-wrap s-" \+ escapeHtml\(statusClassName\)/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
@@ -4569,7 +4591,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
   assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return Boolean\(state\.remoteCustomersLoaded\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /if \(state\.activeStatus === "beschikbaar"\) return false;/);
-  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260814a/);
   assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);

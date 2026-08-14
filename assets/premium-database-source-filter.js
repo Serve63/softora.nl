@@ -35,9 +35,15 @@
         return activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's";
     }
 
+    function getContextualStatusPresentation(activeStatus, isCanonicalMailReady) {
+        if (activeStatus !== "benaderbaar" || isCanonicalMailReady !== true) return null;
+        return { className: "benaderbaar", label: "Mailklaar" };
+    }
+
     return {
         normalizeCustomerSourceFields: normalizeCustomerSourceFields,
         isKvkTransferCustomer: isKvkTransferCustomer,
-        getHeaderLabel: getHeaderLabel
+        getHeaderLabel: getHeaderLabel,
+        getContextualStatusPresentation: getContextualStatusPresentation
     };
 });
