@@ -819,7 +819,15 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Laat AI voorbereiden, niet blind beslissen',
         paragraphs: Object.freeze([
-          'AI kan een aanvraag samenvatten, de intentie herkennen, ontbrekende informatie signaleren en een voorstel doen voor de volgende taak. Dat scheelt tijd en maakt opvolging consistenter.',
+          Object.freeze({
+            text: 'AI kan een aanvraag samenvatten, ontbrekende informatie signaleren en een voorstel doen voor de volgende taak. Leg de criteria voor kwalificatie apart vast, zodat deze opvolgingsflow pas begint nadat de route en eigenaar controleerbaar zijn gekozen.',
+            links: Object.freeze([
+              Object.freeze({
+                anchor: 'criteria voor kwalificatie',
+                href: '/blog/ai-automatisering-leadkwalificatie-mkb',
+              }),
+            ]),
+          }),
           'Voor belangrijke commerciële keuzes blijft menselijke controle verstandig. De beste flow laat AI voorbereiden en geeft het team daarna een helder beslismoment.',
         ]),
       }),
@@ -1183,60 +1191,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Kennisbank', href: '/kennisbank' }),
       Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
       Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
-    ]),
-  }),
-  Object.freeze({
-    collection: 'blog',
-    slug: 'ai-automatisering-leadkwalificatie-mkb',
-    title: 'AI automatisering voor leadkwalificatie in het MKB',
-    description:
-      'Hoe MKB-bedrijven AI kunnen gebruiken om leads beter voor te bereiden, te beoordelen en netjes over te dragen aan een mens.',
-    category: 'AI automatisering',
-    intent: 'Koopintentie',
-    publishedAt: '2026-06-02',
-    updatedAt: '2026-06-02',
-    image: Object.freeze({
-      src: '/assets/seo-content/ai-leadopvolging-workflow-mkb-softora.jpg',
-      alt: 'MKB-team bespreekt een AI workflow voor leadkwalificatie en opvolging aan een kantoorwerktafel.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'AI leadkwalificatie werkt vooral goed wanneer de criteria vooraf helder zijn en een medewerker de commerciële keuzes blijft controleren.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Leadkwalificatie begint met duidelijke criteria',
-        paragraphs: Object.freeze([
-          'AI kan pas nuttig helpen bij leadkwalificatie wanneer duidelijk is wat een goede aanvraag voor je bedrijf betekent. Denk aan dienst, regio, timing, budgetindicatie, urgentie, beslisser en de informatie die nodig is voor een sterke vervolgstap.',
-          'Zonder die criteria gaat AI vooral samenvatten wat er binnenkomt. Dat kan handig zijn, maar het maakt de opvolging nog niet scherper. De echte waarde ontstaat wanneer de aanvraag direct wordt vertaald naar een duidelijke status, taak of vervolgvraag.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Laat AI voorbereiden en mensen beslissen',
-        paragraphs: Object.freeze([
-          'Voor commerciële keuzes blijft menselijke controle belangrijk. AI kan signalen herkennen, ontbrekende informatie benoemen en een voorstel doen voor prioriteit, maar het team moet kunnen zien waarom die suggestie logisch is.',
-          'Daarom bouwt Softora leadflows met een duidelijke overdracht. De AI maakt een samenvatting, geeft context en zet een volgende stap klaar. Daarna kan een medewerker beoordelen of de lead direct opvolging krijgt, eerst extra vragen nodig heeft of beter naar een andere route gaat.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Koppel kwalificatie aan CRM en opvolging',
-        paragraphs: Object.freeze([
-          'Leadkwalificatie is pas waardevol als het resultaat in het werkproces landt. Een losse AI-score in een chatvenster verdwijnt snel. Een CRM-status, taak, notitie of agenda-actie maakt de informatie bruikbaar voor het team.',
-          'Voor MKB-bedrijven is dat vaak de praktische winst: minder zoeken, minder losse berichten en sneller overzicht over welke aanvragen aandacht nodig hebben. Zo ondersteunt AI de opvolging zonder dat het de commerciële verantwoordelijkheid overneemt.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
-      Object.freeze({ label: 'AI leadopvolging flow', href: '/blog/ai-automatisering-leadopvolging' }),
-      Object.freeze({
-        label: 'Wat is leadkwalificatie?',
-        href: '/kennisbank/wat-is-leadkwalificatie',
-        availableFrom: '2026-06-03',
-      }),
-      Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
     ]),
   }),
   Object.freeze({

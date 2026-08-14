@@ -1010,6 +1010,54 @@ test('CRM-integratiegids gebruikt een toetsbaar contract en twee verschillende b
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 });
 
+test('AI-leadkwalificatie gebruikt een bewijskaart, menselijke review en twee verschillende beelden', () => {
+  const item = getSeoContentItem('blog', 'ai-automatisering-leadkwalificatie-mkb', {
+    now: new Date('2026-08-14T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const followUpHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-leadopvolging', {
+      now: new Date('2026-08-14T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-08-14');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.targetMoneyPage, '/ai-automatisering');
+  assert.ok(item.informationGain.includes('harde uitsluitingen'));
+  assert.ok(item.informationGain.includes('menselijke override'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualFamily, 'translucent-human-review-console');
+  assert.equal(item.visualBrief.support.visualFamily, 'woven-evidence-gate-tapestry');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.src, '/assets/seo-content/ai-leadkwalificatie-menselijke-beslispoort-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/ai-leadkwalificatie-bewijsroute-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-automatisering-leadkwalificatie-mkb">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"dateModified":"2026-08-14"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Maak één bewijskaart per aanvraag/);
+  assert.match(html, /Behandel ontbrekende informatie als eigen toestand/);
+  assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM-systeem op maat<\/a>/);
+  assert.match(html, /href="\/blog\/ai-automatisering-leadopvolging">Leadopvolging<\/a>/);
+  assert.match(html, /href="\/blog\/ai-automatisering-klantintake-mkb"/);
+  assert.match(followUpHtml, /href="\/blog\/ai-automatisering-leadkwalificatie-mkb">criteria voor kwalificatie<\/a>/);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+});
+
 test('chatbot-vs-livechat gebruikt quality v2 als unieke beslispagina', () => {
   const item = getSeoContentItem('vergelijkingen', 'chatbot-vs-livechat', {
     now: new Date('2026-08-07T12:00:00.000Z'),
