@@ -54,6 +54,12 @@
     { id: 'vip-box-willem-2-2028', title: 'VIP-box Willem II', timeframe: 2028, imageId: 'vip-box-willem-2' },
     { id: 'instagram-post-2027', title: 'Jaarlijkse Instagram-post 2027', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
+    {
+      id: 'silence-controle',
+      title: 'Silence controle',
+      missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
+      imageId: 'silence-controle'
+    },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
     { id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' },
     { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
@@ -153,11 +159,12 @@
     const top = document.createElement('span');
     const title = document.createElement('strong');
     const subtitle = document.createElement('span');
+    const missionCopy = document.createElement('span');
     const mission = document.createElement('span');
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260809g`;
+    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260815a`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
@@ -181,6 +188,8 @@
     title.textContent = card.title;
     subtitle.className = 'end-game-card-subtitle';
     subtitle.textContent = card.subtitle || '';
+    missionCopy.className = 'end-game-card-mission-copy';
+    missionCopy.textContent = card.missionText || '';
     if (['origin', 'checkpoint', 'destination'].includes(card.type)) {
       const specialLabel = document.createElement('span');
       specialLabel.className = `end-game-card-special-label end-game-card-${card.type}-label`;
@@ -198,6 +207,7 @@
       target.append(createTargetIcon());
       artwork.append(image, shade, top, title);
       if (card.subtitle) artwork.append(subtitle);
+      if (card.missionText) artwork.append(missionCopy);
       artwork.append(mission, target);
     }
     return artwork;
@@ -212,9 +222,10 @@
   }
 
   function getMissionAriaLabel(card, state, missionNumber) {
+    const missionText = card.missionText ? ` ${card.missionText}` : '';
     return state.completed
-      ? `Missie ${missionNumber}: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
-      : `Missie ${missionNumber}: ${card.title}. Sleep om te verplaatsen of klik voor acties.`;
+      ? `Missie ${missionNumber}: ${card.title}.${missionText} Afgerond. Sleep om te verplaatsen of klik voor acties.`
+      : `Missie ${missionNumber}: ${card.title}.${missionText} Sleep om te verplaatsen of klik voor acties.`;
   }
 
   function createCard(card, state, missionNumber) {
@@ -426,5 +437,7 @@
     };
   }
 
-  window.SoftoraMomentumEndGameCards = { CARD_CATALOG, createController, normalizeState };
+  const api = { CARD_CATALOG, createController, normalizeState };
+  if (typeof window !== 'undefined') window.SoftoraMomentumEndGameCards = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

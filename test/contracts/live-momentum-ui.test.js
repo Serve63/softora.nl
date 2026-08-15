@@ -15,7 +15,7 @@ const endGameCardFiles = [
   'leuke-vriendin.png', 'lijpe-instagram-feed.png', 'maatpak.png', 'nieuwe-fiets.png', 'nieuwe-whoop.png', 'oktober-2024.png',
   'persoonlijke-handtekening.png', 'professionele-fotoshoot.png', 'prp-behandeling.png',
   'range-rover-sport.png', 'rolex-datejust.png', 'ruben-zet-toto.png', 'rubens-company.png',
-  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'serves-gezondheidsdossier.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
+  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'serves-gezondheidsdossier.png', 'silence-controle.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
   'tanden-rechtzetten.png', 'tandenbleek-voorraad.png', 'transfermarkt.png',
   'vakantiehuis-kopen.png', 'vijf-kilo-spiermassa.png', 'vip-box-psv.png', 'vip-box-willem-2.png',
   'wereldkaart-bezochte-landen.png', 'world-watcher.png'
@@ -35,8 +35,9 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813b" defer><\/script>/);
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260729a"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260815a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260814c"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260804a"/);
@@ -48,7 +49,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260813a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260815a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260814b" defer><\/script>/);
@@ -125,6 +126,7 @@ test('live momentum page renders the requested dashboard surface', () => {
 test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const css = read('assets/live-momentum.css');
   const mobileCss = read('assets/live-momentum-mobile.css');
+  const missionCopyCss = read('assets/live-momentum-endgame-mission-copy.css');
   const settingsBackCss = read('assets/settings-module-back.css');
   const progressCss = read('assets/live-momentum-endgame-progress.css');
   const endGameNumbersCss = read('assets/live-momentum-endgame-numbers.css');
@@ -221,6 +223,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-name\s*\{[\s\S]*text-transform:\s*uppercase;/);
+  assert.match(missionCopyCss, /\.end-game-card-mission-copy\s*\{[\s\S]*font-size:\s*\.58rem;[\s\S]*text-wrap:\s*balance;/);
+  assert.match(missionCopyCss, /@media \(max-width: 700px\)[\s\S]*\.end-game-card-mission-copy\s*\{[^}]*-webkit-line-clamp:\s*2;[^}]*font-size:\s*8px;/);
   assert.match(subtitleCss, /\.end-game-card-subtitle\s*\{[\s\S]*position:\s*relative;[\s\S]*border-radius:\s*999px;[\s\S]*text-transform:\s*uppercase;/);
   assert.match(css, /\.end-game-card-target\s*\{[\s\S]*border-radius:\s*50%;/);
   assert.match(css, /\.end-game-mission-complete\s*\{[\s\S]*background:\s*linear-gradient\([\s\S]*opacity:\s*0;/);
@@ -408,7 +412,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /const imageId = card\.imageId \|\| card\.id/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260809g/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260815a/);
   assert.match(endGameCardsJs, /\{ id: 'jurisalem-af', title: 'Jurisalem af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'nieuwe-fiets', title: 'Nieuwe fiets' \}/);
   assert.match(endGameCardsJs, /\{ id: 'dertig-dagen-streak', title: '30 dagen streak' \}/);
@@ -429,9 +433,11 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'alle-formaten-scheermesjes', title: 'Alle formaten scheermesjes' \}/);
   assert.match(endGameCardsJs, /\{ id: 'softora-apple-kwaliteit-software', title: 'Softora Apple kwaliteit software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'softora-gpt-af', title: 'Softora GPT af', imageId: 'softora-apple-kwaliteit-software' \}/);
+  assert.match(endGameCardsJs, /id: 'silence-controle',[\s\S]*?title: 'Silence controle',[\s\S]*?missionText: 'Ik luister, zeg niets en ga geen discussie aan\.',[\s\S]*?imageId: 'silence-controle'/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
+  assert.match(endGameCardsJs, /if \(card\.missionText\) artwork\.append\(missionCopy\)/);
   assert.match(endGameCardsJs, /\{ id: 'vip-box-willem-2-2028', title: 'VIP-box Willem II', timeframe: 2028, imageId: 'vip-box-willem-2' \}/);
   assert.match(endGameCardsJs, /\{ id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' \}/);
   assert.match(endGameCardsJs, /if \(card\.subtitle\) artwork\.append\(subtitle\)/);
@@ -457,7 +463,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
     "Ruben's wereldkaart", 'Professionele fotoshoot', 'Persoonlijke handtekening',
-    'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
+    'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028', 'Silence controle',
     'Lijpe Instagram feed', '3 posts · 6 slides', 'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
     'Huis van €1 miljoen+ kopen', '2028...', '2035...', 'Oktober 2024…'
@@ -605,4 +611,51 @@ test('live momentum Supabase-scope is alleen voor Full Acces accounts', () => {
 
   assert.match(scopeConfig, /'premium_live_momentum'/);
   assert.match(scopeConfig, /ADMIN_ONLY_UI_STATE_SCOPES/);
+});
+
+test('Silence controle is een unieke missie 54 met geïsoleerde duurzame state', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
+  const cardIndex = catalog.findIndex((card) => card.id === 'silence-controle');
+  const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
+  const missionNumber = catalog
+    .slice(0, cardIndex + 1)
+    .filter((card) => !['origin', 'checkpoint', 'destination'].includes(card.type))
+    .length;
+
+  assert.deepEqual(cardMatches, [{
+    id: 'silence-controle',
+    title: 'Silence controle',
+    missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
+    imageId: 'silence-controle'
+  }]);
+  assert.equal(missionNumber, 54);
+  assert.equal(cardIndex, checkpointIndex - 1);
+
+  const oldPersistedOrder = catalog
+    .filter((card) => card.id !== 'silence-controle')
+    .map((card) => card.id);
+  const initial = JSON.parse(JSON.stringify(api.normalizeState({
+    'softora-gpt-af': { completed: true, deleted: false },
+    __order: oldPersistedOrder
+  })));
+  assert.deepEqual(initial['silence-controle'], { completed: false, deleted: false });
+  assert.deepEqual(initial['softora-gpt-af'], { completed: true, deleted: false });
+  assert.equal(initial.__order.filter((id) => id === 'silence-controle').length, 1);
+  assert.equal(initial.__order.indexOf('silence-controle'), initial.__order.indexOf('checkpoint-2028') - 1);
+
+  const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...initial,
+    'silence-controle': { completed: true, deleted: false }
+  })));
+  assert.deepEqual(completedReload['silence-controle'], { completed: true, deleted: false });
+  assert.deepEqual(completedReload['softora-gpt-af'], initial['softora-gpt-af']);
+
+  const resetReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...completedReload,
+    'silence-controle': { completed: false, deleted: false }
+  })));
+  assert.deepEqual(resetReload['silence-controle'], { completed: false, deleted: false });
+  assert.deepEqual(resetReload['softora-gpt-af'], completedReload['softora-gpt-af']);
 });

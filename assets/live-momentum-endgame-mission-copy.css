@@ -1,0 +1,28 @@
+.end-game-card-mission-copy {
+  position: relative;
+  z-index: 2;
+  width: calc(100% - .4rem);
+  margin-top: .48rem;
+  color: rgba(244, 239, 228, .88);
+  font-size: .58rem;
+  font-weight: 600;
+  line-height: 1.28;
+  text-wrap: balance;
+}
+
+@media (max-width: 700px) {
+  body[data-momentum-mobile-view="endgame"] .end-game-card-mission-copy {
+    display: -webkit-box;
+    width: 100%;
+    margin-top: 4px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: rgba(244, 239, 228, .68);
+    font-size: 8px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: left;
+    text-shadow: none;
+  }
+}
