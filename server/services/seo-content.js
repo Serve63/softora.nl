@@ -679,55 +679,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
   }),
   Object.freeze({
     collection: 'kennisbank',
-    slug: 'wat-is-een-conversiegerichte-website',
-    title: 'Wat is een conversiegerichte website?',
-    description:
-      'Een uitleg van conversiegerichte websites: hoe structuur, tekst, bewijs en CTA’s samen meer aanvragen opleveren.',
-    category: 'Websites',
-    intent: 'Uitleg',
-    publishedAt: '2026-05-20',
-    updatedAt: '2026-05-20',
-    readTime: '5 min',
-    summary:
-      'Een conversiegerichte website helpt bezoekers sneller begrijpen, vertrouwen en actie ondernemen.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Conversie begint met duidelijkheid',
-        paragraphs: Object.freeze([
-          'Een website converteert beter wanneer bezoekers snel zien wat je doet, voor wie het is en welke volgende stap logisch is. Mooie vormgeving helpt, maar duidelijkheid is de basis.',
-          'Daarom moet een pagina niet alleen informatie tonen, maar twijfels wegnemen. Denk aan bewijs, werkwijze, voorbeelden, veelgestelde vragen en een duidelijke aanvraagroute.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Elke pagina heeft een taak',
-        paragraphs: Object.freeze([
-          'Een homepage oriënteert, een dienstenpagina overtuigt, een kennisbankartikel legt uit en een contactpagina maakt de stap makkelijk. Als iedere pagina zijn taak kent, voelt de site rustiger en presteert hij beter.',
-          'Voor SEO helpt dit ook, omdat Google beter kan begrijpen welke pagina bij welke zoekvraag hoort.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Meten maakt verbeteren mogelijk',
-        paragraphs: Object.freeze([
-          'Een conversiegerichte website is nooit echt af. Je kijkt naar klikken, aanvragen, scrollgedrag, zoekopdrachten en vragen van bezoekers.',
-          'Die signalen gebruik je om titels, CTA’s, interne links en content stap voor stap sterker te maken.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
-      Object.freeze({ label: 'Website laten maken kosten 2026', href: '/blog/website-laten-maken-kosten-2026' }),
-      Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
-      Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
-      Object.freeze({
-        label: 'Interne linkstructuur',
-        href: '/kennisbank/wat-is-interne-linkstructuur',
-        availableFrom: '2026-06-01',
-      }),
-      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
-    ]),
-  }),
-  Object.freeze({
-    collection: 'kennisbank',
     slug: 'wat-is-een-crm-systeem',
     title: 'Wat is een CRM systeem?',
     description:
