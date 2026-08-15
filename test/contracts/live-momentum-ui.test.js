@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
@@ -615,10 +614,7 @@ test('live momentum Supabase-scope is alleen voor Full Acces accounts', () => {
 });
 
 test('Silence controle is een unieke missie 54 met geïsoleerde duurzame state', () => {
-  const sandbox = { window: {} };
-  vm.createContext(sandbox);
-  vm.runInContext(read('assets/live-momentum-endgame-cards.js'), sandbox);
-  const api = sandbox.window.SoftoraMomentumEndGameCards;
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
   const cardIndex = catalog.findIndex((card) => card.id === 'silence-controle');

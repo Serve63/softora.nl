@@ -437,5 +437,7 @@
     };
   }
 
-  window.SoftoraMomentumEndGameCards = { CARD_CATALOG, createController, normalizeState };
+  const api = { CARD_CATALOG, createController, normalizeState };
+  if (typeof window !== 'undefined') window.SoftoraMomentumEndGameCards = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
