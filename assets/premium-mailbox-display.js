@@ -236,7 +236,7 @@
   function getReplyToAddress(mail, options) {
     return isSentMessage(mail, options)
       ? String(mail && mail.to || '').trim()
-      : String(mail && mail.email || '').trim();
+      : String(mail && (mail.replyTo || mail.email) || '').trim();
   }
 
   function buildSearchText(mail, options) {

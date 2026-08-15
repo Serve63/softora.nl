@@ -486,7 +486,7 @@ function renderMailboxConversationAction(action, mailId) {
   const icon = isNewMessage
     ? '<path d="M12 5v14M5 12h14"/>'
     : '<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/>';
-  return `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="${command}" data-mailbox-id="${escapeHtml(id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg>${label}</button></div>`;
+  const messageKey = String(action.messageKey || '').trim(); return `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="${command}" data-mailbox-id="${escapeHtml(id)}"${messageKey ? ` data-mailbox-message-key="${escapeHtml(messageKey)}"` : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg>${label}</button></div>`;
 }
 function renderMailBody(value, images, options) {
   const imageState = {
@@ -777,7 +777,7 @@ function normalizeMailboxApiMessage(message, options = {}) {
     id: message.id,
     folder: message.folder || options.folder || activeFolder,
     from: message.from || 'Onbekend',
-    email: message.email || '',
+    email: message.email || '', replyTo: message.replyTo || '',
     to: message.to || '',
     toDisplay: message.toDisplay || '',
     cc: message.cc || '',
@@ -1063,7 +1063,7 @@ function handleMailboxAction(actionEl) {
   const composeActionId = action === 'remove-attachment'
     ? actionEl.getAttribute('data-attachment-index')
     : id;
-  if (mailboxComposeController.handleAction(action, composeActionId)) return;
+  if (mailboxComposeController.handleAction(action, composeActionId, { messageKey: actionEl.getAttribute('data-mailbox-message-key') || '' })) return;
   switch (action) {
     case 'set-folder':
       setFolder(actionEl.getAttribute('data-mailbox-folder') || 'inbox', actionEl);

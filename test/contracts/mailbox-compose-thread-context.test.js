@@ -65,6 +65,85 @@ test('mailbox reply context is resolved from the exact stored message and builds
   assert.equal(result.mode, 'reply');
 });
 
+test('mailbox reply proof uses the priority reader and accepts a normalized Reply-To target', async () => {
+  let ordinaryReads = 0;
+  let proofReads = 0;
+  const resolver = createResolver(null, {
+    mailboxIndexStore: {
+      async getMessage() {
+        ordinaryReads += 1;
+        return null;
+      },
+      async getMessageForReplyProof(input) {
+        proofReads += 1;
+        return {
+          accountEmail: input.accountEmail,
+          email: 'mailer@salontof.nl',
+          replyTo: 'INFO@SALONTOF.NL',
+          messageId: '<salon-latest@salontof.nl>',
+          references: '<salon-parent@softora.nl>',
+        };
+      },
+    },
+  });
+
+  const result = await resolver.resolve({
+    accountEmail: 'serve@softora.nl',
+    recipientEmail: ' info@salontof.nl ',
+    body: {
+      owner: 'serve', mode: 'reply', idempotencyKey: 'salon-proof-1',
+      replyIdentity: {
+        provider: 'smtp', owner: 'serve', accountEmail: 'serve@softora.nl',
+        sourceMessageId: '<salon-latest@salontof.nl>', conversationId: 'conversation:salon',
+      },
+      context: {
+        id: 'coldmail:278', folder: 'coldmail', messageId: '<stale-client-value@invalid>',
+        conversationId: 'conversation:salon',
+      },
+    },
+  });
+
+  assert.equal(ordinaryReads, 0);
+  assert.equal(proofReads, 1);
+  assert.equal(result.replyTargetMessageId, '<salon-latest@salontof.nl>');
+});
+
+test('mailbox reply proof distinguishes temporary unavailability from a real target mismatch', async () => {
+  const unavailableResolver = createResolver(null, {
+    mailboxIndexStore: {
+      async getMessageForReplyProof() {
+        const error = new Error('Supabase timeout');
+        error.code = 'MAILBOX_INDEX_EXACT_READ_UNAVAILABLE';
+        throw error;
+      },
+    },
+  });
+  const body = {
+    owner: 'serve', mode: 'reply', idempotencyKey: 'salon-unavailable',
+    context: {
+      id: 'coldmail:278', folder: 'coldmail', messageId: '<salon-latest@salontof.nl>',
+      conversationId: 'conversation:salon',
+    },
+  };
+  await assert.rejects(() => unavailableResolver.resolve({
+    accountEmail: 'serve@softora.nl', recipientEmail: 'info@salontof.nl', body,
+  }), (error) => error.code === 'MAILBOX_REPLY_TARGET_UNAVAILABLE' && error.status === 503);
+
+  const mismatchResolver = createResolver(null, {
+    mailboxIndexStore: {
+      async getMessageForReplyProof() {
+        return {
+          accountEmail: 'serve@softora.nl', email: 'other@example.nl',
+          messageId: '<salon-latest@salontof.nl>',
+        };
+      },
+    },
+  });
+  await assert.rejects(() => mismatchResolver.resolve({
+    accountEmail: 'serve@softora.nl', recipientEmail: 'info@salontof.nl', body,
+  }), (error) => error.code === 'MAILBOX_REPLY_TARGET_MISMATCH' && error.status === 409);
+});
+
 test('mailbox reply context fails closed across owners accounts and recipients', async () => {
   const resolver = createResolver({
     id: 'inbox:25',

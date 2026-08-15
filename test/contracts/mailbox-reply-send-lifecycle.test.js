@@ -120,6 +120,88 @@ test('MHCBE suggested reply keeps one canonical identity through edit and send p
   assert.match(sendPayload.body, /geen mail in deze test/);
 });
 
+test('rapid conversation switching sends only the exact latest opened message context', async () => {
+  const requests = [];
+  const values = {
+    'c-to': { value: '' }, 'c-cc': { value: '' }, 'c-bcc': { value: '' },
+    'c-subject': { value: '' }, 'c-body': { value: 'Veilige synthetische test.' },
+    'compose-overlay': { classList: { add() {}, remove() {} } },
+  };
+  const first = {
+    id: 'serve@softora.nl|coldmail:10', mailboxId: 'coldmail:10', folder: 'coldmail', uid: 10,
+    accountEmail: 'serve@softora.nl', email: 'first@example.nl', subject: 'Eerste gesprek',
+    messageId: '<first@example.nl>', conversationId: 'conversation:first', threadMessages: [],
+  };
+  const secondLatest = {
+    id: 'serve@softora.nl|coldmail:20', mailboxId: 'coldmail:20', folder: 'coldmail', uid: 20,
+    accountEmail: 'serve@softora.nl', email: 'second@example.nl', replyTo: 'reply@example.nl',
+    subject: 'Tweede gesprek', messageId: '<second@example.nl>', conversationId: 'conversation:second',
+    threadMessages: [],
+  };
+  const second = {
+    ...secondLatest,
+    id: 'serve@softora.nl|coldmail:19', mailboxId: 'coldmail:19', uid: 19,
+    email: 'stale@example.nl', replyTo: '', messageId: '<stale@example.nl>',
+    threadMessages: [secondLatest],
+  };
+  const current = new Map([[first.id, first], [second.id, second]]);
+  const controller = composeController.create({
+    document: {
+      getElementById: (id) => values[id] || null,
+      querySelector: () => null,
+    },
+    compose: {
+      buildReplyContext(message, options) {
+        const accountEmail = options.getAccount();
+        return {
+          ...message, accountEmail, mode: 'reply',
+          replyIdentity: globalThis.SoftoraMailboxReplyIdentity.createReplyIdentity(
+            message, accountEmail, options.getOwner()
+          ),
+        };
+      },
+      getAttachments: () => [], isUsed: () => false,
+      reset() {}, resetOptionalFields() {},
+    },
+    campaignInbox: {
+      resolveReplyAccount: (mail) => mail.accountEmail,
+      getMessageOwner: () => 'serve',
+      getOwnerByAccount: () => 'serve',
+      getConversationAction: (mail) => {
+        const message = mail === second ? secondLatest : mail;
+        return {
+          kind: 'reply', isRoot: message === mail, message,
+          messageKey: `message:${message.messageId}`,
+        };
+      },
+    },
+    display: {
+      getReplyToAddress: (mail) => mail.replyTo || mail.email,
+      formatDetailSubject: (value) => value,
+    },
+    findMail: (id) => current.get(id),
+    normalizeEmail,
+    getAccount: () => 'serve@softora.nl', getOwner: () => 'both', getActiveFolder: () => 'outreach',
+    fetch: async (url, options) => {
+      requests.push({ url, payload: JSON.parse(options.body) });
+      return { ok: true, json: async () => ({ ok: true, result: {} }) };
+    },
+    toast() {},
+  });
+
+  controller.reply(first, 'message:<first@example.nl>');
+  controller.reply(second, 'message:<second@example.nl>');
+  values['c-body'].value = 'Veilige synthetische test.';
+  await controller.send();
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].payload.to, 'reply@example.nl');
+  assert.equal(requests[0].payload.context.id, 'coldmail:20');
+  assert.equal(requests[0].payload.context.messageId, '<second@example.nl>');
+  assert.equal(requests[0].payload.replyIdentity.sourceMessageId, '<second@example.nl>');
+  assert.equal(requests[0].payload.context.conversationId, 'conversation:second');
+});
+
 test('captured MHCBE payload passes real preflight and selects only the exact mocked Instantly adapter', async () => {
   const flow = createMhcbePayloadCapture();
   flow.controller.reply(flow.mail);
