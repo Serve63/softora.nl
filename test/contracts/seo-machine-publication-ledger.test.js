@@ -130,6 +130,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/kennisbank/wat-is-een-conversiegerichte-website',
+        '2026-08-15',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });

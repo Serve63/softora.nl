@@ -1058,6 +1058,41 @@ test('AI-leadkwalificatie gebruikt een bewijskaart, menselijke review en twee ve
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 });
 
+test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht', () => {
+  const item = getSeoContentItem('kennisbank', 'wat-is-een-conversiegerichte-website', {
+    now: new Date('2026-08-15T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-08-15');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.targetMoneyPage, '/website-laten-maken');
+  assert.ok(item.informationGain.includes('vijfdelige routekaart'));
+  assert.ok(item.informationGain.includes('leklogboek'));
+  assert.ok(item.wordCount >= 1400);
+  assert.equal(item.image.src, '/assets/seo-content/conversiegerichte-website-bewijsroute-softora.jpg');
+  const imagePath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+  assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-conversiegerichte-website">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"dateModified":"2026-08-15"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Leg per route vijf bewijspunten vast/);
+  assert.match(html, /Een mooie bedankpagina zonder aantoonbare ontvangst is geen voltooide conversie/);
+  assert.match(html, /href="\/website-laten-maken">website laten maken<\/a>/);
+  assert.match(html, /href="\/blog\/website-laten-maken-kosten-2026">kostengids<\/a>/);
+  assert.match(html, /href="\/vergelijkingen\/website-laten-maken-vs-zelf-maken">vergelijking tussen laten maken en zelf maken<\/a>/);
+  assert.match(html, /href="\/blog\/website-leadgeneratie-mkb-meten"><span>Websiteleadgeneratie meten<\/span><\/a>/);
+  assert.match(html, /href="\/blog\/website-offerte-vergelijken"><span>Website-offertes vergelijken<\/span><\/a>/);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 0);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+});
+
 test('chatbot-vs-livechat gebruikt quality v2 als unieke beslispagina', () => {
   const item = getSeoContentItem('vergelijkingen', 'chatbot-vs-livechat', {
     now: new Date('2026-08-07T12:00:00.000Z'),
