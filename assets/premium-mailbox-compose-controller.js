@@ -145,6 +145,24 @@
       };
     }
 
+    function resolveReplySource(mail, requestedMessageKey = '') {
+      if (!mail) return null;
+      const action = options.campaignInbox?.getConversationAction?.(mail);
+      if (!action || action.kind !== 'reply' || !action.message) return mail;
+      const expectedMessageKey = String(action.messageKey || '').trim();
+      const requested = String(requestedMessageKey || '').trim();
+      if (requested && requested !== expectedMessageKey) {
+        throw new Error('De geselecteerde reply is gewijzigd; open het bericht opnieuw.');
+      }
+      if (action.isRoot) return mail;
+      return {
+        ...action.message,
+        conversationId: String(mail.conversationId || action.message.conversationId || '').trim(),
+        threadMessages: Array.isArray(mail.threadMessages) ? mail.threadMessages : [],
+        campaign: action.message.campaign || mail.campaign || null,
+      };
+    }
+
     function assertReplyOwner(accountEmail = '') {
       const selectedOwner = String(options.getOwner?.() || '').trim().toLowerCase();
       const accountOwner = normalize(
@@ -201,11 +219,13 @@
       });
     }
 
-    function reply(mail) {
+    function reply(mail, requestedMessageKey = '') {
       if (!mail) return;
       options.compose.resetOptionalFields();
+      let replySource = mail;
       try {
-        setReplyContext(mail);
+        replySource = resolveReplySource(mail, requestedMessageKey);
+        setReplyContext(replySource);
       } catch (error) {
         options.toast(String(error?.message || error));
         return;
@@ -213,13 +233,13 @@
       const toField = documentRef?.getElementById('c-to');
       const subjectField = documentRef?.getElementById('c-subject');
       if (toField) {
-        toField.value = options.display.getReplyToAddress(mail, {
+        toField.value = options.display.getReplyToAddress(replySource, {
           activeFolder: options.getActiveFolder(),
           account: options.getAccount(),
         });
       }
       if (subjectField) {
-        const subject = options.display.formatDetailSubject(mail.subject);
+        const subject = options.display.formatDetailSubject(replySource.subject);
         subjectField.value = /^re:/i.test(subject) ? subject : `Re: ${subject}`;
       }
       open({ keepContext: true });
@@ -456,14 +476,14 @@
       }
     }
 
-    function handleAction(action, id) {
+    function handleAction(action, id, actionContext = {}) {
       if (action === 'close-compose') close();
       else if (action === 'send-mail') void send();
       else if (action === 'rewrite-compose') void rewrite();
       else if (action === 'toggle-copy-fields') options.compose.toggleCopyFields();
       else if (action === 'choose-attachments') documentRef?.getElementById('c-attachments')?.click();
       else if (action === 'remove-attachment') options.compose.removeAttachment(id);
-      else if (action === 'reply-mail') reply(options.findMail(id));
+      else if (action === 'reply-mail') reply(options.findMail(id), actionContext.messageKey);
       else if (action === 'new-message') newMessage(options.findMail(id));
       else return false;
       return true;

@@ -176,7 +176,11 @@ function createMailboxComposeThreadContext(deps = {}) {
       }
       return { ...base, provider: 'instantly', providerThreadId, replyTargetMessageId: providerMessageId, references: providerMessageId };
     }
-    if (!mailboxIndexStore || typeof mailboxIndexStore.getMessage !== 'function') {
+    const hasProofReader = mailboxIndexStore && (
+      typeof mailboxIndexStore.getMessageForReplyProof === 'function' ||
+      typeof mailboxIndexStore.getMessage === 'function'
+    );
+    if (!hasProofReader) {
       throw inputError('De mailbox-index is niet beschikbaar om het replydoel te bewijzen.', 'MAILBOX_REPLY_TARGET_UNAVAILABLE', 503);
     }
     const folder = normalizeText(context.folder || 'inbox').toLowerCase();
@@ -184,11 +188,24 @@ function createMailboxComposeThreadContext(deps = {}) {
     if (!id || folder === 'sent') {
       throw inputError('Selecteer een echt ontvangen bericht om te beantwoorden.', 'MAILBOX_REPLY_TARGET_INVALID', 409);
     }
-    const stored = await mailboxIndexStore.getMessage({ accountEmail: account, folder, id });
+    const proofReader = typeof mailboxIndexStore.getMessageForReplyProof === 'function'
+      ? mailboxIndexStore.getMessageForReplyProof.bind(mailboxIndexStore)
+      : mailboxIndexStore.getMessage.bind(mailboxIndexStore);
+    let stored = null;
+    try {
+      stored = await proofReader({ accountEmail: account, folder, id });
+    } catch (_) {
+      throw inputError(
+        'Het exacte mailboxbericht kon tijdelijk niet worden gecontroleerd; probeer opnieuw.',
+        'MAILBOX_REPLY_TARGET_UNAVAILABLE',
+        503
+      );
+    }
     const storedMessageId = normalizeMessageId(stored && stored.messageId);
-    const clientMessageId = normalizeMessageId(context.messageId);
+    const clientMessageId = normalizeMessageId(replyIdentity.sourceMessageId || context.messageId);
+    const storedReplyTarget = normalizeEmail(stored && (stored.replyTo || stored.email));
     const targetMismatch = !stored || !storedMessageId || (clientMessageId && clientMessageId !== storedMessageId) ||
-      normalizeEmail(stored.accountEmail) !== account || normalizeEmail(stored.email) !== recipient;
+      normalizeEmail(stored.accountEmail) !== account || storedReplyTarget !== recipient;
     if (targetMismatch) {
       throw inputError('Het antwoorddoel wijkt af van het bewezen mailboxbericht.', 'MAILBOX_REPLY_TARGET_MISMATCH', 409);
     }

@@ -136,6 +136,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     accountEmail: 'serve@softora.nl',
     from: 'Servé Creusen',
     email: 'serve@softora.nl',
+    replyTo: '',
     to: 'bedrijf-0@example.test',
     toDisplay: '',
     cc: '',

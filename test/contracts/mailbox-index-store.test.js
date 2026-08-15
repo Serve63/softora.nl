@@ -116,6 +116,7 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
       body: 'Volledige tekst',
       date: '2026-05-20T11:00:00.000Z',
       messageId: '<m-42@softora.nl>',
+      replyTo: 'reply@softora.nl',
       unread: true,
       starred: false,
       toDisplay: 'Klant <klant@example.nl>',
@@ -147,6 +148,7 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
     webdesignLinkEvidenceKnown: false,
     webdesignLinkUrl: '',
     recipientRoutingEvidenceKnown: true,
+    replyTo: 'reply@softora.nl',
     toDisplay: 'Klant <klant@example.nl>',
     cc: 'boekhouder@example.nl',
     bcc: 'archief@example.nl',
@@ -177,6 +179,7 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(listMessage.originalCampaignOutbound, false);
   assert.equal(listMessage.webdesignLinkEvidenceKnown, false);
   assert.equal(listMessage.webdesignLinkUrl, '');
+  assert.equal(listMessage.replyTo, 'reply@softora.nl');
   assert.equal(listMessage.cc, 'boekhouder@example.nl');
   assert.equal(listMessage.bcc, 'archief@example.nl');
   assert.deepEqual(listMessage.attachments, [{
@@ -1826,6 +1829,71 @@ test('exact provider provenance bypasses an unrelated mailbox index cooldown', a
   assert.equal(providerReadCalls, 1);
   assert.equal(message.providerOwner, 'serve');
   assert.equal(message.providerThreadId, 'provider-thread-1');
+  assert.equal(requestedClientOptions.at(-1).ignoreFailureCooldown, true);
+  assert.equal(requestedClientOptions.at(-1).suppressFailureCooldown, true);
+});
+
+test('exact IMAP reply proof bypasses an unrelated mailbox index cooldown', async () => {
+  let syncReadCalls = 0;
+  let proofReadCalls = 0;
+  const requestedClientOptions = [];
+  const proofRow = {
+    message_key: 'serve290@gmail.com|coldmail|278',
+    account_email: 'serve290@gmail.com',
+    folder: 'coldmail',
+    uid: 278,
+    provider_id: 'coldmail:278',
+    message_id: '<salon-latest@salontof.nl>',
+    sender_name: 'Info | Salon TOF',
+    sender_email: 'info@salontof.nl',
+    recipients_text: 'serve290@gmail.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-08-13T14:48:13.000Z',
+    payload: { source: 'imap-sync' },
+  };
+  const client = {
+    from(table) {
+      return {
+        select() {
+          return {
+            eq() { return this; },
+            is() { return this; },
+            limit() { return this; },
+            maybeSingle() {
+              if (table === 'softora_mailbox_sync_state') {
+                syncReadCalls += 1;
+                return new Promise(() => {});
+              }
+              proofReadCalls += 1;
+              return Promise.resolve({ data: proofRow, error: null });
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options || {});
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  assert.equal(await store.getSyncState({ accountEmail: 'serve@softora.nl', folder: 'inbox' }), null);
+  const message = await store.getMessageForReplyProof({
+    accountEmail: 'serve290@gmail.com',
+    folder: 'coldmail',
+    id: 'coldmail:278',
+  });
+
+  assert.equal(syncReadCalls, 1);
+  assert.equal(proofReadCalls, 1);
+  assert.equal(message.messageId, '<salon-latest@salontof.nl>');
+  assert.equal(message.email, 'info@salontof.nl');
   assert.equal(requestedClientOptions.at(-1).ignoreFailureCooldown, true);
   assert.equal(requestedClientOptions.at(-1).suppressFailureCooldown, true);
 });

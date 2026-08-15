@@ -1835,7 +1835,7 @@ function createMailboxService(deps = {}) {
       uid: message.uid,
       folder,
       from: fromText,
-      email: parsedFromEmail || account.email,
+      email: parsedFromEmail || account.email, replyTo: addressText(parsed.replyTo?.value),
       to: addressText(parsed.to?.value),
       toDisplay: addressDisplayText(parsed.to),
       cc: addressDisplayText(parsed.cc),

@@ -171,6 +171,21 @@ function createMailboxIndexStore(deps = {}) {
     return first.ok || !isSoftIndexError(first.error) ? first : execute();
   }
 
+  async function runPriorityRead(label, operation) {
+    const execute = () => run(label, operation, {
+      bypassFailureCooldown: true,
+      suppressFailureCooldown: true,
+      clientOptions: {
+        timeoutMs: DURABLE_WRITE_CLIENT_TIMEOUT_MS,
+        ignoreFailureCooldown: true,
+        suppressFailureCooldown: true,
+      },
+      queryTimeoutMs: DURABLE_WRITE_QUERY_TIMEOUT_MS,
+    });
+    const first = await execute();
+    return first.ok || !isSoftIndexError(first.error) ? first : execute();
+  }
+
   function isoNow() {
     return now().toISOString();
   }
@@ -281,6 +296,7 @@ function createMailboxIndexStore(deps = {}) {
           4000
         ),
         recipientRoutingEvidenceKnown: message && message.recipientRoutingEvidenceKnown === true,
+        replyTo: truncateText(normalizeString(message && message.replyTo), 320),
         toDisplay: truncateText(normalizeString(message && message.toDisplay), 2000),
         cc: truncateText(normalizeString(message && message.cc), 2000),
         bcc: truncateText(normalizeString(message && message.bcc), 2000),
@@ -320,6 +336,7 @@ function createMailboxIndexStore(deps = {}) {
       bcc: normalizeString(payload.bcc),
       deliveredTo: normalizeString(payload.deliveredTo),
       recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true || Boolean(normalizeString(row.recipients_text)),
+      replyTo: normalizeString(payload.replyTo),
       attachments: normalizeAttachments(payload.attachments),
       autoSubmitted: normalizeString(payload.autoSubmitted),
       precedence: normalizeString(payload.precedence),
@@ -900,6 +917,32 @@ function createMailboxIndexStore(deps = {}) {
     return normalizeMessageRow(result.data, { includeBody: true });
   }
 
+  async function getMessageForReplyProof({ accountEmail, folder = 'inbox', id = '' }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const uid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
+    const query = (client) => {
+      const base = client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .select('*')
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null)
+        .limit(1);
+      if (Number.isFinite(uid) && uid > 0) return base.eq('uid', uid).maybeSingle();
+      return base.eq('provider_id', normalizeString(id)).maybeSingle();
+    };
+    const result = await runPriorityRead('get-message-reply-proof', query);
+    if (!result.ok) {
+      const error = new Error('Exact mailboxbericht kon niet worden gecontroleerd.');
+      error.code = 'MAILBOX_INDEX_EXACT_READ_UNAVAILABLE';
+      throw error;
+    }
+    if (!result.data) return null;
+    return normalizeMessageRow(result.data, { includeBody: true });
+  }
+
   async function listUnthreadedSentCandidatesForConversations({ targets = [], limit = 1000 } = {}) {
     const normalizedTargets = (Array.isArray(targets) ? targets : [])
       .map((target) => ({
@@ -1114,6 +1157,7 @@ function createMailboxIndexStore(deps = {}) {
     buildSyncKey,
     finishSync,
     getMessage,
+    getMessageForReplyProof,
     getProviderMessage,
     getSyncState,
     hydrateMessageBodies,

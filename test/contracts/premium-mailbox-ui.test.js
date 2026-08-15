@@ -3937,7 +3937,7 @@ test('premium mailbox kan vanuit de mailcontext een voorgestelde reactie schrijv
   assert.match(composeControllerSource, /context: buildRewriteContext\(\)/);
   assert.match(composeControllerSource, /action === 'rewrite-compose'[\s\S]*void rewrite\(\)/);
   assert.match(composeControllerSource, /function setReplyContext\(mail\) \{[\s\S]*options\.compose\.buildReplyContext/);
-  assert.match(composeControllerSource, /function reply\(mail\) \{[\s\S]*setReplyContext\(mail\);/);
+  assert.match(composeControllerSource, /function reply\(mail, requestedMessageKey = ''\) \{[\s\S]*resolveReplySource\(mail, requestedMessageKey\)[\s\S]*setReplyContext\(replySource\);/);
   assert.match(composeControllerSource, /if \(!draft && !isSuggestedReply\)/);
   assert.match(composeControllerSource, /Reactie voorgesteld/);
   assert.match(composeControllerSource, /bodyField\.value = rewritten;/);
@@ -5959,6 +5959,9 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   assert.match(scriptSource, /<div class="detail-divider" aria-hidden="true"><\/div>/);
   assert.match(scriptSource, /function renderMailboxConversationAction\(action, mailId\)[\s\S]*const label = isNewMessage \? 'Nieuw bericht sturen' : 'Beantwoorden'/);
   assert.match(scriptSource, /const conversationAction = options && options\.mail[\s\S]*getConversationAction/);
+  assert.match(scriptSource, /data-mailbox-message-key="\$\{escapeHtml\(messageKey\)\}"/);
+  assert.match(scriptSource, /mailboxComposeController\.handleAction\(action, composeActionId, \{[\s\S]*messageKey: actionEl\.getAttribute\('data-mailbox-message-key'\)/);
+  assert.match(fs.readFileSync(composeControllerScriptPath, 'utf8'), /resolveReplySource\(mail, requestedMessageKey[\s\S]*requested !== expectedMessageKey[\s\S]*open het bericht opnieuw/);
   assert.match(scriptSource, /section && section\.type === 'quote'[\s\S]*renderedSections\.push\(rootActionHtml\)/);
   assert.match(scriptSource, /renderMailboxRootIncomingMeta\(m, detailPrimary\)/);
   assert.match(scriptSource, /class="detail-hide-conversation"[\s\S]*Alleen uit Softora verbergen/);
