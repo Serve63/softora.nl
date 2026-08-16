@@ -1271,6 +1271,56 @@ test('CRM-adoptiegids maakt werkafspraken en herstel per rol controleerbaar', ()
   ]);
 });
 
+test('adviesbureauspagina maakt projectstart en overdracht controleerbaar', () => {
+  const now = new Date('2026-08-16T12:00:00.000Z');
+  const item = getSeoContentItem('branches', 'adviesbureaus', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const taskHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-taken-reminders-automatiseren-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-08-16');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.targetMoneyPage, '/crm-systeem-op-maat');
+  assert.ok(item.informationGain.includes('vijf beslispoorten'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.image.sourceType, 'trainedAlgorithmicMedia');
+  assert.equal(item.image.src, '/assets/seo-content/adviesbureau-projectstart-bewijsroute-softora.jpg');
+
+  const imagePath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+  assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 0);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/branches\/adviesbureaus">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="900">/);
+  assert.match(html, /"@type":"Service"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/adviesbureau-projectstart-bewijsroute-softora\.jpg"/);
+  assert.match(html, /"datePublished":"2026-06-29"/);
+  assert.match(html, /"dateModified":"2026-08-16"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Gebruik een projectstartbewijs in plaats van alleen een leadstatus/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM-systeem op maat<\/a>/);
+  assert.match(html, /href="\/website-laten-maken">website laten maken<\/a>/);
+  assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-crm-integratie">CRM-integratie<\/a>/);
+  assert.match(taskHtml, /href="\/branches\/adviesbureaus">projectstart en overdracht voor adviesbureaus<\/a>/);
+  assert.doesNotMatch(html, /garandeert omzet|garandeert tijdwinst|wij leveren foutloos|AI beslist zelfstandig/i);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/branches/adviesbureaus');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/adviesbureau-projectstart-bewijsroute-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));

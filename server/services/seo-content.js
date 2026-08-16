@@ -1973,57 +1973,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'branches',
-    slug: 'adviesbureaus',
-    schemaType: 'Service',
-    serviceType: 'Websites, CRM en AI automatisering voor adviesbureaus',
-    title: 'Websites, CRM en AI automatisering voor adviesbureaus',
-    description:
-      'Een branchepagina voor adviesbureaus die expertise beter willen tonen, intake willen verbeteren en opvolging overzichtelijker willen maken.',
-    category: 'Adviesbureaus',
-    intent: 'Branche',
-    publishedAt: '2026-06-29',
-    updatedAt: '2026-06-29',
-    image: Object.freeze({
-      src: '/assets/seo-content/branche-digitalisering-planning-softora.jpg',
-      alt: 'Adviesbureau bespreekt website, CRM en automatisering aan een werktafel met laptops en procesnotities.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Adviesbureaus winnen online vooral met duidelijke expertise, scherpe intake en een proces waarin aanvragen niet blijven liggen.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Expertise moet snel vertrouwen geven',
-        paragraphs: Object.freeze([
-          'Bij adviesbureaus koopt een bezoeker geen standaardproduct. De website moet daarom snel duidelijk maken welk probleem het bureau oplost, voor wie de aanpak bedoeld is en welke route naar een eerste gesprek logisch is.',
-          'Sterke dienstenpagina’s, cases, kennisbankcontent en branche-uitleg helpen om expertise zichtbaar te maken zonder dat de site vaag of te algemeen wordt.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Intake bepaalt de kwaliteit van de aanvraag',
-        paragraphs: Object.freeze([
-          'Een adviesaanvraag heeft vaak context nodig: type organisatie, vraagstuk, timing, gewenste ondersteuning en betrokken beslissers. Als die informatie pas na meerdere losse mails duidelijk wordt, vertraagt opvolging.',
-          'Een slimme intakeflow kan de vraag structureren. AI kan helpen met samenvatten en ontbrekende informatie signaleren, terwijl het team blijft bepalen welke commerciële vervolgstap past.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'CRM en automatisering houden opvolging scherp',
-        paragraphs: Object.freeze([
-          'Voor adviesbureaus is opvolging vaak relationeel en inhoudelijk. Juist daarom helpt een CRM met duidelijke pipeline, notities, taken en reminders.',
-          'Softora koppelt website, CRM en automatisering stap voor stap. Eerst de commerciële basis, daarna flows voor intake, offertevoorbereiding, klantopvolging of rapportage waar die echt waarde toevoegen.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
-      Object.freeze({ label: 'Wat is een CRM integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'blog',
     slug: 'crm-taken-reminders-automatiseren-mkb',
     title: 'CRM taken en reminders automatiseren in het MKB',
@@ -2060,7 +2009,16 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         heading: 'Begin met drie duidelijke taakmomenten',
         paragraphs: Object.freeze([
           'Een sterke eerste versie hoeft niet groot te zijn. Kies bijvoorbeeld taken na een nieuwe aanvraag, reminders na een verstuurde offerte en een signaal wanneer een klant al te lang geen update heeft gehad.',
-          'Vanuit die basis kan Softora CRM, website, mailbox en eventueel AI automatisering koppelen. Zo ontstaat een systeem waarin opvolging consistenter wordt, zonder dat het team elke stap handmatig hoeft te bewaken.',
+          Object.freeze({
+            text: 'Vanuit die basis kan Softora CRM, website, mailbox en eventueel AI automatisering koppelen. Voor advieswerk helpt een projectstart en overdracht voor adviesbureaus om een taak pas te sluiten wanneer vraag, scope, voorstel, capaciteit en dossier aantoonbaar op elkaar aansluiten. Zo wordt opvolging consistenter zonder dat automatisering het inhoudelijke besluit overneemt.',
+            links: Object.freeze([
+              Object.freeze({
+                anchor: 'projectstart en overdracht voor adviesbureaus',
+                href: '/branches/adviesbureaus',
+                availableFrom: '2026-06-29',
+              }),
+            ]),
+          }),
         ]),
       }),
     ]),
@@ -3448,7 +3406,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
       description: item.description,
       provider: { '@id': `${site}/#organization` },
       serviceType: item.serviceType || cluster.label || item.category,
-      image: imageUrl,
+      image: buildSeoImageObject(imageUrl, image),
       about: {
         '@type': 'Thing',
         name: cluster.label,
@@ -3716,6 +3674,9 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
         url: canonicalUrl,
         name: item.title,
         description: item.description,
+        datePublished: item.publishedAt,
+        dateModified: item.updatedAt || item.publishedAt,
+        inLanguage: 'nl-NL',
         isPartOf: { '@id': `${site}/#website` },
         mainEntity: { '@id': mainEntity['@id'] },
       },
