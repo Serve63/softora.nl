@@ -72,6 +72,18 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .mail-list-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--tag); }
 .mail-list-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-light); }
 .mail-list-count { font-size: 11px; color: var(--text-light); }
+.mail-search { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); background: var(--card); flex-shrink: 0; }
+.mail-search-control { min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: #faf9f7; color: var(--text-light); }
+.mail-search-control:focus-within { border-color: rgba(155,35,85,.55); box-shadow: 0 0 0 3px rgba(155,35,85,.08); }
+.mail-search-control svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.mail-search-control input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text-dark); font: 13px/1.3 'Barlow', sans-serif; }
+.mail-search-control input::placeholder { color: #aaa; }
+.mail-search-clear { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--text-light); cursor: pointer; font-size: 18px; line-height: 1; }
+.mail-search-clear:hover { background: rgba(155,35,85,.08); color: var(--crimson); }
+.mail-search-clear:focus-visible { outline: 2px solid rgba(155,35,85,.35); outline-offset: 1px; }
+.mail-search-status { padding: 7px 2px 0; color: var(--text-light); font-size: 11px; line-height: 1.3; }
+.mail-search-status[data-state="error"] { color: #9b3b30; }
+.mail-search-more { width: 100%; margin-top: 7px; min-height: 32px; border: 1px solid rgba(155,35,85,.2); border-radius: 6px; background: #fff; color: var(--crimson); font: 600 12px 'Barlow', sans-serif; cursor: pointer; }
 .mail-sync-status { padding: 8px 16px; border-bottom: 1px solid var(--border); background: rgba(155,35,85,.05); color: var(--crimson); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .mail-items { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
 .mail-items::-webkit-scrollbar { display: none; width: 0; height: 0; }
@@ -80,6 +92,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .mail-item.active { background: rgba(155,35,85,.05); }
 .mail-item-open { min-height: 52px; padding: 0 12px 0 28px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; flex: 1; min-width: 0; }
 .mail-item-open:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: -3px; border-radius: 4px; }
+.mail-item-content { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 9px 0; }
 .unread-dot { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; background: var(--crimson); border-radius: 50%; }
 .mail-item-top { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .mail-from { flex: 1; font-size: 14px; font-weight: 400; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -91,6 +104,9 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .mail-time { flex-shrink: 0; color: var(--text-light); white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.15; text-align: right; }
 .mail-date-label { font-size: 10px; font-weight: 600; }
 .mail-time-value { font-size: 12px; }
+.mail-search-snippet { display: block; overflow: hidden; color: var(--text-light); font-size: 11px; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
+.mail-search-snippet strong { color: var(--crimson); font-weight: 600; }
+.mail-search-snippet mark { border-radius: 2px; padding: 0 1px; background: rgba(242,193,61,.32); color: inherit; }
 
 /* MAIL DETAIL */
 .mail-detail { flex: 1; min-width: 0; max-width: 100%; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
@@ -165,6 +181,15 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .detail-mail-section-sent { padding: 18px; border-radius: 6px; background: rgba(155,35,85,.055); border-left: 3px solid rgba(155,35,85,.42); }
 .detail-mail-section-received { padding: 18px; border: 0; border-radius: 6px; background: rgba(82,86,99,.065); border-left: 3px solid rgba(82,86,99,.34); }
 .detail-mail-section-received > .detail-footer { margin-top: 2px; padding: 8px 0 0; }
+.mail-contact-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 12px; color: var(--text-light); font-size: 12px; }
+.mail-contact-summary strong { color: var(--crimson); }
+.mail-contact-summary button { border: 0; background: transparent; color: var(--crimson); font: inherit; font-weight: 600; cursor: pointer; }
+.mail-contact-summary button:hover { text-decoration: underline; }
+.mail-contact-summary button:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; }
+.mail-contact-thread-boundary { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; color: var(--text-light); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+.mail-contact-thread-boundary::before { content: ''; flex: 0 0 24px; border-top: 1px solid var(--border); }
+.mail-contact-thread-boundary::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+.mail-contact-thread-boundary span { max-width: min(540px, 70vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-mail-quote-meta { font-size: 12px; color: var(--text-light); }
 .detail-mail-quote-body { color: var(--text-mid); }
 .detail-mail-section-signature { padding-top: 16px; color: var(--text-mid); }
@@ -177,13 +202,15 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 /* COMPOSE MODAL */
 .compose-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.42); z-index: 50; display: none; align-items: center; justify-content: center; padding: clamp(10px, 3vw, 28px); }
 .compose-overlay.open { display: flex; }
-.compose-box { width: min(1040px, calc(100vw - 28px)); max-width: 100%; min-height: min(90vh, 700px); max-height: calc(100vh - 28px); background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 72px rgba(0,0,0,.22); display: flex; flex-direction: column; overflow: hidden; animation: compose-pop .2s ease; }
+.compose-box { position: relative; width: min(1040px, calc(100vw - 28px)); max-width: 100%; min-height: min(90vh, 700px); max-height: calc(100vh - 28px); background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 72px rgba(0,0,0,.22); display: flex; flex-direction: column; overflow: hidden; animation: compose-pop .2s ease; }
 @keyframes compose-pop { from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none} }
-.compose-head { padding: 16px 20px; background: var(--crimson); color: #fff; display: flex; align-items: center; justify-content: space-between; cursor: grab; touch-action: none; user-select: none; }
+.compose-head { min-height: 56px; padding: 6px 8px 6px 20px; background: var(--crimson); color: #fff; display: flex; align-items: center; justify-content: space-between; cursor: grab; touch-action: none; user-select: none; }
 .compose-box[data-compose-dragging="true"] .compose-head { cursor: grabbing; }
 .compose-head-title { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-.compose-x { background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer; font-size: 18px; line-height: 1; padding: 0; transition: color .15s; }
-.compose-x:hover { color: #fff; }
+.compose-x { position: relative; z-index: 8; display: inline-grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: rgba(255,255,255,.78); cursor: pointer; font-size: 26px; line-height: 1; touch-action: manipulation; transition: color .15s, background .15s, transform .12s; }
+.compose-x:hover { color: #fff; background: rgba(255,255,255,.14); }
+.compose-x:active { color: #fff; background: rgba(255,255,255,.22); transform: scale(.96); }
+.compose-x:focus-visible { outline: 2px solid #fff; outline-offset: -4px; color: #fff; background: rgba(255,255,255,.14); }
 .compose-field { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .compose-field-label { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-light); padding: 14px 16px; width: 92px; flex-shrink: 0; }
 .compose-field input { flex: 1; padding: 14px 16px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); outline: none; background: transparent; }
@@ -198,8 +225,12 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .compose-attachment-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compose-attachment-chip button { border: 0; background: transparent; color: var(--crimson); cursor: pointer; font-size: 16px; line-height: 1; padding: 0; }
 .compose-body { padding: 0; display: flex; flex: 1; min-height: 0; }
-.compose-body textarea { flex: 1; width: 100%; min-height: 360px; padding: 18px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); resize: none; outline: none; background: transparent; line-height: 1.7; }
-.compose-footer { padding: 14px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.compose-body textarea { flex: 1; width: 100%; min-height: 180px; overflow: auto; padding: 18px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); resize: none; outline: none; background: transparent; line-height: 1.7; }
+.compose-footer { padding: 14px 42px 14px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.compose-resize-grip { position: absolute; z-index: 7; right: 3px; bottom: 3px; width: 30px; height: 30px; border: 0; border-radius: 5px 0 8px 0; background: transparent; cursor: nwse-resize; touch-action: none; user-select: none; }
+.compose-resize-grip::before { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; border-right: 2px solid rgba(105,35,67,.5); border-bottom: 2px solid rgba(105,35,67,.5); box-shadow: 4px 4px 0 -2px rgba(105,35,67,.24); }
+.compose-resize-grip:hover,.compose-box[data-compose-resizing="true"] .compose-resize-grip { background: rgba(155,35,85,.08); }
+.compose-box[data-compose-resizing="true"] { user-select: none; }
 .compose-footer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
 .btn-rewrite-compose { padding: 10px 18px; background: #fff; color: var(--crimson); border: 1px solid rgba(155,35,85,.35); border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; }
 .btn-rewrite-compose:hover { border-color: var(--crimson); background: rgba(155,35,85,.06); }
@@ -359,7 +390,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
   color: var(--crimson);
 }
 </style>
-<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260728a">
+<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260817a">
 </head>
 <body>
 <div class="dashboard-layout">
@@ -471,7 +502,15 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 
   <!-- MAIL LIST -->
   <div class="mail-list">
-
+    <div class="mail-search" role="search" aria-label="Mailbox doorzoeken">
+      <div class="mail-search-control">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+        <input id="mailbox-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Zoek op naam, e-mail, onderwerp of inhoud…" aria-label="Zoek op naam, e-mail, onderwerp of inhoud" aria-describedby="mailbox-search-status">
+        <button class="mail-search-clear" id="mailbox-search-clear" type="button" aria-label="Zoekopdracht wissen" title="Zoekopdracht wissen" hidden>×</button>
+      </div>
+      <div class="mail-search-status" id="mailbox-search-status" role="status" aria-live="polite" hidden></div>
+      <button class="mail-search-more" id="mailbox-search-more" type="button" hidden>Meer resultaten laden</button>
+    </div>
     <div class="mail-sync-status" id="mail-sync-status" hidden></div>
     <div class="mail-items" id="mail-items"></div>
   </div>
@@ -491,7 +530,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
   <div class="compose-box">
     <div class="compose-head" data-mailbox-compose-drag-handle>
       <div class="compose-head-title" id="compose-title">Nieuwe mail</div>
-      <button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×</button>
+      <button class="compose-x" type="button" data-mailbox-action="close-compose" data-mailbox-compose-no-drag aria-label="Sluiten" title="Sluiten">×</button>
     </div>
     <div class="compose-field"><div class="compose-field-label">Aan</div><input type="email" id="c-to" placeholder="ontvanger@email.nl"><button class="compose-copy-toggle" type="button" data-mailbox-action="toggle-copy-fields" aria-controls="c-copy-fields">CC/BCC</button></div>
     <div class="compose-copy-fields" id="c-copy-fields" hidden>
@@ -514,6 +553,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
         <button class="btn-send" type="button" data-mailbox-action="send-mail">Versturen</button>
       </div>
     </div>
+    <div class="compose-resize-grip" data-mailbox-compose-resize-handle aria-hidden="true"></div>
   </div>
 </div>
 
@@ -525,8 +565,8 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
 <script src="assets/premium-mailbox-body-section.js?v=20260811a"></script>
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260810a"></script><script src="assets/premium-mailbox-owner-preference.js?v=20260806a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-quoted-thread.js?v=20260806b"></script><script src="assets/premium-mailbox-reply-identity.js?v=20260812a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260812b"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260813a"></script><script src="assets/premium-mailbox-list.js?v=20260804d"></script><script src="assets/premium-mailbox-detail-state.js?v=20260813a"></script><script src="assets/premium-mailbox-index.js?v=20260813a"></script><script src="assets/premium-mailbox-refresh.js?v=20260810c"></script><script src="assets/premium-mailbox-compose.js?v=20260812a"></script><script src="assets/premium-mailbox-compose-window.js?v=20260803a"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260806e"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-browser-storage.js?v=20260814a"></script><script src="assets/premium-mailbox-state-outbox.js?v=20260814b"></script><script src="assets/premium-mailbox-read.js?v=20260814a"></script><script src="assets/premium-mailbox-ui-state.js?v=20260814a"></script>
-<script src="assets/premium-mailbox-boot.js?v=20260806a"></script><script src="assets/premium-mailbox.js?v=20260813a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260810a"></script><script src="assets/premium-mailbox-owner-preference.js?v=20260806a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-quoted-thread.js?v=20260806b"></script><script src="assets/premium-mailbox-reply-identity.js?v=20260812a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260812b"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260813a"></script><script src="assets/premium-mailbox-discovery.js?v=20260817a"></script><script src="assets/premium-mailbox-list.js?v=20260817a"></script><script src="assets/premium-mailbox-detail-state.js?v=20260813a"></script><script src="assets/premium-mailbox-index.js?v=20260813a"></script><script src="assets/premium-mailbox-refresh.js?v=20260810c"></script><script src="assets/premium-mailbox-compose.js?v=20260812a"></script><script src="assets/premium-mailbox-compose-window.js?v=20260817b"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260817b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-browser-storage.js?v=20260814a"></script><script src="assets/premium-mailbox-state-outbox.js?v=20260814b"></script><script src="assets/premium-mailbox-read.js?v=20260814a"></script><script src="assets/premium-mailbox-ui-state.js?v=20260814a"></script>
+<script src="assets/premium-mailbox-boot.js?v=20260806a"></script><script src="assets/premium-mailbox.js?v=20260817a"></script>
 <script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
 </html>

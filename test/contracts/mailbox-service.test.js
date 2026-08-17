@@ -3586,6 +3586,8 @@ test('mailbox routes expose accounts, messages, send, local hide restore and rew
     coordinator: {
       accountsResponse() {},
       campaignRepliesResponse() {},
+      searchMailboxResponse() {},
+      contactTimelineResponse() {},
       listMessagesResponse() {},
       getMessageResponse() {},
       getMessageBodiesResponse() {},
@@ -3601,6 +3603,8 @@ test('mailbox routes expose accounts, messages, send, local hide restore and rew
 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/campaign-replies'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/search'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/contact-timeline'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/bodies'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/message-image'));

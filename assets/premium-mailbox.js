@@ -24,9 +24,7 @@ function escapeHtml(value) {
 }
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|hier|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[\s*(?:\[(https?:\/\/[^\]\s<>"']+)\]\((https?:\/\/[^\)\s<>"']+)\)|(https?:\/\/[^\]\s<>"']+))\s*\]/gi;
-function countCharacter(value, character) {
-  return String(value || '').split(character).length - 1;
-}
+function countCharacter(value, character) { return String(value || '').split(character).length - 1; }
 function splitUrlTrailingPunctuation(value) {
   let url = String(value || '');
   let suffix = '';
@@ -85,16 +83,9 @@ function renderLinkedMailboxText(value, options) {
   html += renderMailboxUrls(text.slice(lastIndex));
   return window.SoftoraMailboxDisplay.applySenderCtaLinks(html, text, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl });
 }
-function normalizeMailboxEmail(value) {
-  return String(value || '').trim().toLowerCase();
-}
-function getMailboxAccountEmails() {
-  return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter((email) => window.SoftoraMailboxCampaignInbox?.isCampaignAccount(email));
-}
-function hasMailboxAccount(email) {
-  const normalized = normalizeMailboxEmail(email);
-  return Boolean(normalized && getMailboxAccountEmails().includes(normalized));
-}
+function normalizeMailboxEmail(value) { return String(value || '').trim().toLowerCase(); }
+function getMailboxAccountEmails() { return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter((email) => window.SoftoraMailboxCampaignInbox?.isCampaignAccount(email)); }
+function hasMailboxAccount(email) { const normalized = normalizeMailboxEmail(email); return Boolean(normalized && getMailboxAccountEmails().includes(normalized)); }
 function resolveMailboxPreferenceIdentity(session) {
   const source = session && typeof session === 'object' ? session : {};
   const value = String(source.userId || source.email || source.displayName || '').trim().toLowerCase();
@@ -507,8 +498,9 @@ function renderMailBody(value, images, options) {
   imageState.quoteImages = normalizeMailboxBodyImages(imagePlan.quoteImages);
   const replyMailId = String(options && options.replyMailId || '').trim();
   const rootIncomingMeta = String(options && options.rootIncomingMeta || '');
+  const contactTimeline = options?.mail?.contactTimelineLoaded === true;
   const conversationAction = options && options.mail
-    ? window.SoftoraMailboxCampaignInbox?.getConversationAction?.(options.mail)
+    ? window.SoftoraMailboxCampaignInbox?.getConversationAction?.(contactTimeline ? { ...options.mail, threadMessages: [] } : options.mail)
     : replyMailId ? { kind: 'reply', isRoot: true } : null;
   const actionHtml = renderMailboxConversationAction(conversationAction, replyMailId);
   const newMessageActionHtml = conversationAction && conversationAction.kind === 'new-message'
@@ -517,7 +509,7 @@ function renderMailBody(value, images, options) {
   const rootActionHtml = conversationAction && conversationAction.kind === 'reply' && conversationAction.isRoot
     ? actionHtml
     : '';
-  const threadAction = conversationAction && conversationAction.kind === 'reply' && !conversationAction.isRoot
+  const threadAction = !contactTimeline && conversationAction && conversationAction.kind === 'reply' && !conversationAction.isRoot
     ? { ...conversationAction, html: actionHtml }
     : null;
   const rootAttachmentsHtml = window.SoftoraMailboxCampaignInbox?.renderAttachments?.(
@@ -533,6 +525,7 @@ function renderMailBody(value, images, options) {
     position,
     newestFirst: true,
     action: threadAction,
+    renderMessageAction: contactTimeline ? (message) => renderMailboxConversationAction(window.SoftoraMailboxCampaignInbox?.getConversationAction?.({ ...message, threadMessages: [] }), replyMailId) : null,
     renderMessageBody: (payload) => window.SoftoraMailboxImages?.renderThreadMessageBody?.(payload, threadBodyContext, {
       normalizeEmail: normalizeMailboxEmail, normalizeOptOutUrl: normalizeMailboxOptOutUrl,
       renderInlineImage: renderMailboxInlineImage, renderParagraphs: renderMailboxParagraphs,
@@ -696,7 +689,7 @@ let activeFolder = 'outreach';
 let activeMail = null;
 let inboxUnreadCount = 0;
 let mailboxSyncState = null;
-let mailboxOwnerView = null, mailboxRefreshController = null;
+let mailboxOwnerView = null, mailboxRefreshController = null, mailboxDiscoveryController = null;
 const mailboxToastController = window.SoftoraMailboxToast.create({ document });
 function toast(message, actionOptions) {
   mailboxToastController.show(message, actionOptions);
@@ -800,6 +793,7 @@ function normalizeMailboxApiMessage(message, options = {}) {
     starred: Boolean(message.starred),
     replyDismissedAt: String(message.replyDismissedAt || ''),
     tags: [],
+    messageKey: message.messageKey || '', technicalThreadKey: message.technicalThreadKey || '', externalContactEmail: message.externalContactEmail || '', searchMatch: message.searchMatch || null, searchQuery: message.searchQuery || '',
   };
   const decoratedMail = window.SoftoraMailboxCampaignInbox?.decorateMessage(mail, message) || mail;
   const indexedMail = window.SoftoraMailboxIndex && typeof window.SoftoraMailboxIndex.decorateMessage === 'function'
@@ -840,19 +834,16 @@ async function syncMailboxInBackground() {
   });
 }
 async function loadMailboxMessages(options = {}) {
+  if (mailboxDiscoveryController?.isSearchActive?.()) { void mailboxDiscoveryController.refreshActiveTimeline?.(findMailById(activeMail)); return false; }
   const loadOptions = activeFolder === 'outreach' && !Object.prototype.hasOwnProperty.call(options, 'skipProviderRefresh')
     ? { ...options, skipProviderRefresh: true }
     : options;
   return mailboxOwnerView.load(loadOptions);
 }
-function resetMailboxViewForScopeChange() {
-  mailboxOwnerView.reset();
-}
-
+function resetMailboxViewForScopeChange() { mailboxDiscoveryController?.resetForScopeChange?.(); mailboxOwnerView.reset(); }
 function switchCampaignMailboxOwner(value) {
   const owner = mailboxOwnerView.switchOwner(value); mailboxRefreshController?.scopeChanged?.(); return owner;
 }
-
 async function applyMailboxAccount(email, options = {}) {
   const normalizedEmail = normalizeMailboxEmail(email);
   activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (getMailboxAccountEmails()[0] || MAILBOX_ACCOUNT_DEFAULT);
@@ -958,7 +949,7 @@ function openMail(id, options = {}) {
   if (wasUnread) window.SoftoraMailboxUiState.markReadOnOpen({ mail: m, skipReadPersist: options.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail });
   renderList({ openLatest: false });
   if ((!m.bodyLoaded || m.recipientRoutingNeedsHydration) && !options.skipBodyFetch) void loadMailboxMessageBody(m.id);
-  if (!options.skipThreadBodyFetch && activeFolder === 'outreach' && window.SoftoraMailboxCampaignInbox.isCampaignMail(m)) void window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail: m, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail, isCurrent: () => isMailboxViewCurrent(token), signal: token.signal });
+  if (!options.skipThreadBodyFetch && activeFolder === 'outreach' && (window.SoftoraMailboxCampaignInbox.isCampaignMail(m) || m.contactTimelineLoaded)) void window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail: m, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail, isCurrent: () => isMailboxViewCurrent(token), signal: token.signal });
   const conversationBodyImages = window.SoftoraMailboxImages?.getConversationImages?.(m) || m.bodyImages;
   const imagesPending = !options.imagesPrepared && Boolean(window.SoftoraMailboxImages?.stage?.(
     conversationBodyImages,
@@ -995,6 +986,7 @@ function openMail(id, options = {}) {
               </div>
             </div>
           </div>
+          ${window.SoftoraMailboxDiscovery?.renderTimelineSummary?.(m, escapeHtml) || ''}
           ${window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml)}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
@@ -1006,6 +998,7 @@ function openMail(id, options = {}) {
     if (nextDetailBody) nextDetailBody.scrollTop = detailScrollTop;
   }
   window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: m.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail });
+  if (!options.skipContactTimeline) void mailboxDiscoveryController?.loadContactTimeline?.(m);
 }
 async function deleteMail(id) {
   const m = findMailById(id);
@@ -1083,6 +1076,7 @@ function handleMailboxAction(actionEl) {
     case 'retry-thread-message':
       retryMailboxThreadMessage(id, actionEl.getAttribute('data-mailbox-thread-key'));
       break;
+    case 'load-more-contact-timeline': void mailboxDiscoveryController?.loadMoreContactTimeline?.(findMailById(id)); break;
   }
 }
 function bindMailboxActions() {
@@ -1105,6 +1099,7 @@ function bindMailboxActions() {
   mailboxComposeController.bind();
 }
 bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody, openMail });
+mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-items'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail });
 mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
