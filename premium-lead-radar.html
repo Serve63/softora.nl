@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Softora | Lead Radar</title>
+  <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260817a">
+</head>
+<body class="lead-radar-page">
+  <main class="lead-radar-app">
+    <header class="lead-radar-header">
+      <div>
+        <p class="lead-radar-eyebrow">SOFTORA ACQUISITIE</p>
+        <h1>Lead Radar</h1>
+        <p class="lead-radar-subtitle">Openbare websitevragen uit Facebook en Instagram, met websitecontrole.</p>
+      </div>
+      <div class="lead-radar-header-actions">
+        <button class="button button-secondary" id="refresh-button" type="button">Vernieuwen</button>
+        <button class="button button-primary" id="open-import-button" type="button">Lead importeren</button>
+      </div>
+    </header>
+
+    <section class="status-banner" id="provider-banner" hidden></section>
+
+    <section class="metric-grid" aria-label="Lead Radar tellingen">
+      <article class="metric-card metric-card--primary"><span>Totaal signalen</span><strong id="metric-total">-</strong><small>opgeslagen in Lead Radar</small></article>
+      <article class="metric-card"><span>Nieuw</span><strong id="metric-new">-</strong><small>nog te beoordelen</small></article>
+      <article class="metric-card metric-card--green"><span>Geen website gevonden</span><strong id="metric-no-website">-</strong><small>na openbare controle</small></article>
+      <article class="metric-card metric-card--amber"><span>Website gevonden</span><strong id="metric-website">-</strong><small>bron of zoekresultaat bevestigd</small></article>
+    </section>
+
+    <section class="scan-panel" aria-label="Lead Radar scan">
+      <div class="scan-panel__intro">
+        <div>
+          <p class="section-kicker">LANDDEKKING</p>
+          <h2>Nieuwe signalen zoeken</h2>
+          <p id="scan-status-text">De scan gebruikt kleine zoekopdrachten per platform, regio en zoekwoordgroep.</p>
+        </div>
+        <div class="scan-panel__controls">
+          <label>Platforms
+            <select id="scan-platforms" multiple size="2">
+              <option value="facebook" selected>Facebook</option>
+              <option value="instagram" selected>Instagram</option>
+            </select>
+          </label>
+          <label>Regio
+            <select id="scan-region-mode">
+              <option value="nationwide" selected>Heel Nederland</option>
+              <option value="regional">Nederland + provincies en steden</option>
+              <option value="custom">Eigen regio's</option>
+            </select>
+          </label>
+          <label class="scan-region-input">Eigen regio's
+            <input id="scan-regions" type="text" placeholder="Eindhoven, Noord-Brabant, Tilburg" autocomplete="off" disabled>
+          </label>
+          <label>Zoekopdrachten
+            <input id="scan-max-queries" type="number" min="1" max="100" value="12" inputmode="numeric">
+          </label>
+          <label>Websitechecks
+            <input id="scan-website-limit" type="number" min="0" max="50" value="10" inputmode="numeric">
+          </label>
+          <button class="button button-primary scan-button" id="scan-button" type="button">Scan starten</button>
+        </div>
+      </div>
+      <div class="scan-progress" id="scan-progress" hidden>
+        <div class="scan-progress__bar"><span id="scan-progress-bar"></span></div>
+        <span id="scan-progress-label">Scan wordt uitgevoerd...</span>
+      </div>
+    </section>
+
+    <section class="coverage-panel" aria-label="Scanoverzicht">
+      <div class="coverage-panel__heading">
+        <div><p class="section-kicker">CONTROLE</p><h2>Scanruns en dekking</h2></div>
+        <button class="icon-button" id="toggle-runs-button" type="button" aria-expanded="false" title="Scanruns tonen">+</button>
+      </div>
+      <div class="coverage-summary" id="coverage-summary"></div>
+      <div class="runs-list" id="runs-list" hidden></div>
+    </section>
+
+    <section class="inbox-section" aria-label="Lead Radar inbox">
+      <div class="inbox-heading">
+        <div><p class="section-kicker">INBOX</p><h2>Recente signalen</h2></div>
+        <span class="result-count" id="result-count">0 resultaten</span>
+      </div>
+      <form class="filter-bar" id="filter-form">
+        <label>Platform
+          <select id="filter-platform"><option value="">Alle platforms</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select>
+        </label>
+        <label>Periode
+          <select id="filter-days"><option value="">Alle datums</option><option value="1">Vandaag</option><option value="3">Laatste 3 dagen</option><option value="7">Laatste 7 dagen</option><option value="30">Laatste 30 dagen</option></select>
+        </label>
+        <label>Website
+          <select id="filter-website-status"><option value="">Alle statussen</option><option value="no_website_found">Geen website gevonden</option><option value="website_found">Website gevonden</option><option value="website_not_working">Website werkt niet</option><option value="website_unverified">Niet bevestigd</option><option value="website_not_checked">Nog niet gecontroleerd</option><option value="provider_unavailable">Controle niet beschikbaar</option></select>
+        </label>
+        <label>Leadstatus
+          <select id="filter-lead-status"><option value="">Alle leadstatussen</option><option value="new">Nieuw</option><option value="relevant">Relevant</option><option value="follow_up">Later opvolgen</option><option value="not_relevant">Niet relevant</option><option value="archived">Gearchiveerd</option></select>
+        </label>
+        <label>Min. score
+          <input id="filter-min-score" type="number" min="0" max="100" placeholder="0" inputmode="numeric">
+        </label>
+        <label class="filter-search">Zoeken
+          <input id="filter-search" type="search" placeholder="Naam, bericht of zoekterm">
+        </label>
+        <button class="button button-secondary filter-submit" type="submit">Filteren</button>
+      </form>
+
+      <div class="bulk-bar" id="bulk-bar" hidden>
+        <span><strong id="selected-count">0</strong> geselecteerd</span>
+        <button class="button button-secondary" id="bulk-website-button" type="button">Websites controleren</button>
+        <button class="button button-ghost" id="clear-selection-button" type="button">Selectie wissen</button>
+      </div>
+
+      <div class="inbox-state" id="inbox-state" hidden></div>
+      <div class="lead-list" id="lead-list"></div>
+      <div class="pagination" id="pagination" hidden>
+        <button class="button button-secondary" id="previous-page-button" type="button">Vorige</button>
+        <span id="page-label">Pagina 1</span>
+        <button class="button button-secondary" id="next-page-button" type="button">Volgende</button>
+      </div>
+    </section>
+
+    <section class="import-panel" id="import-panel" hidden aria-label="Handmatige lead import">
+      <div class="import-panel__heading"><div><p class="section-kicker">HANDMATIG</p><h2>Openbare lead toevoegen</h2></div><button class="icon-button" id="close-import-button" type="button" title="Import sluiten">×</button></div>
+      <form id="import-form" class="import-form">
+        <label>Platform<select id="import-platform" required><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label>
+        <label>Originele URL<input id="import-url" type="url" placeholder="https://www.facebook.com/..." required></label>
+        <label>Naam pagina of profiel<input id="import-author" type="text" maxlength="500"></label>
+        <label>Regio<input id="import-region" type="text" maxlength="120" placeholder="bijvoorbeeld Eindhoven"></label>
+        <label class="import-form__wide">Berichttekst of snippet<textarea id="import-message" maxlength="20000" rows="6" required></textarea></label>
+        <label>Website indien bekend<input id="import-website" type="url" placeholder="https://..." ></label>
+        <label>Interne notitie<textarea id="import-notes" maxlength="5000" rows="3"></textarea></label>
+        <div class="import-form__actions"><button class="button button-primary" type="submit">Lead opslaan</button><span id="import-feedback" role="status"></span></div>
+      </form>
+    </section>
+  </main>
+  <script src="/assets/lead-radar.js?v=20260817a" defer></script>
+</body>
+</html>
