@@ -49,9 +49,9 @@ test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC
     contactTimelineThreadCount: 2,
     externalContactEmail: 'contact@example.test',
     threadMessages: [
-      { id: 'standalone-in', subject: 'Afspraak', body: 'Nieuw los bericht', bodyLoaded: true },
-      { id: 'standalone-out', subject: 'Re: Afspraak', body: 'Nieuw los antwoord', bodyLoaded: true },
-      { id: 'old-reply', subject: 'Re: Oude vraag', body: 'Volledig oud antwoord', bodyLoaded: true },
+      { id: 'standalone-in', messageId: '<standalone-in@example.test>', subject: 'Afspraak', body: 'Nieuw los bericht', bodyLoaded: true },
+      { id: 'standalone-out', messageId: '<standalone-out@example.test>', subject: 'Re: Afspraak', body: 'Nieuw los antwoord', bodyLoaded: true },
+      { id: 'timeline-old-reply', messageId: '<old-reply@example.test>', subject: 'Re: Oude vraag', body: 'Volledig oud antwoord', bodyLoaded: true },
     ],
   }];
   const refresh = [{
@@ -59,8 +59,8 @@ test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC
     contactTimelineLoaded: false,
     contactTimelineTotal: 1,
     threadMessages: [
-      { id: 'old-reply', subject: 'Re: Oude vraag', body: 'Korte preview', bodyLoaded: false },
-      { id: 'older-in', subject: 'Oude vraag', body: 'Ouder bericht', bodyLoaded: true },
+      { id: 'snapshot-old-reply', messageId: 'old-reply@example.test', subject: 'Re: Oude vraag', body: 'Korte preview', bodyLoaded: false },
+      { id: 'older-in', messageId: '<older-in@example.test>', subject: 'Oude vraag', body: 'Ouder bericht', bodyLoaded: true },
     ],
   }];
 
@@ -72,7 +72,7 @@ test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC
   assert.equal(reconciled[0].contactTimelineThreadCount, 2);
   assert.equal(reconciled[0].externalContactEmail, 'contact@example.test');
   assert.deepEqual(reconciled[0].threadMessages.map((message) => message.id), [
-    'standalone-in', 'standalone-out', 'old-reply', 'older-in',
+    'standalone-in', 'standalone-out', 'snapshot-old-reply', 'older-in',
   ]);
   assert.equal(reconciled[0].threadMessages[2].body, 'Volledig oud antwoord');
   assert.equal(reconciled[0].threadMessages[2].bodyLoaded, true);
