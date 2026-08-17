@@ -50,6 +50,22 @@
     return account && folder && uid ? `${account}|${folder}|${uid}` : '';
   }
 
+  function getStableThreadMessageKey(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    const messageId = normalize(source.messageId).replace(/^<|>$/g, '');
+    if (messageId) return `message-id:${messageId}`;
+    const account = normalize(source.accountEmail || source.account);
+    const providerMessageId = normalize(source.providerMessageId || source.instantlyMessageId);
+    if (providerMessageId) return `provider:${account}|${providerMessageId}`;
+    const messageKey = normalize(source.messageKey);
+    if (messageKey) return `message-key:${messageKey}`;
+    const folder = normalize(source.storageFolder || source.folder);
+    const uid = String(source.uid == null ? '' : source.uid).trim();
+    if (account && folder && uid) return `mailbox:${account}|${folder}|${uid}`;
+    const fallback = getMessageKey(source);
+    return fallback ? `ui:${fallback}` : '';
+  }
+
   function getBodyCompleteness(message) {
     const source = message && typeof message === 'object' ? message : {};
     const body = String(source.body || '').trim();
@@ -88,18 +104,18 @@
   function mergeMessagesPreservingCurrent(currentMessages, incomingMessages) {
     const incomingByKey = new Map(
       (Array.isArray(incomingMessages) ? incomingMessages : [])
-        .map((message) => [getMessageKey(message), message])
+        .map((message) => [getStableThreadMessageKey(message), message])
         .filter(([key]) => key)
     );
     const seen = new Set();
     const preserved = (Array.isArray(currentMessages) ? currentMessages : []).map((message) => {
-      const key = getMessageKey(message);
+      const key = getStableThreadMessageKey(message);
       if (!key || !incomingByKey.has(key)) return message;
       seen.add(key);
       return reconcileMessage(message, incomingByKey.get(key));
     });
     (Array.isArray(incomingMessages) ? incomingMessages : []).forEach((message) => {
-      const key = getMessageKey(message);
+      const key = getStableThreadMessageKey(message);
       if (!key || seen.has(key)) return;
       seen.add(key);
       preserved.push(message);
