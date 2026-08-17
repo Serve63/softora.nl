@@ -1008,14 +1008,24 @@ test('WHOOP backfill never leaps over a missing recovery day', async () => {
   });
   const service = createWhoopHealthService({
     getSupabaseClient: () => supabase,
-    fetchImpl: async (url) => createJsonResponse(200, {
-      records: String(url).includes('/recovery?') ? [{
-        cycle_id: 1707000000, user_id: 23320184,
-        created_at: '2026-08-12T08:00:00.000Z', score_state: 'SCORED',
-        score: { recovery_score: 81 },
-      }] : [],
-      next_token: '',
-    }),
+    fetchImpl: async (url) => {
+      const pathname = new URL(String(url)).pathname;
+      if (pathname.endsWith('/recovery')) {
+        return createJsonResponse(200, { records: [{
+          cycle_id: 1707000000, user_id: 23320184,
+          created_at: '2026-08-12T08:00:00.000Z', score_state: 'SCORED',
+          score: { recovery_score: 81 },
+        }], next_token: '' });
+      }
+      if (pathname.endsWith('/activity/sleep')) {
+        return createJsonResponse(200, { records: [{
+          id: 'sleep-without-recovery', user_id: 23320184,
+          start: '2026-08-10T23:00:00.000Z', end: '2026-08-11T07:00:00.000Z',
+          nap: false, score_state: 'SCORED', score: {},
+        }], next_token: '' });
+      }
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
     now: () => new Date(nowIso),
     config: {
       clientId: 'whoop-client', clientSecret: 'whoop-secret',
@@ -1030,6 +1040,53 @@ test('WHOOP backfill never leaps over a missing recovery day', async () => {
   assert.equal(result.lastContiguousRecoveryDay, '2026-08-10');
   assert.equal(supabase.tables.softora_health_whoop_connections[0].last_synced_day, '2026-08-10');
   assert.ok(result.nextRetryAt);
+});
+
+test('WHOOP backfill treats historical days without a main sleep as verified no-recovery days', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const nowIso = '2026-08-12T16:00:00.000Z';
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: new Date(nowIso).getTime() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+      last_synced_day: '2026-08-10',
+    })],
+  });
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => {
+      const pathname = new URL(String(url)).pathname;
+      if (pathname.endsWith('/recovery')) {
+        return createJsonResponse(200, { records: [{
+          cycle_id: 1707000000, user_id: 23320184,
+          created_at: '2026-08-12T08:00:00.000Z', score_state: 'SCORED',
+          score: { recovery_score: 81 },
+        }], next_token: '' });
+      }
+      if (pathname.endsWith('/activity/sleep')) {
+        return createJsonResponse(200, { records: [{
+          id: 'historical-nap', user_id: 23320184,
+          start: '2026-08-11T12:00:00.000Z', end: '2026-08-11T12:30:00.000Z',
+          nap: true, score_state: 'SCORED', score: {},
+        }], next_token: '' });
+      }
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
+    now: () => new Date(nowIso),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const result = await service.sync({ mode: 'backfill', targetDay: '2026-08-12' });
+  assert.equal(result.targetDayComplete, true);
+  assert.equal(result.recoveryRangeComplete, true);
+  assert.equal(result.lastContiguousRecoveryDay, '2026-08-12');
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].last_synced_day, '2026-08-12');
+  assert.equal(result.nextRetryAt, null);
 });
 
 test('WHOOP resumed webhook cannot outrun the reauthorization backfill', async () => {
@@ -1091,28 +1148,38 @@ test('WHOOP forced reauthorization backfill repairs stale progress before a gap'
       last_synced_day: '2026-08-17',
     })],
     softora_health_whoop_webhook_events: [{
-      trace_id: 'forced-backfill-repair', whoop_user_id: 23320184, resource_id: '2026-05-20',
+      trace_id: 'forced-backfill-repair', whoop_user_id: 23320184, resource_id: '2026-08-10',
       event_type: 'internal.backfill', status: 'pending', attempts: 0,
       next_attempt_at: nowIso, received_at: nowIso, last_error: null,
     }],
   });
   const service = createWhoopHealthService({
     getSupabaseClient: () => supabase,
-    fetchImpl: async (url) => createJsonResponse(200, {
-      records: String(url).includes('/recovery?') ? [
-        {
-          cycle_id: 1706990000, user_id: 23320184,
-          created_at: '2026-08-10T08:00:00.000Z', score_state: 'SCORED',
-          score: { recovery_score: 47 },
-        },
-        {
-          cycle_id: 1707000000, user_id: 23320184,
-          created_at: '2026-08-12T08:00:00.000Z', score_state: 'SCORED',
-          score: { recovery_score: 66 },
-        },
-      ] : [],
-      next_token: '',
-    }),
+    fetchImpl: async (url) => {
+      const pathname = new URL(String(url)).pathname;
+      if (pathname.endsWith('/recovery')) {
+        return createJsonResponse(200, { records: [
+          {
+            cycle_id: 1706990000, user_id: 23320184,
+            created_at: '2026-08-10T08:00:00.000Z', score_state: 'SCORED',
+            score: { recovery_score: 47 },
+          },
+          {
+            cycle_id: 1707000000, user_id: 23320184,
+            created_at: '2026-08-12T08:00:00.000Z', score_state: 'SCORED',
+            score: { recovery_score: 66 },
+          },
+        ], next_token: '' });
+      }
+      if (pathname.endsWith('/activity/sleep')) {
+        return createJsonResponse(200, { records: [{
+          id: 'sleep-without-recovery', user_id: 23320184,
+          start: '2026-08-10T23:00:00.000Z', end: '2026-08-11T07:00:00.000Z',
+          nap: false, score_state: 'SCORED', score: {},
+        }], next_token: '' });
+      }
+      return createJsonResponse(200, { records: [], next_token: '' });
+    },
     now: () => new Date(nowIso),
     config: {
       clientId: 'whoop-client', clientSecret: 'whoop-secret',
