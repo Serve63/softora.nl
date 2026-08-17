@@ -10,6 +10,7 @@ const { SOFTWARE_CHOICE_CONTENT_ITEM } = require('./seo-content-software-choice'
 const { LEAD_QUALIFICATION_CONTENT_ITEM } = require('./seo-content-lead-qualification');
 const { CONVERSION_WEBSITE_CONTENT_ITEM } = require('./seo-content-conversion-website');
 const { ADVISORY_FIRMS_CONTENT_ITEM } = require('./seo-content-adviesbureaus');
+const { AI_TELEFONIST_KOSTEN_CONTENT_ITEM } = require('./seo-content-ai-telefonist-kosten');
 
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
@@ -24,6 +25,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   LEAD_QUALIFICATION_CONTENT_ITEM,
   CONVERSION_WEBSITE_CONTENT_ITEM,
   ADVISORY_FIRMS_CONTENT_ITEM,
+  AI_TELEFONIST_KOSTEN_CONTENT_ITEM,
 ]);
 
 module.exports = {

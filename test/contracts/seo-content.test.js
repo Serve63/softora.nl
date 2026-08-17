@@ -1271,6 +1271,65 @@ test('CRM-adoptiegids maakt werkafspraken en herstel per rol controleerbaar', ()
   ]);
 });
 
+test('AI-telefonist kostengids maakt belvolume, scope en menselijke controle vergelijkbaar', () => {
+  const now = new Date('2026-08-17T12:00:00.000Z');
+  const item = getSeoContentItem('blog', 'ai-telefonist-kosten-mkb', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const comparisonHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('vergelijkingen', 'ai-telefonist-vs-receptionist', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const appointmentHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonist-voor-afspraakintake', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-17');
+  assert.equal(item.targetMoneyPage, '/ai-telefonist');
+  assert.ok(item.informationGain.includes('drie volumescenario’s'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualType, 'object-study');
+  assert.equal(item.visualBrief.hero.visualFamily, 'acoustic-telephony-testbench');
+  assert.equal(item.visualBrief.support.visualType, 'architecture-diagram');
+  assert.equal(item.visualBrief.support.visualFamily, 'charcoal-signal-cost-cutaway');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.sourceType, 'trainedAlgorithmicMedia');
+  assert.equal(item.secondaryImage.sourceType, 'trainedAlgorithmicMedia');
+  assert.equal(item.image.src, '/assets/seo-content/ai-telefonist-kosten-testbank-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/ai-telefonist-kosten-signaalpad-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-telefonist-kosten-mkb">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="900">/);
+  assert.match(html, /"datePublished":"2026-08-17"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Bereken gebruik met drie belvolumescenario’s/);
+  assert.match(html, /href="\/ai-telefonist">AI telefonist laten maken<\/a>/);
+  assert.match(html, /href="\/ai-automatisering">uitleg over AI automatisering<\/a>/);
+  assert.match(html, /href="\/vergelijkingen\/ai-telefonist-vs-receptionist">vergelijking tussen AI telefonist en receptionist<\/a>/);
+  assert.match(comparisonHtml, /href="\/blog\/ai-telefonist-kosten-mkb"><span>Kosten en scope van een AI telefonist<\/span><\/a>/);
+  assert.match(appointmentHtml, /href="\/blog\/ai-telefonist-kosten-mkb"><span>Kosten van een AI telefonist<\/span><\/a>/);
+  assert.doesNotMatch(html, /gegarandeerde bereikbaarheid|foutloze intake|garandeert besparing|volledig autonoom/i);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/ai-telefonist-kosten-mkb');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/ai-telefonist-kosten-testbank-softora.jpg',
+    '/assets/seo-content/ai-telefonist-kosten-signaalpad-softora.jpg',
+  ]);
+});
+
 test('adviesbureauspagina maakt projectstart en overdracht controleerbaar', () => {
   const now = new Date('2026-08-16T12:00:00.000Z');
   const item = getSeoContentItem('branches', 'adviesbureaus', { now });
