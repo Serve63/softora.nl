@@ -228,6 +228,79 @@ test('webdesign bulk restore ignores cancelled batches instead of showing a canc
   assert.equal(document.getElementById('webdesignBulkStatus'), null);
 });
 
+test('webdesign bulk restore automatically hides a fully successful completed batch', async () => {
+  const { context, document } = createHarness(async () => ({
+    ok: true,
+    json: async () => ({
+      batches: [{ id: 'batch-done-success', status: 'done', total: 3, made: 3, done: 3, failed: 0, finishedAt: Date.now() }],
+    }),
+  }));
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+
+  const batch = await controller.loadLatestBatch();
+
+  assert.equal(batch.id, 'batch-done-success');
+  assert.equal(document.getElementById('webdesignBulkStatus'), null);
+});
+
+test('webdesign bulk hides a running bar after its final successful photo refresh is queued', async () => {
+  const timers = [];
+  let photoRefreshes = 0;
+  const { context, document } = createHarness(
+    async (url) => {
+      const target = String(url || '');
+      if (target.endsWith('/run')) return new Promise(() => {});
+      if (target.endsWith('/batch-completes')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ batch: { id: 'batch-completes', status: 'done', total: 3, made: 3, done: 3, failed: 0, finishedAt: Date.now() } }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          batches: [{ id: 'batch-completes', status: 'running', total: 3, made: 2, done: 2, failed: 0, createdAt: Date.now() }],
+        }),
+      };
+    },
+    {
+      setTimeout(callback, delay) {
+        const timer = { callback, delay };
+        timers.push(timer);
+        return timer;
+      },
+      clearTimeout(timer) {
+        const index = timers.indexOf(timer);
+        if (index >= 0) timers.splice(index, 1);
+      },
+    }
+  );
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({
+    refreshPhotos: async () => {
+      photoRefreshes += 1;
+    },
+    refreshDelayMs: 100,
+  });
+
+  await controller.loadLatestBatch();
+  const node = document.getElementById('webdesignBulkStatus');
+  assert.equal(node.hidden, false);
+
+  const pollTimer = timers.find((timer) => Number(timer.delay) === 0);
+  assert.ok(pollTimer, 'running batch should poll its final status');
+  pollTimer.callback();
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+
+  assert.equal(node.hidden, true);
+  const refreshTimer = timers.find((timer) => Number(timer.delay) === 100);
+  assert.ok(refreshTimer, 'the final photo refresh should remain queued after the bar hides');
+  refreshTimer.callback();
+  await Promise.resolve();
+  assert.equal(photoRefreshes, 1);
+});
+
 test('webdesign bulk close button stays visible for a completed restored batch', async () => {
   const fetchCalls = [];
   const { context, document } = createHarness(async (url) => {
