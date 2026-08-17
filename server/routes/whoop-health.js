@@ -69,6 +69,18 @@ function registerWhoopHealthPublicRoutes(app, deps = {}) {
     }
   });
 
+  app.get('/api/health/whoop/token-worker', async (req, res) => {
+    if (!cronSecret) return res.status(503).json({ ok: false, error: 'WHOOP-cron is niet geconfigureerd.' });
+    if (!hasCronAccess(req, cronSecret)) {
+      return res.status(401).json({ ok: false, error: 'WHOOP-cron geweigerd.' });
+    }
+    try {
+      return res.json(await service.maintainToken());
+    } catch (error) {
+      return res.status(500).json(safeErrorPayload(error));
+    }
+  });
+
   app.get('/api/health/whoop/reconcile', async (req, res) => {
     if (!cronSecret) return res.status(503).json({ ok: false, error: 'WHOOP-cron is niet geconfigureerd.' });
     if (!hasCronAccess(req, cronSecret)) {
