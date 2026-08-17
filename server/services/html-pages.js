@@ -144,7 +144,7 @@ const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
 
 function removeInternalPremiumSidebarLinks(html) {
   return String(html || '').replace(
-    /<a\b(?=[^>]*\bdata-sidebar-key=["'](?:coldmailing|agenda|websitegenerator|bookkeeping)["'])[^>]*>[\s\S]*?<\/a>/gi,
+    /<a\b(?=[^>]*\bdata-sidebar-key=["'](?:coldmailing|agenda|websitegenerator|bookkeeping|pdfs)["'])[^>]*>[\s\S]*?<\/a>/gi,
     ''
   );
 }
@@ -366,6 +366,26 @@ function createHtmlPageCoordinator(options = {}) {
     if (dashboardFallback) {
       if (session) dashboardFallback.data.session = session;
       return dashboardFallback;
+    }
+    if (fileName === 'premium-klanten.html') {
+      return {
+        marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
+        scriptId: 'softoraCustomersBootstrap',
+        data: {
+          ok: false,
+          loadedAt: new Date().toISOString(),
+          source: 'bootstrap-timeout',
+          completeDataset: false,
+          message: 'Klanten konden tijdelijk niet worden geladen. Probeer het opnieuw.',
+          customers: [],
+          activeOrdersState: {
+            values: {},
+            source: 'bootstrap-timeout',
+            updatedAt: null,
+          },
+          ...(session ? { session } : {}),
+        },
+      };
     }
     if (!session) return null;
     return {

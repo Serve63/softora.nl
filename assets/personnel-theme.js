@@ -614,7 +614,7 @@
     }
 
     const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set(["passwords"]);
-    const PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set(["live_momentum"]);
+    const PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set(["live_momentum", "pdfs"]);
 
     function getPremiumSidebarAdminExtraLinks() {
         return [
@@ -798,12 +798,6 @@
                 label: "Pakketten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg>',
             },
-            {
-                key: "pdfs",
-                href: "/premium-pdfs",
-                label: "PDF'S",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg>',
-            },
         ];
 
         const adsPlatformIcon =
@@ -939,7 +933,7 @@
     function pruneDeprecatedSidebarLinks(sidebar) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const legacyAnalyticsLinks = sidebar.querySelectorAll(
-            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="websitegenerator"], a[data-sidebar-key="bookkeeping"], a[data-sidebar-key="live_momentum"], a[href="/winnen"], a[href="/live-momentum"], a[href="/live-momentum.html"]'
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="websitegenerator"], a[data-sidebar-key="bookkeeping"], a[data-sidebar-key="pdfs"], a[data-sidebar-key="live_momentum"], a[href="/winnen"], a[href="/live-momentum"], a[href="/live-momentum.html"]'
         );
         legacyAnalyticsLinks.forEach(function (link) {
             if (link && link.parentNode) {
@@ -1046,7 +1040,7 @@
                 sidebar,
                 "beheer",
                 getCustomersSidebarLink(),
-                ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
+                ["mailbox", "websitegenerator", "seo", "packages"]
             );
         }
 

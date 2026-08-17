@@ -395,6 +395,38 @@ test('premium database customer route returns a bounded structured page', async 
   assert.equal(calls[0].metaOnly, false);
 });
 
+test('premium database customer route returns the complete canonical client view', async () => {
+  const calls = [];
+  const coordinator = createPremiumDatabaseCustomersPageCoordinator({
+    dataOpsStore: {
+      async listCustomersPage() {
+        throw new Error('wide customer page must not be queried');
+      },
+      async listDashboardCustomers(options) {
+        calls.push(options);
+        return [
+          { id: 'client-1', naam: 'Klant Een', telefoon: 'redacted', databaseStatus: 'klant' },
+          { id: 'client-2', naam: 'Klant Twee', telefoon: 'redacted', databaseStatus: 'klant' },
+        ];
+      },
+    },
+  });
+  const response = createMockResponse();
+
+  await coordinator.sendCustomersPageResponse({ query: { view: 'clients' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.source, 'canonical-clients');
+  assert.equal(response.body.completeDataset, true);
+  assert.equal(response.body.total, 2);
+  assert.equal(response.body.customers[0].telefoon, 'redacted');
+  assert.equal(response.headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].maxRows, 5000);
+  assert.equal(calls[0].bypassReadFailureCooldown, true);
+});
+
 test('premium database delete lead route removes one customer through data ops without reposting the full list', async () => {
   const calls = [];
   const coordinator = createPremiumDatabaseImportCoordinator({

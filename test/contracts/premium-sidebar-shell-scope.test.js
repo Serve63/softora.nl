@@ -88,7 +88,7 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
   assert.match(pageSource, /data-momentum-focus-toggle/);
   assert.match(themeSource, /pathname === "\/winnen"/);
   assert.match(themeSource, /return p === "\/winnen" \|\| p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard";/);
-  assert.match(themeSource, /PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set\(\["live_momentum"\]\)/);
+  assert.match(themeSource, /PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set\(\["live_momentum", "pdfs"\]\)/);
   assert.match(themeSource, /PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS\.has\(key\)/);
   assert.match(themeSource, /a\[data-sidebar-key="live_momentum"\][^']*a\[href="\/winnen"\]/);
   assert.doesNotMatch(themeSource, /getLiveMomentumSidebarLink|label: "Winnen"/);
@@ -121,6 +121,32 @@ test('Winnen blijft deep-link-only en wordt door geen premium-sidebarvariant zic
       `${fileName} mag geen zichtbare Winnen-entry bevatten`
     );
   });
+});
+
+test('PDF blijft deep-link-only en is uit elke premium-sidebarbron verwijderd', () => {
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const htmlPagesSource = readRepoFile('server/services/html-pages.js');
+  const pdfPageSource = readRepoFile('premium-pdfs.html');
+  const smokeSource = readRepoFile('test/smoke/pages.smoke.test.js');
+
+  assert.match(themeSource, /if \(p\.indexOf\("\/premium-pdfs"\) === 0\) return "pdfs"/);
+  assert.match(themeSource, /PREMIUM_SIDEBAR_DEEP_LINK_ONLY_KEYS = new Set\(\["live_momentum", "pdfs"\]\)/);
+  assert.doesNotMatch(themeSource, /key: "pdfs",\s*href: "\/premium-pdfs",\s*label: "PDF'S"/);
+  assert.match(themeSource, /a\[data-sidebar-key="pdfs"\]/);
+  assert.match(htmlPagesSource, /bookkeeping\|pdfs/);
+
+  [...staticSidebarPages, 'premium-lead-radar-shell.html'].forEach((fileName) => {
+    const source = readRepoFile(fileName);
+    assert.doesNotMatch(
+      source,
+      /data-sidebar-key="pdfs"|href="\/premium-pdfs"[^>]*sidebar-link|sidebar-link-text">PDF(?:'|’)?S/i,
+      `${fileName} mag geen PDF-sidebarentry bevatten`
+    );
+  });
+
+  assert.match(pdfPageSource, /<title>PDF's - Softora\.nl<\/title>/);
+  assert.match(pdfPageSource, /assets\/premium-pdfs-builder\.js\?v=/);
+  assert.match(smokeSource, /'premium-pdfs\.html'/);
 });
 
 test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar', () => {
@@ -424,8 +450,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     themeJsSource,
     /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s
   );
-  assert.match(themeJsSource, /a\[data-sidebar-key="agenda"\][\s\S]*a\[data-sidebar-key="websitegenerator"\][\s\S]*a\[data-sidebar-key="bookkeeping"\]/);
-  assert.match(htmlPagesSource, /coldmailing\|agenda\|websitegenerator\|bookkeeping/);
+  assert.match(themeJsSource, /a\[data-sidebar-key="agenda"\][\s\S]*a\[data-sidebar-key="websitegenerator"\][\s\S]*a\[data-sidebar-key="bookkeeping"\][\s\S]*a\[data-sidebar-key="pdfs"\]/);
+  assert.match(htmlPagesSource, /coldmailing\|agenda\|websitegenerator\|bookkeeping\|pdfs/);
   assert.match(stabilitySource, /navigation:\s*none/);
 });
 
@@ -898,7 +924,6 @@ test('static premium sidebars share the same section order and public labels', (
         'seo:SEO',
         'qr_code:QR Code',
         'packages:Pakketten',
-        "pdfs:PDF'S",
       ],
     },
     {

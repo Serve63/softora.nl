@@ -61,6 +61,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
 
   assert.equal(payload.ok, true);
   assert.equal(payload.source, 'customers');
+  assert.equal(payload.completeDataset, true);
   assert.deepEqual(
     payload.customers.map((customer) => customer.naam),
     ['Linsey Klaus', 'Maarten Van Gemert']
@@ -409,6 +410,7 @@ test('customers page bootstrap gebruikt compacte dashboardklanten zonder zware c
 
   assert.equal(payload.ok, true);
   assert.equal(payload.source, 'dashboard-customers');
+  assert.equal(payload.completeDataset, false);
   assert.deepEqual(seenScopes, ['premium_active_orders']);
   assert.equal(payload.customers.length, 1);
   assert.equal(payload.customers[0].bedrijf, 'Linszorgt.nl');
