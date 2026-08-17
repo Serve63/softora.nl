@@ -1195,7 +1195,7 @@
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script src="assets/premium-customers-renderers.js?v=20260427a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
-    <script src="assets/premium-customers-load-state.js?v=20260817a"></script>
+    <script src="assets/premium-customers-load-state.js?v=20260817b"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
@@ -2066,7 +2066,7 @@
             customerScope: CUSTOMER_DB_SCOPE,
             customerKey: CUSTOMER_DB_KEY,
             orderScope: ORDER_SCOPE,
-            orderKey: ORDER_KEY,
+            orderKey: ORDER_KEY, fetchCanonicalCustomers: function () { return customerLoadState.fetchCanonicalCustomers(window.fetch.bind(window)); }, parseCanonicalCustomers: parseCustomersFromRows,
             fetchUiState: fetchUiStateGetWithFallback,
             parseCustomerStorageRows: parseCustomerStorageRows,
             readChunkedStateValue: readChunkedStateValue,

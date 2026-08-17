@@ -11,7 +11,8 @@ test('premium customers page bootstraps customer rows before async sync runs', (
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
   assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-customers-load-state\.js\?v=20260817a/);
+  assert.match(pageSource, /assets\/premium-customers-load-state\.js\?v=20260817b/);
+  assert.match(pageSource, /customerLoadState\.fetchCanonicalCustomers\(window\.fetch\.bind\(window\)\)/);
   assert.match(pageSource, /<option value="website">Website<\/option>/);
   assert.match(pageSource, /function readCustomersBootstrapPayload\(\)/);
   assert.match(pageSource, /document\.getElementById\("softoraCustomersBootstrap"\)/);
