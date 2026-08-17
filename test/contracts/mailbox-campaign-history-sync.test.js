@@ -320,6 +320,49 @@ test('narrow Gmail label sync advances through unindexed messages without campai
   assert.deepEqual(queries, [{ query: { all: true }, options: { uid: true } }]);
 });
 
+test('regular mailbox sync selects only UIDs newer than the durable cursor', async () => {
+  const selected = await resolveMailboxSyncUids({
+    client: {
+      async search() {
+        return [117, 118, 119, 120];
+      },
+    },
+    limit: 30,
+    lastSyncedUid: 118,
+  });
+
+  assert.deepEqual(selected, [120, 119]);
+});
+
+test('regular mailbox sync can refresh a small overlap without refetching the full batch', async () => {
+  const selected = await resolveMailboxSyncUids({
+    client: {
+      async search() {
+        return [114, 115, 116, 117, 118, 119, 120];
+      },
+    },
+    limit: 30,
+    lastSyncedUid: 118,
+    syncCursorOverlap: 3,
+  });
+
+  assert.deepEqual(selected, [120, 119, 118, 117, 116]);
+});
+
+test('regular mailbox sync falls back to a fresh batch after an IMAP UID reset', async () => {
+  const selected = await resolveMailboxSyncUids({
+    client: {
+      async search() {
+        return [1, 2, 3];
+      },
+    },
+    limit: 30,
+    lastSyncedUid: 500,
+  });
+
+  assert.deepEqual(selected, [3, 2, 1]);
+});
+
 test('campaign history sync prioritizes missing sent replies linked by thread headers', async () => {
   const queries = [];
   const client = {

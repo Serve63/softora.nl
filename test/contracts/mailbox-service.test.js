@@ -4307,6 +4307,132 @@ test('mailbox cron sync indexes a lightweight sent batch by default', async () =
   assert.equal(response.body.results[0].synced, 30);
 });
 
+test('regular mailbox sync reuses and advances the durable UID cursor', async () => {
+  const fetches = [];
+  const finished = [];
+  const selected = {
+    email: 'martijnven123@gmail.com',
+    imapHost: 'imap.gmail.com',
+    imapConfigured: true,
+  };
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'incremental-lock' }),
+      getSyncState: async () => ({ status: 'ok', last_uid: 118 }),
+      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
+      finishSync: async (options) => {
+        finished.push(options);
+        return { ok: true };
+      },
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async (options) => {
+      fetches.push(options);
+      return [{ uid: 120 }, { uid: 119 }];
+    },
+    getSafeLimit: (value) => Number(value) || 30,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: 'sent',
+    limit: 30,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetches.length, 1);
+  assert.equal(fetches[0].lastSyncedUid, 118);
+  assert.equal(fetches[0].syncCursorOverlap, 3);
+  assert.equal(finished[0].lastUid, 120);
+});
+
+test('regular mailbox sync preserves its durable UID cursor when no new mail exists', async () => {
+  const finished = [];
+  const selected = {
+    email: 'martijnven123@gmail.com',
+    imapHost: 'imap.gmail.com',
+    imapConfigured: true,
+  };
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'no-new-mail-lock' }),
+      getSyncState: async () => ({ status: 'ok', last_uid: 120 }),
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+      finishSync: async (options) => {
+        finished.push(options);
+        return { ok: true };
+      },
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => [],
+    getSafeLimit: (value) => Number(value) || 30,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    logger: { error() {} },
+  });
+
+  await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: 'sent',
+    limit: 30,
+  });
+
+  assert.equal(finished[0].lastUid, 120);
+});
+
+test('regular mailbox sync restores a zeroed cursor from the newest indexed UID', async () => {
+  const fetches = [];
+  const uidLookups = [];
+  const selected = {
+    email: 'martijnven123@gmail.com',
+    imapHost: 'imap.gmail.com',
+    imapConfigured: true,
+  };
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'cursor-bootstrap-lock' }),
+      getSyncState: async () => ({ status: 'error', last_uid: 0 }),
+      listMessageUidsForAccount: async (options) => {
+        uidLookups.push(options);
+        return [806];
+      },
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+      finishSync: async () => ({ ok: true }),
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async (options) => {
+      fetches.push(options);
+      return [];
+    },
+    getSafeLimit: (value) => Number(value) || 30,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    logger: { error() {} },
+  });
+
+  await service.syncMailboxFolder({
+    accountEmail: selected.email,
+    folder: 'sent',
+    limit: 30,
+  });
+
+  assert.deepEqual(uidLookups, [{
+    accountEmail: selected.email,
+    folder: 'sent',
+    limit: 1,
+  }]);
+  assert.equal(fetches[0].lastSyncedUid, 806);
+});
+
 test('campaign mailbox sync combines newest mail with missing historical conversation messages', async () => {
   const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
     uid: index + 1,

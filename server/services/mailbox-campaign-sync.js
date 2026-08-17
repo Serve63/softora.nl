@@ -28,6 +28,7 @@ const CAMPAIGN_HISTORY_SEED_FOLDERS = Object.freeze([
 ]);
 const INCREMENTAL_LOCK_RETRY_ATTEMPTS = 12;
 const INCREMENTAL_LOCK_RETRY_DELAY_MS = 500;
+const REGULAR_SYNC_CURSOR_OVERLAP = 3;
 
 function selectMailboxSyncAccounts({
   accountEmail = '',
@@ -271,6 +272,31 @@ function createMailboxSyncService({
       let threadReferenceIds = [];
       let threadRecipientTerms = [];
       let indexedUids = [];
+      let lastSyncedUid = 0;
+      if (!campaignOnly && typeof mailboxIndexStore.getSyncState === 'function') {
+        const syncState = await mailboxIndexStore.getSyncState({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+        });
+        lastSyncedUid = Math.max(0, Number(syncState && syncState.last_uid) || 0);
+      }
+      if (
+        !campaignOnly &&
+        lastSyncedUid <= 0 &&
+        typeof mailboxIndexStore.listMessageUidsForAccount === 'function'
+      ) {
+        const latestIndexedUids = await mailboxIndexStore.listMessageUidsForAccount({
+          accountEmail: account.email,
+          folder: normalizedFolder,
+          limit: 1,
+        });
+        lastSyncedUid = Math.max(
+          0,
+          ...(Array.isArray(latestIndexedUids)
+            ? latestIndexedUids.map(Number).filter(Number.isSafeInteger)
+            : [])
+        );
+      }
       if (campaignOnly) {
         if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
           indexedUids =
@@ -398,6 +424,8 @@ function createMailboxSyncService({
         prioritizeTargetedUids: recoverGmailAllMail,
         logImapOperation: true,
         indexedUids,
+        lastSyncedUid,
+        syncCursorOverlap: campaignOnly ? 0 : REGULAR_SYNC_CURSOR_OVERLAP,
       });
       const saved = await mailboxIndexStore.upsertMessages({
         accountEmail: account.email,
@@ -407,7 +435,13 @@ function createMailboxSyncService({
       if (!saved || saved.ok === false) {
         throw saved?.error || new Error('Mailbox-index opslaan mislukt');
       }
-      const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
+      const fetchedLastUid = messages.reduce(
+        (max, message) => Math.max(max, Number(message.uid) || 0),
+        0
+      );
+      const lastUid = lastSyncedUid > 0 && fetchedLastUid > 0 && fetchedLastUid < lastSyncedUid
+        ? fetchedLastUid
+        : Math.max(lastSyncedUid, fetchedLastUid);
       const finalized = await mailboxIndexStore.finishSync({
         accountEmail: account.email,
         folder: normalizedFolder,

@@ -1087,13 +1087,13 @@ function createMailboxIndexStore(deps = {}) {
     const patch = {
       status: failed ? 'error' : 'ok',
       last_error: failed ? truncateText(normalizeString(error), 1000) : null,
-      message_count: Math.max(0, Number(messageCount) || 0),
-      last_uid: Math.max(0, Number(lastUid) || 0),
       lock_token: null,
       lock_expires_at: null,
       updated_at: isoNow(),
     };
-    if (!failed) patch.last_synced_at = isoNow();
+    if (!failed) Object.assign(patch, {
+      message_count: Math.max(0, Number(messageCount) || 0), last_uid: Math.max(0, Number(lastUid) || 0), last_synced_at: isoNow(),
+    });
     return runDurableWrite(
       'finish-sync',
       (client) => client

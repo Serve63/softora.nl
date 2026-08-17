@@ -2063,6 +2063,47 @@ test('mailbox index store finalizes a fenced sync even while the read/write circ
   });
 });
 
+test('mailbox index store preserves the last successful cursor when a sync fails', async () => {
+  let updatePatch = null;
+  const client = {
+    from() {
+      return {
+        update(patch) {
+          updatePatch = patch;
+          return {
+            eq() {
+              return {
+                async eq() {
+                  return { data: [], error: null };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const result = await store.finishSync({
+    accountEmail: 'martijnven123@gmail.com',
+    folder: 'sent',
+    lockToken: 'failed-sync-lock',
+    error: 'IMAP-operatie timeout',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(updatePatch.status, 'error');
+  assert.equal(updatePatch.last_error, 'IMAP-operatie timeout');
+  assert.equal(Object.prototype.hasOwnProperty.call(updatePatch, 'last_uid'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(updatePatch, 'message_count'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(updatePatch, 'last_synced_at'), false);
+});
+
 test('mailbox index store safely retries a transient fenced sync finalization failure', async () => {
   let finishCalls = 0;
   const transientError = new Error('Supabase client timeout na 8000ms');
