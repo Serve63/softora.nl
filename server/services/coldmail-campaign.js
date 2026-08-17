@@ -18,6 +18,7 @@ const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-r
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
+const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
   fitWebdesignPreviewForEmail,
@@ -322,6 +323,14 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/[.,;:!?]+$/g, '')
       .trim();
   }
+
+  const historicalOutboundMailboxGuard = createColdmailHistoricalOutboundGuard({
+    dataOpsStore,
+    getConfiguredSenderEmails: () => getConfiguredSenderEmails(),
+    getAllowedSenderEmails: () => getAllowedSenderEmails(),
+    getRowEmail, getRowCompany, isTestRecipientRow, normalizeEmailAddress,
+    normalizeContactStatus, normalizeString,
+  });
 
   const loadCriticalUiState = autopilotResilience.createCriticalUiStateReader({ getUiStateValues, sleep });
   const normalizeColdmailAutopilotLog = autopilotResilience.createAutopilotLogNormalizer({
@@ -1590,31 +1599,6 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  function hasPriorOutboundMailSignal(row) {
-    if (!row || typeof row !== 'object') return false;
-    if (normalizeContactStatus(row.outreachStatus, row) === 'gemaild') return true;
-    if (normalizeString(row.lastColdmailSentAt || row.lastMailSentAt || row.outreachSentAt || row.outreach_sent_at)) {
-      return true;
-    }
-    if (normalizeString(row.coldmailSentMessageId || row.outreachMessageId || row.sentMessageId || row.messageId)) {
-      return true;
-    }
-    if (Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0) return true;
-    if (row.coldmailOpened === true || row.outreachOpened === true) return true;
-    return (Array.isArray(row.hist) ? row.hist : []).some((entry) => {
-      const text = normalizeString([
-        entry && entry.type,
-        entry && entry.status,
-        entry && entry.label,
-        entry && entry.source,
-        entry && entry.subject,
-        entry && entry.preview,
-        entry && entry.messageKey,
-      ].join(' ')).toLowerCase();
-      return /\b(gemaild|mail verstuurd|coldmail|cold mailing|instantly|email sent|email opened|open tracking)\b/.test(text);
-    });
-  }
-
   async function getColdmailOutboundDuplicateBlock(item, recipientGuardEntries = []) {
     const email = getRowEmail(item && item.row);
     if (isTestRecipientRow(item && item.row, email)) return null;
@@ -1622,7 +1606,7 @@ function createColdmailCampaignService(deps = {}) {
     if (recipientGuardMatch) return buildColdmailRecipientGuardFailure(item, recipientGuardMatch);
     const supabaseGuardMatch = await getSupabaseOutboundRecipientBlock(item);
     if (supabaseGuardMatch) return supabaseGuardMatch;
-    if (hasPriorOutboundMailSignal(item && item.row)) {
+    if (historicalOutboundMailboxGuard.hasPriorOutboundMailSignal(item && item.row)) {
       return {
         id: item && item.id,
         bedrijf: getRowCompany(item && item.row),
@@ -5726,7 +5710,7 @@ function createColdmailCampaignService(deps = {}) {
     if (isEmailBlocked(email, blockedEmailKeys)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
     if (!isTestRecipientRow(row, email) && hasActiveInstantlyColdmailOutreach(row)) return false;
-    if (!isTestRecipientRow(row, email) && hasPriorOutboundMailSignal(row)) return false;
+    if (!isTestRecipientRow(row, email) && historicalOutboundMailboxGuard.hasPriorOutboundMailSignal(row)) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
     if (isTestRecipientRow(row, email)) return true;
@@ -8675,6 +8659,13 @@ function createColdmailCampaignService(deps = {}) {
             })
           : undefined;
       try {
+        if (!testMode) {
+          const historicalDuplicateBlock = await historicalOutboundMailboxGuard.getBlock(item);
+          if (historicalDuplicateBlock) {
+            failed.push(historicalDuplicateBlock);
+            continue;
+          }
+        }
         const mail = {
           from: formatMailFromHeader(senderEmail, smtpAccount),
           to,
@@ -8806,11 +8797,14 @@ function createColdmailCampaignService(deps = {}) {
         const errorCode = normalizeString(error && error.code);
         const guardConfirmFailed = errorCode === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
         const guardPreflightFailed = /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(errorCode);
+        const historicalMailboxGuardFailed = errorCode === 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE';
         const postSmtpPersistenceFailed = errorCode === 'COLDMAIL_POST_SMTP_PERSISTENCE_FAILED';
         const safetyReason = guardConfirmFailed
           ? 'central_outbound_guard_confirm_failed'
           : guardPreflightFailed
           ? 'central_outbound_guard_preflight_failed'
+          : historicalMailboxGuardFailed
+          ? 'historical_mailbox_guard_unavailable'
           : postSmtpPersistenceFailed
           ? 'post_smtp_persistence_failed'
           : getSmtpSafetyStopReason(error);

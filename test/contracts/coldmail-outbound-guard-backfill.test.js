@@ -6,6 +6,7 @@ const {
   BACKFILL_SOURCE,
   buildCustomerIndexes,
   buildCustomerSentEvents,
+  buildHistoricalMailboxOutboundEvents,
   buildLegacyCustomerRowsFromUiState,
   buildMailboxSentEvents,
   buildMailboxWebdesignContactEvents,
@@ -16,6 +17,7 @@ const {
   groupMissingRowsForInsert,
   isInitialWebdesignMail,
   parseArgs,
+  planGuardBackfillChanges,
   summarizeMailboxCoverage,
   summarizeConsolidatedDuplicateRiskEmails,
   summarizeMultiProviderGuards,
@@ -101,6 +103,142 @@ test('coldmail outbound guard backfill maps mailbox recipients to all central gu
   assert.equal(insertRows[0].last_seen_at, '2026-06-08T05:02:00.000Z');
   assert.equal(insertRows[0].payload.sentAt, '2026-06-08T05:02:00.000Z');
   assert.equal(insertRows[0].payload.events[0].messageId, '<message-1@example.test>');
+});
+
+test('coldmail outbound guard backfill protects every historical outbound folder including tombstones', () => {
+  const customers = [
+    {
+      customer_id: 'customer-history-one',
+      company: 'Historie Een BV',
+      email: 'info@historie.example',
+      website: 'https://historie-een.example',
+      payload: {},
+    },
+    {
+      customer_id: 'customer-history-two',
+      company: 'Historie Twee BV',
+      email: 'info@historie.example',
+      website: 'https://historie-twee.example',
+      payload: {},
+    },
+  ];
+  const base = {
+    account_email: 'serve@softora.nl',
+    recipients_text: 'Historie <info@historie.example>',
+    date: '2026-08-01T10:00:00.000Z',
+    payload: {},
+  };
+  const events = buildHistoricalMailboxOutboundEvents([
+    { ...base, message_key: 'history-sent', folder: 'sent', subject: 'Gewone eerdere mail' },
+    {
+      ...base,
+      message_key: 'history-coldmail-deleted',
+      folder: 'coldmail',
+      subject: 'Verwijderde coldmail',
+      deleted_at: '2026-08-02T10:00:00.000Z',
+    },
+    { ...base, message_key: 'history-instantly', folder: 'instantly', subject: 'Instantly mail' },
+    { ...base, message_key: 'history-inbox', folder: 'inbox', subject: 'Inkomend bericht' },
+  ], buildCustomerIndexes(customers));
+
+  assert.equal(events.length, 3);
+  assert.deepEqual(events.map((event) => event.folder).sort(), ['coldmail', 'instantly', 'sent']);
+  assert.equal(events.find((event) => event.folder === 'coldmail').tombstoned, true);
+  assert.equal(events.find((event) => event.folder === 'instantly').provider, 'instantly');
+  assert.deepEqual(
+    [...new Set(events.flatMap((event) => event.keyRows.map((row) => row.guardKey)))].sort(),
+    [
+      'company:historie-een-bv',
+      'company:historie-twee-bv',
+      'domain:historie-een-example',
+      'domain:historie-twee-example',
+      'email:info@historie.example',
+      'id:customer-history-one',
+      'id:customer-history-two',
+    ]
+  );
+});
+
+test('coldmail outbound guard backfill inserts only absent guards and promotes existing rows in place', () => {
+  const events = buildHistoricalMailboxOutboundEvents([
+    {
+      message_key: 'history-plan',
+      account_email: 'serve@softora.nl',
+      folder: 'sent',
+      recipients_text: 'info@plan.example',
+      subject: 'Eerdere mail',
+      date: '2026-08-01T10:00:00.000Z',
+    },
+  ], buildCustomerIndexes([{
+    customer_id: 'plan-customer',
+    company: 'Plan BV',
+    email: 'info@plan.example',
+    website: 'https://plan.example',
+    payload: {},
+  }]));
+  const missing = findMissingGuardKeys(events, [{
+    guard_key: 'email:info@plan.example',
+    permanent: false,
+    status: 'reserved',
+    source: 'existing-source-must-stay',
+  }]);
+  const plan = planGuardBackfillChanges(missing);
+
+  assert.deepEqual(plan.insertRows.map((row) => row.guard_key), [
+    'domain:plan-example',
+    'company:plan-bv',
+    'id:plan-customer',
+  ]);
+  assert.deepEqual(plan.promoteKeys, ['email:info@plan.example']);
+  assert.equal(plan.insertRows.some((row) => row.guard_key === 'email:info@plan.example'), false);
+  assert.deepEqual(findMissingGuardKeys(events, [
+    { guard_key: 'email:info@plan.example', permanent: true, status: 'sent' },
+    { guard_key: 'domain:plan-example', permanent: true, status: 'sent' },
+    { guard_key: 'company:plan-bv', permanent: true, status: 'sent' },
+    { guard_key: 'id:plan-customer', permanent: true, status: 'sent' },
+  ]), []);
+});
+
+test('coldmail outbound guard backfill keeps unknown recipients email-only', () => {
+  const events = buildHistoricalMailboxOutboundEvents([
+    {
+      message_key: 'history-unknown-recipient',
+      account_email: 'serve@softora.nl',
+      folder: 'sent',
+      recipients_text: 'unknown@shared-or-foreign.example',
+      subject: 'Eerdere mail',
+      date: '2026-08-01T10:00:00.000Z',
+    },
+  ], buildCustomerIndexes([]));
+
+  assert.deepEqual(events[0].keyRows.map((row) => row.guardKey), [
+    'email:unknown@shared-or-foreign.example',
+  ]);
+});
+
+test('coldmail outbound guard backfill never creates a shared mailbox domain guard without a website', () => {
+  const events = buildHistoricalMailboxOutboundEvents([
+    {
+      message_key: 'history-shared-recipient',
+      account_email: 'serve@softora.nl',
+      folder: 'sent',
+      recipients_text: 'Gmail bedrijf <bedrijf@gmail.com>',
+      subject: 'Eerdere mail',
+      date: '2026-08-01T10:00:00.000Z',
+    },
+  ], buildCustomerIndexes([{
+    customer_id: 'gmail-company',
+    company: 'Gmail Bedrijf',
+    email: 'bedrijf@gmail.com',
+    website: '',
+    payload: {},
+  }]));
+
+  assert.deepEqual(events[0].keyRows.map((row) => row.guardKey), [
+    'email:bedrijf@gmail.com',
+    'company:gmail-bedrijf',
+    'id:gmail-company',
+  ]);
 });
 
 test('coldmail outbound guard backfill treats non-permanent reservations as missing protection', () => {
@@ -719,6 +857,7 @@ test('coldmail outbound guard backfill never matches unrelated customers through
 test('coldmail outbound guard backfill keeps historical post-pause sends visible without blocking live readiness', () => {
   const options = parseArgs(['--post-pause-after=2026-06-08T08:27:00.000Z']);
   assert.equal(options.apply, false);
+  assert.equal(parseArgs(['--summary-only']).summaryOnly, true);
 
   const report = buildReport({
     events: [

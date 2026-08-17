@@ -15,6 +15,9 @@ const {
 } = require('../server/services/outbound-recipient-guard-store');
 
 const SENDERS = [
+  'info@softora.nl',
+  'zakelijk@softora.nl',
+  'ruben@softora.nl',
   'serve@softora.nl',
   'martijn@softora.nl',
   'servecreusen@softora.nl',
@@ -27,7 +30,7 @@ const SENDERS = [
 ];
 
 const INTERNAL_RECIPIENTS = new Set(SENDERS.map((email) => email.toLowerCase()));
-const BACKFILL_SOURCE = 'mailbox-sent-webdesign-backfill-2026-06-08';
+const BACKFILL_SOURCE = 'mailbox-historical-outbound-backfill-2026-08-17';
 const MONITOR_PAUSE_REASON = 'central_outbound_guard_missing_monitor_2026_06_08';
 const POST_PAUSE_AFTER = '2026-06-08T08:27:00.000Z';
 const SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
@@ -87,6 +90,7 @@ function parseArgs(argv) {
   return {
     apply: args.has('--apply'),
     json: args.has('--json'),
+    summaryOnly: args.has('--summary-only'),
     pauseOnMissing: args.has('--pause-on-missing'),
     envFile: normalizeString(process.env.SOFTORA_ENV_FILE || (envFileArg ? envFileArg.split('=').slice(1).join('=') : '')),
     since: normalizeString(sinceArg ? sinceArg.split('=').slice(1).join('=') : ''),
@@ -184,6 +188,11 @@ function isSentFolder(folder) {
     normalized.includes('verzonden') ||
     normalized.includes('verstuurd')
   );
+}
+
+function isHistoricalOutboundFolder(folder) {
+  const normalized = normalizeString(folder).toLowerCase();
+  return normalized === 'coldmail' || normalized === 'instantly' || isSentFolder(normalized);
 }
 
 function isInitialWebdesignMail(message = {}) {
@@ -383,6 +392,8 @@ function isSharedMailboxDomain(domain) {
 function buildCustomerIndexes(customers = []) {
   const byEmail = new Map();
   const byDomain = new Map();
+  const allByEmail = new Map();
+  const allByDomain = new Map();
   customers.forEach((customer) => {
     if (customer && customer.deleted_at) return;
     const email = getCustomerEmail(customer);
@@ -393,16 +404,31 @@ function buildCustomerIndexes(customers = []) {
       customerId: getCustomerId(customer),
       company: getCustomerCompany(customer),
       email,
-      domain: websiteDomain || emailDomain,
+      domain: websiteDomain || (isSharedMailboxDomain(emailDomain) ? '' : emailDomain),
       website: getCustomerWebsite(customer),
     };
     if (email && !byEmail.has(email)) byEmail.set(email, enriched);
+    if (email) {
+      const matches = allByEmail.get(email) || [];
+      matches.push(enriched);
+      allByEmail.set(email, matches);
+    }
     if (websiteDomain && !byDomain.has(websiteDomain)) byDomain.set(websiteDomain, enriched);
+    if (websiteDomain) {
+      const matches = allByDomain.get(websiteDomain) || [];
+      matches.push(enriched);
+      allByDomain.set(websiteDomain, matches);
+    }
     if (emailDomain && !isSharedMailboxDomain(emailDomain) && !byDomain.has(emailDomain)) {
       byDomain.set(emailDomain, enriched);
     }
+    if (emailDomain && !isSharedMailboxDomain(emailDomain)) {
+      const matches = allByDomain.get(emailDomain) || [];
+      if (!matches.some((item) => item.customerId === enriched.customerId)) matches.push(enriched);
+      allByDomain.set(emailDomain, matches);
+    }
   });
-  return { byEmail, byDomain };
+  return { byEmail, byDomain, allByEmail, allByDomain };
 }
 
 function mapLegacyCustomerRow(row = {}) {
@@ -499,6 +525,75 @@ function buildMailboxSentEvents(messages = [], customerIndexes = {}, options = {
     if (!byEventKey.has(event.eventKey)) byEventKey.set(event.eventKey, event);
   });
   return [...byEventKey.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function buildHistoricalMailboxOutboundEvents(messages = [], customerIndexes = {}, options = {}) {
+  const since = parseDate(options.since);
+  const events = [];
+  messages.forEach((message) => {
+    if (!isHistoricalOutboundFolder(message && message.folder)) return;
+    const parsedDate = parseDate(message.date || message.internal_date);
+    if (since && (!parsedDate || parsedDate < since)) return;
+    const date = (parsedDate || new Date(0)).toISOString();
+    extractRecipientEmails(message).forEach((recipientEmail) => {
+      const recipientDomain = getEmailDomain(recipientEmail);
+      const exactMatches = customerIndexes.allByEmail && customerIndexes.allByEmail.get(recipientEmail);
+      const customerMatches = Array.isArray(exactMatches) && exactMatches.length
+        ? exactMatches
+        : [];
+      const identities = customerMatches.length
+        ? customerMatches.map((customer) => ({
+            recipientEmail,
+            recipientDomain:
+              normalizeString(customer && customer.domain) ||
+              (isSharedMailboxDomain(recipientDomain) ? '' : recipientDomain),
+            recipientCompanyKey: normalizeGuardKeyPart(customer && customer.company),
+            recipientId: normalizeGuardKeyPart(customer && customer.customerId),
+            recipientCompany: normalizeString(customer && customer.company),
+          }))
+        : [{
+            recipientEmail,
+            recipientDomain: '',
+            recipientCompanyKey: '',
+            recipientId: '',
+            recipientCompany: '',
+          }];
+      const keyRowsByKey = new Map();
+      identities.forEach((identity) => {
+        getIdentityKeyRows(identity, normalizeString)
+          .filter((keyRow) => identity.recipientDomain || keyRow.keyType !== 'domain')
+          .forEach((keyRow) => {
+            if (!keyRowsByKey.has(keyRow.guardKey)) keyRowsByKey.set(keyRow.guardKey, keyRow);
+          });
+      });
+      const identity = identities[0];
+      const folder = normalizeString(message.folder).toLowerCase();
+      const accountEmail = normalizeEmail(message.sender_email || message.account_email);
+      events.push({
+        source: 'mailbox_sent',
+        provider: folder === 'instantly' ? 'instantly' : 'softora',
+        eventKey: [
+          normalizeString(message.message_key) || `${accountEmail}:${folder}:${message.uid || date}`,
+          recipientEmail,
+        ].join('|'),
+        accountEmail,
+        recipientEmail,
+        date,
+        subject: normalizeString(message.subject),
+        folder,
+        uid: message.uid,
+        messageKey: normalizeString(message.message_key),
+        messageId: normalizeString(message.message_id),
+        providerId: normalizeString(message.provider_id),
+        company: identity.recipientCompany,
+        customerId: identity.recipientId,
+        identity,
+        keyRows: Array.from(keyRowsByKey.values()),
+        tombstoned: Boolean(message.deleted_at),
+      });
+    });
+  });
+  return dedupeOutboundEvents(events);
 }
 
 function buildMailboxWebdesignContactEvents(messages = [], customerIndexes = {}, options = {}) {
@@ -732,7 +827,7 @@ function groupMissingRowsForInsert(missing = []) {
         key_type: item.keyType,
         key_value: item.keyValue,
         reservation_id: `${BACKFILL_SOURCE}-${stableHash(item.guardKey)}`,
-        provider: 'softora',
+        provider: normalizeString(event.provider).toLowerCase() === 'instantly' ? 'instantly' : 'softora',
         channel: 'coldmail',
         sender_email: event.accountEmail,
         recipient_email: event.identity.recipientEmail,
@@ -1255,6 +1350,7 @@ function buildReport({
   });
   const mailboxCoverageWarnings = summarizeCoverageWarnings(mailboxCoverage);
   const mailboxCoverageNotes = summarizeCoverageNotes(mailboxCoverage);
+  const backfillPlan = planGuardBackfillChanges(missing);
   const blockingProblems = [];
   if (missing.length) {
     blockingProblems.push({
@@ -1293,6 +1389,8 @@ function buildReport({
       missingGuardKeys: missing.length,
       missingRecipients: missingEmails.length,
       missingByType,
+      plannedGuardInserts: backfillPlan.insertRows.length,
+      plannedGuardPromotions: backfillPlan.promoteKeys.length,
       insertedGuardRows: insertedRows.length,
       postPauseInitialSends: postPauseEvents.length,
       mailboxDuplicateRecipients: summarizeMailboxDuplicates(events).length,
@@ -1371,7 +1469,7 @@ function formatAmsterdam(value) {
   }).format(date);
 }
 
-function printHuman(report) {
+function printHuman(report, options = {}) {
   console.log('Coldmail centrale guard audit');
   console.log(`- Outbound bewijs-events: ${report.summary.outboundEvidenceEvents}`);
   console.log(`- Mailbox-sent webdesign events: ${report.summary.mailboxSentInitialWebdesignEvents}`);
@@ -1381,6 +1479,8 @@ function printHuman(report) {
   console.log(`- Centrale guard-rijen gelezen: ${report.summary.centralGuardRows}`);
   console.log(`- Ontbrekende guard-keys: ${report.summary.missingGuardKeys}`);
   console.log(`- Ontbrekende ontvangers: ${report.summary.missingRecipients}`);
+  console.log(`- Geplande nieuwe guard-rijen: ${report.summary.plannedGuardInserts}`);
+  console.log(`- Geplande permanente guard-promoties: ${report.summary.plannedGuardPromotions}`);
   console.log(`- Ingevoegde guard-rijen: ${report.summary.insertedGuardRows}`);
   console.log(`- Sends na pauzemoment: ${report.summary.postPauseInitialSends}`);
   console.log(`- Mailbox-dubbel ontvangers: ${report.summary.mailboxDuplicateRecipients}`);
@@ -1400,6 +1500,7 @@ function printHuman(report) {
   console.log(`- Mailbox coverage monitor-notes: ${report.summary.mailboxCoverageNotes}`);
   console.log(`- Mailbox sent-index leeg (monitoring-only): ${report.summary.mailboxSentIndexEmptyMonitoringOnly}`);
   console.log(`- Mailbox sent-sync limiet geraakt (monitoring-only): ${report.summary.mailboxSentSyncLimitReachedMonitoringOnly}`);
+  if (options.summaryOnly) return;
   if (report.mailboxCoverageWarnings.length) {
     console.log('\nMailbox coverage waarschuwingen:');
     console.table(
@@ -1461,15 +1562,50 @@ function printHuman(report) {
   }
 }
 
-async function upsertMissingRows(client, missing = []) {
-  const rows = groupMissingRowsForInsert(missing);
-  if (!rows.length) return [];
-  const { data, error } = await client
-    .from('softora_outbound_recipient_guards')
-    .upsert(rows, { onConflict: 'guard_key' })
-    .select('guard_key');
-  if (error) throw new Error(`Backfill upsert mislukt: ${error.message || error}`);
-  return Array.isArray(data) ? data : rows.map((row) => ({ guard_key: row.guard_key }));
+function planGuardBackfillChanges(missing = []) {
+  const insertMissing = [];
+  const promoteKeys = new Set();
+  (Array.isArray(missing) ? missing : []).forEach((item) => {
+    if (item && item.existingGuard) {
+      if (!isPermanentSentGuard(item.existingGuard)) promoteKeys.add(item.guardKey);
+      return;
+    }
+    insertMissing.push(item);
+  });
+  return {
+    insertRows: groupMissingRowsForInsert(insertMissing),
+    promoteKeys: Array.from(promoteKeys),
+  };
+}
+
+async function applyMissingRows(client, missing = []) {
+  const plan = planGuardBackfillChanges(missing);
+  const changed = [];
+  for (let index = 0; index < plan.insertRows.length; index += 500) {
+    const rows = plan.insertRows.slice(index, index + 500);
+    const { data, error } = await client
+      .from('softora_outbound_recipient_guards')
+      .insert(rows)
+      .select('guard_key');
+    if (error) throw new Error(`Backfill insert mislukt: ${error.message || error}`);
+    changed.push(...(Array.isArray(data) ? data : rows.map((row) => ({ guard_key: row.guard_key }))));
+  }
+  for (let index = 0; index < plan.promoteKeys.length; index += 250) {
+    const keys = plan.promoteKeys.slice(index, index + 250);
+    const { data, error } = await client
+      .from('softora_outbound_recipient_guards')
+      .update({
+        status: 'sent',
+        permanent: true,
+        expires_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .in('guard_key', keys)
+      .select('guard_key');
+    if (error) throw new Error(`Backfill guard-promotie mislukt: ${error.message || error}`);
+    changed.push(...(Array.isArray(data) ? data : keys.map((guardKey) => ({ guard_key: guardKey }))));
+  }
+  return changed;
 }
 
 async function readUiState(client, stateTable, scope) {
@@ -1564,7 +1700,7 @@ async function loadLiveData(client, stateTable, options = {}) {
       client,
       'softora_mailbox_messages',
       'message_key,account_email,folder,uid,provider_id,message_id,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at',
-      (query) => query.in('account_email', SENDERS).order('date', { ascending: true })
+      (query) => query.order('date', { ascending: true })
     ),
     fetchAll(
       client,
@@ -1593,13 +1729,12 @@ async function loadLiveData(client, stateTable, options = {}) {
   const legacyCustomers = buildLegacyCustomerRowsFromUiState(legacyCustomerRow);
   const legacyEvents = buildCustomerSentEvents(legacyCustomers, options);
   const events = dedupeOutboundEvents([
-    ...buildMailboxSentEvents(messages, customerIndexes, options),
+    ...buildHistoricalMailboxOutboundEvents(messages, customerIndexes, options),
     ...buildCustomerSentEvents(customers, options),
     ...buildSendGuardEvents(sendGuardState, customerIndexes, options),
   ]);
   const contactEvents = buildMailboxWebdesignContactEvents(messages, customerIndexes, options);
-  const guardEvidenceEvents = dedupeOutboundEvents([...events, ...contactEvents]);
-  const missing = findMissingGuardKeys(guardEvidenceEvents, guards);
+  const missing = findMissingGuardKeys(events, guards);
   const mailboxCoverage = summarizeMailboxCoverage(messages, mailboxSyncStates);
   return { events, contactEvents, customers, guards, sendGuardState, missing, mailboxCoverage, legacyEvents };
 }
@@ -1610,7 +1745,7 @@ async function run(options) {
   const live = await loadLiveData(client, stateTable, options);
   let insertedRows = [];
   if (options.apply && live.missing.length) {
-    insertedRows = await upsertMissingRows(client, live.missing);
+    insertedRows = await applyMissingRows(client, live.missing);
     const reloaded = await loadLiveData(client, stateTable, options);
     const report = buildReport({ ...reloaded, insertedRows, options });
     return { report, paused: options.pauseOnMissing ? await pauseAutopilotForMissingGuard(client, stateTable, report) : false };
@@ -1626,7 +1761,7 @@ async function main() {
   if (options.json) {
     console.log(JSON.stringify({ ...report, paused }, null, 2));
   } else {
-    printHuman(report);
+    printHuman(report, options);
     if (paused) console.log('\nAutopilot is gepauzeerd door de centrale guard-monitor.');
   }
   if (!report.ok) process.exitCode = 1;
@@ -1645,6 +1780,7 @@ module.exports = {
   buildCustomerIndexes,
   buildCustomerSentEvents,
   buildLegacyCustomerRowsFromUiState,
+  buildHistoricalMailboxOutboundEvents,
   buildMailboxSentEvents,
   buildMailboxWebdesignContactEvents,
   buildReport,
@@ -1652,8 +1788,10 @@ module.exports = {
   extractRecipientEmails,
   findMissingGuardKeys,
   groupMissingRowsForInsert,
+  isHistoricalOutboundFolder,
   isInitialWebdesignMail,
   parseArgs,
+  planGuardBackfillChanges,
   summarizeMailboxCoverage,
   summarizeConsolidatedDuplicateRiskEmails,
   summarizeMultiProviderGuards,
