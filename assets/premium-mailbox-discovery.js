@@ -215,12 +215,14 @@
 
     async function loadContactTimeline(mail, { append = false, force = false } = {}) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
-      if (mail.contactTimelineLoaded && !append && !force) return true;
+      if (mail.contactTimelineLoading && !append) return false;
+      if (mail.contactTimelineLoaded && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
       const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
       if (!contactEmail) return false;
       const generation = ++timelineGeneration;
       timelineController?.abort?.();
       timelineController = typeof AbortController === 'function' ? new AbortController() : null;
+      mail.contactTimelineLoading = true;
       try {
         const params = new URLSearchParams({ contact: contactEmail, owner: options.getOwner?.() || 'both', limit: '50' });
         if (append && mail.contactTimelineNextCursor) params.set('cursor', mail.contactTimelineNextCursor);
@@ -235,6 +237,8 @@
         const prior = append && mail.contactTimelineLoaded ? [mail, ...(mail.threadMessages || [])] : [];
         const rows = [...prior, ...incoming];
         mergeContactTimeline(mail, rows, contactEmail, data.totalCount);
+        mail.contactTimelineNeedsRefresh = false;
+        mail.contactTimelineError = '';
         mail.contactTimelineNextCursor = String(data.nextCursor || '');
         options.openMail?.(mail.id, {
           skipBodyFetch: true,
@@ -246,6 +250,8 @@
         if (error?.name === 'AbortError' || generation !== timelineGeneration) return false;
         mail.contactTimelineError = 'Contacthistorie wordt bij de volgende poging opnieuw geladen.';
         return false;
+      } finally {
+        mail.contactTimelineLoading = false;
       }
     }
 
