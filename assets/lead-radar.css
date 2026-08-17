@@ -31,6 +31,7 @@ h2 { margin-bottom: 0; font-size: 17px; letter-spacing: 0; }
 .button-secondary:hover { border-color: var(--radar-pink); color: var(--radar-pink); }
 .button-ghost { border-color: transparent; background: transparent; color: var(--radar-muted); }
 .button-ghost:hover { color: var(--radar-pink); }
+.button:disabled { cursor: not-allowed; opacity: .55; }
 .status-banner { margin-bottom: 16px; border: 1px solid #e6c9cf; border-left: 4px solid var(--radar-danger); border-radius: var(--radar-radius); padding: 13px 16px; background: #fff7f8; color: #712f39; }
 .status-banner strong { display: block; margin-bottom: 3px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -48,6 +49,7 @@ h2 { margin-bottom: 0; font-size: 17px; letter-spacing: 0; }
 .scan-panel__intro p:not(.section-kicker) { max-width: 610px; margin: 8px 0 0; color: var(--radar-muted); line-height: 1.5; }
 .auto-scan-status { color: var(--radar-green) !important; font-weight: 750; }
 .auto-scan-status--muted { color: var(--radar-muted) !important; }
+.auto-scan-status--warning { color: var(--radar-amber) !important; }
 .scan-panel__controls { align-items: flex-end; justify-content: flex-end; }
 .scan-region-input input:disabled { opacity: .55; cursor: not-allowed; }
 label { display: grid; gap: 6px; color: #675d57; font-size: 11px; font-weight: 800; text-transform: uppercase; }

@@ -450,7 +450,8 @@ function buildSignalFromProviderItem(item, context = {}) {
     comments: null,
     website_url: directWebsite || null,
     website_domain: directWebsite ? new URL(directWebsite).hostname : null,
-    website_status: directWebsite ? 'website_found' : 'website_not_checked',
+    // A URL found in a snippet is a candidate until the server-side check succeeds.
+    website_status: 'website_not_checked',
     website_source: directWebsite ? 'post' : 'not_checked',
     website_confidence_score: directWebsite ? 100 : null,
   };
@@ -643,11 +644,25 @@ function createLeadRadarService(deps = {}) {
 
   async function checkWebsiteForSignal(signal, { force = false } = {}) {
     const existingUrl = normalizeHttpUrl(signal.website_url, { allowPlatform: false });
-    if (existingUrl && !force) return { status: signal.website_status || 'website_found', websiteUrl: existingUrl };
+    const existingStatus = normalizeWebsiteStatus(signal.website_status);
+    if (existingUrl && !force && ['website_found', 'website_not_working', 'website_unverified'].includes(existingStatus)) {
+      return {
+        website_url: existingUrl,
+        website_domain: new URL(existingUrl).hostname,
+        website_title: signal.website_title || null,
+        website_status: existingStatus,
+        website_source: signal.website_source || 'manual',
+        website_confidence_score: signal.website_confidence_score ?? null,
+        website_http_status: signal.website_http_status ?? null,
+        website_checked_at: signal.website_checked_at || null,
+        website_check_error: signal.website_check_error || null,
+        website_candidates: Array.isArray(signal.website_candidates) ? signal.website_candidates : [],
+      };
+    }
     const sourceText = `${signal.message_text || ''} ${signal.snippet || ''}`;
     const directUrl = extractUrls(sourceText)[0] || '';
-    let candidateUrl = directUrl;
-    let source = directUrl ? 'post' : 'not_found';
+    let candidateUrl = existingUrl || directUrl;
+    let source = existingUrl ? (signal.website_source || 'post') : (directUrl ? 'post' : 'not_found');
     let candidates = [];
     if (!candidateUrl && provider?.configured && typeof provider.search === 'function') {
       const websiteQuery = buildWebsiteSearchQuery(signal);
@@ -1005,6 +1020,7 @@ module.exports = {
   createDataForSeoProvider,
   createLeadRadarService,
   buildFingerprint,
+  buildSignalFromProviderItem,
   buildSearchPlan,
   normalizeHttpUrl,
   normalizePlatform,

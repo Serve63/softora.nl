@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   buildSearchPlan,
+  buildSignalFromProviderItem,
   createLeadRadarService,
   normalizeHttpUrl,
   normalizePlatform,
@@ -58,6 +59,59 @@ test('Lead Radar scoreert directe en recente websitevragen hoger', () => {
   assert.ok(recent.score > old.score);
   assert.ok(recent.reasons.includes('Bevat directe websitevraag'));
   assert.ok(recent.reasons.includes('Aantal reacties onbekend') || recent.reasons.includes('Engagement onbekend'));
+});
+
+test('Lead Radar behandelt een website-link uit een bericht eerst als kandidaat', () => {
+  const signal = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/123',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner. Bekijk onze huidige website https://voorbeeld.nl',
+  }, { region: 'Eindhoven', query: 'site:facebook.com website gezocht Eindhoven', keywordGroup: 'direct_website' });
+  assert.equal(signal.website_url, 'https://voorbeeld.nl');
+  assert.equal(signal.website_status, 'website_not_checked');
+  assert.equal(signal.website_source, 'post');
+});
+
+test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd worden', async () => {
+  const existing = {
+    id: '00000000-0000-0000-0000-000000000001',
+    website_url: 'https://voorbeeld.nl',
+    website_status: 'website_not_checked',
+    website_source: 'post',
+    website_candidates: [],
+  };
+  const updated = { ...existing };
+  const db = {
+    from() {
+      return {
+        select() {
+          const chain = {
+            eq() { return chain; },
+            limit: async () => ({ data: [existing], error: null }),
+          };
+          return chain;
+        },
+        update(patch) {
+          Object.assign(updated, patch);
+          const chain = {
+            eq() { return chain; },
+            select() { return { single: async () => ({ data: updated, error: null }) }; },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+  const service = createLeadRadarService({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => db,
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<title>Voorbeeld</title>' }),
+    env: {},
+  });
+  const result = await service.lookupWebsite(existing.id);
+  assert.equal(result.website_status, 'website_found');
+  assert.equal(result.website_http_status, 200);
+  assert.equal(result.website_title, 'Voorbeeld');
 });
 
 test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () => {
@@ -138,6 +192,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /Website zoeken/);
   assert.match(script, /setInterval/);
   assert.match(page, /id="auto-scan-status"/);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260817b/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260817b/);
 });
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {

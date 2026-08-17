@@ -34,6 +34,13 @@
   function renderProviderStatus() {
     const banner = $('#provider-banner');
     const provider = state.status && state.status.provider;
+    const scanButton = $('#scan-button');
+    if (scanButton) {
+      scanButton.disabled = !provider || !provider.configured;
+      scanButton.title = provider && provider.configured
+        ? ''
+        : 'Configureer de DataForSEO-provider om scans te starten.';
+    }
     if (!banner || !provider || provider.configured) { if (banner) banner.hidden = true; return; }
     banner.hidden = false;
     banner.innerHTML = `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Handmatige import en websitecontrole van bestaande leads blijven beschikbaar.</span>`;
@@ -47,6 +54,11 @@
     if (!autoScan.enabled) {
       element.textContent = 'Automatische scan staat uit.';
       element.className = 'auto-scan-status auto-scan-status--muted';
+      return;
+    }
+    if (!state.status?.provider?.configured) {
+      element.textContent = 'Automatische scan wacht op configuratie van de zoekprovider.';
+      element.className = 'auto-scan-status auto-scan-status--warning';
       return;
     }
     const lastRun = autoScan.lastRun;
