@@ -138,13 +138,31 @@
       return documentRef?.querySelector('[data-mailbox-action="spellcheck-compose"]') || null;
     }
 
+    function getSpellingUndoButton() {
+      return documentRef?.querySelector('[data-mailbox-action="undo-spelling"]') || null;
+    }
+
+    function updateSpellingUndoButton() {
+      const button = getSpellingUndoButton();
+      if (!button) return;
+      const available = Boolean(
+        spellingUndo
+        && spellingUndo.composeGeneration === composeGeneration
+        && fieldValue('c-body') === spellingUndo.after
+      );
+      button.hidden = !available;
+      button.disabled = !available;
+    }
+
     function updateSpellingButton() {
       const button = getSpellingButton();
-      if (!button) return;
-      button.textContent = spellingRequest ? 'Controleren…' : 'Spellingscontrole';
-      button.disabled = Boolean(spellingRequest || rewriteRequestActive || !fieldValue('c-body').trim());
-      if (spellingRequest) button.setAttribute?.('aria-busy', 'true');
-      else button.removeAttribute?.('aria-busy');
+      if (button) {
+        button.textContent = spellingRequest ? 'Controleren…' : 'Spellingscontrole';
+        button.disabled = Boolean(spellingRequest || rewriteRequestActive || !fieldValue('c-body').trim());
+        if (spellingRequest) button.setAttribute?.('aria-busy', 'true');
+        else button.removeAttribute?.('aria-busy');
+      }
+      updateSpellingUndoButton();
     }
 
     function abortSpellingRequest() {
@@ -517,7 +535,7 @@
           options.toast('Geen spellingcorrecties gevonden');
           return;
         }
-        restoreBodyFieldState(bodyField, snapshot, corrected);
+        restoreBodyFieldState(bodyField, { ...snapshot, focused: true }, corrected);
         spellingUndo = {
           before: original,
           after: corrected,
@@ -526,10 +544,8 @@
           selectionEnd: Number(bodyField.selectionEnd) || 0,
           scrollTop: Number(bodyField.scrollTop) || 0,
         };
-        options.toast('Spelling gecontroleerd', {
-          label: 'Ongedaan maken',
-          action: async () => undoSpelling(),
-        });
+        updateSpellingUndoButton();
+        options.toast('Spelling gecontroleerd');
       } catch (error) {
         if (spellingRequest !== request || requestComposeGeneration !== composeGeneration) return;
         const timedOut = error?.name === 'AbortError';
@@ -700,6 +716,7 @@
       else if (action === 'send-mail') void send();
       else if (action === 'rewrite-compose') void rewrite();
       else if (action === 'spellcheck-compose') void spellcheck();
+      else if (action === 'undo-spelling') undoSpelling();
       else if (action === 'toggle-copy-fields') options.compose.toggleCopyFields();
       else if (action === 'choose-attachments') documentRef?.getElementById('c-attachments')?.click();
       else if (action === 'remove-attachment') options.compose.removeAttachment(id);
