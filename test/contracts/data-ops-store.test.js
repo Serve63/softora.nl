@@ -107,6 +107,251 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
 });
 
+test('data ops store finds exact historical outbound recipients including tombstones and all outbound folders', async () => {
+  const calls = [];
+  const rows = [
+    {
+      message_key: 'sent-exact',
+      folder: 'sent',
+      recipients_text: 'Bedrijf <info@historisch.example>',
+      date: '2026-08-01T10:00:00.000Z',
+      deleted_at: null,
+    },
+    {
+      message_key: 'coldmail-deleted-exact',
+      folder: 'coldmail',
+      recipients_text: 'info@historisch.example',
+      date: '2026-07-01T10:00:00.000Z',
+      deleted_at: '2026-08-02T10:00:00.000Z',
+    },
+    {
+      message_key: 'instantly-exact',
+      folder: 'instantly',
+      recipients_text: 'INFO@HISTORISCH.EXAMPLE',
+      date: '2026-06-01T10:00:00.000Z',
+      deleted_at: null,
+    },
+    {
+      message_key: 'substring-only',
+      folder: 'sent',
+      recipients_text: 'otherinfo@historisch.example',
+      date: '2026-08-03T10:00:00.000Z',
+      deleted_at: null,
+    },
+  ];
+  const client = {
+    from(table) {
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        ilike(column, value) {
+          calls.push(['ilike', column, value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        limit(value) {
+          calls.push(['limit', value]);
+          return Promise.resolve({ data: rows, error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const matches = await store.listHistoricalOutboundMailboxMessagesByRecipientEmails({
+    recipientEmails: ['Info@Historisch.Example'],
+  });
+
+  assert.deepEqual(matches.map((row) => row.message_key), [
+    'sent-exact',
+    'coldmail-deleted-exact',
+    'instantly-exact',
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'in'), [
+    'in',
+    'folder',
+    ['sent', 'coldmail', 'instantly'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'ilike'), [
+    'ilike',
+    'recipients_text',
+    '%info@historisch.example%',
+  ]);
+  assert.equal(calls.some((call) => call[0] === 'is'), false);
+});
+
+test('data ops historical outbound lookup returns null on mailbox read failure', async () => {
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        const query = {
+          select() { return query; },
+          in() { return query; },
+          ilike() { return query; },
+          order() { return query; },
+          limit() { return Promise.resolve({ data: null, error: new Error('mailbox read failed') }); },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+  });
+
+  const matches = await store.listHistoricalOutboundMailboxMessagesByRecipientEmails({
+    recipientEmails: ['info@failure.example'],
+  });
+
+  assert.equal(matches, null);
+});
+
+test('data ops historical outbound lookup paginates past substring candidates to an older exact recipient', async () => {
+  const candidateRows = Array.from({ length: 50 }, (_, index) => ({
+    message_key: `substring-${index}`,
+    folder: 'sent',
+    recipients_text: `otherinfo@historisch.example`,
+    date: `2026-08-01T10:${String(index).padStart(2, '0')}:00.000Z`,
+  })).concat({
+    message_key: 'older-exact-recipient',
+    folder: 'sent',
+    recipients_text: 'Historisch <info@historisch.example>',
+    date: '2025-01-01T10:00:00.000Z',
+  });
+  const ranges = [];
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        const query = {
+          select() { return query; },
+          in() { return query; },
+          ilike() { return query; },
+          order() { return query; },
+          range(from, to) {
+            ranges.push([from, to]);
+            return Promise.resolve({ data: candidateRows.slice(from, to + 1), error: null });
+          },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+  });
+
+  const matches = await store.listHistoricalOutboundMailboxMessagesByRecipientEmails({
+    recipientEmails: ['info@historisch.example'],
+    pageSize: 50,
+    maxCandidateRows: 100,
+  });
+
+  assert.deepEqual(matches.map((row) => row.message_key), ['older-exact-recipient']);
+  assert.deepEqual(ranges, [[0, 49], [50, 99]]);
+});
+
+test('data ops historical mailbox coverage requires fresh successful sent sync for every sender', async () => {
+  const calls = [];
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from(table) {
+        const query = {
+          select(columns) {
+            calls.push(['select', table, columns]);
+            return query;
+          },
+          in(column, values) {
+            calls.push(['in', column, values]);
+            return query;
+          },
+          eq(column, value) {
+            calls.push(['eq', column, value]);
+            return Promise.resolve({
+              data: [
+                {
+                  account_email: 'serve@softora.nl',
+                  folder: 'sent',
+                  status: 'ok',
+                  last_synced_at: '2026-08-17T11:30:00.000Z',
+                },
+                {
+                  account_email: 'martijn@softora.nl',
+                  folder: 'sent',
+                  status: 'error',
+                  last_synced_at: '2026-08-17T11:30:00.000Z',
+                },
+              ],
+              error: null,
+            });
+          },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+    now: () => new Date('2026-08-17T12:00:00.000Z'),
+  });
+
+  const coverage = await store.getHistoricalOutboundMailboxCoverageStatus({
+    accountEmails: ['serve@softora.nl', 'martijn@softora.nl', 'missing@softora.nl'],
+  });
+
+  assert.equal(coverage.ok, false);
+  assert.deepEqual(coverage.issues, [
+    { accountEmail: 'martijn@softora.nl', reason: 'sent_sync_error' },
+    { accountEmail: 'missing@softora.nl', reason: 'missing_sent_sync_state' },
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'sent']);
+});
+
+test('data ops historical mailbox coverage accepts fresh successful sent sync', async () => {
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        const query = {
+          select() { return query; },
+          in() { return query; },
+          eq() {
+            return Promise.resolve({
+              data: [{
+                account_email: 'serve@softora.nl',
+                folder: 'sent',
+                status: 'ok',
+                last_synced_at: '2026-08-17T11:30:00.000Z',
+              }],
+              error: null,
+            });
+          },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+    now: () => new Date('2026-08-17T12:00:00.000Z'),
+  });
+
+  assert.deepEqual(
+    await store.getHistoricalOutboundMailboxCoverageStatus({
+      accountEmails: ['serve@softora.nl'],
+    }),
+    { ok: true, checkedAccounts: 1, issues: [] }
+  );
+});
+
 test('data ops store reads only customers matching campaign reply sender emails', async () => {
   const calls = [];
   const client = {
