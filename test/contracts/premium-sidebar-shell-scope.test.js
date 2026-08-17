@@ -850,6 +850,21 @@ test('websitegenerator layout gebruikt dezelfde sidebarbreedte als de premium sh
   );
 });
 
+test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw', () => {
+  const shellSource = readRepoFile('premium-lead-radar-shell.html');
+  const sidebarSource = readRepoFile('assets/lead-radar-sidebar.js');
+
+  assert.match(shellSource, /data-sidebar-shell="canonical"/);
+  assert.match(shellSource, /<aside class="sidebar"[^>]*aria-label="Premium navigatie"/);
+  assert.match(shellSource, /assets\/personnel-theme\.css\?v=20260519b/);
+  assert.match(shellSource, /assets\/personnel-theme\.js\?v=20260519b/);
+  assert.match(shellSource, /assets\/lead-radar-sidebar\.js\?v=20260817a/);
+  assert.match(shellSource, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
+  assert.match(sidebarSource, /const LINK_HREF = '\/lead-radar'/);
+  assert.match(sidebarSource, /const LINK_LABEL = 'Lead Radar'/);
+  assert.match(sidebarSource, /overview\.insertBefore\(link, database \|\| null\)/);
+});
+
 test('static premium sidebars share the same section order and public labels', () => {
   const expectedSections = [
     {
