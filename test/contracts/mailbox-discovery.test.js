@@ -139,6 +139,40 @@ test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart techn
   );
 });
 
+test('contacttijdlijn laat alleen berichten met exact bewezen alias en externe identiteit toe', () => {
+  const root = {
+    id: 'martijn@softora.nl|sent:1',
+    messageId: '<root@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    folder: 'sent',
+    email: 'martijn@softora.nl',
+    to: 'secretariaat@seniorenhaaren.nl',
+  };
+  const rows = [
+    root,
+    {
+      id: 'inbox:correct', messageId: '<correct@example.test>', accountEmail: 'martijnvandeven@softora.nl',
+      folder: 'inbox', email: 'secretariaat@seniorenhaaren.nl', to: 'martijnvandeven@softora.nl',
+    },
+    {
+      id: 'sent:serve-alias', messageId: '<serve@example.test>', accountEmail: 'serve290@gmail.com',
+      folder: 'sent', email: 'serve290@gmail.com', to: 'secretariaat@seniorenhaaren.nl',
+    },
+    {
+      id: 'inbox:same-name-other-contact', messageId: '<wrong@example.test>', accountEmail: 'martijn@softora.nl',
+      folder: 'inbox', from: 'Secretariaat', email: 'ander@example.nl', to: 'martijn@softora.nl',
+    },
+  ];
+
+  discoveryUi.mergeContactTimeline(root, rows, 'secretariaat@seniorenhaaren.nl', 4, {
+    accountEmails: ['martijn@softora.nl', 'martijnvandeven@softora.nl', 'serve290@gmail.com'],
+  });
+
+  assert.deepEqual(root.threadMessages.map((message) => message.id), ['inbox:correct', 'sent:serve-alias']);
+  assert.equal(root.contactTimelineRejectedCount, 1);
+  assert.equal(root.contactTimelineTotal, 3);
+});
+
 test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt selectie en scroll', async () => {
   const input = createElement();
   const clear = createElement();
@@ -156,6 +190,7 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
   let messages = [{ id: 'normal' }];
   let activeMail = 'normal';
   const rendered = [];
+  let resetDetailCalls = 0;
   const controller = discoveryUi.create({
     document: {
       getElementById(id) { return elements[id] || null; },
@@ -175,6 +210,7 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
     normalizeMessage: (value) => ({ ...value }),
     renderList: (value) => rendered.push(value),
     openMail() {},
+    resetDetail: () => { resetDetailCalls += 1; },
   });
 
   input.value = 'alpha';
@@ -186,11 +222,15 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
   pending.get('alpha')({ ok: true, json: async () => ({ ok: true, messages: [{ id: 'alpha' }], totalCount: 1 }) });
   assert.equal(await alpha, false);
   assert.deepEqual(messages.map((message) => message.id), ['beta']);
+  assert.equal(resetDetailCalls, 1);
+  assert.equal(controller.canOpenResult(messages[0]), true);
+  assert.equal(controller.canOpenResult({ id: 'stale-normal-row' }), false);
   controller.clearSearch();
   assert.deepEqual(messages.map((message) => message.id), ['normal']);
   assert.equal(activeMail, 'normal');
   assert.equal(list.scrollTop, 86);
   assert.ok(rendered.length >= 2);
+  assert.equal(controller.canOpenResult({ id: 'normal' }), true);
 });
 
 test('zoekpaginering is single-flight en verdwijnt pas na de laatste pagina', async () => {
@@ -256,7 +296,10 @@ test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contac
   const mail = {
     id: 'contact-root',
     messageId: '<root@example.test>',
+    accountEmail: 'owner@example.test',
+    folder: 'inbox',
     email: 'contact@example.test',
+    to: 'owner@example.test',
     contactTimelineLoaded: true,
     contactTimelineNeedsRefresh: true,
     externalContactEmail: 'contact@example.test',
@@ -275,8 +318,8 @@ test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contac
             ok: true,
             totalCount: 2,
             messages: [
-              { id: 'root-row', messageId: '<root@example.test>', technicalThreadKey: 'thread-a' },
-              { id: 'fresh-row', messageId: '<fresh@example.test>', technicalThreadKey: 'thread-b' },
+              { id: 'root-row', messageId: '<root@example.test>', accountEmail: 'owner@example.test', folder: 'inbox', email: 'contact@example.test', to: 'owner@example.test', technicalThreadKey: 'thread-a' },
+              { id: 'fresh-row', messageId: '<fresh@example.test>', accountEmail: 'owner@example.test', folder: 'sent', email: 'owner@example.test', to: 'contact@example.test', technicalThreadKey: 'thread-b' },
             ],
           };
         },

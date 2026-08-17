@@ -59,8 +59,16 @@
     ].join('|');
   }
 
-  function mergeContactTimeline(root, messages, contactEmail, totalCount) {
-    const normalized = Array.isArray(messages) ? messages : [];
+  function mergeContactTimeline(root, messages, contactEmail, totalCount, options = {}) {
+    const normalizedContact = normalizeEmail(contactEmail);
+    const accountEmails = Array.isArray(options.accountEmails) ? options.accountEmails : [];
+    let rejectedCount = Math.max(0, Number(options.rejectedCountOffset) || 0);
+    const normalized = (Array.isArray(messages) ? messages : []).filter((message) => {
+      if (!accountEmails.length || getMessageIdentity(message) === getMessageIdentity(root)) return true;
+      const matches = resolveExternalContact(message, accountEmails) === normalizedContact;
+      if (!matches) rejectedCount += 1;
+      return matches;
+    });
     const rootIdentity = getMessageIdentity(root);
     const matchingRoot = normalized.find((message) => getMessageIdentity(message) === rootIdentity);
     if (matchingRoot) {
@@ -74,17 +82,30 @@
       seen.add(identity);
       return true;
     });
-    root.externalContactEmail = contactEmail;
+    root.externalContactEmail = normalizedContact;
     root.contactTimelineLoaded = true;
-    root.contactTimelineTotal = Number.isFinite(Number(totalCount)) && Number(totalCount) > 0
+    const reportedTotal = Number.isFinite(Number(totalCount)) && Number(totalCount) > 0
       ? Number(totalCount)
       : 1 + root.threadMessages.length;
+    root.contactTimelineRejectedCount = rejectedCount;
+    root.contactTimelineTotal = Math.max(1 + root.threadMessages.length, reportedTotal - rejectedCount);
     root.contactTimelineThreadCount = new Set(normalized.map((message) => message.technicalThreadKey).filter(Boolean)).size;
     return root;
   }
 
   function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function getSearchResultKey(message) {
+    return [
+      String(message?.owner || message?.canonicalOwner || '').trim().toLowerCase(),
+      String(message?.provider || message?.providerKind || '').trim().toLowerCase(),
+      normalizeEmail(message?.accountEmail || message?.providerAccountEmail),
+      normalizeEmail(message?.externalContactEmail),
+      String(message?.technicalThreadKey || message?.threadId || '').trim(),
+      getMessageIdentity(message),
+    ].join('|');
   }
 
   function renderSearchSnippet(match, query, escapeHtml) {
@@ -110,6 +131,19 @@
     return `<div class="mail-contact-summary" role="status"><strong>Contactdossier</strong><span>${escapeHtml(`${messages} berichten · ${threads} onderwerpen${contact ? ` · ${contact}` : ''}`)}</span>${more}</div>`;
   }
 
+  function renderRootSentCardStart(mail, options = {}) {
+    if (!options.contactDossierMode || options.isProvenMailboxCopy || options.rootIncoming) return '';
+    const campaignInbox = options.campaignInbox;
+    const rootOwner = campaignInbox?.getMessageOwner?.(mail);
+    const ownerLabel = rootOwner ? campaignInbox?.getOwnerLabel?.(rootOwner) : '';
+    const meta = [mail?.date, mail?.time, ownerLabel]
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean)
+      .join(' · ');
+    const escapeHtml = typeof options.escapeHtml === 'function' ? options.escapeHtml : String;
+    return `<section class="detail-mail-section detail-mail-section-sent" data-mailbox-message-direction="sent" data-mailbox-root-message="true"><div class="detail-mail-section-label">Jouw bericht</div>${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}`;
+  }
+
   function create(options = {}) {
     const documentRef = options.document || global.document;
     const fetchImpl = options.fetch || global.fetch?.bind(global);
@@ -126,6 +160,7 @@
     let totalCount = 0;
     let snapshot = null;
     let searchLoading = false;
+    let searchResultKeys = new Set();
 
     function setStatus(text, kind = '') {
       if (!status) return;
@@ -199,8 +234,14 @@
         const existing = append ? (options.getMessages?.() || []) : [];
         const byIdentity = new Map(existing.map((message) => [getMessageIdentity(message), message]));
         incoming.forEach((message) => byIdentity.set(getMessageIdentity(message), message));
-        options.setMessages?.(Array.from(byIdentity.values()));
-        if (!append) options.setActiveMail?.(null);
+        const resultMessages = Array.from(byIdentity.values());
+        resultMessages.forEach((message) => { message.searchResultKey = getSearchResultKey(message); });
+        searchResultKeys = new Set(resultMessages.map(getSearchResultKey));
+        options.setMessages?.(resultMessages);
+        if (!append) {
+          options.setActiveMail?.(null);
+          options.resetDetail?.();
+        }
         nextCursor = String(data.nextCursor || '');
         totalCount = Math.max(0, Number(data.totalCount) || 0);
         options.renderList?.({ openLatest: false });
@@ -230,6 +271,7 @@
       activeQuery = '';
       nextCursor = '';
       totalCount = 0;
+      searchResultKeys = new Set();
       if (input) input.value = '';
       setStatus('');
       setMoreState();
@@ -275,7 +317,10 @@
         const incoming = (Array.isArray(data.messages) ? data.messages : []).map((message) => options.normalizeMessage?.(message) || message);
         const prior = append && mail.contactTimelineLoaded ? [mail, ...(mail.threadMessages || [])] : [];
         const rows = [...prior, ...incoming];
-        mergeContactTimeline(mail, rows, contactEmail, data.totalCount);
+        mergeContactTimeline(mail, rows, contactEmail, data.totalCount, {
+          accountEmails: options.getAccountEmails?.(),
+          rejectedCountOffset: append ? mail.contactTimelineRejectedCount : 0,
+        });
         mail.contactTimelineNeedsRefresh = false;
         mail.contactTimelineError = '';
         mail.contactTimelineNextCursor = String(data.nextCursor || '');
@@ -323,6 +368,7 @@
     bind();
     return {
       clearSearch,
+      canOpenResult: (mail) => !isSearchActive() || searchResultKeys.has(getSearchResultKey(mail)),
       isSearchActive,
       loadContactTimeline,
       loadMoreContactTimeline: (mail) => loadContactTimeline(mail, { append: true }),
@@ -338,7 +384,9 @@
     create,
     extractEmails,
     getContactDossier,
+    getSearchResultKey,
     mergeContactTimeline,
+    renderRootSentCardStart,
     renderSearchSnippet,
     renderReplyMessageAction,
     renderTimelineSummary,

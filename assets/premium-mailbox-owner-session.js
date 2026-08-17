@@ -196,6 +196,9 @@
     let token = null;
     const getScope = () => normalizeScope(options.getScope?.());
     const isCurrent = (candidate = token) => session.isCurrent(candidate, getScope());
+    const canApply = (candidate = token) => (
+      isCurrent(candidate) && options.shouldApplyMessages?.() !== false
+    );
     const setBusy = (busy) => options.getListElement?.()?.setAttribute?.('aria-busy', String(Boolean(busy)));
 
     function releaseTransientLoadingState(messages) {
@@ -228,13 +231,13 @@
       const index = options.index;
       if (!index || typeof index.hydrateOutreachContexts !== 'function') return;
       await index.hydrateOutreachContexts({
-        getMails: () => isCurrent(candidate) ? options.getMessages?.() || [] : [],
+        getMails: () => canApply(candidate) ? options.getMessages?.() || [] : [],
         setMails: (messages) => {
-          if (isCurrent(candidate)) options.setMessages?.(options.filterDeleted?.(messages) || []);
+          if (canApply(candidate)) options.setMessages?.(options.filterDeleted?.(messages) || []);
         },
-        renderList: (...args) => { if (isCurrent(candidate)) options.renderList?.(...args); },
+        renderList: (...args) => { if (canApply(candidate)) options.renderList?.(...args); },
         getActiveMail: options.getActiveMail,
-        openMail: (...args) => { if (isCurrent(candidate)) options.openMail?.(...args); },
+        openMail: (...args) => { if (canApply(candidate)) options.openMail?.(...args); },
         toast: options.toast,
       });
     }
@@ -259,7 +262,10 @@
             refreshInstantly: loadOptions.skipProviderRefresh !== true,
           }
         );
-        if (!isCurrent(candidate)) return false;
+        if (!canApply(candidate)) {
+          setBusy(false);
+          return false;
+        }
         if (campaignResult) {
           options.setSync?.(campaignResult.sync);
           const ownerMessages = options.campaignInbox.filterMessages(campaignResult.messages, scope.owner);
@@ -275,7 +281,7 @@
           keepConversationOpen(messages, activeId, loadOptions);
           options.setStatus?.('');
           setBusy(false);
-          if (campaignResult.fromBootstrap && isCurrent(candidate)) {
+          if (campaignResult.fromBootstrap && canApply(candidate)) {
             void load({
               skipPageBootstrap: true,
               skipBackgroundSync: true,
@@ -300,7 +306,10 @@
         if (!response.ok || !data?.ok) {
           throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
         }
-        if (!isCurrent(candidate)) return false;
+        if (!canApply(candidate)) {
+          setBusy(false);
+          return false;
+        }
         const sync = data?.sync && typeof data.sync === 'object' ? data.sync : null;
         const messages = reconcileMessages(
           options.getMessages?.() || [],
@@ -321,7 +330,10 @@
         setBusy(false);
         return true;
       } catch (error) {
-        if (!isCurrent(candidate) || isAbortError(error)) return false;
+        if (!canApply(candidate) || isAbortError(error)) {
+          setBusy(false);
+          return false;
+        }
         const currentMessages = options.getMessages?.() || [];
         if (loadOptions.preserveOnError && currentMessages.length) {
           const activeId = options.getActiveMail?.();

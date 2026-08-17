@@ -41,6 +41,42 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
+test('late normale inboxload kan een actieve zoekresultaatlijst niet overschrijven', async () => {
+  let messages = [{ id: 'zoekresultaat-jenny' }];
+  let searchActive = false;
+  let resolveLoad;
+  let renderCalls = 0;
+  const pendingLoad = new Promise((resolve) => { resolveLoad = resolve; });
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'both', folder: 'outreach' }),
+    campaignInbox: {
+      load: () => pendingLoad,
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    filterDeleted: (value) => value,
+    getActiveMail: () => null,
+    setActiveMail() {},
+    getListElement: () => ({ setAttribute() {} }),
+    renderList: () => { renderCalls += 1; },
+    setSync() {},
+    setStatus() {},
+    shouldApplyMessages: () => !searchActive,
+  });
+
+  const normalLoad = view.load();
+  searchActive = true;
+  resolveLoad({
+    messages: [{ id: 'normale-inbox-1' }, { id: 'normale-inbox-2' }],
+    sync: {},
+  });
+
+  assert.equal(await normalLoad, false);
+  assert.deepEqual(messages.map((message) => message.id), ['zoekresultaat-jenny']);
+  assert.equal(renderCalls, 0);
+});
+
 test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC-thread', () => {
   const current = [{
     id: 'root-message',
