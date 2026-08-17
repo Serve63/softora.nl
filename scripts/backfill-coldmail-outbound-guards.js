@@ -13,6 +13,7 @@ const {
   getIdentityKeyRows,
   normalizeIdentity,
 } = require('../server/services/outbound-recipient-guard-store');
+const { SHARED_MAILBOX_DOMAINS } = require('../server/config/coldmail-campaign');
 
 const SENDERS = [
   'info@softora.nl',
@@ -40,23 +41,6 @@ const AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
 const LEGACY_CUSTOMER_SCOPE = 'premium_customers_database';
 const LEGACY_CUSTOMER_KEY = 'softora_customers_premium_v1';
 const MAILBOX_SYNC_LIMIT_HINT = 100;
-const SHARED_MAILBOX_DOMAINS = new Set([
-  'gmail.com',
-  'googlemail.com',
-  'outlook.com',
-  'hotmail.com',
-  'live.com',
-  'icloud.com',
-  'me.com',
-  'msn.com',
-  'planet.nl',
-  'ziggo.nl',
-  'kpnmail.nl',
-  'hetnet.nl',
-  'xs4all.nl',
-  'upcmail.nl',
-]);
-
 function normalizeString(value) {
   return String(value || '').trim();
 }
@@ -553,7 +537,7 @@ function buildHistoricalMailboxOutboundEvents(messages = [], customerIndexes = {
           }))
         : [{
             recipientEmail,
-            recipientDomain: '',
+            recipientDomain: isSharedMailboxDomain(recipientDomain) ? '' : recipientDomain,
             recipientCompanyKey: '',
             recipientId: '',
             recipientCompany: '',

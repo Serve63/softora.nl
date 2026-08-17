@@ -22,11 +22,15 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
     };
   }
 
-  function mailboxRowHasExactRecipient(row, recipientEmails) {
+  function mailboxRowHasRecipientIdentity(row, recipientEmails, recipientDomains) {
     const matches = normalizeString(row && row.recipients_text)
       .toLowerCase()
       .match(MAILBOX_RECIPIENT_EMAIL_PATTERN) || [];
-    return matches.some((email) => recipientEmails.has(normalizeString(email).toLowerCase()));
+    return matches.some((email) => {
+      const normalizedEmail = normalizeString(email).toLowerCase();
+      const domain = normalizedEmail.split('@')[1] || '';
+      return recipientEmails.has(normalizedEmail) || recipientDomains.has(domain);
+    });
   }
 
   async function listHistoricalOutboundMailboxMessagesByRecipientEmails(options = {}) {
@@ -34,8 +38,17 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
       (Array.isArray(options.recipientEmails) ? options.recipientEmails : [])
         .map((email) => normalizeString(email).toLowerCase())
         .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    )).slice(0, 100);
-    if (!recipientEmails.length) return [];
+    ));
+    const recipientDomains = Array.from(new Set(
+      (Array.isArray(options.recipientDomains) ? options.recipientDomains : [])
+        .map((domain) => normalizeString(domain).toLowerCase().replace(/^@/, '').replace(/^www\./, ''))
+        .filter((domain) => /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(domain))
+    ));
+    const lookupTargets = [
+      ...recipientEmails.map((value) => ({ type: 'email', value, search: `%${value}%` })),
+      ...recipientDomains.map((value) => ({ type: 'domain', value, search: `%@${value}%` })),
+    ].slice(0, 100);
+    if (!lookupTargets.length) return [];
     const folders = Array.from(new Set(
       (Array.isArray(options.folders) && options.folders.length
         ? options.folders
@@ -48,8 +61,8 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
       pageSize,
       Math.min(20000, Number(options.maxCandidateRows) || 20000)
     );
-    const results = await Promise.all(recipientEmails.map((recipientEmail, index) =>
-      run(`list-historical-outbound-mailbox-recipient:${index}`, async (client) => {
+    const results = await Promise.all(lookupTargets.map((target, index) =>
+      run(`list-historical-outbound-mailbox-recipient:${target.type}:${index}`, async (client) => {
         const candidates = [];
         for (let from = 0; from < maxCandidateRows; from += pageSize) {
           const to = Math.min(maxCandidateRows - 1, from + pageSize - 1);
@@ -57,7 +70,7 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
             .from(mailboxMessagesTable)
             .select('message_key,account_email,folder,uid,provider_id,message_id,sender_email,recipients_text,subject,date,internal_date,deleted_at')
             .in('folder', folders)
-            .ilike('recipients_text', `%${recipientEmail}%`)
+            .ilike('recipients_text', target.search)
             .order('date', { ascending: false });
           const response = typeof query.range === 'function'
             ? await query.range(from, to)
@@ -72,7 +85,7 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
         return {
           data: null,
           error: new Error(
-            `Historische mailbox kandidaatlimiet (${maxCandidateRows}) bereikt voor ${recipientEmail}`
+            `Historische mailbox kandidaatlimiet (${maxCandidateRows}) bereikt voor ${target.type}`
           ),
         };
       }, getReadOptions())
@@ -80,10 +93,11 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
     if (results.some((result) => !result.ok)) return null;
 
     const recipientSet = new Set(recipientEmails);
+    const domainSet = new Set(recipientDomains);
     const rowsByKey = new Map();
     results
       .flatMap((result) => Array.isArray(result.data) ? result.data : [])
-      .filter((row) => mailboxRowHasExactRecipient(row, recipientSet))
+      .filter((row) => mailboxRowHasRecipientIdentity(row, recipientSet, domainSet))
       .forEach((row) => {
         const key = normalizeString(row && row.message_key) || [
           normalizeString(row && row.account_email).toLowerCase(),

@@ -9745,6 +9745,54 @@ test('coldmail campaign blocks exact historical mailbox recipients immediately b
   assert.deepEqual(historyLookups[0].folders, ['sent', 'coldmail', 'instantly']);
 });
 
+test('coldmail campaign blocks a new address on a historically mailed business domain before SMTP', async () => {
+  const historyLookups = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'historical-domain-row',
+        bedrijf: 'Historisch Domein BV',
+        naam: 'Historisch Domein BV',
+        email: 'nieuw@historisch-domein.example',
+        website: 'https://historisch-domein.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    dataOpsStore: {
+      async listHistoricalOutboundMailboxMessagesByRecipientEmails(options) {
+        historyLookups.push(options);
+        return [{
+          message_key: 'serve|sent|historical-domain',
+          account_email: 'serve@softora.nl',
+          folder: 'sent',
+          recipients_text: 'Oud contact <oud@historisch-domein.example>',
+          date: '2025-07-01T10:00:00.000Z',
+        }];
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Goedendag {{naam}}',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /al eerder gemaild/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(historyLookups.length, 1);
+  assert.deepEqual(historyLookups[0].recipientEmails, ['nieuw@historisch-domein.example']);
+  assert.deepEqual(historyLookups[0].recipientDomains, ['historisch-domein.example']);
+});
+
 test('coldmail campaign fails closed before SMTP when historical mailbox lookup fails', async () => {
   const { service, sentMessages, getSendGuardState } = createService({
     rows: [
