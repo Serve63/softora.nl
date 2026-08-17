@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
+const DATAFORSEO_ENDPOINT = 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced';
 const WEBSITE_STATUSES = Object.freeze([
   'website_found',
   'no_website_found',
@@ -319,8 +320,7 @@ function extractTaskItems(body) {
 function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
   const login = text(env.LEAD_RADAR_DATAFORSEO_LOGIN || env.DATAFORSEO_LOGIN, 500);
   const password = text(env.LEAD_RADAR_DATAFORSEO_PASSWORD || env.DATAFORSEO_PASSWORD, 500);
-  const baseUrl = text(env.LEAD_RADAR_SERP_API_BASE_URL || env.DATAFORSEO_API_BASE_URL || 'https://api.dataforseo.com', 500).replace(/\/$/, '');
-  const endpoint = `${baseUrl}/v3/serp/google/organic/live/advanced`;
+  const endpoint = DATAFORSEO_ENDPOINT;
 
   async function search({ query, maxResults = 10 } = {}) {
     if (!login || !password) {
