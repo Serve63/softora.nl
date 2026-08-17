@@ -811,6 +811,7 @@ function createCustomersPageBootstrapService(deps = {}) {
         loadedAt: new Date().toISOString(),
         source: 'deferred',
         deferred: true,
+        completeDataset: false,
         customers: [],
         activeOrdersState: buildBootstrapStateSnapshot(null),
       };
@@ -841,6 +842,7 @@ function createCustomersPageBootstrapService(deps = {}) {
           ok: true,
           loadedAt: new Date().toISOString(),
           source: 'dashboard-customers',
+          completeDataset: false,
           customers: mergeCustomersWithResponsible(dashboardCustomers, orders),
           activeOrdersState: buildBootstrapStateSnapshot(orderState),
         };
@@ -850,6 +852,7 @@ function createCustomersPageBootstrapService(deps = {}) {
         ok: false,
         loadedAt: new Date().toISOString(),
         source: 'unavailable',
+        completeDataset: false,
         message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
         customers: [],
         activeOrdersState: buildBootstrapStateSnapshot(orderState),
@@ -867,6 +870,7 @@ function createCustomersPageBootstrapService(deps = {}) {
         ok: true,
         loadedAt: new Date().toISOString(),
         source: 'customers',
+        completeDataset: true,
         customers: mergeCustomersWithResponsible(remoteCustomers, orders),
         activeOrdersState: buildBootstrapStateSnapshot(orderState),
       };
@@ -879,6 +883,7 @@ function createCustomersPageBootstrapService(deps = {}) {
         ok: false,
         loadedAt: new Date().toISOString(),
         source: 'unavailable',
+        completeDataset: false,
         message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
         customers: [],
         activeOrdersState: buildBootstrapStateSnapshot(orderState),
@@ -889,6 +894,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       ok: true,
       loadedAt: new Date().toISOString(),
       source: customers.length ? 'orders' : 'empty',
+      completeDataset: true,
       customers,
       activeOrdersState: buildBootstrapStateSnapshot(orderState),
     };
