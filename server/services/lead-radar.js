@@ -24,7 +24,8 @@ const MAX_SCAN_QUERY_LIMIT = 100;
 const DEFAULT_WEBSITE_LOOKUP_LIMIT = 10;
 const MAX_WEBSITE_LOOKUP_LIMIT = 50;
 const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
-const DEFAULT_AUTO_SCAN_MAX_AGE_DAYS = 7;
+const DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS = 30;
+const DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS = 3;
 
 const KEYWORD_GROUPS = Object.freeze({
   direct_website: [
@@ -292,17 +293,39 @@ function getAutomaticScanConfig(env = process.env) {
   const websiteLookupLimit = env.LEAD_RADAR_AUTO_SCAN_WEBSITE_LOOKUP_LIMIT === '0'
     ? 0
     : safeLimit(env.LEAD_RADAR_AUTO_SCAN_WEBSITE_LOOKUP_LIMIT, DEFAULT_WEBSITE_LOOKUP_LIMIT, MAX_WEBSITE_LOOKUP_LIMIT);
-  const maxAgeDays = safeLimit(env.LEAD_RADAR_AUTO_SCAN_MAX_AGE_DAYS, DEFAULT_AUTO_SCAN_MAX_AGE_DAYS, 365);
+  const initialLookbackDays = safeLimit(
+    env.LEAD_RADAR_AUTO_SCAN_INITIAL_MAX_AGE_DAYS,
+    DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS,
+    365
+  );
+  const refreshLookbackDays = safeLimit(
+    env.LEAD_RADAR_AUTO_SCAN_REFRESH_MAX_AGE_DAYS || env.LEAD_RADAR_AUTO_SCAN_MAX_AGE_DAYS,
+    DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS,
+    365
+  );
   return {
     enabled,
     intervalMinutes,
     maxQueries,
     websiteLookupLimit,
-    maxAgeDays,
+    initialLookbackDays,
+    refreshLookbackDays,
+    // Keep maxAgeDays in the response for older clients and configuration screens.
+    maxAgeDays: refreshLookbackDays,
     platforms: [...PLATFORMS],
     regionMode: 'nationwide',
     keywordGroups: Object.keys(KEYWORD_GROUPS),
   };
+}
+
+function hasCompletedInitialBackfill(run, config) {
+  const queryCount = Array.isArray(run?.query_plan) ? run.query_plan.length : 0;
+  return Boolean(
+    run
+      && Number(run.max_age_days) >= Number(config.initialLookbackDays)
+      && ['completed', 'completed_with_errors'].includes(run.status)
+      && Number(run.query_cursor || 0) >= queryCount
+  );
 }
 
 function getFreshnessSuffix(maxAgeDays) {
@@ -943,6 +966,8 @@ function createLeadRadarService(deps = {}) {
       return { skipped: true, status: 'waiting_for_next_interval', run: latest, config };
     }
 
+    const initialBackfillCompleted = hasCompletedInitialBackfill(latest, config);
+
     return {
       skipped: false,
       resumed: false,
@@ -952,7 +977,7 @@ function createLeadRadarService(deps = {}) {
         keywordGroups: config.keywordGroups,
         maxQueries: config.maxQueries,
         websiteLookupLimit: config.websiteLookupLimit,
-        maxAgeDays: config.maxAgeDays,
+        maxAgeDays: initialBackfillCompleted ? config.refreshLookbackDays : config.initialLookbackDays,
         scanMode: 'automatic',
       }),
       config,
@@ -971,7 +996,7 @@ function createLeadRadarService(deps = {}) {
       negativeTerms: NEGATIVE_TERMS,
       regionalCoverage: { provinces: PROVINCES.length, cities: IMPORTANT_CITIES.length },
       defaults: { maxQueries: DEFAULT_SCAN_QUERY_LIMIT, websiteLookupLimit: DEFAULT_WEBSITE_LOOKUP_LIMIT },
-      autoScan: { ...autoScanConfig, lastRun: null },
+      autoScan: { ...autoScanConfig, initialBackfillCompleted: false, lastRun: null },
     };
     if (!storageConfigured) return status;
     const db = getDb();
@@ -989,7 +1014,12 @@ function createLeadRadarService(deps = {}) {
       notChecked: await count('website_status', 'website_not_checked'),
       notWorking: await count('website_status', 'website_not_working'),
     };
-    status.autoScan.lastRun = summarizeScanRun(await getLatestAutomaticRun());
+    const latestAutomaticRun = await getLatestAutomaticRun();
+    status.autoScan.lastRun = summarizeScanRun(latestAutomaticRun);
+    status.autoScan.initialBackfillCompleted = hasCompletedInitialBackfill(latestAutomaticRun, autoScanConfig);
+    status.autoScan.nextLookbackDays = status.autoScan.initialBackfillCompleted
+      ? autoScanConfig.refreshLookbackDays
+      : autoScanConfig.initialLookbackDays;
     return status;
   }
 
@@ -1002,6 +1032,7 @@ function createLeadRadarService(deps = {}) {
     normalizeStatus,
     normalizeWebsiteStatus,
     scoreSignal,
+    hasCompletedInitialBackfill,
     getStatus,
     listSignals,
     getSignal,
@@ -1022,6 +1053,7 @@ module.exports = {
   buildFingerprint,
   buildSignalFromProviderItem,
   buildSearchPlan,
+  hasCompletedInitialBackfill,
   normalizeHttpUrl,
   normalizePlatform,
   normalizeStatus,

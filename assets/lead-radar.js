@@ -62,8 +62,12 @@
       return;
     }
     const lastRun = autoScan.lastRun;
+    const initialDays = Number(autoScan.initialLookbackDays) || 30;
+    const refreshDays = Number(autoScan.refreshLookbackDays) || 3;
     const lastRunLabel = lastRun?.finished_at ? ` Laatste ronde: ${formatDate(lastRun.finished_at)}.` : '';
-    element.textContent = `Automatisch actief: nieuwe openbare signalen worden elke ${interval} minuten opgehaald.${lastRunLabel}`;
+    element.textContent = autoScan.initialBackfillCompleted
+      ? `Automatisch actief: nieuwste signalen uit de laatste ${refreshDays} dagen worden elke ${interval} minuten opgehaald.${lastRunLabel}`
+      : `Eerste automatische vulling: signalen uit de laatste ${initialDays} dagen worden opgehaald. Daarna volgen updates elke ${interval} minuten.${lastRunLabel}`;
     element.className = 'auto-scan-status';
   }
 
@@ -156,11 +160,14 @@
       ? $('#scan-regions').value.split(',').map((value) => value.trim()).filter(Boolean)
       : [];
     const websiteLookupInput = Number($('#scan-website-limit').value);
-    const payload = { platforms, regionMode, regions, maxQueries: Number($('#scan-max-queries').value) || 12, websiteLookupLimit: Number.isFinite(websiteLookupInput) ? websiteLookupInput : 10, ...(extra || {}) };
+    const payload = { platforms, regionMode, regions, maxAgeDays: Number($('#scan-max-age-days').value) || 30, maxQueries: Number($('#scan-max-queries').value) || 12, websiteLookupLimit: Number.isFinite(websiteLookupInput) ? websiteLookupInput : 10, ...(extra || {}) };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan wordt uitgevoerd...'; $('#scan-progress-bar').style.width = '15%';
     try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-bar').style.width = '100%'; $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals(), loadRuns()]); }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
-    finally { button.disabled = false; setTimeout(() => { $('#scan-progress').hidden = true; }, 1200); }
+    finally {
+      button.disabled = !state.status?.provider?.configured;
+      setTimeout(() => { $('#scan-progress').hidden = true; }, 1200);
+    }
   }
 
   async function submitImport(event) {

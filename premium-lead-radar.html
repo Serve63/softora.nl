@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260817b">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260817c">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -38,7 +38,7 @@
         <div>
             <p class="section-kicker">LANDDEKKING</p>
             <h2>Nieuwe signalen zoeken</h2>
-            <p id="scan-status-text">De scan gebruikt kleine zoekopdrachten per platform, regio en zoekwoordgroep.</p>
+            <p id="scan-status-text">De eerste vulling kijkt standaard 30 dagen terug. Daarna worden alleen de nieuwste signalen bijgewerkt.</p>
             <p class="auto-scan-status" id="auto-scan-status">Automatische scanstatus wordt geladen...</p>
         </div>
         <div class="scan-panel__controls">
@@ -53,6 +53,14 @@
               <option value="nationwide" selected>Heel Nederland</option>
               <option value="regional">Nederland + provincies en steden</option>
               <option value="custom">Eigen regio's</option>
+            </select>
+          </label>
+          <label>Periode
+            <select id="scan-max-age-days">
+              <option value="30" selected>Laatste 30 dagen</option>
+              <option value="7">Laatste 7 dagen</option>
+              <option value="3">Laatste 3 dagen</option>
+              <option value="1">Laatste 24 uur</option>
             </select>
           </label>
           <label class="scan-region-input">Eigen regio's
@@ -138,6 +146,6 @@
       </form>
     </section>
   </main>
-  <script src="/assets/lead-radar.js?v=20260817b" defer></script>
+  <script src="/assets/lead-radar.js?v=20260817c" defer></script>
 </body>
 </html>

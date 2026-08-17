@@ -8,6 +8,7 @@ const {
   buildSearchPlan,
   buildSignalFromProviderItem,
   createLeadRadarService,
+  hasCompletedInitialBackfill,
   normalizeHttpUrl,
   normalizePlatform,
   scoreSignal,
@@ -124,6 +125,17 @@ test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () 
   assert.equal(status.storageConfigured, false);
   assert.equal(status.provider.configured, false);
   assert.match(status.provider.message, /Configureer|provider/i);
+  assert.equal(status.autoScan.initialLookbackDays, 30);
+  assert.equal(status.autoScan.refreshLookbackDays, 3);
+});
+
+test('Lead Radar vult eerst 30 dagen en schakelt daarna over op een korte updateperiode', () => {
+  const config = { initialLookbackDays: 30 };
+  const incomplete = { status: 'paused', max_age_days: 30, query_cursor: 12, query_plan: Array.from({ length: 20 }) };
+  const complete = { status: 'completed', max_age_days: 30, query_cursor: 20, query_plan: Array.from({ length: 20 }) };
+  assert.equal(hasCompletedInitialBackfill(null, config), false);
+  assert.equal(hasCompletedInitialBackfill(incomplete, config), false);
+  assert.equal(hasCompletedInitialBackfill(complete, config), true);
 });
 
 test('Lead Radar registreert beveiligde adminroutes en geen outbound-acties', () => {
@@ -192,8 +204,9 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /Website zoeken/);
   assert.match(script, /setInterval/);
   assert.match(page, /id="auto-scan-status"/);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260817b/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260817b/);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260817c/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260817c/);
+  assert.match(page, /id="scan-max-age-days"/);
 });
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
