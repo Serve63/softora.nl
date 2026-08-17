@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
 
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
 const DEVICE_MOCKUP_FILE_VERSION = 'v8';
@@ -540,6 +541,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     getUiStateValues = async () => null,
     setUiStateValues = async () => null,
     dataOpsStore = null,
+    backgroundWorkerLeaseStore = dataOpsStore,
     photoScope = 'premium_database_photos',
     photoKey = 'softora_database_photos_v1',
     photoRemovalKey = 'softora_database_photos_removed_v1',
@@ -570,12 +572,12 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const RETRY_DELAY_MAX_MS = 60000;
   const PROCESSING_CONCURRENCY = Math.max(1, Math.min(10, Math.floor(Number(webdesignJobConcurrency) || 6)));
   const BULK_CHUNK_TARGET_LIMIT = Math.max(1, Math.min(250, Math.floor(Number(bulkChunkTargetLimit) || 100)));
-  const BULK_ACTIVE_JOB_LIMIT = Math.max(1, Math.min(64, Math.floor(Number(bulkActiveJobLimit) || 36)));
-  const BULK_START_LIMIT = Math.max(1, Math.min(48, Math.floor(Number(bulkStartLimit) || 36)));
+  const BULK_ACTIVE_JOB_LIMIT = Math.max(1, Math.min(64, Math.floor(Number(bulkActiveJobLimit) || 8)));
+  const BULK_START_LIMIT = Math.max(1, Math.min(48, Math.floor(Number(bulkStartLimit) || 8)));
   const BULK_RECONCILE_LIMIT = Math.max(1, Math.min(12, Math.floor(Number(bulkReconcileLimit) || 4)));
-  const BULK_WORKER_BATCH_LIMIT = Math.max(1, Math.min(8, Math.floor(Number(bulkWorkerBatchLimit) || 4)));
-  const BULK_WORKER_JOB_LIMIT = Math.max(1, Math.min(24, Math.floor(Number(bulkWorkerJobLimit) || 18)));
-  const BULK_WORKER_CONCURRENCY = Math.max(1, Math.min(PROCESSING_CONCURRENCY, Math.floor(Number(bulkWorkerConcurrency) || 6)));
+  const BULK_WORKER_BATCH_LIMIT = Math.max(1, Math.min(8, Math.floor(Number(bulkWorkerBatchLimit) || 1)));
+  const BULK_WORKER_JOB_LIMIT = Math.max(1, Math.min(24, Math.floor(Number(bulkWorkerJobLimit) || 2)));
+  const BULK_WORKER_CONCURRENCY = Math.max(1, Math.min(PROCESSING_CONCURRENCY, Math.floor(Number(bulkWorkerConcurrency) || 2)));
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
@@ -2427,69 +2429,19 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function runBatchWorker(options = {}) {
-    pruneJobs();
-    if (!requiresPersistentBatchStorage()) {
-      return createBatchStorageUnavailableResult('batch-opslag controleren');
-    }
-    const batchLimit = Math.max(1, Math.min(BULK_WORKER_BATCH_LIMIT, Math.floor(Number(options.batchLimit) || BULK_WORKER_BATCH_LIMIT)));
-    let runnableBatches;
-    try {
-      runnableBatches = await listRunnableBatches(batchLimit);
-    } catch (error) {
-      return createBatchStorageUnavailableResult('runnable batches lezen', error);
-    }
-    if (!Array.isArray(runnableBatches)) {
-      return createBatchStorageUnavailableResult('runnable batches lezen', new Error('Geen batchlijst ontvangen'));
-    }
-
-    const result = {
-      ok: true,
-      statusCode: 200,
-      batchCount: 0,
-      processedJobs: 0,
-      loadedJobs: 0,
-      missingJobs: 0,
-      completedTargets: 0,
-      changedChunks: 0,
-      batches: [],
-    };
-
-    for (const batch of runnableBatches) {
-      if (!batch || !batch.id || !batch.ownerKey) continue;
-      const chunksResult = await loadBatchChunks(batch.ownerKey, batch.id);
-      if (chunksResult.error) continue;
-      const drivenBefore = await driveBatch(batch, chunksResult.chunks || []);
-      if (drivenBefore.storageError) {
-        return createBatchStorageUnavailableResult(
-          drivenBefore.storageError.action || 'batch-status opslaan',
-          drivenBefore.storageError.error
-        );
-      }
-      const workerResult = await processBatchJobsForWorker(drivenBefore.batch, drivenBefore.chunks, options);
-      if (workerResult.storageError) {
-        return createBatchStorageUnavailableResult(
-          workerResult.storageError.action || 'batch-worker opslaan',
-          workerResult.storageError.error
-        );
-      }
-      const drivenAfter = await driveBatch(drivenBefore.batch, drivenBefore.chunks);
-      if (drivenAfter.storageError) {
-        return createBatchStorageUnavailableResult(
-          drivenAfter.storageError.action || 'batch-status opslaan',
-          drivenAfter.storageError.error
-        );
-      }
-      const serialized = serializeBatch(drivenAfter.batch, drivenAfter.chunks);
-      result.batchCount += 1;
-      result.processedJobs += workerResult.processedJobs;
-      result.loadedJobs += workerResult.loadedJobs;
-      result.missingJobs += workerResult.missingJobs;
-      result.completedTargets += workerResult.completedTargets;
-      result.changedChunks += workerResult.changedChunks;
-      result.batches.push(serialized);
-    }
-
-    return result;
+    return runPremiumDatabaseWebdesignBatchWorker(options, {
+      logger,
+      backgroundWorkerLeaseStore,
+      pruneJobs,
+      requiresPersistentBatchStorage,
+      createBatchStorageUnavailableResult,
+      listRunnableBatches,
+      loadBatchChunks,
+      driveBatch,
+      processBatchJobsForWorker,
+      serializeBatch,
+      bulkWorkerBatchLimit: BULK_WORKER_BATCH_LIMIT,
+    });
   }
 
   async function runBatchWorkerResponse(req, res) {

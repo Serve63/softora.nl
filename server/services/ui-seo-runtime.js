@@ -10,6 +10,7 @@ const { createWebsiteLinkCoordinator } = require('./website-links');
 const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-library');
 const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridge');
 const { createSoftoraDataOpsStore } = require('./data-ops-store');
+const { createBackgroundWorkerLeaseStore } = require('./background-worker-lease-store');
 const { createDataOpsHealthReporter } = require('./data-ops-health');
 const { createSportschoolLogbookStore } = require('./sportschool-logbook-store');
 
@@ -130,6 +131,11 @@ function createUiSeoRuntime(deps = {}) {
     isSupabaseConfigured,
     getSupabaseClient,
     dataOpsReadQueryTimeoutMs,
+    logger,
+  });
+  const backgroundWorkerLeaseStore = createBackgroundWorkerLeaseStore({
+    isSupabaseConfigured,
+    getSupabaseClient,
     logger,
   });
   const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({
@@ -327,6 +333,7 @@ function createUiSeoRuntime(deps = {}) {
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
     dataOpsStore,
+    backgroundWorkerLeaseStore,
     dataOpsHealthReporter,
     dataOpsUiStateBridge,
     websiteLinkCoordinator,

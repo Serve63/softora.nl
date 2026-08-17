@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { deduplicateRowsByKey } = require('./mailbox-index-message-rows');
 const { createMailboxStateMutationStore } = require('../repositories/mailbox-state-mutation-store');
 const {
   isOriginalCampaignOutboundMessage,
@@ -980,9 +981,7 @@ function createMailboxIndexStore(deps = {}) {
   }
 
   async function upsertMessages({ accountEmail, folder = 'inbox', messages = [] }) {
-    const rows = (Array.isArray(messages) ? messages : [])
-      .map((message, index) => buildMessageRow(message, accountEmail, folder, index))
-      .filter((row) => row.uid > 0);
+    const rows = deduplicateRowsByKey((Array.isArray(messages) ? messages : []).map((message, index) => buildMessageRow(message, accountEmail, folder, index)).filter((row) => row.uid > 0), 'message_key');
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
     const result = await runDurableWrite('upsert-messages', (client) =>
       client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {

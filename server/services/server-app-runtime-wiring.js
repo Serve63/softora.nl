@@ -44,6 +44,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     getUiStateValues: featureRouteOptions.getUiStateValues,
     setUiStateValues: featureRouteOptions.setUiStateValues,
     dataOpsStore: featureRouteOptions.dataOpsStore,
+    backgroundWorkerLeaseStore: featureRouteOptions.backgroundWorkerLeaseStore,
   });
   const premiumDatabaseCinematicJobsCoordinator = createPremiumDatabaseCinematicJobsCoordinator({
     logger: aiDashboardOptions.logger || console,
