@@ -120,14 +120,14 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817c/);
-  assert.match(readPage(), /assets\/premium-mailbox-discovery\.js\?v=20260817c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817d/);
+  assert.match(readPage(), /assets\/premium-mailbox-discovery\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
   assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817c/);
+  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260817a/);
@@ -3087,7 +3087,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260817a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
@@ -3185,7 +3185,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260817c/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260817d/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -6010,8 +6010,8 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260817c/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260817c/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260817d/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260817d/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -6311,6 +6311,82 @@ test('premium mailbox houdt de oude Sent-parent zichtbaar naast een latere uitga
     new RegExp(`<a class="detail-mail-cta-link" href="${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;')}" target="_blank" rel="noopener noreferrer">hier</a>`)
   );
   assert.doesNotMatch(html, /Jouw eerdere mail|detail-mail-section-quote/);
+});
+
+test('contactdossier rendert het geselecteerde uitgaande bericht exact één keer volledig roze', () => {
+  const body = [
+    'Beste secretariaat,',
+    '',
+    'Dit volledige uitgaande bericht hoort in één kaart.',
+    '',
+    'Op 27 juli schreef Secretariaat:',
+    '> Geciteerde ontvangen tekst.',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(body, [], {
+    contactDossierMode: true,
+    mail: {
+      id: 'martijn@softora.nl|sent:senioren-1',
+      messageId: '<senioren-1@example.test>',
+      folder: 'sent',
+      direction: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      email: 'martijn@softora.nl',
+      to: 'secretariaat@seniorenhaaren.nl',
+      date: '28 jul',
+      time: '16:19',
+      body,
+      contactTimelineLoaded: true,
+      threadMessages: [],
+    },
+  });
+
+  assert.equal((html.match(/data-mailbox-root-message="true"/g) || []).length, 1);
+  assert.equal((html.match(/detail-mail-section detail-mail-section-sent/g) || []).length, 1);
+  assert.equal((html.match(/>Jouw bericht</g) || []).length, 1);
+  const card = html.match(/<section class="detail-mail-section detail-mail-section-sent"[^>]*data-mailbox-root-message="true">([\s\S]*?)<\/section>/);
+  assert.ok(card);
+  assert.match(card[1], /Dit volledige uitgaande bericht hoort in één kaart/);
+  assert.doesNotMatch(html.replace(card[0], ''), /Dit volledige uitgaande bericht hoort in één kaart/);
+  assert.equal((html.match(/Geciteerde ontvangen tekst/g) || []).length, 1);
+  assert.ok(html.startsWith('<section class="detail-mail-section detail-mail-section-sent"'));
+  assert.ok(html.endsWith('</section>'));
+});
+
+test('contactdossier rendert ieder onderscheiden uitgaand bericht één keer roze naast inkomend', () => {
+  const aliases = [
+    ['martijnvandeven@softora.nl', 'secretariaat@seniorenhaaren.nl'],
+    ['serve290@gmail.com', 'contact@example.nl'],
+  ];
+  aliases.forEach(([accountEmail, contact], fixtureIndex) => {
+    const html = renderMailboxBodyForTest(`Uitgaand hoofdbericht ${fixtureIndex}.`, [], {
+      contactDossierMode: true,
+      mail: {
+        id: `sent:root-${fixtureIndex}`,
+        messageId: `<root-${fixtureIndex}@example.test>`,
+        folder: 'sent', accountEmail, email: accountEmail, to: contact,
+        body: `Uitgaand hoofdbericht ${fixtureIndex}.`,
+        contactTimelineLoaded: true,
+        threadMessages: [{
+          id: `inbox:${fixtureIndex}`, messageId: `<in-${fixtureIndex}@example.test>`,
+          folder: 'inbox', accountEmail, email: contact, to: accountEmail,
+          date: '2026-07-27T10:00:00.000Z', body: `Inkomend bericht ${fixtureIndex}.`,
+        }, {
+          id: `sent:older-${fixtureIndex}`, messageId: `<out-${fixtureIndex}@example.test>`,
+          folder: 'sent', accountEmail, email: accountEmail, to: contact,
+          date: '2026-07-26T10:00:00.000Z', body: `Tweede uitgaand bericht ${fixtureIndex}.`,
+        }],
+      },
+    });
+
+    assert.equal((html.match(/detail-mail-section detail-mail-section-sent/g) || []).length, 2);
+    assert.equal((html.match(/detail-mail-section detail-mail-section-received/g) || []).length, 1);
+    assert.equal((html.match(/>Jouw bericht</g) || []).length, 2);
+    assert.equal((html.match(new RegExp(`Uitgaand hoofdbericht ${fixtureIndex}`, 'g')) || []).length, 1);
+    assert.equal((html.match(new RegExp(`Tweede uitgaand bericht ${fixtureIndex}`, 'g')) || []).length, 1);
+    assert.equal((html.match(new RegExp(`Inkomend bericht ${fixtureIndex}`, 'g')) || []).length, 1);
+    assert.ok(html.indexOf(`Uitgaand hoofdbericht ${fixtureIndex}`) < html.indexOf(`Inkomend bericht ${fixtureIndex}`));
+    assert.ok(html.indexOf(`Inkomend bericht ${fixtureIndex}`) < html.indexOf(`Tweede uitgaand bericht ${fixtureIndex}`));
+  });
 });
 
 test('premium mailbox maakt een legacy hier-url zonder exact MIME-bewijs niet klikbaar', () => {
