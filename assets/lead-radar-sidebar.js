@@ -15,14 +15,17 @@
     });
     if (!overview) return;
     let link = overview.querySelector(`[data-sidebar-key="${LINK_KEY}"]`);
-    if (!link) {
-      link = document.createElement('a');
-      link.className = 'sidebar-link magnetic';
-      link.dataset.sidebarKey = LINK_KEY;
-      link.innerHTML = `${LINK_ICON}<span class="sidebar-link-text">${LINK_LABEL}</span>`;
-      const database = overview.querySelector('[data-sidebar-key="database"]');
-      overview.insertBefore(link, database || null);
-    }
+      if (!link) {
+        link = document.createElement('a');
+        link.className = 'sidebar-link magnetic';
+        link.dataset.sidebarKey = LINK_KEY;
+        link.innerHTML = `${LINK_ICON}<span class="sidebar-link-text">${LINK_LABEL}</span>`;
+        const database = overview.querySelector('[data-sidebar-key="database"]');
+        overview.insertBefore(link, database || null);
+      }
+    overview.querySelectorAll('.sidebar-link[data-sidebar-key]').forEach((item) => {
+      item.classList.toggle('active', item === link);
+    });
     link.href = LINK_HREF;
     link.classList.remove('sidebar-link--coming-soon');
     link.removeAttribute('aria-disabled');
