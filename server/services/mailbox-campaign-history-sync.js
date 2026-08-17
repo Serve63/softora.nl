@@ -151,6 +151,8 @@ async function resolveMailboxSyncUids({
   client,
   limit,
   campaignHistory = false,
+  lastSyncedUid = 0,
+  syncCursorOverlap = 0,
   oldestIndexedCampaignUid = 0,
   threadReferenceIds = [],
   threadRecipientTerms = [],
@@ -161,8 +163,14 @@ async function resolveMailboxSyncUids({
   folder = '',
   prioritizeTargetedUids = false,
 } = {}) {
-  const allUids = await client.search({ all: true }, { uid: true });
+  const allUids = normalizeUidList(await client.search({ all: true }, { uid: true }));
   if (!campaignHistory) {
+    const cursor = Math.max(0, Number(lastSyncedUid) || 0);
+    const highestUid = allUids[allUids.length - 1] || 0;
+    const cursorFloor = Math.max(0, cursor - Math.max(0, Number(syncCursorOverlap) || 0));
+    const incrementalUids = cursor > 0 && highestUid >= cursor
+      ? allUids.filter((uid) => uid > cursorFloor)
+      : allUids;
     const targetedUids = threadReferenceIds.length || threadRecipientTerms.length
       ? await searchThreadReplyUids({
           client,
@@ -175,7 +183,7 @@ async function resolveMailboxSyncUids({
         })
       : [];
     return selectMailboxSyncUids({
-      allUids,
+      allUids: incrementalUids,
       priorityUids: targetedUids,
       indexedUids,
       limit,
