@@ -22,6 +22,14 @@ function consistencyBlock(source) {
   return match[0];
 }
 
+function hasFunctionPrivilegeStatement(source, action, signature) {
+  const pattern = new RegExp(
+    `${action} on function public\\.${signature.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r?\\n  ` +
+      (action === 'grant execute' ? 'to service_role;' : 'from public, anon, authenticated;')
+  );
+  return pattern.test(source);
+}
+
 test('de deploymigratie en data-ops-schema bevatten exact dezelfde idempotente foundation', () => {
   assert.equal(consistencyBlock(schema), consistencyBlock(migration));
   assert.match(migration, /create table if not exists public\.softora_mailbox_campaign_consistency/);
@@ -128,11 +136,11 @@ test('RPCs en tabellen zijn alleen voor service_role bereikbaar', () => {
     'softora_get_mailbox_campaign_fence(boolean)',
   ].forEach((signature) => {
     assert.ok(
-      migration.includes(`grant execute on function public.${signature}\n  to service_role;`),
+      hasFunctionPrivilegeStatement(migration, 'grant execute', signature),
       `${signature} mist service_role grant`
     );
     assert.ok(
-      migration.includes(`revoke all on function public.${signature}\n  from public, anon, authenticated;`),
+      hasFunctionPrivilegeStatement(migration, 'revoke all', signature),
       `${signature} mist publieke revoke`
     );
   });

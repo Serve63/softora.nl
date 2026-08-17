@@ -8,23 +8,60 @@ const { spawn } = require('node:child_process');
 const root = path.join(__dirname, '../..');
 const pluginRoot = path.join(root, 'codex-plugins/whatsapp-read-only');
 
-function requestMcp(messages, env = {}, waitMs = 150) {
+function requestMcp(messages, env = {}, waitMs = 1500) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(pluginRoot, 'mcp/server.mjs')], {
       env: { ...process.env, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    let stdout = '';
+    const expectedIds = new Set(messages.map((message) => message.id).filter((id) => id != null));
+    const responses = [];
+    let stdoutBuffer = '';
     let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    let settled = false;
+    let timer = null;
+
+    function parseStdoutChunk(chunk = '') {
+      stdoutBuffer += chunk;
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() || '';
+      lines.filter(Boolean).forEach((line) => responses.push(JSON.parse(line)));
+    }
+
+    function hasExpectedResponses() {
+      if (expectedIds.size === 0) return responses.length > 0;
+      return Array.from(expectedIds).every((id) => responses.some((response) => response.id === id));
+    }
+
+    function finish() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill('SIGTERM');
+      resolve(responses);
+    }
+
+    child.stdout.on('data', (chunk) => {
+      parseStdoutChunk(String(chunk || ''));
+      if (hasExpectedResponses()) finish();
+    });
     child.stderr.on('data', (chunk) => { stderr += chunk; });
-    child.on('error', reject);
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
     child.on('close', (code, signal) => {
+      if (settled) return;
+      if (stdoutBuffer.trim()) parseStdoutChunk('\n');
       if (code !== 0 && signal !== 'SIGTERM') return reject(new Error(`MCP exit ${code}: ${stderr}`));
-      resolve(stdout.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line)));
+      settled = true;
+      clearTimeout(timer);
+      resolve(responses);
     });
     child.stdin.end(messages.map((message) => JSON.stringify(message)).join('\n') + '\n');
-    setTimeout(() => child.kill('SIGTERM'), waitMs);
+    timer = setTimeout(finish, waitMs);
   });
 }
 
@@ -44,7 +81,9 @@ test('WhatsApp plugin manifest and skill stay strictly read-only', async () => {
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25' } },
     { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
   ]);
-  const tools = responses.find((response) => response.id === 2).result.tools;
+  const toolsResponse = responses.find((response) => response.id === 2);
+  assert.ok(toolsResponse?.result, 'tools/list response ontbreekt');
+  const tools = toolsResponse.result.tools;
   assert.deepEqual(tools.map((tool) => tool.name), ['whatsapp_status', 'read_whatsapp']);
   for (const tool of tools) {
     assert.deepEqual(tool.annotations, {
@@ -80,12 +119,13 @@ test('WhatsApp MCP tool performs only authenticated GET and does not echo its to
     }], {
       SOFTORA_WHATSAPP_READ_TOKEN: token,
       SOFTORA_WHATSAPP_BASE_URL: `http://127.0.0.1:${address.port}`,
-    }, 300);
+    });
     assert.equal(requests.length, 1);
     assert.equal(requests[0].method, 'GET');
     assert.equal(requests[0].authorization, `Bearer ${token}`);
     assert.match(requests[0].url, /^\/api\/whatsapp\/messages\?/);
     assert.match(requests[0].url, /contact=Test\+Persoon/);
+    assert.ok(responses[0]?.result, 'tools/call response ontbreekt');
     assert.equal(responses[0].result.structuredContent.count, 1);
     assert.doesNotMatch(JSON.stringify(responses), new RegExp(token));
   } finally {

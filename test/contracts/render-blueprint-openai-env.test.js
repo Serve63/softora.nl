@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 test('render blueprint preserves OpenAI billing and project env placeholders', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../../render.yaml'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../../render.yaml'), 'utf8').replace(/\r\n/g, '\n');
   const softoraService = source.split(/\n  - type: web\n    name: twilio-media-bridge/)[0] || '';
 
   [

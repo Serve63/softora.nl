@@ -162,7 +162,8 @@ function isApprovedPremiumAuthUsersWriteFile(filePath, fileSource = '') {
   const normalized = normalizeRepoPath(filePath);
   const expectedHash = PREMIUM_AUTH_USERS_APPROVED_WRITE_FILE_HASHES[normalized];
   if (!expectedHash) return false;
-  const actualHash = crypto.createHash('sha256').update(String(fileSource || '')).digest('hex');
+  const normalizedSource = String(fileSource || '').replace(/\r\n/g, '\n');
+  const actualHash = crypto.createHash('sha256').update(normalizedSource).digest('hex');
   return actualHash === expectedHash;
 }
 
