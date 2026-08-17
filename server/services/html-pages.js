@@ -17,6 +17,7 @@ const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260811a';
 const PREMIUM_PERSONNEL_THEME_VERSION = '20260811a';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
+const LEAD_RADAR_SIDEBAR_VERSION = '20260817a';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
@@ -24,6 +25,7 @@ const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
   `<script src="/assets/premium-sidebar-autopilot.js?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}" defer></script>`,
   `<script src="/assets/premium-dashboard-ai-chat-scope.js?v=${PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION}" defer></script>`,
+  `<script src="/assets/lead-radar-sidebar.js?v=${LEAD_RADAR_SIDEBAR_VERSION}" defer></script>`,
 ].join('\n');
 const LIVE_MOMENTUM_VIEW_TRANSITION_OPTOUT = `<style id="softora-live-momentum-view-transition-optout">
 @view-transition{navigation:none;}

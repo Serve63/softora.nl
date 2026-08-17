@@ -46,6 +46,8 @@ h2 { margin-bottom: 0; font-size: 17px; letter-spacing: 0; }
 .scan-panel { padding: 20px; }
 .scan-panel__intro { display: flex; justify-content: space-between; gap: 24px; }
 .scan-panel__intro p:not(.section-kicker) { max-width: 610px; margin: 8px 0 0; color: var(--radar-muted); line-height: 1.5; }
+.auto-scan-status { color: var(--radar-green) !important; font-weight: 750; }
+.auto-scan-status--muted { color: var(--radar-muted) !important; }
 .scan-panel__controls { align-items: flex-end; justify-content: flex-end; }
 .scan-region-input input:disabled { opacity: .55; cursor: not-allowed; }
 label { display: grid; gap: 6px; color: #675d57; font-size: 11px; font-weight: 800; text-transform: uppercase; }
