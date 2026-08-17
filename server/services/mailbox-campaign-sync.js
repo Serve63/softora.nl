@@ -28,6 +28,7 @@ const CAMPAIGN_HISTORY_SEED_FOLDERS = Object.freeze([
 ]);
 const INCREMENTAL_LOCK_RETRY_ATTEMPTS = 12;
 const INCREMENTAL_LOCK_RETRY_DELAY_MS = 500;
+const REGULAR_CRON_LOCK_RETRY_ATTEMPTS = 150;
 const REGULAR_SYNC_CURSOR_OVERLAP = 3;
 
 function selectMailboxSyncAccounts({
@@ -168,17 +169,32 @@ async function syncMailboxRequest({
     !folderParam &&
     !campaignOnly
   );
-  const result = await syncMailbox({
-    accountEmail,
-    owner,
-    folders,
-    limit: Number(requestedLimit) || fallbackLimit,
-    force,
-    campaignOnly,
-    incrementalOnly,
-    maxConcurrentAccounts: fastRefresh || defaultCronRequest ? 2 : 1,
-  });
+  let result;
   if (defaultCronRequest) {
+    const sentResult = await syncMailbox({
+      folders: ['sent'],
+      limit: Number(requestedLimit) || fallbackLimit,
+      force,
+      campaignOnly: false,
+      incrementalOnly: false,
+      retryContention: true,
+      maxConcurrentAccounts: 2,
+    });
+    const inboxResult = await syncMailbox({
+      folders: ['inbox'],
+      limit: Number(requestedLimit) || fallbackLimit,
+      force,
+      campaignOnly: false,
+      incrementalOnly: false,
+      maxConcurrentAccounts: 2,
+    });
+    result = {
+      ok: sentResult.ok && inboxResult.ok,
+      results: [
+        ...(Array.isArray(sentResult.results) ? sentResult.results : []),
+        ...(Array.isArray(inboxResult.results) ? inboxResult.results : []),
+      ],
+    };
     const campaignHistoryResult = await syncMailbox({
       folders: ['inbox', CAMPAIGN_GMAIL_LABEL_FOLDER],
       limit: Number(requestedLimit) || fallbackLimit,
@@ -192,6 +208,17 @@ async function syncMailboxRequest({
       ...(Array.isArray(result.results) ? result.results : []),
       ...(Array.isArray(campaignHistoryResult.results) ? campaignHistoryResult.results : []),
     ];
+  } else {
+    result = await syncMailbox({
+      accountEmail,
+      owner,
+      folders,
+      limit: Number(requestedLimit) || fallbackLimit,
+      force,
+      campaignOnly,
+      incrementalOnly,
+      maxConcurrentAccounts: fastRefresh ? 2 : 1,
+    });
   }
   return result;
 }
@@ -217,6 +244,7 @@ function createMailboxSyncService({
     force = false,
     campaignOnly = false,
     incrementalOnly = false,
+    retryContention = false,
     campaignSeedCache = null,
   } = {}) {
     const account = assertReadableAccount(accountEmail);
@@ -229,11 +257,15 @@ function createMailboxSyncService({
       folder: normalizedFolder,
       force,
     });
-    if (incrementalOnly && !lock.ok && lock.locked && lock.contention === 'active_lock') {
+    const requiredLock = incrementalOnly || retryContention;
+    if (requiredLock && !lock.ok && lock.locked && lock.contention === 'active_lock') {
       return { ok: true, skipped: true, reason: 'coalesced' };
     }
-    if (incrementalOnly) {
-      for (let attempt = 1; attempt < INCREMENTAL_LOCK_RETRY_ATTEMPTS && !lock.ok; attempt += 1) {
+    if (requiredLock) {
+      const retryAttempts = retryContention
+        ? REGULAR_CRON_LOCK_RETRY_ATTEMPTS
+        : INCREMENTAL_LOCK_RETRY_ATTEMPTS;
+      for (let attempt = 1; attempt < retryAttempts && !lock.ok; attempt += 1) {
         const retryableContention = lock.locked || isMailboxSyncCapacityError(lock.error);
         if (!retryableContention) break;
         await waitForIncrementalLockRetry(INCREMENTAL_LOCK_RETRY_DELAY_MS);
@@ -250,10 +282,10 @@ function createMailboxSyncService({
     if (!lock.ok) {
       const retryableContention = lock.locked || isMailboxSyncCapacityError(lock.error);
       return {
-        ok: incrementalOnly && retryableContention ? false : true,
+        ok: requiredLock && retryableContention ? false : true,
         skipped: true,
         reason: lock.locked ? 'locked' : 'lock_failed',
-        ...(incrementalOnly && retryableContention ? { retryable: true } : {}),
+        ...(requiredLock && retryableContention ? { retryable: true } : {}),
       };
     }
 
@@ -483,6 +515,7 @@ function createMailboxSyncService({
     force = false,
     campaignOnly = false,
     incrementalOnly = false,
+    retryContention = false,
     maxConcurrentAccounts = 1,
   } = {}) {
     const accounts = selectMailboxSyncAccounts({
@@ -518,6 +551,7 @@ function createMailboxSyncService({
               force,
               campaignOnly,
               incrementalOnly,
+              retryContention,
               campaignSeedCache,
             }));
           } catch (error) {
@@ -555,6 +589,7 @@ module.exports = {
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
   INCREMENTAL_LOCK_RETRY_ATTEMPTS,
   INCREMENTAL_LOCK_RETRY_DELAY_MS,
+  REGULAR_CRON_LOCK_RETRY_ATTEMPTS,
   MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
