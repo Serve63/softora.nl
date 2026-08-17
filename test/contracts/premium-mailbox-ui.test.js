@@ -3919,6 +3919,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie<\/button>/);
   assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" data-mailbox-compose-no-drag aria-label="Sluiten" title="Sluiten">×<\/button>/);
   assert.match(pageSource, /\.compose-x \{[^}]*z-index:\s*8;[^}]*width:\s*44px;[^}]*height:\s*44px;/);
+  assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(pageSource, /class="compose-resize-grip" data-mailbox-compose-resize-handle aria-hidden="true"/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817b/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817b/);

@@ -13,6 +13,10 @@ const migrationPath = path.resolve(
   __dirname,
   '../../supabase/migrations/20260817102256_mailbox_full_history_search.sql'
 );
+const performanceMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260817115400_mailbox_search_stored_document.sql'
+);
 
 function createElement() {
   const listeners = {};
@@ -266,6 +270,14 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
     ''
   );
   await database.exec(migration);
+  let performanceMigration = fs.readFileSync(performanceMigrationPath, 'utf8');
+  performanceMigration = performanceMigration
+    .replace(
+      /create index if not exists softora_mailbox_messages_search_document_idx[\s\S]*?generation_superseded_at is null;\n\n/,
+      ''
+    )
+    .replace(/drop index if exists public\.softora_mailbox_messages_full_history_search_idx;\n\n/, '');
+  await database.exec(performanceMigration);
 
   const payload = (extra = {}) => JSON.stringify({ source: 'imap-sync', provider: 'imap', ...extra });
   const rows = [
@@ -316,6 +328,7 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
 
 test('SQL-contract houdt discovery service-role-only, bounded en op de volledige body-index', () => {
   const source = fs.readFileSync(migrationPath, 'utf8');
+  const performanceSource = fs.readFileSync(performanceMigrationPath, 'utf8');
   assert.match(source, /using gin[\s\S]*extensions\.gin_trgm_ops/);
   assert.match(source, /body_text/);
   assert.match(source, /generation_superseded_at is null/);
@@ -324,4 +337,11 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   assert.match(source, /revoke all on function public\.softora_search_mailbox_messages[\s\S]*from public, anon, authenticated/);
   assert.match(source, /grant execute on function public\.softora_mailbox_contact_timeline[\s\S]*to service_role/);
   assert.doesNotMatch(source, /grant execute[\s\S]*to authenticated/);
+  assert.match(performanceSource, /search_document text generated always as/);
+  assert.match(performanceSource, /using gin \(search_document extensions\.gin_trgm_ops\)/);
+  assert.match(performanceSource, /matched_keys as materialized/);
+  assert.match(performanceSource, /unique_messages as materialized/);
+  assert.match(performanceSource, /thread_matches as materialized/);
+  assert.match(performanceSource, /from paged[\s\S]*join public\.softora_mailbox_messages/);
+  assert.doesNotMatch(performanceSource, /grant execute[\s\S]*to authenticated/);
 });

@@ -202,7 +202,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 /* COMPOSE MODAL */
 .compose-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.42); z-index: 50; display: none; align-items: center; justify-content: center; padding: clamp(10px, 3vw, 28px); }
 .compose-overlay.open { display: flex; }
-.compose-box { position: relative; width: min(1040px, calc(100vw - 28px)); max-width: 100%; min-height: min(90vh, 700px); max-height: calc(100vh - 28px); background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 72px rgba(0,0,0,.22); display: flex; flex-direction: column; overflow: hidden; animation: compose-pop .2s ease; }
+.compose-box { position: relative; width: min(1040px, calc(100vw - 28px)); height: min(700px, calc(100vh - 28px)); max-width: 100%; min-height: min(480px, calc(100vh - 28px)); max-height: calc(100vh - 28px); background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 72px rgba(0,0,0,.22); display: flex; flex-direction: column; overflow: hidden; animation: compose-pop .2s ease; }
 @keyframes compose-pop { from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none} }
 .compose-head { min-height: 56px; padding: 6px 8px 6px 20px; background: var(--crimson); color: #fff; display: flex; align-items: center; justify-content: space-between; cursor: grab; touch-action: none; user-select: none; }
 .compose-box[data-compose-dragging="true"] .compose-head { cursor: grabbing; }
