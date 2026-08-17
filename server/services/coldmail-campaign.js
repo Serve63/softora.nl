@@ -17,6 +17,7 @@ const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-r
 const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation'); const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
+const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
   fitWebdesignPreviewForEmail,
@@ -3346,9 +3347,7 @@ function createColdmailCampaignService(deps = {}) {
       });
       setColdmailRecipientCount(recipientCounts, recipientKey, 1);
 
-      const sentAt = normalizeString(
-        group.updated_at || group.updatedAt || group.last_seen_at || group.lastSeenAt || group.created_at || group.createdAt
-      );
+      const sentAt = resolveColdmailGuardSentAt(group);
       const sentAtMs = parseTimestampMs(sentAt);
       if (sentAtMs && (!lastSentAt || sentAtMs > parseTimestampMs(lastSentAt))) {
         lastSentAt = sentAt;
@@ -3363,7 +3362,7 @@ function createColdmailCampaignService(deps = {}) {
     });
 
     return {
-      available: true,
+      available: true, sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL,
       recipientCounts,
       todayRecipientCounts,
       unkeyedTotalSent: 0,
@@ -3407,7 +3406,8 @@ function createColdmailCampaignService(deps = {}) {
       const current = summarizeColdmailCentralGuardLiveStats(groups);
       const dateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
       const merged = mergeMonotonicCurrentDayStats(payload, { stats: {
-        reliable: current.available, dateKey, lastSuccessfulSendAt: current.lastSentAt, lastSenderEmail: current.lastSenderEmail,
+        reliable: current.available, dateKey, sentTimestampModel: current.sentTimestampModel,
+        lastSuccessfulSendAt: current.lastSentAt, lastSenderEmail: current.lastSenderEmail,
         centralGuardSentToday: mergeColdmailRecipientCountTotals({ recipientCounts: current.todayRecipientCounts }),
       } }, now().toISOString());
       if (merged !== payload) {
@@ -3521,7 +3521,7 @@ function createColdmailCampaignService(deps = {}) {
       ok: true,
       stats: {
         timezone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
-        dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
+        dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE), sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL,
         source: centralGuardAvailable ? 'central-outbound-recipient-guard' : 'central-outbound-recipient-guard-unavailable',
         authoritativeSource: 'central-outbound-recipient-guard',
         reliable: centralGuardAvailable,

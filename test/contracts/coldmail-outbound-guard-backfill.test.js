@@ -98,6 +98,8 @@ test('coldmail outbound guard backfill maps mailbox recipients to all central gu
   assert.equal(insertRows[0].channel, 'coldmail');
   assert.equal(insertRows[0].permanent, true);
   assert.equal(insertRows[0].source, BACKFILL_SOURCE);
+  assert.equal(insertRows[0].last_seen_at, '2026-06-08T05:02:00.000Z');
+  assert.equal(insertRows[0].payload.sentAt, '2026-06-08T05:02:00.000Z');
   assert.equal(insertRows[0].payload.events[0].messageId, '<message-1@example.test>');
 });
 

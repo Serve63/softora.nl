@@ -17,16 +17,25 @@ function mergeMonotonicCurrentDayStats(payload, currentDayPayload, updatedAt) {
   const previousToday = finiteCount(base.centralGuardSentToday ?? base.systemSentToday ?? base.sentToday) || 0;
   const freshToday = finiteCount(fresh.centralGuardSentToday ?? fresh.systemSentToday ?? fresh.sentToday);
   if (freshToday === null) return payload;
-  const sentToday = Math.max(previousToday, freshToday);
-  const delta = Math.max(0, sentToday - previousToday);
-  const freshLastSentAt = fresh.lastSuccessfulSendAt &&
-    timestamp(fresh.lastSuccessfulSendAt) > timestamp(base.lastSuccessfulSendAt)
-    ? fresh.lastSuccessfulSendAt
-    : base.lastSuccessfulSendAt;
-  const freshLastSenderEmail = freshLastSentAt === fresh.lastSuccessfulSendAt
-    ? fresh.lastSenderEmail || base.lastSenderEmail
-    : base.lastSenderEmail;
-  const changed = delta > 0 ||
+  const previousTimestampModel = String(base.sentTimestampModel || '').trim();
+  const freshTimestampModel = String(fresh.sentTimestampModel || '').trim();
+  const timestampModelChanged = Boolean(
+    freshTimestampModel && freshTimestampModel !== previousTimestampModel
+  );
+  const sentToday = timestampModelChanged ? freshToday : Math.max(previousToday, freshToday);
+  const delta = timestampModelChanged ? 0 : Math.max(0, sentToday - previousToday);
+  const freshLastSentAt = timestampModelChanged
+    ? fresh.lastSuccessfulSendAt || ''
+    : fresh.lastSuccessfulSendAt &&
+        timestamp(fresh.lastSuccessfulSendAt) > timestamp(base.lastSuccessfulSendAt)
+      ? fresh.lastSuccessfulSendAt
+      : base.lastSuccessfulSendAt;
+  const freshLastSenderEmail = timestampModelChanged
+    ? fresh.lastSenderEmail || ''
+    : freshLastSentAt === fresh.lastSuccessfulSendAt
+      ? fresh.lastSenderEmail || base.lastSenderEmail
+      : base.lastSenderEmail;
+  const changed = timestampModelChanged || delta > 0 ||
     freshLastSentAt !== base.lastSuccessfulSendAt ||
     freshLastSenderEmail !== base.lastSenderEmail;
   if (!changed) return payload;
@@ -37,6 +46,7 @@ function mergeMonotonicCurrentDayStats(payload, currentDayPayload, updatedAt) {
     systemSentToday: sentToday,
     centralGuardSentToday: sentToday,
     webdesignSentToday: sentToday,
+    sentTimestampModel: freshTimestampModel || previousTimestampModel,
     lastSuccessfulSendAt: freshLastSentAt,
     lastSenderEmail: freshLastSenderEmail,
     reliable: true,
