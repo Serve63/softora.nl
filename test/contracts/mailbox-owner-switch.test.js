@@ -41,6 +41,44 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
+test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC-thread', () => {
+  const current = [{
+    id: 'root-message',
+    contactTimelineLoaded: true,
+    contactTimelineTotal: 8,
+    contactTimelineThreadCount: 2,
+    externalContactEmail: 'contact@example.test',
+    threadMessages: [
+      { id: 'standalone-in', messageId: '<standalone-in@example.test>', subject: 'Afspraak', body: 'Nieuw los bericht', bodyLoaded: true },
+      { id: 'standalone-out', messageId: '<standalone-out@example.test>', subject: 'Re: Afspraak', body: 'Nieuw los antwoord', bodyLoaded: true },
+      { id: 'timeline-old-reply', messageId: '<old-reply@example.test>', subject: 'Re: Oude vraag', body: 'Volledig oud antwoord', bodyLoaded: true },
+    ],
+  }];
+  const refresh = [{
+    id: 'root-message',
+    contactTimelineLoaded: false,
+    contactTimelineTotal: 1,
+    threadMessages: [
+      { id: 'snapshot-old-reply', messageId: 'old-reply@example.test', subject: 'Re: Oude vraag', body: 'Korte preview', bodyLoaded: false },
+      { id: 'older-in', messageId: '<older-in@example.test>', subject: 'Oude vraag', body: 'Ouder bericht', bodyLoaded: true },
+    ],
+  }];
+
+  const reconciled = ownerSession.reconcileMessages(current, refresh);
+
+  assert.equal(reconciled[0], current[0]);
+  assert.equal(reconciled[0].contactTimelineLoaded, true);
+  assert.equal(reconciled[0].contactTimelineTotal, 8);
+  assert.equal(reconciled[0].contactTimelineThreadCount, 2);
+  assert.equal(reconciled[0].externalContactEmail, 'contact@example.test');
+  assert.equal(reconciled[0].contactTimelineNeedsRefresh, true);
+  assert.deepEqual(reconciled[0].threadMessages.map((message) => message.id), [
+    'standalone-in', 'standalone-out', 'snapshot-old-reply',
+  ]);
+  assert.equal(reconciled[0].threadMessages[2].body, 'Volledig oud antwoord');
+  assert.equal(reconciled[0].threadMessages[2].bodyLoaded, true);
+});
+
 test('gekozen campagne-eigenaar blijft na een refresh dezelfde servervoorkeur houden', async () => {
   const writes = [];
   const client = {

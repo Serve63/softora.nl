@@ -21,7 +21,7 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /body \{[\s\S]*font-family:\s*'Inter', sans-serif;[\s\S]*min-height:\s*100vh;/);
   assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">/);
-  assert.match(pageSource, /<a href="\/premium-pdfs" class="sidebar-link magnetic active" data-sidebar-key="pdfs">/);
+  assert.doesNotMatch(pageSource, /data-sidebar-key="pdfs"|href="\/premium-pdfs"[^>]*sidebar-link/);
   assert.match(pageSource, /\.main-content \{[\s\S]*margin-left:\s*280px;[\s\S]*width:\s*calc\(100% - 280px\);[\s\S]*min-width:\s*0;[\s\S]*padding:\s*0 !important;[\s\S]*overflow:\s*hidden;/);
   assert.match(pageSource, /\.pdf-builder-shell \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex:\s*1 1 auto;[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*min-height:\s*0;/);
   assert.match(pageSource, /\.pdf-main > \.premium-boot-shell \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*flex-direction:\s*column;[\s\S]*min-height:\s*0;/);

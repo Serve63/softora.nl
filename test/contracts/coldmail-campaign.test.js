@@ -300,6 +300,20 @@ function createService(overrides = {}) {
       return { ok: true };
     },
   };
+  const defaultDataOpsStore = {
+    async getHistoricalOutboundMailboxCoverageStatus() {
+      return { ok: true, checkedAccounts: 9, issues: [] };
+    },
+    async listHistoricalOutboundMailboxMessagesByRecipientEmails() {
+      return [];
+    },
+  };
+  const dataOpsStore = overrides.dataOpsStore === null
+    ? null
+    : {
+        ...defaultDataOpsStore,
+        ...(overrides.dataOpsStore || {}),
+      };
   const service = createColdmailCampaignService({
     env: overrides.env || {},
     mailConfig: {
@@ -338,7 +352,7 @@ function createService(overrides = {}) {
       overrides.outboundRecipientGuardStore === undefined
         ? defaultOutboundRecipientGuardStore
         : overrides.outboundRecipientGuardStore,
-    dataOpsStore: overrides.dataOpsStore || null,
+    dataOpsStore,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -488,7 +502,7 @@ function createService(overrides = {}) {
         },
       };
     },
-    dataOpsStore: overrides.dataOpsStore,
+    dataOpsStore,
     mailboxAccountsRaw: overrides.mailboxAccountsRaw || '',
     createImapClient:
       overrides.createImapClient ||
@@ -1000,6 +1014,85 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.conversionRate, 33);
   assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:00:00.000Z');
   assert.equal(result.stats.lastSenderEmail, 'martijn@softora.nl');
+});
+
+test('coldmail live stats never count historical guard backfills as sends from today', async () => {
+  const historicalBackfills = Array.from({ length: 193 }, (_, index) => {
+    const actualSentAt = index === 0
+      ? '2026-08-17T08:33:07.000Z'
+      : `2024-03-${String((index % 28) + 1).padStart(2, '0')}T09:00:00.000Z`;
+    return {
+      reservation_id: `historical-backfill-${index + 1}`,
+      recipient_email: `historical-${index + 1}@example.test`,
+      recipient_id: `historical-${index + 1}`,
+      sender_email: 'martijn@softora.nl',
+      provider: 'softora',
+      channel: 'coldmail',
+      source: 'mailbox-historical-outbound-backfill-2026-08-17',
+      payload: {
+        backfillSource: 'mailbox-historical-outbound-backfill-2026-08-17',
+        events: [{ at: actualSentAt }],
+      },
+      last_seen_at: actualSentAt,
+      created_at: '2026-08-17T10:30:03.000Z',
+      updated_at: '2026-08-17T10:30:02.000Z',
+    };
+  });
+  const actualAutopilotSends = Array.from({ length: 10 }, (_, index) => {
+    const sentAt = `2026-08-17T10:${String(20 + index).padStart(2, '0')}:00.000Z`;
+    return {
+      reservation_id: `actual-autopilot-send-${index + 1}`,
+      recipient_email: `actual-${index + 1}@example.test`,
+      recipient_id: `actual-${index + 1}`,
+      sender_email: index === 9 ? 'serve@softora.nl' : 'serve290@gmail.com',
+      provider: 'softora',
+      channel: 'coldmail',
+      source: 'softora-coldmail-pre-send',
+      payload: {
+        sentAt,
+        messageId: `<actual-${index + 1}@example.test>`,
+        postSmtpEvidence: 'smtp-accepted',
+        postSmtpReconciled: true,
+      },
+      last_seen_at: sentAt,
+      created_at: sentAt,
+      updated_at: sentAt,
+    };
+  });
+  const { service } = createService({
+    now: () => new Date('2026-08-17T10:46:55.000Z'),
+    coldmailStatsCacheRaw: JSON.stringify({
+      ok: true,
+      stats: {
+        reliable: true,
+        dateKey: '2026-08-17',
+        sentToday: 203,
+        systemSentToday: 203,
+        centralGuardSentToday: 203,
+        webdesignSentToday: 203,
+        totalSent: 203,
+        systemTotalSent: 203,
+        centralGuardTotalSent: 203,
+        webdesignTotalSent: 203,
+        bounceDeduplication: 'recipient-email',
+        updatedAt: '2026-08-17T10:44:11.000Z',
+      },
+    }),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        return [...historicalBackfills, ...actualAutopilotSends];
+      },
+    },
+    dataOpsStore: { async listMailboxMessages() { return []; } },
+  });
+
+  const result = await service.getColdmailLiveStats();
+
+  assert.equal(result.stats.systemTotalSent, 203);
+  assert.equal(result.stats.systemSentToday, 11);
+  assert.equal(result.stats.centralGuardSentToday, 11);
+  assert.equal(result.stats.lastSuccessfulSendAt, '2026-08-17T10:29:00.000Z');
+  assert.equal(result.stats.lastSenderEmail, 'serve@softora.nl');
 });
 
 test('coldmail live stats never overwrite reliable totals with a transient guard failure', async () => {
@@ -9600,6 +9693,187 @@ test('coldmail campaign blocks recipients already reserved in the central outbou
       return true;
     }
   );
+  assert.equal(sentMessages.length, 0);
+});
+
+test('coldmail campaign blocks exact historical mailbox recipients immediately before SMTP', async () => {
+  const historyLookups = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'historical-mailbox-row',
+        bedrijf: 'Historisch Benaderd BV',
+        naam: 'Historisch Benaderd BV',
+        email: 'info@historisch-benaderd.example',
+        website: 'https://historisch-benaderd.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    dataOpsStore: {
+      async listHistoricalOutboundMailboxMessagesByRecipientEmails(options) {
+        historyLookups.push(options);
+        return [{
+          message_key: 'serve|coldmail|deleted-history',
+          account_email: 'serve@softora.nl',
+          folder: 'coldmail',
+          recipients_text: 'Historisch Benaderd BV <info@historisch-benaderd.example>',
+          deleted_at: '2026-08-01T10:00:00.000Z',
+          date: '2026-07-01T10:00:00.000Z',
+        }];
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Goedendag {{naam}}',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /al eerder gemaild/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(historyLookups.length, 1);
+  assert.deepEqual(historyLookups[0].recipientEmails, ['info@historisch-benaderd.example']);
+  assert.deepEqual(historyLookups[0].folders, ['sent', 'coldmail', 'instantly']);
+});
+
+test('coldmail campaign blocks a new address on a historically mailed business domain before SMTP', async () => {
+  const historyLookups = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'historical-domain-row',
+        bedrijf: 'Historisch Domein BV',
+        naam: 'Historisch Domein BV',
+        email: 'nieuw@historisch-domein.example',
+        website: 'https://historisch-domein.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    dataOpsStore: {
+      async listHistoricalOutboundMailboxMessagesByRecipientEmails(options) {
+        historyLookups.push(options);
+        return [{
+          message_key: 'serve|sent|historical-domain',
+          account_email: 'serve@softora.nl',
+          folder: 'sent',
+          recipients_text: 'Oud contact <oud@historisch-domein.example>',
+          date: '2025-07-01T10:00:00.000Z',
+        }];
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Goedendag {{naam}}',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /al eerder gemaild/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(historyLookups.length, 1);
+  assert.deepEqual(historyLookups[0].recipientEmails, ['nieuw@historisch-domein.example']);
+  assert.deepEqual(historyLookups[0].recipientDomains, ['historisch-domein.example']);
+});
+
+test('coldmail campaign fails closed before SMTP when historical mailbox lookup fails', async () => {
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'historical-lookup-failure',
+        bedrijf: 'Lookup Failure BV',
+        naam: 'Lookup Failure BV',
+        email: 'info@lookup-failure.example',
+        website: 'https://lookup-failure.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    dataOpsStore: {
+      async listHistoricalOutboundMailboxMessagesByRecipientEmails() {
+        return null;
+      },
+    },
+    coldmailSafetyPauseMs: 60_000,
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Goedendag {{naam}}',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /Historische mailbox kon niet veilig worden gecontroleerd/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(
+    getSendGuardState().entries[0].safetyPauseReason,
+    'historical_mailbox_guard_unavailable'
+  );
+});
+
+test('coldmail campaign fails closed before SMTP when sent-mailbox coverage is unhealthy', async () => {
+  let recipientLookupCalled = false;
+  const { service, sentMessages } = createService({
+    rows: [{
+      id: 'historical-coverage-failure',
+      bedrijf: 'Coverage Failure BV',
+      email: 'info@coverage-failure.example',
+      status: 'prospect',
+      mail: true,
+    }],
+    dataOpsStore: {
+      async getHistoricalOutboundMailboxCoverageStatus() {
+        return {
+          ok: false,
+          issues: [{ accountEmail: 'martijnven123@gmail.com', reason: 'sent_sync_error' }],
+        };
+      },
+      async listHistoricalOutboundMailboxMessagesByRecipientEmails() {
+        recipientLookupCalled = true;
+        return [];
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Goedendag {{naam}}',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /mailbox-index is niet volledig of actueel/);
+      return true;
+    }
+  );
+
+  assert.equal(recipientLookupCalled, false);
   assert.equal(sentMessages.length, 0);
 });
 

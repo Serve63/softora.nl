@@ -25,10 +25,21 @@ function preserveReliableColdmailLiveStats(payload, previousPayload, expectedDat
   ];
   const previousTotal = Number(previous.systemTotalSent ?? previous.totalSent);
   const currentTotal = Number(stats.systemTotalSent ?? stats.totalSent);
-  const currentReliableTotalRegressed = isReliableLiveTotals(payload, expectedDateKey) &&
+  const currentReliable = isReliableLiveTotals(payload, expectedDateKey);
+  const currentReliableTotalRegressed = currentReliable &&
     Number.isFinite(previousTotal) && Number.isFinite(currentTotal) && currentTotal < previousTotal;
+  const timestampModelChanged = currentReliable &&
+    String(stats.sentTimestampModel || '').trim() &&
+    String(stats.sentTimestampModel || '').trim() !== String(previous.sentTimestampModel || '').trim();
   if (currentReliableTotalRegressed || !isReliableLiveTotals(payload, expectedDateKey)) {
-    cumulativeFields.forEach((field) => {
+    cumulativeFields.filter((field) => !timestampModelChanged || ![
+      'sentToday',
+      'systemSentToday',
+      'centralGuardSentToday',
+      'webdesignSentToday',
+      'lastSuccessfulSendAt',
+      'lastSenderEmail',
+    ].includes(field)).forEach((field) => {
       mergedStats[field] = previous[field];
     });
     mergedStats.reliable = true;

@@ -670,7 +670,9 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(gitignoreSource, /outputs\//);
   assert.match(gitignoreSource, /research\//);
   assert.match(gitignoreSource, /\*\.csv/);
-  assert.match(coldmailGuardBackfillSource, /mailbox-sent-webdesign-backfill-2026-06-08/);
+  assert.match(coldmailGuardBackfillSource, /mailbox-historical-outbound-backfill-2026-08-17/);
+  assert.match(coldmailGuardBackfillSource, /isHistoricalOutboundFolder/);
+  assert.match(coldmailGuardBackfillSource, /--summary-only/);
   assert.match(coldmailGuardBackfillSource, /central_outbound_guard_missing_monitor_2026_06_08/);
   assert.match(coldmailGuardBackfillSource, /--pause-on-missing/);
   assert.match(coldmailGuardBackfillSource, /softora_outbound_recipient_guards/);

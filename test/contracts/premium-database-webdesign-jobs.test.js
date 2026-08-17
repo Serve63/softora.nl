@@ -325,6 +325,7 @@ function createInMemoryWebdesignBatchStore() {
   const jobs = new Map();
   const batches = new Map();
   const chunks = new Map();
+  const workerLeases = new Map();
   function clone(value) {
     return value ? cloneJson(value) : value;
   }
@@ -332,6 +333,25 @@ function createInMemoryWebdesignBatchStore() {
     jobs,
     batches,
     chunks,
+    workerLeases,
+    async claimBackgroundWorkerLease({ lockKey, lockToken, ttlSeconds = 900 }) {
+      const current = workerLeases.get(lockKey);
+      const currentTime = Date.now();
+      if (current && current.lockExpiresAt > currentTime && current.lockToken !== lockToken) {
+        return { ok: true, acquired: false, lockExpiresAt: new Date(current.lockExpiresAt).toISOString() };
+      }
+      workerLeases.set(lockKey, {
+        lockToken,
+        lockExpiresAt: currentTime + (Math.max(30, Number(ttlSeconds) || 900) * 1000),
+      });
+      return { ok: true, acquired: true, lockToken };
+    },
+    async releaseBackgroundWorkerLease({ lockKey, lockToken }) {
+      const current = workerLeases.get(lockKey);
+      const released = Boolean(current && current.lockToken === lockToken);
+      if (released) workerLeases.delete(lockKey);
+      return { ok: true, released };
+    },
     async upsertWebdesignJob(job) {
       jobs.set(job.id, clone(job));
       return { ok: true };
@@ -731,7 +751,7 @@ test('premium database webdesign bulk batches process targets through a persiste
   assert.equal(pipelineCalls.length, 5);
 });
 
-test('premium database webdesign bulk starts a larger default active window for faster generation', async () => {
+test('premium database webdesign bulk keeps the default active queue bounded for Supabase stability', async () => {
   const store = createInMemoryWebdesignBatchStore();
   let pipelineCalls = 0;
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
@@ -773,13 +793,13 @@ test('premium database webdesign bulk starts a larger default active window for 
   await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 50, expectedChunks: 1 } }, commitRes);
 
   assert.equal(commitRes.statusCode, 202);
-  assert.equal(commitRes.body.batch.active, 36);
-  assert.equal(commitRes.body.batch.queued, 36);
-  assert.equal(commitRes.body.batch.activeJobIds.length, 36);
+  assert.equal(commitRes.body.batch.active, 8);
+  assert.equal(commitRes.body.batch.queued, 8);
+  assert.equal(commitRes.body.batch.activeJobIds.length, 8);
   assert.equal(pipelineCalls, 0);
 });
 
-test('premium database webdesign bulk server worker processes batches without browser job polling', async () => {
+test('premium database webdesign bulk server worker advances two jobs per safe default run', async () => {
   const store = createInMemoryWebdesignBatchStore();
   const pipelineCalls = [];
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
@@ -816,15 +836,163 @@ test('premium database webdesign bulk server worker processes batches without br
   );
   await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 4, expectedChunks: 1 } }, createResponseRecorder());
 
-  const run = await coordinator.runBatchWorker({ batchLimit: 1, jobLimit: 4, concurrency: 2 });
+  const firstRun = await coordinator.runBatchWorker({ batchLimit: 4, jobLimit: 18, concurrency: 6 });
+
+  assert.equal(firstRun.ok, true);
+  assert.equal(firstRun.batchCount, 1);
+  assert.equal(firstRun.processedJobs, 2);
+  assert.equal(firstRun.batches[0].status, 'running');
+  assert.equal(pipelineCalls.length, 2);
+
+  const secondRun = await coordinator.runBatchWorker({ batchLimit: 4, jobLimit: 18, concurrency: 6 });
+  assert.equal(secondRun.ok, true);
+  assert.equal(secondRun.processedJobs, 2);
+  assert.equal(pipelineCalls.length, 4);
+  assert.equal(secondRun.batches[0].status, 'done');
+  assert.equal(secondRun.batches[0].made, 4);
+  assert.equal(secondRun.batches[0].remaining, 0);
+});
+
+test('premium database webdesign bulk coalesces concurrent workers through one central lease', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let allowPipelineToFinish;
+  let markPipelineStarted;
+  const pipelineGate = new Promise((resolve) => { allowPipelineToFinish = resolve; });
+  const pipelineStarted = new Promise((resolve) => { markPipelineStarted = resolve; });
+  let pipelineCalls = 0;
+  const createCoordinator = () => createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        markPipelineStarted();
+        await pipelineGate;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+  const firstCoordinator = createCoordinator();
+  const secondCoordinator = createCoordinator();
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+  const startRes = createResponseRecorder();
+  await firstCoordinator.startBatchResponse({ premiumAuth: auth, body: { total: 1 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  await firstCoordinator.appendBatchChunkResponse({
+    premiumAuth: auth,
+    params: { batchId },
+    body: {
+      index: 0,
+      targets: [{
+        websiteUrl: 'https://lease-worker.test',
+        customer: { id: 'lease-worker', bedrijf: 'Lease Worker', dom: 'lease-worker.test' },
+      }],
+    },
+  }, createResponseRecorder());
+  await firstCoordinator.commitBatchResponse(
+    { premiumAuth: auth, params: { batchId }, body: { total: 1, expectedChunks: 1 } },
+    createResponseRecorder()
+  );
+
+  const firstRunPromise = firstCoordinator.runBatchWorker();
+  await pipelineStarted;
+  const secondRun = await secondCoordinator.runBatchWorker();
+
+  assert.equal(secondRun.ok, true);
+  assert.equal(secondRun.statusCode, 200);
+  assert.equal(secondRun.skipped, true);
+  assert.equal(secondRun.reason, 'coalesced');
+  assert.equal(secondRun.batchCount, 0);
+  assert.equal(pipelineCalls, 1);
+
+  allowPipelineToFinish();
+  const firstRun = await firstRunPromise;
+  assert.equal(firstRun.ok, true);
+  assert.equal(firstRun.processedJobs, 1);
+  assert.equal(store.workerLeases.size, 0);
+});
+
+test('premium database webdesign bulk releases its central lease in finally after a storage error', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let releaseCalls = 0;
+  store.listRunnableWebdesignBatches = async () => {
+    throw new Error('Supabase batches tijdelijk onbeschikbaar');
+  };
+  const releaseLease = store.releaseBackgroundWorkerLease;
+  store.releaseBackgroundWorkerLease = async (input) => {
+    releaseCalls += 1;
+    return releaseLease(input);
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    processJobsInline: true,
+    dataOpsStore: store,
+  });
+
+  const run = await coordinator.runBatchWorker();
+
+  assert.equal(run.ok, false);
+  assert.equal(run.statusCode, 503);
+  assert.equal(releaseCalls, 1);
+  assert.equal(store.workerLeases.size, 0);
+});
+
+test('premium database webdesign bulk fails closed before reads or image generation without a central lease', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let listCalls = 0;
+  let pipelineCalls = 0;
+  store.claimBackgroundWorkerLease = undefined;
+  store.listRunnableWebdesignBatches = async () => {
+    listCalls += 1;
+    return [];
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+
+  const run = await coordinator.runBatchWorker();
+
+  assert.equal(run.ok, false);
+  assert.equal(run.statusCode, 503);
+  assert.equal(run.action, 'batch-workerlease claimen');
+  assert.equal(listCalls, 0);
+  assert.equal(pipelineCalls, 0);
+});
+
+test('premium database webdesign bulk safely reclaims an expired central lease', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let listCalls = 0;
+  store.workerLeases.set('premium-webdesign-bulk-worker', {
+    lockToken: 'expired-token',
+    lockExpiresAt: Date.now() - 1000,
+  });
+  store.listRunnableWebdesignBatches = async () => {
+    listCalls += 1;
+    return [];
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    processJobsInline: true,
+    dataOpsStore: store,
+  });
+
+  const run = await coordinator.runBatchWorker();
 
   assert.equal(run.ok, true);
-  assert.equal(run.batchCount, 1);
-  assert.equal(run.processedJobs, 4);
-  assert.equal(pipelineCalls.length, 4);
-  assert.equal(run.batches[0].status, 'done');
-  assert.equal(run.batches[0].made, 4);
-  assert.equal(run.batches[0].remaining, 0);
+  assert.equal(run.skipped, undefined);
+  assert.equal(listCalls, 1);
+  assert.equal(store.workerLeases.size, 0);
 });
 
 test('premium database webdesign bulk worker never processes an expired persistent job', async () => {

@@ -786,6 +786,7 @@
     } else if (options.chronological === true) {
       messages = messages.slice().sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
     }
+    let previousThreadKey = '';
     return messages.map((message) => {
       const loadError = String(message && message.bodyLoadError || '').trim();
       const loading = !loadError && isMessageBodyPending(message);
@@ -814,13 +815,19 @@
       const sectionClass = sent
         ? 'detail-mail-section detail-mail-section-sent'
         : 'detail-mail-section detail-mail-section-received';
-      const messageActionHtml = options.action &&
-        options.action.messageKey === getActionMessageKey(message)
-        ? String(options.action.html || '')
+      const threadKey = String(message && message.technicalThreadKey || '').trim();
+      const threadBoundary = mail.contactTimelineLoaded && threadKey && threadKey !== previousThreadKey
+        ? `<div class="mail-contact-thread-boundary"><span>${escapeHtml(message.subject || '(Geen onderwerp)')}</span></div>`
         : '';
+      previousThreadKey = threadKey || previousThreadKey;
+      const messageActionHtml = typeof options.renderMessageAction === 'function'
+        ? String(options.renderMessageAction(message) || '')
+        : options.action && options.action.messageKey === getActionMessageKey(message)
+          ? String(options.action.html || '')
+          : '';
       const actionBefore = sent ? messageActionHtml : '';
       const actionInside = sent ? '' : messageActionHtml;
-      return `${actionBefore}<section class="${sectionClass}">
+      return `${threadBoundary}${actionBefore}<section class="${sectionClass}">
           <div class="detail-mail-section-label">${sent ? sentLabel : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
           ${renderedRouting}${renderedBody}${renderedAttachments}${actionInside}

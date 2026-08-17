@@ -119,13 +119,14 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260813a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817a/);
+  assert.match(readPage(), /assets\/premium-mailbox-discovery\.js\?v=20260817b/);
   assert.match(readPage(), /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
   assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260810a/);
+  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b/);
@@ -3016,7 +3017,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260813a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260812b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
@@ -3111,10 +3112,10 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen"/);
   assert.match(pageSource, /<span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">Controleren…<\/span>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
-  assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
+  assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260813a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260817a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3126,6 +3127,9 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(composeControllerSource, /\/api\/mailbox\/send/);
   assert.match(composeControllerSource, /\/api\/mailbox\/rewrite/);
   assert.match(readComposeWindowScript(), /data-mailbox-compose-drag-handle/);
+  assert.match(readComposeWindowScript(), /data-mailbox-compose-resize-handle/);
+  assert.match(readComposeWindowScript(), /bounds\.width - resize\.left - VIEWPORT_MARGIN/);
+  assert.match(readComposeWindowScript(), /closeButton\?\.addEventListener\?\.\('pointerdown', \(event\) => event\.stopPropagation\?\.\(\)\)/);
   assert.match(readComposeWindowScript(), /elementFromPoint/);
   assert.doesNotMatch(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
@@ -3913,7 +3917,11 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-footer \{[\s\S]*justify-content:\s*space-between;/);
   assert.match(pageSource, /\.btn-rewrite-compose \{[\s\S]*color:\s*var\(--crimson\);/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie<\/button>/);
-  assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×<\/button>/);
+  assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" data-mailbox-compose-no-drag aria-label="Sluiten" title="Sluiten">×<\/button>/);
+  assert.match(pageSource, /\.compose-x \{[^}]*z-index:\s*8;[^}]*width:\s*44px;[^}]*height:\s*44px;/);
+  assert.match(pageSource, /class="compose-resize-grip" data-mailbox-compose-resize-handle aria-hidden="true"/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817b/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -5945,7 +5953,7 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   assert.match(readIndexScript(), /mail\.bodyImagesTruncated = false;/);
   assert.match(readIndexScript(), /String\(getActiveMail\(\)\) === String\(id\)/);
   assert.match(readIndexScript(), /function loadThreadBodies\(/);
-  assert.match(scriptSource, /if \(!options\.skipThreadBodyFetch && activeFolder === 'outreach' && window\.SoftoraMailboxCampaignInbox\.isCampaignMail\(m\)\) void window\.SoftoraMailboxIndex\?\.loadThreadBodies\?\.\(\{ mail: m,/);
+  assert.match(scriptSource, /if \(!options\.skipThreadBodyFetch && activeFolder === 'outreach' && \(window\.SoftoraMailboxCampaignInbox\.isCampaignMail\(m\) \|\| m\.contactTimelineLoaded\)\) void window\.SoftoraMailboxIndex\?\.loadThreadBodies\?\.\(\{ mail: m,/);
   assert.match(scriptSource, /const detailBody = m\.safeBodyPreviewOnly \? \(m\.preview \|\| ''\) : \(m\.body \|\| m\.preview \|\| ''\);/);
   assert.match(readDisplayScript(), /Volledige inhoud wordt opgehaald…/);
 
@@ -5961,7 +5969,7 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   assert.match(scriptSource, /const conversationAction = options && options\.mail[\s\S]*getConversationAction/);
   assert.match(scriptSource, /data-mailbox-message-key="\$\{escapeHtml\(messageKey\)\}"/);
   assert.match(scriptSource, /mailboxComposeController\.handleAction\(action, composeActionId, \{[\s\S]*messageKey: actionEl\.getAttribute\('data-mailbox-message-key'\)/);
-  assert.match(fs.readFileSync(composeControllerScriptPath, 'utf8'), /resolveReplySource\(mail, requestedMessageKey[\s\S]*requested !== expectedMessageKey[\s\S]*open het bericht opnieuw/);
+  assert.match(fs.readFileSync(composeControllerScriptPath, 'utf8'), /resolveReplySource\(mail, requestedMessageKey[\s\S]*normalizeRequestedMessageKey\(requestedMessageKey\)[\s\S]*getActionMessageKey\(message\) === requested[\s\S]*exactAction\?\.kind !== 'reply'[\s\S]*open het bericht opnieuw/);
   assert.match(scriptSource, /section && section\.type === 'quote'[\s\S]*renderedSections\.push\(rootActionHtml\)/);
   assert.match(scriptSource, /renderMailboxRootIncomingMeta\(m, detailPrimary\)/);
   assert.match(scriptSource, /class="detail-hide-conversation"[\s\S]*Alleen uit Softora verbergen/);

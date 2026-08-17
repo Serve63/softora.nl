@@ -29,7 +29,7 @@ const {
   createMailboxSyncService,
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
-const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies'); const { createMailboxProviderThreadAuditService } = require('./mailbox-provider-thread-audit');
+const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies'); const { createMailboxProviderThreadAuditService } = require('./mailbox-provider-thread-audit'); const { createMailboxDiscoveryService } = require('./mailbox-discovery');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
 const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list');
@@ -550,8 +550,8 @@ function createMailboxService(deps = {}) {
       dataOpsStore,
       mailboxSendProvenanceStore,
     }),
-  } = deps;
-  const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
+    mailboxDiscoveryService = createMailboxDiscoveryService({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, logger }),
+  } = deps; const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
       env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY
@@ -2231,7 +2231,6 @@ function createMailboxService(deps = {}) {
       })),
     });
   }
-
   async function listMessagesResponse(req, res) {
     try {
       const result = await listMessagesWithMeta({
@@ -2413,10 +2412,11 @@ function createMailboxService(deps = {}) {
   return {
     accountsResponse,
     campaignRepliesResponse,
+    contactTimelineResponse: mailboxDiscoveryService.contactTimelineResponse,
     getMessageBodiesResponse,
     getMessageResponse,
     getMessageImageResponse,
-    listMessagesResponse, providerThreadAuditResponse,
+    listMessagesResponse, providerThreadAuditResponse, searchMailboxResponse: mailboxDiscoveryService.searchMailboxResponse,
     preflightMessageResponse,
     sendMessageResponse,
     markMessageReadResponse,

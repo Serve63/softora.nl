@@ -89,6 +89,15 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
   'yahoo.com',
   'ymail.com',
 ]);
+const SHARED_MAILBOX_DOMAINS = new Set([
+  ...PERSONAL_MAILBOX_DOMAINS,
+  'hetnet.nl',
+  'kpnmail.nl',
+  'planet.nl',
+  'upcmail.nl',
+  'xs4all.nl',
+  'ziggo.nl',
+]);
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
@@ -333,6 +342,7 @@ module.exports = {
   MARTIJN_LINKEDIN_CTA_PATTERN,
   MAX_COLDMAIL_RADIUS_KM,
   PERSONAL_MAILBOX_DOMAINS,
+  SHARED_MAILBOX_DOMAINS,
   TEST_RECIPIENT_COMPANIES,
   TEST_RECIPIENT_EMAILS,
   TEST_RECIPIENT_LOOKUP_EMAILS,

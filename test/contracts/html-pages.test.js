@@ -725,6 +725,52 @@ test('html page coordinator caps dashboard bootstrap reads without late error lo
   );
 });
 
+test('klantenpagina krijgt bij bootstrap-timeout een expliciete unavailable payload in plaats van nep-leegte', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-customers-timeout-'));
+  const loggerInfos = [];
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-klanten.html'),
+    '<!DOCTYPE html><html><head><title>Klanten</title></head><body><!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><main>Klanten</main></body></html>'
+  );
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    protectedPageBootstrapWaitMs: 25,
+    logger: { info: (...args) => loggerInfos.push(args), error() {} },
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-klanten.html' ? 'premium-klanten.html' : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: { authenticated: true, email: 'serve@softora.nl', role: 'admin' },
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () => new Promise(() => {}),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-klanten' },
+    res,
+    () => {},
+    'premium-klanten.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /id="softoraCustomersBootstrap" type="application\/json">/);
+  assert.match(res.body, /"source":"bootstrap-timeout"/);
+  assert.match(res.body, /"completeDataset":false/);
+  assert.match(res.body, /Klanten konden tijdelijk niet worden geladen/);
+  assert.doesNotMatch(res.body, /id="softoraPageStateBootstrap"/);
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-klanten.html'),
+    true
+  );
+});
+
 test('html page coordinator gives protected premium bootstrap enough time for Supabase-backed data', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-protected-bootstrap-'));
   const loggerInfos = [];

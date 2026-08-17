@@ -890,6 +890,40 @@ test('mailbox index sync laat ontbrekende tombstonevelden ongemoeid bij upsert',
   });
 });
 
+test('mailbox index sync dedupliceert gelijke message_key waarden voor de Supabase upsert', async () => {
+  let upsertRows = null;
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          async upsert(rows) {
+            upsertRows = rows;
+            return { data: [], error: null };
+          },
+        };
+      },
+    }),
+    now: () => new Date('2026-08-17T12:30:00.000Z'),
+  });
+
+  const result = await store.upsertMessages({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    messages: [
+      { id: 'inbox:42', uid: 42, subject: 'Oud', body: 'Oude body', date: '2026-08-17T12:00:00.000Z' },
+      { id: 'inbox:42', uid: 42, subject: 'Nieuw', body: 'Nieuwe body', date: '2026-08-17T12:01:00.000Z' },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.upserted, 1);
+  assert.equal(upsertRows.length, 1);
+  assert.equal(upsertRows[0].message_key, 'serve@softora.nl|inbox|42');
+  assert.equal(upsertRows[0].subject, 'Nieuw');
+  assert.equal(upsertRows[0].body_text, 'Nieuwe body');
+});
+
 test('mailbox index store reads campaign inbox messages across selected accounts', async () => {
   const calls = [];
   const client = {

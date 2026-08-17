@@ -36,6 +36,22 @@
       ].map((value) => String(value || '').trim()).filter(Boolean));
     }
 
+    function getActionMessageKey(message) {
+      const canonical = options.campaignInbox?.getActionMessageKey?.(message);
+      if (canonical) return String(canonical).trim();
+      const messageId = normalizeMessageId(message?.messageId);
+      if (messageId) return `message:${messageId}`;
+      const account = options.normalizeEmail(message?.accountEmail || '');
+      const mailboxId = String(message?.mailboxId || message?.id || '').trim();
+      return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
+    }
+
+    function normalizeRequestedMessageKey(value) {
+      const key = String(value || '').trim();
+      if (!key.toLowerCase().startsWith('message:')) return key;
+      return `message:${normalizeMessageId(key.slice('message:'.length))}`;
+    }
+
     function recordMatchesMail(record, mail) {
       if (!record || !mail) return false;
       if (normalize(record.owner) !== normalize(options.campaignInbox?.getMessageOwner?.(mail))) return false;
@@ -148,12 +164,23 @@
     function resolveReplySource(mail, requestedMessageKey = '') {
       if (!mail) return null;
       const action = options.campaignInbox?.getConversationAction?.(mail);
-      if (!action || action.kind !== 'reply' || !action.message) return mail;
-      const expectedMessageKey = String(action.messageKey || '').trim();
-      const requested = String(requestedMessageKey || '').trim();
-      if (requested && requested !== expectedMessageKey) {
-        throw new Error('De geselecteerde reply is gewijzigd; open het bericht opnieuw.');
+      const requested = normalizeRequestedMessageKey(requestedMessageKey);
+      if (requested) {
+        const exact = [mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])]
+          .find((message) => getActionMessageKey(message) === requested);
+        const exactAction = exact && options.campaignInbox?.getConversationAction?.({ ...exact, threadMessages: [] });
+        if (!exact || exactAction?.kind !== 'reply') {
+          throw new Error('De geselecteerde reply is gewijzigd; open het bericht opnieuw.');
+        }
+        if (exact === mail) return mail;
+        return {
+          ...exact,
+          conversationId: String(mail.conversationId || exact.conversationId || '').trim(),
+          threadMessages: Array.isArray(mail.threadMessages) ? mail.threadMessages : [],
+          campaign: exact.campaign || mail.campaign || null,
+        };
       }
+      if (!action || action.kind !== 'reply' || !action.message) return mail;
       if (action.isRoot) return mail;
       return {
         ...action.message,
@@ -205,6 +232,7 @@
       options.compose.reset(Boolean(replyContext && replyContext.mode !== 'new-message'));
       options.composeWindow?.reset?.();
       documentRef?.getElementById('compose-overlay')?.classList.add('open');
+      options.composeWindow?.open?.();
     }
 
     function close() {
@@ -245,12 +273,18 @@
       open({ keepContext: true });
     }
 
-    function newMessage(mail) {
+    function newMessage(mail, requestedMessageKey = '') {
       if (!mail) return;
-      const action = options.campaignInbox.getConversationAction?.(mail);
+      const requested = normalizeRequestedMessageKey(requestedMessageKey);
+      const exact = requested
+        ? [mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])]
+          .find((message) => getActionMessageKey(message) === requested)
+        : null;
+      const source = exact || mail;
+      const action = options.campaignInbox.getConversationAction?.(exact ? { ...exact, threadMessages: [] } : mail);
       if (!action || action.kind !== 'new-message') return;
       options.compose.resetOptionalFields();
-      replyContext = options.compose.buildNewMessageContext(mail, {
+      replyContext = options.compose.buildNewMessageContext(source, {
         latestMessage: action.message,
         fallbackAccount: options.getAccount(),
       });
@@ -484,7 +518,7 @@
       else if (action === 'choose-attachments') documentRef?.getElementById('c-attachments')?.click();
       else if (action === 'remove-attachment') options.compose.removeAttachment(id);
       else if (action === 'reply-mail') reply(options.findMail(id), actionContext.messageKey);
-      else if (action === 'new-message') newMessage(options.findMail(id));
+      else if (action === 'new-message') newMessage(options.findMail(id), actionContext.messageKey);
       else return false;
       return true;
     }

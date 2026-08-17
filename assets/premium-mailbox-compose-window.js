@@ -1,18 +1,33 @@
 (function (global) {
   'use strict';
 
+  const DESKTOP_BREAKPOINT = 900, VIEWPORT_MARGIN = 8, MIN_WIDTH = 560, MIN_HEIGHT = 480;
+
   function create(options = {}) {
     const documentRef = options.document || global.document;
     const windowRef = options.window || global;
     const overlay = documentRef?.getElementById('compose-overlay');
     const box = overlay?.querySelector?.('.compose-box');
     const handle = overlay?.querySelector?.('[data-mailbox-compose-drag-handle]');
+    const grip = overlay?.querySelector?.('[data-mailbox-compose-resize-handle]'), closeButton = overlay?.querySelector?.('[data-mailbox-action="close-compose"]');
     let drag = null;
+    let resize = null;
+
+    function viewport() { return { width: Number(windowRef.innerWidth) || documentRef?.documentElement?.clientWidth || 0, height: Number(windowRef.innerHeight) || documentRef?.documentElement?.clientHeight || 0 }; }
+
+    function limits() {
+      const current = viewport();
+      const maxWidth = Math.max(320, current.width - (VIEWPORT_MARGIN * 2)), maxHeight = Math.max(320, current.height - (VIEWPORT_MARGIN * 2));
+      return { ...current, maxWidth, maxHeight, minWidth: Math.min(MIN_WIDTH, maxWidth), minHeight: Math.min(MIN_HEIGHT, maxHeight) };
+    }
+
+    function isDesktop() { return viewport().width > DESKTOP_BREAKPOINT; }
 
     function reset() {
       drag = null;
-      box?.removeAttribute?.('data-compose-dragging');
-      ['position', 'left', 'top', 'width', 'maxWidth', 'margin', 'animation'].forEach(
+      resize = null;
+      ['data-compose-dragging', 'data-compose-resizing', 'data-compose-sized'].forEach((attribute) => box?.removeAttribute?.(attribute));
+      ['position', 'left', 'top', 'width', 'height', 'maxWidth', 'maxHeight', 'margin', 'animation'].forEach(
         (property) => box?.style?.removeProperty?.(property)
       );
     }
@@ -21,14 +36,38 @@
       return Math.min(Math.max(value, min), Math.max(min, max));
     }
 
+    function place(left, top, width, height) {
+      Object.assign(box.style, {
+        position: 'fixed', left: `${Math.round(left)}px`, top: `${Math.round(top)}px`,
+        width: `${Math.round(width)}px`, height: `${Math.round(height)}px`,
+        maxWidth: 'none', maxHeight: 'none', margin: '0', animation: 'none',
+      });
+      box.setAttribute('data-compose-sized', 'true');
+    }
+
+    function fitToViewport(center = false) {
+      if (!box || !overlay?.classList?.contains?.('open')) return;
+      if (!isDesktop()) return reset();
+      const rect = box.getBoundingClientRect();
+      const bounds = limits();
+      const width = clamp(rect.width || 1040, bounds.minWidth, bounds.maxWidth);
+      const height = clamp(rect.height || 700, bounds.minHeight, bounds.maxHeight);
+      const left = center ? (bounds.width - width) / 2 : rect.left;
+      const top = center ? (bounds.height - height) / 2 : rect.top;
+      place(clamp(left, VIEWPORT_MARGIN, bounds.width - width - VIEWPORT_MARGIN), clamp(top, VIEWPORT_MARGIN, bounds.height - height - VIEWPORT_MARGIN), width, height);
+    }
+
+    function open() { fitToViewport(true); }
+
     function move(event) {
       if (!drag || (event.pointerId != null && event.pointerId !== drag.pointerId)) return;
-      const viewportWidth = Number(windowRef.innerWidth) || documentRef?.documentElement?.clientWidth || drag.width;
-      const viewportHeight = Number(windowRef.innerHeight) || documentRef?.documentElement?.clientHeight || drag.height;
-      const left = clamp(drag.left + Number(event.clientX - drag.clientX), 8, viewportWidth - drag.width - 8);
-      const top = clamp(drag.top + Number(event.clientY - drag.clientY), 8, viewportHeight - drag.height - 8);
-      box.style.left = `${Math.round(left)}px`;
-      box.style.top = `${Math.round(top)}px`;
+      const bounds = limits();
+      place(
+        clamp(drag.left + Number(event.clientX - drag.clientX), VIEWPORT_MARGIN, bounds.width - drag.width - VIEWPORT_MARGIN),
+        clamp(drag.top + Number(event.clientY - drag.clientY), VIEWPORT_MARGIN, bounds.height - drag.height - VIEWPORT_MARGIN),
+        drag.width,
+        drag.height
+      );
       event.preventDefault?.();
     }
 
@@ -40,29 +79,47 @@
     }
 
     function start(event) {
-      if (!box || event.button > 0 || event.target?.closest?.('button, input, textarea, a, select')) return;
+      if (!box || !isDesktop() || event.button > 0 || event.target?.closest?.('[data-mailbox-compose-no-drag], button, input, textarea, a, select')) return;
       const rect = box.getBoundingClientRect();
       drag = {
-        pointerId: event.pointerId,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
+        pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY,
+        left: rect.left, top: rect.top, width: rect.width, height: rect.height,
       };
-      Object.assign(box.style, {
-        position: 'fixed',
-        left: `${Math.round(rect.left)}px`,
-        top: `${Math.round(rect.top)}px`,
-        width: `${Math.round(rect.width)}px`,
-        maxWidth: 'none',
-        margin: '0',
-        animation: 'none',
-      });
+      place(drag.left, drag.top, drag.width, drag.height);
       box.setAttribute('data-compose-dragging', 'true');
       handle?.setPointerCapture?.(event.pointerId);
       event.preventDefault?.();
+    }
+
+    function moveResize(event) {
+      if (!resize || (event.pointerId != null && event.pointerId !== resize.pointerId)) return;
+      const bounds = limits();
+      place(
+        resize.left,
+        resize.top,
+        clamp(Number(event.clientX) - resize.left, bounds.minWidth, bounds.width - resize.left - VIEWPORT_MARGIN),
+        clamp(Number(event.clientY) - resize.top, bounds.minHeight, bounds.height - resize.top - VIEWPORT_MARGIN)
+      );
+      event.preventDefault?.();
+      event.stopPropagation?.();
+    }
+
+    function stopResize(event) {
+      if (!resize || (event?.pointerId != null && event.pointerId !== resize.pointerId)) return;
+      grip?.releasePointerCapture?.(resize.pointerId);
+      resize = null;
+      box?.removeAttribute?.('data-compose-resizing');
+      event?.stopPropagation?.();
+    }
+
+    function startResize(event) {
+      if (!box || !isDesktop() || event.button > 0) return;
+      const rect = box.getBoundingClientRect();
+      resize = { pointerId: event.pointerId, left: rect.left, top: rect.top };
+      box.setAttribute('data-compose-resizing', 'true');
+      grip?.setPointerCapture?.(event.pointerId);
+      event.preventDefault?.();
+      event.stopPropagation?.();
     }
 
     function isScrollable(element) {
@@ -106,11 +163,16 @@
       handle?.addEventListener?.('pointermove', move);
       handle?.addEventListener?.('pointerup', stop);
       handle?.addEventListener?.('pointercancel', stop);
+      grip?.addEventListener?.('pointerdown', startResize);
+      grip?.addEventListener?.('pointermove', moveResize);
+      grip?.addEventListener?.('pointerup', stopResize);
+      grip?.addEventListener?.('pointercancel', stopResize);
+      closeButton?.addEventListener?.('pointerdown', (event) => event.stopPropagation?.());
       overlay?.addEventListener?.('wheel', forwardBackgroundWheel, { passive: false });
-      windowRef.addEventListener?.('resize', reset);
+      windowRef.addEventListener?.('resize', fitToViewport, { passive: true });
     }
 
-    return { bind, reset };
+    return { bind, fitToViewport, open, reset };
   }
 
   const api = { create };

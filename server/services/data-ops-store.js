@@ -8,13 +8,10 @@ const {
   resolveRecordId,
   sanitizeStorageSegment,
 } = require('./data-ops-serialization');
-const {
-  chooseStrongerContactStatus,
-  getContactStatusPriority,
-  normalizeContactStatus,
-} = require('./customer-lifecycle');
+const { chooseStrongerContactStatus, getContactStatusPriority, normalizeContactStatus } = require('./customer-lifecycle');
 const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 const { createDataOpsCustomerLookups } = require('./data-ops-customer-lookups');
+const { createMailboxHistoricalOutboundRepository } = require('../repositories/mailbox-historical-outbound');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
@@ -2530,6 +2527,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     listCustomerIdentityKeys,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
+    ...createMailboxHistoricalOutboundRepository({
+      run, normalizeString, now, readQueryTimeoutMs: dataOpsReadQueryTimeoutMs, mailboxMessagesTable: TABLES.mailboxMessages, mailboxSyncStateTable: TABLES.mailboxSyncState,
+    }),
     listMailboxMessages,
     listOutboundRecipientGuardKeys,
     listOutboundRecipientGuardsForPreview,
