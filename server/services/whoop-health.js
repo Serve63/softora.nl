@@ -4,7 +4,7 @@ const {
   TOKEN_REFRESH_LOCK_MS, TOKEN_REQUEST_TIMEOUT_MS, TOKEN_WORKER_RETRY_DELAY_MS,
   hasActiveLease, isAuthBlockedReason, isOperationFenceConflict,
 } = require('./whoop-token-policy');
-const { isCompleteRecoveryRecord, latestContiguousRecoveryDay, queuedSyncOptions } = require('./whoop-recovery-completeness');
+const { isCompleteRecoveryRecord, latestContiguousRecoveryDay, queuedSyncOptions, recoveryProgressOptions } = require('./whoop-recovery-completeness');
 
 const OWNER_KEY = 'serve';
 const TIMEZONE = 'Europe/Amsterdam';
@@ -751,7 +751,7 @@ function createWhoopHealthService(deps = {}) {
       );
       const lastContiguousRecoveryDay = latestContiguousRecoveryDay(
         records, options.resetProgress === true ? '' : String(lockedConnection.last_synced_day || ''),
-        { allowBootstrap: mode === 'backfill' }
+        recoveryProgressOptions(mode, backfillStartDay, targetDay)
       );
       const targetDayComplete = completeRecoveryRecords.some((record) => record.local_day === targetDay);
       const recoveryRangeComplete = lastContiguousRecoveryDay === targetDay;
