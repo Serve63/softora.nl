@@ -525,12 +525,13 @@ function createAgendaRuntime(deps = {}) {
     ) {
       const isPremiumDashboard = fileName === 'premium-personeel-dashboard.html';
       const isPremiumDatabase = fileName === 'premium-database.html';
+      const isPremiumCustomers = fileName === 'premium-klanten.html';
       const [dashboardPayloadRaw, pageState] = await Promise.all([
         isPremiumDatabase
           ? customersPageBootstrapService.buildMailReadySnapshotBootstrapPayload()
           : customersPageBootstrapService.buildCustomersBootstrapPayload({
               includeCustomers: true,
-              preferDashboardCustomers: isPremiumDashboard,
+              preferDashboardCustomers: isPremiumDashboard || isPremiumCustomers,
             }),
         pageStatePromise(),
       ]);
