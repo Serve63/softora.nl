@@ -20,12 +20,15 @@ const MAX_NOTE_LENGTH = 5_000;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_SCAN_QUERY_LIMIT = 12;
-const MAX_SCAN_QUERY_LIMIT = 100;
+// Een ronde blijft bewust begrensd op de huidige batchgrootte. Dat houdt kosten,
+// looptijd en de hoeveelheid nieuwe ruis per handmatige scan beheersbaar.
+const MAX_SCAN_QUERY_LIMIT = DEFAULT_SCAN_QUERY_LIMIT;
 const DEFAULT_WEBSITE_LOOKUP_LIMIT = 10;
 const MAX_WEBSITE_LOOKUP_LIMIT = 50;
 const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
 const DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS = 30;
 const DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS = 3;
+const DEFAULT_LEAD_RADAR_SUPABASE_TIMEOUT_MS = 10_000;
 
 const KEYWORD_GROUPS = Object.freeze({
   direct_website: [
@@ -98,6 +101,101 @@ const NEGATIVE_TERMS = Object.freeze([
   'gratis website maken', 'website handleiding', 'software installeren', 'website baan',
   'webdesigner vacature', 'marketing vacature',
 ]);
+
+const BUYER_INTENT_TERMS = Object.freeze([
+  'ik zoek', 'ik ben op zoek', 'ben op zoek', 'ben opzoek', 'wij zoeken', 'we zoeken',
+  'wij zijn op zoek', 'we zijn op zoek', 'wie kan een website', 'wie kent een goede',
+  'wie weet een goede', 'iemand die een website kan maken', 'iemand die een website bouwt',
+  'iemand nodig voor mijn website', 'hulp met website', 'website hulp gezocht',
+  'website hulp nodig', 'website gezocht', 'webdesigner gezocht', 'websitebouwer gezocht',
+  'hulp gevraagd voor mijn website', 'offerte voor een website', 'website offerte',
+  'nog geen website', 'geen website', 'toe aan een website', 'website nodig voor',
+  'website nodig', 'webshop hulp gezocht', 'webshop laten maken voor',
+  'webshop laten bouwen voor', 'website vernieuwen voor', 'bestaande website vernieuwen',
+  'website opnieuw laten bouwen', 'online aanwezigheid nodig',
+  'ik wil een website', 'wij willen een website', 'we willen een website',
+  'website laten maken voor mijn', 'website laten bouwen voor mijn',
+  'mijn website vernieuwen', 'onze website vernieuwen', 'oude website vervangen',
+  'website werkt niet', 'website doet het niet', 'website aanpassen', 'website verbeteren',
+  'webshop vernieuwen', 'webshop werkt niet',
+]);
+
+const PROVIDER_ROLE_TERMS = Object.freeze([
+  'webdesigner', 'websitedesigner', 'webdesign', 'webbureau', 'websitebouwer',
+  'website bouwer', 'webdeveloper', 'web development', 'webdevelopment',
+  'webshopbouwer', 'online marketing', 'marketingbureau', 'marketing bureau',
+  'digital agency', 'marketing agency', 'seo bureau', 'seo specialist',
+  'wordpress specialist', 'shopify partner', 'web tech bureau', 'websites en logo',
+  'website onderhoud', 'website voor ondernemers',
+]);
+
+const PROVIDER_PROMO_TERMS = Object.freeze([
+  'wij bouwen websites', 'wij bouwen webshops', 'wij maken websites', 'wij maken webshops',
+  'wij helpen', 'wij ontwerpen', 'wij ontwikkelen', 'website laten maken?',
+  'vraag direct een offerte aan', 'offerte aanvragen', 'neem contact op',
+  'stuur me gerust een bericht', 'stuur me gerust een dm', 'breng een nieuwe klant bij ons',
+  'verdien €', 'vanaf €', 'vanaf eur', 'scherpe prijs', 'betaalbaar', 'tijdelijk voor',
+  'seo optimalisatie', 'online marketing', 'meer bezoekers', 'maatwerk website',
+  'maatwerk websites', 'volledig via programmering', 'geschikt voor mobiel',
+  'gemakkelijk zelf wijzigingen', 'ben shopify partner', 'wij helpen je',
+  'heb je ook een nieuwe website nodig', 'heb jij ook een nieuwe website nodig',
+  'tag iemand die een nieuwe website nodig heeft', 'ken jij iemand die een nieuwe website nodig heeft',
+]);
+
+function countPhraseHits(value, phrases) {
+  const normalized = String(value || '').toLowerCase();
+  return phrases.reduce((count, phrase) => count + (normalized.includes(String(phrase).toLowerCase()) ? 1 : 0), 0);
+}
+
+function isLikelyPlatformProfileUrl(value) {
+  const normalized = normalizeHttpUrl(value);
+  if (!normalized || !platformFromUrl(normalized)) return false;
+  try {
+    const segments = new URL(normalized).pathname.split('/').filter(Boolean);
+    return segments.length <= 1;
+  } catch {
+    return false;
+  }
+}
+
+function classifySignal(input = {}) {
+  const author = text(input.author_name || input.authorName || input.title, 500).toLowerCase();
+  const message = `${input.message_text || input.messageText || input.snippet || ''}`.toLowerCase();
+  const sourceUrl = input.post_url || input.source_url || input.sourceUrl || input.url || '';
+  const buyerIntentHits = countPhraseHits(message, BUYER_INTENT_TERMS);
+  const providerRoleHits = countPhraseHits(author, PROVIDER_ROLE_TERMS);
+  const providerMessageRoleHits = countPhraseHits(message, PROVIDER_ROLE_TERMS);
+  const providerPromoHits = countPhraseHits(message, PROVIDER_PROMO_TERMS);
+  const profileOnly = isLikelyPlatformProfileUrl(sourceUrl);
+  const hasWebsiteContext = /\b(websites?|webshops?|webwinkels?|webdesign|webdevelopers?|site)\b/i.test(message);
+  const strongPromotion = providerPromoHits >= 2 ||
+    (providerPromoHits >= 1 && (providerRoleHits > 0 || providerMessageRoleHits > 0));
+  const providerConfidence = Math.min(100,
+    providerRoleHits * 45 +
+    providerMessageRoleHits * 20 +
+    providerPromoHits * 25 +
+    (profileOnly ? 15 : 0)
+  );
+  const isProvider = Boolean(
+    hasWebsiteContext &&
+    strongPromotion &&
+    (providerRoleHits > 0 || providerMessageRoleHits > 0 || profileOnly || providerPromoHits >= 2)
+  );
+  const hasBuyerIntent = buyerIntentHits > 0;
+  const isWebsiteNeed = hasWebsiteContext && hasBuyerIntent;
+  const reasons = [];
+  if (isProvider) reasons.push('Zelfpromotie van webdesign-, SEO- of marketingaanbieder');
+  if (!hasWebsiteContext) reasons.push('Geen duidelijke websitecontext in het bericht');
+  if (!hasBuyerIntent) reasons.push('Geen duidelijke klantvraag gevonden');
+  return {
+    role: isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear'),
+    isProvider,
+    isWebsiteNeed,
+    providerConfidence,
+    buyerIntentHits,
+    reasons,
+  };
+}
 
 class LeadRadarValidationError extends Error {
   constructor(message) {
@@ -284,7 +382,9 @@ function getSelectedGroups(value) {
 
 function getAutomaticScanConfig(env = process.env) {
   const enabledValue = text(env.LEAD_RADAR_AUTO_SCAN_ENABLED, 20).toLowerCase();
-  const enabled = enabledValue ? /^(1|true|yes|on)$/.test(enabledValue) : true;
+  // Automatische rondes staan voorlopig standaard uit. Ze kunnen later bewust
+  // worden aangezet via een expliciete server-side environment variable.
+  const enabled = enabledValue ? /^(1|true|yes|on)$/.test(enabledValue) : false;
   const intervalMinutes = Math.max(
     15,
     Math.min(1_440, Math.round(Number(env.LEAD_RADAR_AUTO_SCAN_INTERVAL_MINUTES) || DEFAULT_AUTO_SCAN_INTERVAL_MINUTES))
@@ -449,6 +549,19 @@ function buildSignalFromProviderItem(item, context = {}) {
   const platform = platformFromUrl(url);
   if (!platform) return null;
   const messageText = text(item?.snippet || item?.description || '', MAX_MESSAGE_LENGTH);
+  const classification = classifySignal({
+    url,
+    source_url: url,
+    post_url: url,
+    title: item?.title,
+    author_name: item?.title,
+    message_text: messageText,
+    snippet: messageText,
+  });
+  // SERP-resultaten van partijen die zelf websites/SEO verkopen zijn geen
+  // acquisitielead. Ook resultaten zonder echte websitevraag zijn te vaak
+  // algemene content die alleen toevallig het woord website bevat.
+  if (classification.isProvider || !classification.isWebsiteNeed) return null;
   const directWebsite = extractUrls(messageText)[0] || '';
   const publishedAt = normalizeDate(item?.date || item?.datetime);
   const region = text(context.region, 120);
@@ -517,7 +630,18 @@ function createLeadRadarService(deps = {}) {
   function getDb() {
     if (typeof isSupabaseConfigured === 'function' && !isSupabaseConfigured()) return null;
     if (typeof getSupabaseClient !== 'function') return null;
-    return getSupabaseClient();
+    const timeoutMs = Math.max(
+      5_000,
+      Math.min(60_000, Number(env.LEAD_RADAR_SUPABASE_TIMEOUT_MS) || DEFAULT_LEAD_RADAR_SUPABASE_TIMEOUT_MS)
+    );
+    // Lead Radar mag niet op de algemene 1,5s-client en globale REST-cooldown
+    // leunen. Een telling of inbox-query kan iets langer duren zonder dat een
+    // tijdelijke storing andere onderdelen van Softora blokkeert.
+    return getSupabaseClient({
+      timeoutMs,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
   }
 
   function requireDb() {
@@ -573,7 +697,14 @@ function createLeadRadarService(deps = {}) {
     if (days > 0) request = request.gte('published_at', new Date(Date.now() - days * 86_400_000).toISOString());
     const result = await request;
     if (result.error) throw result.error;
-    return { signals: result.data || [], total: result.count || 0, limit, offset };
+    const visibleSignals = (result.data || []).filter((signal) => !classifySignal(signal).isProvider);
+    const hiddenProviderCount = Math.max(0, (result.data || []).length - visibleSignals.length);
+    return {
+      signals: visibleSignals,
+      total: Math.max(0, Number(result.count || 0) - hiddenProviderCount),
+      limit,
+      offset,
+    };
   }
 
   async function getSignal(id) {
@@ -1006,15 +1137,16 @@ function createLeadRadarService(deps = {}) {
       const result = await request;
       return result.error ? null : result.count || 0;
     };
-    status.counts = {
-      total: await count(),
-      new: await count('lead_status', 'new'),
-      websiteFound: await count('website_status', 'website_found'),
-      noWebsiteFound: await count('website_status', 'no_website_found'),
-      notChecked: await count('website_status', 'website_not_checked'),
-      notWorking: await count('website_status', 'website_not_working'),
-    };
-    const latestAutomaticRun = await getLatestAutomaticRun();
+    const [total, newCount, websiteFound, noWebsiteFound, notChecked, notWorking, latestAutomaticRun] = await Promise.all([
+      count(),
+      count('lead_status', 'new'),
+      count('website_status', 'website_found'),
+      count('website_status', 'no_website_found'),
+      count('website_status', 'website_not_checked'),
+      count('website_status', 'website_not_working'),
+      getLatestAutomaticRun(),
+    ]);
+    status.counts = { total, new: newCount, websiteFound, noWebsiteFound, notChecked, notWorking };
     status.autoScan.lastRun = summarizeScanRun(latestAutomaticRun);
     status.autoScan.initialBackfillCompleted = hasCompletedInitialBackfill(latestAutomaticRun, autoScanConfig);
     status.autoScan.nextLookbackDays = status.autoScan.initialBackfillCompleted
@@ -1054,6 +1186,8 @@ module.exports = {
   buildSignalFromProviderItem,
   buildSearchPlan,
   hasCompletedInitialBackfill,
+  classifySignal,
+  getAutomaticScanConfig,
   normalizeHttpUrl,
   normalizePlatform,
   normalizeStatus,

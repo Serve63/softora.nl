@@ -7,6 +7,7 @@ const path = require('path');
 const {
   buildSearchPlan,
   buildSignalFromProviderItem,
+  classifySignal,
   createLeadRadarService,
   hasCompletedInitialBackfill,
   normalizeHttpUrl,
@@ -60,6 +61,30 @@ test('Lead Radar scoreert directe en recente websitevragen hoger', () => {
   assert.ok(recent.score > old.score);
   assert.ok(recent.reasons.includes('Bevat directe websitevraag'));
   assert.ok(recent.reasons.includes('Aantal reacties onbekend') || recent.reasons.includes('Engagement onbekend'));
+});
+
+test('Lead Radar filtert zelfpromotie van webbouwers zonder echte klantvraag', () => {
+  const providerOne = {
+    url: 'https://www.facebook.com/websitedesigner.nu',
+    title: 'Websitedesigner',
+    snippet: 'Wij bouwen websites & webshops + SEO optimalisatie voor meer bezoekers op je website. Website laten maken? Wij bouwen websites & webshops + online marketing.',
+  };
+  const providerTwo = {
+    url: 'https://www.facebook.com/example/posts/123',
+    title: '# Maatwerk website laten maken? * Volledig via programmering ...',
+    snippet: 'Maatwerk website laten maken? Volledig via programmering ontworpen; Geschikt voor mobiel, tablet en computer; Gemakkelijk zelf wijzigingen doorvoeren.',
+  };
+  const prospect = {
+    url: 'https://www.facebook.com/kapsalonnijlen/posts/123',
+    title: 'Kapsalon Nijlen',
+    snippet: 'Beste we zijn opzoek naar iemand die een website kan maken. Neem gerust contact met ons op.',
+  };
+
+  assert.equal(classifySignal(providerOne).role, 'provider');
+  assert.equal(classifySignal(providerTwo).role, 'provider');
+  assert.equal(buildSignalFromProviderItem(providerOne, { region: 'Nederland' }), null);
+  assert.equal(buildSignalFromProviderItem(providerTwo, { region: 'Nederland' }), null);
+  assert.ok(buildSignalFromProviderItem(prospect, { region: 'Nijlen' }));
 });
 
 test('Lead Radar behandelt een website-link uit een bericht eerst als kandidaat', () => {
@@ -125,8 +150,30 @@ test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () 
   assert.equal(status.storageConfigured, false);
   assert.equal(status.provider.configured, false);
   assert.match(status.provider.message, /Configureer|provider/i);
+  assert.equal(status.autoScan.enabled, false);
   assert.equal(status.autoScan.initialLookbackDays, 30);
   assert.equal(status.autoScan.refreshLookbackDays, 3);
+});
+
+test('Lead Radar gebruikt een eigen ruimere Supabase-timeout zonder globale cooldown', async () => {
+  const clientOptions = [];
+  const chain = {
+    select() { return chain; },
+    eq() { return chain; },
+    order() { return chain; },
+    limit() { return chain; },
+    then(resolve, reject) { return Promise.resolve({ data: [], count: 0, error: null }).then(resolve, reject); },
+  };
+  const service = createLeadRadarService({
+    env: {},
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => { clientOptions.push(options); return { from: () => chain }; },
+  });
+
+  await service.getStatus();
+  assert.ok(clientOptions.some((options) => options.timeoutMs === 10_000));
+  assert.ok(clientOptions.every((options) => options.ignoreFailureCooldown === true));
+  assert.ok(clientOptions.every((options) => options.suppressFailureCooldown === true));
 });
 
 test('Lead Radar vult eerst 30 dagen en schakelt daarna over op een korte updateperiode', () => {
@@ -206,9 +253,10 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /Website zoeken/);
   assert.match(script, /setInterval/);
   assert.match(page, /id="auto-scan-status"/);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260817d/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260817d/);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260817e/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260817e/);
   assert.match(page, /id="scan-max-age-days"/);
+  assert.match(page, /id="scan-max-queries"[^>]*max="12"/);
 });
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
@@ -217,7 +265,7 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   const envExample = readRepoFile('.env.example');
   assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260817b'/);
   assert.match(htmlPages, /assets\/lead-radar-sidebar\.js\?v=\$\{LEAD_RADAR_SIDEBAR_VERSION\}/);
-  assert.match(vercel, /"path": "\/api\/lead-radar\/cron"/);
-  assert.match(vercel, /"schedule": "\*\/15 \* \* \* \*"/);
-  assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_INTERVAL_MINUTES=15/);
+  assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
+  assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
+  assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
 });

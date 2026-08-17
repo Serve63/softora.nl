@@ -52,7 +52,7 @@
     if (!element || !autoScan) return;
     const interval = Number(autoScan.intervalMinutes) || 15;
     if (!autoScan.enabled) {
-      element.textContent = 'Automatische scan staat uit.';
+      element.textContent = 'Automatische scan staat uit. Nieuwe rondes starten alleen na een klik op Scan starten.';
       element.className = 'auto-scan-status auto-scan-status--muted';
       return;
     }
@@ -160,7 +160,8 @@
       ? $('#scan-regions').value.split(',').map((value) => value.trim()).filter(Boolean)
       : [];
     const websiteLookupInput = Number($('#scan-website-limit').value);
-    const payload = { platforms, regionMode, regions, maxAgeDays: Number($('#scan-max-age-days').value) || 30, maxQueries: Number($('#scan-max-queries').value) || 12, websiteLookupLimit: Number.isFinite(websiteLookupInput) ? websiteLookupInput : 10, ...(extra || {}) };
+    const requestedQueries = Number($('#scan-max-queries').value) || 12;
+    const payload = { platforms, regionMode, regions, maxAgeDays: Number($('#scan-max-age-days').value) || 30, maxQueries: Math.min(12, Math.max(1, requestedQueries)), websiteLookupLimit: Number.isFinite(websiteLookupInput) ? websiteLookupInput : 10, ...(extra || {}) };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan wordt uitgevoerd...'; $('#scan-progress-bar').style.width = '15%';
     try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-bar').style.width = '100%'; $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals(), loadRuns()]); }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
