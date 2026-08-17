@@ -3999,7 +3999,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817c/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817d/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });

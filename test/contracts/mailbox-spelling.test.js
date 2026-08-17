@@ -44,6 +44,7 @@ function createControllerHarness({ body = '', fetch, spellingTimeoutMs } = {}) {
     ['compose-overlay', { classList: { add() {}, remove() {} }, addEventListener() {} }],
   ]);
   const spellingButton = createButton('Spellingscontrole');
+  const undoButton = { ...createButton('Ongedaan maken'), hidden: true };
   const rewriteButton = createButton('Voorgestelde reactie');
   const sendButton = createButton('Versturen');
   const documentRef = {
@@ -51,6 +52,7 @@ function createControllerHarness({ body = '', fetch, spellingTimeoutMs } = {}) {
     getElementById(id) { return fields.get(id) || null; },
     querySelector(selector) {
       if (selector === '[data-mailbox-action="spellcheck-compose"]') return spellingButton;
+      if (selector === '[data-mailbox-action="undo-spelling"]') return undoButton;
       if (selector === '[data-mailbox-action="rewrite-compose"]') return rewriteButton;
       if (selector === '.btn-send') return sendButton;
       return null;
@@ -85,6 +87,7 @@ function createControllerHarness({ body = '', fetch, spellingTimeoutMs } = {}) {
     rewriteButton,
     sendButton,
     spellingButton,
+    undoButton,
     toasts,
   };
 }
@@ -150,6 +153,7 @@ test('composer vervangt uitsluitend body, bewaart focus en biedt exact undo zond
   const originalProtectedFields = ['c-to', 'c-cc', 'c-bcc', 'c-subject']
     .map((id) => [id, harness.fields.get(id).value]);
 
+  harness.documentRef.activeElement = harness.spellingButton;
   await harness.controller.spellcheck();
 
   assert.equal(harness.requests.length, 1);
@@ -164,11 +168,17 @@ test('composer vervangt uitsluitend body, bewaart focus en biedt exact undo zond
     originalProtectedFields
   );
   assert.equal(harness.toasts.at(-1).message, 'Spelling gecontroleerd');
-  assert.equal(harness.toasts.at(-1).actionOptions.label, 'Ongedaan maken');
+  assert.equal(harness.toasts.at(-1).actionOptions, undefined);
+  assert.equal(harness.undoButton.hidden, false);
+  assert.equal(harness.undoButton.disabled, false);
 
-  await harness.toasts.at(-1).actionOptions.action();
+  harness.documentRef.activeElement = harness.spellingButton;
+  harness.controller.handleAction('undo-spelling');
 
   assert.equal(harness.fields.get('c-body').value, original);
+  assert.equal(harness.documentRef.activeElement, harness.fields.get('c-body'));
+  assert.equal(harness.undoButton.hidden, true);
+  assert.equal(harness.undoButton.disabled, true);
   assert.equal(harness.toasts.at(-1).message, 'Spellingscorrectie ongedaan gemaakt');
 });
 
@@ -243,7 +253,7 @@ test('sluiten tijdens controle blokkeert iedere late bodymutatie', async () => {
   assert.equal(harness.toasts.length, 0);
 });
 
-test('composerfooter plaatst Spellingscontrole direct naast Voorgestelde reactie en blijft mobiel bruikbaar', () => {
+test('composerfooter plaatst Spellingscontrole en inline undo direct naast Voorgestelde reactie en blijft mobiel bruikbaar', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
   const mobileCss = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-mobile.css'), 'utf8');
   const controllerSource = fs.readFileSync(
@@ -251,16 +261,18 @@ test('composerfooter plaatst Spellingscontrole direct naast Voorgestelde reactie
     'utf8'
   );
 
-  assert.match(page, /class="compose-assist-actions">\s*<button[^>]+rewrite-compose[^>]*>Voorgestelde reactie<\/button>\s*<button[^>]+spellcheck-compose[^>]*>Spellingscontrole<\/button>/);
+  assert.match(page, /class="compose-assist-actions">\s*<button[^>]+rewrite-compose[^>]*>Voorgestelde reactie<\/button>\s*<button[^>]+spellcheck-compose[^>]*>Spellingscontrole<\/button>\s*<button[^>]+undo-spelling[^>]+hidden[^>]+disabled[^>]*>Ongedaan maken<\/button>/);
   assert.match(page, /\.btn-rewrite-compose,\s*\.btn-spellcheck-compose \{/);
   assert.match(page, /\.btn-spellcheck-compose:focus-visible/);
-  assert.match(mobileCss, /\.compose-assist-actions \{ flex: 1 1 100%; \}/);
+  assert.match(mobileCss, /\.compose-assist-actions \{ flex: 1 1 100%; flex-wrap: wrap; \}/);
+  assert.match(mobileCss, /\.btn-spelling-undo \{ flex: 1 1 100%; min-height: 44px; \}/);
   assert.match(mobileCss, /\.btn-rewrite-compose,\s*\.btn-spellcheck-compose \{ flex: 1 1 0;/);
   assert.match(mobileCss, /\.btn-rewrite-compose,\s*\.btn-spellcheck-compose,\s*\.btn-send \{ min-height: 44px;/);
   assert.match(mobileCss, /\.compose-footer \{ align-items: stretch; flex-direction: column; \}/);
   assert.match(controllerSource, /body:\s*JSON\.stringify\(\{ body: original \}\)/);
   assert.match(controllerSource, /action === 'spellcheck-compose'[\s\S]*void spellcheck\(\)/);
+  assert.match(controllerSource, /action === 'undo-spelling'[\s\S]*undoSpelling\(\)/);
   assert.doesNotMatch(controllerSource, /spellcheck[\s\S]{0,500}\/api\/mailbox\/send/);
-  assert.match(page, /assets\/premium-mailbox-compose-controller\.js\?v=20260817c/);
-  assert.match(page, /assets\/premium-mailbox-mobile\.css\?v=20260817c/);
+  assert.match(page, /assets\/premium-mailbox-compose-controller\.js\?v=20260817d/);
+  assert.match(page, /assets\/premium-mailbox-mobile\.css\?v=20260817d/);
 });
