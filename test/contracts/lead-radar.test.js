@@ -10,6 +10,8 @@ const {
   classifySignal,
   createLeadRadarService,
   hasCompletedInitialBackfill,
+  isLikelyDirectPlatformPostUrl,
+  normalizeProviderPublishedAt,
   normalizeHttpUrl,
   normalizePlatform,
   scoreSignal,
@@ -87,6 +89,46 @@ test('Lead Radar filtert zelfpromotie van webbouwers zonder echte klantvraag', (
   assert.ok(buildSignalFromProviderItem(prospect, { region: 'Nijlen' }));
 });
 
+test('Lead Radar houdt echte ondernemersvragen en websitebouwers uit elkaar', () => {
+  const classify = (title, snippet) => classifySignal({
+    title,
+    snippet,
+    url: 'https://www.facebook.com/example/posts/123',
+  });
+
+  const agency = classify(
+    'Roweb Webdesign | Deurne',
+    'Wilt u voor een scherpe prijs een WordPress website laten bouwen? Wij bouwen websites voor bedrijven.'
+  );
+  const vacancy = classify(
+    'Effectief B.V.',
+    'VACATURE: ervaren webdeveloper gezocht. Wij zoeken een fulltime collega om ons team te versterken.'
+  );
+  const productSearch = classify(
+    'Marketplace',
+    'Nederlandse website gezocht naar een identieke auto, nergens te koop of te vinden.'
+  );
+  const webshopOwner = classify(
+    'Noor Van Dam',
+    'WEBdesigner gezocht. Ik zoek iemand die mijn webshop kan verbeteren en professioneler kan maken.'
+  );
+  const butcher = classify(
+    'Slagerij Echt Ambachtelijk',
+    'WEBSITEBOUWER GEZOCHT! WIE HELPT.'
+  );
+
+  assert.equal(agency.role, 'provider');
+  assert.equal(vacancy.role, 'excluded');
+  assert.equal(productSearch.isWebsiteNeed, false);
+  assert.equal(webshopOwner.role, 'prospect');
+  assert.equal(butcher.role, 'prospect');
+  assert.equal(buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/124',
+    title: 'Marketplace',
+    snippet: productSearch.message || 'Nederlandse website gezocht naar een identieke auto.',
+  }, { region: 'Nederland' }), null);
+});
+
 test('Lead Radar behandelt een website-link uit een bericht eerst als kandidaat', () => {
   const signal = buildSignalFromProviderItem({
     url: 'https://www.facebook.com/example/posts/123',
@@ -96,6 +138,36 @@ test('Lead Radar behandelt een website-link uit een bericht eerst als kandidaat'
   assert.equal(signal.website_url, 'https://voorbeeld.nl');
   assert.equal(signal.website_status, 'website_not_checked');
   assert.equal(signal.website_source, 'post');
+});
+
+test('Lead Radar accepteert voor een scan alleen recente directe posts met echte publicatiedatum', () => {
+  const recentTimestamp = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const recent = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/123',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: recentTimestamp,
+    datetime: new Date().toISOString(),
+  }, { region: 'Eindhoven', maxAgeDays: 30, requireFresh: true });
+  const old = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/124',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: new Date(Date.now() - 45 * 86_400_000).toISOString(),
+  }, { region: 'Eindhoven', maxAgeDays: 30, requireFresh: true });
+  const profileOnly = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: recentTimestamp,
+  }, { region: 'Eindhoven', maxAgeDays: 30, requireFresh: true });
+
+  assert.equal(normalizeProviderPublishedAt({ datetime: recentTimestamp }), null);
+  assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example/posts/123', 'facebook'), true);
+  assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example', 'facebook'), false);
+  assert.ok(recent);
+  assert.equal(old, null);
+  assert.equal(profileOnly, null);
 });
 
 test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd worden', async () => {
@@ -138,6 +210,57 @@ test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd wo
   assert.equal(result.website_status, 'website_found');
   assert.equal(result.website_http_status, 200);
   assert.equal(result.website_title, 'Voorbeeld');
+});
+
+test('Lead Radar zoekt een openbare bedrijfswebsite en bewaart de klikbare kandidaat', async () => {
+  const existing = {
+    id: '00000000-0000-0000-0000-000000000002',
+    author_name: 'Kapsalon Nijlen',
+    region: 'Nijlen',
+    message_text: 'Wij zoeken iemand die een website kan maken.',
+    website_url: null,
+    website_status: 'website_not_checked',
+    website_candidates: [],
+  };
+  const updated = { ...existing };
+  const db = {
+    from() {
+      return {
+        select() {
+          const chain = {
+            eq() { return chain; },
+            limit: async () => ({ data: [existing], error: null }),
+          };
+          return chain;
+        },
+        update(patch) {
+          Object.assign(updated, patch);
+          const chain = {
+            eq() { return chain; },
+            select() { return { single: async () => ({ data: updated, error: null }) }; },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+  const service = createLeadRadarService({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => db,
+    provider: {
+      configured: true,
+      search: async () => [{ url: 'https://kapsalonnijlen.nl', title: 'Kapsalon Nijlen', snippet: 'Officiele website van Kapsalon Nijlen' }],
+    },
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<title>Kapsalon Nijlen</title>' }),
+    env: {},
+  });
+
+  const result = await service.lookupWebsite(existing.id, { force: true });
+  assert.equal(result.website_url, 'https://kapsalonnijlen.nl');
+  assert.equal(result.website_status, 'website_found');
+  assert.equal(result.website_source, 'public_search');
+  assert.equal(result.website_http_status, 200);
+  assert.equal(result.website_candidates[0].url, 'https://kapsalonnijlen.nl');
 });
 
 test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () => {
@@ -251,10 +374,15 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /Gepubliceerd op:/);
   assert.match(script, /import-published-at/);
   assert.match(script, /Website zoeken/);
+  assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
   assert.match(page, /id="auto-scan-status"/);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260817e/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260817e/);
+  assert.match(page, /Automatische scan staat uit/);
+  assert.doesNotMatch(script, /Automatisch actief/);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260817g/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260817g/);
+  assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
+  assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
   assert.match(page, /id="scan-max-age-days"/);
   assert.match(page, /id="scan-max-queries"[^>]*max="12"/);
 });

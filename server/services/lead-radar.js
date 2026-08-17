@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { createLeadRadarQuality } = require('./lead-radar-quality');
 
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
@@ -25,6 +26,7 @@ const DEFAULT_SCAN_QUERY_LIMIT = 12;
 const MAX_SCAN_QUERY_LIMIT = DEFAULT_SCAN_QUERY_LIMIT;
 const DEFAULT_WEBSITE_LOOKUP_LIMIT = 10;
 const MAX_WEBSITE_LOOKUP_LIMIT = 50;
+const DEFAULT_SOURCE_CHECK_LIMIT = 10;
 const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
 const DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS = 30;
 const DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS = 3;
@@ -101,34 +103,6 @@ const NEGATIVE_TERMS = Object.freeze([
   'gratis website maken', 'website handleiding', 'software installeren', 'website baan',
   'webdesigner vacature', 'marketing vacature',
 ]);
-
-const BUYER_INTENT_TERMS = Object.freeze([
-  'ik zoek', 'ik ben op zoek', 'ben op zoek', 'ben opzoek', 'wij zoeken', 'we zoeken',
-  'wij zijn op zoek', 'we zijn op zoek', 'wie kan een website', 'wie kent een goede',
-  'wie weet een goede', 'iemand die een website kan maken', 'iemand die een website bouwt',
-  'iemand nodig voor mijn website', 'hulp met website', 'website hulp gezocht',
-  'website hulp nodig', 'website gezocht', 'webdesigner gezocht', 'websitebouwer gezocht',
-  'hulp gevraagd voor mijn website', 'offerte voor een website', 'website offerte',
-  'nog geen website', 'geen website', 'toe aan een website', 'website nodig voor',
-  'website nodig', 'webshop hulp gezocht', 'webshop laten maken voor',
-  'webshop laten bouwen voor', 'website vernieuwen voor', 'bestaande website vernieuwen',
-  'website opnieuw laten bouwen', 'online aanwezigheid nodig',
-  'ik wil een website', 'wij willen een website', 'we willen een website',
-  'website laten maken voor mijn', 'website laten bouwen voor mijn',
-  'mijn website vernieuwen', 'onze website vernieuwen', 'oude website vervangen',
-  'website werkt niet', 'website doet het niet', 'website aanpassen', 'website verbeteren',
-  'webshop vernieuwen', 'webshop werkt niet',
-]);
-
-const PROVIDER_ROLE_TERMS = Object.freeze([
-  'webdesigner', 'websitedesigner', 'webdesign', 'webbureau', 'websitebouwer',
-  'website bouwer', 'webdeveloper', 'web development', 'webdevelopment',
-  'webshopbouwer', 'online marketing', 'marketingbureau', 'marketing bureau',
-  'digital agency', 'marketing agency', 'seo bureau', 'seo specialist',
-  'wordpress specialist', 'shopify partner', 'web tech bureau', 'websites en logo',
-  'website onderhoud', 'website voor ondernemers',
-]);
-
 const PROVIDER_PROMO_TERMS = Object.freeze([
   'wij bouwen websites', 'wij bouwen webshops', 'wij maken websites', 'wij maken webshops',
   'wij helpen', 'wij ontwerpen', 'wij ontwikkelen', 'website laten maken?',
@@ -141,62 +115,6 @@ const PROVIDER_PROMO_TERMS = Object.freeze([
   'heb je ook een nieuwe website nodig', 'heb jij ook een nieuwe website nodig',
   'tag iemand die een nieuwe website nodig heeft', 'ken jij iemand die een nieuwe website nodig heeft',
 ]);
-
-function countPhraseHits(value, phrases) {
-  const normalized = String(value || '').toLowerCase();
-  return phrases.reduce((count, phrase) => count + (normalized.includes(String(phrase).toLowerCase()) ? 1 : 0), 0);
-}
-
-function isLikelyPlatformProfileUrl(value) {
-  const normalized = normalizeHttpUrl(value);
-  if (!normalized || !platformFromUrl(normalized)) return false;
-  try {
-    const segments = new URL(normalized).pathname.split('/').filter(Boolean);
-    return segments.length <= 1;
-  } catch {
-    return false;
-  }
-}
-
-function classifySignal(input = {}) {
-  const author = text(input.author_name || input.authorName || input.title, 500).toLowerCase();
-  const message = `${input.message_text || input.messageText || input.snippet || ''}`.toLowerCase();
-  const sourceUrl = input.post_url || input.source_url || input.sourceUrl || input.url || '';
-  const buyerIntentHits = countPhraseHits(message, BUYER_INTENT_TERMS);
-  const providerRoleHits = countPhraseHits(author, PROVIDER_ROLE_TERMS);
-  const providerMessageRoleHits = countPhraseHits(message, PROVIDER_ROLE_TERMS);
-  const providerPromoHits = countPhraseHits(message, PROVIDER_PROMO_TERMS);
-  const profileOnly = isLikelyPlatformProfileUrl(sourceUrl);
-  const hasWebsiteContext = /\b(websites?|webshops?|webwinkels?|webdesign|webdevelopers?|site)\b/i.test(message);
-  const strongPromotion = providerPromoHits >= 2 ||
-    (providerPromoHits >= 1 && (providerRoleHits > 0 || providerMessageRoleHits > 0));
-  const providerConfidence = Math.min(100,
-    providerRoleHits * 45 +
-    providerMessageRoleHits * 20 +
-    providerPromoHits * 25 +
-    (profileOnly ? 15 : 0)
-  );
-  const isProvider = Boolean(
-    hasWebsiteContext &&
-    strongPromotion &&
-    (providerRoleHits > 0 || providerMessageRoleHits > 0 || profileOnly || providerPromoHits >= 2)
-  );
-  const hasBuyerIntent = buyerIntentHits > 0;
-  const isWebsiteNeed = hasWebsiteContext && hasBuyerIntent;
-  const reasons = [];
-  if (isProvider) reasons.push('Zelfpromotie van webdesign-, SEO- of marketingaanbieder');
-  if (!hasWebsiteContext) reasons.push('Geen duidelijke websitecontext in het bericht');
-  if (!hasBuyerIntent) reasons.push('Geen duidelijke klantvraag gevonden');
-  return {
-    role: isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear'),
-    isProvider,
-    isWebsiteNeed,
-    providerConfidence,
-    buyerIntentHits,
-    reasons,
-  };
-}
-
 class LeadRadarValidationError extends Error {
   constructor(message) {
     super(message);
@@ -208,36 +126,30 @@ class LeadRadarValidationError extends Error {
 function text(value, maxLength = 500) {
   return String(value ?? '').trim().slice(0, maxLength);
 }
-
 function normalizePlatform(value) {
   const normalized = text(value, 30).toLowerCase();
   if (PLATFORMS.includes(normalized)) return normalized;
   return platformFromUrl(normalized);
 }
-
 function normalizeStatus(value) {
   const normalized = text(value, 30).toLowerCase();
   return LEAD_STATUSES.includes(normalized) ? normalized : '';
 }
-
 function normalizeWebsiteStatus(value) {
   const normalized = text(value, 40).toLowerCase();
   return WEBSITE_STATUSES.includes(normalized) ? normalized : '';
 }
-
 function normalizeInteger(value, { min = 0, max = 2_000_000 } = {}) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
   return Math.max(min, Math.min(max, Math.round(parsed)));
 }
-
 function normalizeDate(value) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
-
 function normalizeHttpUrl(value, { allowPlatform = true } = {}) {
   const raw = text(value, 2_000);
   if (!raw) return '';
@@ -256,14 +168,12 @@ function normalizeHttpUrl(value, { allowPlatform = true } = {}) {
     return '';
   }
 }
-
 function isPlatformHostname(hostname) {
   const value = String(hostname || '').toLowerCase();
   return value === 'facebook.com' || value.endsWith('.facebook.com') ||
     value === 'fb.com' || value.endsWith('.fb.com') ||
     value === 'instagram.com' || value.endsWith('.instagram.com');
 }
-
 function platformFromUrl(value) {
   const normalized = normalizeHttpUrl(value);
   if (!normalized) return '';
@@ -276,6 +186,15 @@ function platformFromUrl(value) {
     return '';
   }
 }
+
+const leadRadarQuality = createLeadRadarQuality({ text, normalizeHttpUrl, normalizePlatform, normalizeDate, normalizeInteger, platformFromUrl });
+const {
+  classifySignal,
+  isEligibleAutomaticSignal,
+  isLikelyDirectPlatformPostUrl,
+  isRecentPublication,
+  normalizeProviderPublishedAt,
+} = leadRadarQuality;
 
 function assertSourceUrl(value, expectedPlatform = '') {
   const normalized = normalizeHttpUrl(value);
@@ -329,9 +248,8 @@ function scoreSignal(input = {}, { targetRegion = '' } = {}) {
     reasons.push('Publicatiedatum onbekend');
   }
 
-  const directWebsiteIntent = containsAny(message, KEYWORD_GROUPS.direct_website) ||
-    ((message.includes('website') || message.includes('webdesigner') || message.includes('webshop')) &&
-      containsAny(message, ['gezocht', 'nodig', 'hulp', 'wie kent', 'wie weet', 'aanbeveling']));
+  const classification = classifySignal({ message_text: message });
+  const directWebsiteIntent = classification.isWebsiteNeed && !classification.isProvider && !classification.isExcluded;
   if (directWebsiteIntent) {
     score += 30;
     reasons.push('Bevat directe websitevraag');
@@ -381,10 +299,9 @@ function getSelectedGroups(value) {
 }
 
 function getAutomaticScanConfig(env = process.env) {
-  const enabledValue = text(env.LEAD_RADAR_AUTO_SCAN_ENABLED, 20).toLowerCase();
-  // Automatische rondes staan voorlopig standaard uit. Ze kunnen later bewust
-  // worden aangezet via een expliciete server-side environment variable.
-  const enabled = enabledValue ? /^(1|true|yes|on)$/.test(enabledValue) : false;
+  // Automatische rondes zijn bewust gepauzeerd. Ook als een oude Vercel-variable
+  // nog op true staat, mag Lead Radar alleen na een handmatige klik zoeken.
+  const enabled = false;
   const intervalMinutes = Math.max(
     15,
     Math.min(1_440, Math.round(Number(env.LEAD_RADAR_AUTO_SCAN_INTERVAL_MINUTES) || DEFAULT_AUTO_SCAN_INTERVAL_MINUTES))
@@ -516,7 +433,10 @@ function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fe
         url: text(item.url, 2_000),
         title: text(item.title, 500),
         snippet: text(item.description || item.snippet, 5_000),
-        date: item.datetime || item.date || item.published_at || item.timestamp || null,
+        // Do not map result.datetime here: DataForSEO documents that value as
+        // the time the SERP was retrieved, not when the Facebook/Instagram post
+        // was published. `timestamp` is the publication/indexing candidate.
+        date: item.date || item.timestamp || item.published_at || null,
         rank: normalizeInteger(item.rank_absolute, { min: 1, max: 10_000 }),
       }));
   }
@@ -538,10 +458,15 @@ function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fe
 }
 
 function buildWebsiteSearchQuery(signal) {
-  const name = text(signal.author_name || signal.authorName || '', 180).replace(/["']/g, ' ');
+  const name = text(signal.author_name || signal.authorName || '', 180)
+    .split('|')[0]
+    .replace(/^#\s*/, '')
+    .replace(/["']/g, ' ')
+    .trim();
   const region = text(signal.region, 100).replace(/["']/g, ' ');
   if (!name || name.length < 3) return '';
-  return `"${name}" ${region} website`.trim();
+  // Exclude social profiles and ask for the public company site itself.
+  return `"${name}" ${region} website -site:facebook.com -site:instagram.com`.trim();
 }
 
 function buildSignalFromProviderItem(item, context = {}) {
@@ -561,9 +486,17 @@ function buildSignalFromProviderItem(item, context = {}) {
   // SERP-resultaten van partijen die zelf websites/SEO verkopen zijn geen
   // acquisitielead. Ook resultaten zonder echte websitevraag zijn te vaak
   // algemene content die alleen toevallig het woord website bevat.
-  if (classification.isProvider || !classification.isWebsiteNeed) return null;
+  if (classification.isProvider || classification.isExcluded || !classification.isWebsiteNeed) return null;
+  const maxAgeDays = normalizeInteger(context.maxAgeDays, { min: 1, max: 3650 });
+  if (context.requireFresh) {
+    // A SERP hit is not enough. We need both a direct public post URL and a
+    // provider-supplied publication timestamp before it enters the inbox.
+    if (!isLikelyDirectPlatformPostUrl(url, platform)) return null;
+    if (!normalizeProviderPublishedAt(item)) return null;
+    if (!isRecentPublication(normalizeProviderPublishedAt(item), maxAgeDays || 30)) return null;
+  }
   const directWebsite = extractUrls(messageText)[0] || '';
-  const publishedAt = normalizeDate(item?.date || item?.datetime);
+  const publishedAt = normalizeProviderPublishedAt(item);
   const region = text(context.region, 120);
   const authorName = text(item?.title || '', 500);
   const input = {
@@ -697,7 +630,14 @@ function createLeadRadarService(deps = {}) {
     if (days > 0) request = request.gte('published_at', new Date(Date.now() - days * 86_400_000).toISOString());
     const result = await request;
     if (result.error) throw result.error;
-    const visibleSignals = (result.data || []).filter((signal) => !classifySignal(signal).isProvider);
+    const visibleSignals = (result.data || []).filter((signal) => {
+      // Handmatige imports blijven altijd zichtbaar. Alleen automatisch
+      // gevonden SERP-signalen worden opnieuw tegen de kwaliteitsregels gelegd.
+      const isAutomaticSignal = signal.source_type === 'serp' || signal.provider === 'dataforseo';
+      if (!isAutomaticSignal) return true;
+      const requestedDays = normalizeInteger(query.days, { min: 1, max: 3650 });
+      return isEligibleAutomaticSignal(signal, { maxAgeDays: requestedDays || 30 });
+    });
     const hiddenProviderCount = Math.max(0, (result.data || []).length - visibleSignals.length);
     return {
       signals: visibleSignals,
@@ -825,11 +765,25 @@ function createLeadRadarService(deps = {}) {
         candidates = items
           .map((item) => ({ url: normalizeHttpUrl(item.url, { allowPlatform: false }), title: text(item.title, 500), snippet: text(item.snippet, 2_000) }))
           .filter((item) => item.url);
-        const exactName = text(signal.author_name, 120).toLowerCase();
+        const exactName = text(signal.author_name, 120).split('|')[0].toLowerCase().trim();
+        const nameTokens = exactName
+          .replace(/[^a-z0-9\s-]/gi, ' ')
+          .split(/\s+/)
+          .filter((token) => token.length >= 3 && !['website', 'webdesign', 'media', 'bureau', 'bedrijf'].includes(token));
+        const regionName = text(signal.region, 100).toLowerCase();
         const scoredCandidates = candidates.map((item) => ({
           ...item,
-          score: (exactName && `${item.title} ${item.snippet}`.toLowerCase().includes(exactName) ? 50 : 0) + (item.title.toLowerCase().includes('website') ? 10 : 0),
+          score: (() => {
+            const candidateText = `${item.title} ${item.snippet} ${item.url}`.toLowerCase();
+            const matchingTokens = nameTokens.filter((token) => candidateText.includes(token)).length;
+            const exactMatch = exactName && candidateText.includes(exactName);
+            const regionMatch = regionName && candidateText.includes(regionName);
+            const directory = /\b(facebook|instagram|linkedin|offerte|vacature|yelp|bedrijvengids|gouden gids)\b/i.test(candidateText);
+            return (exactMatch ? 55 : Math.min(45, matchingTokens * 20)) + (regionMatch ? 15 : 0) +
+              (item.title.toLowerCase().includes('website') ? 5 : 0) - (directory ? 35 : 0);
+          })(),
         })).sort((a, b) => b.score - a.score);
+        candidates = scoredCandidates;
         if (scoredCandidates[0] && scoredCandidates[0].score >= 30) {
           candidateUrl = scoredCandidates[0].url;
           source = 'public_search';
@@ -837,10 +791,12 @@ function createLeadRadarService(deps = {}) {
       }
     }
     if (!candidateUrl) {
+      const hasWebsiteCandidate = candidates.length > 0;
       return {
-        website_status: provider?.configured ? 'no_website_found' : 'provider_unavailable',
-        website_source: provider?.configured ? 'not_found' : 'not_checked',
+        website_status: provider?.configured ? (hasWebsiteCandidate ? 'website_unverified' : 'no_website_found') : 'provider_unavailable',
+        website_source: provider?.configured && hasWebsiteCandidate ? 'public_search' : (provider?.configured ? 'not_found' : 'not_checked'),
         website_checked_at: new Date().toISOString(),
+        website_check_error: hasWebsiteCandidate ? 'Mogelijke website gevonden, maar de koppeling is nog niet betrouwbaar genoeg bevestigd.' : null,
         website_candidates: candidates,
       };
     }
@@ -852,7 +808,7 @@ function createLeadRadarService(deps = {}) {
       website_http_status: check.status,
       website_status: check.ok ? 'website_found' : 'website_not_working',
       website_source: source,
-      website_confidence_score: source === 'post' ? 100 : 70,
+      website_confidence_score: source === 'post' ? 100 : (candidates[0]?.score >= 55 ? 90 : 60),
       website_checked_at: new Date().toISOString(),
       website_check_error: check.ok ? null : check.error,
       website_candidates: candidates,
@@ -877,6 +833,30 @@ function createLeadRadarService(deps = {}) {
       return { ok: response.ok, status: response.status, title, error: response.ok ? '' : `HTTP ${response.status}` };
     } catch (error) {
       return { ok: false, status: null, title: '', error: text(error?.message || error, 500) };
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  async function verifyPublicSource(url) {
+    const normalized = normalizeHttpUrl(url);
+    if (!normalized || typeof fetchImpl !== 'function') return true;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), 5_000) : null;
+    try {
+      const response = await fetchImpl(normalized, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: { Accept: 'text/html,application/xhtml+xml' },
+        signal: controller?.signal,
+      });
+      if ([404, 410].includes(Number(response.status))) return false;
+      const body = await response.text().catch(() => '');
+      return !/(this content isn't available|this page isn't available|content is not available|pagina is niet beschikbaar|pagina niet gevonden)/i.test(body);
+    } catch {
+      // A platform timeout or bot protection is inconclusive; do not discard a
+      // possibly valid public lead because our server could not inspect it.
+      return true;
     } finally {
       if (timeout) clearTimeout(timeout);
     }
@@ -934,7 +914,7 @@ function createLeadRadarService(deps = {}) {
     let cursor = 0;
     const requestedScanMode = text(input.scanMode || input.scan_mode, 20).toLowerCase();
     const scanMode = ['automatic', 'manual'].includes(requestedScanMode) ? requestedScanMode : 'manual';
-    const maxAgeDays = normalizeInteger(input.maxAgeDays ?? input.max_age_days, { min: 1, max: 3650 });
+    const maxAgeDays = normalizeInteger(input.maxAgeDays ?? input.max_age_days, { min: 1, max: 3650 }) || 30;
     if (input.runId || input.run_id) {
       const db = requireDb();
       const result = await db.from(SCAN_RUNS_TABLE).select('*').eq('id', text(input.runId || input.run_id, 100)).limit(1);
@@ -977,6 +957,7 @@ function createLeadRadarService(deps = {}) {
     let websiteFoundCount = Number(run.website_found_count) || 0;
     let errorCount = Number(run.error_count) || 0;
     let websiteLookupsLeft = websiteLookupLimit;
+    let sourceChecksLeft = DEFAULT_SOURCE_CHECK_LIMIT;
     for (let index = cursor; index < end; index += 1) {
       const query = plan[index];
       try {
@@ -984,8 +965,22 @@ function createLeadRadarService(deps = {}) {
         resultCount += items.length;
         usedQueries.push({ ...query, executedAt: new Date().toISOString(), resultCount: items.length, status: 'completed' });
         for (const item of items) {
-          const signal = buildSignalFromProviderItem(item, { ...query, provider: provider.name, targetRegion: query.region });
+          const signal = buildSignalFromProviderItem(item, {
+            ...query,
+            provider: provider.name,
+            targetRegion: query.region,
+            maxAgeDays: run.max_age_days || maxAgeDays,
+            requireFresh: true,
+          });
           if (!signal) continue;
+          if (sourceChecksLeft > 0) {
+            sourceChecksLeft -= 1;
+            const sourceAvailable = await verifyPublicSource(signal.post_url);
+            // Alleen een definitieve 404/410 of een expliciete platformmelding
+            // dat de content niet bestaat mag een resultaat blokkeren. 403/429
+            // en loginblokkades zijn geen bewijs dat de post verwijderd is.
+            if (!sourceAvailable) continue;
+          }
           const saved = await upsertSignal(signal);
           if (saved.created) newSignalCount += 1; else duplicateCount += 1;
           if (websiteLookupsLeft > 0 && signal.website_status === 'website_not_checked' && signal.author_name && signal.author_name.length > 3) {
@@ -1163,6 +1158,9 @@ function createLeadRadarService(deps = {}) {
     normalizePlatform,
     normalizeStatus,
     normalizeWebsiteStatus,
+    isLikelyDirectPlatformPostUrl,
+    isRecentPublication,
+    normalizeProviderPublishedAt,
     scoreSignal,
     hasCompletedInitialBackfill,
     getStatus,
@@ -1187,6 +1185,9 @@ module.exports = {
   buildSearchPlan,
   hasCompletedInitialBackfill,
   classifySignal,
+  isLikelyDirectPlatformPostUrl,
+  isRecentPublication,
+  normalizeProviderPublishedAt,
   getAutomaticScanConfig,
   normalizeHttpUrl,
   normalizePlatform,

@@ -48,27 +48,11 @@
 
   function renderAutoScanStatus() {
     const element = $('#auto-scan-status');
-    const autoScan = state.status && state.status.autoScan;
-    if (!element || !autoScan) return;
-    const interval = Number(autoScan.intervalMinutes) || 15;
-    if (!autoScan.enabled) {
-      element.textContent = 'Automatische scan staat uit. Nieuwe rondes starten alleen na een klik op Scan starten.';
-      element.className = 'auto-scan-status auto-scan-status--muted';
-      return;
-    }
-    if (!state.status?.provider?.configured) {
-      element.textContent = 'Automatische scan wacht op configuratie van de zoekprovider.';
-      element.className = 'auto-scan-status auto-scan-status--warning';
-      return;
-    }
-    const lastRun = autoScan.lastRun;
-    const initialDays = Number(autoScan.initialLookbackDays) || 30;
-    const refreshDays = Number(autoScan.refreshLookbackDays) || 3;
-    const lastRunLabel = lastRun?.finished_at ? ` Laatste ronde: ${formatDate(lastRun.finished_at)}.` : '';
-    element.textContent = autoScan.initialBackfillCompleted
-      ? `Automatisch actief: nieuwste signalen uit de laatste ${refreshDays} dagen worden elke ${interval} minuten opgehaald.${lastRunLabel}`
-      : `Eerste automatische vulling: signalen uit de laatste ${initialDays} dagen worden opgehaald. Daarna volgen updates elke ${interval} minuten.${lastRunLabel}`;
-    element.className = 'auto-scan-status';
+    if (!element) return;
+    // Automatische rondes zijn tijdelijk gepauzeerd. De gebruiker start iedere
+    // begrensde ronde bewust zelf, zodat er geen onverwachte providerkosten zijn.
+    element.textContent = 'Automatische scan staat uit. Nieuwe rondes starten alleen na een klik op Scan starten.';
+    element.className = 'auto-scan-status auto-scan-status--muted';
   }
 
   function renderMetrics() {
@@ -92,6 +76,8 @@
     const originalUrl = signal.post_url || signal.source_url || '';
     const profileUrl = signal.profile_url || '';
     const websiteUrl = signal.website_url || '';
+    const websiteCandidates = Array.isArray(signal.website_candidates) ? signal.website_candidates.filter((candidate) => candidate && candidate.url).slice(0, 3) : [];
+    const candidateLinks = websiteCandidates.map((candidate) => `<a class="website-candidate" href="${escapeHtml(candidate.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.title || candidate.url)}</a>`).join('');
     const selected = state.selected.has(signal.id);
     return `<article class="lead-card" data-signal-id="${escapeHtml(signal.id)}">
       <input class="lead-select" type="checkbox" data-select-signal="${escapeHtml(signal.id)}" ${selected ? 'checked' : ''} aria-label="Selecteer lead">
@@ -99,7 +85,7 @@
       <div class="lead-copy"><p class="lead-copy__text">${escapeHtml(signal.message_text || signal.snippet || 'Geen berichttekst beschikbaar.')}</p><div class="lead-copy__query">${escapeHtml(signal.query || 'Handmatige import')} ${signal.keyword_group ? `· ${escapeHtml(signal.keyword_group)}` : ''}</div><div class="lead-actions"><a href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Open originele post</a>${profileUrl ? `<a href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener noreferrer">Open profiel/pagina</a>` : ''}</div></div>
       <div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}<div class="lead-engagement"><strong>Engagement</strong>${signal.engagement_known ? `${signal.likes == null ? 'likes onbekend' : `${signal.likes} likes`} · ${signal.comments == null ? 'reacties onbekend' : `${signal.comments} reacties`}` : 'Onbekend'}</div></div>
       <div class="lead-score"><span class="score ${score >= 70 ? 'score--high' : ''}">${score}</span><ul class="score-reasons">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><span class="website-state ${websiteClass(websiteStatus)}">${escapeHtml(statusLabels[websiteStatus] || websiteStatus)}</span></div>
-      <div class="lead-website lead-actions-cell">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : '<span class="website-url">Geen website-URL opgeslagen</span>'}<div class="lead-actions"><button type="button" data-action="website" data-id="${escapeHtml(signal.id)}">${websiteStatus === 'website_not_checked' ? 'Website zoeken' : 'Opnieuw controleren'}</button><button type="button" data-action="${escapeHtml(signal.lead_status === 'relevant' ? 'new' : 'relevant')}" data-id="${escapeHtml(signal.id)}">${signal.lead_status === 'relevant' ? 'Nieuw maken' : 'Relevant'}</button><button type="button" data-action="${escapeHtml(signal.lead_status === 'follow_up' ? 'new' : 'follow_up')}" data-id="${escapeHtml(signal.id)}">${signal.lead_status === 'follow_up' ? 'Opnieuw openen' : 'Later opvolgen'}</button><button type="button" data-action="not_relevant" data-id="${escapeHtml(signal.id)}">Niet relevant</button></div><textarea class="lead-notes" data-notes-id="${escapeHtml(signal.id)}" maxlength="5000" placeholder="Interne notitie...">${escapeHtml(signal.internal_notes || '')}</textarea><button class="button button-ghost" type="button" data-action="save-notes" data-id="${escapeHtml(signal.id)}">Notitie opslaan</button></div>
+      <div class="lead-website lead-actions-cell">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : websiteCandidates.length ? `<span class="website-url website-url--candidate">Mogelijke websites</span><div class="website-candidates">${candidateLinks}</div>` : '<span class="website-url">Geen website-URL opgeslagen</span>'}<div class="lead-actions"><button type="button" data-action="website" data-id="${escapeHtml(signal.id)}">${websiteStatus === 'website_not_checked' ? 'Website zoeken' : 'Opnieuw controleren'}</button><button type="button" data-action="${escapeHtml(signal.lead_status === 'relevant' ? 'new' : 'relevant')}" data-id="${escapeHtml(signal.id)}">${signal.lead_status === 'relevant' ? 'Nieuw maken' : 'Relevant'}</button><button type="button" data-action="${escapeHtml(signal.lead_status === 'follow_up' ? 'new' : 'follow_up')}" data-id="${escapeHtml(signal.id)}">${signal.lead_status === 'follow_up' ? 'Opnieuw openen' : 'Later opvolgen'}</button><button type="button" data-action="not_relevant" data-id="${escapeHtml(signal.id)}">Niet relevant</button></div><textarea class="lead-notes" data-notes-id="${escapeHtml(signal.id)}" maxlength="5000" placeholder="Interne notitie...">${escapeHtml(signal.internal_notes || '')}</textarea><button class="button button-ghost" type="button" data-action="save-notes" data-id="${escapeHtml(signal.id)}">Notitie opslaan</button></div>
     </article>`;
   }
 
