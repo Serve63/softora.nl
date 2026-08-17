@@ -468,7 +468,7 @@ function renderMailboxRootIncomingMeta(mail, senderLabel) {
   ].filter(Boolean).join(' ');
   return `<div class="detail-message-meta"${ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : ''}>${timestamp ? `<span class="detail-message-time">${escapeHtml(timestamp)}</span>` : ''}${sender ? `<span class="detail-message-sender">${escapeHtml(sender)}</span>` : ''}</div>`;
 }
-function renderMailboxConversationAction(action, mailId) {
+function renderMailboxConversationAction(action, mailId, options = {}) {
   const id = String(mailId || '').trim();
   if (!action || !id) return '';
   const isNewMessage = action.kind === 'new-message';
@@ -477,7 +477,7 @@ function renderMailboxConversationAction(action, mailId) {
   const icon = isNewMessage
     ? '<path d="M12 5v14M5 12h14"/>'
     : '<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/>';
-  const messageKey = String(action.messageKey || '').trim(); return `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="${command}" data-mailbox-id="${escapeHtml(id)}"${messageKey ? ` data-mailbox-message-key="${escapeHtml(messageKey)}"` : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg>${label}</button></div>`;
+  const messageKey = String(action.messageKey || '').trim(); return `<div class="detail-footer${options.placement === 'contact-header' ? ' detail-contact-action' : ''}"><button class="detail-reply" type="button" data-mailbox-action="${command}" data-mailbox-id="${escapeHtml(id)}"${messageKey ? ` data-mailbox-message-key="${escapeHtml(messageKey)}"` : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg>${label}</button></div>`;
 }
 function renderMailBody(value, images, options) {
   const imageState = {
@@ -498,12 +498,12 @@ function renderMailBody(value, images, options) {
   imageState.quoteImages = normalizeMailboxBodyImages(imagePlan.quoteImages);
   const replyMailId = String(options && options.replyMailId || '').trim();
   const rootIncomingMeta = String(options && options.rootIncomingMeta || '');
-  const contactTimeline = options?.mail?.contactTimelineLoaded === true;
+  const contactTimeline = options?.mail?.contactTimelineLoaded === true; const contactDossierMode = options?.contactDossierMode === true || contactTimeline;
   const conversationAction = options && options.mail
     ? window.SoftoraMailboxCampaignInbox?.getConversationAction?.(contactTimeline ? { ...options.mail, threadMessages: [] } : options.mail)
     : replyMailId ? { kind: 'reply', isRoot: true } : null;
   const actionHtml = renderMailboxConversationAction(conversationAction, replyMailId);
-  const newMessageActionHtml = conversationAction && conversationAction.kind === 'new-message'
+  const newMessageActionHtml = !contactDossierMode && conversationAction && conversationAction.kind === 'new-message'
     ? actionHtml
     : '';
   const rootActionHtml = conversationAction && conversationAction.kind === 'reply' && conversationAction.isRoot
@@ -525,7 +525,7 @@ function renderMailBody(value, images, options) {
     position,
     newestFirst: true,
     action: threadAction,
-    renderMessageAction: contactTimeline ? (message) => renderMailboxConversationAction(window.SoftoraMailboxCampaignInbox?.getConversationAction?.({ ...message, threadMessages: [] }), replyMailId) : null,
+    renderMessageAction: contactTimeline ? (message) => window.SoftoraMailboxDiscovery.renderReplyMessageAction(message, window.SoftoraMailboxCampaignInbox, renderMailboxConversationAction, replyMailId) : null,
     renderMessageBody: (payload) => window.SoftoraMailboxImages?.renderThreadMessageBody?.(payload, threadBodyContext, {
       normalizeEmail: normalizeMailboxEmail, normalizeOptOutUrl: normalizeMailboxOptOutUrl,
       renderInlineImage: renderMailboxInlineImage, renderParagraphs: renderMailboxParagraphs,
@@ -747,7 +747,7 @@ mailboxOwnerView = window.SoftoraMailboxOwnerSession.createView({
   normalizeMessage: (message, scope) => normalizeMailboxApiMessage(message, { folder: scope.folder }),
   getMessages: () => mails, setMessages: (value) => { mails = value; }, filterDeleted: mailboxDeleteController.filterMessages,
   getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, openMail,
-  getListElement: () => document.getElementById('mail-items'), renderList, prewarm: (messages) => window.SoftoraMailboxImages?.prewarm?.(messages),
+  getListElement: () => document.getElementById('mail-results-scroll'), renderList, prewarm: (messages) => window.SoftoraMailboxImages?.prewarm?.(messages),
   getSync: () => mailboxSyncState, setSync: (value) => { mailboxSyncState = value; }, setStatus: (value) => window.SoftoraMailboxIndex?.setStatus(value),
   syncInBackground: syncMailboxInBackground, syncInboxBadge: syncInboxBadgeFromCurrentFolder,
   closeCompose: mailboxComposeController.close, closeMenu: closeMailboxAccountMenu, updateAccountUi: () => setMailboxAccountUi(activeMailboxAccount),
@@ -890,14 +890,14 @@ function syncInboxBadgeFromCurrentFolder() {
 function renderList(options = {}) {
   let list = getMailsForFolder(activeFolder);
   const displayOptions = { activeFolder, account: getMailboxAccount() };
-  const wrap = document.getElementById('mail-items');
+  const wrap = document.getElementById('mail-items'); const scrollWrap = document.getElementById('mail-results-scroll') || wrap;
   if (!wrap) return;
-  const listScrollTop = Number.isFinite(Number(wrap.scrollTop)) ? Number(wrap.scrollTop) : 0;
+  const listScrollTop = Number.isFinite(Number(scrollWrap.scrollTop)) ? Number(scrollWrap.scrollTop) : 0;
   syncInboxBadgeFromCurrentFolder();
   if (!list.length) {
     const emptyText = mailboxSyncState?.warming ? 'Mailbox wordt bijgewerkt…' : 'Geen e-mails gevonden.';
     wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(emptyText)}</div>`;
-    wrap.scrollTop = listScrollTop;
+    scrollWrap.scrollTop = listScrollTop;
     return;
   }
   const hasVisibleActiveMail = activeMail != null && list.some((mail) => String(mail.id) === String(activeMail));
@@ -905,7 +905,7 @@ function renderList(options = {}) {
   wrap.innerHTML = list.map(m => window.SoftoraMailboxList.renderItem(m, {
     activeMail, displayOptions, escapeHtml, display: window.SoftoraMailboxDisplay,
   })).join('');
-  wrap.scrollTop = listScrollTop;
+  scrollWrap.scrollTop = listScrollTop;
   if (!activeMail && options.openLatest !== false) openMail(list[0].id);
 }
 async function loadMailboxMessageBody(id) {
@@ -960,7 +960,7 @@ function openMail(id, options = {}) {
   ));
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
-  const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
+  const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions); const contactDossier = window.SoftoraMailboxDiscovery.getContactDossier(m, { activeFolder, accountEmails: getMailboxAccounts(), campaignInbox: window.SoftoraMailboxCampaignInbox, fallbackTitle: window.SoftoraMailboxDisplay.formatDetailSubject(m.subject) }); const contactDossierMode = contactDossier.active; const detailTitle = contactDossier.title;
   const detailBody = m.safeBodyPreviewOnly ? (m.preview || '') : (m.body || m.preview || '');
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
@@ -970,7 +970,7 @@ function openMail(id, options = {}) {
       <article class="detail-mail-block">
         <div class="detail-header">
           <div class="detail-subject-row">
-            <div class="detail-subject">${escapeHtml(window.SoftoraMailboxDisplay.formatDetailSubject(m.subject))}</div>
+            <div class="detail-subject">${escapeHtml(detailTitle)}</div>
             <div class="detail-head-tools">
               ${window.SoftoraMailboxUiState.renderReadTools(readState, m.id, escapeHtml)}
               <button class="detail-hide-conversation" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}" aria-label="Gesprek alleen uit Softora verbergen" title="Alleen uit Softora verbergen">
@@ -987,10 +987,10 @@ function openMail(id, options = {}) {
             </div>
           </div>
           ${window.SoftoraMailboxDiscovery?.renderTimelineSummary?.(m, escapeHtml) || ''}
-          ${window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml)}
+          ${window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml)}${contactDossier.newMessageAction ? renderMailboxConversationAction(contactDossier.newMessageAction, m.id, { placement: 'contact-header' }) : ''}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending }))}</div>
+        <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending, contactDossierMode }))}</div>
       </article>
     </div>`;
   if (preserveDetailScroll) {
@@ -1099,7 +1099,7 @@ function bindMailboxActions() {
   mailboxComposeController.bind();
 }
 bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody, openMail });
-mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-items'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail });
+mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail });
 mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');

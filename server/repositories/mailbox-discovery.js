@@ -94,7 +94,24 @@ function createMailboxDiscoveryRepository(deps = {}) {
     };
   }
 
-  return { contactTimeline, search };
+  async function filterOutreachContacts({ accountEmails, contactEmails }) {
+    const client = getClient();
+    if (!client) {
+      const error = new Error('De duurzame mailboxindex is niet beschikbaar.');
+      error.code = 'MAILBOX_DISCOVERY_UNAVAILABLE';
+      error.status = 503;
+      throw error;
+    }
+    const rows = await withTimeout(client.rpc('softora_filter_mailbox_outreach_contacts', {
+      p_account_emails: accountEmails,
+      p_contact_emails: contactEmails,
+    }), 'Mailbox outreachscope bepalen');
+    return rows
+      .map((row) => String(row?.contact_email || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  return { contactTimeline, filterOutreachContacts, search };
 }
 
 module.exports = {

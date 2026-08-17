@@ -496,8 +496,8 @@ test('page smoke: premium-mailbox compose modal is centered and enlarged', () =>
   );
   assert.match(
     html,
-    /\.compose-box \{[^}]*min-height:\s*min\(90vh, 700px\);/,
-    'Compose box moet groter in hoogte staan.'
+    /\.compose-box \{[^}]*height:\s*min\(700px, calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px, calc\(100vh - 28px\)\);/,
+    'Compose box moet groot openen en toch handmatig kleiner kunnen.'
   );
 });
 
