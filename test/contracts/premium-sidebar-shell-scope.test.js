@@ -855,14 +855,17 @@ test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw',
   const sidebarSource = readRepoFile('assets/lead-radar-sidebar.js');
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
-  assert.match(shellSource, /<aside class="sidebar"[^>]*aria-label="Premium navigatie"/);
+  assert.match(shellSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*aria-label="Premium navigatie"/);
   assert.match(shellSource, /assets\/personnel-theme\.css\?v=20260519b/);
   assert.match(shellSource, /assets\/personnel-theme\.js\?v=20260519b/);
-  assert.match(shellSource, /assets\/lead-radar-sidebar\.js\?v=20260817a/);
+  assert.match(shellSource, /assets\/lead-radar-sidebar\.js\?v=20260817b/);
+  assert.match(shellSource, /class="sidebar-link magnetic active" data-sidebar-key="lead_radar"/);
+  assert.match(shellSource, /<span class="sidebar-link-text">Lead Radar<\/span>/);
   assert.match(shellSource, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(sidebarSource, /const LINK_HREF = '\/lead-radar'/);
   assert.match(sidebarSource, /const LINK_LABEL = 'Lead Radar'/);
   assert.match(sidebarSource, /overview\.insertBefore\(link, database \|\| null\)/);
+  assert.match(sidebarSource, /item\.classList\.toggle\('active', item === link\)/);
 });
 
 test('static premium sidebars share the same section order and public labels', () => {
