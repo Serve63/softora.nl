@@ -201,11 +201,13 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(page, /id="scan-regions"/);
   assert.match(script, /no_website_found: 'GEEN WEBSITE GEVONDEN'/);
   assert.match(script, /Open originele post/);
+  assert.match(script, /Gepubliceerd op:/);
+  assert.match(script, /import-published-at/);
   assert.match(script, /Website zoeken/);
   assert.match(script, /setInterval/);
   assert.match(page, /id="auto-scan-status"/);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260817c/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260817c/);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260817d/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260817d/);
   assert.match(page, /id="scan-max-age-days"/);
 });
 

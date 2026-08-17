@@ -95,7 +95,7 @@
     const selected = state.selected.has(signal.id);
     return `<article class="lead-card" data-signal-id="${escapeHtml(signal.id)}">
       <input class="lead-select" type="checkbox" data-select-signal="${escapeHtml(signal.id)}" ${selected ? 'checked' : ''} aria-label="Selecteer lead">
-      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span><div class="lead-author">${escapeHtml(signal.author_name || 'Openbare pagina of profiel')}</div><div class="lead-date">Bericht: ${escapeHtml(formatDate(signal.published_at))}</div><div class="lead-source">Gevonden: ${escapeHtml(formatDate(signal.found_at))}</div></div>
+      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span><div class="lead-author">${escapeHtml(signal.author_name || 'Openbare pagina of profiel')}</div><div class="lead-date">Gepubliceerd op: ${escapeHtml(formatDate(signal.published_at))}</div><div class="lead-source">Gevonden op: ${escapeHtml(formatDate(signal.found_at))}</div></div>
       <div class="lead-copy"><p class="lead-copy__text">${escapeHtml(signal.message_text || signal.snippet || 'Geen berichttekst beschikbaar.')}</p><div class="lead-copy__query">${escapeHtml(signal.query || 'Handmatige import')} ${signal.keyword_group ? `· ${escapeHtml(signal.keyword_group)}` : ''}</div><div class="lead-actions"><a href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Open originele post</a>${profileUrl ? `<a href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener noreferrer">Open profiel/pagina</a>` : ''}</div></div>
       <div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}<div class="lead-engagement"><strong>Engagement</strong>${signal.engagement_known ? `${signal.likes == null ? 'likes onbekend' : `${signal.likes} likes`} · ${signal.comments == null ? 'reacties onbekend' : `${signal.comments} reacties`}` : 'Onbekend'}</div></div>
       <div class="lead-score"><span class="score ${score >= 70 ? 'score--high' : ''}">${score}</span><ul class="score-reasons">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><span class="website-state ${websiteClass(websiteStatus)}">${escapeHtml(statusLabels[websiteStatus] || websiteStatus)}</span></div>
@@ -174,7 +174,7 @@
     event.preventDefault();
     const feedback = $('#import-feedback'); feedback.className = ''; feedback.textContent = 'Opslaan...';
     try {
-      await api('/api/lead-radar/import', { method: 'POST', body: JSON.stringify({ platform: $('#import-platform').value, source_url: $('#import-url').value, author_name: $('#import-author').value, region: $('#import-region').value, message_text: $('#import-message').value, website_url: $('#import-website').value, internal_notes: $('#import-notes').value }) });
+      await api('/api/lead-radar/import', { method: 'POST', body: JSON.stringify({ platform: $('#import-platform').value, source_url: $('#import-url').value, author_name: $('#import-author').value, region: $('#import-region').value, published_at: $('#import-published-at').value ? new Date($('#import-published-at').value).toISOString() : null, message_text: $('#import-message').value, website_url: $('#import-website').value, internal_notes: $('#import-notes').value }) });
       feedback.textContent = 'Lead opgeslagen.'; $('#import-form').reset(); await Promise.all([loadStatus(), loadSignals()]);
     } catch (error) { feedback.className = 'is-error'; feedback.textContent = error.message; }
   }
