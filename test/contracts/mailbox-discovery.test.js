@@ -137,6 +137,59 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
   assert.ok(rendered.length >= 2);
 });
 
+test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contactbron', async () => {
+  const elements = {
+    'mailbox-search-input': createElement(),
+    'mailbox-search-clear': createElement(),
+    'mailbox-search-status': createElement(),
+    'mailbox-search-more': createElement(),
+  };
+  const mail = {
+    id: 'contact-root',
+    messageId: '<root@example.test>',
+    email: 'contact@example.test',
+    contactTimelineLoaded: true,
+    contactTimelineNeedsRefresh: true,
+    externalContactEmail: 'contact@example.test',
+    threadMessages: [{ id: 'stale-copy', messageId: '<stale@example.test>' }],
+  };
+  let requests = 0;
+  let renders = 0;
+  const controller = discoveryUi.create({
+    document: { getElementById: (id) => elements[id] || null, querySelector: () => null },
+    async fetch() {
+      requests += 1;
+      return {
+        ok: true,
+        async json() {
+          return {
+            ok: true,
+            totalCount: 2,
+            messages: [
+              { id: 'root-row', messageId: '<root@example.test>', technicalThreadKey: 'thread-a' },
+              { id: 'fresh-row', messageId: '<fresh@example.test>', technicalThreadKey: 'thread-b' },
+            ],
+          };
+        },
+      };
+    },
+    getOwner: () => 'both',
+    getAccountEmails: () => ['owner@example.test'],
+    getActiveMail: () => mail.id,
+    normalizeMessage: (value) => ({ ...value }),
+    openMail: () => { renders += 1; },
+  });
+
+  assert.equal(await controller.loadContactTimeline(mail), true);
+  assert.equal(requests, 1);
+  assert.equal(renders, 1);
+  assert.equal(mail.contactTimelineNeedsRefresh, false);
+  assert.equal(mail.contactTimelineTotal, 2);
+  assert.deepEqual(mail.threadMessages.map((message) => message.id), ['fresh-row']);
+  assert.equal(await controller.loadContactTimeline(mail), true);
+  assert.equal(requests, 1);
+});
+
 test('contactdossier rendert onderwerpgrenzen en reply gebruikt exact het gekozen bronbericht', () => {
   campaignInbox.setOwner('both');
   const older = {

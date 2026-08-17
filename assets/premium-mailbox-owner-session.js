@@ -37,7 +37,8 @@
   ];
   const CONTACT_TIMELINE_FIELDS = [
     'contactTimelineLoaded', 'contactTimelineTotal', 'contactTimelineThreadCount',
-    'contactTimelineNextCursor', 'contactTimelineError', 'externalContactEmail',
+    'contactTimelineNextCursor', 'contactTimelineError', 'contactTimelineNeedsRefresh',
+    'externalContactEmail',
   ];
 
   function getMessageKey(message) {
@@ -92,6 +93,7 @@
     }
     if (preserveContactTimeline) {
       CONTACT_TIMELINE_FIELDS.forEach((field) => { current[field] = currentContactTimeline[field]; });
+      current.contactTimelineNeedsRefresh = true;
     }
     if (Array.isArray(incoming.threadMessages)) {
       current.threadMessages = preserveContactTimeline
@@ -107,20 +109,11 @@
         .map((message) => [getStableThreadMessageKey(message), message])
         .filter(([key]) => key)
     );
-    const seen = new Set();
-    const preserved = (Array.isArray(currentMessages) ? currentMessages : []).map((message) => {
+    return (Array.isArray(currentMessages) ? currentMessages : []).map((message) => {
       const key = getStableThreadMessageKey(message);
       if (!key || !incomingByKey.has(key)) return message;
-      seen.add(key);
       return reconcileMessage(message, incomingByKey.get(key));
     });
-    (Array.isArray(incomingMessages) ? incomingMessages : []).forEach((message) => {
-      const key = getStableThreadMessageKey(message);
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      preserved.push(message);
-    });
-    return preserved;
   }
 
   function reconcileMessages(currentMessages, incomingMessages) {

@@ -71,8 +71,9 @@ test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC
   assert.equal(reconciled[0].contactTimelineTotal, 8);
   assert.equal(reconciled[0].contactTimelineThreadCount, 2);
   assert.equal(reconciled[0].externalContactEmail, 'contact@example.test');
+  assert.equal(reconciled[0].contactTimelineNeedsRefresh, true);
   assert.deepEqual(reconciled[0].threadMessages.map((message) => message.id), [
-    'standalone-in', 'standalone-out', 'snapshot-old-reply', 'older-in',
+    'standalone-in', 'standalone-out', 'snapshot-old-reply',
   ]);
   assert.equal(reconciled[0].threadMessages[2].body, 'Volledig oud antwoord');
   assert.equal(reconciled[0].threadMessages[2].bodyLoaded, true);
