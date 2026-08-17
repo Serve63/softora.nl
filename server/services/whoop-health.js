@@ -4,7 +4,7 @@ const {
   TOKEN_REFRESH_LOCK_MS, TOKEN_REQUEST_TIMEOUT_MS, TOKEN_WORKER_RETRY_DELAY_MS,
   hasActiveLease, isAuthBlockedReason, isOperationFenceConflict,
 } = require('./whoop-token-policy');
-const { isCompleteRecoveryRecord, latestContiguousRecoveryDay } = require('./whoop-recovery-completeness');
+const { isCompleteRecoveryRecord, latestContiguousRecoveryDay, queuedSyncOptions } = require('./whoop-recovery-completeness');
 
 const OWNER_KEY = 'serve';
 const TIMEZONE = 'Europe/Amsterdam';
@@ -526,7 +526,7 @@ function createWhoopHealthService(deps = {}) {
     const { error } = await db().from(WHOOP_WEBHOOK_TABLE).upsert({
       trace_id: traceId,
       whoop_user_id: Number(userId || 0),
-      resource_id: '',
+      resource_id: addDays(today(), -89),
       event_type: 'internal.backfill',
       status: 'pending',
       attempts: 0,
@@ -750,7 +750,8 @@ function createWhoopHealthService(deps = {}) {
         ''
       );
       const lastContiguousRecoveryDay = latestContiguousRecoveryDay(
-        records, String(lockedConnection.last_synced_day || '')
+        records, options.resetProgress === true ? '' : String(lockedConnection.last_synced_day || ''),
+        { allowBootstrap: mode === 'backfill' }
       );
       const targetDayComplete = completeRecoveryRecords.some((record) => record.local_day === targetDay);
       const recoveryRangeComplete = lastContiguousRecoveryDay === targetDay;
@@ -957,9 +958,7 @@ function createWhoopHealthService(deps = {}) {
       if (!event) continue;
       const attempts = Number(event.attempts || 0);
       try {
-        const result = event.event_type === 'internal.backfill'
-          ? await sync({ mode: 'backfill', targetDay: today() })
-          : await sync({ mode: 'webhook', targetDay: today() });
+        const result = await sync(queuedSyncOptions(event, today()));
         if (result?.skipped) {
           if (result.reason === 'sync_in_progress') {
             await updateClaimedWebhookEvent(event, {
