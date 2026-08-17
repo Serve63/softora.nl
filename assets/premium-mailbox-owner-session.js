@@ -35,6 +35,10 @@
     'webdesignLinkHydrationAttempted', 'webdesignLinkUrl', 'recipientRoutingEvidenceKnown',
     'recipientRoutingNeedsHydration', 'to', 'toDisplay', 'cc', 'bcc', 'deliveredTo',
   ];
+  const CONTACT_TIMELINE_FIELDS = [
+    'contactTimelineLoaded', 'contactTimelineTotal', 'contactTimelineThreadCount',
+    'contactTimelineNextCursor', 'contactTimelineError', 'externalContactEmail',
+  ];
 
   function getMessageKey(message) {
     const source = message && typeof message === 'object' ? message : {};
@@ -60,16 +64,47 @@
     if (!incoming || typeof incoming !== 'object') return current;
     const currentBody = Object.fromEntries(HYDRATED_MESSAGE_FIELDS.map((field) => [field, current[field]]));
     const currentThread = Array.isArray(current.threadMessages) ? current.threadMessages : [];
+    const preserveContactTimeline = current.contactTimelineLoaded === true && incoming.contactTimelineLoaded !== true;
+    const currentContactTimeline = Object.fromEntries(
+      CONTACT_TIMELINE_FIELDS.map((field) => [field, current[field]])
+    );
     const preserveHydration = current.bodyLoading === true ||
       getBodyCompleteness(current) > getBodyCompleteness(incoming);
     Object.assign(current, incoming);
     if (preserveHydration) {
       HYDRATED_MESSAGE_FIELDS.forEach((field) => { current[field] = currentBody[field]; });
     }
+    if (preserveContactTimeline) {
+      CONTACT_TIMELINE_FIELDS.forEach((field) => { current[field] = currentContactTimeline[field]; });
+    }
     if (Array.isArray(incoming.threadMessages)) {
-      current.threadMessages = reconcileMessages(currentThread, incoming.threadMessages);
+      current.threadMessages = preserveContactTimeline
+        ? mergeMessagesPreservingCurrent(currentThread, incoming.threadMessages)
+        : reconcileMessages(currentThread, incoming.threadMessages);
     }
     return current;
+  }
+
+  function mergeMessagesPreservingCurrent(currentMessages, incomingMessages) {
+    const incomingByKey = new Map(
+      (Array.isArray(incomingMessages) ? incomingMessages : [])
+        .map((message) => [getMessageKey(message), message])
+        .filter(([key]) => key)
+    );
+    const seen = new Set();
+    const preserved = (Array.isArray(currentMessages) ? currentMessages : []).map((message) => {
+      const key = getMessageKey(message);
+      if (!key || !incomingByKey.has(key)) return message;
+      seen.add(key);
+      return reconcileMessage(message, incomingByKey.get(key));
+    });
+    (Array.isArray(incomingMessages) ? incomingMessages : []).forEach((message) => {
+      const key = getMessageKey(message);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      preserved.push(message);
+    });
+    return preserved;
   }
 
   function reconcileMessages(currentMessages, incomingMessages) {
