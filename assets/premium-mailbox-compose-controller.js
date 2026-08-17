@@ -4,6 +4,13 @@
     const acceptedSends = new Map();
     let replyContext = null;
     let replyOwner = '';
+    let composeGeneration = 0;
+    let spellingGeneration = 0;
+    let spellingRequest = null;
+    let spellingUndo = null;
+    let rewriteRequestActive = false;
+    const configuredSpellingTimeout = Number(options.spellingTimeoutMs);
+    const SPELLING_TIMEOUT_MS = configuredSpellingTimeout > 0 ? configuredSpellingTimeout : 8000;
 
     function normalize(value) {
       return String(value || '').trim().toLowerCase();
@@ -127,6 +134,79 @@
       return String(documentRef?.getElementById(id)?.value || '');
     }
 
+    function getSpellingButton() {
+      return documentRef?.querySelector('[data-mailbox-action="spellcheck-compose"]') || null;
+    }
+
+    function updateSpellingButton() {
+      const button = getSpellingButton();
+      if (!button) return;
+      button.textContent = spellingRequest ? 'Controleren…' : 'Spellingscontrole';
+      button.disabled = Boolean(spellingRequest || rewriteRequestActive || !fieldValue('c-body').trim());
+      if (spellingRequest) button.setAttribute?.('aria-busy', 'true');
+      else button.removeAttribute?.('aria-busy');
+    }
+
+    function abortSpellingRequest() {
+      spellingGeneration += 1;
+      const request = spellingRequest;
+      request?.controller?.abort?.();
+      spellingRequest = null;
+      if (request?.rewriteButton) request.rewriteButton.disabled = request.rewriteWasDisabled;
+      if (request?.sendButton) request.sendButton.disabled = request.sendWasDisabled;
+      updateSpellingButton();
+    }
+
+    function mapSelectionPosition(before, after, position) {
+      const safePosition = Math.max(0, Math.min(before.length, Number(position) || 0));
+      let prefix = 0;
+      while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
+      let suffix = 0;
+      while (
+        suffix < before.length - prefix
+        && suffix < after.length - prefix
+        && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]
+      ) suffix += 1;
+      if (safePosition <= prefix) return safePosition;
+      if (safePosition >= before.length - suffix) {
+        return Math.max(prefix, after.length - (before.length - safePosition));
+      }
+      return Math.min(after.length - suffix, prefix + (safePosition - prefix));
+    }
+
+    function restoreBodyFieldState(bodyField, snapshot, nextValue) {
+      bodyField.value = nextValue;
+      bodyField.scrollTop = snapshot.scrollTop;
+      if (snapshot.focused) bodyField.focus?.({ preventScroll: true });
+      if (typeof bodyField.setSelectionRange === 'function') {
+        bodyField.setSelectionRange(
+          mapSelectionPosition(snapshot.value, nextValue, snapshot.selectionStart),
+          mapSelectionPosition(snapshot.value, nextValue, snapshot.selectionEnd)
+        );
+      }
+    }
+
+    function undoSpelling() {
+      const undo = spellingUndo;
+      const bodyField = documentRef?.getElementById('c-body');
+      if (!undo || !bodyField || undo.composeGeneration !== composeGeneration) return false;
+      if (String(bodyField.value || '') !== undo.after) {
+        options.toast('De tekst is daarna gewijzigd; ongedaan maken is niet toegepast.');
+        return false;
+      }
+      restoreBodyFieldState(bodyField, {
+        value: undo.after,
+        selectionStart: undo.selectionStart,
+        selectionEnd: undo.selectionEnd,
+        scrollTop: undo.scrollTop,
+        focused: true,
+      }, undo.before);
+      spellingUndo = null;
+      updateSpellingButton();
+      options.toast('Spellingscorrectie ongedaan gemaakt');
+      return true;
+    }
+
     function setReplyContext(mail) {
       if (!mail) {
         replyContext = null;
@@ -225,6 +305,9 @@
     }
 
     function open(optionsOverride = {}) {
+      composeGeneration += 1;
+      abortSpellingRequest();
+      spellingUndo = null;
       if (!optionsOverride.keepContext) {
         setReplyContext(null);
         options.compose.resetOptionalFields();
@@ -233,9 +316,13 @@
       options.composeWindow?.reset?.();
       documentRef?.getElementById('compose-overlay')?.classList.add('open');
       options.composeWindow?.open?.();
+      updateSpellingButton();
     }
 
     function close() {
+      composeGeneration += 1;
+      abortSpellingRequest();
+      spellingUndo = null;
       documentRef?.getElementById('compose-overlay')?.classList.remove('open');
       options.composeWindow?.reset?.();
       setReplyContext(null);
@@ -245,6 +332,7 @@
         const field = documentRef?.getElementById(id);
         if (field) field.value = '';
       });
+      updateSpellingButton();
     }
 
     function reply(mail, requestedMessageKey = '') {
@@ -308,7 +396,7 @@
     }
 
     async function rewrite() {
-      if (options.compose.isUsed()) return;
+      if (options.compose.isUsed() || spellingRequest || rewriteRequestActive) return;
       const bodyField = documentRef?.getElementById('c-body');
       const draft = String(bodyField?.value || '').trim();
       const isSuggestedReply = Boolean(replyContext && replyContext.mode !== 'new-message');
@@ -316,6 +404,8 @@
         options.toast('Typ eerst je mailtekst');
         return;
       }
+      rewriteRequestActive = true;
+      updateSpellingButton();
       const rewriteBtn = documentRef?.querySelector('[data-mailbox-action="rewrite-compose"]');
       const sendBtn = documentRef?.querySelector('.btn-send');
       const originalLabel = rewriteBtn ? rewriteBtn.textContent : '';
@@ -349,16 +439,111 @@
         const rewritten = String(data?.text || data?.result?.text || '').trim();
         if (!rewritten) throw new Error('Geen verbeterde tekst ontvangen');
         bodyField.value = rewritten;
+        updateSpellingButton();
         options.compose.complete(rewriteBtn);
         options.toast(isSuggestedReply ? 'Reactie voorgesteld' : 'Tekst verbeterd');
       } catch (error) {
         options.toast(String(error?.message || error || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt')));
       } finally {
+        rewriteRequestActive = false;
         options.compose.finish(
           rewriteBtn,
           originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter')
         );
         if (sendBtn) sendBtn.disabled = false;
+        updateSpellingButton();
+      }
+    }
+
+    async function spellcheck() {
+      if (spellingRequest || rewriteRequestActive) return;
+      const bodyField = documentRef?.getElementById('c-body');
+      const original = String(bodyField?.value || '');
+      if (!original.trim()) {
+        updateSpellingButton();
+        options.toast('Typ eerst je mailtekst');
+        return;
+      }
+
+      const rewriteButton = documentRef?.querySelector('[data-mailbox-action="rewrite-compose"]');
+      const sendButton = documentRef?.querySelector('.btn-send');
+      const rewriteWasDisabled = Boolean(rewriteButton?.disabled);
+      const sendWasDisabled = Boolean(sendButton?.disabled);
+      const requestId = ++spellingGeneration;
+      const requestComposeGeneration = composeGeneration;
+      const controller = new AbortController();
+      const request = {
+        id: requestId,
+        composeGeneration: requestComposeGeneration,
+        controller,
+        rewriteButton,
+        rewriteWasDisabled,
+        sendButton,
+        sendWasDisabled,
+      };
+      spellingRequest = request;
+      spellingUndo = null;
+      const snapshot = {
+        value: original,
+        selectionStart: Number(bodyField.selectionStart) || 0,
+        selectionEnd: Number(bodyField.selectionEnd) || 0,
+        scrollTop: Number(bodyField.scrollTop) || 0,
+        focused: documentRef?.activeElement === bodyField,
+      };
+      if (rewriteButton) rewriteButton.disabled = true;
+      if (sendButton) sendButton.disabled = true;
+      updateSpellingButton();
+      const timeout = global.setTimeout(() => controller.abort(), SPELLING_TIMEOUT_MS);
+
+      try {
+        const response = await options.fetch('/api/mailbox/spelling', {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ body: original }),
+          signal: controller.signal,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.ok) throw new Error('SPELLING_REQUEST_FAILED');
+        if (spellingRequest !== request || requestComposeGeneration !== composeGeneration) return;
+        if (String(bodyField.value || '') !== original) {
+          options.toast('De tekst is tijdens de controle gewijzigd; controleer opnieuw.');
+          return;
+        }
+        const corrected = typeof data.text === 'string' ? data.text : '';
+        if (!corrected) throw new Error('SPELLING_RESPONSE_EMPTY');
+        if (corrected === original) {
+          options.toast('Geen spellingcorrecties gevonden');
+          return;
+        }
+        restoreBodyFieldState(bodyField, snapshot, corrected);
+        spellingUndo = {
+          before: original,
+          after: corrected,
+          composeGeneration,
+          selectionStart: Number(bodyField.selectionStart) || 0,
+          selectionEnd: Number(bodyField.selectionEnd) || 0,
+          scrollTop: Number(bodyField.scrollTop) || 0,
+        };
+        options.toast('Spelling gecontroleerd', {
+          label: 'Ongedaan maken',
+          action: async () => undoSpelling(),
+        });
+      } catch (error) {
+        if (spellingRequest !== request || requestComposeGeneration !== composeGeneration) return;
+        const timedOut = error?.name === 'AbortError';
+        options.toast(timedOut
+          ? 'Spellingscontrole duurde te lang. Je tekst is niet gewijzigd.'
+          : 'Spellingscontrole kon niet worden uitgevoerd. Je tekst is niet gewijzigd.');
+      } finally {
+        global.clearTimeout(timeout);
+        if (spellingRequest === request) {
+          spellingRequest = null;
+          if (rewriteButton) rewriteButton.disabled = rewriteWasDisabled;
+          if (sendButton) sendButton.disabled = sendWasDisabled;
+          updateSpellingButton();
+        }
       }
     }
 
@@ -514,6 +699,7 @@
       if (action === 'close-compose') close();
       else if (action === 'send-mail') void send();
       else if (action === 'rewrite-compose') void rewrite();
+      else if (action === 'spellcheck-compose') void spellcheck();
       else if (action === 'toggle-copy-fields') options.compose.toggleCopyFields();
       else if (action === 'choose-attachments') documentRef?.getElementById('c-attachments')?.click();
       else if (action === 'remove-attachment') options.compose.removeAttachment(id);
@@ -534,6 +720,8 @@
         input.value = '';
         if (!result.ok) options.toast(result.error);
       });
+      documentRef?.getElementById('c-body')?.addEventListener('input', updateSpellingButton);
+      updateSpellingButton();
     }
 
     return {
@@ -545,6 +733,8 @@
       open,
       reply,
       rewrite,
+      spellcheck,
+      undoSpelling,
       reconcile,
       send,
     };

@@ -3572,7 +3572,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   assert.equal(persistedSnapshot.messages[1].hasBody, false);
 });
 
-test('mailbox routes expose accounts, messages, send, local hide restore and rewrite endpoints', () => {
+test('mailbox routes expose accounts, messages, send, local hide restore, rewrite and spelling endpoints', () => {
   const routes = [];
   const app = {
     get(path, ...handlers) {
@@ -3616,6 +3616,7 @@ test('mailbox routes expose accounts, messages, send, local hide restore and rew
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send/preflight'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/spelling'));
 });
 
 test('mailbox image response serves exact-message MIME media with durable private browser cache', async () => {

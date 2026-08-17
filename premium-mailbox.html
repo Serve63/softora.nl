@@ -240,10 +240,16 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .compose-resize-zone--se { right: 0; bottom: 0; }
 .compose-resize-zone--sw { bottom: 0; left: 0; }
 .compose-box[data-compose-resizing="true"] { user-select: none; }
+.compose-assist-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .compose-footer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
-.btn-rewrite-compose { padding: 10px 18px; background: #fff; color: var(--crimson); border: 1px solid rgba(155,35,85,.35); border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; }
-.btn-rewrite-compose:hover { border-color: var(--crimson); background: rgba(155,35,85,.06); }
+.btn-rewrite-compose,
+.btn-spellcheck-compose { min-height: 40px; padding: 10px 18px; background: #fff; color: var(--crimson); border: 1px solid rgba(155,35,85,.35); border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.btn-rewrite-compose:hover,
+.btn-spellcheck-compose:hover { border-color: var(--crimson); background: rgba(155,35,85,.06); }
+.btn-rewrite-compose:focus-visible,
+.btn-spellcheck-compose:focus-visible { outline: 2px solid rgba(155,35,85,.34); outline-offset: 2px; }
 .btn-rewrite-compose:disabled,
+.btn-spellcheck-compose:disabled,
 .btn-send:disabled { opacity: .55; cursor: not-allowed; }
 .btn-send { padding: 10px 24px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
 .btn-send:hover { background: var(--crimson-light); }
@@ -399,7 +405,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
   color: var(--crimson);
 }
 </style>
-<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260817b">
+<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260817c">
 </head>
 <body>
 <div class="dashboard-layout">
@@ -557,7 +563,10 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
     </div>
     <div class="compose-body"><textarea id="c-body" placeholder="Typ je bericht hier…"></textarea></div>
     <div class="compose-footer">
-      <button class="btn-rewrite-compose" type="button" data-mailbox-action="rewrite-compose">Voorgestelde reactie</button>
+      <div class="compose-assist-actions">
+        <button class="btn-rewrite-compose" type="button" data-mailbox-action="rewrite-compose">Voorgestelde reactie</button>
+        <button class="btn-spellcheck-compose" type="button" data-mailbox-action="spellcheck-compose" disabled>Spellingscontrole</button>
+      </div>
       <div class="compose-footer-actions">
         <button class="btn-send" type="button" data-mailbox-action="send-mail">Versturen</button>
       </div>
@@ -581,7 +590,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
 <script src="assets/premium-mailbox-body-section.js?v=20260811a"></script>
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260817d"></script><script src="assets/premium-mailbox-owner-preference.js?v=20260806a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-quoted-thread.js?v=20260806b"></script><script src="assets/premium-mailbox-reply-identity.js?v=20260812a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260817a"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260813a"></script><script src="assets/premium-mailbox-discovery.js?v=20260817d"></script><script src="assets/premium-mailbox-list.js?v=20260817a"></script><script src="assets/premium-mailbox-detail-state.js?v=20260813a"></script><script src="assets/premium-mailbox-index.js?v=20260813a"></script><script src="assets/premium-mailbox-refresh.js?v=20260810c"></script><script src="assets/premium-mailbox-compose.js?v=20260812a"></script><script src="assets/premium-mailbox-compose-window.js?v=20260817c"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260817b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-browser-storage.js?v=20260814a"></script><script src="assets/premium-mailbox-state-outbox.js?v=20260814b"></script><script src="assets/premium-mailbox-read.js?v=20260814a"></script><script src="assets/premium-mailbox-ui-state.js?v=20260814a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260817d"></script><script src="assets/premium-mailbox-owner-preference.js?v=20260806a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-quoted-thread.js?v=20260806b"></script><script src="assets/premium-mailbox-reply-identity.js?v=20260812a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260817a"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260813a"></script><script src="assets/premium-mailbox-discovery.js?v=20260817d"></script><script src="assets/premium-mailbox-list.js?v=20260817a"></script><script src="assets/premium-mailbox-detail-state.js?v=20260813a"></script><script src="assets/premium-mailbox-index.js?v=20260813a"></script><script src="assets/premium-mailbox-refresh.js?v=20260810c"></script><script src="assets/premium-mailbox-compose.js?v=20260812a"></script><script src="assets/premium-mailbox-compose-window.js?v=20260817c"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260817c"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-browser-storage.js?v=20260814a"></script><script src="assets/premium-mailbox-state-outbox.js?v=20260814b"></script><script src="assets/premium-mailbox-read.js?v=20260814a"></script><script src="assets/premium-mailbox-ui-state.js?v=20260814a"></script>
 <script src="assets/premium-mailbox-boot.js?v=20260806a"></script><script src="assets/premium-mailbox.js?v=20260817d"></script>
 <script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
