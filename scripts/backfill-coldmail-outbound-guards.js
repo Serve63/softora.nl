@@ -746,6 +746,7 @@ function groupMissingRowsForInsert(missing = []) {
         permanent: true,
         payload: {
           backfillSource: BACKFILL_SOURCE,
+          sentAt: event.date,
           events: [],
         },
         expires_at: null,
@@ -757,6 +758,7 @@ function groupMissingRowsForInsert(missing = []) {
     if (event.date > row.last_seen_at) {
       row.last_seen_at = event.date;
       row.sender_email = event.accountEmail;
+      row.payload.sentAt = event.date;
     }
     row.payload.events.push({
       at: event.date,

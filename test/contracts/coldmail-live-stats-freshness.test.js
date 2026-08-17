@@ -90,3 +90,44 @@ test('coldmail current-day stats ignore unreliable or different-day data', () =>
     stats: { reliable: true, dateKey: '2026-08-03', centralGuardSentToday: 12 },
   }), current);
 });
+
+test('coldmail current-day stats correct an older timestamp model without lowering all-time totals', () => {
+  const incorrectBackfillCache = {
+    ok: true,
+    stats: {
+      reliable: true,
+      dateKey: '2026-08-17',
+      sentToday: 203,
+      systemSentToday: 203,
+      centralGuardSentToday: 203,
+      webdesignSentToday: 203,
+      totalSent: 2565,
+      systemTotalSent: 2565,
+      centralGuardTotalSent: 2565,
+      webdesignTotalSent: 2565,
+      lastSuccessfulSendAt: '2026-08-17T10:45:00.000Z',
+      lastSenderEmail: 'historical-backfill@example.test',
+      updatedAt: '2026-08-17T10:44:11.000Z',
+    },
+  };
+
+  const merged = mergeMonotonicCurrentDayStats(incorrectBackfillCache, {
+    stats: {
+      reliable: true,
+      dateKey: '2026-08-17',
+      sentTimestampModel: 'delivery-evidence-v1',
+      centralGuardSentToday: 11,
+      lastSuccessfulSendAt: '2026-08-17T10:34:02.869Z',
+      lastSenderEmail: 'serve@softora.nl',
+    },
+  }, '2026-08-17T10:46:55.000Z');
+
+  assert.equal(merged.stats.sentToday, 11);
+  assert.equal(merged.stats.systemSentToday, 11);
+  assert.equal(merged.stats.centralGuardSentToday, 11);
+  assert.equal(merged.stats.webdesignSentToday, 11);
+  assert.equal(merged.stats.systemTotalSent, 2565);
+  assert.equal(merged.stats.sentTimestampModel, 'delivery-evidence-v1');
+  assert.equal(merged.stats.lastSuccessfulSendAt, '2026-08-17T10:34:02.869Z');
+  assert.equal(merged.stats.lastSenderEmail, 'serve@softora.nl');
+});
