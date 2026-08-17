@@ -25,6 +25,33 @@
       .find((email) => !own.has(email)) || '';
   }
 
+  function getContactDossier(mail, options = {}) {
+    const accounts = Array.isArray(options.accountEmails) ? options.accountEmails : [];
+    const contactEmail = normalizeEmail(mail?.externalContactEmail) || resolveExternalContact(mail, accounts);
+    const active = String(options.activeFolder || '').toLowerCase() === 'outreach' && Boolean(contactEmail);
+    if (!active) return { active: false, contactEmail: '', title: String(options.fallbackTitle || '') };
+    const campaignInbox = options.campaignInbox;
+    const messages = [mail, ...(Array.isArray(mail?.threadMessages) ? mail.threadMessages : [])];
+    const title = messages
+      .filter((message) => normalizeEmail(message?.email) === contactEmail)
+      .sort((left, right) => new Date(right?.date || 0).getTime() - new Date(left?.date || 0).getTime())
+      .map((message) => String(message?.from || '').trim())
+      .find((name) => name && normalizeEmail(name) !== contactEmail) || contactEmail || 'Contactdossier';
+    const newMessageAction = campaignInbox?.sortMessagesNewestFirst?.(messages).reduce((selected, message) => {
+      if (selected || resolveExternalContact(message, accounts) !== contactEmail) return selected;
+      const action = campaignInbox.getConversationAction?.({ ...message, threadMessages: [] });
+      return action?.kind === 'new-message' ? action : null;
+    }, null) || null;
+    return { active, contactEmail, title, newMessageAction };
+  }
+
+  function renderReplyMessageAction(message, campaignInbox, renderAction, mailId) {
+    const action = campaignInbox?.getConversationAction?.({ ...message, threadMessages: [] });
+    return action?.kind === 'reply' && typeof renderAction === 'function'
+      ? renderAction(action, mailId)
+      : '';
+  }
+
   function getMessageIdentity(message) {
     return normalizeEmail(message?.messageId) || String(message?.messageKey || '').trim() || [
       normalizeEmail(message?.accountEmail),
@@ -87,7 +114,6 @@
     const documentRef = options.document || global.document;
     const fetchImpl = options.fetch || global.fetch?.bind(global);
     const input = documentRef?.getElementById?.('mailbox-search-input');
-    const clearButton = documentRef?.getElementById?.('mailbox-search-clear');
     const status = documentRef?.getElementById?.('mailbox-search-status');
     const moreButton = documentRef?.getElementById?.('mailbox-search-more');
     let debounceTimer = 0;
@@ -99,6 +125,7 @@
     let nextCursor = '';
     let totalCount = 0;
     let snapshot = null;
+    let searchLoading = false;
 
     function setStatus(text, kind = '') {
       if (!status) return;
@@ -107,8 +134,12 @@
       status.dataset.state = kind;
     }
 
-    function setMoreVisible(visible) {
-      if (moreButton) moreButton.hidden = !visible;
+    function setMoreState({ visible = false, loading = false } = {}) {
+      if (!moreButton) return;
+      moreButton.hidden = !visible;
+      moreButton.disabled = loading;
+      moreButton.setAttribute?.('aria-busy', loading ? 'true' : 'false');
+      moreButton.textContent = loading ? 'Meer resultaten laden…' : 'Meer resultaten laden';
     }
 
     function captureSnapshot() {
@@ -128,6 +159,7 @@
     }
 
     async function runSearch({ append = false } = {}) {
+      if (searchLoading && append) return false;
       const query = String(input?.value || '').replace(/\s+/g, ' ').trim();
       if (query.length < SEARCH_MIN_LENGTH) {
         if (activeQuery) clearSearch();
@@ -143,8 +175,9 @@
       const generation = ++searchGeneration;
       searchController?.abort?.();
       searchController = typeof AbortController === 'function' ? new AbortController() : null;
+      searchLoading = true;
       setStatus(append ? 'Meer resultaten laden…' : 'Volledige mailbox doorzoeken…', 'loading');
-      setMoreVisible(false);
+      setMoreState({ visible: append && Boolean(nextCursor), loading: append });
       try {
         const params = new URLSearchParams({ q: query, owner: options.getOwner?.() || 'both', limit: '20' });
         if (append && nextCursor) params.set('cursor', nextCursor);
@@ -172,13 +205,18 @@
         totalCount = Math.max(0, Number(data.totalCount) || 0);
         options.renderList?.({ openLatest: false });
         setStatus(totalCount ? `${totalCount} gesprekken gevonden` : 'Geen resultaten gevonden.', totalCount ? 'ready' : 'empty');
-        setMoreVisible(Boolean(nextCursor));
+        setMoreState({ visible: Boolean(nextCursor) });
         return true;
       } catch (error) {
         if (error?.name === 'AbortError' || generation !== searchGeneration) return false;
         setStatus('Zoeken lukte tijdelijk niet. Probeer opnieuw.', 'error');
-        setMoreVisible(Boolean(nextCursor));
+        setMoreState({ visible: Boolean(nextCursor) });
         return false;
+      } finally {
+        if (generation === searchGeneration) {
+          searchLoading = false;
+          if (moreButton?.disabled) setMoreState({ visible: Boolean(nextCursor) });
+        }
       }
     }
 
@@ -186,6 +224,7 @@
       searchGeneration += 1;
       searchController?.abort?.();
       searchController = null;
+      searchLoading = false;
       if (debounceTimer) global.clearTimeout?.(debounceTimer);
       debounceTimer = 0;
       activeQuery = '';
@@ -193,7 +232,7 @@
       totalCount = 0;
       if (input) input.value = '';
       setStatus('');
-      setMoreVisible(false);
+      setMoreState();
       if (restore && snapshot) {
         const saved = snapshot;
         snapshot = null;
@@ -266,7 +305,6 @@
       input?.addEventListener?.('input', () => {
         if (debounceTimer) global.clearTimeout?.(debounceTimer);
         debounceTimer = global.setTimeout?.(() => void runSearch(), SEARCH_DEBOUNCE_MS) || 0;
-        if (clearButton) clearButton.hidden = !input.value;
       });
       input?.addEventListener?.('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -278,11 +316,6 @@
           if (debounceTimer) global.clearTimeout?.(debounceTimer);
           void runSearch();
         }
-      });
-      clearButton?.addEventListener?.('click', () => {
-        clearSearch();
-        input?.focus?.();
-        clearButton.hidden = true;
       });
       moreButton?.addEventListener?.('click', () => void runSearch({ append: true }));
     }
@@ -304,8 +337,10 @@
     SEARCH_MIN_LENGTH,
     create,
     extractEmails,
+    getContactDossier,
     mergeContactTimeline,
     renderSearchSnippet,
+    renderReplyMessageAction,
     renderTimelineSummary,
     resolveExternalContact,
   };

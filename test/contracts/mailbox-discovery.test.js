@@ -8,6 +8,7 @@ const discoveryUi = require('../../assets/premium-mailbox-discovery');
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
 const { createMailboxDiscoveryService } = require('../../server/services/mailbox-discovery');
+const { createMailboxOutreachScope } = require('../../server/services/mailbox-outreach-scope');
 
 const migrationPath = path.resolve(
   __dirname,
@@ -17,12 +18,35 @@ const performanceMigrationPath = path.resolve(
   __dirname,
   '../../supabase/migrations/20260817115400_mailbox_search_stored_document.sql'
 );
+const outreachScopeMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260817141000_mailbox_outreach_discovery_scope.sql'
+);
+const outreachQueryPlanMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260817143800_mailbox_outreach_discovery_query_plan.sql'
+);
+const outreachEligibilitySetMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260817145600_mailbox_outreach_eligibility_set.sql'
+);
+const outreachNarrowPlanMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260817151000_mailbox_search_narrow_outreach_plan.sql'
+);
+const outreachScoreOnceMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260817153000_mailbox_search_score_once.sql'
+);
 
 function createElement() {
   const listeners = {};
+  const attributes = {};
   return {
-    value: '', hidden: false, textContent: '', dataset: {}, scrollTop: 0,
+    value: '', hidden: false, disabled: false, textContent: '', dataset: {}, scrollTop: 0,
     addEventListener(type, handler) { listeners[type] = handler; },
+    setAttribute(name, value) { attributes[name] = String(value); },
+    getAttribute(name) { return attributes[name]; },
     focus() {},
     dispatch(type, event = {}) { return listeners[type]?.(event); },
   };
@@ -58,6 +82,34 @@ test('mailbox discovery beperkt owner-scope server-side en valideert query en cu
   await assert.rejects(() => service.searchMailbox({ owner: 'unknown', query: 'mail' }), /Onbekende mailboxscope/);
   await assert.rejects(() => service.searchMailbox({ owner: 'serve', query: '%' }), /2 tot 160/);
   await assert.rejects(() => service.getContactTimeline({ owner: 'serve', contactEmail: 'not-an-email' }), /Ongeldig contactadres/);
+});
+
+test('gedeelde outreachscope voegt provideraccounts toe en filtert de normale lijst exact', async () => {
+  const calls = [];
+  const scope = createMailboxOutreachScope({
+    getInstantlyAccounts(owner) {
+      return [{ email: `${owner}@websoftora.com` }];
+    },
+    repository: {
+      async filterOutreachContacts(input) {
+        calls.push(input);
+        return ['eric@outreach.example'];
+      },
+    },
+  });
+  const scoped = scope.getScopedAccounts('serve');
+  assert.ok(scoped.includes('serve@softora.nl'));
+  assert.ok(scoped.includes('serve@websoftora.com'));
+  assert.ok(!scoped.includes('martijn@websoftora.com'));
+  const messages = await scope.filterConversations({
+    owner: 'serve',
+    messages: [
+      { accountEmail: 'serve@softora.nl', email: 'eric@outreach.example', folder: 'inbox' },
+      { accountEmail: 'serve@softora.nl', email: 'newsletter@example', folder: 'inbox' },
+    ],
+  });
+  assert.deepEqual(messages.map((message) => message.email), ['eric@outreach.example']);
+  assert.deepEqual(calls[0].contactEmails.sort(), ['eric@outreach.example', 'newsletter@example']);
 });
 
 test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart technische threadgrenzen', () => {
@@ -141,6 +193,59 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
   assert.ok(rendered.length >= 2);
 });
 
+test('zoekpaginering is single-flight en verdwijnt pas na de laatste pagina', async () => {
+  const input = createElement();
+  const status = createElement();
+  const more = createElement();
+  const list = createElement();
+  const elements = {
+    'mailbox-search-input': input,
+    'mailbox-search-status': status,
+    'mailbox-search-more': more,
+  };
+  const pending = [];
+  let messages = [];
+  const controller = discoveryUi.create({
+    document: { getElementById: (id) => elements[id] || null, querySelector: () => null },
+    fetch(url) {
+      return new Promise((resolve) => pending.push({ url, resolve }));
+    },
+    getOwner: () => 'both',
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => null,
+    setActiveMail() {},
+    getListElement: () => list,
+    normalizeMessage: (value) => ({ ...value }),
+    renderList() {},
+  });
+
+  input.value = 'eric';
+  const first = controller.runSearch();
+  pending[0].resolve({
+    ok: true,
+    json: async () => ({ ok: true, messages: [{ id: 'page-1' }], totalCount: 2, nextCursor: 'page-2' }),
+  });
+  assert.equal(await first, true);
+  assert.equal(more.hidden, false);
+  assert.equal(more.disabled, false);
+
+  const append = more.dispatch('click');
+  more.dispatch('click');
+  assert.equal(pending.length, 2);
+  assert.equal(more.disabled, true);
+  assert.equal(more.getAttribute('aria-busy'), 'true');
+  pending[1].resolve({
+    ok: true,
+    json: async () => ({ ok: true, messages: [{ id: 'page-2' }], totalCount: 2, nextCursor: null }),
+  });
+  await append;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(messages.map((message) => message.id), ['page-1', 'page-2']);
+  assert.equal(more.hidden, true);
+  assert.equal(more.disabled, false);
+});
+
 test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contactbron', async () => {
   const elements = {
     'mailbox-search-input': createElement(),
@@ -194,7 +299,7 @@ test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contac
   assert.equal(requests, 1);
 });
 
-test('contactdossier rendert onderwerpgrenzen en reply gebruikt exact het gekozen bronbericht', () => {
+test('contactdossier verbergt technische onderwerpen en reply gebruikt exact het gekozen bronbericht', () => {
   campaignInbox.setOwner('both');
   const older = {
     id: 'inbox:older', mailboxId: 'inbox:older', accountEmail: 'martijn@softora.nl',
@@ -216,9 +321,9 @@ test('contactdossier rendert onderwerpgrenzen en reply gebruikt exact het gekoze
     newestFirst: true,
     renderMessageAction: (message) => `<button data-key="${campaignInbox.getActionMessageKey(message)}">Reply</button>`,
   });
-  assert.equal((rendered.match(/mail-contact-thread-boundary/g) || []).length, 2);
-  assert.match(rendered, /Los onderwerp/);
-  assert.match(rendered, /Nieuw onderwerp/);
+  assert.doesNotMatch(rendered, /mail-contact-thread-boundary/);
+  assert.doesNotMatch(rendered, /Los onderwerp|Nieuw onderwerp/);
+  assert.ok(rendered.indexOf('Nieuwer') < rendered.indexOf('Ouder'));
   assert.equal((rendered.match(/>Reply<\/button>/g) || []).length, 2);
 
   const fields = new Map(['c-to', 'c-subject', 'c-body', 'compose-overlay'].map((id) => [id, {
@@ -263,6 +368,18 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
       generation_superseded_at timestamptz, state_revision bigint,
       state_mutation_key text, state_mutation_at timestamptz
     );
+    create table public.softora_outbound_recipient_guards (
+      guard_key text primary key, key_type text, key_value text, reservation_id text,
+      provider text, channel text, sender_email text, recipient_email text,
+      recipient_domain text, recipient_company_key text, recipient_id text,
+      recipient_company text, status text, source text, actor text, permanent boolean,
+      payload jsonb, expires_at timestamptz, last_seen_at timestamptz,
+      created_at timestamptz, updated_at timestamptz
+    );
+    create table public.softora_mailbox_send_provenance (
+      intent_id text primary key, account_email text, recipient_email text,
+      provider text, status text, accepted_at timestamptz
+    );
   `);
   let migration = fs.readFileSync(migrationPath, 'utf8');
   migration = migration.replace(
@@ -278,6 +395,16 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
     )
     .replace(/drop index if exists public\.softora_mailbox_messages_full_history_search_idx;\n\n/, '');
   await database.exec(performanceMigration);
+  await database.exec(fs.readFileSync(outreachScopeMigrationPath, 'utf8'));
+  let outreachQueryPlanMigration = fs.readFileSync(outreachQueryPlanMigrationPath, 'utf8');
+  outreachQueryPlanMigration = outreachQueryPlanMigration.replace(
+    /create index if not exists softora_mailbox_messages_participants_active_idx[\s\S]*?generation_superseded_at is null;\n\n/,
+    ''
+  );
+  await database.exec(outreachQueryPlanMigration);
+  await database.exec(fs.readFileSync(outreachEligibilitySetMigrationPath, 'utf8'));
+  await database.exec(fs.readFileSync(outreachNarrowPlanMigrationPath, 'utf8'));
+  await database.exec(fs.readFileSync(outreachScoreOnceMigrationPath, 'utf8'));
 
   const payload = (extra = {}) => JSON.stringify({ source: 'imap-sync', provider: 'imap', ...extra });
   const rows = [
@@ -289,6 +416,7 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
     ['other-ziggo', 'martijn@softora.nl', 'inbox', 6, 'inbox:6', '<other@test>', '', '', 'Ander', 'ander@ziggo.nl', 'martijn@softora.nl', 'Andere klant', 'anders', 'anders', '2026-08-16T08:33:00Z', payload()],
     ['serve-contact', 'serve@softora.nl', 'inbox', 7, 'inbox:7', '<serve@test>', '', '', 'Peter', 'psonnemans@ziggo.nl', 'serve@softora.nl', 'Servé onderwerp', 'serve', 'serve', '2026-08-14T08:33:00Z', payload()],
     ['instantly-copy', 'martijn@softora.nl', 'instantly', 8, 'instantly:copy', '<old-in@test>', '', '', 'Peter', 'psonnemans@ziggo.nl', 'martijn@softora.nl', 'Kleine vraag', 'oude vraag', 'Crème inhoud', '2026-07-31T16:39:00Z', payload({ provider: 'instantly', providerThreadId: 'inst-thread', direction: 'received' })],
+    ['bericht-address', 'martijn@softora.nl', 'coldmail', 10, 'coldmail:10', '<bericht-address@test>', '', '', 'Contact', 'bericht@outreach.example', 'martijn@softora.nl', 'Los onderwerp', 'gewone tekst', 'Geen zoekterm aanwezig', '2026-08-17T08:45:00Z', payload()],
   ];
   for (const row of rows) {
     await database.query(`
@@ -299,6 +427,15 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,false,true,false,false,$16::jsonb)
     `, row);
   }
+  await database.exec(`
+    insert into public.softora_outbound_recipient_guards (
+      guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,
+      status,source,permanent
+    ) values (
+      'email:psonnemans@ziggo.nl','email','psonnemans@ziggo.nl','softora','coldmail',
+      'serve@softora.nl','psonnemans@ziggo.nl','sent','fixture',true
+    );
+  `);
 
   const martijnTimeline = await database.query(
     "select * from public.softora_mailbox_contact_timeline(array['martijn@softora.nl'],'psonnemans@ziggo.nl',50,0)"
@@ -323,12 +460,42 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
   );
   assert.equal(accentSearch.rows.length, 1);
   assert.match(accentSearch.rows[0].match_snippet, /Crème/);
+  const boundarySearch = await database.query(
+    "select * from public.softora_search_mailbox_messages(array['martijn@softora.nl'],'eric',20,0)"
+  );
+  assert.equal(boundarySearch.rows.length, 0);
+  await database.query(`
+    insert into public.softora_mailbox_messages (
+      message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,
+      sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,
+      body_truncated,has_body,unread,starred,payload
+    ) values (
+      'eric-outreach','martijn@softora.nl','coldmail',9,'coldmail:9','<eric@test>','','',
+      'Eric de Boer','eric@outreach.example','martijn@softora.nl','Los onderwerp',
+      'Echte Eric','Dit bericht hoort bij Eric','2026-08-17T09:00:00Z','2026-08-17T09:00:00Z',
+      false,true,false,false,'{"source":"imap-sync","provider":"imap"}'::jsonb
+    )
+  `);
+  const exactEricSearch = await database.query(
+    "select * from public.softora_search_mailbox_messages(array['martijn@softora.nl'],'eric',20,0)"
+  );
+  assert.equal(exactEricSearch.rows.length, 1);
+  assert.equal(exactEricSearch.rows[0].sender_email, 'eric@outreach.example');
+  const excludedTimeline = await database.query(
+    "select * from public.softora_mailbox_contact_timeline(array['martijn@softora.nl'],'ander@ziggo.nl',50,0)"
+  );
+  assert.equal(excludedTimeline.rows.length, 0);
   await database.close();
 });
 
 test('SQL-contract houdt discovery service-role-only, bounded en op de volledige body-index', () => {
   const source = fs.readFileSync(migrationPath, 'utf8');
   const performanceSource = fs.readFileSync(performanceMigrationPath, 'utf8');
+  const outreachSource = fs.readFileSync(outreachScopeMigrationPath, 'utf8');
+  const queryPlanSource = fs.readFileSync(outreachQueryPlanMigrationPath, 'utf8');
+  const eligibilitySetSource = fs.readFileSync(outreachEligibilitySetMigrationPath, 'utf8');
+  const narrowPlanSource = fs.readFileSync(outreachNarrowPlanMigrationPath, 'utf8');
+  const scoreOnceSource = fs.readFileSync(outreachScoreOnceMigrationPath, 'utf8');
   assert.match(source, /using gin[\s\S]*extensions\.gin_trgm_ops/);
   assert.match(source, /body_text/);
   assert.match(source, /generation_superseded_at is null/);
@@ -344,4 +511,34 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   assert.match(performanceSource, /thread_matches as materialized/);
   assert.match(performanceSource, /from paged[\s\S]*join public\.softora_mailbox_messages/);
   assert.doesNotMatch(performanceSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(outreachSource, /softora_mailbox_is_outreach_contact/);
+  assert.match(outreachSource, /softora_filter_mailbox_outreach_contacts/);
+  assert.match(outreachSource, /softora_mailbox_search_word_prefix/);
+  assert.match(outreachSource, /guard\.key_type = 'email'/);
+  assert.match(outreachSource, /participant <> all\(p_account_emails\)/);
+  assert.doesNotMatch(outreachSource, /recipient_domain\s*=/);
+  assert.doesNotMatch(outreachSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(queryPlanSource, /softora_mailbox_messages_participants_active_idx/);
+  assert.match(queryPlanSource, /@> array\[p\.contact_email\]/);
+  assert.match(queryPlanSource, /m\.search_document ~ \(/);
+  assert.match(queryPlanSource, /\[\^a-z0-9\]\+/);
+  assert.doesNotMatch(queryPlanSource, /recipient_domain\s*=/);
+  assert.doesNotMatch(queryPlanSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(eligibilitySetSource, /softora_mailbox_outreach_contacts/);
+  assert.match(eligibilitySetSource, /eligible_contacts as materialized/);
+  assert.match(eligibilitySetSource, /expanded as materialized/);
+  assert.match(eligibilitySetSource, /join eligible_contacts using \(contact_email\)/);
+  assert.doesNotMatch(eligibilitySetSource, /recipient_domain\s*=/);
+  assert.doesNotMatch(eligibilitySetSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(narrowPlanSource, /candidates as materialized/);
+  assert.match(narrowPlanSource, /select\s+m\.message_key,/);
+  assert.match(narrowPlanSource, /paged as materialized/);
+  assert.match(narrowPlanSource, /from paged[\s\S]*join public\.softora_mailbox_messages/);
+  assert.doesNotMatch(narrowPlanSource, /select\s+m\.\*,[\s\S]*candidates as materialized/);
+  assert.doesNotMatch(narrowPlanSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(scoreOnceSource, /scored as materialized/);
+  assert.match(scoreOnceSource, /eligible\.sender_email/);
+  assert.match(scoreOnceSource, /from paged[\s\S]*join public\.softora_mailbox_messages/);
+  assert.doesNotMatch(scoreOnceSource, /candidates as materialized \(\s*select\s+m\.\*,/);
+  assert.doesNotMatch(scoreOnceSource, /grant execute[\s\S]*to authenticated/);
 });

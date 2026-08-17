@@ -9,7 +9,8 @@
     const overlay = documentRef?.getElementById('compose-overlay');
     const box = overlay?.querySelector?.('.compose-box');
     const handle = overlay?.querySelector?.('[data-mailbox-compose-drag-handle]');
-    const grip = overlay?.querySelector?.('[data-mailbox-compose-resize-handle]'), closeButton = overlay?.querySelector?.('[data-mailbox-action="close-compose"]');
+    const resizeZones = Array.from(overlay?.querySelectorAll?.('[data-mailbox-compose-resize-zone]') || []);
+    const closeButton = overlay?.querySelector?.('[data-mailbox-action="close-compose"]');
     let drag = null;
     let resize = null;
 
@@ -94,19 +95,31 @@
     function moveResize(event) {
       if (!resize || (event.pointerId != null && event.pointerId !== resize.pointerId)) return;
       const bounds = limits();
-      place(
-        resize.left,
-        resize.top,
-        clamp(Number(event.clientX) - resize.left, bounds.minWidth, bounds.width - resize.left - VIEWPORT_MARGIN),
-        clamp(Number(event.clientY) - resize.top, bounds.minHeight, bounds.height - resize.top - VIEWPORT_MARGIN)
-      );
+      const deltaX = Number(event.clientX) - resize.clientX;
+      const deltaY = Number(event.clientY) - resize.clientY;
+      let left = resize.left, top = resize.top, width = resize.width, height = resize.height;
+      if (resize.edge.includes('e')) {
+        width = clamp(resize.width + deltaX, bounds.minWidth, bounds.width - resize.left - VIEWPORT_MARGIN);
+      }
+      if (resize.edge.includes('s')) {
+        height = clamp(resize.height + deltaY, bounds.minHeight, bounds.height - resize.top - VIEWPORT_MARGIN);
+      }
+      if (resize.edge.includes('w')) {
+        left = clamp(resize.left + deltaX, VIEWPORT_MARGIN, resize.right - bounds.minWidth);
+        width = resize.right - left;
+      }
+      if (resize.edge.includes('n')) {
+        top = clamp(resize.top + deltaY, VIEWPORT_MARGIN, resize.bottom - bounds.minHeight);
+        height = resize.bottom - top;
+      }
+      place(left, top, width, height);
       event.preventDefault?.();
       event.stopPropagation?.();
     }
 
     function stopResize(event) {
       if (!resize || (event?.pointerId != null && event.pointerId !== resize.pointerId)) return;
-      grip?.releasePointerCapture?.(resize.pointerId);
+      resize.zone?.releasePointerCapture?.(resize.pointerId);
       resize = null;
       box?.removeAttribute?.('data-compose-resizing');
       event?.stopPropagation?.();
@@ -114,10 +127,25 @@
 
     function startResize(event) {
       if (!box || !isDesktop() || event.button > 0) return;
+      const zone = event.currentTarget;
+      const edge = String(zone?.dataset?.mailboxComposeResizeZone || '').trim().toLowerCase();
+      if (!/^(n|ne|e|se|s|sw|w|nw)$/.test(edge)) return;
       const rect = box.getBoundingClientRect();
-      resize = { pointerId: event.pointerId, left: rect.left, top: rect.top };
+      resize = {
+        pointerId: event.pointerId,
+        zone,
+        edge,
+        clientX: Number(event.clientX),
+        clientY: Number(event.clientY),
+        left: rect.left,
+        top: rect.top,
+        right: rect.right ?? (rect.left + rect.width),
+        bottom: rect.bottom ?? (rect.top + rect.height),
+        width: rect.width,
+        height: rect.height,
+      };
       box.setAttribute('data-compose-resizing', 'true');
-      grip?.setPointerCapture?.(event.pointerId);
+      zone?.setPointerCapture?.(event.pointerId);
       event.preventDefault?.();
       event.stopPropagation?.();
     }
@@ -163,10 +191,12 @@
       handle?.addEventListener?.('pointermove', move);
       handle?.addEventListener?.('pointerup', stop);
       handle?.addEventListener?.('pointercancel', stop);
-      grip?.addEventListener?.('pointerdown', startResize);
-      grip?.addEventListener?.('pointermove', moveResize);
-      grip?.addEventListener?.('pointerup', stopResize);
-      grip?.addEventListener?.('pointercancel', stopResize);
+      resizeZones.forEach((zone) => {
+        zone?.addEventListener?.('pointerdown', startResize);
+        zone?.addEventListener?.('pointermove', moveResize);
+        zone?.addEventListener?.('pointerup', stopResize);
+        zone?.addEventListener?.('pointercancel', stopResize);
+      });
       closeButton?.addEventListener?.('pointerdown', (event) => event.stopPropagation?.());
       overlay?.addEventListener?.('wheel', forwardBackgroundWheel, { passive: false });
       windowRef.addEventListener?.('resize', fitToViewport, { passive: true });

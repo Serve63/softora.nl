@@ -666,17 +666,20 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
+  assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"[\s\S]*id="mail-items"[\s\S]*id="mailbox-search-more"/);
+  assert.doesNotMatch(pageSource, /mailbox-search-clear|mail-search-clear/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*margin:\s*0 auto;/);
   assert.match(pageSource, /\.detail-mail-block \{[^}]*min-height:\s*min\(620px,\s*calc\(100vh - 92px\)\)/);
   assert.doesNotMatch(pageSource, /\.detail-more/);
   assert.match(pageSource, /\.detail-reply \{[^}]*border:\s*1px solid rgba\(155,35,85,\.34\);[^}]*border-radius:\s*6px;[^}]*padding:\s*8px 14px;/);
   assert.match(pageSource, /\.detail-footer \{[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*0;/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
-  assert.match(pageSource, /data-mailbox-compose-resize-handle/);
+  assert.equal((pageSource.match(/data-mailbox-compose-resize-zone=/g) || []).length, 8);
+  assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle/);
   assert.match(pageSource, /data-mailbox-compose-no-drag aria-label="Sluiten"/);
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
-  assert.match(mobileCssSource, /\.compose-resize-grip \{ display: none; \}/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260814b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260814a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260817a"><\/script>/);
+  assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20260817c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260814b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260814a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260817c"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {

@@ -12,6 +12,7 @@ function createMailboxDiscoveryService(deps = {}) {
     isSupabaseConfigured = () => false,
     getSupabaseClient = () => null,
     mailboxIndexStore = {},
+    mailboxOutreachScope = null,
     logger = console,
     repository = createMailboxDiscoveryRepository({
       isSupabaseConfigured,
@@ -31,6 +32,9 @@ function createMailboxDiscoveryService(deps = {}) {
   }
 
   function getScopedAccounts(owner) {
+    if (mailboxOutreachScope?.getScopedAccounts) {
+      return mailboxOutreachScope.getScopedAccounts(owner);
+    }
     return getCampaignMailboxAccounts(normalizeOwner(owner))
       .map((email) => String(email || '').trim().toLowerCase())
       .filter(Boolean);

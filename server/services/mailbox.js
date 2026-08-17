@@ -29,7 +29,7 @@ const {
   createMailboxSyncService,
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
-const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies'); const { createMailboxProviderThreadAuditService } = require('./mailbox-provider-thread-audit'); const { createMailboxDiscoveryService } = require('./mailbox-discovery');
+const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies'); const { createMailboxProviderThreadAuditService } = require('./mailbox-provider-thread-audit'); const { createMailboxDiscoveryService } = require('./mailbox-discovery'); const { createMailboxOutreachScope } = require('./mailbox-outreach-scope');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
 const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list');
@@ -545,12 +545,9 @@ function createMailboxService(deps = {}) {
     instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
     mailboxComposeThreadContext = createMailboxComposeThreadContext({ mailboxIndexStore, instantlyMailboxService }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
-    mailboxCampaignRepliesService = createMailboxCampaignRepliesService({
-      mailboxIndexStore,
-      dataOpsStore,
-      mailboxSendProvenanceStore,
-    }),
-    mailboxDiscoveryService = createMailboxDiscoveryService({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, logger }),
+    mailboxOutreachScope = createMailboxOutreachScope({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, getInstantlyAccounts: (owner) => instantlyMailboxService?.getConfiguredAccounts?.(owner) || [] }),
+    mailboxCampaignRepliesService = createMailboxCampaignRepliesService({ mailboxIndexStore, dataOpsStore, mailboxSendProvenanceStore, mailboxOutreachScope }),
+    mailboxDiscoveryService = createMailboxDiscoveryService({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, mailboxOutreachScope, logger }),
   } = deps; const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||

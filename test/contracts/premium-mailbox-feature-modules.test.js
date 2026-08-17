@@ -344,7 +344,12 @@ test('composevenster resize, drag, viewport-clamp en sluit-hitarea blijven gesch
     };
   }
   const handle = interactiveNode('handle');
-  const grip = interactiveNode('grip');
+  const resizeEdges = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
+  const resizeZones = Object.fromEntries(resizeEdges.map((edge) => {
+    const zone = interactiveNode(`zone-${edge}`);
+    zone.dataset = { mailboxComposeResizeZone: edge };
+    return [edge, zone];
+  }));
   const closeButton = interactiveNode('close');
   const style = {
     removeProperty(property) { delete this[property]; },
@@ -352,12 +357,11 @@ test('composevenster resize, drag, viewport-clamp en sluit-hitarea blijven gesch
   const box = {
     style,
     getBoundingClientRect() {
-      return {
-        left: Number.parseFloat(style.left) || 100,
-        top: Number.parseFloat(style.top) || 80,
-        width: Number.parseFloat(style.width) || 800,
-        height: Number.parseFloat(style.height) || 600,
-      };
+      const left = Number.parseFloat(style.left) || 100;
+      const top = Number.parseFloat(style.top) || 80;
+      const width = Number.parseFloat(style.width) || 800;
+      const height = Number.parseFloat(style.height) || 600;
+      return { left, top, right: left + width, bottom: top + height, width, height };
     },
     setAttribute(name, value) { this[name] = value; },
     removeAttribute(name) { delete this[name]; },
@@ -369,9 +373,11 @@ test('composevenster resize, drag, viewport-clamp en sluit-hitarea blijven gesch
     querySelector(selector) {
       if (selector === '.compose-box') return box;
       if (selector === '[data-mailbox-compose-drag-handle]') return handle;
-      if (selector === '[data-mailbox-compose-resize-handle]') return grip;
       if (selector === '[data-mailbox-action="close-compose"]') return closeButton;
       return null;
+    },
+    querySelectorAll(selector) {
+      return selector === '[data-mailbox-compose-resize-zone]' ? Object.values(resizeZones) : [];
     },
     addEventListener(type, handler) { listeners[`overlay:${type}`] = handler; },
   };
@@ -401,37 +407,39 @@ test('composevenster resize, drag, viewport-clamp en sluit-hitarea blijven gesch
   assert.equal(box.style.width, '800px');
   assert.equal(box.style.height, '600px');
 
-  listeners['grip:pointerdown']({
-    button: 0, pointerId: 2, clientX: 1000, clientY: 700,
-    preventDefault() {}, stopPropagation() {},
-  });
-  listeners['grip:pointermove']({
-    pointerId: 2, clientX: 800, clientY: 600,
-    preventDefault() {}, stopPropagation() {},
-  });
-  assert.equal(box.style.width, '600px');
-  assert.equal(box.style.height, '500px');
-  listeners['grip:pointermove']({
-    pointerId: 2, clientX: 1400, clientY: 900,
-    preventDefault() {}, stopPropagation() {},
-  });
-  assert.equal(box.style.width, '992px');
-  assert.equal(box.style.height, '692px');
-  listeners['grip:pointerup']({ pointerId: 2, stopPropagation() {} });
+  function setRect() {
+    Object.assign(style, { left: '100px', top: '80px', width: '800px', height: '600px' });
+  }
+  function resizeFrom(edge, deltaX, deltaY, pointerId) {
+    setRect();
+    const zone = resizeZones[edge];
+    const base = { pointerId, currentTarget: zone, preventDefault() {}, stopPropagation() {} };
+    listeners[`zone-${edge}:pointerdown`]({ ...base, button: 0, clientX: 500, clientY: 400 });
+    listeners[`zone-${edge}:pointermove`]({ ...base, clientX: 500 + deltaX, clientY: 400 + deltaY });
+    listeners[`zone-${edge}:pointerup`](base);
+    return { left: style.left, top: style.top, width: style.width, height: style.height };
+  }
 
-  listeners['grip:pointerdown']({
-    button: 0, pointerId: 4, clientX: 1192, clientY: 792,
-    preventDefault() {}, stopPropagation() {},
-  });
-  listeners['grip:pointermove']({
-    pointerId: 4, clientX: 800, clientY: 600,
-    preventDefault() {}, stopPropagation() {},
-  });
-  listeners['grip:pointerup']({ pointerId: 4, stopPropagation() {} });
+  assert.deepEqual(resizeFrom('n', 0, 50, 11), { left: '100px', top: '130px', width: '800px', height: '550px' });
+  assert.deepEqual(resizeFrom('ne', 80, 50, 12), { left: '100px', top: '130px', width: '880px', height: '550px' });
+  assert.deepEqual(resizeFrom('e', 80, 0, 13), { left: '100px', top: '80px', width: '880px', height: '600px' });
+  assert.deepEqual(resizeFrom('se', 80, 70, 14), { left: '100px', top: '80px', width: '880px', height: '670px' });
+  assert.deepEqual(resizeFrom('s', 0, 70, 15), { left: '100px', top: '80px', width: '800px', height: '670px' });
+  assert.deepEqual(resizeFrom('sw', 50, 70, 16), { left: '150px', top: '80px', width: '750px', height: '670px' });
+  assert.deepEqual(resizeFrom('w', 50, 0, 17), { left: '150px', top: '80px', width: '750px', height: '600px' });
+  assert.deepEqual(resizeFrom('nw', 50, 50, 18), { left: '150px', top: '130px', width: '750px', height: '550px' });
+
+  const maxRect = resizeFrom('se', 1000, 1000, 19);
+  assert.equal(maxRect.width, '1092px');
+  assert.equal(maxRect.height, '712px');
+  const minRect = resizeFrom('se', -1000, -1000, 20);
+  assert.equal(minRect.width, '560px');
+  assert.equal(minRect.height, '480px');
 
   let closePointerStopped = false;
   listeners['close:pointerdown']({ stopPropagation() { closePointerStopped = true; } });
   assert.equal(closePointerStopped, true);
+  resizeFrom('ne', 40, -40, 21);
   const leftBeforeClosePointer = box.style.left;
   listeners['handle:pointerdown']({
     button: 0, pointerId: 3, clientX: 120, clientY: 100,
@@ -439,6 +447,7 @@ test('composevenster resize, drag, viewport-clamp en sluit-hitarea blijven gesch
   });
   assert.equal(box.style.left, leftBeforeClosePointer);
 
+  setRect();
   listeners['handle:pointerdown']({
     button: 0,
     pointerId: 1,
@@ -453,16 +462,16 @@ test('composevenster resize, drag, viewport-clamp en sluit-hitarea blijven gesch
     clientY: 220,
     preventDefault() {},
   });
-  assert.equal(box.style.left, '330px');
-  assert.equal(box.style.top, '220px');
+  assert.equal(box.style.left, '230px');
+  assert.equal(box.style.top, '192px');
 
   windowRef.innerWidth = 920;
   windowRef.innerHeight = 650;
   listeners['window:resize']();
-  assert.equal(box.style.left, '312px');
-  assert.equal(box.style.top, '142px');
-  assert.equal(box.style.width, '600px');
-  assert.equal(box.style.height, '500px');
+  assert.equal(box.style.left, '112px');
+  assert.equal(box.style.top, '42px');
+  assert.equal(box.style.width, '800px');
+  assert.equal(box.style.height, '600px');
 
   windowRef.innerWidth = 700;
   listeners['window:resize']();

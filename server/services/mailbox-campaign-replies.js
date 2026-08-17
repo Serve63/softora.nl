@@ -876,7 +876,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
   const {
     mailboxIndexStore = null,
     dataOpsStore = null,
-    mailboxSendProvenanceStore = null,
+    mailboxSendProvenanceStore = null, mailboxOutreachScope = null,
   } = deps;
 
   async function listRepliesWithSnapshot({
@@ -1088,7 +1088,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
     });
     const conversationsWithQuotedOriginals = quotedRecovery.conversations;
     const hydratedRecoveryByIdentity = quotedRecovery.hydratedByIdentity;
-    const allVisibleConversations = attachCrossAccountMailboxCopies(
+    let allVisibleConversations = attachCrossAccountMailboxCopies(
       conversationsWithQuotedOriginals,
       replies,
       dedupeCampaignMessages([
@@ -1097,7 +1097,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
           ? targetedUnthreadedRows.map((row) => row.message)
           : []),
       ])
-    ).filter(shouldShowCampaignConversation);
+    ).filter(shouldShowCampaignConversation); if (mailboxOutreachScope?.filterConversations) allVisibleConversations = await mailboxOutreachScope.filterConversations({ owner: safeSnapshotLimit ? '' : owner, messages: allVisibleConversations });
     const selectedAccountSet = new Set(selectedMailboxAccounts);
     const selectedConversations = allVisibleConversations
       .filter((conversation) => selectedAccountSet.has(getCampaignConversationAccountEmail(conversation)))
@@ -1172,7 +1172,7 @@ module.exports = {
   dedupeCampaignMessages,
   getStrictUnreferencedCampaignParent,
   getCampaignConversationId,
-  getCampaignConversationAccountEmail,
+  getCampaignConversationAccountEmail, getCampaignCounterpartyEmail,
   getCampaignMailboxAccounts,
   getMessageReferenceIds,
   getMessageReferenceLookupValues,

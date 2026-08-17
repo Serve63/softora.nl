@@ -3410,6 +3410,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   let snapshotWrite = null;
   const service = createMailboxService({
     logger: { error() {} },
+    mailboxOutreachScope: { filterConversations: async ({ messages }) => messages },
     setUiStateValues: async (scope, values, meta) => {
       snapshotWrite = { scope, values, meta };
       return { values };
