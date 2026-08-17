@@ -23,6 +23,8 @@ const DEFAULT_SCAN_QUERY_LIMIT = 12;
 const MAX_SCAN_QUERY_LIMIT = 100;
 const DEFAULT_WEBSITE_LOOKUP_LIMIT = 10;
 const MAX_WEBSITE_LOOKUP_LIMIT = 50;
+const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
+const DEFAULT_AUTO_SCAN_MAX_AGE_DAYS = 7;
 
 const KEYWORD_GROUPS = Object.freeze({
   direct_website: [
@@ -279,12 +281,44 @@ function getSelectedGroups(value) {
   return value.map((item) => text(item, 50)).filter((item) => Object.prototype.hasOwnProperty.call(KEYWORD_GROUPS, item));
 }
 
+function getAutomaticScanConfig(env = process.env) {
+  const enabledValue = text(env.LEAD_RADAR_AUTO_SCAN_ENABLED, 20).toLowerCase();
+  const enabled = enabledValue ? /^(1|true|yes|on)$/.test(enabledValue) : true;
+  const intervalMinutes = Math.max(
+    15,
+    Math.min(1_440, Math.round(Number(env.LEAD_RADAR_AUTO_SCAN_INTERVAL_MINUTES) || DEFAULT_AUTO_SCAN_INTERVAL_MINUTES))
+  );
+  const maxQueries = safeLimit(env.LEAD_RADAR_AUTO_SCAN_MAX_QUERIES, DEFAULT_SCAN_QUERY_LIMIT, MAX_SCAN_QUERY_LIMIT);
+  const websiteLookupLimit = env.LEAD_RADAR_AUTO_SCAN_WEBSITE_LOOKUP_LIMIT === '0'
+    ? 0
+    : safeLimit(env.LEAD_RADAR_AUTO_SCAN_WEBSITE_LOOKUP_LIMIT, DEFAULT_WEBSITE_LOOKUP_LIMIT, MAX_WEBSITE_LOOKUP_LIMIT);
+  const maxAgeDays = safeLimit(env.LEAD_RADAR_AUTO_SCAN_MAX_AGE_DAYS, DEFAULT_AUTO_SCAN_MAX_AGE_DAYS, 365);
+  return {
+    enabled,
+    intervalMinutes,
+    maxQueries,
+    websiteLookupLimit,
+    maxAgeDays,
+    platforms: [...PLATFORMS],
+    regionMode: 'nationwide',
+    keywordGroups: Object.keys(KEYWORD_GROUPS),
+  };
+}
+
+function getFreshnessSuffix(maxAgeDays) {
+  const days = normalizeInteger(maxAgeDays, { min: 1, max: 3650 });
+  if (!days) return '';
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return ` after:${cutoff}`;
+}
+
 function buildSearchPlan(options = {}) {
   const platforms = Array.isArray(options.platforms) && options.platforms.length
     ? options.platforms.map(normalizePlatform).filter(Boolean)
     : [...PLATFORMS];
   const regions = getRegionList(options.regions || options.region, options.regionMode);
   const groups = getSelectedGroups(options.keywordGroups);
+  const freshnessSuffix = getFreshnessSuffix(options.maxAgeDays || options.max_age_days);
   const plan = [];
   for (const platform of platforms) {
     const site = platform === 'facebook' ? 'site:facebook.com' : 'site:instagram.com';
@@ -296,7 +330,7 @@ function buildSearchPlan(options = {}) {
             region,
             keywordGroup: group,
             term,
-            query: `${site} "${term}" ${region}`.trim(),
+            query: `${site} "${term}" ${region}${freshnessSuffix}`.trim(),
           });
         }
       }
@@ -729,6 +763,9 @@ function createLeadRadarService(deps = {}) {
     let run;
     let plan;
     let cursor = 0;
+    const requestedScanMode = text(input.scanMode || input.scan_mode, 20).toLowerCase();
+    const scanMode = ['automatic', 'manual'].includes(requestedScanMode) ? requestedScanMode : 'manual';
+    const maxAgeDays = normalizeInteger(input.maxAgeDays ?? input.max_age_days, { min: 1, max: 3650 });
     if (input.runId || input.run_id) {
       const db = requireDb();
       const result = await db.from(SCAN_RUNS_TABLE).select('*').eq('id', text(input.runId || input.run_id, 100)).limit(1);
@@ -741,6 +778,8 @@ function createLeadRadarService(deps = {}) {
       plan = buildSearchPlan(input);
       run = await createRun({
         provider: provider?.name || 'dataforseo',
+        scan_mode: scanMode,
+        max_age_days: maxAgeDays,
         platforms: plan.map((item) => item.platform).filter((item, index, array) => array.indexOf(item) === index),
         regions: plan.map((item) => item.region).filter((item, index, array) => array.indexOf(item) === index),
         query_plan: plan,
@@ -825,8 +864,89 @@ function createLeadRadarService(deps = {}) {
     });
   }
 
+  async function getLatestAutomaticRun() {
+    const db = getDb();
+    if (!db) return null;
+    const result = await db.from(SCAN_RUNS_TABLE)
+      .select('*')
+      .eq('scan_mode', 'automatic')
+      .order('started_at', { ascending: false })
+      .limit(1);
+    if (result.error) {
+      logger.warn('[LeadRadar][automatic-status]', result.error.message || result.error);
+      return null;
+    }
+    return result.data?.[0] || null;
+  }
+
+  function summarizeScanRun(run) {
+    if (!run) return null;
+    return {
+      id: run.id,
+      scan_mode: run.scan_mode || 'manual',
+      status: run.status,
+      started_at: run.started_at,
+      finished_at: run.finished_at,
+      updated_at: run.updated_at,
+      query_cursor: Number(run.query_cursor || 0),
+      query_count: Array.isArray(run.query_plan) ? run.query_plan.length : 0,
+      result_count: Number(run.result_count || 0),
+      new_signal_count: Number(run.new_signal_count || 0),
+      duplicate_count: Number(run.duplicate_count || 0),
+      error_count: Number(run.error_count || 0),
+    };
+  }
+
+  async function runScheduledScan() {
+    const config = getAutomaticScanConfig(env);
+    if (!config.enabled) return { skipped: true, status: 'disabled', config };
+    if (!getDb()) return { skipped: true, status: 'storage_unavailable', config };
+    if (!provider?.configured || typeof provider.search !== 'function') {
+      return { skipped: true, status: 'provider_unavailable', config };
+    }
+
+    const latest = await getLatestAutomaticRun();
+    const latestUpdatedAt = latest?.updated_at ? new Date(latest.updated_at).getTime() : 0;
+    const latestFinishedAt = latest?.finished_at ? new Date(latest.finished_at).getTime() : 0;
+    const now = Date.now();
+    const activeRun = latest && ['running', 'paused'].includes(latest.status) &&
+      Number(latest.query_cursor || 0) < (Array.isArray(latest.query_plan) ? latest.query_plan.length : 0);
+
+    if (activeRun && (!latestUpdatedAt || now - latestUpdatedAt < 2 * 60 * 60 * 1000)) {
+      return {
+        skipped: false,
+        resumed: true,
+        run: await runScan({
+          runId: latest.id,
+          maxQueries: config.maxQueries,
+          websiteLookupLimit: config.websiteLookupLimit,
+        }),
+        config,
+      };
+    }
+    if (latestFinishedAt && now - latestFinishedAt < config.intervalMinutes * 60 * 1000) {
+      return { skipped: true, status: 'waiting_for_next_interval', run: latest, config };
+    }
+
+    return {
+      skipped: false,
+      resumed: false,
+      run: await runScan({
+        platforms: config.platforms,
+        regionMode: config.regionMode,
+        keywordGroups: config.keywordGroups,
+        maxQueries: config.maxQueries,
+        websiteLookupLimit: config.websiteLookupLimit,
+        maxAgeDays: config.maxAgeDays,
+        scanMode: 'automatic',
+      }),
+      config,
+    };
+  }
+
   async function getStatus() {
     const storageConfigured = Boolean(getDb());
+    const autoScanConfig = getAutomaticScanConfig(env);
     const status = {
       storageConfigured,
       provider: provider?.getStatus ? provider.getStatus() : { configured: false, provider: 'unknown' },
@@ -836,6 +956,7 @@ function createLeadRadarService(deps = {}) {
       negativeTerms: NEGATIVE_TERMS,
       regionalCoverage: { provinces: PROVINCES.length, cities: IMPORTANT_CITIES.length },
       defaults: { maxQueries: DEFAULT_SCAN_QUERY_LIMIT, websiteLookupLimit: DEFAULT_WEBSITE_LOOKUP_LIMIT },
+      autoScan: { ...autoScanConfig, lastRun: null },
     };
     if (!storageConfigured) return status;
     const db = getDb();
@@ -853,6 +974,7 @@ function createLeadRadarService(deps = {}) {
       notChecked: await count('website_status', 'website_not_checked'),
       notWorking: await count('website_status', 'website_not_working'),
     };
+    status.autoScan.lastRun = summarizeScanRun(await getLatestAutomaticRun());
     return status;
   }
 
@@ -873,6 +995,7 @@ function createLeadRadarService(deps = {}) {
     lookupWebsite,
     bulkLookupWebsite,
     runScan,
+    runScheduledScan,
     listRuns,
     constants: { SIGNALS_TABLE, SCAN_RUNS_TABLE, WEBSITE_STATUSES, LEAD_STATUSES, KEYWORD_GROUPS },
   };

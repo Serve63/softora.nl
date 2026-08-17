@@ -39,6 +39,22 @@
     banner.innerHTML = `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Handmatige import en websitecontrole van bestaande leads blijven beschikbaar.</span>`;
   }
 
+  function renderAutoScanStatus() {
+    const element = $('#auto-scan-status');
+    const autoScan = state.status && state.status.autoScan;
+    if (!element || !autoScan) return;
+    const interval = Number(autoScan.intervalMinutes) || 15;
+    if (!autoScan.enabled) {
+      element.textContent = 'Automatische scan staat uit.';
+      element.className = 'auto-scan-status auto-scan-status--muted';
+      return;
+    }
+    const lastRun = autoScan.lastRun;
+    const lastRunLabel = lastRun?.finished_at ? ` Laatste ronde: ${formatDate(lastRun.finished_at)}.` : '';
+    element.textContent = `Automatisch actief: nieuwe openbare signalen worden elke ${interval} minuten opgehaald.${lastRunLabel}`;
+    element.className = 'auto-scan-status';
+  }
+
   function renderMetrics() {
     const counts = state.status && state.status.counts || {};
     [['#metric-total', counts.total], ['#metric-new', counts.new], ['#metric-no-website', counts.noWebsiteFound], ['#metric-website', counts.websiteFound]].forEach(([selector, value]) => { const element = $(selector); if (element) element.textContent = value == null ? '-' : Number(value).toLocaleString('nl-NL'); });
@@ -93,9 +109,9 @@
     return params.toString();
   }
 
-  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); }
-  async function loadSignals() {
-    setInboxState('Signalen laden...', '');
+  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); renderAutoScanStatus(); }
+  async function loadSignals({ silent = false } = {}) {
+    if (!silent) setInboxState('Signalen laden...', '');
     try { const body = await api(`/api/lead-radar/signals?${getFilters()}`); state.signals = body.signals || []; state.total = Number(body.total) || 0; renderSignals(); }
     catch (error) { state.signals = []; state.total = 0; renderSignals(); setInboxState(error.message, 'error'); }
   }
@@ -170,6 +186,11 @@
   $('#toggle-runs-button').addEventListener('click', async () => { const list = $('#runs-list'); const open = list.hidden; list.hidden = !open; $('#toggle-runs-button').textContent = open ? '−' : '+'; $('#toggle-runs-button').setAttribute('aria-expanded', String(open)); if (open) await loadRuns(); });
   $('#clear-selection-button').addEventListener('click', () => { state.selected.clear(); renderSignals(); });
   $('#bulk-website-button').addEventListener('click', async () => { try { await api('/api/lead-radar/website-lookup', { method: 'POST', body: JSON.stringify({ signalIds: Array.from(state.selected), force: true }) }); state.selected.clear(); await Promise.all([loadStatus(), loadSignals()]); } catch (error) { setInboxState(error.message, 'error'); } });
+
+  window.setInterval(() => {
+    if (document.hidden) return;
+    Promise.all([loadStatus(), loadSignals({ silent: true })]).catch(() => {});
+  }, 60_000);
 
   Promise.all([loadStatus(), loadSignals(), loadRuns()]).catch((error) => setInboxState(error.message, 'error'));
 })();

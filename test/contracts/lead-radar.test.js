@@ -38,6 +38,9 @@ test('Lead Radar bouwt kleine Facebook- en Instagram-queryfamilies met regionale
 
   const custom = buildSearchPlan({ platforms: ['instagram'], regions: ['Oisterwijk', 'Noord-Brabant'], keywordGroups: ['direct_website'] });
   assert.deepEqual([...new Set(custom.map((item) => item.region))].sort(), ['Noord-Brabant', 'Oisterwijk']);
+
+  const recent = buildSearchPlan({ platforms: ['facebook'], regions: ['Nederland'], keywordGroups: ['direct_website'], maxAgeDays: 7 });
+  assert.ok(recent.every((item) => / after:\d{4}-\d{2}-\d{2}$/.test(item.query)));
 });
 
 test('Lead Radar scoreert directe en recente websitevragen hoger', () => {
@@ -78,11 +81,13 @@ test('Lead Radar registreert beveiligde adminroutes en geen outbound-acties', ()
   const service = {
     getStatus: async () => ({}), listSignals: async () => ({}), getSignal: async () => ({}),
     updateSignal: async () => ({}), importSignal: async () => ({ created: true }), runScan: async () => ({}),
+    runScheduledScan: async () => ({ skipped: true }),
     listRuns: async () => [], lookupWebsite: async () => ({}), bulkLookupWebsite: async () => [],
   };
   const adminGuard = () => {};
   registerLeadRadarRoutes(app, { service, requirePremiumAdminApiAccess: adminGuard });
   assert.deepEqual(routes.map((item) => `${item.method.toUpperCase()} ${item.route}`), [
+    'GET /api/lead-radar/cron',
     'GET /api/lead-radar/status',
     'GET /api/lead-radar/signals',
     'GET /api/lead-radar/signals/:id',
@@ -93,7 +98,8 @@ test('Lead Radar registreert beveiligde adminroutes en geen outbound-acties', ()
     'POST /api/lead-radar/signals/:id/website-lookup',
     'POST /api/lead-radar/website-lookup',
   ]);
-  assert.ok(routes.every((item) => item.handlers.includes(adminGuard)));
+  assert.ok(routes.filter((item) => item.route !== '/api/lead-radar/cron').every((item) => item.handlers.includes(adminGuard)));
+  assert.ok(routes.find((item) => item.route === '/api/lead-radar/cron').handlers.length >= 2);
   const routeSource = readRepoFile('server/routes/lead-radar.js');
   assert.doesNotMatch(routeSource, /facebook.*message|instagram.*message|sendMessage|postComment/i);
 });
@@ -109,6 +115,9 @@ test('Lead Radar migration is service-role-only and has one canonical website st
     assert.match(migration, new RegExp(status));
   }
   assert.doesNotMatch(migration, /grant .* to anon|grant .* to authenticated/i);
+  const automaticMigration = readRepoFile('supabase/migrations/20260817130000_softora_social_lead_radar_automatic_scans.sql');
+  assert.match(automaticMigration, /add column if not exists scan_mode/i);
+  assert.match(automaticMigration, /scan_mode in \('manual', 'automatic'\)/i);
 });
 
 test('Lead Radar page, sidebar and user-visible website labels are wired', () => {
@@ -127,4 +136,17 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /no_website_found: 'GEEN WEBSITE GEVONDEN'/);
   assert.match(script, /Open originele post/);
   assert.match(script, /Website zoeken/);
+  assert.match(script, /setInterval/);
+  assert.match(page, /id="auto-scan-status"/);
+});
+
+test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
+  const htmlPages = readRepoFile('server/services/html-pages.js');
+  const vercel = readRepoFile('vercel.json');
+  const envExample = readRepoFile('.env.example');
+  assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260817a'/);
+  assert.match(htmlPages, /assets\/lead-radar-sidebar\.js\?v=\$\{LEAD_RADAR_SIDEBAR_VERSION\}/);
+  assert.match(vercel, /"path": "\/api\/lead-radar\/cron"/);
+  assert.match(vercel, /"schedule": "\*\/15 \* \* \* \*"/);
+  assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_INTERVAL_MINUTES=15/);
 });
