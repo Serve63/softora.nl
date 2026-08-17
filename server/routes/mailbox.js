@@ -53,6 +53,10 @@ function registerMailboxRoutes(app, deps = {}) {
   app.get('/api/mailbox/campaign-replies', requireAdmin, (req, res) =>
     coordinator.campaignRepliesResponse(req, res)
   );
+  app.get('/api/mailbox/search', requireAdmin, (req, res) => coordinator.searchMailboxResponse(req, res));
+  app.get('/api/mailbox/contact-timeline', requireAdmin, (req, res) =>
+    coordinator.contactTimelineResponse(req, res)
+  );
   app.get('/api/mailbox/messages', requireAdmin, (req, res) => coordinator.listMessagesResponse(req, res));
   app.get('/api/mailbox/message', requireAdmin, (req, res) => coordinator.getMessageResponse(req, res));
   app.post('/api/mailbox/provider-thread-audit', requireAdmin, (req, res) => coordinator.providerThreadAuditResponse(req, res));
