@@ -122,7 +122,7 @@ const {
   EXCLUDED_DATABASE_STATUSES,
   MARTIJN_LINKEDIN_CTA_PATTERN,
   MAX_COLDMAIL_RADIUS_KM,
-  PERSONAL_MAILBOX_DOMAINS,
+  PERSONAL_MAILBOX_DOMAINS, SHARED_MAILBOX_DOMAINS,
   TEST_RECIPIENT_COMPANIES,
   TEST_RECIPIENT_EMAILS,
   TEST_RECIPIENT_LOOKUP_EMAILS,
@@ -328,8 +328,8 @@ function createColdmailCampaignService(deps = {}) {
     dataOpsStore,
     getConfiguredSenderEmails: () => getConfiguredSenderEmails(),
     getAllowedSenderEmails: () => getAllowedSenderEmails(),
-    getRowEmail, getRowCompany, isTestRecipientRow, normalizeEmailAddress,
-    normalizeContactStatus, normalizeString,
+    getRowEmail, getRowCompany, getRowDomain, isTestRecipientRow, normalizeEmailAddress,
+    isSharedMailboxDomain: (domain) => SHARED_MAILBOX_DOMAINS.has(normalizeString(domain).toLowerCase()), normalizeContactStatus, normalizeString,
   });
 
   const loadCriticalUiState = autopilotResilience.createCriticalUiStateReader({ getUiStateValues, sleep });

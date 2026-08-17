@@ -219,6 +219,52 @@ test('data ops historical outbound lookup returns null on mailbox read failure',
   assert.equal(matches, null);
 });
 
+test('data ops historical outbound lookup matches another recipient on the same business domain', async () => {
+  const calls = [];
+  const rowsBySearch = new Map([
+    ['%nieuw@historisch.example%', []],
+    ['%@historisch.example%', [
+      {
+        message_key: 'same-business-domain',
+        folder: 'sent',
+        recipients_text: 'Oud contact <oud@historisch.example>',
+        date: '2026-07-01T10:00:00.000Z',
+      },
+      {
+        message_key: 'domain-substring-only',
+        folder: 'sent',
+        recipients_text: 'contact@anderhistorisch.example',
+        date: '2026-07-02T10:00:00.000Z',
+      },
+    ]],
+  ]);
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        let search = '';
+        const query = {
+          select() { return query; },
+          in() { return query; },
+          ilike(_column, value) { search = value; calls.push(value); return query; },
+          order() { return query; },
+          limit() { return Promise.resolve({ data: rowsBySearch.get(search) || [], error: null }); },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+  });
+
+  const matches = await store.listHistoricalOutboundMailboxMessagesByRecipientEmails({
+    recipientEmails: ['nieuw@historisch.example'],
+    recipientDomains: ['historisch.example'],
+  });
+
+  assert.deepEqual(calls, ['%nieuw@historisch.example%', '%@historisch.example%']);
+  assert.deepEqual(matches.map((row) => row.message_key), ['same-business-domain']);
+});
+
 test('data ops historical outbound lookup paginates past substring candidates to an older exact recipient', async () => {
   const candidateRows = Array.from({ length: 50 }, (_, index) => ({
     message_key: `substring-${index}`,

@@ -5,7 +5,9 @@ function createColdmailHistoricalOutboundGuard(deps = {}) {
     getAllowedSenderEmails,
     getRowEmail,
     getRowCompany,
+    getRowDomain,
     isTestRecipientRow,
+    isSharedMailboxDomain,
     normalizeEmailAddress,
     normalizeContactStatus,
     normalizeString,
@@ -16,6 +18,30 @@ function createColdmailHistoricalOutboundGuard(deps = {}) {
     error.code = 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE';
     error.status = 503;
     return error;
+  }
+
+  function normalizeDomain(value) {
+    const raw = normalizeString(value).toLowerCase();
+    if (!raw) return '';
+    const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      return normalizeString(new URL(candidate).hostname).toLowerCase().replace(/^www\./, '');
+    } catch (_error) {
+      return raw
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .split(/[/?#]/)[0];
+    }
+  }
+
+  function getBusinessDomains(row, email) {
+    const domains = [
+      normalizeDomain(typeof getRowDomain === 'function' ? getRowDomain(row) : ''),
+      normalizeDomain(normalizeEmailAddress(email).split('@')[1] || ''),
+    ];
+    return Array.from(new Set(domains.filter((domain) =>
+      domain && !(typeof isSharedMailboxDomain === 'function' && isSharedMailboxDomain(domain))
+    )));
   }
 
   function hasPriorOutboundMailSignal(row) {
@@ -66,6 +92,7 @@ function createColdmailHistoricalOutboundGuard(deps = {}) {
     }
     const messages = await dataOpsStore.listHistoricalOutboundMailboxMessagesByRecipientEmails({
       recipientEmails: [email],
+      recipientDomains: getBusinessDomains(row, email),
       folders: ['sent', 'coldmail', 'instantly'],
     });
     if (!Array.isArray(messages)) {

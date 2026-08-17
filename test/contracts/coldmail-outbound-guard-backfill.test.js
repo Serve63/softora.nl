@@ -199,7 +199,7 @@ test('coldmail outbound guard backfill inserts only absent guards and promotes e
   ]), []);
 });
 
-test('coldmail outbound guard backfill keeps unknown recipients email-only', () => {
+test('coldmail outbound guard backfill protects the business domain for unknown recipients', () => {
   const events = buildHistoricalMailboxOutboundEvents([
     {
       message_key: 'history-unknown-recipient',
@@ -213,6 +213,24 @@ test('coldmail outbound guard backfill keeps unknown recipients email-only', () 
 
   assert.deepEqual(events[0].keyRows.map((row) => row.guardKey), [
     'email:unknown@shared-or-foreign.example',
+    'domain:shared-or-foreign-example',
+  ]);
+});
+
+test('coldmail outbound guard backfill keeps unknown shared-mailbox recipients email-only', () => {
+  const events = buildHistoricalMailboxOutboundEvents([
+    {
+      message_key: 'history-unknown-shared-recipient',
+      account_email: 'serve@softora.nl',
+      folder: 'sent',
+      recipients_text: 'unknown@gmail.com',
+      subject: 'Eerdere mail',
+      date: '2026-08-01T10:00:00.000Z',
+    },
+  ], buildCustomerIndexes([]));
+
+  assert.deepEqual(events[0].keyRows.map((row) => row.guardKey), [
+    'email:unknown@gmail.com',
   ]);
 });
 
