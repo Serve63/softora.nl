@@ -566,6 +566,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       },
       leadRadar: {
         env,
+        cronSecret: env.CRON_SECRET || '',
         fetchImpl: globalThis.fetch,
         getSupabaseClient: platformRuntime.getSupabaseClient,
         isSupabaseConfigured: platformRuntime.isSupabaseConfigured,

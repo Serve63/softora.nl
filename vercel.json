@@ -98,6 +98,10 @@
     {
       "path": "/api/google-ads/daily-run",
       "schedule": "15 6 * * 1-5"
+    },
+    {
+      "path": "/api/lead-radar/cron",
+      "schedule": "*/15 * * * *"
     }
   ],
   "headers": [

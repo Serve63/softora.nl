@@ -20,6 +20,20 @@ function registerLeadRadarRoutes(app, deps = {}) {
   const requireAdmin = typeof deps.requirePremiumAdminApiAccess === 'function'
     ? deps.requirePremiumAdminApiAccess
     : passThrough;
+  const cronSecret = String(deps.cronSecret || process.env.CRON_SECRET || '').trim();
+
+  function requireCronAccess(req, res, next) {
+    if (!cronSecret) return res.status(503).json({ ok: false, error: 'Lead Radar-cron is niet geconfigureerd.' });
+    if (String(req.headers?.authorization || '').trim() !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ ok: false, error: 'Lead Radar-cron geweigerd.' });
+    }
+    return next();
+  }
+
+  app.get('/api/lead-radar/cron', requireCronAccess, async (_req, res) => {
+    try { return res.json({ ok: true, ...(await service.runScheduledScan()) }); }
+    catch (error) { return sendError(res, error); }
+  });
 
   app.get('/api/lead-radar/status', requireAdmin, async (_req, res) => {
     try { return res.json({ ok: true, ...(await service.getStatus()) }); }
