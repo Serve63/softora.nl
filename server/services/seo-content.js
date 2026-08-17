@@ -670,11 +670,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
       Object.freeze({ label: 'AI automatisering startgids', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
-      Object.freeze({
-        label: 'AI telefonist voor afspraakintake',
-        href: '/blog/ai-telefonist-voor-afspraakintake',
-        availableFrom: '2026-05-29',
-      }),
+      Object.freeze({ label: 'AI telefonist voor afspraakintake', href: '/blog/ai-telefonist-voor-afspraakintake', availableFrom: '2026-05-29' }),
+      Object.freeze({ label: 'Kosten en scope van een AI telefonist', href: '/blog/ai-telefonist-kosten-mkb', availableFrom: '2026-08-17' }),
     ]),
   }),
   Object.freeze({
@@ -843,6 +840,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'Wat is een AI telefonist?', href: '/kennisbank/wat-is-een-ai-telefonist' }),
       Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
+      Object.freeze({ label: 'Kosten van een AI telefonist', href: '/blog/ai-telefonist-kosten-mkb', availableFrom: '2026-08-17' }),
     ]),
   }),
   ...SEO_CONTENT_QUALITY_V2_ITEMS,

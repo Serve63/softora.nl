@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-11",
+  "updatedAt": "2026-08-17",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1093,7 +1093,9 @@
     },
     {
       "id": "voice-cost-011",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-17",
+      "shippedPath": "/blog/ai-telefonist-kosten-mkb",
       "path": "/blog/ai-telefonist-kosten-mkb",
       "contentType": "blog",
       "cluster": "ai-contact",
@@ -1109,17 +1111,40 @@
           "source": "Softora SEO-contentinventaris",
           "observedAt": "2026-07-17",
           "detail": "De site vergelijkt met een receptionist en behandelt afspraakintake en overdracht, maar mist een pagina over inrichting, belgebruik, koppelingen en beheer."
+        },
+        {
+          "type": "gsc",
+          "source": "GSC 28 dagen tot en met 2026-08-16",
+          "observedAt": "2026-08-17",
+          "detail": "De niet-merkgebonden zoekopdracht ai telefonist had 3 impressies en gemiddelde positie 12.67. De money page /ai-telefonist had 1 impressie en gemiddelde positie 3, maar een aparte kosten- en scopepagina ontbrak."
+        },
+        {
+          "type": "current-serp-and-direct-pricing",
+          "source": "Nederlandse SERP voor ai telefonist kosten en directe prijspagina's van MOISEN, NeemtOp, Ringover en Bellen.ai",
+          "observedAt": "2026-08-17",
+          "detail": "Actuele aanbieders tonen verschillende combinaties van inrichting, abonnement, belminuten en koppelingen. Dat bevestigt de buyer task om voorstellen eerst op gelijke gesprekstaak, gebruikseenheden, overdracht en beheer te normaliseren; de publicatie neemt geen prijsband of marktgemiddelde over."
+        },
+        {
+          "type": "primary-source",
+          "source": "Retell AI pricing en webhookdocumentatie, Twilio Voice-prijzen Nederland en Europese Commissie-richtlijnen voor AI-transparantie",
+          "observedAt": "2026-08-17",
+          "detail": "De bronnen maken afzonderlijke voice-, telefonie-, add-on-, event- en overdrachtscomponenten controleerbaar en ondersteunen een aparte begrotingslaag voor gebruik, integratie, transparantie en menselijke overdracht."
         }
       ],
+      "competitorPatterns": [
+        "Minuut- of pakketprijzen zonder dezelfde gesprekstaak, gemiddelde duur en piekbelasting",
+        "Functielijsten waarin telefonie, modelgebruik, integraties, overdracht en beheer door elkaar lopen",
+        "Besparings- of bereikbaarheidstaal zonder controleerbare nulmeting, foutpad en menselijke eigenaar"
+      ],
       "overlap": {
-        "checkedAt": "2026-07-17",
+        "checkedAt": "2026-08-17",
         "closestPaths": [
           "/vergelijkingen/ai-telefonist-vs-receptionist",
           "/blog/ai-telefonist-voor-afspraakintake",
           "/kennisbank/wat-is-een-ai-telefonist"
         ],
         "decision": "distinct",
-        "rationale": "De kandidaat behandelt kostenstructuur en scope, niet definitie, use case of personeelsvergelijking."
+        "rationale": "De vergelijking verdeelt gesprekken tussen mens en AI, de afspraakpagina behandelt één intake-use-case en de kennisbank geeft de definitie. Deze publicatie behandelt uitsluitend de vijf begrotingslagen, belvolumescenario's, gebruikseenheden, acceptatie en beheer voor een gekozen gesprekstaak."
       },
       "scores": {
         "businessFit": 5,
@@ -1167,7 +1192,7 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Verifieer actuele kostendrijvers en gebruik geen prijsclaim zonder interne bron."
+      "nextAction": "Controleer indexatie en de eerste niet-merkgebonden impressies op 2026-08-31, 2026-09-14 en 2026-10-12; toets daarna of de belminutenkaart een aantoonbare route naar /ai-telefonist ondersteunt."
     },
     {
       "id": "voice-comparison-012",
@@ -2015,6 +2040,95 @@
         ]
       },
       "nextAction": "Controleer platformneutrale buyer questions en schrijf de toegangsmatrix zonder productspecifieke instellingen of absolute securityclaims."
+    },
+    {
+      "id": "voice-crm-integration-025",
+      "status": "ready",
+      "path": "/kennisbank/ai-telefonist-crm-koppeling",
+      "contentType": "kennisbank",
+      "cluster": "ai-contact",
+      "primaryQuery": "ai telefonist crm koppeling",
+      "intent": "Gespreksuitkomsten gecontroleerd naar CRM, agenda of taken doorzetten",
+      "intentClass": "integration",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-telefonist",
+      "clusterRole": "Integratie- en herstelgids tussen een afgerond telefoongesprek en gecontroleerde opvolging in het bedrijfssysteem",
+      "demandEvidence": [
+        {
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP voor AI telefonist CRM koppeling",
+          "observedAt": "2026-08-17",
+          "detail": "Actuele Nederlandse aanbiederspagina's van NeemtOp, Next Telecom en Whisper noemen CRM-, agenda- en telefoniekoppelingen als concrete kooptaal, maar werken de datavelden, dubbele levering, mislukte acties en menselijke herstelbeslissing niet leveranciersneutraal uit."
+        },
+        {
+          "type": "primary-source",
+          "source": "Retell AI Docs over call webhooks en call transfer events",
+          "observedAt": "2026-08-17",
+          "detail": "De documentatie onderscheidt onder meer call_started, call_ended, call_analyzed en overdrachtsevents, beschrijft retries en ondertekening en noemt CRM-updates als integratietoepassing. Dit ondersteunt een buyer task rond eventkeuze, afzendercontrole, idempotentie en herstel."
+        }
+      ],
+      "competitorPatterns": [
+        "Integratielogo's zonder veldmapping, leidend systeem of schrijfbevoegdheid",
+        "Automatische CRM-opvolging zonder duplicate-, timeout- en herstelpad",
+        "Technische webhookuitleg zonder proceseigenaar, acceptatiescenario en menselijke controle"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-17",
+        "closestPaths": [
+          "/blog/ai-telefonist-voor-afspraakintake",
+          "/blog/ai-telefonist-kosten-mkb",
+          "/kennisbank/wat-is-een-crm-integratie"
+        ],
+        "decision": "distinct",
+        "rationale": "De afspraakpagina behandelt de informatievraag in het gesprek, de kostengids begroot de totale telefonieflow en de CRM-definitie legt een algemene integratie uit. Deze kandidaat behandelt uitsluitend welke call-events en gegevens veilig naar CRM of agenda gaan, hoe dubbele of mislukte levering wordt hersteld en wanneer een mens beslist."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.55,
+      "brief": {
+        "title": "AI telefonist koppelen aan CRM of agenda",
+        "metaDescription": "Bepaal welke gespreksuitkomsten naar CRM of agenda gaan, welke velden leidend zijn en hoe je dubbele, mislukte en onzekere acties herstelt.",
+        "h1": "Hoe koppel je een AI telefonist veilig aan CRM of agenda?",
+        "outline": [
+          "Begin bij de uitkomst van één gesprekstaak",
+          "Kies call-events en minimale datavelden",
+          "Leg leidend systeem, rechten en duplicatecontrole vast",
+          "Ontwerp time-out, retry en menselijke herstelwachtrij",
+          "Test normale, dubbele en mislukte opvolging vóór livegang"
+        ],
+        "buyerQuestions": [
+          "Welke gespreksgegevens horen in CRM?",
+          "Wanneer mag een AI telefonist direct een afspraak boeken?",
+          "Hoe voorkom je dubbele leads of taken na een webhookretry?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-telefonist-voor-afspraakintake",
+          "/blog/ai-telefonist-kosten-mkb"
+        ],
+        "outgoingLinks": [
+          "/ai-telefonist",
+          "/kennisbank/wat-is-een-crm-integratie"
+        ],
+        "conversionPath": "Van event- en veldmapping naar een scopegesprek over één controleerbare AI-telefonieflow met herstel en menselijke eigenaar.",
+        "claimRisk": "Geen foutloze koppeling, volledige beveiliging, autonome boeking of compliance beloven; benoem leveranciersevents, minimale data, menselijke goedkeuring en specialistisch advies waar nodig.",
+        "visualConcepts": [
+          "Eventkaart van gesprekseinde via validatie en duplicatecontrole naar CRM, agenda of herstelwachtrij",
+          "Veldmapping met bron, doel, leidend systeem, toegestane actie en menselijke eigenaar"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig actuele Nederlandse buyer questions en werk de event- en veldmapping leveranciersneutraal uit met retries, idempotentie, herstelwachtrij en menselijke acceptatie."
     }
   ]
 }
