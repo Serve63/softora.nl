@@ -46,15 +46,6 @@
     banner.innerHTML = `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Handmatige import en websitecontrole van bestaande leads blijven beschikbaar.</span>`;
   }
 
-  function renderAutoScanStatus() {
-    const element = $('#auto-scan-status');
-    if (!element) return;
-    // Automatische rondes zijn tijdelijk gepauzeerd. De gebruiker start iedere
-    // begrensde ronde bewust zelf, zodat er geen onverwachte providerkosten zijn.
-    element.textContent = 'Automatische scan staat uit. Nieuwe rondes starten alleen na een klik op Scan starten.';
-    element.className = 'auto-scan-status auto-scan-status--muted';
-  }
-
   function renderMetrics() {
     const counts = state.status && state.status.counts || {};
     [['#metric-total', counts.total], ['#metric-new', counts.new], ['#metric-no-website', counts.noWebsiteFound], ['#metric-website', counts.websiteFound]].forEach(([selector, value]) => { const element = $(selector); if (element) element.textContent = value == null ? '-' : Number(value).toLocaleString('nl-NL'); });
@@ -111,7 +102,7 @@
     return params.toString();
   }
 
-  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); renderAutoScanStatus(); }
+  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); }
   async function loadSignals({ silent = false } = {}) {
     if (!silent) setInboxState('Signalen laden...', '');
     try { const body = await api(`/api/lead-radar/signals?${getFilters()}`); state.signals = body.signals || []; state.total = Number(body.total) || 0; renderSignals(); }

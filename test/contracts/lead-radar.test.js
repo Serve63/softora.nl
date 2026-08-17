@@ -376,11 +376,11 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /Website zoeken/);
   assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
-  assert.match(page, /id="auto-scan-status"/);
-  assert.match(page, /Automatische scan staat uit/);
+  assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
   assert.doesNotMatch(script, /Automatisch actief/);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260817g/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260817g/);
+  assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260817h/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260817h/);
   assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
   assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
   assert.match(page, /id="scan-max-age-days"/);
