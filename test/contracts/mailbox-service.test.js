@@ -3867,8 +3867,8 @@ test('mailbox cron supplements normal folders with campaign inbox recovery and t
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(requestedFolders, [
-    'inbox',
     'sent',
+    'inbox',
     'inbox',
     CAMPAIGN_GMAIL_LABEL_FOLDER,
     CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,

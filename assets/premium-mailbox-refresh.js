@@ -7,7 +7,7 @@
   const REFRESH_REQUEST_TIMEOUT_MS = 75 * 1000;
   const REFRESH_MAX_ATTEMPTS = 2;
   const REFRESH_RETRY_BASE_DELAY_MS = 500;
-  const RECOVERY_REFRESH_INTERVAL_MS = 15 * 1000;
+  const RECOVERY_REFRESH_INTERVAL_MS = 60 * 1000;
 
   function formatRefreshAge(lastRefreshAt, currentTime = Date.now()) {
     if (!Number.isFinite(Number(lastRefreshAt)) || Number(lastRefreshAt) <= 0) return '';

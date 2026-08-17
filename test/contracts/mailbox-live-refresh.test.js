@@ -6,6 +6,7 @@ const {
   createMailboxSyncService,
   INCREMENTAL_LOCK_RETRY_ATTEMPTS,
   MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
+  REGULAR_CRON_LOCK_RETRY_ATTEMPTS,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
   syncMailboxRequest,
@@ -135,9 +136,16 @@ test('mailbox cron houdt normale sync binnen runtime en voegt campaign-inboxreco
 
   assert.deepEqual(calls, [
     {
-      accountEmail: '',
-      owner: '',
-      folders: ['inbox', 'sent'],
+      folders: ['sent'],
+      limit: 30,
+      force: false,
+      campaignOnly: false,
+      incrementalOnly: false,
+      retryContention: true,
+      maxConcurrentAccounts: 2,
+    },
+    {
+      folders: ['inbox'],
       limit: 30,
       force: false,
       campaignOnly: false,
@@ -153,7 +161,50 @@ test('mailbox cron houdt normale sync binnen runtime en voegt campaign-inboxreco
       maxConcurrentAccounts: 2,
     },
   ]);
-  assert.equal(result.results.length, 2);
+  assert.equal(result.results.length, 3);
+});
+
+test('mailbox cron waits for sent capacity before starting lower-priority work', async () => {
+  const selected = account('martijnven123@gmail.com');
+  const waits = [];
+  let lockAttempts = 0;
+  let fetches = 0;
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => {
+        lockAttempts += 1;
+        if (lockAttempts < 3) return { ok: false, locked: true, contention: 'capacity' };
+        return { ok: true, lockToken: 'sent-cron-lock' };
+      },
+      finishSync: async () => ({ ok: true }),
+      getSyncState: async () => ({ status: 'error', last_uid: 715 }),
+      upsertMessages: async () => ({ ok: true, upserted: 1 }),
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => {
+      fetches += 1;
+      return [{ uid: 715 }];
+    },
+    getSafeLimit: (value) => Number(value) || 30,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    waitForIncrementalLockRetry: async (delayMs) => waits.push(delayMs),
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailbox({
+    folders: ['sent'],
+    retryContention: true,
+    maxConcurrentAccounts: 2,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(lockAttempts, 3);
+  assert.deepEqual(waits, [500, 500]);
+  assert.equal(fetches, 1);
+  assert.equal(REGULAR_CRON_LOCK_RETRY_ATTEMPTS, 150);
 });
 
 test('incremental IMAP refresh skips expensive history scans but retains exact UID dedupe', async () => {
@@ -624,7 +675,7 @@ test('refresh status is exclusive while active, successful, partial and failed',
   controller.destroy();
 });
 
-test('zichtbare mailbox herstelt na een storing binnen vijftien seconden', async () => {
+test('zichtbare mailbox geeft providerlocks na een storing een volle minuut herstelruimte', async () => {
   assert.equal(refreshModule.REFRESH_REQUEST_TIMEOUT_MS, 75_000);
   const timers = [];
   const controller = refreshModule.create({
@@ -643,7 +694,7 @@ test('zichtbare mailbox herstelt na een storing binnen vijftien seconden', async
   await timers.at(-1).handler();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(timers.at(-1).delay, refreshModule.RECOVERY_REFRESH_INTERVAL_MS);
-  assert.equal(refreshModule.RECOVERY_REFRESH_INTERVAL_MS, 15_000);
+  assert.equal(refreshModule.RECOVERY_REFRESH_INTERVAL_MS, 60_000);
   controller.destroy();
 });
 
