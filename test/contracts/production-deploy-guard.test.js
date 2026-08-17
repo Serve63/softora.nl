@@ -78,6 +78,9 @@ test('production deploy scripts and docs force the safe deployment path', () => 
   assert.match(deployScript, /@img\/sharp-libvips-linux-x64/);
   assert.match(deployScript, /@img\/sharp-linux-arm64/);
   assert.match(deployScript, /@img\/sharp-libvips-linux-arm64/);
-  assert.match(deployScript, /deploy', '--prebuilt', '--prod', '--yes'/);
+  assert.match(
+    deployScript,
+    /'deploy',\s*'--prebuilt',\s*'--archive=tgz',\s*'--prod',\s*'--yes'/
+  );
   assert.match(deployScript, /check:live-production-version/);
 });

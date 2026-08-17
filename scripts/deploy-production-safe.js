@@ -174,5 +174,12 @@ run('Vercel productie-build', npxCmd, ['vercel', 'build', '--prod']);
 restoreKnownProductionBuildSideEffects();
 installVercelSharpLinuxOutput();
 assertSafeProductionDeploySource();
-run('Vercel productie-deploy', npxCmd, ['vercel', 'deploy', '--prebuilt', '--prod', '--yes']);
+run('Vercel productie-deploy', npxCmd, [
+  'vercel',
+  'deploy',
+  '--prebuilt',
+  '--archive=tgz',
+  '--prod',
+  '--yes',
+]);
 run('live productieversie controleren', npmCmd, ['run', 'check:live-production-version']);
