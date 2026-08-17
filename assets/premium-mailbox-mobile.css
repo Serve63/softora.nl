@@ -280,18 +280,26 @@
   .compose-attachment-chip button { width: 44px; height: 44px; }
   .compose-body { flex: 1 0 140px; min-height: 140px; }
   .compose-body textarea { min-height: 140px; padding: 16px; }
-  .compose-footer { position: sticky; bottom: 0; min-height: calc(68px + env(safe-area-inset-bottom)); padding: 10px 12px max(10px, env(safe-area-inset-bottom)); background: var(--card); z-index: 3; }
+  .compose-footer { position: sticky; bottom: 0; min-height: calc(68px + env(safe-area-inset-bottom)); padding: 10px 12px max(10px, env(safe-area-inset-bottom)); background: var(--card); z-index: 3; flex-wrap: wrap; }
   .compose-resize-zone { display: none; }
+  .compose-assist-actions { flex: 1 1 100%; }
+  .compose-footer-actions { flex: 1 1 100%; }
   .btn-rewrite-compose,
+  .btn-spellcheck-compose { flex: 1 1 0; min-width: 0; font-size: 12px; letter-spacing: .7px; }
+  .btn-rewrite-compose,
+  .btn-spellcheck-compose,
   .btn-send { min-height: 44px; padding: 10px 14px; }
+  .btn-send { width: 100%; }
 }
 
 @media (max-width: 360px) {
   .topbar-refresh-age { display: none; }
   .topbar-title-wrap { max-width: calc(100% - 44px); }
-  .compose-footer { align-items: stretch; }
+  .compose-footer { align-items: stretch; flex-direction: column; }
+  .compose-assist-actions,
   .compose-footer-actions { flex: 1; }
   .btn-rewrite-compose,
+  .btn-spellcheck-compose,
   .btn-send { width: 100%; }
 }
 

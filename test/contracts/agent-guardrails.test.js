@@ -93,6 +93,22 @@ test('mailbox PostgreSQL-verificatie blijft dev-only en exact reproduceerbaar', 
   assert.equal(packageJson.dependencies['pgsql-parser'], undefined);
 });
 
+test('mailbox spellingscontrole blijft lokaal en activeert geen betaalde provider', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const spellingServiceSource = readRepoFile('server/services/mailbox-spelling.js');
+  const mailboxRoutesSource = readRepoFile('server/routes/mailbox.js');
+
+  assert.equal(packageJson.dependencies.nspell, '^2.1.5');
+  assert.equal(packageJson.dependencies['dictionary-nl'], '^2.0.0');
+  assert.match(spellingServiceSource, /import\('nspell'\)/);
+  assert.match(spellingServiceSource, /import\('dictionary-nl'\)/);
+  assert.doesNotMatch(spellingServiceSource, /openai|chat\.completions|fetch\s*\(|axios|https\.request/i);
+  assert.match(
+    mailboxRoutesSource,
+    /app\.post\('\/api\/mailbox\/spelling', requireAdmin, \(req, res\) =>/
+  );
+});
+
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],

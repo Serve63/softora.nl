@@ -3987,7 +3987,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
 
   assert.match(pageSource, /\.compose-head \{[\s\S]*background:\s*var\(--crimson\);/);
   assert.match(pageSource, /\.compose-footer \{[\s\S]*justify-content:\s*space-between;/);
-  assert.match(pageSource, /\.btn-rewrite-compose \{[\s\S]*color:\s*var\(--crimson\);/);
+  assert.match(pageSource, /\.btn-rewrite-compose,\s*\.btn-spellcheck-compose \{[\s\S]*color:\s*var\(--crimson\);/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie<\/button>/);
   assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" data-mailbox-compose-no-drag aria-label="Sluiten" title="Sluiten">×<\/button>/);
   assert.match(pageSource, /\.compose-x \{[^}]*z-index:\s*12;[^}]*width:\s*44px;[^}]*height:\s*44px;/);
@@ -3999,7 +3999,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817c/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });

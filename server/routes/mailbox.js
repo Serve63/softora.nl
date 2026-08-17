@@ -1,6 +1,9 @@
+const { createMailboxSpellingService } = require('../services/mailbox-spelling');
+
 function registerMailboxRoutes(app, deps = {}) {
   const coordinator = deps.coordinator;
   if (!coordinator) return;
+  const spellingService = deps.spellingService || createMailboxSpellingService({ logger: deps.logger });
   const requireAdmin =
     typeof deps.requirePremiumAdminApiAccess === 'function'
       ? deps.requirePremiumAdminApiAccess
@@ -102,6 +105,9 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/send', requireAdmin, (req, res) => coordinator.sendMessageResponse(req, res));
   app.post('/api/mailbox/rewrite', requireAdmin, (req, res) =>
     coordinator.rewriteDraftResponse(req, res)
+  );
+  app.post('/api/mailbox/spelling', requireAdmin, (req, res) =>
+    spellingService.correctDraftResponse(req, res)
   );
 }
 
