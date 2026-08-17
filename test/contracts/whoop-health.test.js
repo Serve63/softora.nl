@@ -402,6 +402,9 @@ test('WHOOP persists exchanged OAuth tokens before fallible profile enrichment',
   assert.equal(resumed.last_error, null);
   assert.ok(supabase.tables.softora_health_whoop_webhook_events
     .some((event) => event.event_type === 'internal.backfill'));
+  const backfill = supabase.tables.softora_health_whoop_webhook_events
+    .find((event) => event.event_type === 'internal.backfill');
+  assert.equal(backfill.resource_id, '2026-05-13');
 });
 
 test('WHOOP day formatting follows Europe/Amsterdam around daylight saving time', () => {
@@ -1027,6 +1030,102 @@ test('WHOOP backfill never leaps over a missing recovery day', async () => {
   assert.equal(result.lastContiguousRecoveryDay, '2026-08-10');
   assert.equal(supabase.tables.softora_health_whoop_connections[0].last_synced_day, '2026-08-10');
   assert.ok(result.nextRetryAt);
+});
+
+test('WHOOP resumed webhook cannot outrun the reauthorization backfill', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const nowIso = '2026-08-17T08:00:00.000Z';
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: new Date(nowIso).getTime() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+      last_synced_day: null,
+    })],
+    softora_health_whoop_webhook_events: [{
+      trace_id: 'resumed-before-backfill', whoop_user_id: 23320184, resource_id: 'recovery-old',
+      event_type: 'recovery.updated', status: 'retry', attempts: 0,
+      next_attempt_at: nowIso, received_at: '2026-08-11T07:00:00.000Z', last_error: null,
+    }, {
+      trace_id: 'internal-backfill-after-reauth', whoop_user_id: 23320184, resource_id: '2026-05-20',
+      event_type: 'internal.backfill', status: 'pending', attempts: 0,
+      next_attempt_at: nowIso, received_at: nowIso, last_error: null,
+    }],
+  });
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => createJsonResponse(200, {
+      records: String(url).includes('/recovery?') ? [{
+        cycle_id: 1707000000, user_id: 23320184,
+        created_at: '2026-08-17T08:00:00.000Z', score_state: 'SCORED',
+        score: { recovery_score: 80 },
+      }] : [],
+      next_token: '',
+    }),
+    now: () => new Date(nowIso),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const worker = await service.processWebhookQueue({ limit: 1 });
+  assert.equal(worker.processed, 1);
+  assert.equal(worker.results[0].result.targetDayComplete, true);
+  assert.equal(worker.results[0].result.recoveryRangeComplete, false);
+  assert.equal(worker.results[0].result.lastContiguousRecoveryDay, null);
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].last_synced_day, null);
+  assert.equal(supabase.tables.softora_health_whoop_webhook_events[1].status, 'pending');
+});
+
+test('WHOOP forced reauthorization backfill repairs stale progress before a gap', async () => {
+  const tokenEncryptionKey = crypto.randomBytes(32).toString('base64');
+  const nowIso = '2026-08-17T08:00:00.000Z';
+  const supabase = createMemorySupabase({
+    softora_health_whoop_connections: [createConnectedWhoopState(tokenEncryptionKey, {
+      encrypted_tokens: encryptWhoopTokens({
+        access_token: 'access-valid', refresh_token: 'refresh-valid',
+        expires_at: new Date(nowIso).getTime() + 3600000, scope: 'offline',
+      }, tokenEncryptionKey),
+      last_synced_day: '2026-08-17',
+    })],
+    softora_health_whoop_webhook_events: [{
+      trace_id: 'forced-backfill-repair', whoop_user_id: 23320184, resource_id: '2026-05-20',
+      event_type: 'internal.backfill', status: 'pending', attempts: 0,
+      next_attempt_at: nowIso, received_at: nowIso, last_error: null,
+    }],
+  });
+  const service = createWhoopHealthService({
+    getSupabaseClient: () => supabase,
+    fetchImpl: async (url) => createJsonResponse(200, {
+      records: String(url).includes('/recovery?') ? [
+        {
+          cycle_id: 1706990000, user_id: 23320184,
+          created_at: '2026-08-10T08:00:00.000Z', score_state: 'SCORED',
+          score: { recovery_score: 47 },
+        },
+        {
+          cycle_id: 1707000000, user_id: 23320184,
+          created_at: '2026-08-12T08:00:00.000Z', score_state: 'SCORED',
+          score: { recovery_score: 66 },
+        },
+      ] : [],
+      next_token: '',
+    }),
+    now: () => new Date(nowIso),
+    config: {
+      clientId: 'whoop-client', clientSecret: 'whoop-secret',
+      redirectUri: 'https://www.softora.nl/api/health/whoop/callback', tokenEncryptionKey,
+    },
+  });
+
+  const worker = await service.processWebhookQueue({ limit: 1 });
+  assert.equal(worker.processed, 1);
+  assert.equal(worker.results[0].result.recoveryRangeComplete, false);
+  assert.equal(worker.results[0].result.lastContiguousRecoveryDay, '2026-08-10');
+  assert.equal(supabase.tables.softora_health_whoop_connections[0].last_synced_day, '2026-08-10');
+  assert.ok(worker.results[0].result.nextRetryAt);
 });
 
 test('Google health sheet service replaces the five managed data ranges', async () => {
