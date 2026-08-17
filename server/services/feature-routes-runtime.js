@@ -29,6 +29,7 @@ const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerKvkDatabaseRoutes } = require('../routes/kvk-database');
+const { registerLeadRadarRoutes } = require('../routes/lead-radar');
 const {
   registerPremiumDatabaseMassResearchRoutes,
 } = require('../routes/premium-database-mass-research');
@@ -103,6 +104,7 @@ function registerFeatureRoutes(app, deps = {}) {
     seoReadCoordinator,
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
+    leadRadar = {},
     whoopHealth = {},
     whatsappReadOnly = {},
   } = deps;
@@ -287,6 +289,10 @@ function registerFeatureRoutes(app, deps = {}) {
     coordinator: kvkDatabaseSnapshotCoordinator,
     controlCoordinator: kvkDatabaseControlCoordinator,
     directoryCoordinator: kvkCompanyDirectoryCoordinator,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
+  registerLeadRadarRoutes(app, {
+    ...leadRadar,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerPremiumDatabaseMassResearchRoutes(app, {

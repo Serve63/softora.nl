@@ -50,6 +50,9 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   if (map.has('premium-kvk-company-directory-shell')) {
     map.set('kvk-database-bedrijven', map.get('premium-kvk-company-directory-shell'));
   }
+  if (map.has('premium-lead-radar-shell')) {
+    map.set('lead-radar', map.get('premium-lead-radar-shell'));
+  }
   if (map.has('sportschool')) {
     map.set('logboek', map.get('sportschool'));
   }
