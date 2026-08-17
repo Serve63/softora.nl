@@ -25,6 +25,15 @@
         const value = fallbackNormalize(status).toLowerCase();
         return value === "done" || value === "error" || value === "cancelled";
     }
+    function isSuccessfulCompletedBatch(batch) {
+        const status = fallbackNormalize(batch && batch.status).toLowerCase();
+        const total = Math.max(0, Number(batch && batch.total) || 0);
+        const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
+        const failed = Math.max(0, Number(batch && batch.failed) || 0);
+        const cancelled = Math.max(0, Number(batch && batch.cancelled) || 0);
+        const remaining = Math.max(0, total - made - failed - cancelled);
+        return status === "done" && total > 0 && made >= total && failed === 0 && cancelled === 0 && remaining === 0;
+    }
     function getBatchSortTime(batch) { return Math.max(0, Number(batch && (batch.finishedAt || batch.startedAt || batch.createdAt)) || 0); }
 
     function ensureStyles() {
@@ -305,6 +314,12 @@
             if (status === "cancelled") {
                 rememberCancelledBatch(batchId);
                 queuePhotoRefresh(batch);
+                hideStatus();
+                return;
+            }
+            if (isSuccessfulCompletedBatch(batch)) {
+                queuePhotoRefresh(batch);
+                rememberDismissedBatch(batchId);
                 hideStatus();
                 return;
             }

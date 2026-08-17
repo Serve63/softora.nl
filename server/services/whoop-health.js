@@ -1,4 +1,10 @@
 const crypto = require('crypto');
+const {
+  AUTH_REQUIRED_RETRY_DELAY_MS, DATA_SYNC_MIN_TOKEN_VALIDITY_MS, TOKEN_REFRESH_AHEAD_MS,
+  TOKEN_REFRESH_LOCK_MS, TOKEN_REQUEST_TIMEOUT_MS, TOKEN_WORKER_RETRY_DELAY_MS,
+  hasActiveLease, isAuthBlockedReason, isOperationFenceConflict,
+} = require('./whoop-token-policy');
+const { isCompleteRecoveryRecord, latestContiguousRecoveryDay, queuedSyncOptions, recoveryProgressOptions } = require('./whoop-recovery-completeness');
 
 const OWNER_KEY = 'serve';
 const TIMEZONE = 'Europe/Amsterdam';
@@ -6,9 +12,7 @@ const WHOOP_API_BASE = 'https://api.prod.whoop.com/developer/v2';
 const WHOOP_AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const WHOOP_WEBHOOK_TABLE = 'softora_health_whoop_webhook_events';
-const TOKEN_REQUEST_TIMEOUT_MS = 15000;
 const API_REQUEST_TIMEOUT_MS = 20000;
-const TOKEN_REFRESH_LOCK_MS = 60000;
 const SYNC_LOCK_MS = 15 * 60 * 1000;
 const WEBHOOK_CLAIM_MS = 15 * 60 * 1000;
 const WHOOP_SCOPES = [
@@ -164,7 +168,7 @@ function createWhoopHealthService(deps = {}) {
     return {
       access_token: data.access_token,
       refresh_token: data.refresh_token || previous.refresh_token,
-      expires_at: Date.now() + Math.max(300, Number(data.expires_in || 3600)) * 1000,
+      expires_at: now().getTime() + Math.max(300, Number(data.expires_in || 3600)) * 1000,
       scope: data.scope || previous.scope || WHOOP_SCOPES.join(' '),
     };
   }
@@ -176,7 +180,10 @@ function createWhoopHealthService(deps = {}) {
       p_lock_id: lockId,
       p_lock_ttl_seconds: Math.ceil(TOKEN_REFRESH_LOCK_MS / 1000),
     });
-    if (error) throw error;
+    if (error) {
+      if (isOperationFenceConflict(error, 'WHOOP_SYNC_ACTIVE')) return null;
+      throw error;
+    }
     const result = Array.isArray(data) ? data[0] : data;
     if (result?.acquired !== true || String(result.claimed_lock_id || '') !== lockId) return null;
     return {
@@ -221,7 +228,7 @@ function createWhoopHealthService(deps = {}) {
       if (!fresh?.encrypted_tokens) continue;
       if (fresh.encrypted_tokens !== previousEncryptedTokens) {
         const tokens = decryptTokens(fresh.encrypted_tokens);
-        if (Number(tokens.expires_at || 0) > Date.now() + 30000) return tokens.access_token;
+        if (Number(tokens.expires_at || 0) > now().getTime() + 30000) return tokens.access_token;
       }
       const lockUntil = new Date(fresh.token_refresh_lock_until || 0).getTime();
       if (Number.isFinite(lockUntil) && lockUntil > Date.now()) {
@@ -259,13 +266,31 @@ function createWhoopHealthService(deps = {}) {
     return true;
   }
 
-  async function validAccessToken(connection) {
+  async function validAccessToken(connection, options = {}) {
+    const refreshIfExpiresWithinMs = Math.max(
+      30000,
+      Number(options.refreshIfExpiresWithinMs || DATA_SYNC_MIN_TOKEN_VALIDITY_MS)
+        || DATA_SYNC_MIN_TOKEN_VALIDITY_MS
+    );
     const initialTokens = decryptTokens(connection.encrypted_tokens);
-    if (Number(initialTokens.expires_at || 0) > Date.now() + 120000) return initialTokens.access_token;
+    if (Number(initialTokens.expires_at || 0) > now().getTime() + refreshIfExpiresWithinMs) {
+      return initialTokens.access_token;
+    }
+    if (options.allowRefresh === false) {
+      const error = new Error('WHOOP-tokenvernieuwing wordt uitsluitend door de aparte tokenworker uitgevoerd.');
+      error.code = 'WHOOP_TOKEN_REFRESH_DEFERRED';
+      throw error;
+    }
 
     for (let claimAttempt = 0; claimAttempt < 2; claimAttempt += 1) {
       const lock = await claimTokenRefreshLock();
       if (!lock) {
+        const fresh = await getConnection();
+        if (hasActiveLease(fresh?.sync_lock_id, fresh?.sync_lock_until, now().getTime())) {
+          const error = new Error('WHOOP-tokenvernieuwing wacht tot de actieve datasync is afgerond.');
+          error.code = 'WHOOP_TOKEN_REFRESH_DEFERRED';
+          throw error;
+        }
         try {
           return await waitForPeerRefresh(connection.encrypted_tokens);
         } catch (error) {
@@ -276,9 +301,16 @@ function createWhoopHealthService(deps = {}) {
 
       let finalized = false;
       try {
-        const lockedConnection = lock.connection || await getConnection();
+        const lockedConnection = await getConnection();
+        if (hasActiveLease(lockedConnection?.sync_lock_id, lockedConnection?.sync_lock_until, now().getTime())) {
+          const error = new Error('WHOOP-tokenvernieuwing wacht tot de actieve datasync is afgerond.');
+          error.code = 'WHOOP_TOKEN_REFRESH_DEFERRED';
+          throw error;
+        }
         const lockedTokens = decryptTokens(lockedConnection.encrypted_tokens);
-        if (Number(lockedTokens.expires_at || 0) > Date.now() + 120000) return lockedTokens.access_token;
+        if (Number(lockedTokens.expires_at || 0) > now().getTime() + refreshIfExpiresWithinMs) {
+          return lockedTokens.access_token;
+        }
 
         let refreshed;
         try {
@@ -338,6 +370,38 @@ function createWhoopHealthService(deps = {}) {
       }
     }
     throw new Error('WHOOP-tokenvernieuwing kon binnen de veilige leasegrens niet worden bevestigd.');
+  }
+
+  async function maintainToken() {
+    const connection = await getConnection();
+    if (!connection?.encrypted_tokens || connection.status !== 'connected') {
+      return {
+        ok: true,
+        skipped: true,
+        reason: connection?.status === 'reauthorization_required'
+          ? 'whoop_reauthorization_required'
+          : (connection?.status === 'refresh_uncertain'
+              ? 'whoop_refresh_outcome_unknown'
+              : 'whoop_not_connected'),
+      };
+    }
+
+    const before = decryptTokens(connection.encrypted_tokens);
+    if (Number(before.expires_at || 0) > now().getTime() + TOKEN_REFRESH_AHEAD_MS) {
+      return { ok: true, skipped: true, reason: 'token_current', expiresAt: before.expires_at };
+    }
+
+    await validAccessToken(connection, {
+      allowRefresh: true,
+      refreshIfExpiresWithinMs: TOKEN_REFRESH_AHEAD_MS,
+    });
+    const fresh = await getConnection();
+    const after = decryptTokens(fresh.encrypted_tokens);
+    return {
+      ok: true,
+      refreshed: fresh.encrypted_tokens !== connection.encrypted_tokens,
+      expiresAt: after.expires_at,
+    };
   }
 
   async function whoopRequest(path, token) {
@@ -462,13 +526,31 @@ function createWhoopHealthService(deps = {}) {
     const { error } = await db().from(WHOOP_WEBHOOK_TABLE).upsert({
       trace_id: traceId,
       whoop_user_id: Number(userId || 0),
-      resource_id: '',
+      resource_id: addDays(today(), -89),
       event_type: 'internal.backfill',
       status: 'pending',
       attempts: 0,
       next_attempt_at: now().toISOString(),
       received_at: now().toISOString(),
     }, { onConflict: 'trace_id', ignoreDuplicates: true });
+    if (error) throw error;
+  }
+
+  async function resumeDeferredWebhookEvents() {
+    const { error } = await db().from(WHOOP_WEBHOOK_TABLE).update({
+      status: 'retry',
+      attempts: 0,
+      next_attempt_at: now().toISOString(),
+      processed_at: null,
+      last_error: null,
+    }).in('status', ['retry', 'dead']).in('last_error', [
+      'whoop_not_connected',
+      'whoop_reauthorization_required',
+      'whoop_refresh_outcome_unknown',
+      'WHOOP_REAUTHORIZATION_REQUIRED',
+      'WHOOP_REFRESH_OUTCOME_UNKNOWN',
+      'WHOOP-tokenvernieuwing is nog bezig; probeer de sync zo opnieuw.',
+    ]);
     if (error) throw error;
   }
 
@@ -488,6 +570,8 @@ function createWhoopHealthService(deps = {}) {
       scopes: String(tokens.scope || '').split(/\s+/).filter(Boolean),
       connected_at: now().toISOString(), oauth_state_hash: null,
       oauth_state_expires_at: null, last_sync_error: null,
+      last_sync_error_code: null, last_sync_status: null, last_sync_attempt: 0,
+      last_synced_day: null, next_retry_at: null,
       token_refresh_lock_id: null, token_refresh_lock_until: null,
       sync_lock_id: null, sync_lock_until: null,
     });
@@ -511,6 +595,7 @@ function createWhoopHealthService(deps = {}) {
       body_measurement: bodyMeasurement,
       last_sync_error: metadataError || null,
     });
+    await resumeDeferredWebhookEvents();
     await enqueueInternalBackfill(userId);
     return { ok: true, userId, profilePending: Boolean(metadataError) };
   }
@@ -526,14 +611,14 @@ function createWhoopHealthService(deps = {}) {
     return { records: records || [], runs: runs || [] };
   }
 
-  async function hasScoredRecoveryForDay(targetDay) {
+  async function hasCompleteRecoveryForDay(targetDay) {
     const { data, error } = await db()
       .from('softora_health_whoop_records')
       .select('source_id')
       .eq('owner_key', OWNER_KEY)
       .eq('source_type', 'recovery')
       .eq('local_day', targetDay)
-      .eq('score_state', 'SCORED')
+      .in('score_state', ['SCORED', 'UNSCORABLE'])
       .limit(1);
     if (error) throw error;
     return Array.isArray(data) && data.length > 0;
@@ -549,7 +634,10 @@ function createWhoopHealthService(deps = {}) {
       p_target_day: targetDay,
       p_attempt: attempt,
     });
-    if (error) throw error;
+    if (error) {
+      if (isOperationFenceConflict(error, 'WHOOP_TOKEN_REFRESH_ACTIVE')) return null;
+      throw error;
+    }
     const result = Array.isArray(data) ? data[0] : data;
     if (result?.acquired !== true || String(result.claimed_lock_id || '') !== lockId) return null;
     const connection = await getConnection();
@@ -614,7 +702,17 @@ function createWhoopHealthService(deps = {}) {
     let finalized = false;
     try {
       const lockedConnection = syncRun.connection || connection;
-      const token = await validAccessToken(lockedConnection);
+      if (hasActiveLease(
+        lockedConnection.token_refresh_lock_id, lockedConnection.token_refresh_lock_until, now().getTime()
+      )) {
+        const error = new Error('WHOOP-datasync wacht tot de aparte tokenworker is afgerond.');
+        error.code = 'WHOOP_TOKEN_REFRESH_DEFERRED';
+        throw error;
+      }
+      const token = await validAccessToken(lockedConnection, {
+        allowRefresh: false,
+        refreshIfExpiresWithinMs: DATA_SYNC_MIN_TOKEN_VALIDITY_MS,
+      });
       const backfillStartDay = String(
         options.startDay || (lockedConnection.last_synced_day
           ? addDays(String(lockedConnection.last_synced_day), 1)
@@ -646,7 +744,18 @@ function createWhoopHealthService(deps = {}) {
         ''
       );
       const targetDayStored = records.some((record) => record.local_day === targetDay);
-      const retryAt = targetDayStored
+      const completeRecoveryRecords = records.filter(isCompleteRecoveryRecord);
+      const lastCompleteRecoveryDay = completeRecoveryRecords.reduce(
+        (latest, record) => !latest || record.local_day > latest ? record.local_day : latest,
+        ''
+      );
+      const lastContiguousRecoveryDay = latestContiguousRecoveryDay(
+        records, options.resetProgress === true ? '' : String(lockedConnection.last_synced_day || ''),
+        recoveryProgressOptions(mode, backfillStartDay, targetDay)
+      );
+      const targetDayComplete = completeRecoveryRecords.some((record) => record.local_day === targetDay);
+      const recoveryRangeComplete = lastContiguousRecoveryDay === targetDay;
+      const retryAt = recoveryRangeComplete
         ? null
         : new Date(now().getTime() + 15 * 60 * 1000).toISOString();
       const syncedRecord = records.find((record) => Number(record.whoop_user_id || 0) > 0);
@@ -654,10 +763,10 @@ function createWhoopHealthService(deps = {}) {
         status: 'completed',
         recordsSeen: records.length,
         recordsUpserted: records.length,
-        errorCode: targetDayStored ? null : 'WHOOP_TARGET_DAY_MISSING',
-        errorMessage: targetDayStored ? null : 'WHOOP heeft voor de verwachte dag nog geen records bevestigd.',
+        errorCode: recoveryRangeComplete ? null : 'WHOOP_RECOVERY_RANGE_INCOMPLETE',
+        errorMessage: recoveryRangeComplete ? null : 'WHOOP heeft nog geen aaneengesloten complete recovery-reeks bevestigd.',
         nextRetryAt: retryAt,
-        lastSyncedDay: lastStoredDay || null,
+        lastSyncedDay: lastContiguousRecoveryDay || null,
         whoopUserId: syncedRecord ? Number(syncedRecord.whoop_user_id) : null,
       });
       finalized = true;
@@ -677,7 +786,11 @@ function createWhoopHealthService(deps = {}) {
         records: records.length,
         dataProgress: Boolean(lastStoredDay),
         targetDayStored,
+        targetDayComplete,
+        recoveryRangeComplete,
         lastStoredDay: lastStoredDay || null,
+        lastCompleteRecoveryDay: lastCompleteRecoveryDay || null,
+        lastContiguousRecoveryDay: lastContiguousRecoveryDay || null,
         nextRetryAt: retryAt,
         runId: syncRun.runId,
         sheet: sheetResult,
@@ -720,7 +833,7 @@ function createWhoopHealthService(deps = {}) {
         startDay: addDays(String(connection.last_synced_day), 1),
       });
     }
-    if (await hasScoredRecoveryForDay(targetDay)) {
+    if (await hasCompleteRecoveryForDay(targetDay)) {
       return { ok: true, skipped: true, reason: 'today_recovery_already_synced', targetDay };
     }
     return sync({ mode: 'reconcile', targetDay });
@@ -845,9 +958,7 @@ function createWhoopHealthService(deps = {}) {
       if (!event) continue;
       const attempts = Number(event.attempts || 0);
       try {
-        const result = event.event_type === 'internal.backfill'
-          ? await sync({ mode: 'backfill', targetDay: today() })
-          : await sync({ mode: 'webhook', targetDay: today() });
+        const result = await sync(queuedSyncOptions(event, today()));
         if (result?.skipped) {
           if (result.reason === 'sync_in_progress') {
             await updateClaimedWebhookEvent(event, {
@@ -855,6 +966,16 @@ function createWhoopHealthService(deps = {}) {
               attempts: Math.max(0, attempts - 1),
               next_attempt_at: new Date(now().getTime() + 60 * 1000).toISOString(),
               last_error: 'sync_in_progress',
+            });
+            results.push({ traceId: event.trace_id, ok: true, deferred: true, reason: result.reason });
+            continue;
+          }
+          if (isAuthBlockedReason(result.reason)) {
+            await updateClaimedWebhookEvent(event, {
+              status: 'retry',
+              attempts: Math.max(0, attempts - 1),
+              next_attempt_at: new Date(now().getTime() + AUTH_REQUIRED_RETRY_DELAY_MS).toISOString(),
+              last_error: result.reason,
             });
             results.push({ traceId: event.trace_id, ok: true, deferred: true, reason: result.reason });
             continue;
@@ -870,14 +991,26 @@ function createWhoopHealthService(deps = {}) {
       } catch (queueError) {
         const message = String(queueError.message || queueError).slice(0, 1000);
         const queueErrorCode = errorCode(queueError);
-        const terminal = attempts >= 8 || [
+        const deferred = [
+          'WHOOP_TOKEN_REFRESH_DEFERRED',
           'WHOOP_REAUTHORIZATION_REQUIRED',
           'WHOOP_REFRESH_OUTCOME_UNKNOWN',
-        ].includes(queueErrorCode) || [
-          'whoop_not_connected',
-          'whoop_reauthorization_required',
-          'whoop_refresh_outcome_unknown',
-        ].includes(message);
+        ].includes(queueErrorCode);
+        if (deferred) {
+          await updateClaimedWebhookEvent(event, {
+            status: 'retry',
+            attempts: Math.max(0, attempts - 1),
+            next_attempt_at: new Date(now().getTime() + (
+              queueErrorCode === 'WHOOP_TOKEN_REFRESH_DEFERRED'
+                ? TOKEN_WORKER_RETRY_DELAY_MS
+                : AUTH_REQUIRED_RETRY_DELAY_MS
+            )).toISOString(),
+            last_error: queueErrorCode,
+          });
+          results.push({ traceId: event.trace_id, ok: true, deferred: true, reason: queueErrorCode });
+          continue;
+        }
+        const terminal = attempts >= 8;
         const delaySeconds = Math.min(3600, 30 * (2 ** Math.max(0, attempts - 1)));
         await updateClaimedWebhookEvent(event, {
           status: terminal ? 'dead' : 'retry',
@@ -1051,6 +1184,7 @@ function createWhoopHealthService(deps = {}) {
     getDashboard,
     getStatus,
     processWebhookQueue,
+    maintainToken,
     reconcileToday,
     sync,
     syncTodayFallback,

@@ -84,12 +84,16 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/health/whoop/token-worker",
+      "schedule": "7,22,37,52 * * * *"
+    },
+    {
       "path": "/api/health/whoop/reconcile",
-      "schedule": "*/15 3-11 * * *"
+      "schedule": "11,26,41,56 3-11 * * *"
     },
     {
       "path": "/api/health/whoop/daily-sync",
-      "schedule": "0 10,11 * * *"
+      "schedule": "17 10,11 * * *"
     },
     {
       "path": "/api/google-ads/daily-run",
