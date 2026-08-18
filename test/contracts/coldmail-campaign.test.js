@@ -10032,7 +10032,72 @@ test('coldmail campaign fails closed without a long sender pause when historical
   assert.equal(getSendGuardState().entries.length, 0);
 });
 
+test('coldmail campaign requires coverage for all nine coldmail senders but not an external mailbox', async () => {
+  const coldmailSenderEmails = [
+    'serve@softora.nl',
+    'martijn@softora.nl',
+    'servecreusen@softora.nl',
+    'martijnvandeven@softora.nl',
+    'servec321@gmail.com',
+    'martijnven123@gmail.com',
+    'serve290@gmail.com',
+    'servecreusen7@gmail.com',
+    'contact.venvisuals@gmail.com',
+  ];
+  const coverageRequests = [];
+  const { service, sentMessages } = createService({
+    rows: [{
+      id: 'external-mailbox-coverage-prospect',
+      bedrijf: 'Veilige Coverage BV',
+      email: 'info@veilige-coverage.example',
+      status: 'prospect',
+      mail: true,
+    }],
+    mailboxAccountsRaw: JSON.stringify([
+      ...coldmailSenderEmails.map((email) => ({
+        email,
+        smtpHost: 'smtp.example.test',
+        smtpUser: email,
+        smtpPass: `${email}-secret`,
+      })),
+      {
+        email: 'zakelijk@theimpactbox.co',
+        smtpHost: 'smtp.example.test',
+        smtpUser: 'zakelijk@theimpactbox.co',
+        smtpPass: 'impactbox-secret',
+      },
+    ]),
+    dataOpsStore: {
+      async getHistoricalOutboundMailboxCoverageStatus(options) {
+        coverageRequests.push(options);
+        const accountEmails = Array.isArray(options && options.accountEmails)
+          ? options.accountEmails
+          : [];
+        return {
+          ok:
+            !accountEmails.includes('zakelijk@theimpactbox.co') &&
+            coldmailSenderEmails.every((email) => accountEmails.includes(email)),
+          issues: [],
+        };
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'serve@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(coverageRequests.length, 1);
+  assert.deepEqual(coverageRequests[0].accountEmails, coldmailSenderEmails);
+});
+
 test('coldmail campaign fails closed without a long sender pause when sent-mailbox coverage is unhealthy', async () => {
+  const coverageRequests = [];
   let recipientLookupCalled = false;
   const { service, sentMessages } = createService({
     rows: [{
@@ -10043,7 +10108,8 @@ test('coldmail campaign fails closed without a long sender pause when sent-mailb
       mail: true,
     }],
     dataOpsStore: {
-      async getHistoricalOutboundMailboxCoverageStatus() {
+      async getHistoricalOutboundMailboxCoverageStatus(options) {
+        coverageRequests.push(options);
         return {
           ok: false,
           issues: [{ accountEmail: 'martijnven123@gmail.com', reason: 'sent_sync_error' }],
@@ -10070,6 +10136,9 @@ test('coldmail campaign fails closed without a long sender pause when sent-mailb
     }
   );
 
+  assert.equal(coverageRequests.length, 1);
+  assert.equal(coverageRequests[0].accountEmails.includes('martijnven123@gmail.com'), true);
+  assert.equal(coverageRequests[0].accountEmails.includes('zakelijk@theimpactbox.co'), false);
   assert.equal(recipientLookupCalled, false);
   assert.equal(sentMessages.length, 0);
 });
