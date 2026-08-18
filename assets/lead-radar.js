@@ -14,7 +14,7 @@
     website_not_working: 'WEBSITE WERKT NIET', website_unverified: 'WEBSITE NIET BEVESTIGD',
     website_not_checked: 'NOG NIET GECONTROLEERD', provider_unavailable: 'CONTROLE NIET BESCHIKBAAR',
   };
-  const leadLabels = { new: 'Nieuw', relevant: 'Relevant', not_relevant: 'Niet relevant', follow_up: 'Later opvolgen', not_relevant: 'Niet relevant', archived: 'Gearchiveerd' };
+  const leadLabels = { new: 'Nieuw', relevant: 'Relevant', not_relevant: 'Niet relevant', follow_up: 'Later opvolgen', archived: 'Gearchiveerd' };
   const publicationDateLabels = { provider_timestamp: 'Bron: DataForSEO-publicatietijd', provider_date: 'Bron: SERP-datumveld', serp_date: 'Bron: SERP-datum', serp_text: 'Bron: datum in zoekresultaattekst', manual: 'Bron: handmatig ingevoerd', unknown: 'Bron vermeldde geen publicatiedatum' };
 
   async function api(path, options) {
