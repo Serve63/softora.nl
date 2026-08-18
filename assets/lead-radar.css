@@ -86,7 +86,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--radar-pink); box
 .lead-meta { min-width: 0; }
 .platform-label { display: inline-flex; align-items: center; min-height: 22px; border-radius: 4px; padding: 0 7px; background: #eee8e3; color: #5f534d; font-size: 10px; font-weight: 900; text-transform: uppercase; }
 .platform-label--facebook { background: #e8eef9; color: #345a94; }
-.platform-label--instagram { background: #f6e8ee; color: #9d2355; }
+.platform-label--linkedin { background: #e8f2f7; color: #1b6f91; }
 .lead-author { margin: 8px 0 4px; font-weight: 850; overflow-wrap: anywhere; }
 .lead-date, .lead-source { color: var(--radar-muted); font-size: 11px; line-height: 1.45; }
 .lead-copy { min-width: 0; }
@@ -146,3 +146,4 @@ input:focus, select:focus, textarea:focus { border-color: var(--radar-pink); box
   .bulk-bar { align-items: flex-start; flex-wrap: wrap; padding: 10px 12px; }
   .bulk-bar > span { width: 100%; }
 }
+
