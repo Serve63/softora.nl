@@ -1,5 +1,4 @@
 'use strict';
-
 const crypto = require('crypto');
 const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance');
 const SIGNALS_TABLE = 'softora_social_lead_signals';
@@ -30,7 +29,6 @@ const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
 const DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS = 30;
 const DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS = 3;
 const DEFAULT_LEAD_RADAR_SUPABASE_TIMEOUT_MS = 10_000;
-
 const KEYWORD_GROUPS = Object.freeze({
   direct_website: [
     'ik zoek iemand voor mijn website', 'wij zoeken iemand voor onze website', 'wie kan een website maken voor mijn bedrijf', 'websitebouwer gezocht voor mijn bedrijf', 'webdesigner gezocht voor mijn bedrijf', 'website nodig voor mijn bedrijf', 'website opdracht ondernemer',
@@ -83,7 +81,6 @@ const KEYWORD_GROUPS = Object.freeze({
   ],
 });
 const DEFAULT_KEYWORD_GROUPS = Object.freeze(['direct_website', 'renew_or_repair', 'webshop', 'new_business']);
-
 const PROVINCES = Object.freeze([
   'Groningen', 'Friesland', 'Drenthe', 'Overijssel', 'Flevoland', 'Gelderland',
   'Utrecht', 'Noord-Holland', 'Zuid-Holland', 'Zeeland', 'Noord-Brabant', 'Limburg',
@@ -93,7 +90,6 @@ const IMPORTANT_CITIES = Object.freeze([
   'Almere', 'Breda', 'Nijmegen', 'Apeldoorn', 'Haarlem', 'Arnhem', 'Enschede', 'Amersfoort',
   'Dordrecht', 'Leiden', 'Zwolle', 'Maastricht', 'Delft', 'Deventer', 'Alkmaar', 'Venlo',
 ]);
-
 const NEGATIVE_TERMS = Object.freeze([
   'vacature', 'stage', 'opleiding', 'cursus', 'tutorial', 'template', 'inspiratie',
   'gratis website maken', 'website handleiding', 'software installeren', 'website baan',
@@ -108,7 +104,6 @@ class LeadRadarValidationError extends Error {
     this.statusCode = 400;
   }
 }
-
 function text(value, maxLength = 500) {
   return String(value ?? '').trim().slice(0, maxLength);
 }
@@ -172,17 +167,16 @@ function platformFromUrl(value) {
     return '';
   }
 }
-
 const leadRadarQuality = createLeadRadarQuality({ text, normalizeHttpUrl, normalizePlatform, normalizeDate, normalizeInteger, platformFromUrl });
 const {
   classifySignal,
   isEligibleAutomaticSignal,
   isLikelyDirectPlatformPostUrl,
   isRecentPublication,
+  getProviderPublicationDetails,
   normalizeProviderPublishedAt,
   searchExclusionTerms,
 } = leadRadarQuality;
-
 function assertSourceUrl(value, expectedPlatform = '') {
   const normalized = normalizeHttpUrl(value);
   const platform = platformFromUrl(normalized);
@@ -191,18 +185,15 @@ function assertSourceUrl(value, expectedPlatform = '') {
   }
   return normalized;
 }
-
 function extractUrls(value) {
   const matches = String(value || '').match(/https?:\/\/[^\s<>"']+/gi) || [];
   return matches
     .map((candidate) => normalizeHttpUrl(candidate.replace(/[),.;!?]+$/, ''), { allowPlatform: false }))
     .filter(Boolean);
 }
-
 function normalizeTextForFingerprint(value) {
   return text(value, 10_000).toLowerCase().replace(/\s+/g, ' ');
 }
-
 function buildFingerprint(input = {}) {
   const platform = normalizePlatform(input.platform);
   const externalId = text(input.external_id || input.externalId, 300).toLowerCase();
@@ -213,18 +204,15 @@ function buildFingerprint(input = {}) {
   const identity = externalId || sourceUrl || [author, publishedAt.slice(0, 10), message].join('|');
   return crypto.createHash('sha256').update(`${platform}|${identity}`).digest('hex');
 }
-
 function containsAny(value, phrases) {
   const normalized = String(value || '').toLowerCase();
   return phrases.some((phrase) => normalized.includes(String(phrase).toLowerCase()));
 }
-
 function scoreSignal(input = {}, { targetRegion = '' } = {}) {
   const message = `${input.message_text || input.messageText || ''} ${input.snippet || ''}`.toLowerCase();
   let score = 0;
   const reasons = [];
   const publishedAt = normalizeDate(input.published_at || input.publishedAt);
-
   if (publishedAt) {
     const ageHours = Math.max(0, (Date.now() - new Date(publishedAt).getTime()) / 3_600_000);
     if (ageHours <= 24) { score += 35; reasons.push('Geplaatst binnen 24 uur'); }
@@ -234,7 +222,6 @@ function scoreSignal(input = {}, { targetRegion = '' } = {}) {
   } else {
     reasons.push('Publicatiedatum onbekend');
   }
-
   const classification = classifySignal({ message_text: message });
   const directWebsiteIntent = classification.isWebsiteNeed && !classification.isProvider && !classification.isExcluded;
   if (directWebsiteIntent) {
@@ -478,12 +465,11 @@ function buildSignalFromProviderItem(item, context = {}) {
   // algemene content die alleen toevallig het woord website bevat.
   if (classification.isProvider || classification.isExcluded || !classification.isWebsiteNeed) return null;
   const maxAgeDays = normalizeInteger(context.maxAgeDays, { min: 1, max: 3650 });
-  // Store only direct posts with a provider-supplied publication timestamp.
   if (!isLikelyDirectPlatformPostUrl(url, platform)) return null;
-  if (!normalizeProviderPublishedAt(item)) return null;
-  if (!isRecentPublication(normalizeProviderPublishedAt(item), maxAgeDays || 30)) return null;
+  const publication = getProviderPublicationDetails(item);
+  if (publication.publishedAt && !isRecentPublication(publication.publishedAt, maxAgeDays || 30)) return null;
   const directWebsite = extractUrls(messageText)[0] || '';
-  const publishedAt = normalizeProviderPublishedAt(item);
+  const publishedAt = publication.publishedAt;
   const region = text(context.region, 120);
   const authorName = text(item?.title || '', 500);
   const input = {
@@ -500,6 +486,9 @@ function buildSignalFromProviderItem(item, context = {}) {
     query: text(context.query, 2_000),
     keyword_group: text(context.keywordGroup, 100),
     published_at: publishedAt,
+    publication_date_source: publication.source,
+    publication_date_raw: publication.raw,
+    publication_date_confidence: publication.confidence,
     found_at: new Date().toISOString(),
     engagement_known: false,
     likes: null,
@@ -527,6 +516,12 @@ function mergeSignal(existing, incoming) {
     merged.website_status = existing.website_status;
     merged.website_source = existing.website_source;
     merged.website_confidence_score = existing.website_confidence_score;
+  }
+  if (!incoming?.published_at && existing?.published_at) {
+    merged.published_at = existing.published_at;
+    merged.publication_date_source = existing.publication_date_source || 'unknown';
+    merged.publication_date_raw = existing.publication_date_raw || null;
+    merged.publication_date_confidence = existing.publication_date_confidence ?? 0;
   }
   if (existing?.lead_status && existing.lead_status !== 'new' && (!incoming?.lead_status || incoming.lead_status === 'new')) {
     merged.lead_status = existing.lead_status;
@@ -614,7 +609,10 @@ function createLeadRadarService(deps = {}) {
     const minScore = normalizeInteger(query.min_score ?? query.minScore, { min: 0, max: 100 });
     if (minScore !== null) request = request.gte('relevance_score', minScore);
     const days = normalizeInteger(query.days, { min: 0, max: 3650 });
-    if (days > 0) request = request.gte('published_at', new Date(Date.now() - days * 86_400_000).toISOString());
+    if (days > 0) {
+      const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+      request = typeof request.or === 'function' ? request.or(`published_at.gte.${cutoff},published_at.is.null`) : request.gte('published_at', cutoff);
+    }
     if (typeof request.in === 'function' && !platform) request = request.in('platform', [...PLATFORMS]);
     if (typeof request.range === 'function') request = request.range(0, 4_999);
     const result = await request;
@@ -687,7 +685,6 @@ function createLeadRadarService(deps = {}) {
     const messageText = text(input.message_text || input.messageText || input.snippet, MAX_MESSAGE_LENGTH);
     if (!messageText) throw new LeadRadarValidationError('Voeg de tekst of snippet van het bericht toe.');
     const publishedAt = normalizeDate(input.published_at || input.publishedAt);
-    if (!publishedAt) throw new LeadRadarValidationError('Publicatiedatum is verplicht voor een Lead Radar-lead.');
     const classification = classifySignal({ platform, post_url: sourceUrl, author_name: input.author_name || input.authorName, message_text: messageText, snippet: messageText });
     if (classification.isProvider || classification.isExcluded || !classification.isWebsiteNeed) {
       throw new LeadRadarValidationError('Dit bericht lijkt geen concrete websitevraag van een ondernemer te zijn.');
@@ -708,6 +705,9 @@ function createLeadRadarService(deps = {}) {
       query: null,
       keyword_group: 'manual',
       published_at: publishedAt,
+      publication_date_source: publishedAt ? 'manual' : 'unknown',
+      publication_date_raw: text(input.published_at || input.publishedAt, 250) || null,
+      publication_date_confidence: publishedAt ? 100 : 0,
       found_at: new Date().toISOString(),
       likes: normalizeInteger(input.likes),
       comments: normalizeInteger(input.comments),
@@ -1127,7 +1127,7 @@ function createLeadRadarService(deps = {}) {
     const count = async (column, value) => {
       let request = db.from(SIGNALS_TABLE).select('id', { count: 'exact', head: true });
       if (typeof request.in === 'function') request = request.in('platform', [...PLATFORMS]);
-      if (typeof request.not === 'function') request = request.not('published_at', 'is', null).not('post_url', 'is', null);
+      if (typeof request.not === 'function') request = request.not('post_url', 'is', null);
       if (column) request = request.eq(column, value);
       const result = await request;
       return result.error ? null : result.count || 0;
