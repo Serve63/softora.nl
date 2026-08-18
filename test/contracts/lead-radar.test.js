@@ -392,7 +392,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   const routing = readRepoFile('server/config/page-routing.js');
   assert.match(shell, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(routing, /map\.set\('lead-radar', map\.get\('premium-lead-radar-shell'\)\)/);
-  assert.match(shell, /assets\/lead-radar-sidebar\.js\?v=20260818a/);
+  assert.doesNotMatch(shell, /assets\/lead-radar-sidebar\.js/);
   assert.match(sidebarScript, /const LINK_KEY = 'lead_radar'/);
   assert.match(sidebarScript, /href = LINK_HREF/);
   assert.match(page, /Geen website gevonden/);
