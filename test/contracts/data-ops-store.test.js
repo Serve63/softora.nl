@@ -219,6 +219,47 @@ test('data ops historical outbound lookup returns null on mailbox read failure',
   assert.equal(matches, null);
 });
 
+test('data ops historical outbound lookup retries a transient Supabase timeout', async () => {
+  let reads = 0;
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        const query = {
+          select() { return query; },
+          in() { return query; },
+          ilike() { return query; },
+          order() { return query; },
+          limit() {
+            reads += 1;
+            if (reads === 1) {
+              return Promise.resolve({ data: null, error: new Error('Supabase client timeout na 1500ms') });
+            }
+            return Promise.resolve({
+              data: [{
+                message_key: 'retry-match',
+                folder: 'sent',
+                recipients_text: 'info@retry.example',
+                date: '2026-08-18T08:00:00.000Z',
+              }],
+              error: null,
+            });
+          },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+  });
+
+  const matches = await store.listHistoricalOutboundMailboxMessagesByRecipientEmails({
+    recipientEmails: ['info@retry.example'],
+  });
+
+  assert.equal(reads, 2);
+  assert.deepEqual(matches.map((row) => row.message_key), ['retry-match']);
+});
+
 test('data ops historical outbound lookup matches another recipient on the same business domain', async () => {
   const calls = [];
   const rowsBySearch = new Map([
@@ -396,6 +437,46 @@ test('data ops historical mailbox coverage accepts fresh successful sent sync', 
     }),
     { ok: true, checkedAccounts: 1, issues: [] }
   );
+});
+
+test('data ops historical mailbox coverage retries a transient Supabase timeout', async () => {
+  let reads = 0;
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        const query = {
+          select() { return query; },
+          in() { return query; },
+          eq() {
+            reads += 1;
+            if (reads === 1) {
+              return Promise.resolve({ data: null, error: new Error('Supabase REST tijdelijk overgeslagen na timeout') });
+            }
+            return Promise.resolve({
+              data: [{
+                account_email: 'serve@softora.nl',
+                folder: 'sent',
+                status: 'ok',
+                last_synced_at: '2026-08-18T11:30:00.000Z',
+              }],
+              error: null,
+            });
+          },
+        };
+        return query;
+      },
+    }),
+    logger: { error() {}, warn() {} },
+    now: () => new Date('2026-08-18T12:00:00.000Z'),
+  });
+
+  const coverage = await store.getHistoricalOutboundMailboxCoverageStatus({
+    accountEmails: ['serve@softora.nl'],
+  });
+
+  assert.equal(reads, 2);
+  assert.deepEqual(coverage, { ok: true, checkedAccounts: 1, issues: [] });
 });
 
 test('data ops store reads only customers matching campaign reply sender emails', async () => {
