@@ -17,15 +17,18 @@
       const hasMeta = options.isReplyHeaderLine(firstLine);
       const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
       const isOwnQuote = !embeddedIncoming && hasMeta && options.isOwnReplyHeaderLine(firstLine);
+      // Een citaat in een ontvangen bronmail is geen canoniek timelinebericht.
+      // Echte uitgaande berichten worden afzonderlijk uit threadMessages gerenderd.
+      if (rootIncomingQuote && isOwnQuote) return '';
       const quoteLabel = isOwnQuote
-        ? `<div class="detail-mail-section-label">${rootIncomingQuote ? 'Jouw bericht (citaat · niet ontvangen)' : 'Eerdere mail'}</div>`
+        ? '<div class="detail-mail-section-label">Eerdere mail</div>'
         : rootIncomingQuote ? '<div class="detail-mail-section-label">Citaat uit eerdere mail (niet ontvangen)</div>' : '';
       const quoteLines = trimQuotedLines(hasMeta ? section.lines.slice(1) : section.lines, isOwnQuote ? options.ownReplyAuthorPattern : null);
       const preparedImages = isOwnQuote && imageState.quoteImages.length
         ? options.prepareOwnQuote(imageState.quoteImages.splice(0), imageState, renderInlineImage)
         : { imageState, html: '' };
       return `
-      <section class="detail-mail-section ${isOwnQuote ? 'detail-mail-section-history-sent' : 'detail-mail-section-history'}" aria-label="${isOwnQuote && rootIncomingQuote ? 'Eerder verzonden bericht, niet ontvangen' : 'Ingesloten berichtgeschiedenis'}">
+      <section class="detail-mail-section ${isOwnQuote ? 'detail-mail-section-history-sent' : 'detail-mail-section-history'}" aria-label="Ingesloten berichtgeschiedenis">
         ${sectionLead}
         ${quoteLabel}
         ${quoteMeta}

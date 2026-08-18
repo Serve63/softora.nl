@@ -125,7 +125,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
   assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260818a/);
-  assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
+  assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260818b/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
@@ -253,7 +253,7 @@ function renderMailboxBodyForTest(body, images, options) {
   return loadMailboxHelpersForTest().renderMailBody(body, images, options);
 }
 
-test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () => {
+test('mailbox toont een canoniek verzonden antwoord exact eenmaal en niet nog als afgeleid citaat', () => {
   const html = renderMailboxBodyForTest(
     'Hoi Martijn,\n\nWelke techniek gebruik je?\n\nOp 22 juli 2026 schreef Martijn van de Ven:\n> Eerdere mail',
     [],
@@ -284,8 +284,8 @@ test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () =
   assert.match(html, /class="detail-mail-section detail-mail-section-sent"/);
   assert.ok(html.indexOf('Nieuw bericht sturen') < html.indexOf('Jouw bericht'));
   assert.doesNotMatch(html, /Beantwoorden/);
-  assert.match(html, /Eerdere mail/);
-  assert.doesNotMatch(html, /Jouw eerdere mail/i);
+  assert.equal((html.match(/detail-mail-section detail-mail-section-sent/g) || []).length, 1);
+  assert.doesNotMatch(html, /Eerdere mail|citaat · niet ontvangen/i);
 });
 
 test('mailbox bepaalt de actie uitsluitend uit de nieuwste echte threadmessage', () => {
@@ -894,7 +894,7 @@ test('inkomende metadata blijft bij de eigen inhoud en nooit boven nieuw bericht
   assert.doesNotMatch(replyHtml, /Nieuw bericht sturen/);
 });
 
-test('Salon TOF staat als één grijze inkomende kaart en maakt van het Gmail-citaat geen nepbericht', () => {
+test('Salon TOF toont geen standalone kaart voor een uit de inkomende body afgeleid eigen citaat', () => {
   const html = renderMailboxBodyForTest([
     'Met welk programma werk je? Wij hebben nu Webflow.',
     '',
@@ -916,18 +916,11 @@ test('Salon TOF staat als één grijze inkomende kaart en maakt van het Gmail-ci
   assert.equal((html.match(/data-mailbox-message-direction="incoming"/g) || []).length, 1);
   assert.match(html, /detail-mail-section-received/);
   assert.match(html, /Met welk programma werk je\? Wij hebben nu Webflow\./);
-  assert.match(html, /detail-mail-section-history/);
-  assert.match(html, /detail-mail-section-history-sent/);
-  assert.match(html, /Jouw bericht \(citaat · niet ontvangen\)/);
-  assert.match(html, /Eerder verzonden bericht, niet ontvangen/);
-  assert.match(
-    html,
-    /detail-mail-section-received[\s\S]*Met welk programma werk je\?[\s\S]*<div class="detail-footer">[\s\S]*data-mailbox-action="reply-mail"[\s\S]*<\/div>\s*<\/section>[\s\S]*detail-mail-section-history-sent/
-  );
-  const receivedStart = html.indexOf('data-mailbox-message-direction="incoming"');
-  const quoteStart = html.indexOf('detail-mail-section-history-sent');
-  assert.ok(receivedStart >= 0 && quoteStart > receivedStart);
-  assert.ok(html.lastIndexOf('</section>', quoteStart) > receivedStart);
+  assert.doesNotMatch(html, /detail-mail-section-history-sent/);
+  assert.doesNotMatch(html, /Jouw bericht \(citaat · niet ontvangen\)|Eerder verzonden bericht, niet ontvangen/);
+  assert.doesNotMatch(html, /Afgelopen week kwam ik jullie website salontof\.nl tegen\./);
+  assert.equal((html.match(/data-mailbox-message-direction="incoming"/g) || []).length, 1);
+  assert.equal((html.match(/data-mailbox-action="reply-mail"/g) || []).length, 1);
 
   const pageSource = readPage();
   assert.match(
@@ -938,6 +931,45 @@ test('Salon TOF staat als één grijze inkomende kaart en maakt van het Gmail-ci
     pageSource,
     /\.detail-mail-section-received \{[^}]*rgba\(155,35,85/
   );
+});
+
+test('contactdossier telt een geneste eigen quote niet als bericht en muteert de bronbody niet', () => {
+  const sourceBody = [
+    'Bedankt voor je bericht.',
+    '',
+    'Op 18 aug 2026 schreef Martijn van de Ven:',
+    '> Dit is alleen geciteerde eerdere uitgaande tekst.',
+    '> ----- Doorgestuurd bericht -----',
+    '> Nested quote blijft onderdeel van de bronmail.',
+  ].join('\n');
+  const root = {
+    id: 'inbox:nested-quote',
+    messageId: '<nested-quote@example.test>',
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'contact@example.test',
+    to: 'martijn@softora.nl',
+    body: sourceBody,
+    threadMessages: [],
+  };
+
+  discoveryModule.mergeContactTimeline(root, [root], 'contact@example.test', 1, {
+    accountEmails: ['martijn@softora.nl'],
+  });
+  const html = renderMailboxBodyForTest(root.body, [], {
+    contactDossierMode: true,
+    replyMailId: root.id,
+    mail: root,
+  });
+  const summary = discoveryModule.renderTimelineSummary(root, String);
+
+  assert.equal(root.body, sourceBody);
+  assert.equal(root.threadMessages.length, 0);
+  assert.equal(root.contactTimelineTotal, 1);
+  assert.match(summary, /1 berichten/);
+  assert.match(html, /Bedankt voor je bericht\./);
+  assert.doesNotMatch(html, /Dit is alleen geciteerde|Nested quote|Doorgestuurd bericht/);
+  assert.doesNotMatch(html, /detail-mail-section-history-sent|citaat · niet ontvangen/i);
 });
 
 test('onbewezen citaat in een inkomend bericht blijft neutraal en niet-ontvangen', () => {
@@ -2972,7 +3004,7 @@ test('mailbox dedupliceert een coldmail wanneer Gmail alleen het campagneadres i
   assert.doesNotMatch(html, /detail-mail-section-quote/);
 });
 
-test('mailbox voegt vergelijkbare coldmails voor verschillende websites nooit samen', () => {
+test('mailbox voegt vergelijkbare coldmails voor verschillende websites nooit samen of als inferred kaart toe', () => {
   const html = renderMailboxBodyForTest(
     [
       'Bedankt voor je bericht.',
@@ -3018,14 +3050,13 @@ test('mailbox voegt vergelijkbare coldmails voor verschillende websites nooit sa
     }
   );
 
-  assert.match(html, /detail-mail-section-history/);
-  assert.match(html, /detail-mail-section-history-sent/);
-  assert.match(html, /Jouw bericht \(citaat · niet ontvangen\)/);
-  assert.match(html, /Eerder verzonden bericht, niet ontvangen/);
-  assert.match(html, /Afgelopen week kwam ik jullie website ander-bedrijf\.nl tegen\./);
+  assert.doesNotMatch(html, /detail-mail-section-history-sent|citaat · niet ontvangen/i);
+  assert.doesNotMatch(html, /Afgelopen week kwam ik jullie website ander-bedrijf\.nl tegen\./);
+  assert.match(html, /Afgelopen week kwam ik jullie website huidig-bedrijf\.nl tegen\./);
+  assert.equal((html.match(/detail-mail-section detail-mail-section-sent/g) || []).length, 1);
 });
 
-test('mailbox laat een inhoudelijk andere eerdere eigen mail wel staan', () => {
+test('mailbox maakt ook van een inhoudelijk andere onbewezen eigen quote geen timelinekaart', () => {
   const html = renderMailboxBodyForTest(
     [
       'Bedankt voor de uitleg.',
@@ -3059,11 +3090,10 @@ test('mailbox laat een inhoudelijk andere eerdere eigen mail wel staan', () => {
   );
 
   assert.match(html, /Jouw bericht/);
-  assert.match(html, /detail-mail-section-history/);
-  assert.match(html, /detail-mail-section-history-sent/);
-  assert.match(html, /Jouw bericht \(citaat · niet ontvangen\)/);
-  assert.match(html, /Eerder verzonden bericht, niet ontvangen/);
-  assert.match(html, /Hierbij stuur ik een nieuw voorstel met een andere prijs en planning\./);
+  assert.doesNotMatch(html, /detail-mail-section-history-sent|citaat · niet ontvangen/i);
+  assert.doesNotMatch(html, /Hierbij stuur ik een nieuw voorstel met een andere prijs en planning\./);
+  assert.match(html, /Afgelopen week kwam ik jullie website nicolevintagefashion\.com tegen\./);
+  assert.equal((html.match(/detail-mail-section detail-mail-section-sent/g) || []).length, 1);
 });
 
 test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af', () => {
@@ -5192,11 +5222,10 @@ test('premium mailbox maakt uit geciteerde campagnebeelden geen berichtmedia', (
   });
 
   const replyIndex = html.indexOf('Bedankt voor je mail');
-  const quoteIndex = html.indexOf('<div class="detail-mail-section-label">Eerdere mail</div>');
   assert.ok(replyIndex >= 0);
-  assert.ok(quoteIndex > replyIndex);
   assert.equal((html.match(/<figure class="detail-mail-image">/g) || []).length, 0);
-  assert.equal((html.match(/Afgelopen week kwam ik jullie website dirvenschoenen\.nl tegen\./g) || []).length, 1);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website dirvenschoenen\.nl tegen\./g) || []).length, 0);
+  assert.doesNotMatch(html, /detail-mail-section-history-sent|citaat · niet ontvangen/i);
 });
 
 test('premium mailbox toont geen handtekening van de ontvanger in Eerdere mail', () => {
