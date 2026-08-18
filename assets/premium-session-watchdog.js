@@ -19,6 +19,7 @@
     redirecting = true;
     var params = new URLSearchParams();
     params.set("next", getCurrentPath());
+    params.set("logout", "1");
     params.set("expired", "1");
     window.location.replace(loginPath + "?" + params.toString());
   }

@@ -123,7 +123,7 @@ const PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE = Object.freeze({
     '<link rel="preload" as="image" href="/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg">',
   'premium-voicesoftware.html': '<link rel="preload" as="image" href="/assets/softora-telefonie-studio.jpg">',
 });
-const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260516a" defer></script>';
+const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260818a" defer></script>';
 const LIVE_MOMENTUM_VIDEO_ORIGIN = 'https://www.youtube-nocookie.com';
 const KVK_COMPANY_DIRECTORY_FILE = 'premium-kvk-company-directory-shell.html';
 const KVK_COMPANY_DIRECTORY_LOCAL_ORIGIN = 'http://127.0.0.1:8000';

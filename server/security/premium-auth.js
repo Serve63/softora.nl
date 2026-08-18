@@ -465,7 +465,7 @@ function createPremiumApiAccessGuard(options = {}) {
       return next();
     }
 
-    if (authState.expired || authState.revoked) {
+    if (authState.expired || authState.revoked || authState.token) {
       clearPremiumSessionCookie(req, res);
     }
 

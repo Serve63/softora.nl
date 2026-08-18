@@ -18,7 +18,7 @@ test('premium personeel login explains expired sessions clearly', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-personeel-login.html'), 'utf8');
 
   assert.match(source, /params\.get\('expired'\) === '1'/);
-  assert.match(source, /Je sessie is verlopen\. Log opnieuw in om verder te gaan\./);
+  assert.match(source, /Je bent uitgelogd omdat je sessie niet meer geldig was\. Log opnieuw in om verder te gaan\./);
 });
 
 test('premium personeel login timeboxes auth requests and recovers the submit button', () => {

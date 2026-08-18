@@ -141,13 +141,13 @@ function createPremiumHtmlPageAccessController(options = {}) {
       }
 
       if (!authState.authenticated) {
-        const sessionEnded = Boolean(authState.expired || authState.revoked);
+        const sessionEnded = Boolean(authState.expired || authState.revoked || authState.token);
         if (sessionEnded) {
           clearPremiumSessionCookie(req, res);
         }
         res.redirect(
           302,
-          `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}${sessionEnded ? '&expired=1' : ''}`
+          `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}${sessionEnded ? '&expired=1&logout=1' : ''}`
         );
         return {
           handled: true,
