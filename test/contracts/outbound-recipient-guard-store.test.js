@@ -3,7 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createOutboundRecipientGuardStore } = require('../../server/services/outbound-recipient-guard-store');
+const {
+  HISTORICAL_MAILBOX_LEDGER_GUARD_KEY,
+  createOutboundRecipientGuardStore,
+} = require('../../server/services/outbound-recipient-guard-store');
 
 function createMockSupabaseClient({ conflictKeys = [], conflictAfterInsert = false, confirmRows = 1 } = {}) {
   const calls = [];
@@ -137,6 +140,32 @@ test('outbound recipient guard store blocks a batch conflict before inserting', 
   assert.equal(calls.some((call) => call.type === 'insert'), false);
   const check = calls.find((call) => call.type === 'conflict-check');
   assert.ok(check.keys.includes('email:blocked@example.test'));
+});
+
+test('outbound recipient guard store reads the indexed mailbox-history ledger marker', async () => {
+  const { client, calls } = createMockSupabaseClient({
+    conflictKeys: [HISTORICAL_MAILBOX_LEDGER_GUARD_KEY],
+  });
+  const store = createStore(client);
+
+  const status = await store.getHistoricalMailboxLedgerStatus();
+
+  assert.equal(status.ok, true);
+  assert.equal(status.marker.guard_key, HISTORICAL_MAILBOX_LEDGER_GUARD_KEY);
+  const check = calls.find((call) => call.type === 'conflict-check');
+  assert.deepEqual(check.keys, [HISTORICAL_MAILBOX_LEDGER_GUARD_KEY]);
+  assert.equal(check.count, 1);
+});
+
+test('outbound recipient guard store fails readiness closed when the ledger marker is absent', async () => {
+  const { client } = createMockSupabaseClient();
+  const store = createStore(client);
+
+  const status = await store.getHistoricalMailboxLedgerStatus();
+
+  assert.equal(status.ok, false);
+  assert.equal(status.reason, 'mailbox_outbound_ledger_marker_missing');
+  assert.equal(status.marker, null);
 });
 
 test('outbound recipient guard store resolves the real conflict after a unique-key race', async () => {

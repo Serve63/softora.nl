@@ -1,6 +1,7 @@
 function createColdmailHistoricalOutboundGuard(deps = {}) {
   const {
     dataOpsStore,
+    outboundRecipientGuardStore,
     getConfiguredSenderEmails,
     getAllowedSenderEmails,
     getRowEmail,
@@ -18,6 +19,36 @@ function createColdmailHistoricalOutboundGuard(deps = {}) {
     error.code = 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE';
     error.status = 503;
     return error;
+  }
+
+  async function assertLedgerReady() {
+    if (
+      !outboundRecipientGuardStore ||
+      typeof outboundRecipientGuardStore.getHistoricalMailboxLedgerStatus !== 'function'
+    ) {
+      const error = new Error('Centrale mailboxhistorie-ledger ontbreekt; coldmail niet verzonden.');
+      error.code = 'COLDMAIL_OUTBOUND_LEDGER_UNAVAILABLE';
+      error.status = 503;
+      throw error;
+    }
+    let readiness = null;
+    try {
+      readiness = await outboundRecipientGuardStore.getHistoricalMailboxLedgerStatus();
+    } catch (cause) {
+      const error = new Error(
+        'Centrale mailboxhistorie-ledger kon niet veilig worden gecontroleerd; coldmail niet verzonden.'
+      );
+      error.code = 'COLDMAIL_OUTBOUND_LEDGER_UNAVAILABLE';
+      error.status = 503;
+      error.cause = cause;
+      throw error;
+    }
+    if (!readiness || readiness.ok !== true) {
+      const error = new Error('Centrale mailboxhistorie-ledger is niet gereed; coldmail niet verzonden.');
+      error.code = 'COLDMAIL_OUTBOUND_LEDGER_UNAVAILABLE';
+      error.status = 503;
+      throw error;
+    }
   }
 
   function normalizeDomain(value) {
@@ -116,7 +147,7 @@ function createColdmailHistoricalOutboundGuard(deps = {}) {
     };
   }
 
-  return { getBlock, hasPriorOutboundMailSignal };
+  return { assertLedgerReady, getBlock, hasPriorOutboundMailSignal };
 }
 
 module.exports = {
