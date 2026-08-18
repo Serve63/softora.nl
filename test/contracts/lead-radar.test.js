@@ -392,7 +392,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   const routing = readRepoFile('server/config/page-routing.js');
   assert.match(shell, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(routing, /map\.set\('lead-radar', map\.get\('premium-lead-radar-shell'\)\)/);
-  assert.match(shell, /assets\/lead-radar-sidebar\.js\?v=20260817b/);
+  assert.match(shell, /assets\/lead-radar-sidebar\.js\?v=20260818a/);
   assert.match(sidebarScript, /const LINK_KEY = 'lead_radar'/);
   assert.match(sidebarScript, /href = LINK_HREF/);
   assert.match(page, /Geen website gevonden/);
@@ -422,7 +422,7 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   const htmlPages = readRepoFile('server/services/html-pages.js');
   const vercel = readRepoFile('vercel.json');
   const envExample = readRepoFile('.env.example');
-  assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260817b'/);
+  assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260818a'/);
   assert.match(htmlPages, /assets\/lead-radar-sidebar\.js\?v=\$\{LEAD_RADAR_SIDEBAR_VERSION\}/);
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
