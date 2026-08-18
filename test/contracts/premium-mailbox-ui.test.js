@@ -125,7 +125,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
   assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260818a/);
-  assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260818b/);
+  assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
@@ -972,7 +972,7 @@ test('contactdossier telt een geneste eigen quote niet als bericht en muteert de
   assert.doesNotMatch(html, /detail-mail-section-history-sent|citaat · niet ontvangen/i);
 });
 
-test('onbewezen citaat in een inkomend bericht blijft neutraal en niet-ontvangen', () => {
+test('onbewezen citaat in een inkomend bericht wordt evenmin een standalone timelinekaart', () => {
   const html = renderMailboxBodyForTest([
     'Dit is de nieuwe ontvangen tekst.',
     '',
@@ -991,10 +991,10 @@ test('onbewezen citaat in een inkomend bericht blijft neutraal en niet-ontvangen
   });
 
   assert.match(html, /data-mailbox-message-direction="incoming"/);
-  assert.match(html, /detail-mail-section-history/);
-  assert.doesNotMatch(html, /detail-mail-section-history-sent/);
-  assert.match(html, /Citaat uit eerdere mail \(niet ontvangen\)/);
-  assert.match(html, /aria-label="Ingesloten berichtgeschiedenis"/);
+  assert.match(html, /Dit is de nieuwe ontvangen tekst\./);
+  assert.doesNotMatch(html, /detail-mail-section-history/);
+  assert.doesNotMatch(html, /Original message\.|John Example wrote/);
+  assert.doesNotMatch(html, /niet ontvangen|Ingesloten berichtgeschiedenis/i);
 });
 
 test('beantwoorden staat in de nieuwste inkomende grijze threadkaart en nergens los eronder', () => {
