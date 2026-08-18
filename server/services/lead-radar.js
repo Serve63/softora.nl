@@ -2,7 +2,6 @@
 
 const crypto = require('crypto');
 const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance');
-
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
 const DATAFORSEO_ENDPOINT = 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced';
