@@ -38,6 +38,7 @@ function createAppOpsRuntime(deps = {}) {
     isProduction,
     isServerlessRuntime,
     assetsDirectory,
+    personalSitesDirectory,
     securityContactEmail,
     getEffectivePublicBaseUrl,
     sendSeoManagedHtmlPageResponse,
@@ -123,6 +124,7 @@ function createAppOpsRuntime(deps = {}) {
 
   registerPublicPageRoutes(app, {
     assetsDirectory,
+    personalSitesDirectory,
     securityContactEmail,
     getEffectivePublicBaseUrl,
     sendSeoManagedHtmlPageResponse,

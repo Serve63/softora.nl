@@ -213,7 +213,7 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   );
   assert.match(
     source,
-    /<div class="tilt-card fade-up" data-tilt style="transition-delay: 0\.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">[\s\S]*<div class="card-number">04<\/div>/
+    /<div\s+class="tilt-card fade-up chatbot-trigger"[\s\S]*data-chatbot-trigger[\s\S]*style="transition-delay: 0\.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;"[\s\S]*<div class="card-number">04<\/div>/
   );
   assert.match(
     source,
