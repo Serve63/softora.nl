@@ -4,23 +4,6 @@
   const state = { offset: 0, limit: 50, total: 0, signals: [], status: null };
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
-  const formatDate = (value) => {
-    if (!value) return 'Onbekend';
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? 'Onbekend' : new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-  };
-  const publicationDateLabels = Object.freeze({
-    provider_timestamp: 'Bron: DataForSEO-publicatietijd',
-    provider_date: 'Bron: SERP-datumveld',
-    serp_date: 'Bron: SERP-datum',
-    serp_text: 'Bron: datum in zoekresultaattekst',
-    post_meta: 'Bron: openbare post-metadata',
-    post_jsonld: 'Bron: openbare post-JSON-LD',
-    post_time: 'Bron: openbare posttijd',
-    manual: 'Bron: handmatig ingevoerd',
-    unknown: 'Bron vermeldde geen publicatiedatum',
-  });
-
   async function api(path, options) {
     const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...options, headers: { 'Content-Type': 'application/json', ...(options && options.headers || {}) } });
     const body = await response.json().catch(() => ({}));
@@ -84,13 +67,11 @@
     const leadTitle = getLeadTitle(signal);
     const leadSummary = signal.message_text || signal.snippet || '';
     const candidateLinks = websiteCandidates.map((candidate) => `<a class="website-candidate" href="${escapeHtml(candidate.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.title || candidate.url)}</a>`).join('');
-    const publicationDate = signal.published_at ? formatDate(signal.published_at) : (signal.publication_date_raw || 'Nog niet beschikbaar via openbare bron');
-    const publicationSource = publicationDateLabels[signal.publication_date_source] || publicationDateLabels.unknown;
     const originalPostLink = originalUrl ? `<a class="lead-source-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open originele post" title="Open originele post"><span class="lead-source-icon" aria-hidden="true">↗</span></a>` : '<span class="lead-link-warning">Directe postlink niet beschikbaar</span>';
     const websiteDetails = websiteUrl || websiteCandidates.length || signal.website_title || signal.website_http_status || signal.website_redirect_url;
     const websiteMarkup = websiteDetails ? `<div class="lead-website">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : websiteCandidates.length ? `<span class="website-url website-url--candidate">Mogelijke websites</span><div class="website-candidates">${candidateLinks}</div>` : ''}${signal.website_title ? `<small class="website-detail">Titel: ${escapeHtml(signal.website_title)}</small>` : ''}${signal.website_http_status ? `<small class="website-detail">HTTP: ${escapeHtml(signal.website_http_status)}</small>` : ''}${signal.website_redirect_url ? `<a class="website-detail" href="${escapeHtml(signal.website_redirect_url)}" target="_blank" rel="noopener noreferrer">Redirect bekijken</a>` : ''}</div>` : '';
     return `<article class="lead-card" data-signal-id="${escapeHtml(signal.id)}">
-      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span>${originalPostLink}<div class="lead-date"><strong>Publicatiedatum:</strong> ${escapeHtml(publicationDate)}<small>${escapeHtml(publicationSource)}</small></div><div class="lead-source">Gevonden op: ${escapeHtml(formatDate(signal.found_at))}</div></div>
+      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span>${originalPostLink}</div>
       <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${leadSummary ? `<p class="lead-summary">${escapeHtml(leadSummary)}</p>` : ''}</div>
       <div class="lead-side"><div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}</div>${websiteMarkup}</div>
     </article>`;

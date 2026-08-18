@@ -76,9 +76,6 @@ input:focus, select:focus, textarea:focus, .custom-select__trigger:focus-visible
 .lead-card { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(280px, 2fr) minmax(220px, 1fr); gap: 14px; align-items: start; border-bottom: 1px solid var(--radar-line); padding: 16px 20px; }
 .lead-card:hover { background: #fffafc; }
 .lead-meta { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; }
-.lead-date { color: var(--radar-muted); font-size: 11px; line-height: 1.45; }
-.lead-date strong { display: block; color: var(--radar-text); font-size: 11px; }
-.lead-date small, .lead-source { display: block; margin-top: 3px; color: var(--radar-muted); font-size: 10px; }
 .lead-link-warning { display: inline-block; color: var(--radar-danger); font-size: 11px; font-weight: 700; }
 .platform-label { display: inline-flex; align-items: center; min-height: 22px; border-radius: 4px; padding: 0 7px; background: #eee8e3; color: #5f534d; font-size: 10px; font-weight: 900; text-transform: uppercase; }
 .platform-label--facebook { background: #e8eef9; color: #345a94; }
