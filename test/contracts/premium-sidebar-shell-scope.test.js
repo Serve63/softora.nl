@@ -152,6 +152,9 @@ test('PDF blijft deep-link-only en is uit elke premium-sidebarbron verwijderd', 
 test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar', () => {
   const pageSource = readRepoFile('premium-wachtwoordenregister.html');
   const themeSource = readRepoFile('assets/personnel-theme.css');
+  const htmlPagesSource = readRepoFile('server/services/html-pages.js');
+  const reauthStyleSource = readRepoFile('assets/premium-password-register-reauth.css');
+  const reauthSource = readRepoFile('assets/premium-password-register-reauth.js');
 
   assert.match(pageSource, /<body data-sidebar-nav-ready="1">/);
   assert.doesNotMatch(pageSource, /assets\/personnel-theme\.js/);
@@ -159,6 +162,20 @@ test('vergrendeld wachtwoordenregister houdt de globale sidebar direct bruikbaar
   assert.match(themeSource, /\.sidebar-link\.sidebar-link--coming-soon[\s\S]*?pointer-events:\s*none\s*!important/);
   assert.match(pageSource, /<main class="main-content">[\s\S]*?<div id="screen-pin">/);
   assert.doesNotMatch(pageSource.match(/<div id="screen-pin">[\s\S]*?<\/main>/)[0], /aria-modal="true"|\binert\b/);
+  assert.match(htmlPagesSource, /id="password-register-auth-recovery"/);
+  assert.match(htmlPagesSource, /id="password-register-auth-retry"[^>]*>Opnieuw bevestigen<\/button>/);
+  assert.match(htmlPagesSource, /href="\/premium-instellingen#extra">Terug<\/a>/);
+  assert.match(htmlPagesSource, /const recoveryMarkup[\s\S]*?screen-pin[\s\S]*?recoveryMarkup/);
+  assert.match(htmlPagesSource, /premium-password-register-reauth\.css/);
+  assert.match(reauthStyleSource, /#password-register-auth-recovery[\s\S]*?display:\s*flex/);
+  assert.match(reauthStyleSource, /data-password-register-auth-recovery="1"[\s\S]*?#screen-pin/);
+  assert.match(reauthSource, /automaticDelaysMs = \[900, 2400\]/);
+  assert.match(reauthSource, /"Accept": "application\/json"/);
+  assert.match(reauthSource, /credentials: "same-origin"/);
+  assert.match(reauthSource, /global\.location\.replace\("\/premium-wachtwoordenregister"\)/);
+  assert.match(reauthSource, /next=%2Fpremium-wachtwoordenregister/);
+  assert.match(reauthSource, /global\.addEventListener\("pagehide"[\s\S]*abortActiveRequest/);
+  assert.doesNotMatch(reauthSource, /localStorage|sessionStorage|verify-pin|master-secret|ciphertext/);
 });
 
 test('premium database consistency assets stay outside the static sidebar', () => {

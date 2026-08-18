@@ -111,6 +111,11 @@ const PASSWORD_REGISTER_CSP = [
   "worker-src 'none'",
   "manifest-src 'self'",
 ].join('; ');
+const PASSWORD_REGISTER_REAUTH_ASSET_VERSION = '20260818a';
+const PASSWORD_REGISTER_REAUTH_STYLESHEET =
+  `<link rel="stylesheet" href="/assets/premium-password-register-reauth.css?v=${PASSWORD_REGISTER_REAUTH_ASSET_VERSION}">`;
+const PASSWORD_REGISTER_REAUTH_SCRIPT =
+  `<script src="/assets/premium-password-register-reauth.js?v=${PASSWORD_REGISTER_REAUTH_ASSET_VERSION}" defer></script>`;
 const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg?v=20260511a';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
 const PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE = Object.freeze({
@@ -501,6 +506,52 @@ function createHtmlPageCoordinator(options = {}) {
     res.setHeader('Referrer-Policy', 'no-referrer');
   }
 
+  function applyPasswordRegisterAuthRecoveryHtml(html, recovery = null) {
+    if (!recovery || typeof recovery !== 'object') return String(html || '');
+
+    const code = normalizeString(recovery.code || 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE');
+    const ownerDenied = code === 'PASSWORD_REGISTER_OWNER_REQUIRED';
+    const ownerUnavailable = code === 'PASSWORD_REGISTER_OWNER_NOT_CONFIGURED';
+    const title = ownerDenied
+      ? 'Geen toegang tot dit register'
+      : ownerUnavailable
+        ? 'Toegang tijdelijk niet beschikbaar'
+        : 'Sessie opnieuw bevestigen';
+    const message = ownerDenied
+      ? 'Dit wachtwoordenregister is alleen beschikbaar voor de geconfigureerde eigenaar. Er zijn geen kluisgegevens geladen.'
+      : ownerUnavailable
+        ? 'De eigenaarstoegang kan nu niet veilig worden bevestigd. De kluis blijft gesloten; probeer het later opnieuw.'
+        : 'De beveiligde sessiecontrole kon tijdelijk niet worden afgerond. De kluis blijft gesloten; probeer opnieuw of ga veilig terug.';
+
+    let renderedHtml = injectHtmlAttribute(
+      String(html || ''),
+      `data-password-register-auth-recovery="1" data-password-register-auth-code="${escapeHtml(code)}" data-password-register-auth-retryable="${recovery.retryable ? '1' : '0'}"`
+    );
+    const recoveryMarkup = [
+      '<section id="password-register-auth-recovery" aria-labelledby="password-register-auth-recovery-title">',
+      '<div class="auth-recovery-card">',
+      '<div class="auth-recovery-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0110 0v4"></path><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M12 15v2"></path></svg></div>',
+      '<p class="auth-recovery-eyebrow">Beveiligde toegang</p>',
+      `<h1 class="auth-recovery-title" id="password-register-auth-recovery-title" data-password-register-recovery-title>${escapeHtml(title)}</h1>`,
+      `<p class="auth-recovery-message" data-password-register-recovery-message>${escapeHtml(message)}</p>`,
+      '<p class="auth-recovery-status" id="password-register-auth-recovery-status" role="status" aria-live="polite"></p>',
+      '<div class="auth-recovery-actions">',
+      '<button class="auth-recovery-action primary" id="password-register-auth-retry" type="button">Opnieuw bevestigen</button>',
+      '<a class="auth-recovery-action" href="/premium-instellingen#extra">Terug</a>',
+      '</div></div></section>',
+    ].join('');
+    renderedHtml = renderedHtml
+      .replace(/(<div\b[^>]*\bid=["']screen-pin["'][^>]*>)/i, `${recoveryMarkup}$1`)
+      .replace(
+        /[ \t]*<script\b[^>]*\bsrc=["'][^"']*premium-password-register-(?!reauth\.js)[^"']*["'][^>]*><\/script>\s*/gi,
+        '\n'
+      );
+    return injectSnippetBeforeHeadClose(
+      renderedHtml,
+      `${PASSWORD_REGISTER_REAUTH_STYLESHEET}\n${PASSWORD_REGISTER_REAUTH_SCRIPT}`
+    );
+  }
+
   function applyPremiumSidebarContentFrameHtml(html) {
     let renderedHtml = injectHtmlAttribute(html, 'data-softora-sidebar-content-frame="1"');
     renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE);
@@ -794,6 +845,12 @@ function createHtmlPageCoordinator(options = {}) {
       rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null, {
         isSidebarContentFrame,
       });
+      if (fileName === 'premium-wachtwoordenregister.html' && premiumPageAccess.passwordRegisterAuthRecovery) {
+        rendered = applyPasswordRegisterAuthRecoveryHtml(
+          rendered,
+          premiumPageAccess.passwordRegisterAuthRecovery
+        );
+      }
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       if (isSidebarContentFrame) {
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -808,7 +865,11 @@ function createHtmlPageCoordinator(options = {}) {
           ? 'no-store, private'
           : 'public, max-age=300, stale-while-revalidate=900'
       );
-      return res.status(200).send(rendered);
+      const responseStatusCode = Number(premiumPageAccess.responseStatusCode);
+      const safeStatusCode = Number.isInteger(responseStatusCode) && responseStatusCode >= 400 && responseStatusCode <= 599
+        ? responseStatusCode
+        : 200;
+      return res.status(safeStatusCode).send(rendered);
     } catch (error) {
       logger.error('[SEO][RenderPageError]', fileName, error?.message || error);
       if (isLoginPage || isProtectedPremiumPage) {
