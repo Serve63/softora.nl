@@ -1,0 +1,263 @@
+.chatbot-trigger {
+    cursor: pointer;
+}
+
+.chatbot-trigger:focus-visible {
+    outline: 3px solid #f7e0ce;
+    outline-offset: 5px;
+}
+
+body.chatbot-open {
+    overflow: hidden;
+}
+
+.softora-chatbot[hidden] {
+    display: none !important;
+}
+
+.softora-chatbot {
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+}
+
+.softora-chatbot-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    background: rgba(19, 14, 18, 0.56);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+}
+
+.softora-chatbot-panel {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto minmax(180px, 1fr) auto auto auto;
+    width: min(100%, 480px);
+    max-height: min(720px, calc(100dvh - 2rem));
+    padding: 0 !important;
+    overflow: hidden;
+    content-visibility: visible !important;
+    border: 1px solid rgba(139, 34, 82, 0.18);
+    border-radius: 30px;
+    background: linear-gradient(180deg, #fffaf6 0%, #f5eee8 100%);
+    box-shadow: 0 30px 90px rgba(15, 10, 14, 0.3);
+}
+
+.softora-chatbot-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.35rem 1.35rem 1.1rem;
+    border-bottom: 1px solid rgba(27, 24, 31, 0.1);
+    background: rgba(255, 255, 255, 0.42);
+}
+
+.softora-chatbot-eyebrow {
+    display: inline-flex;
+    margin-bottom: 0.45rem;
+    color: var(--accent, #8b2252);
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.softora-chatbot-header h2 {
+    color: var(--text-primary, #1a1a2e);
+    font-size: clamp(1.45rem, 4vw, 1.9rem);
+    line-height: 1.05;
+}
+
+.softora-chatbot-header p {
+    max-width: 30rem;
+    margin-top: 0.55rem;
+    color: var(--text-secondary, #606272);
+    font-size: 0.88rem;
+    line-height: 1.55;
+}
+
+.softora-chatbot-close {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    border: 1px solid rgba(139, 34, 82, 0.16);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--text-primary, #1a1a2e);
+    font-size: 1.55rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.softora-chatbot-close:hover,
+.softora-chatbot-close:focus-visible {
+    background: var(--accent, #8b2252);
+    color: #fff;
+    transform: rotate(6deg);
+}
+
+.softora-chatbot-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.2rem 1.35rem;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.softora-chatbot-message {
+    width: fit-content;
+    max-width: 88%;
+    padding: 0.75rem 0.9rem;
+    border-radius: 17px;
+    color: var(--text-primary, #1a1a2e);
+    font-size: 0.92rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.softora-chatbot-message--bot {
+    border: 1px solid rgba(139, 34, 82, 0.1);
+    border-bottom-left-radius: 5px;
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.softora-chatbot-message--user {
+    align-self: flex-end;
+    border-bottom-right-radius: 5px;
+    background: var(--accent, #8b2252);
+    color: #fff;
+}
+
+.softora-chatbot-suggestions {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0 1.35rem 0.85rem;
+    scrollbar-width: none;
+}
+
+.softora-chatbot-suggestions::-webkit-scrollbar {
+    display: none;
+}
+
+.softora-chatbot-suggestions button {
+    flex: 0 0 auto;
+    min-height: 2.2rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgba(139, 34, 82, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.64);
+    color: var(--accent, #8b2252);
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.softora-chatbot-suggestions button:hover,
+.softora-chatbot-suggestions button:focus-visible {
+    background: var(--accent, #8b2252);
+    color: #fff;
+}
+
+.softora-chatbot-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.55rem;
+    padding: 0 1.35rem 0.6rem;
+}
+
+.softora-chatbot-form input {
+    min-width: 0;
+    min-height: 2.9rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid rgba(27, 24, 31, 0.16);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--text-primary, #1a1a2e);
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.softora-chatbot-form input:focus-visible {
+    outline: 3px solid rgba(139, 34, 82, 0.18);
+    border-color: var(--accent, #8b2252);
+}
+
+.softora-chatbot-form > button {
+    min-height: 2.9rem;
+    padding: 0.7rem 0.95rem;
+    border: 1px solid var(--accent, #8b2252);
+    border-radius: 14px;
+    background: var(--accent, #8b2252);
+    color: #fff;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.softora-chatbot-form > button:hover,
+.softora-chatbot-form > button:focus-visible {
+    border-color: var(--accent-light, #a62d65);
+    background: var(--accent-light, #a62d65);
+}
+
+.softora-chatbot-note {
+    padding: 0 1.35rem 1rem;
+    color: var(--text-tertiary, #9599a8);
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.softora-chatbot-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
+
+@media (max-width: 600px) {
+    .softora-chatbot {
+        align-items: end;
+        padding: 0;
+    }
+
+    .softora-chatbot-panel {
+        width: 100%;
+        max-height: 100dvh;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 28px 28px 0 0;
+    }
+
+    .softora-chatbot-header,
+    .softora-chatbot-messages,
+    .softora-chatbot-suggestions,
+    .softora-chatbot-form,
+    .softora-chatbot-note {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
