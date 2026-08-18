@@ -18,7 +18,7 @@ const endGameCardFiles = [
   'rubens-trading-system.png', 'rubens-vakantieradar.png', 'serves-gezondheidsdossier.png', 'silence-controle.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
   'tanden-rechtzetten.png', 'tandenbleek-voorraad.png', 'transfermarkt.png',
   'vakantiehuis-kopen.png', 'vijf-kilo-spiermassa.png', 'vip-box-psv.png', 'vip-box-willem-2.png',
-  'wereldkaart-bezochte-landen.png', 'world-watcher.png'
+  'vitalora-draaiend.png', 'wereldkaart-bezochte-landen.png', 'world-watcher.png'
 ];
 
 function read(fileName) {
@@ -49,7 +49,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260815a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260818a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260814b" defer><\/script>/);
@@ -412,7 +412,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /const imageId = card\.imageId \|\| card\.id/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260815a/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260818a/);
   assert.match(endGameCardsJs, /\{ id: 'jurisalem-af', title: 'Jurisalem af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'nieuwe-fiets', title: 'Nieuwe fiets' \}/);
   assert.match(endGameCardsJs, /\{ id: 'dertig-dagen-streak', title: '30 dagen streak' \}/);
@@ -433,6 +433,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'alle-formaten-scheermesjes', title: 'Alle formaten scheermesjes' \}/);
   assert.match(endGameCardsJs, /\{ id: 'softora-apple-kwaliteit-software', title: 'Softora Apple kwaliteit software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'softora-gpt-af', title: 'Softora GPT af', imageId: 'softora-apple-kwaliteit-software' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'impactbox-draaiend', title: 'Impactbox draaiend', imageId: 'softora-apple-kwaliteit-software' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'vitalora-draaiend', title: 'Vitalora draaiend', imageId: 'vitalora-draaiend' \}/);
   assert.match(endGameCardsJs, /id: 'silence-controle',[\s\S]*?title: 'Silence controle',[\s\S]*?missionText: 'Ik luister, zeg niets en ga geen discussie aan\.',[\s\S]*?imageId: 'silence-controle'/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
@@ -613,7 +615,7 @@ test('live momentum Supabase-scope is alleen voor Full Acces accounts', () => {
   assert.match(scopeConfig, /ADMIN_ONLY_UI_STATE_SCOPES/);
 });
 
-test('Silence controle is een unieke missie 54 met geïsoleerde duurzame state', () => {
+test('Silence controle is een unieke missie 56 met geïsoleerde duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
@@ -630,7 +632,7 @@ test('Silence controle is een unieke missie 54 met geïsoleerde duurzame state',
     missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
     imageId: 'silence-controle'
   }]);
-  assert.equal(missionNumber, 54);
+  assert.equal(missionNumber, 56);
   assert.equal(cardIndex, checkpointIndex - 1);
 
   const oldPersistedOrder = catalog

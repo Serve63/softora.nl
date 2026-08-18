@@ -16,6 +16,8 @@
     { id: 'bestaanszekerheid-bedrijf', title: 'Bestaanszekerheid bedrijf' },
     { id: 'softora-apple-kwaliteit-software', title: 'Softora Apple kwaliteit software' },
     { id: 'softora-gpt-af', title: 'Softora GPT af', imageId: 'softora-apple-kwaliteit-software' },
+    { id: 'impactbox-draaiend', title: 'Impactbox draaiend', imageId: 'softora-apple-kwaliteit-software' },
+    { id: 'vitalora-draaiend', title: 'Vitalora draaiend', imageId: 'vitalora-draaiend' },
     { id: 'eigen-koophuis-kopen', title: 'Eigen koophuis kopen' },
     { id: 'leuke-vriendin', title: 'Leuke vriendin' },
     { id: 'eigen-cinema', title: 'Eigen Cinema' },
@@ -164,7 +166,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260815a`;
+    image.src = `/assets/live-momentum-endgame-cards/${imageId}.png?v=20260818a`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
