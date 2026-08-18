@@ -17,9 +17,22 @@ const {
   scoreSignal,
 } = require('../../server/services/lead-radar');
 const { registerLeadRadarRoutes } = require('../../server/routes/lead-radar');
+const { createQueryDiagnostics, summarizeScanDiagnostics } = require('../../server/services/lead-radar-diagnostics');
 
 const repoRoot = path.join(__dirname, '../..');
 const readRepoFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+
+test('Lead Radar bewaart zichtbare redenen waarom ruwe resultaten worden afgewezen', () => {
+  const diagnostics = createQueryDiagnostics();
+  diagnostics.reject('provider_or_showcase');
+  diagnostics.reject('missing_publication_date');
+  diagnostics.accept();
+  assert.deepEqual(diagnostics.snapshot(), { acceptedCount: 1, rejectionReasons: { provider_or_showcase: 1, missing_publication_date: 1 } });
+  assert.deepEqual(summarizeScanDiagnostics([{ ...diagnostics.snapshot() }, { rejectionReasons: { provider_or_showcase: 2 } }]), {
+    acceptedSignalCount: 1,
+    rejectionReasons: { provider_or_showcase: 3, missing_publication_date: 1 },
+  });
+});
 
 test('Lead Radar normaliseert alleen toegestane openbare URLs', () => {
   assert.equal(normalizePlatform('https://www.facebook.com/groups/softora/posts/1'), 'facebook');
@@ -301,6 +314,7 @@ test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () 
   assert.equal(status.autoScan.enabled, false);
   assert.equal(status.autoScan.initialLookbackDays, 30);
   assert.equal(status.autoScan.refreshLookbackDays, 3);
+  assert.equal(status.defaults.maxQueries, 50);
 });
 
 test('Lead Radar gebruikt een eigen ruimere Supabase-timeout zonder globale cooldown', async () => {
@@ -410,12 +424,13 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
   assert.doesNotMatch(script, /Automatisch actief/);
   assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260818a/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260818a/);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260818b/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260818b/);
   assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
   assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
   assert.match(page, /id="scan-max-age-days"/);
-  assert.match(page, /id="scan-max-queries"[^>]*max="12"/);
+  assert.match(page, /id="scan-max-queries"[^>]*max="50"/);
+  assert.match(page, /Afwijsredenen verschijnen bij de scanrun/);
 });
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
@@ -427,5 +442,11 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
+  assert.match(envExample, /LEAD_RADAR_RETENTION_DAYS=90/);
+  assert.match(envExample, /LEAD_RADAR_SCAN_RUN_RETENTION_DAYS=180/);
+  const maintenance = readRepoFile('server/services/lead-radar-maintenance.js');
+  assert.match(maintenance, /not_relevant/);
+  assert.match(maintenance, /archived/);
+  assert.match(maintenance, /source_type.*serp/);
 });
 
