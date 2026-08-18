@@ -17,6 +17,7 @@ alter table public.softora_social_lead_signals
   add column if not exists business_rating_votes integer,
   add column if not exists business_match_status text not null default 'not_checked',
   add column if not exists business_match_score integer,
+  add column if not exists business_agency_detected boolean,
   add column if not exists business_match_reasons jsonb not null default '[]'::jsonb,
   add column if not exists business_candidates jsonb not null default '[]'::jsonb,
   add column if not exists business_source text,
