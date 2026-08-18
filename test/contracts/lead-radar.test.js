@@ -6,7 +6,12 @@ const fs = require('fs');
 const path = require('path');
 const {
   buildSearchPlan,
+  buildSignalFromProviderItem,
+  classifySignal,
   createLeadRadarService,
+  hasCompletedInitialBackfill,
+  isLikelyDirectPlatformPostUrl,
+  normalizeProviderPublishedAt,
   normalizeHttpUrl,
   normalizePlatform,
   scoreSignal,
@@ -18,25 +23,29 @@ const readRepoFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relat
 
 test('Lead Radar normaliseert alleen toegestane openbare URLs', () => {
   assert.equal(normalizePlatform('https://www.facebook.com/groups/softora/posts/1'), 'facebook');
-  assert.equal(normalizePlatform('https://www.instagram.com/p/abc123/'), 'instagram');
+  assert.equal(normalizePlatform('https://www.linkedin.com/posts/softora_website-123'), 'linkedin');
+  assert.equal(normalizePlatform('https://www.instagram.com/p/abc123/'), '');
   assert.equal(normalizeHttpUrl('https://example.nl/bedrijf/#contact', { allowPlatform: false }), 'https://example.nl/bedrijf');
   assert.equal(normalizeHttpUrl('http://localhost:3000', { allowPlatform: false }), '');
   assert.equal(normalizeHttpUrl('https://192.168.1.10/site', { allowPlatform: false }), '');
   assert.equal(normalizeHttpUrl('file:///C:/secret.txt', { allowPlatform: false }), '');
 });
 
-test('Lead Radar bouwt kleine Facebook- en Instagram-queryfamilies met regionale dekking', () => {
-  const nationwide = buildSearchPlan({ platforms: ['facebook', 'instagram'], regionMode: 'nationwide', keywordGroups: ['direct_website'] });
+test('Lead Radar bouwt kleine Facebook- en LinkedIn-queryfamilies met regionale dekking', () => {
+  const nationwide = buildSearchPlan({ platforms: ['facebook', 'linkedin'], regionMode: 'nationwide', keywordGroups: ['direct_website'] });
   assert.ok(nationwide.length > 20);
   assert.ok(nationwide.some((item) => item.query.startsWith('site:facebook.com')));
-  assert.ok(nationwide.some((item) => item.query.startsWith('site:instagram.com')));
+  assert.ok(nationwide.some((item) => item.query.includes('site:linkedin.com/posts')));
+  assert.deepEqual(new Set(nationwide.slice(0, 2).map((item) => item.platform)), new Set(['facebook', 'linkedin']));
+  assert.ok(nationwide.every((item) => !item.query.includes('instagram')));
+  assert.ok(nationwide.every((item) => item.query.includes('-marketingbureau')));
   assert.ok(nationwide.every((item) => item.query.includes('Nederland')));
 
   const regional = buildSearchPlan({ platforms: ['facebook'], regionMode: 'regional', keywordGroups: ['webshop'] });
   assert.ok(regional.some((item) => item.region === 'Noord-Brabant'));
   assert.ok(regional.some((item) => item.region === 'Eindhoven'));
 
-  const custom = buildSearchPlan({ platforms: ['instagram'], regions: ['Oisterwijk', 'Noord-Brabant'], keywordGroups: ['direct_website'] });
+  const custom = buildSearchPlan({ platforms: ['linkedin'], regions: ['Oisterwijk', 'Noord-Brabant'], keywordGroups: ['direct_website'] });
   assert.deepEqual([...new Set(custom.map((item) => item.region))].sort(), ['Noord-Brabant', 'Oisterwijk']);
 
   const recent = buildSearchPlan({ platforms: ['facebook'], regions: ['Nederland'], keywordGroups: ['direct_website'], maxAgeDays: 7 });
@@ -60,6 +69,225 @@ test('Lead Radar scoreert directe en recente websitevragen hoger', () => {
   assert.ok(recent.reasons.includes('Aantal reacties onbekend') || recent.reasons.includes('Engagement onbekend'));
 });
 
+test('Lead Radar filtert zelfpromotie van webbouwers zonder echte klantvraag', () => {
+  const providerOne = {
+    url: 'https://www.facebook.com/websitedesigner.nu',
+    title: 'Websitedesigner',
+    snippet: 'Wij bouwen websites & webshops + SEO optimalisatie voor meer bezoekers op je website. Website laten maken? Wij bouwen websites & webshops + online marketing.',
+  };
+  const providerTwo = {
+    url: 'https://www.facebook.com/example/posts/123',
+    title: '# Maatwerk website laten maken? * Volledig via programmering ...',
+    snippet: 'Maatwerk website laten maken? Volledig via programmering ontworpen; Geschikt voor mobiel, tablet en computer; Gemakkelijk zelf wijzigingen doorvoeren.',
+  };
+  const prospect = {
+    url: 'https://www.facebook.com/kapsalonnijlen/posts/123',
+    title: 'Kapsalon Nijlen',
+    snippet: 'Beste we zijn opzoek naar iemand die een website kan maken. Neem gerust contact met ons op.',
+    timestamp: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+  };
+
+  assert.equal(classifySignal(providerOne).role, 'provider');
+  assert.equal(classifySignal(providerTwo).role, 'provider');
+  assert.equal(buildSignalFromProviderItem(providerOne, { region: 'Nederland' }), null);
+  assert.equal(buildSignalFromProviderItem(providerTwo, { region: 'Nederland' }), null);
+  assert.ok(buildSignalFromProviderItem(prospect, { region: 'Nijlen' }));
+});
+
+test('Lead Radar houdt echte ondernemersvragen en websitebouwers uit elkaar', () => {
+  const classify = (title, snippet) => classifySignal({
+    title,
+    snippet,
+    url: 'https://www.facebook.com/example/posts/123',
+  });
+
+  const agency = classify(
+    'Roweb Webdesign | Deurne',
+    'Wilt u voor een scherpe prijs een WordPress website laten bouwen? Wij bouwen websites voor bedrijven.'
+  );
+  const vacancy = classify(
+    'Effectief B.V.',
+    'VACATURE: ervaren webdeveloper gezocht. Wij zoeken een fulltime collega om ons team te versterken.'
+  );
+  const productSearch = classify(
+    'Marketplace',
+    'Nederlandse website gezocht naar een identieke auto, nergens te koop of te vinden.'
+  );
+  const webshopOwner = classify(
+    'Noor Van Dam',
+    'WEBdesigner gezocht. Ik zoek iemand die mijn webshop kan verbeteren en professioneler kan maken.'
+  );
+  const butcher = classify(
+    'Slagerij Echt Ambachtelijk',
+    'WEBSITEBOUWER GEZOCHT! WIE HELPT.'
+  );
+
+  assert.equal(agency.role, 'provider');
+  assert.equal(vacancy.role, 'excluded');
+  assert.equal(productSearch.isWebsiteNeed, false);
+  assert.equal(classifySignal({ title: 'Team Rood', snippet: 'ZZP\'ers en bedrijven zonder website opgelet! Wil jij een website laten ontwikkelen? Dan is dit je kans.' }).role, 'provider');
+  assert.equal(classifySignal({ title: 'Fine Graphic', snippet: 'GumFree heeft een nieuwe website laten ontwikkelen door Fine Graphic.' }).role, 'provider');
+  assert.equal(webshopOwner.role, 'prospect');
+  assert.equal(butcher.role, 'prospect');
+  assert.equal(classifySignal({ title: 'Algemene pagina', snippet: 'Maatwerk website laten maken? Volledig via programmering ontworpen.' }).role, 'provider');
+  assert.equal(classifySignal({ title: 'Algemene pagina', snippet: 'Website laten maken.' }).role, 'unclear');
+  assert.equal(buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/124',
+    title: 'Marketplace',
+    snippet: productSearch.message || 'Nederlandse website gezocht naar een identieke auto.',
+  }, { region: 'Nederland' }), null);
+});
+
+test('Lead Radar behandelt een website-link uit een bericht eerst als kandidaat', () => {
+  const signal = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/123',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner. Bekijk onze huidige website https://voorbeeld.nl',
+    timestamp: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+  }, { region: 'Eindhoven', query: 'site:facebook.com website gezocht Eindhoven', keywordGroup: 'direct_website' });
+  assert.equal(signal.website_url, 'https://voorbeeld.nl');
+  assert.equal(signal.website_status, 'website_not_checked');
+  assert.equal(signal.website_source, 'post');
+});
+
+test('Lead Radar accepteert voor een scan alleen recente directe posts met echte publicatiedatum', () => {
+  const recentTimestamp = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const recent = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/123',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: recentTimestamp,
+    datetime: new Date().toISOString(),
+  }, { region: 'Eindhoven', maxAgeDays: 30, requireFresh: true });
+  const old = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/124',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: new Date(Date.now() - 45 * 86_400_000).toISOString(),
+  }, { region: 'Eindhoven', maxAgeDays: 30, requireFresh: true });
+  const profileOnly = buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: recentTimestamp,
+  }, { region: 'Eindhoven', maxAgeDays: 30, requireFresh: true });
+
+  assert.equal(normalizeProviderPublishedAt({ datetime: recentTimestamp }), null);
+  assert.equal(normalizeProviderPublishedAt({ date: '17 aug 2026', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-17T00:00:00.000Z');
+  assert.equal(normalizeProviderPublishedAt({ date: '3 dagen geleden', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-14T18:00:00.000Z');
+  assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example/posts/123', 'facebook'), true);
+  assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example', 'facebook'), false);
+  assert.equal(isLikelyDirectPlatformPostUrl('https://www.linkedin.com/posts/softora_website-123', 'linkedin'), true);
+  assert.equal(isLikelyDirectPlatformPostUrl('https://www.linkedin.com/company/softora', 'linkedin'), false);
+  assert.ok(recent);
+  assert.equal(old, null);
+  assert.equal(profileOnly, null);
+  assert.equal(buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+    timestamp: recentTimestamp,
+  }, { region: 'Eindhoven' }), null);
+  assert.equal(buildSignalFromProviderItem({
+    url: 'https://www.facebook.com/example/posts/125',
+    title: 'Voorbeeld bedrijf',
+    snippet: 'Wij zoeken een webdesigner voor onze website.',
+  }, { region: 'Eindhoven' }), null);
+});
+
+test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd worden', async () => {
+  const existing = {
+    id: '00000000-0000-0000-0000-000000000001',
+    website_url: 'https://voorbeeld.nl',
+    website_status: 'website_not_checked',
+    website_source: 'post',
+    website_candidates: [],
+  };
+  const updated = { ...existing };
+  const db = {
+    from() {
+      return {
+        select() {
+          const chain = {
+            eq() { return chain; },
+            limit: async () => ({ data: [existing], error: null }),
+          };
+          return chain;
+        },
+        update(patch) {
+          Object.assign(updated, patch);
+          const chain = {
+            eq() { return chain; },
+            select() { return { single: async () => ({ data: updated, error: null }) }; },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+  const service = createLeadRadarService({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => db,
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<title>Voorbeeld</title>' }),
+    env: {},
+  });
+  const result = await service.lookupWebsite(existing.id);
+  assert.equal(result.website_status, 'website_found');
+  assert.equal(result.website_http_status, 200);
+  assert.equal(result.website_title, 'Voorbeeld');
+});
+
+test('Lead Radar zoekt een openbare bedrijfswebsite en bewaart de klikbare kandidaat', async () => {
+  const existing = {
+    id: '00000000-0000-0000-0000-000000000002',
+    author_name: 'Kapsalon Nijlen',
+    region: 'Nijlen',
+    message_text: 'Wij zoeken iemand die een website kan maken.',
+    website_url: null,
+    website_status: 'website_not_checked',
+    website_candidates: [],
+  };
+  const updated = { ...existing };
+  const db = {
+    from() {
+      return {
+        select() {
+          const chain = {
+            eq() { return chain; },
+            limit: async () => ({ data: [existing], error: null }),
+          };
+          return chain;
+        },
+        update(patch) {
+          Object.assign(updated, patch);
+          const chain = {
+            eq() { return chain; },
+            select() { return { single: async () => ({ data: updated, error: null }) }; },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+  const service = createLeadRadarService({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => db,
+    provider: {
+      configured: true,
+      search: async () => [{ url: 'https://kapsalonnijlen.nl', title: 'Kapsalon Nijlen', snippet: 'Officiele website van Kapsalon Nijlen' }],
+    },
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<title>Kapsalon Nijlen</title>' }),
+    env: {},
+  });
+
+  const result = await service.lookupWebsite(existing.id, { force: true });
+  assert.equal(result.website_url, 'https://kapsalonnijlen.nl');
+  assert.equal(result.website_status, 'website_found');
+  assert.equal(result.website_source, 'public_search');
+  assert.equal(result.website_http_status, 200);
+  assert.equal(result.website_candidates[0].url, 'https://kapsalonnijlen.nl');
+});
+
 test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () => {
   const service = createLeadRadarService({
     env: {},
@@ -70,6 +298,40 @@ test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () 
   assert.equal(status.storageConfigured, false);
   assert.equal(status.provider.configured, false);
   assert.match(status.provider.message, /Configureer|provider/i);
+  assert.equal(status.autoScan.enabled, false);
+  assert.equal(status.autoScan.initialLookbackDays, 30);
+  assert.equal(status.autoScan.refreshLookbackDays, 3);
+});
+
+test('Lead Radar gebruikt een eigen ruimere Supabase-timeout zonder globale cooldown', async () => {
+  const clientOptions = [];
+  const chain = {
+    select() { return chain; },
+    eq() { return chain; },
+    in() { return chain; },
+    order() { return chain; },
+    limit() { return chain; },
+    then(resolve, reject) { return Promise.resolve({ data: [], count: 0, error: null }).then(resolve, reject); },
+  };
+  const service = createLeadRadarService({
+    env: {},
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => { clientOptions.push(options); return { from: () => chain }; },
+  });
+
+  await service.getStatus();
+  assert.ok(clientOptions.some((options) => options.timeoutMs === 10_000));
+  assert.ok(clientOptions.every((options) => options.ignoreFailureCooldown === true));
+  assert.ok(clientOptions.every((options) => options.suppressFailureCooldown === true));
+});
+
+test('Lead Radar vult eerst 30 dagen en schakelt daarna over op een korte updateperiode', () => {
+  const config = { initialLookbackDays: 30 };
+  const incomplete = { status: 'paused', max_age_days: 30, query_cursor: 12, query_plan: Array.from({ length: 20 }) };
+  const complete = { status: 'completed', max_age_days: 30, query_cursor: 20, query_plan: Array.from({ length: 20 }) };
+  assert.equal(hasCompletedInitialBackfill(null, config), false);
+  assert.equal(hasCompletedInitialBackfill(incomplete, config), false);
+  assert.equal(hasCompletedInitialBackfill(complete, config), true);
 });
 
 test('Lead Radar registreert beveiligde adminroutes en geen outbound-acties', () => {
@@ -118,6 +380,8 @@ test('Lead Radar migration is service-role-only and has one canonical website st
   const automaticMigration = readRepoFile('supabase/migrations/20260817130000_softora_social_lead_radar_automatic_scans.sql');
   assert.match(automaticMigration, /add column if not exists scan_mode/i);
   assert.match(automaticMigration, /scan_mode in \('manual', 'automatic'\)/i);
+  const linkedinMigration = readRepoFile('supabase/migrations/20260817150000_softora_social_lead_radar_linkedin.sql');
+  assert.match(linkedinMigration, /platform in \('facebook', 'instagram', 'linkedin'\)/i);
 });
 
 test('Lead Radar page, sidebar and user-visible website labels are wired', () => {
@@ -128,27 +392,40 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   const routing = readRepoFile('server/config/page-routing.js');
   assert.match(shell, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(routing, /map\.set\('lead-radar', map\.get\('premium-lead-radar-shell'\)\)/);
-  assert.doesNotMatch(shell, /assets\/lead-radar-sidebar\.js/);
+  assert.match(shell, /assets\/lead-radar-sidebar\.js\?v=20260817b/);
   assert.match(sidebarScript, /const LINK_KEY = 'lead_radar'/);
   assert.match(sidebarScript, /href = LINK_HREF/);
-  assert.match(sidebarScript, /__softoraLeadRadarSidebarInitialized/);
-  assert.match(sidebarScript, /observer\.disconnect\(\)/);
   assert.match(page, /Geen website gevonden/);
+  assert.match(page, /LinkedIn/);
+  assert.doesNotMatch(page, /Instagram/);
+  assert.doesNotMatch(script, /instagram/i);
   assert.match(page, /id="scan-regions"/);
   assert.match(script, /no_website_found: 'GEEN WEBSITE GEVONDEN'/);
   assert.match(script, /Open originele post/);
+  assert.match(script, /Publicatiedatum:/);
+  assert.match(script, /import-published-at/);
   assert.match(script, /Website zoeken/);
+  assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
-  assert.match(page, /id="auto-scan-status"/);
+  assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
+  assert.doesNotMatch(script, /Automatisch actief/);
+  assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
+  assert.match(page, /assets\/lead-radar\.css\?v=20260818a/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260818a/);
+  assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
+  assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
+  assert.match(page, /id="scan-max-age-days"/);
+  assert.match(page, /id="scan-max-queries"[^>]*max="12"/);
 });
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
   const htmlPages = readRepoFile('server/services/html-pages.js');
   const vercel = readRepoFile('vercel.json');
   const envExample = readRepoFile('.env.example');
-  assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260818a'/);
+  assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260817b'/);
   assert.match(htmlPages, /assets\/lead-radar-sidebar\.js\?v=\$\{LEAD_RADAR_SIDEBAR_VERSION\}/);
-  assert.match(vercel, /"path": "\/api\/lead-radar\/cron"/);
-  assert.match(vercel, /"schedule": "\*\/15 \* \* \* \*"/);
-  assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_INTERVAL_MINUTES=15/);
+  assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
+  assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
+  assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
 });
+
