@@ -302,6 +302,7 @@ test('Lead Radar toont provider en opslagstatus zonder nepresultaten', async () 
   assert.equal(status.autoScan.enabled, false);
   assert.equal(status.autoScan.initialLookbackDays, 30);
   assert.equal(status.autoScan.refreshLookbackDays, 3);
+  assert.equal(status.defaults.maxQueries, 50);
 });
 
 test('Lead Radar gebruikt een eigen ruimere Supabase-timeout zonder globale cooldown', async () => {
@@ -408,7 +409,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.match(page, /lead-radar\.css\?v=20260818a/);
-  assert.match(page, /lead-radar\.js\?v=20260818a/);
+  assert.match(page, /lead-radar\.js\?v=20260818b/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
   const stylesheet = readRepoFile('assets/lead-radar.css');
   assert.doesNotMatch(stylesheet, /lead-radar-header-actions|import-panel|import-form|metric-context/);
@@ -425,7 +426,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /Automatisch actief/);
   assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
   assert.match(page, /assets\/lead-radar\.css\?v=20260818a/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260818a/);
+  assert.match(page, /assets\/lead-radar\.js\?v=20260818b/);
+  assert.match(page, /maximaal 50 zoekacties/);
   assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
   assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
   assert.match(page, /id="scan-max-age-days"/);
@@ -441,4 +443,10 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
+  assert.match(envExample, /LEAD_RADAR_RETENTION_DAYS=90/);
+  assert.match(envExample, /LEAD_RADAR_SCAN_RUN_RETENTION_DAYS=180/);
+  const maintenance = readRepoFile('server/services/lead-radar-maintenance.js');
+  assert.match(maintenance, /not_relevant/);
+  assert.match(maintenance, /archived/);
+  assert.match(maintenance, /source_type.*serp/);
 });
