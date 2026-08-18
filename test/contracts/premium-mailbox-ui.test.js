@@ -120,17 +120,17 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817d/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-discovery\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
-  assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260814a/);
+  assert.match(readPage(), /assets\/premium-mailbox-read\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-body-section\.js\?v=20260811a/);
-  assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
+  assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260817a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260812a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   assert.match(readPage(), /assets\/premium-mailbox-detail-state\.js\?v=20260813a/);
@@ -3087,9 +3087,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260817d/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260817a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -3129,7 +3129,7 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   });
 
   assert.equal(intervals.length, 0);
-  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
   assert.equal(await controller.refresh({ manual: true }), true);
   assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   assert.equal(requests.length, 2);
@@ -3180,12 +3180,12 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé Creusen<\/span>/);
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"><\/div>/);
   assert.match(pageSource, /<button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen"/);
-  assert.match(pageSource, /<span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">Controleren…<\/span>/);
+  assert.match(pageSource, /<span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">Nog niet gecontroleerd<\/span>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260810c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260817d/);
+  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260818a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260818a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3213,7 +3213,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(refreshSource, /function formatRefreshAge\(lastRefreshAt, currentTime = Date\.now\(\)\)/);
   assert.match(refreshSource, /function buildRefreshRequestBatches\(scope, signal\)/);
   assert.match(refreshSource, /for \(const batch of buildRefreshRequestBatches\(scope, signal\)\)/);
-  assert.match(refreshSource, /async function refresh\(\{ manual = false \} = \{\}\)/);
+  assert.match(refreshSource, /function refresh\(\{ manual = false \} = \{\}\)/);
   assert.match(refreshSource, /function start\(\)/);
   assert.match(refreshSource, /button\.addEventListener\('click',[\s\S]*refresh\(\{ manual: true \}\)/);
   assert.match(refreshSource, /owner: scope\.owner,[\s\S]*folder: 'inbox',[\s\S]*incrementalOnly: true,[\s\S]*fastRefresh: true/);
@@ -3489,7 +3489,7 @@ test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespre
   assert.equal(grouped[0].threadMessages[0].folder, 'inbox');
 });
 
-test('eigen uitgaand antwoord verandert threadvolgorde maar niet de inkomende lijstpositie', () => {
+test('eigen uitgaand antwoord werkt de lijstpositie bij op de nieuwste activiteit', () => {
   const rosmalen = {
     id: 'serve@softora.nl|inbox:rosmalen',
     mailboxId: 'inbox:rosmalen',
@@ -3522,10 +3522,10 @@ test('eigen uitgaand antwoord verandert threadvolgorde maar niet de inkomende li
   };
 
   let grouped = campaignInboxModule.filterMessages([rosmalen, newerInbound], 'serve');
-  assert.deepEqual(grouped.map((mail) => mail.mailboxId), ['inbox:newer', 'inbox:rosmalen']);
-  assert.equal(grouped[1].activityAt, '2026-07-07T09:00:00.000Z');
-  assert.equal(grouped[1].latestOutboundAt, '2026-08-05T16:39:00.000Z');
-  assert.equal(grouped[1].threadMessages[0].id, 'sent:rosmalen-reply');
+  assert.deepEqual(grouped.map((mail) => mail.mailboxId), ['inbox:rosmalen', 'inbox:newer']);
+  assert.equal(grouped[0].activityAt, '2026-08-05T16:39:00.000Z');
+  assert.equal(grouped[0].latestOutboundAt, '2026-08-05T16:39:00.000Z');
+  assert.equal(grouped[0].threadMessages[0].id, 'sent:rosmalen-reply');
 
   grouped = campaignInboxModule.filterMessages([{
     ...rosmalen,
@@ -3823,7 +3823,7 @@ test('coldmail inbox toont de ontvangsttijd vast in Europe Amsterdam', () => {
   assert.equal(mail.time, '08:14');
 });
 
-test('coldmail rij gebruikt laatste inkomende reactie en nooit een latere eigen reply', () => {
+test('coldmail rij gebruikt de laatste inkomende of uitgaande activiteit', () => {
   const helpers = loadMailboxHelpersForTest();
   const mail = helpers.normalizeMailboxApiMessage({
     id: 'inbox:ralph',
@@ -3843,10 +3843,10 @@ test('coldmail rij gebruikt laatste inkomende reactie en nooit een latere eigen 
 
   assert.equal(mail.date, '15 juni');
   assert.equal(mail.time, '15:58');
-  assert.equal(mail.activityDate, '15 juni');
-  assert.equal(mail.activityTime, '15:58');
-  assert.match(row, /<span class="mail-date-label">15 juni<\/span>/);
-  assert.match(row, /<span class="mail-time-value">15:58<\/span>/);
+  assert.equal(mail.activityDate, '23 juni');
+  assert.equal(mail.activityTime, '13:32');
+  assert.match(row, /<span class="mail-date-label">23 juni<\/span>/);
+  assert.match(row, /<span class="mail-time-value">13:32<\/span>/);
 });
 
 test('coldmail tabcache behoudt de echte ontvangsttijd en valt niet terug op middernacht', () => {
@@ -3999,7 +3999,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260817d/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260818a/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -4283,8 +4283,8 @@ test('geaccepteerde reply verschijnt direct roze en dedupliceert met vertraagde 
   assert.equal(rootMail.threadMessages[0].folder, 'sent');
   assert.equal(rootMail.threadMessages[0].body, 'Dankjewel voor je reactie 😁');
   assert.equal(rootMail.replyDismissedAt, accepted[0].acceptedAt);
-  assert.equal(rootMail.activityAt, '2026-08-05T10:00:00.000Z');
-  assert.equal(rootMail.latestOutboundAt, accepted[0].acceptedAt);
+  assert.equal(rootMail.activityAt, '2026-08-05T10:01:00.000Z');
+  assert.equal(rootMail.latestOutboundAt, '2026-08-05T10:01:00.000Z');
 
   const refreshed = {
     ...rootMail,
@@ -4308,6 +4308,89 @@ test('geaccepteerde reply verschijnt direct roze en dedupliceert met vertraagde 
   };
   controller.reconcile(otherOwner);
   assert.equal(otherOwner.threadMessages.length, 0);
+});
+
+test('send-ack werkt contacttijdlijn, lijstactiviteit en exact replytarget atomisch bij', async () => {
+  const order = [];
+  const writes = [];
+  const inbound = {
+    id: 'martijn@softora.nl|inbox:58', mailboxId: 'inbox:58', uid: 58,
+    folder: 'inbox', accountEmail: 'martijn@softora.nl', owner: 'martijn',
+    receivedAt: '2026-08-08T10:12:00.000Z', unread: false, replyDismissedAt: '',
+  };
+  const root = {
+    id: 'contact:both:inkoop-seniorenwinkel', accountEmail: 'martijn@softora.nl', owner: 'martijn',
+    activityAt: inbound.receivedAt, latestInboundAt: inbound.receivedAt,
+    threadMessages: [inbound],
+  };
+  const getConversationAction = (mail) => {
+    const latest = [mail, ...(mail.threadMessages || [])]
+      .filter((message) => message.receivedAt)
+      .sort((left, right) => Date.parse(right.receivedAt) - Date.parse(left.receivedAt))[0];
+    return latest?.direction === 'sent'
+      ? { kind: 'new-message', message: latest, isRoot: latest === mail }
+      : { kind: 'reply', message: latest, isRoot: latest === mail };
+  };
+  const outbox = {
+    subscribe() {},
+    async enqueue(payload, metadata) {
+      order.push('handled-outbox');
+      writes.push({ payload, metadata });
+      return { ok: true, pending: true, record: { mutationId: 'accepted-send-handled-1' } };
+    },
+  };
+  const readController = readModule.create({
+    outbox,
+    getAccount: (message) => message.accountEmail,
+    getFolder: (message) => message.folder,
+    getOwner: (message) => message.owner,
+    getRequestId: (message) => message.id,
+    getConversationAction,
+  });
+  const composeController = {
+    reconcile(mail) {
+      order.push('optimistic-card');
+      if (!mail.threadMessages.some((message) => message.messageId === '<accepted-inkoop@softora.nl>')) {
+        mail.threadMessages.push({
+          id: 'accepted-sent:inkoop', folder: 'sent', direction: 'sent',
+          accountEmail: 'martijn@softora.nl', owner: 'martijn',
+          messageId: '<accepted-inkoop@softora.nl>', receivedAt: '2026-08-18T11:14:16.000Z',
+        });
+      }
+      mail.latestOutboundAt = '2026-08-18T11:14:16.000Z';
+      mail.activityAt = mail.latestOutboundAt;
+      return mail;
+    },
+  };
+  let renderCount = 0;
+  let openCount = 0;
+  const completion = uiStateModule.completeAcceptedSend({
+    record: {
+      mode: 'reply', sourceMailId: root.id,
+      replyTarget: { ...inbound },
+    },
+    mails: [root],
+    composeController,
+    readController,
+    findMail: (id) => id === root.id ? root : null,
+    renderList: () => { renderCount += 1; },
+    getActiveMail: () => root.id,
+    openMail: () => { openCount += 1; },
+  });
+
+  assert.deepEqual(order, ['handled-outbox', 'optimistic-card']);
+  assert.equal(root.threadMessages.length, 2);
+  assert.equal(root.threadMessages.filter((message) => message.direction === 'sent').length, 1);
+  assert.equal(root.activityAt, '2026-08-18T11:14:16.000Z');
+  assert.ok(inbound.replyDismissedAt);
+  assert.equal(inbound.replyDismissPending, true);
+  assert.equal(renderCount, 1);
+  assert.equal(openCount, 1);
+  assert.equal((await completion.handledPromise).pending, true);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].payload.id, inbound.id);
+  assert.equal(writes[0].payload.uid, 58);
+  assert.equal(writes[0].payload.dismissReply, true);
 });
 
 test('gecombineerde mailbox verstuurt via het concrete account en niet met owner both', async () => {
@@ -6011,7 +6094,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260817d/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260817d/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260818a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);

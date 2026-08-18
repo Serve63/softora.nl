@@ -71,20 +71,21 @@
           }, { once: true });
         });
     const freshnessByScope = new Map();
-    let refreshInFlight = false;
-    let refreshQueued = false;
+    const inFlightRequests = new Map();
     let started = false;
     let destroyed = false;
     let paused = false;
     let refreshTimer = 0;
     let refreshAgeTimer = 0;
-    let activeController = null;
+    let activeRequest = null;
+    let requestGeneration = 0;
+    let lifecycleGeneration = 0;
     let failureCount = 0;
 
     function handleDetailPriority() {
-      if (!refreshInFlight) return;
-      refreshQueued = true;
-      activeController?.abort?.();
+      if (!activeRequest || activeRequest.foreground) return;
+      activeRequest.interruptedByDetail = true;
+      activeRequest.controller?.abort?.();
     }
 
     function getScope() {
@@ -94,17 +95,24 @@
     function getFreshness(scope = getScope()) {
       const key = getScopeKey(scope);
       if (!freshnessByScope.has(key)) {
-        freshnessByScope.set(key, { status: 'checking', lastSuccessfulAt: 0, lastErrorAt: 0 });
+        freshnessByScope.set(key, { status: 'idle', lastSuccessfulAt: 0, lastErrorAt: 0 });
       }
       return freshnessByScope.get(key);
+    }
+
+    function isForegroundChecking(scopeKey = getScopeKey(getScope())) {
+      return Array.from(inFlightRequests.values())
+        .some((requestState) => requestState.foreground && requestState.scopeKey === scopeKey);
     }
 
     function updateRefreshAge() {
       if (!ageLabel) return;
       const scope = getScope();
+      const scopeKey = getScopeKey(scope);
       const state = getFreshness(scope);
       const age = formatRefreshAge(state.lastSuccessfulAt, getNow());
-      if (state.status === 'checking') {
+      const checking = isForegroundChecking(scopeKey);
+      if (checking) {
         ageLabel.textContent = 'Controleren…';
       } else if (state.status === 'partial') {
         ageLabel.textContent = 'Deels bijgewerkt';
@@ -117,7 +125,7 @@
       const checkedText = state.lastSuccessfulAt
         ? new Date(state.lastSuccessfulAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : 'nog niet voltooid';
-      const statusText = state.status === 'checking'
+      const statusText = checking
         ? `Mailboxproviders worden gecontroleerd${ownerText}.`
         : state.status === 'partial'
           ? `Niet alle mailboxproviders konden worden bijgewerkt${ownerText}.`
@@ -128,7 +136,7 @@
       ageLabel.setAttribute('aria-label', statusText);
     }
 
-    function setRefreshing(refreshing) {
+    function setRefreshing(refreshing = isForegroundChecking()) {
       if (!button) return;
       button.disabled = Boolean(refreshing);
       button.classList.toggle('is-refreshing', Boolean(refreshing));
@@ -154,7 +162,7 @@
       clearRefreshTimer();
       refreshTimer = scheduleTimeout(() => {
         refreshTimer = 0;
-        void refresh();
+        void refresh({ reason: 'scheduled' });
       }, Math.max(0, Number(delayMs) || 0));
     }
 
@@ -245,97 +253,107 @@
       )]];
     }
 
-    async function refresh({ manual = false } = {}) {
-      if (destroyed || paused) return false;
+    function refresh({ manual = false } = {}) {
+      if (destroyed || paused) return Promise.resolve(false);
       if (!manual && Number(global.SoftoraMailboxDetailState?.snapshot?.().inFlight) > 0) {
         scheduleNext(1500);
-        return false;
+        return Promise.resolve(false);
       }
-      if (refreshInFlight) {
-        refreshQueued = true;
-        return false;
+      if (activeRequest) {
+        if (manual && !activeRequest.foreground) {
+          activeRequest.foreground = true;
+          setRefreshing();
+          updateRefreshAge();
+        }
+        return activeRequest.promise || Promise.resolve(false);
       }
       const scope = getScope();
       const scopeKey = getScopeKey(scope);
       const state = getFreshness(scope);
       clearRefreshTimer();
-      refreshInFlight = true;
-      state.status = 'checking';
-      setRefreshing(true);
+      const requestState = {
+        token: ++requestGeneration,
+        generation: lifecycleGeneration,
+        scopeKey,
+        foreground: manual,
+        interruptedByDetail: false,
+        controller: typeof AbortController === 'function' ? new AbortController() : null,
+        promise: null,
+      };
+      activeRequest = requestState;
+      inFlightRequests.set(requestState.token, requestState);
+      setRefreshing();
       updateRefreshAge();
-      activeController = typeof AbortController === 'function' ? new AbortController() : null;
-      const signal = activeController?.signal;
-      try {
-        const settled = [];
-        let listUpdated = false;
-        for (const batch of buildRefreshRequestBatches(scope, signal)) {
-          const batchSettled = await Promise.allSettled(batch.map((startRequest) => startRequest()));
-          settled.push(...batchSettled);
-          if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
-          const batchFulfilled = batchSettled
-            .filter((entry) => entry.status === 'fulfilled')
-            .map((entry) => entry.value);
-          if (!batchFulfilled.length) continue;
-          const batchListUpdated = await loadMessages({
-            showLoader: false,
-            skipBackgroundSync: true,
-            skipProviderRefresh: true,
-            skipPageBootstrap: true,
-            openLatest: false,
-            preserveOnError: true,
-          });
-          if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
-          if (batchListUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
-          listUpdated = true;
-        }
-        const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
-        const rejected = settled.filter((entry) => entry.status === 'rejected');
-        const partialPayload = fulfilled.some((entry) => entry?.data?.ok === false);
-        if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
-        if (listUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
+      const signal = requestState.controller?.signal;
+      requestState.promise = (async () => {
+        try {
+          const settled = [];
+          let listUpdated = false;
+          for (const batch of buildRefreshRequestBatches(scope, signal)) {
+            const batchSettled = await Promise.allSettled(batch.map((startRequest) => startRequest()));
+            settled.push(...batchSettled);
+            if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
+            const batchFulfilled = batchSettled
+              .filter((entry) => entry.status === 'fulfilled')
+              .map((entry) => entry.value);
+            if (!batchFulfilled.length) continue;
+            const batchListUpdated = await loadMessages({
+              showLoader: false,
+              skipBackgroundSync: true,
+              skipProviderRefresh: true,
+              skipPageBootstrap: true,
+              openLatest: false,
+              preserveOnError: true,
+            });
+            if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
+            if (batchListUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
+            listUpdated = true;
+          }
+          const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
+          const rejected = settled.filter((entry) => entry.status === 'rejected');
+          const partialPayload = fulfilled.some((entry) => entry?.data?.ok === false);
+          if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
+          if (listUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
 
-        const complete = !rejected.length && !partialPayload;
-        if (complete) {
-          state.lastSuccessfulAt = getNow();
-          state.status = 'ok';
-          failureCount = 0;
-        } else {
-          state.status = 'partial';
+          const complete = !rejected.length && !partialPayload;
+          if (complete) {
+            state.lastSuccessfulAt = getNow();
+            state.status = 'ok';
+            failureCount = 0;
+          } else {
+            state.status = 'partial';
+            state.lastErrorAt = getNow();
+            failureCount += 1;
+          }
+          if (manual) showToast(complete ? 'Mailbox volledig bijgewerkt' : 'Mailbox gedeeltelijk bijgewerkt');
+          return complete;
+        } catch (error) {
+          if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
+          state.status = 'recovering';
           state.lastErrorAt = getNow();
           failureCount += 1;
-        }
-        updateRefreshAge();
-        if (manual) showToast(complete ? 'Mailbox volledig bijgewerkt' : 'Mailbox gedeeltelijk bijgewerkt');
-        return complete;
-      } catch (error) {
-        if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
-        state.status = 'recovering';
-        state.lastErrorAt = getNow();
-        failureCount += 1;
-        updateRefreshAge();
-        if (manual) showToast('Tijdelijke verbindingsstoring; je huidige mailbox blijft zichtbaar.');
-        return false;
-      } finally {
-        if (scopeKey === getScopeKey(getScope())) setRefreshing(false);
-        refreshInFlight = false;
-        activeController = null;
-        if (!destroyed && !paused) {
-          if (refreshQueued) {
-            refreshQueued = false;
-            scheduleNext(0);
-          } else {
-            scheduleNext();
+          if (manual) showToast('Tijdelijke verbindingsstoring; je huidige mailbox blijft zichtbaar.');
+          return false;
+        } finally {
+          inFlightRequests.delete(requestState.token);
+          if (activeRequest === requestState) activeRequest = null;
+          setRefreshing();
+          updateRefreshAge();
+          if (
+            !destroyed
+            && !paused
+            && requestState.generation === lifecycleGeneration
+          ) {
+            scheduleNext(requestState.interruptedByDetail ? 1500 : getNextDelay());
           }
         }
-      }
+      })();
+      return requestState.promise;
     }
 
     function requestImmediateRefresh() {
       if (!started || destroyed || paused) return;
-      if (refreshInFlight) {
-        refreshQueued = true;
-        return;
-      }
+      if (activeRequest) return;
       scheduleNext(0);
     }
 
@@ -345,10 +363,12 @@
     }
 
     function scopeChanged() {
-      activeController?.abort?.();
-      refreshQueued = false;
+      lifecycleGeneration += 1;
+      activeRequest?.controller?.abort?.();
+      if (activeRequest) inFlightRequests.delete(activeRequest.token);
+      activeRequest = null;
       failureCount = 0;
-      setRefreshing(false);
+      setRefreshing();
       updateRefreshAge();
       requestImmediateRefresh();
     }
@@ -366,11 +386,14 @@
     function handlePageHide(event) {
       if (event?.persisted === true) {
         paused = true;
-        refreshQueued = false;
-        activeController?.abort?.();
+        lifecycleGeneration += 1;
+        activeRequest?.controller?.abort?.();
+        if (activeRequest) inFlightRequests.delete(activeRequest.token);
+        activeRequest = null;
         clearRefreshTimer();
         stopRefreshAgeTimer();
-        setRefreshing(false);
+        setRefreshing();
+        updateRefreshAge();
         return;
       }
       destroy();
@@ -403,9 +426,14 @@
       if (destroyed) return;
       destroyed = true;
       paused = false;
-      activeController?.abort?.();
+      lifecycleGeneration += 1;
+      activeRequest?.controller?.abort?.();
+      if (activeRequest) inFlightRequests.delete(activeRequest.token);
+      activeRequest = null;
       clearRefreshTimer();
       stopRefreshAgeTimer();
+      setRefreshing();
+      updateRefreshAge();
       documentRef?.removeEventListener?.('visibilitychange', handleVisibilityChange);
       windowRef?.removeEventListener?.('focus', requestImmediateRefresh);
       windowRef?.removeEventListener?.('online', requestImmediateRefresh);
@@ -421,6 +449,11 @@
       destroy,
       refresh,
       requestImmediateRefresh,
+      snapshot: () => ({
+        foregroundInFlight: Array.from(inFlightRequests.values()).filter((entry) => entry.foreground).length,
+        inFlight: inFlightRequests.size,
+        status: getFreshness().status,
+      }),
       scopeChanged,
       start,
       updateRefreshAge,

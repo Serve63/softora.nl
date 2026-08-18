@@ -122,6 +122,7 @@ test('MHCBE suggested reply keeps one canonical identity through edit and send p
 
 test('rapid conversation switching sends only the exact latest opened message context', async () => {
   const requests = [];
+  const acceptedRecords = [];
   const values = {
     'c-to': { value: '' }, 'c-cc': { value: '' }, 'c-bcc': { value: '' },
     'c-subject': { value: '' }, 'c-body': { value: 'Veilige synthetische test.' },
@@ -186,6 +187,7 @@ test('rapid conversation switching sends only the exact latest opened message co
       requests.push({ url, payload: JSON.parse(options.body) });
       return { ok: true, json: async () => ({ ok: true, result: {} }) };
     },
+    onAcceptedSend: (record) => acceptedRecords.push(record),
     toast() {},
   });
 
@@ -200,6 +202,10 @@ test('rapid conversation switching sends only the exact latest opened message co
   assert.equal(requests[0].payload.context.messageId, '<second@example.nl>');
   assert.equal(requests[0].payload.replyIdentity.sourceMessageId, '<second@example.nl>');
   assert.equal(requests[0].payload.context.conversationId, 'conversation:second');
+  assert.equal(acceptedRecords.length, 1);
+  assert.equal(acceptedRecords[0].sourceMailId, second.id);
+  assert.equal(acceptedRecords[0].replyTarget.id, secondLatest.id);
+  assert.equal(acceptedRecords[0].replyTarget.uid, secondLatest.uid);
 });
 
 test('captured MHCBE payload passes real preflight and selects only the exact mocked Instantly adapter', async () => {

@@ -737,7 +737,8 @@ const mailboxComposeController = window.SoftoraMailboxComposeController.create({
   loadSenderProfile: loadMailboxSenderProfile,
   loadMessages: loadMailboxMessages,
   normalizeAcceptedMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'sent', skipAcceptedReconcile: true }),
-  onAcceptedSend() { window.SoftoraMailboxUiState.refresh({ mails, controller: mailboxComposeController, onlyWhenChanged: true, renderList, getActiveMail: () => activeMail, openMail }); },
+  formatMailDate,
+  onAcceptedSend: (record) => window.SoftoraMailboxUiState.completeAcceptedSend({ record, mails, composeController: mailboxComposeController, readController: mailboxReadController, findMail: findMailById, renderList, getActiveMail: () => activeMail, openMail }),
   composeWindow: mailboxComposeWindow,
   toast,
 });

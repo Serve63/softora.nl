@@ -24,15 +24,34 @@
     return options.readController?.reconcile?.(accepted) || accepted;
   }
 
+  function completeAcceptedSend(options = {}) {
+    const record = options.record && typeof options.record === 'object' ? options.record : {};
+    const mail = options.findMail?.(record.sourceMailId) || null;
+    let handledPromise = null;
+    if (record.mode === 'reply' && record.replyTarget && options.readController?.dismissReplyTarget) {
+      handledPromise = options.readController.dismissReplyTarget(mail, record.replyTarget, { render() {} });
+    }
+    const changed = refresh({
+      ...options,
+      controller: options.composeController,
+      onlyWhenChanged: false,
+    });
+    return { changed, handledPromise, mail };
+  }
+
   function normalizeMessageState(message, when, formatMailDate) {
     const source = message && typeof message === 'object' ? message : {};
-    const activityAt = source.latestInboundAt || source.receivedAt || source.date || source.activityAt;
+    const latestInboundAt = source.latestInboundAt || source.receivedAt || source.date || '';
+    const latestOutboundAt = source.latestOutboundAt || '';
+    const activityAt = [source.activityAt, latestInboundAt, latestOutboundAt]
+      .filter((value) => Number.isFinite(Date.parse(value || '')))
+      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || latestInboundAt;
     const activityWhen = formatMailDate(activityAt);
     return {
       autoSubmitted: source.autoSubmitted || '', precedence: source.precedence || '',
       autoResponseSuppress: source.autoResponseSuppress || '', automatedReplyEvidence: source.automatedReplyEvidence === true,
       time: when.time, date: when.date, listDate: when.listDate,
-      activityAt, latestInboundAt: activityAt, latestOutboundAt: source.latestOutboundAt || '',
+      activityAt, latestInboundAt, latestOutboundAt,
       activityTime: activityWhen.time, activityDate: activityWhen.date, activityListDate: activityWhen.listDate,
       readAt: String(source.readAt || ''),
     };
@@ -105,7 +124,7 @@
     return retryRead(options);
   }
 
-  const api = { getReadState, handleReadAction, markReadOnOpen, normalizeMessageState, reconcileMessage, refresh, renderReadTools, retryRead };
+  const api = { completeAcceptedSend, getReadState, handleReadAction, markReadOnOpen, normalizeMessageState, reconcileMessage, refresh, renderReadTools, retryRead };
   global.SoftoraMailboxUiState = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

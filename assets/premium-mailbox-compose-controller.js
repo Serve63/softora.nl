@@ -61,6 +61,8 @@
 
     function recordMatchesMail(record, mail) {
       if (!record || !mail) return false;
+      const sourceMailId = String(record.sourceMailId || '').trim();
+      if (sourceMailId && sourceMailId === String(mail.id || '').trim()) return true;
       if (normalize(record.owner) !== normalize(options.campaignInbox?.getMessageOwner?.(mail))) return false;
       if (normalize(record.accountEmail) !== normalize(mail.accountEmail)) return false;
       const keys = getConversationKeys(mail);
@@ -114,7 +116,20 @@
             identities.add(identity);
           }
           const acceptedAt = String(record.acceptedAt || '');
-          mail.latestOutboundAt = acceptedAt;
+          const outboundAt = String(
+            normalizedMessage?.activityAt || normalizedMessage?.receivedAt || record.acceptedAt || ''
+          );
+          const currentActivityAt = String(mail.activityAt || mail.latestInboundAt || mail.receivedAt || '');
+          mail.latestOutboundAt = outboundAt;
+          if (!currentActivityAt || Date.parse(outboundAt) >= Date.parse(currentActivityAt)) {
+            mail.activityAt = outboundAt;
+            const activityWhen = options.formatMailDate?.(outboundAt);
+            if (activityWhen) {
+              mail.activityTime = activityWhen.time;
+              mail.activityDate = activityWhen.date;
+              mail.activityListDate = activityWhen.listDate;
+            }
+          }
           mail.unread = false;
           mail.replyDismissedAt = acceptedAt;
         });
@@ -360,6 +375,7 @@
       try {
         replySource = resolveReplySource(mail, requestedMessageKey);
         setReplyContext(replySource);
+        replyContext.sourceMailId = String(mail.id || '').trim();
       } catch (error) {
         options.toast(String(error?.message || error));
         return;
@@ -394,6 +410,7 @@
         latestMessage: action.message,
         fallbackAccount: options.getAccount(),
       });
+      if (replyContext) replyContext.sourceMailId = String(mail.id || '').trim();
       replyOwner = String(
         resolveOwnerForMail(mail)
       ).trim().toLowerCase();
@@ -649,8 +666,13 @@
         const acceptedAt = new Date().toISOString();
         const messageId = String(result.messageId || '').trim();
         const providerMessageId = String(result.providerMessageId || '').trim();
-        const contextMail = contextAtSend ? options.findMail(contextAtSend.id) : null;
-        const conversationKeys = Array.from(getConversationKeys(contextMail || contextAtSend));
+        const contextMail = contextAtSend
+          ? options.findMail(contextAtSend.sourceMailId || contextAtSend.id)
+          : null;
+        const conversationKeys = Array.from(new Set([
+          ...getConversationKeys(contextMail || {}),
+          ...getConversationKeys(contextAtSend || {}),
+        ]));
         if (contextAtSend?.providerThreadId) {
           conversationKeys.push(`provider-thread:${normalize(contextAtSend.providerThreadId)}`);
         }
@@ -695,6 +717,21 @@
           owner: normalize(sendOwner),
           accountEmail: normalize(account),
           acceptedAt,
+          mode: sendMode,
+          sourceMailId: String(contextAtSend?.sourceMailId || contextMail?.id || '').trim(),
+          replyTarget: sendMode === 'reply' ? {
+            id: String(contextAtSend?.id || contextAtSend?.mailboxId || '').trim(),
+            mailboxId: String(contextAtSend?.mailboxId || contextAtSend?.id || '').trim(),
+            uid: Number(contextAtSend?.uid || 0) || 0,
+            folder: String(contextAtSend?.folder || 'inbox').trim().toLowerCase(),
+            storageFolder: String(contextAtSend?.folder || 'inbox').trim().toLowerCase(),
+            accountEmail: normalize(account),
+            owner: normalize(sendOwner),
+            providerOwner: normalize(sendOwner),
+            messageId: String(contextAtSend?.messageId || '').trim(),
+            unread: false,
+            replyDismissedAt: '',
+          } : null,
           conversationKeys: Array.from(new Set(conversationKeys.filter(Boolean))),
           message: sentMessage,
         });
