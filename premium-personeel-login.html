@@ -856,7 +856,7 @@
                 } else if (params.get('blocked') === '1') {
                     showError('Toegang geweigerd vanaf dit IP-adres.');
                 } else if (params.get('expired') === '1') {
-                    showError('Je sessie is verlopen. Log opnieuw in om verder te gaan.');
+                    showError('Je bent uitgelogd omdat je sessie niet meer geldig was. Log opnieuw in om verder te gaan.');
                 }
             } catch (_) {
                 if (params.get('setup') === '1') {
@@ -864,7 +864,7 @@
                 } else if (params.get('blocked') === '1') {
                     showError('Toegang geweigerd vanaf dit IP-adres.');
                 } else if (params.get('expired') === '1') {
-                    showError('Je sessie is verlopen. Log opnieuw in om verder te gaan.');
+                    showError('Je bent uitgelogd omdat je sessie niet meer geldig was. Log opnieuw in om verder te gaan.');
                 }
             }
         }

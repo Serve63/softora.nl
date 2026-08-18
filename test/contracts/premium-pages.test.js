@@ -257,7 +257,38 @@ test('protected premium pages clear expired sessions and redirect to login', asy
   assert.equal(result.handled, true);
   assert.equal(cleared.length, 1);
   assert.equal(res.redirectCode, 302);
-  assert.equal(res.redirectLocation, '/premium-personeel-login?next=%2Fpremium-personeel-agenda&expired=1');
+  assert.equal(res.redirectLocation, '/premium-personeel-login?next=%2Fpremium-personeel-agenda&expired=1&logout=1');
+});
+
+test('protected premium pages clear invalid session cookies and explain the logout', async () => {
+  const cleared = [];
+  const controller = createPremiumHtmlPageAccessController({
+    premiumPublicHtmlFiles: new Set(['premium-website.html', 'premium-personeel-login.html']),
+    noindexHeaderValue: 'noindex',
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: false,
+      expired: false,
+      revoked: false,
+      token: 'invalid-session-token',
+    }),
+    clearPremiumSessionCookie: () => cleared.push(true),
+    getSafePremiumRedirectPath: (value, fallback = '/premium-personeel-dashboard') =>
+      String(value || '').trim() || fallback,
+  });
+
+  const req = createRequest({
+    originalUrl: '/premium-personeel-agenda',
+    path: '/premium-personeel-agenda',
+  });
+  const res = createResponseRecorder();
+
+  const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'premium-personeel-agenda.html');
+
+  assert.equal(result.handled, true);
+  assert.equal(cleared.length, 1);
+  assert.equal(res.redirectCode, 302);
+  assert.equal(res.redirectLocation, '/premium-personeel-login?next=%2Fpremium-personeel-agenda&expired=1&logout=1');
 });
 
 test('protected premium pages block disallowed admin ips and emit an audit event', async () => {

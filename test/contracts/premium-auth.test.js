@@ -458,6 +458,45 @@ test('password-register API guard clears an expired session before returning 401
   assert.equal(nextCalls, 0);
 });
 
+test('premium API guard clears an invalid session cookie before returning 401', async () => {
+  let cleared = 0;
+  const guard = createPremiumApiAccessGuard({
+    normalizeString,
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: false,
+      expired: false,
+      revoked: false,
+      token: 'invalid-session-token',
+    }),
+    clearPremiumSessionCookie: () => {
+      cleared += 1;
+    },
+  });
+  const res = {
+    headers: {},
+    statusCode: 200,
+    body: null,
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await guard.requirePremiumApiAccess({}, res, () => {});
+
+  assert.equal(res.statusCode, 401);
+  assert.deepEqual(res.body, { ok: false, error: 'Niet ingelogd.' });
+  assert.equal(cleared, 1);
+});
+
 test('password-register API guard passes only a freshly validated active user', async () => {
   const freshState = {
     configured: true,

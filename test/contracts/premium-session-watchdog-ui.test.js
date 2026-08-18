@@ -51,7 +51,7 @@ test('premium session watchdog redirects protected pages to login after api 401'
   assert.equal(response.status, 401);
   assert.equal(
     windowRef.location.replacedWith,
-    '/premium-personeel-login?next=%2Fpremium-database%3Fstatus%3Dbenaderd%23rij-1&expired=1'
+    '/premium-personeel-login?next=%2Fpremium-database%3Fstatus%3Dbenaderd%23rij-1&logout=1&expired=1'
   );
 });
 
