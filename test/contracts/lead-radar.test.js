@@ -444,8 +444,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260818h/);
-  assert.match(page, /lead-radar\.js\?v=20260818h/);
+  assert.match(page, /lead-radar\.css\?v=20260818i/);
+  assert.match(page, /lead-radar\.js\?v=20260818i/);
   assert.match(page, /id="scan-platforms" data-value="facebook,linkedin"/);
   assert.match(page, /data-custom-select-trigger[\s\S]*aria-haspopup="listbox"[\s\S]*aria-controls="scan-platforms-menu"/);
   assert.match(page, /data-value="facebook,linkedin" aria-selected="true">Facebook en LinkedIn<\/button>[\s\S]*data-value="facebook" aria-selected="false">Facebook<\/button>[\s\S]*data-value="linkedin" aria-selected="false">LinkedIn<\/button>/);
@@ -469,6 +469,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(stylesheet, /::-webkit-scrollbar[\s\S]*display:\s*none/);
   assert.match(stylesheet, /\.lead-side\s*\{[\s\S]*align-items:\s*flex-end/);
   assert.match(stylesheet, /\.lead-source-link\s*\{[\s\S]*width:\s*28px/);
+  assert.match(stylesheet, /\.lead-published-date\s*\{/);
+  assert.match(stylesheet, /\.lead-full-message\s+summary\s*\{/);
   assert.doesNotMatch(stylesheet, /\.lead-date\s*\{|\.lead-source\s*\{/);
   assert.match(stylesheet, /lead-link-warning/);
   assert.match(script, /Leads laden/);
@@ -481,6 +483,10 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /<h3 class="lead-title">/);
   assert.doesNotMatch(script, /const leadTitle = signal\.author_name/);
   assert.match(script, /<p class="lead-summary">/);
+  assert.match(script, /function formatPublishedDate\(value\)/);
+  assert.match(script, /<details class="lead-full-message">[\s\S]*<summary>Lees volledig<\/summary>/);
+  assert.match(script, /lead-full-message__text/);
+  assert.match(script, /lead-published-date/);
   assert.match(script, /lead-source-icon/);
   assert.match(script, /aria-label="Open originele post"/);
   assert.match(script, /lead-side/);
