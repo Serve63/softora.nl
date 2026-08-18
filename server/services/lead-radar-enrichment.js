@@ -9,8 +9,8 @@ const AGENCY_TERMS = Object.freeze([
   'webshopbouwer', 'wordpress specialist', 'shopify partner', 'website maken',
   'websites maken', 'websites bouwen',
 ]);
-const SOCIAL_HOSTS = /(?:^|\\.)facebook\\.|(?:^|\\.)linkedin\\.|(?:^|\\.)instagram\\.|(?:^|\\.)google\\.(?:com|nl)$/i;
-const MAP_HOSTS = /(?:^|\\.)(?:google\\.|googleusercontent\\.|maps\\.)/i;
+const SOCIAL_HOSTS = /(?:^|\.)facebook\.|(?:^|\.)linkedin\.|(?:^|\.)instagram\.|(?:^|\.)google\.(?:com|nl)$/i;
+const MAP_HOSTS = /(?:^|\.)(?:google\.|googleusercontent\.|maps\.)/i;
 
 function limitText(value, max = 500) {
   return String(value ?? '').trim().slice(0, max);
@@ -20,9 +20,9 @@ function normalizeName(value) {
   return limitText(value, 300)
     .toLowerCase()
     .replace(/&/g, ' en ')
-    .replace(/[^a-z0-9\\s]/gi, ' ')
-    .replace(/\\b(bv|b\.v\.|vof|eenmanszaak|stichting|vereniging|bedrijf|onderneming)\\b/gi, ' ')
-    .replace(/\\s+/g, ' ')
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\b(bv|b\.v\.|vof|eenmanszaak|stichting|vereniging|bedrijf|onderneming)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -36,8 +36,8 @@ function containsAgencyTerms(value) {
 }
 
 function normalizeDomain(value) {
-  const raw = limitText(value, 500).replace(/^https?:\\/\\//i, '').split('/')[0].replace(/^www\\./i, '').toLowerCase();
-  return /^[a-z0-9.-]+\\.[a-z]{2,}$/i.test(raw) ? raw : '';
+  const raw = limitText(value, 500).replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '').toLowerCase();
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(raw) ? raw : '';
 }
 
 function websiteUrlFromListing(item, normalizeHttpUrl) {
