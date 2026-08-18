@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260817a">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260818a">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -16,7 +16,7 @@
       <div>
         <p class="lead-radar-eyebrow">SOFTORA ACQUISITIE</p>
         <h1>Lead Radar</h1>
-        <p class="lead-radar-subtitle">Openbare websitevragen uit Facebook en Instagram, met websitecontrole.</p>
+        <p class="lead-radar-subtitle">Openbare websitevragen uit Facebook en LinkedIn, met websitecontrole.</p>
       </div>
       <div class="lead-radar-header-actions">
         <button class="button button-secondary" id="refresh-button" type="button">Vernieuwen</button>
@@ -38,14 +38,13 @@
         <div>
             <p class="section-kicker">LANDDEKKING</p>
             <h2>Nieuwe signalen zoeken</h2>
-            <p id="scan-status-text">De scan gebruikt kleine zoekopdrachten per platform, regio en zoekwoordgroep.</p>
-            <p class="auto-scan-status" id="auto-scan-status">Automatische scanstatus wordt geladen...</p>
+            <p id="scan-status-text">Elke handmatige ronde voert maximaal 12 zoekopdrachten uit. Alleen directe openbare posts met een betrouwbare publicatiedatum binnen de gekozen periode komen in de inbox.</p>
         </div>
         <div class="scan-panel__controls">
           <label>Platforms
             <select id="scan-platforms" multiple size="2">
               <option value="facebook" selected>Facebook</option>
-              <option value="instagram" selected>Instagram</option>
+              <option value="linkedin" selected>LinkedIn</option>
             </select>
           </label>
           <label>Regio
@@ -55,11 +54,19 @@
               <option value="custom">Eigen regio's</option>
             </select>
           </label>
+          <label>Periode
+            <select id="scan-max-age-days">
+              <option value="30" selected>Laatste 30 dagen</option>
+              <option value="7">Laatste 7 dagen</option>
+              <option value="3">Laatste 3 dagen</option>
+              <option value="1">Laatste 24 uur</option>
+            </select>
+          </label>
           <label class="scan-region-input">Eigen regio's
             <input id="scan-regions" type="text" placeholder="Eindhoven, Noord-Brabant, Tilburg" autocomplete="off" disabled>
           </label>
           <label>Zoekopdrachten
-            <input id="scan-max-queries" type="number" min="1" max="100" value="12" inputmode="numeric">
+            <input id="scan-max-queries" type="number" min="1" max="12" value="12" inputmode="numeric">
           </label>
           <label>Websitechecks
             <input id="scan-website-limit" type="number" min="0" max="50" value="10" inputmode="numeric">
@@ -89,10 +96,10 @@
       </div>
       <form class="filter-bar" id="filter-form">
         <label>Platform
-          <select id="filter-platform"><option value="">Alle platforms</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select>
+          <select id="filter-platform"><option value="">Alle platforms</option><option value="facebook">Facebook</option><option value="linkedin">LinkedIn</option></select>
         </label>
         <label>Periode
-          <select id="filter-days"><option value="">Alle datums</option><option value="1">Vandaag</option><option value="3">Laatste 3 dagen</option><option value="7">Laatste 7 dagen</option><option value="30">Laatste 30 dagen</option></select>
+          <select id="filter-days"><option value="30" selected>Laatste 30 dagen</option><option value="1">Vandaag</option><option value="3">Laatste 3 dagen</option><option value="7">Laatste 7 dagen</option><option value="">Alle datums</option></select>
         </label>
         <label>Website
           <select id="filter-website-status"><option value="">Alle statussen</option><option value="no_website_found">Geen website gevonden</option><option value="website_found">Website gevonden</option><option value="website_not_working">Website werkt niet</option><option value="website_unverified">Niet bevestigd</option><option value="website_not_checked">Nog niet gecontroleerd</option><option value="provider_unavailable">Controle niet beschikbaar</option></select>
@@ -127,10 +134,11 @@
     <section class="import-panel" id="import-panel" hidden aria-label="Handmatige lead import">
       <div class="import-panel__heading"><div><p class="section-kicker">HANDMATIG</p><h2>Openbare lead toevoegen</h2></div><button class="icon-button" id="close-import-button" type="button" title="Import sluiten">×</button></div>
       <form id="import-form" class="import-form">
-        <label>Platform<select id="import-platform" required><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label>
-        <label>Originele URL<input id="import-url" type="url" placeholder="https://www.facebook.com/..." required></label>
+        <label>Platform<select id="import-platform" required><option value="facebook">Facebook</option><option value="linkedin">LinkedIn</option></select></label>
+        <label>Directe post-URL<input id="import-url" type="url" placeholder="https://www.facebook.com/.../posts/... of linkedin.com/posts/..." required></label>
         <label>Naam pagina of profiel<input id="import-author" type="text" maxlength="500"></label>
         <label>Regio<input id="import-region" type="text" maxlength="120" placeholder="bijvoorbeeld Eindhoven"></label>
+        <label>Publicatiedatum<input id="import-published-at" type="datetime-local" required></label>
         <label class="import-form__wide">Berichttekst of snippet<textarea id="import-message" maxlength="20000" rows="6" required></textarea></label>
         <label>Website indien bekend<input id="import-website" type="url" placeholder="https://..." ></label>
         <label>Interne notitie<textarea id="import-notes" maxlength="5000" rows="3"></textarea></label>
@@ -138,6 +146,7 @@
       </form>
     </section>
   </main>
-  <script src="/assets/lead-radar.js?v=20260817a" defer></script>
+  <script src="/assets/lead-radar.js?v=20260818a" defer></script>
 </body>
 </html>
+
