@@ -67,32 +67,6 @@ input {
   backdrop-filter: blur(18px);
 }
 
-.momentum-access-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--access-line);
-  border-radius: 12px;
-  color: #9599a8;
-  text-decoration: none;
-  transition: color .18s ease, border-color .18s ease, transform .18s ease;
-}
-
-.momentum-access-close:hover {
-  color: var(--access-ink);
-  border-color: rgba(26, 26, 46, .22);
-  transform: translateY(-1px);
-}
-
-.momentum-access-close svg {
-  width: 18px;
-  height: 18px;
-}
-
 .momentum-access-header {
   padding: 8px 32px 0 0;
 }
@@ -206,8 +180,7 @@ input {
   transform: scale(.96);
 }
 
-.momentum-access-numpad button:focus-visible,
-.momentum-access-close:focus-visible {
+.momentum-access-numpad button:focus-visible {
   outline: 3px solid rgba(35, 159, 88, .25);
   outline-offset: 2px;
 }
