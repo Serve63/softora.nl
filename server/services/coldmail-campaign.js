@@ -325,7 +325,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   const historicalOutboundMailboxGuard = createColdmailHistoricalOutboundGuard({
-    dataOpsStore,
+    dataOpsStore, outboundRecipientGuardStore,
     getConfiguredSenderEmails: () => getConfiguredSenderEmails().filter(isColdmailAutopilotAllowedSenderEmail),
     getAllowedSenderEmails: () => getAllowedSenderEmails().filter(isColdmailAutopilotAllowedSenderEmail),
     getRowEmail, getRowCompany, getRowDomain, isTestRecipientRow, normalizeEmailAddress,
@@ -8389,6 +8389,8 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
 
+    if (!testMode) await historicalOutboundMailboxGuard.assertLedgerReady();
+
     let selectedRows = resolvedRecipients.selectedRows;
     const quota = await getColdmailSendQuota(senderEmail);
     if (!testMode && quota.safetyPause) {
@@ -8660,13 +8662,6 @@ function createColdmailCampaignService(deps = {}) {
             })
           : undefined;
       try {
-        if (!testMode) {
-          const historicalDuplicateBlock = await historicalOutboundMailboxGuard.getBlock(item);
-          if (historicalDuplicateBlock) {
-            failed.push(historicalDuplicateBlock);
-            continue;
-          }
-        }
         const mail = {
           from: formatMailFromHeader(senderEmail, smtpAccount),
           to,

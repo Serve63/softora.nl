@@ -1,5 +1,6 @@
 const DEFAULT_TABLE = 'softora_outbound_recipient_guards';
 const DEFAULT_RESERVATION_TTL_MS = 2 * 60 * 60 * 1000;
+const HISTORICAL_MAILBOX_LEDGER_GUARD_KEY = 'system:mailbox-outbound-ledger-v1';
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
   'googlemail.com',
@@ -191,6 +192,21 @@ function createOutboundRecipientGuardStore(deps = {}) {
     if (!client) return null;
     const keys = getIdentityKeyRows(identity, normalizeString).map((row) => row.guardKey);
     return findRecipientConflictByKeys(client, keys);
+  }
+
+  async function getHistoricalMailboxLedgerStatus() {
+    const client = getClient();
+    if (!client) return { ok: false, reason: 'supabase_not_configured', marker: null };
+    const marker = await findRecipientConflictByKeys(client, [HISTORICAL_MAILBOX_LEDGER_GUARD_KEY]);
+    return {
+      ok: Boolean(
+        marker &&
+        marker.guard_key === HISTORICAL_MAILBOX_LEDGER_GUARD_KEY &&
+        marker.permanent === true
+      ),
+      reason: marker ? '' : 'mailbox_outbound_ledger_marker_missing',
+      marker: marker || null,
+    };
   }
 
   function buildRowsForReservation(items = [], options = {}) {
@@ -430,6 +446,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
 
   return {
     findRecipientConflict,
+    getHistoricalMailboxLedgerStatus,
     reserveRecipients,
     confirmReservation,
     listReservedRecipientGroups,
@@ -439,6 +456,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
 }
 
 module.exports = {
+  HISTORICAL_MAILBOX_LEDGER_GUARD_KEY,
   createOutboundRecipientGuardStore,
   getIdentityKeyRows,
   normalizeIdentity,
