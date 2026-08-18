@@ -338,9 +338,11 @@ function getFreshnessSuffix(maxAgeDays) {
 }
 
 function buildSearchPlan(options = {}) {
-  const platforms = Array.isArray(options.platforms) && options.platforms.length
-    ? options.platforms.map(normalizePlatform).filter(Boolean)
-    : [...PLATFORMS];
+  const platforms = Array.from(new Set(
+    Array.isArray(options.platforms) && options.platforms.length
+      ? options.platforms.map(normalizePlatform).filter(Boolean)
+      : PLATFORMS
+  ));
   const regions = getRegionList(options.regions || options.region, options.regionMode);
   const groups = getSelectedGroups(options.keywordGroups);
   const freshnessSuffix = getFreshnessSuffix(options.maxAgeDays || options.max_age_days);
@@ -1195,4 +1197,3 @@ module.exports = {
   WEBSITE_STATUSES,
   LEAD_STATUSES,
 };
-
