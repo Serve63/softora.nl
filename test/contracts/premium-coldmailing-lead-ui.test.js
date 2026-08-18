@@ -16,6 +16,7 @@ test('premium coldmailing lead page is its own page and uses only coldmailing fo
   assert.match(pageSource, /<h1>Lead<\/h1>/);
   assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /Positieve reacties op webdesign-mails/);
   assert.match(pageSource, /assets\/premium-coldmailing-lead\.js\?v=20260525b/);
   assert.match(scriptSource, /\/api\/coldmailing\/replies\/follow-ups\?limit=100&campaignType=webdesign/);

@@ -14,10 +14,10 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260818a';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20260818b';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
-const LEAD_RADAR_SIDEBAR_VERSION = '20260818a';
+const PREMIUM_SIDEBAR_LINKS_VERSION = '20260818a';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
@@ -25,7 +25,6 @@ const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
   `<script src="/assets/premium-sidebar-autopilot.js?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}" defer></script>`,
   `<script src="/assets/premium-dashboard-ai-chat-scope.js?v=${PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION}" defer></script>`,
-  `<script src="/assets/lead-radar-sidebar.js?v=${LEAD_RADAR_SIDEBAR_VERSION}" defer></script>`,
 ].join('\n');
 const LIVE_MOMENTUM_VIEW_TRANSITION_OPTOUT = `<style id="softora-live-momentum-view-transition-optout">
 @view-transition{navigation:none;}
@@ -52,6 +51,7 @@ html[data-softora-sidebar-content-frame="1"] .monthly-costs-boot-loader{left:0 !
 </style>`;
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
+  `<script src="/assets/premium-sidebar-links.js?v=${PREMIUM_SIDEBAR_LINKS_VERSION}" defer></script>`,
   ...LOCAL_FONT_PRELOAD_LINKS,
   `<style id="softora-premium-sidebar-critical">
 @font-face{font-family:'SoftoraSidebarInter';font-style:normal;font-weight:300 700;font-display:block;src:url('/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}

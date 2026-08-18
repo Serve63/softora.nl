@@ -83,6 +83,7 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
 
   assert.match(pageSource, /data-sidebar-shell="canonical"/);
   assert.match(pageSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
+  assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.match(pageSource, /<main class="main-content momentum-page"/);
   assert.match(pageSource, /data-momentum-focus-toggle/);
@@ -97,6 +98,7 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
   assert.doesNotMatch(focusSource, /localStorage|sessionStorage|location\.(?:assign|replace|reload)/);
   assert.match(accessSource, /data-sidebar-shell="canonical"/);
   assert.match(accessSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
+  assert.match(accessSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(accessSource, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.doesNotMatch(accessSource, /ATTACK, ATTACK, ATTACK\.|THE END GAME IS TO WIN|momentum-access-art/i);
 });
@@ -436,7 +438,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818a'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818b'/);
+  assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
@@ -491,17 +494,22 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   const directoryStyleSource = readRepoFile('assets/kvk-database-total-found.css');
   const directoryScriptSource = readRepoFile('assets/kvk-database-total-found.js');
   const themeSource = readRepoFile('assets/personnel-theme.js');
+  const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
 
   assert.match(pageSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /class="main-content kvk-database-shell__content"/);
   assert.match(pageSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.equal((pageSource.match(/background:\s*#f4f1ed/g) || []).length, 3);
   assert.doesNotMatch(pageSource, /background:\s*#f8f7f4/);
   assert.match(themeSource, /pathname === "\/kvk-database"/);
   assert.match(themeSource, /pathname === "\/kvk-database\.html"/);
+  assert.match(sidebarLinksSource, /function getLeadRadarSidebarLink\(\)/);
+  assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "overzicht", window\.SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\), \["database"\]\)/);
   assert.match(directoryShellSource, /class="dashboard-layout company-directory-shell" data-sidebar-shell="canonical"/);
   assert.match(directoryShellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(directoryShellSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
@@ -738,6 +746,7 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
     /<aside class="sidebar" data-flynow-sidebar-host="1" aria-label="Premium navigatie"><\/aside>/,
     'FLYNOW hoort leeg te starten en daarna de gedeelde premium-sidebar dynamisch te laten vullen'
   );
+  assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /<main class="main-content flynow-main">/);
   assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(pageSource, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
@@ -902,8 +911,9 @@ test('websitegenerator layout gebruikt dezelfde sidebarbreedte als de premium sh
 
 test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw', () => {
   const shellSource = readRepoFile('premium-lead-radar-shell.html');
-  const sidebarSource = readRepoFile('assets/lead-radar-sidebar.js');
   const canonicalSource = readRepoFile('premium-personeel-dashboard.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
   assert.match(shellSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*aria-label="Premium navigatie"/);
@@ -911,18 +921,12 @@ test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw',
   assert.match(shellSource, /assets\/personnel-theme\.css\?v=20260519b/);
   assert.match(shellSource, /assets\/personnel-theme\.js\?v=20260519b/);
   assert.doesNotMatch(shellSource, /assets\/lead-radar-sidebar\.js/);
-  assert.match(shellSource, /class="sidebar-link magnetic active" data-sidebar-key="lead_radar"/);
-  assert.match(shellSource, /<span class="sidebar-link-text">Lead Radar<\/span>/);
+  assert.doesNotMatch(shellSource, /data-sidebar-key="lead_radar"/);
   assert.match(shellSource, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(shellSource, /html, body \{[^}]*scrollbar-width:\s*none/);
   assert.match(shellSource, /\.lead-radar-shell \.sidebar-nav \{[^}]*scrollbar-width:\s*none !important/);
   assert.match(shellSource, /\.lead-radar-shell \.sidebar-nav::-webkit-scrollbar \{[^}]*display:\s*none !important/);
   assert.match(shellSource, /\.lead-radar-shell > \.sidebar \{[^}]*pointer-events:\s*auto !important/);
-  assert.match(sidebarSource, /const LINK_HREF = '\/lead-radar'/);
-  assert.match(sidebarSource, /const LINK_LABEL = 'Lead Radar'/);
-  assert.match(sidebarSource, /overview\.insertBefore\(link, database \|\| null\)/);
-  assert.match(sidebarSource, /__softoraLeadRadarSidebarInitialized/);
-  assert.match(sidebarSource, /window\.setTimeout\(\(\) => observer\.disconnect\(\), 3000\)/);
   const serverHiddenKeys = new Set(['agenda', 'coldmailing', 'websitegenerator', 'bookkeeping', 'pdfs']);
   const visibleSections = (source) => extractSidebarSections(source).map((section) => ({
     ...section,
@@ -934,15 +938,13 @@ test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw',
   assert.deepEqual(
     visibleSections(shellSource),
     visibleSections(canonicalSource),
-    'Lead Radar hoort buiten zijn eigen actieve entry exact dezelfde zichtbare sidebarbron en volgorde te behouden'
+    'Lead Radar hoort via dezelfde runtimebron aan de bestaande sidebar te worden toegevoegd'
   );
-  const overviewLinks = extractSidebarSections(shellSource)[0].links;
-  assert.deepEqual(
-    overviewLinks.slice(overviewLinks.indexOf('coldmailing:Coldmailing') + 1, overviewLinks.indexOf('database:Database')),
-    ['lead_radar:Lead Radar']
-  );
-  assert.match(readRepoFile('assets/personnel-theme.js'), /pathname === "\/lead-radar"/);
-  assert.match(readRepoFile('assets/personnel-theme.js'), /if \(p === "\/lead-radar"\) return "lead_radar"/);
+  assert.match(sidebarLinksSource, /function getLeadRadarSidebarLink\(\)/);
+  assert.match(themeSource, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
+  assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "overzicht", window\.SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\), \["database"\]\)/);
+  assert.match(themeSource, /pathname === "\/lead-radar"/);
+  assert.match(themeSource, /if \(p === "\/lead-radar"\) return "lead_radar"/);
   assert.match(readRepoFile('assets/premium-sidebar-stability.js'), /path === "\/lead-radar"/);
 });
 

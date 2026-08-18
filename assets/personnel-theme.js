@@ -780,9 +780,9 @@
                 label: "Coldcalling",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg>',
             },
+            window.SoftoraPremiumSidebarLinks.getLeadRadarSidebarLink(),
             getDatabaseSidebarLink(),
         ];
-
         const managementLinks = [
             getCustomersSidebarLink(),
             getMailboxSidebarLink(),
@@ -799,7 +799,6 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg>',
             },
         ];
-
         const adsPlatformIcon =
             '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg>';
 
@@ -1045,6 +1044,7 @@
         }
 
         if (overviewSection) {
+            resetStaticSidebarLink(ensureStaticSidebarLink(sidebar, "overzicht", window.SoftoraPremiumSidebarLinks.getLeadRadarSidebarLink(), ["database"]), window.SoftoraPremiumSidebarLinks.getLeadRadarSidebarLink());
             const overviewDatabaseLink = ensureStaticSidebarLink(
                 sidebar,
                 "overzicht",

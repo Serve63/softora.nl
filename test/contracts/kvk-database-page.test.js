@@ -27,6 +27,7 @@ test('kvk database shell keeps the premium sidebar around the scraper', () => {
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
   assert.match(shellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(shellSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(shellSource, /personnel-theme\.css\?v=20260519b/);
   assert.match(shellSource, /personnel-theme\.js\?v=20260519b/);
   assert.match(shellSource, /html, body \{ height: 100%; margin: 0; overflow: hidden;/);
@@ -58,6 +59,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
   assert.match(shellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(shellSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(shellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(shellSource, /<h1 id="company-directory-title">Alle gevonden bedrijven<\/h1>/);
   assert.match(shellSource, /id="company-directory-search"/);
