@@ -3849,6 +3849,31 @@ test('coldmail rij gebruikt de laatste inkomende of uitgaande activiteit', () =>
   assert.match(row, /<span class="mail-time-value">13:32<\/span>/);
 });
 
+test('coldmail rij combineert een activiteit van vandaag nooit met de oude ontvangstdatum', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const row = listModule.renderItem({
+    id: 'martijn@softora.nl|inbox:58',
+    from: 'Inkoop Seniorenwinkel',
+    email: 'inkoop.seniorenwinkel@gmail.com',
+    accountEmail: 'martijn@softora.nl',
+    receivedAt: '2026-08-08T10:12:00.000Z',
+    activityAt: '2026-08-18T11:14:16.000Z',
+    listDate: '8 augustus',
+    time: '12:12',
+    activityListDate: '',
+    activityTime: '13:14',
+  }, {
+    activeMail: '',
+    escapeHtml: String,
+    display: helpers.display,
+    displayOptions: { activeFolder: 'outreach', account: 'martijn@softora.nl' },
+  });
+
+  assert.doesNotMatch(row, /mail-date-label/);
+  assert.doesNotMatch(row, /8 augustus/);
+  assert.match(row, /<span class="mail-time-value">13:14<\/span>/);
+});
+
 test('coldmail tabcache behoudt de echte ontvangsttijd en valt niet terug op middernacht', () => {
   const helpers = loadMailboxHelpersForTest();
   const mail = helpers.normalizeMailboxApiMessage({
