@@ -1,6 +1,5 @@
 const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
-
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
 const DEFAULT_LOGO_PATH = '/assets/softora-touch-icon.png';
@@ -841,6 +840,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Wat is een AI telefonist?', href: '/kennisbank/wat-is-een-ai-telefonist' }),
       Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
       Object.freeze({ label: 'Kosten van een AI telefonist', href: '/blog/ai-telefonist-kosten-mkb', availableFrom: '2026-08-17' }),
+      Object.freeze({ label: 'AI telefonist koppelen aan CRM of agenda', href: '/kennisbank/ai-telefonist-crm-koppeling', availableFrom: '2026-08-18' }),
     ]),
   }),
   ...SEO_CONTENT_QUALITY_V2_ITEMS,

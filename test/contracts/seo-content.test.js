@@ -1330,6 +1330,66 @@ test('AI-telefonist kostengids maakt belvolume, scope en menselijke controle ver
   ]);
 });
 
+test('AI-telefonist CRM-gids maakt events, duplicatecontrole en herstel toetsbaar', () => {
+  const now = new Date('2026-08-18T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'ai-telefonist-crm-koppeling', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const appointmentHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonist-voor-afspraakintake', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const costHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonist-kosten-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-18');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/ai-telefonist');
+  assert.ok(item.informationGain.includes('unieke gebeurtenissleutel'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualType, 'editorial-scene');
+  assert.equal(item.visualBrief.hero.visualFamily, 'documentary-call-routing-workbench');
+  assert.equal(item.visualBrief.support.visualType, 'process-diagram');
+  assert.equal(item.visualBrief.support.visualFamily, 'swiss-stepped-recovery-signal-map');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.sourceType, 'trainedAlgorithmicMedia');
+  assert.equal(item.secondaryImage.sourceType, 'trainedAlgorithmicMedia');
+  assert.equal(item.image.src, '/assets/seo-content/ai-telefonist-crm-routering-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/ai-telefonist-crm-herstelroute-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+  }
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/ai-telefonist-crm-koppeling">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="900">/);
+  assert.match(html, /"datePublished":"2026-08-18"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Gebruik een unieke gebeurtenissleutel vóór je schrijft/);
+  assert.match(html, /href="\/ai-telefonist">AI telefonist laten maken<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-crm-integratie">uitleg over een CRM-integratie<\/a>/);
+  assert.match(html, /href="\/blog\/ai-telefonist-kosten-mkb">kostengids voor een AI telefonist<\/a>/);
+  assert.match(appointmentHtml, /href="\/kennisbank\/ai-telefonist-crm-koppeling"><span>AI telefonist koppelen aan CRM of agenda<\/span><\/a>/);
+  assert.match(costHtml, /href="\/kennisbank\/ai-telefonist-crm-koppeling">AI telefonist koppelen aan CRM of agenda<\/a>/);
+  assert.doesNotMatch(html, /foutloze koppeling|volledig autonome route|gegarandeerde opvolging|altijd beschikbaar/i);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/ai-telefonist-crm-koppeling');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/ai-telefonist-crm-routering-softora.jpg',
+    '/assets/seo-content/ai-telefonist-crm-herstelroute-softora.jpg',
+  ]);
+});
+
 test('adviesbureauspagina maakt projectstart en overdracht controleerbaar', () => {
   const now = new Date('2026-08-16T12:00:00.000Z');
   const item = getSeoContentItem('branches', 'adviesbureaus', { now });

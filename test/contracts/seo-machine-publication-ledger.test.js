@@ -142,6 +142,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/kennisbank/ai-telefonist-crm-koppeling',
+        '2026-08-18',
+        'new_url',
+        'scheduled',
+      ],
     ]
   );
 });
