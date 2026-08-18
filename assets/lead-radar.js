@@ -35,6 +35,14 @@
     banner.innerHTML = `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Websitecontrole van bestaande leads blijft beschikbaar.</span>`;
   }
 
+  function getLeadTitle(signal = {}) {
+    const keywordGroup = String(signal.keyword_group || '').trim().toLowerCase();
+    const message = `${signal.message_text || ''} ${signal.snippet || ''}`.toLowerCase();
+    if (keywordGroup === 'webshop' || /\b(webshop|webwinkel|online shop)\b/.test(message)) return 'Webshop aanvraag';
+    if (keywordGroup === 'renew_or_repair' || /\b(vernieuw|moderniseer|redesign|verbeter|aanpas|onderhoud|werkt niet|doet het niet)\b/.test(message)) return 'Website verbeteren';
+    return 'Website aanvraag';
+  }
+
   function renderMetrics() {
     const counts = state.status && state.status.counts || {};
     [['#metric-total', counts.total], ['#metric-new', counts.new]].forEach(([selector, value]) => { const element = $(selector); if (element) element.textContent = value == null ? '-' : Number(value).toLocaleString('nl-NL'); });
@@ -45,15 +53,16 @@
     const originalUrl = signal.post_url || signal.source_url || '';
     const websiteUrl = signal.website_url || '';
     const websiteCandidates = Array.isArray(signal.website_candidates) ? signal.website_candidates.filter((candidate) => candidate && candidate.url).slice(0, 3) : [];
-    const leadTitle = signal.author_name || signal.message_text || signal.snippet || 'Geen berichttekst beschikbaar.';
-    const leadSummary = signal.author_name ? signal.message_text || signal.snippet || '' : '';
+    const leadTitle = getLeadTitle(signal);
+    const leadSummary = signal.message_text || signal.snippet || '';
     const candidateLinks = websiteCandidates.map((candidate) => `<a class="website-candidate" href="${escapeHtml(candidate.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.title || candidate.url)}</a>`).join('');
-    const originalPostLink = originalUrl ? `<a class="lead-source-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Open originele post</a>` : '';
+    const originalPostLink = originalUrl ? `<a class="lead-source-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open originele post" title="Open originele post"><span class="lead-source-icon" aria-hidden="true">↗</span></a>` : '';
+    const websiteDetails = websiteUrl || websiteCandidates.length || signal.website_title || signal.website_http_status || signal.website_redirect_url;
+    const websiteMarkup = websiteDetails ? `<div class="lead-website">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : websiteCandidates.length ? `<span class="website-url website-url--candidate">Mogelijke websites</span><div class="website-candidates">${candidateLinks}</div>` : ''}${signal.website_title ? `<small class="website-detail">Titel: ${escapeHtml(signal.website_title)}</small>` : ''}${signal.website_http_status ? `<small class="website-detail">HTTP: ${escapeHtml(signal.website_http_status)}</small>` : ''}${signal.website_redirect_url ? `<a class="website-detail" href="${escapeHtml(signal.website_redirect_url)}" target="_blank" rel="noopener noreferrer">Redirect bekijken</a>` : ''}</div>` : '';
     return `<article class="lead-card" data-signal-id="${escapeHtml(signal.id)}">
-      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span></div>
-      <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${leadSummary ? `<p class="lead-summary">${escapeHtml(leadSummary)}</p>` : ''}${originalPostLink}</div>
-      <div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}</div>
-      <div class="lead-website">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : websiteCandidates.length ? `<span class="website-url website-url--candidate">Mogelijke websites</span><div class="website-candidates">${candidateLinks}</div>` : ''}${signal.website_title ? `<small class="website-detail">Titel: ${escapeHtml(signal.website_title)}</small>` : ''}${signal.website_http_status ? `<small class="website-detail">HTTP: ${escapeHtml(signal.website_http_status)}</small>` : ''}${signal.website_redirect_url ? `<a class="website-detail" href="${escapeHtml(signal.website_redirect_url)}" target="_blank" rel="noopener noreferrer">Redirect bekijken</a>` : ''}</div>
+      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span>${originalPostLink}</div>
+      <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${leadSummary ? `<p class="lead-summary">${escapeHtml(leadSummary)}</p>` : ''}</div>
+      <div class="lead-side"><div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}</div>${websiteMarkup}</div>
     </article>`;
   }
 

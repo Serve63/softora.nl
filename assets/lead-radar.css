@@ -73,24 +73,26 @@ input:focus, select:focus, textarea:focus, .custom-select__trigger:focus-visible
 .inbox-heading { padding: 20px 20px 15px; }
 .result-count { color: var(--radar-muted); font-size: 12px; }
 .lead-list { display: grid; }
-.lead-card { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(280px, 2fr) minmax(150px, .8fr) minmax(175px, 1fr); gap: 14px; align-items: start; border-bottom: 1px solid var(--radar-line); padding: 16px 20px; }
+.lead-card { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(280px, 2fr) minmax(220px, 1fr); gap: 14px; align-items: start; border-bottom: 1px solid var(--radar-line); padding: 16px 20px; }
 .lead-card:hover { background: #fffafc; }
-.lead-meta { min-width: 0; }
+.lead-meta { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; }
 .platform-label { display: inline-flex; align-items: center; min-height: 22px; border-radius: 4px; padding: 0 7px; background: #eee8e3; color: #5f534d; font-size: 10px; font-weight: 900; text-transform: uppercase; }
 .platform-label--facebook { background: #e8eef9; color: #345a94; }
 .platform-label--linkedin { background: #e8f2f7; color: #1b6f91; }
 .lead-copy { min-width: 0; }
 .lead-title { display: -webkit-box; overflow: hidden; margin: 0 0 6px; color: var(--radar-text); font-size: 20px; line-height: 1.25; font-weight: 850; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .lead-summary { display: -webkit-box; overflow: hidden; margin: 0 0 10px; color: #3c3430; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
-.lead-location { color: var(--radar-muted); font-size: 12px; line-height: 1.5; }
+.lead-side { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 12px; text-align: right; }
+.lead-location { color: var(--radar-muted); font-size: 12px; line-height: 1.5; text-align: right; }
 .website-detail { display: block; margin-top: 4px; color: var(--radar-muted); font-size: 11px; overflow-wrap: anywhere; }
 .lead-location strong { display: block; color: var(--radar-text); font-size: 12px; }
 .website-url { display: block; margin-top: 7px; color: var(--radar-pink); font-size: 11px; overflow-wrap: anywhere; }
 .website-url--candidate { color: var(--radar-text); font-weight: 700; }
-.website-candidates { display: grid; gap: 3px; margin-top: 5px; }
+.website-candidates { display: grid; justify-items: end; gap: 3px; margin-top: 5px; }
 .website-candidate { color: var(--radar-pink); font-size: 11px; overflow-wrap: anywhere; }
-.lead-source-link { display: inline-block; margin-top: 2px; color: var(--radar-pink); font-size: 11px; font-weight: 750; text-decoration: none; }
-.lead-source-link:hover { text-decoration: underline; }
+.lead-source-link { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #d9cec5; border-radius: 6px; background: #fffdfa; color: var(--radar-pink); text-decoration: none; transition: border-color .15s ease, background .15s ease; }
+.lead-source-link:hover { border-color: var(--radar-pink); background: #f3e0e8; }
+.lead-source-icon { font-size: 17px; line-height: 1; transform: translateY(-1px); }
 .inbox-state { padding: 34px 20px; color: var(--radar-muted); text-align: center; }
 .inbox-state--error { color: var(--radar-danger); }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 16px; }
@@ -98,13 +100,15 @@ input:focus, select:focus, textarea:focus, .custom-select__trigger:focus-visible
 @media (max-width: 1200px) {
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lead-card { grid-template-columns: 1fr 1.6fr 1fr; }
-  .lead-location { grid-column: span 1; }
-  .lead-website { grid-column: 2 / -1; }
+  .lead-side { grid-column: 3; }
 }
 @media (max-width: 760px) {
   .lead-radar-app { padding: 22px 12px 40px; }
   .scan-panel__intro { display: grid; align-items: start; }
   .metric-grid { grid-template-columns: 1fr; }
   .lead-card { grid-template-columns: 1fr; padding: 14px 12px; }
-  .lead-copy, .lead-location, .lead-website { grid-column: 1; }
+  .lead-copy, .lead-side { grid-column: 1; }
+  .lead-side { align-items: flex-start; text-align: left; }
+  .lead-location { text-align: left; }
+  .website-candidates { justify-items: start; }
 }
