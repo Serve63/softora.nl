@@ -201,6 +201,29 @@ test('Lead Radar houdt directe posts zonder publicatiedatum zichtbaar en filtert
   assert.equal(undated.publication_date_source, 'unknown');
 });
 
+test('Lead Radar haalt de publicatiedatum uit openbare postmetadata wanneer SERP geen datum levert', () => {
+  const meta = getPublicPagePublicationDetails(
+    '<meta property="article:published_time" content="2026-08-17T11:32:00+00:00">',
+    '2026-08-18T12:00:00.000Z'
+  );
+  assert.equal(meta.publishedAt, '2026-08-17T11:32:00.000Z');
+  assert.equal(meta.source, 'post_meta');
+
+  const jsonLd = getPublicPagePublicationDetails(
+    '<script type="application/ld+json">{"datePublished":"2026-08-16T09:00:00Z"}</script>',
+    '2026-08-18T12:00:00.000Z'
+  );
+  assert.equal(jsonLd.publishedAt, '2026-08-16T09:00:00.000Z');
+  assert.equal(jsonLd.source, 'post_jsonld');
+});
+
+test('Lead Radar laat echte ondernemersvragen staan en blokkeert advertenties en irrelevante posts', () => {
+  assert.equal(classifySignal({ title: 'Afrodite Lucia', snippet: 'Is er iemand die een website kan maken voor me? Het gaat om beauty, voor het boeken van afspraken.' }).role, 'prospect');
+  assert.equal(classifySignal({ title: 'StartupAmsterdam', snippet: 'Wij zijn op zoek naar iemand die een website kan maken voor een internationaal netwerk.' }).role, 'prospect');
+  assert.equal(classifySignal({ title: 'Lenn Deville', snippet: 'Nexa Society is een privaat netwerk voor jonge bouwers. Beperkte plekken, founding circle is open.' }).role, 'unclear');
+  assert.equal(classifySignal({ title: 'Natalia Grab', snippet: 'In welke taal lees jij ONLINE het meest? Meer Nederlands, meer Engels.' }).role, 'unclear');
+});
+
 test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd worden', async () => {
   const existing = {
     id: '00000000-0000-0000-0000-000000000001',
@@ -439,12 +462,15 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(stylesheet, /lead-radar-header-actions|import-panel|import-form|metric-context/);
   assert.doesNotMatch(stylesheet, /coverage-panel|coverage-summary|coverage-stat|runs-list|run-row|filter-bar|filter-submit|filter-search|scan-region-input/i);
   assert.doesNotMatch(stylesheet, /select\[multiple\]/);
-  assert.doesNotMatch(stylesheet, /lead-actions|lead-notes|lead-date|lead-source\s*\{|lead-author|lead-business|lead-engagement|business-match/);
+  assert.doesNotMatch(stylesheet, /lead-actions|lead-notes|lead-author|lead-business|lead-engagement|business-match/);
   assert.match(stylesheet, /\.custom-select__menu/);
   assert.match(stylesheet, /html, body[\s\S]*scrollbar-width:\s*none/);
   assert.match(stylesheet, /::-webkit-scrollbar[\s\S]*display:\s*none/);
   assert.match(stylesheet, /\.lead-side\s*\{[\s\S]*align-items:\s*flex-end/);
   assert.match(stylesheet, /\.lead-source-link\s*\{[\s\S]*width:\s*28px/);
+  assert.match(stylesheet, /lead-date/);
+  assert.match(stylesheet, /lead-source/);
+  assert.match(stylesheet, /lead-link-warning/);
   assert.match(script, /Leads laden/);
   assert.doesNotMatch(script, /refresh-button|open-import-button|submitImport|import-form|zoekopdrachten|Websitechecks/i);
   assert.doesNotMatch(script, /scan-regions|regionMode\s*===\s*['"]custom['"]|\$\('#scan-region-mode'\)\.value|\$\('#scan-max-age-days'\)\.value/i);
@@ -458,7 +484,11 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /lead-source-icon/);
   assert.match(script, /aria-label="Open originele post"/);
   assert.match(script, /lead-side/);
-  assert.doesNotMatch(script, /Open profiel\/pagina|Publicatiedatum:|Gevonden op:|Bedrijf en website controleren|Opnieuw controleren|Relevant|Later opvolgen|Niet relevant|Interne notitie|Notitie opslaan|lead-actions|lead-notes|data-action|Bedrijfscontrole|BEDRIJF NOG NIET GECONTROLEERD|Engagement|business-match|lead-business|lead-engagement/i);
+  assert.doesNotMatch(script, /Open profiel\/pagina|Bedrijf en website controleren|Opnieuw controleren|Relevant|Later opvolgen|Niet relevant|Interne notitie|Notitie opslaan|lead-actions|lead-notes|data-action|Bedrijfscontrole|BEDRIJF NOG NIET GECONTROLEERD|Engagement|business-match|lead-business|lead-engagement/i);
+  assert.match(script, /Publicatiedatum:/);
+  assert.match(script, /Gevonden op:/);
+  assert.match(script, /post_meta/);
+  assert.match(script, /Directe postlink niet beschikbaar/);
   assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
   assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
