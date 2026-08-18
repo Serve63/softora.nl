@@ -346,9 +346,6 @@
     renderTable();
     renderActions();
 
-    const property = get('[data-seo-property]');
-    if (property && payload.siteUrl) property.textContent = String(payload.siteUrl).replace(/^sc-domain:/, '');
-
     if (!payload.connected) {
       setStatus('Search Console koppeling nodig', 'warning');
       return;
@@ -375,12 +372,7 @@
   }
 
   async function loadPerformance() {
-    const refreshButton = get('[data-seo-refresh]');
     setStatus('Search Console laden...', 'muted');
-    if (refreshButton) {
-      refreshButton.disabled = true;
-      refreshButton.classList.add('is-loading');
-    }
     try {
       const response = await fetch(`${performanceEndpoint}?days=${state.days}`, {
         headers: { Accept: 'application/json' },
@@ -407,11 +399,6 @@
         },
         rows: {},
       });
-    } finally {
-      if (refreshButton) {
-        refreshButton.disabled = false;
-        refreshButton.classList.remove('is-loading');
-      }
     }
   }
 
@@ -445,9 +432,6 @@
       renderTable();
     });
   }
-
-  const refreshButton = get('[data-seo-refresh]');
-  if (refreshButton) refreshButton.addEventListener('click', loadConsole);
 
   loadConsole();
 }());

@@ -16,12 +16,13 @@ test('premium seo page provides a live decision console in the premium shell', (
   );
   assert.match(source, /<main class="main-content seo-performance-main">/);
   assert.match(source, /<h1>SEO Console<\/h1>/);
-  assert.match(source, /Google Search Console &amp; site-audit/);
   assert.match(source, /data-seo-performance-status/);
   assert.match(source, /data-seo-last-updated>Live data laden\.\.\.<\/span>/);
-  assert.match(source, /data-seo-refresh/);
-  assert.match(source, /data-seo-property>softora\.nl/);
   assert.match(source, /data-seo-days="90">3 maanden<\/button>/);
+
+  assert.doesNotMatch(source, /class="seo-console-eyebrow"/);
+  assert.doesNotMatch(source, /data-seo-refresh/);
+  assert.doesNotMatch(source, /class="seo-property"/);
 
   ['clicks', 'impressions', 'ctr', 'position'].forEach((metric) => {
     assert.match(source, new RegExp(`data-seo-metric="${metric}"`));
@@ -62,7 +63,11 @@ test('premium seo page provides a live decision console in the premium shell', (
   assert.match(jsSource, /renderAudit/);
   assert.match(jsSource, /renderActions/);
   assert.match(jsSource, /data-seo-table-search/);
-  assert.match(jsSource, /data-seo-refresh/);
+  assert.doesNotMatch(jsSource, /data-seo-refresh/);
+  assert.doesNotMatch(jsSource, /data-seo-property/);
+  assert.doesNotMatch(cssSource, /\.seo-console-eyebrow/);
+  assert.doesNotMatch(cssSource, /\.seo-refresh-button/);
+  assert.doesNotMatch(cssSource, /\.seo-property/);
 
   assert.doesNotMatch(source, /premium-seo-dr-rating\.css/);
   assert.doesNotMatch(source, /DR Backlink Rating/);
