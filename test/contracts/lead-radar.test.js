@@ -151,7 +151,7 @@ test('Lead Radar behandelt een website-link uit een bericht eerst als kandidaat'
   assert.equal(signal.website_source, 'post');
 });
 
-test('Lead Radar accepteert voor een scan alleen recente directe posts met echte publicatiedatum', () => {
+test('Lead Radar houdt directe posts zonder publicatiedatum zichtbaar en filtert bekende oude posts', () => {
   const recentTimestamp = new Date(Date.now() - 2 * 86_400_000).toISOString();
   const recent = buildSignalFromProviderItem({
     url: 'https://www.facebook.com/example/posts/123',
@@ -176,6 +176,7 @@ test('Lead Radar accepteert voor een scan alleen recente directe posts met echte
   assert.equal(normalizeProviderPublishedAt({ datetime: recentTimestamp }), null);
   assert.equal(normalizeProviderPublishedAt({ date: '17 aug 2026', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-17T00:00:00.000Z');
   assert.equal(normalizeProviderPublishedAt({ date: '3 dagen geleden', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-14T18:00:00.000Z');
+  assert.equal(normalizeProviderPublishedAt({ snippet: 'Gevonden op 17 aug 2026', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-17T00:00:00.000Z');
   assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example/posts/123', 'facebook'), true);
   assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example', 'facebook'), false);
   assert.equal(isLikelyDirectPlatformPostUrl('https://www.linkedin.com/posts/softora_website-123', 'linkedin'), true);
@@ -189,11 +190,14 @@ test('Lead Radar accepteert voor een scan alleen recente directe posts met echte
     snippet: 'Wij zoeken een webdesigner voor onze website.',
     timestamp: recentTimestamp,
   }, { region: 'Eindhoven' }), null);
-  assert.equal(buildSignalFromProviderItem({
+  const undated = buildSignalFromProviderItem({
     url: 'https://www.facebook.com/example/posts/125',
     title: 'Voorbeeld bedrijf',
     snippet: 'Wij zoeken een webdesigner voor onze website.',
-  }, { region: 'Eindhoven' }), null);
+  }, { region: 'Eindhoven' });
+  assert.ok(undated);
+  assert.equal(undated.published_at, null);
+  assert.equal(undated.publication_date_source, 'unknown');
 });
 
 test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd worden', async () => {
@@ -428,7 +432,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(page, /assets\/lead-radar\.css\?v=20260818a/);
   assert.match(page, /assets\/lead-radar\.js\?v=20260818b/);
   assert.match(page, /maximaal 50 zoekacties/);
-  assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
+  assert.match(page, /directe openbare posts met een echte websitevraag/);
   assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
   assert.match(page, /id="scan-max-age-days"/);
   assert.doesNotMatch(page, /id="scan-max-queries"|id="scan-website-limit"/);
@@ -445,6 +449,9 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
   assert.match(envExample, /LEAD_RADAR_RETENTION_DAYS=90/);
   assert.match(envExample, /LEAD_RADAR_SCAN_RUN_RETENTION_DAYS=180/);
+  const publicationMigration = readRepoFile('supabase/migrations/20260818160000_softora_social_lead_publication_dates.sql');
+  assert.match(publicationMigration, /publication_date_source/);
+  assert.match(publicationMigration, /publication_date_confidence/);
   const maintenance = readRepoFile('server/services/lead-radar-maintenance.js');
   assert.match(maintenance, /not_relevant/);
   assert.match(maintenance, /archived/);
