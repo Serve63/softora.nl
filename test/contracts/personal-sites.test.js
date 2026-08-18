@@ -39,9 +39,8 @@ test('personal pages are registered under the Softora subpaths', () => {
   });
 
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'vercel.json'), 'utf8'));
-  Object.values(vercelConfig.functions).forEach((config) => {
-    assert.match(config.includeFiles, /personal-sites\/\*\*/);
-  });
+  assert.match(vercelConfig.functions['api/index.js'].includeFiles, /personal-sites\/\*\*/);
+  assert.match(vercelConfig.functions['api/[...path].js'].includeFiles, /personal-sites\/\*\*/);
 });
 
 test('personal page route serves HTML, redirects the slashless path, and serves assets', async () => {

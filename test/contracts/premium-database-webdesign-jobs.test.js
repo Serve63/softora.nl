@@ -128,10 +128,14 @@ test('premium database webdesign jobs keep Vercel sharp linux installs explicit'
     vercelConfig.installCommand,
     'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.3 @img/sharp-linux-arm64@0.35.3 @img/sharp-libvips-linux-arm64@1.3.2'
   );
-  Object.values(vercelConfig.functions).forEach((functionConfig) => {
+  const standardIncludeFiles = '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}';
+  const personalSiteIncludeFiles = '{*.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';
+  Object.entries(vercelConfig.functions).forEach(([functionPath, functionConfig]) => {
     assert.equal(
       functionConfig.includeFiles,
-      '{*.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
+      ['api/[...path].js', 'api/index.js'].includes(functionPath)
+        ? personalSiteIncludeFiles
+        : standardIncludeFiles
     );
   });
 });
