@@ -135,7 +135,11 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /<h1 id="momentum-access-title">Toegangscode<\/h1>/);
   assert.match(html, /data-momentum-access-dots/);
   assert.equal((html.match(/data-momentum-access-digit=/g) || []).length, 10);
-  assert.match(html, /live-momentum-access\.css\?v=20260814b/);
+  assert.match(html, /live-momentum-access\.css\?v=20260818c/);
+  assert.match(html, /settings-module-routes\.js\?v=20260818b/);
+  assert.match(html, /settings-module-back\.js\?v=20260814b/);
+  assert.equal((html.match(/data-settings-module-back-host/g) || []).length, 1);
+  assert.doesNotMatch(html, /momentum-access-close|Toegangsscherm sluiten/);
   assert.match(html, /live-momentum-access\.js\?v=20260804a/);
   assert.match(html, /data-sidebar-shell="canonical"/);
   assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
