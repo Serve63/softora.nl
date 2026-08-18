@@ -9,7 +9,6 @@ const {
   buildSignalFromProviderItem,
   classifySignal,
   createLeadRadarService,
-  createLeadRadarEnrichment,
   hasCompletedInitialBackfill,
   isLikelyDirectPlatformPostUrl,
   normalizeProviderPublishedAt,
@@ -18,6 +17,7 @@ const {
   scoreSignal,
 } = require('../../server/services/lead-radar');
 const { registerLeadRadarRoutes } = require('../../server/routes/lead-radar');
+const { createLeadRadarEnrichment } = require('../../server/services/lead-radar-enrichment');
 
 const repoRoot = path.join(__dirname, '../..');
 const readRepoFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
