@@ -1102,7 +1102,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
-        pruneDeprecatedSidebarLinks(sidebar);
+        pruneDeprecatedSidebarLinks(sidebar); syncPremiumSidebarManagementLinks(sidebar, activeKey);
         syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar); activateFacebookAdsSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();

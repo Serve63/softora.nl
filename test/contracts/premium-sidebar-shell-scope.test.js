@@ -390,6 +390,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
   assert.match(themeJsSource, /premiumSessionSnapshotFromStorage/);
   assert.match(themeJsSource, /function stabilizePremiumStaticSidebar\(sidebar, activeKey\) \{/);
+  assert.match(
+    themeJsSource,
+    /function stabilizePremiumStaticSidebar\(sidebar, activeKey\) \{[\s\S]*?pruneDeprecatedSidebarLinks\(sidebar\);\s*syncPremiumSidebarManagementLinks\(sidebar, activeKey\);/
+  );
   assert.match(themeJsSource, /if \(p\.indexOf\("\/premium-coldmailing-lead"\) === 0\) return "coldmailing";/);
   assert.doesNotMatch(themeJsSource, /key:\s*"coldmailing_lead"/);
   assert.doesNotMatch(themeJsSource, /label:\s*"Lead"/);
