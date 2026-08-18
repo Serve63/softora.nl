@@ -36,7 +36,7 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
     module.files.forEach((file) => {
       const source = read(file);
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
-      assert.match(source, /settings-module-back\.css\?v=20260814c/, file);
+      assert.match(source, /settings-module-back\.css\?v=20260818a/, file);
       assert.match(source, /settings-module-routes\.js\?v=20260814a/, file);
       assert.match(source, /settings-module-back\.js\?v=20260814b/, file);
       assert.equal((source.match(/class="settings-module-back"/g) || []).length, 0, file);
@@ -66,6 +66,10 @@ test('gedeelde terugknop is deterministisch, toegankelijk, mobiel en niet histor
   assert.match(styles, /background:\s*transparent/);
   assert.match(styles, /box-shadow:\s*none/);
   assert.match(styles, /font-size:\s*\.72rem/);
+  assert.match(sharedRule, /font-family:\s*var\(--premium-sidebar-font-sans,\s*'Inter',\s*system-ui,\s*sans-serif\)/);
+  assert.match(sharedRule, /font-weight:\s*600/);
+  assert.match(sharedRule, /font-synthesis:\s*none/);
+  assert.doesNotMatch(sharedRule, /(?:^|[,\s])serif(?:\s*[;,)])/);
   assert.match(styles, /width:\s*14px/);
   assert.doesNotMatch(sharedRule, /border-radius:\s*14px|background:\s*#fff|padding:\s*0 14px/);
   assert.match(styles, /:focus-visible/);

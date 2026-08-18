@@ -16,8 +16,10 @@
   background: transparent;
   color: var(--muted-soft, #9694a2);
   box-shadow: none;
+  font-family: var(--premium-sidebar-font-sans, 'Inter', system-ui, sans-serif);
   font-size: .72rem;
   font-weight: 600;
+  font-synthesis: none;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
