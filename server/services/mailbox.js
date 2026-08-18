@@ -2111,7 +2111,7 @@ function createMailboxService(deps = {}) {
   const hideConversation = mailboxVisibility.hideConversation;
   const restoreConversation = mailboxVisibility.restoreConversation;
 
-  const { preflightMessageResponse, resolveRewriteIdentity, sendMessage, sendMessageResponse } = createMailboxComposeRuntime({
+  const { attachmentCleanupResponse, attachmentUploadResponse, preflightMessageResponse, resolveRewriteIdentity, sendMessage, sendMessageResponse } = createMailboxComposeRuntime({
     composeSendDependencies: {
       getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
@@ -2119,7 +2119,7 @@ function createMailboxService(deps = {}) {
       webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
     },
     getAccount, instantlyMailboxService, mailboxComposeThreadContext,
-    mailboxSendProvenanceStore, normalizeEmail, normalizeString, logger,
+    getSupabaseClient, attachmentSigningSecret: env.PREMIUM_SESSION_SECRET || '', mailboxSendProvenanceStore, mailboxAttachmentService: deps.mailboxAttachmentService, normalizeEmail, normalizeString, logger,
   });
 
   function cleanPromptText(value, maxLength = 6000) {
@@ -2407,7 +2407,7 @@ function createMailboxService(deps = {}) {
     }
   }
   return {
-    accountsResponse,
+    accountsResponse, attachmentCleanupResponse, attachmentUploadResponse,
     campaignRepliesResponse,
     contactTimelineResponse: mailboxDiscoveryService.contactTimelineResponse,
     getMessageBodiesResponse,

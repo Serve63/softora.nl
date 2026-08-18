@@ -6,6 +6,7 @@
   const MAX_ATTACHMENTS = 5;
   const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
   const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
+  const MAX_SEND_JSON_BYTES = 4 * 1000 * 1000;
   const ALLOWED_EXTENSIONS = new Set([
     'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
     'ppt', 'pptx', 'txt', 'webp', 'xls', 'xlsx',
@@ -67,15 +68,6 @@
     if (!copyFields.hidden) documentRef?.getElementById?.('c-cc')?.focus?.();
   }
 
-  function encodeBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-    }
-    return global.btoa(binary);
-  }
-
   async function addAttachments(fileList, documentRef = global.document) {
     const files = Array.from(fileList || []);
     if (!files.length) return { ok: true };
@@ -98,17 +90,137 @@
       if (totalBytes > MAX_TOTAL_BYTES) {
         return { ok: false, error: 'De bijlagen mogen samen maximaal 5 MB zijn.' };
       }
-      const contentBase64 = encodeBase64(await file.arrayBuffer());
       prepared.push({
         filename,
         contentType: String(file.type || '').trim().toLowerCase(),
         size,
-        contentBase64,
+        file,
       });
     }
     selectedAttachments = [...selectedAttachments, ...prepared];
     renderAttachments(documentRef);
     return { ok: true };
+  }
+
+  function serializedByteLength(value) {
+    const serialized = String(value || '');
+    if (typeof global.TextEncoder === 'function') return new global.TextEncoder().encode(serialized).length;
+    return serialized.length;
+  }
+
+  function serializeSendPayload(payload) {
+    const serialized = JSON.stringify(payload);
+    if (serializedByteLength(serialized) > MAX_SEND_JSON_BYTES) {
+      const error = new Error('De verzendgegevens zijn te groot; kies de bijlagen opnieuw.');
+      error.status = 413;
+      error.code = 'FUNCTION_PAYLOAD_TOO_LARGE';
+      throw error;
+    }
+    return serialized;
+  }
+
+  function mailboxError(error, fallback, context = '') {
+    return global.SoftoraMailboxError?.normalize?.(error, fallback, context)
+      || String(error?.message || fallback);
+  }
+
+  async function cleanupUploadedAttachments(options, references) {
+    const fetchImpl = options.fetch || global.fetch?.bind(global);
+    if (typeof fetchImpl !== 'function' || !references.length) return;
+    try {
+      await fetchImpl('/api/mailbox/attachments/cleanup', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: serializeSendPayload({ ...options.payload, attachments: references }),
+      });
+    } catch (_) {
+      // Signed references expire; cleanup is best effort and never changes send state.
+    }
+  }
+
+  async function uploadAttachments(attachments, options = {}) {
+    const list = Array.isArray(attachments) ? attachments : [];
+    if (!list.length) return [];
+    const fetchImpl = options.fetch || global.fetch?.bind(global);
+    if (typeof fetchImpl !== 'function') {
+      throw new Error('Bijlage uploaden is tijdelijk niet beschikbaar.');
+    }
+    const metadata = list.map((attachment) => ({
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      size: attachment.size,
+    }));
+    const uploadPayload = { ...options.payload, attachments: metadata };
+    const planResponse = await fetchImpl('/api/mailbox/attachments/upload-url', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: serializeSendPayload(uploadPayload),
+    });
+    const planData = await planResponse.json().catch(() => ({}));
+    if (!planResponse.ok || !planData?.ok) {
+      const error = global.SoftoraMailboxError?.fromResponse?.(
+        planResponse,
+        planData,
+        'Bijlage uploaden mislukt. Je mail is niet verzonden.',
+        'attachment-upload'
+      ) || new Error(mailboxError(planData, 'Bijlage uploaden mislukt. Je mail is niet verzonden.', 'attachment-upload'));
+      throw error;
+    }
+    const uploads = Array.isArray(planData.uploads) ? planData.uploads : [];
+    if (uploads.length !== list.length) {
+      throw new Error('Bijlage uploaden mislukt. Je mail is niet verzonden.');
+    }
+    try {
+      for (const [index, upload] of uploads.entries()) {
+        const attachment = list[index];
+        const file = attachment.file;
+        if (!file) throw new Error('Bijlage uploaden mislukt. Je mail is niet verzonden.');
+        const uploadRequest = {
+          method: 'PUT',
+          headers: { 'x-upsert': 'false' },
+        };
+        try {
+          const FormDataCtor = options.FormData || global.FormData;
+          if (typeof FormDataCtor !== 'function') throw new Error('FormData ontbreekt');
+          const form = new FormDataCtor();
+          form.append('cacheControl', '3600');
+          form.append('', file, attachment.filename);
+          uploadRequest.body = form;
+        } catch (_) {
+          uploadRequest.body = file;
+          uploadRequest.headers['content-type'] = attachment.contentType || 'application/octet-stream';
+        }
+        const uploadResponse = await fetchImpl(upload.signedUrl, uploadRequest);
+        if (!uploadResponse.ok) {
+          const uploadData = await uploadResponse.json().catch(() => ({}));
+          throw global.SoftoraMailboxError?.fromResponse?.(
+            uploadResponse,
+            uploadData,
+            'Bijlage uploaden mislukt. Je mail is niet verzonden.',
+            'attachment-upload'
+          ) || new Error('Bijlage uploaden mislukt. Je mail is niet verzonden.');
+        }
+      }
+      return uploads.map(({ reference, filename, contentType, size }) => ({
+        reference,
+        filename,
+        contentType,
+        size,
+      }));
+    } catch (error) {
+      await cleanupUploadedAttachments(options, uploads.map(({ reference, filename, contentType, size }) => ({
+        reference, filename, contentType, size,
+      })));
+      const normalized = mailboxError(error, 'Bijlage uploaden mislukt. Je mail is niet verzonden.', 'attachment-upload');
+      const safeError = new Error(normalized);
+      safeError.code = error?.code || 'MAILBOX_ATTACHMENT_UPLOAD_FAILED';
+      safeError.status = error?.status || 400;
+      throw safeError;
+    }
   }
 
   function removeAttachment(index, documentRef = global.document) {
@@ -234,6 +346,8 @@
     finish,
     getOriginalSentMail,
     getAttachments: () => selectedAttachments.map((attachment) => ({ ...attachment })),
+    serializeSendPayload,
+    uploadAttachments,
     isUsed: () => rewriteUsed,
     reset,
     resetOptionalFields,

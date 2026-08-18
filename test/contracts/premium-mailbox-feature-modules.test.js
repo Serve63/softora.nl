@@ -152,7 +152,9 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
   const controller = composeController.create({
     document: documentRef,
     compose: {
-      getAttachments: () => [{ filename: 'voorstel.pdf', contentBase64: 'AQIDBA==', size: 4 }],
+      getAttachments: () => [{ filename: 'voorstel.pdf', contentType: 'application/pdf', size: 4, file: { name: 'voorstel.pdf' } }],
+      uploadAttachments: async () => [{ reference: 'signed-reference', filename: 'voorstel.pdf', contentType: 'application/pdf', size: 4 }],
+      serializeSendPayload: JSON.stringify,
       reset() {},
       resetOptionalFields() {},
     },
@@ -196,7 +198,7 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
     bcc: 'bcc@example.nl',
     subject: 'Onderwerp',
     body: 'Bericht',
-    attachments: [{ filename: 'voorstel.pdf', contentBase64: 'AQIDBA==', size: 4 }],
+    attachments: [{ reference: 'signed-reference', filename: 'voorstel.pdf', contentType: 'application/pdf', size: 4 }],
   });
 });
 

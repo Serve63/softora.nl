@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { createMailboxComposeSend } = require('./mailbox-compose-send');
+const { createMailboxAttachmentService } = require('./mailbox-attachment-service');
 const { sendMailboxMessage } = require('./mailbox-instantly-integration');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
@@ -10,13 +11,22 @@ function createMailboxComposeRuntime(dependencies = {}) {
     instantlyMailboxService,
     mailboxComposeThreadContext,
     mailboxSendProvenanceStore,
+    mailboxAttachmentService,
+    getSupabaseClient,
+    attachmentSigningSecret = '',
     normalizeEmail,
     normalizeString,
     logger = console,
   } = dependencies;
+  const resolvedMailboxAttachmentService = mailboxAttachmentService || createMailboxAttachmentService({
+    getSupabaseClient,
+    secret: attachmentSigningSecret || process.env.PREMIUM_SESSION_SECRET || '',
+    logger,
+  });
   const sendMessageWithProvenance = createMailboxComposeSend({
     ...composeSendDependencies,
     mailboxSendProvenanceStore,
+    mailboxAttachmentService: resolvedMailboxAttachmentService,
     logger,
   });
 
@@ -83,32 +93,97 @@ function createMailboxComposeRuntime(dependencies = {}) {
     }
   }
 
+  function safeAttachmentErrorMessage(error) {
+    const code = normalizeString(error?.code).toUpperCase();
+    if (code === 'MAILBOX_ATTACHMENT_REFERENCE_EXPIRED') return 'De bijlage-upload is verlopen; kies de bijlage opnieuw.';
+    if (code === 'MAILBOX_ATTACHMENT_CONTEXT_MISMATCH') return 'De bijlage hoort niet bij deze veilige verzendcontext.';
+    if (code.startsWith('MAILBOX_ATTACHMENT_STORAGE') || code === 'MAILBOX_ATTACHMENT_SIGNING_UNAVAILABLE') {
+      return 'Bijlagen zijn tijdelijk niet beschikbaar; probeer het opnieuw.';
+    }
+    const message = typeof error?.message === 'string' ? error.message.trim() : '';
+    return message && message !== '[object Object]'
+      ? message
+      : 'Bijlagen konden niet veilig worden verwerkt; de mail is niet verzonden.';
+  }
+
+  async function attachmentUploadResponse(req, res) {
+    try {
+      if (!resolvedMailboxAttachmentService || typeof resolvedMailboxAttachmentService.createUploadPlan !== 'function') {
+        const error = new Error('Bijlagen zijn tijdelijk niet beschikbaar; probeer het opnieuw.');
+        error.status = 503;
+        error.code = 'MAILBOX_ATTACHMENT_STORAGE_UNAVAILABLE';
+        throw error;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const { threadProvenance } = await prepareMessage(body);
+      const uploads = await resolvedMailboxAttachmentService.createUploadPlan({
+        attachments: body.attachments,
+        binding: threadProvenance,
+      });
+      return res.status(200).json({ ok: true, uploads });
+    } catch (error) {
+      logger.error('[Mailbox][AttachmentUploadPlan]', error?.message || error);
+      return res.status(error.status || 503).json({
+        ok: false,
+        code: normalizeString(error?.code) || 'MAILBOX_ATTACHMENT_UPLOAD_FAILED',
+        error: 'Bijlagen voorbereiden mislukt',
+        detail: safeAttachmentErrorMessage(error),
+      });
+    }
+  }
+
+  async function attachmentCleanupResponse(req, res) {
+    try {
+      if (!resolvedMailboxAttachmentService || typeof resolvedMailboxAttachmentService.cleanupAttachments !== 'function') {
+        return res.status(200).json({ ok: true, removed: 0 });
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const { threadProvenance } = await prepareMessage({ ...body, attachments: [] });
+      const result = await resolvedMailboxAttachmentService.cleanupAttachments(body.attachments, threadProvenance);
+      return res.status(200).json({ ok: true, ...result });
+    } catch (error) {
+      logger.warn('[Mailbox][AttachmentCleanup]', error?.message || error);
+      return res.status(error.status || 503).json({
+        ok: false,
+        code: normalizeString(error?.code) || 'MAILBOX_ATTACHMENT_CLEANUP_FAILED',
+        error: 'Tijdelijke bijlagen konden niet direct worden opgeruimd',
+        detail: safeAttachmentErrorMessage(error),
+      });
+    }
+  }
+
   async function prepareMessage(body = {}, { checkReservation = false } = {}) {
     const threadProvenance = await mailboxComposeThreadContext.resolve({
-        body,
-        accountEmail: body.account,
-        recipientEmail: body.to,
-        provider: body.provider,
-      });
+      body,
+      accountEmail: body.account,
+      recipientEmail: body.to,
+      provider: body.provider,
+    });
+    if (threadProvenance.provider === 'instantly' && Array.isArray(body.attachments) && body.attachments.length) {
+      const error = new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
+      error.status = 400;
+      error.code = 'INSTANTLY_ATTACHMENTS_UNSUPPORTED';
+      throw error;
+    }
     const canonicalBody = {
-        ...body,
-        account: threadProvenance.accountEmail,
-        owner: threadProvenance.owner,
-        provider: threadProvenance.provider === 'instantly' ? 'instantly' : '',
-        providerMessageId: threadProvenance.provider === 'instantly' ? threadProvenance.replyTargetMessageId : '',
-        providerThreadId: threadProvenance.provider === 'instantly' ? threadProvenance.providerThreadId : '',
-      };
+      ...body,
+      account: threadProvenance.accountEmail,
+      owner: threadProvenance.owner,
+      provider: threadProvenance.provider === 'instantly' ? 'instantly' : '',
+      providerMessageId: threadProvenance.provider === 'instantly' ? threadProvenance.replyTargetMessageId : '',
+      providerThreadId: threadProvenance.provider === 'instantly' ? threadProvenance.providerThreadId : '',
+    };
     const reservationInput = {
-          ...threadProvenance,
-          accountEmail: canonicalBody.account,
-          recipientEmail: canonicalBody.to,
-          senderName: threadProvenance.senderName,
-          subject: canonicalBody.subject,
-          body: canonicalBody.body || canonicalBody.text || '',
-          cc: canonicalBody.cc,
-          bcc: canonicalBody.bcc,
-          attachments: canonicalBody.attachments,
-        };
+      ...threadProvenance,
+      accountEmail: canonicalBody.account,
+      recipientEmail: canonicalBody.to,
+      senderName: threadProvenance.senderName,
+      subject: canonicalBody.subject,
+      body: canonicalBody.body || canonicalBody.text || '',
+      cc: canonicalBody.cc,
+      bcc: canonicalBody.bcc,
+      attachments: canonicalBody.attachments,
+    };
     const reservationCheck = checkReservation && typeof mailboxSendProvenanceStore?.preflight === 'function'
       ? await mailboxSendProvenanceStore.preflight(reservationInput)
       : {
@@ -159,7 +234,15 @@ function createMailboxComposeRuntime(dependencies = {}) {
     }
   }
 
-  return { prepareMessage, preflightMessageResponse, resolveRewriteIdentity, sendMessage, sendMessageResponse };
+  return {
+    attachmentCleanupResponse,
+    attachmentUploadResponse,
+    prepareMessage,
+    preflightMessageResponse,
+    resolveRewriteIdentity,
+    sendMessage,
+    sendMessageResponse,
+  };
 }
 
 module.exports = { createMailboxComposeRuntime };
