@@ -31,6 +31,7 @@ function createMailboxComposeSend(deps = {}) {
     nodemailer,
     webdesignEmailTemplateVersion,
     mailboxSendProvenanceStore,
+    mailboxAttachmentService,
     logger = console,
     now = () => new Date(),
   } = deps;
@@ -65,12 +66,28 @@ function createMailboxComposeSend(deps = {}) {
     return Array.from(new Set(values));
   }
 
-  function normalizeComposeAttachments(value) {
+  async function normalizeComposeAttachments(value, threadProvenance) {
     const attachments = Array.isArray(value) ? value : [];
     if (attachments.length > MAX_COMPOSE_ATTACHMENTS) {
       const error = new Error(`Je kunt maximaal ${MAX_COMPOSE_ATTACHMENTS} bijlagen toevoegen.`);
       error.status = 400;
       throw error;
+    }
+    const hasReferences = attachments.some((attachment) => normalizeString(attachment?.reference));
+    if (hasReferences) {
+      if (!attachments.every((attachment) => normalizeString(attachment?.reference))) {
+        const error = new Error('Kies de bijlagen opnieuw; gemengde bijlagegegevens zijn niet veilig.');
+        error.status = 400;
+        error.code = 'MAILBOX_ATTACHMENT_REFERENCE_INVALID';
+        throw error;
+      }
+      if (!mailboxAttachmentService || typeof mailboxAttachmentService.downloadAttachments !== 'function') {
+        const error = new Error('Bijlagen zijn tijdelijk niet beschikbaar; probeer het opnieuw.');
+        error.status = 503;
+        error.code = 'MAILBOX_ATTACHMENT_STORAGE_UNAVAILABLE';
+        throw error;
+      }
+      return mailboxAttachmentService.downloadAttachments(attachments, threadProvenance);
     }
     let totalBytes = 0;
     return attachments.map((attachment) => {
@@ -114,6 +131,13 @@ function createMailboxComposeSend(deps = {}) {
     });
   }
 
+  async function cleanupUploadedAttachments(attachments, threadProvenance) {
+    const references = (Array.isArray(attachments) ? attachments : [])
+      .filter((attachment) => normalizeString(attachment?.reference));
+    if (!references.length || !mailboxAttachmentService || typeof mailboxAttachmentService.cleanupAttachments !== 'function') return;
+    await mailboxAttachmentService.cleanupAttachments(references, threadProvenance);
+  }
+
   return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments, threadProvenance }) {
     const account = getAccount(accountEmail);
     if (!account) {
@@ -147,7 +171,7 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       throw error;
     }
-    const explicitAttachments = normalizeComposeAttachments(attachments);
+    const explicitAttachments = await normalizeComposeAttachments(attachments, threadProvenance);
     const cleanSubject = truncateText(normalizeString(subject), 240);
     if (!cleanSubject) {
       const error = new Error('Onderwerp is verplicht.');
@@ -221,6 +245,9 @@ function createMailboxComposeSend(deps = {}) {
     if (!provenanceReservation.created) {
       if (provenanceReservation.intent.status === 'accepted') {
         const accepted = provenanceReservation.intent;
+        await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
+          logger.warn('[MailboxAttachment][CleanupAfterIdempotentReplay]', error?.message || error);
+        });
         return {
           messageId: accepted.messageId,
           accepted: [normalizedTo],
@@ -275,6 +302,9 @@ function createMailboxComposeSend(deps = {}) {
         throw createMailboxReconcileRequiredError(error);
       }
       await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+      await cleanupUploadedAttachments(attachments, threadProvenance).catch((cleanupError) => {
+        logger.warn('[MailboxAttachment][CleanupAfterProviderFailure]', cleanupError?.message || cleanupError);
+      });
       throw error;
     }
     const sentAt = now();
@@ -308,6 +338,9 @@ function createMailboxComposeSend(deps = {}) {
       messageId: normalizeString(info?.messageId || ''),
       sentAt,
       logger,
+    });
+    await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
+      logger.warn('[MailboxAttachment][CleanupAfterAcceptedSend]', error?.message || error);
     });
     return {
       messageId: normalizeString(info?.messageId || ''),

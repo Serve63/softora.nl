@@ -102,6 +102,12 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/send/preflight', requireAdmin, (req, res) =>
     coordinator.preflightMessageResponse(req, res)
   );
+  app.post('/api/mailbox/attachments/upload-url', requireAdmin, (req, res) =>
+    coordinator.attachmentUploadResponse(req, res)
+  );
+  app.post('/api/mailbox/attachments/cleanup', requireAdmin, (req, res) =>
+    coordinator.attachmentCleanupResponse(req, res)
+  );
   app.post('/api/mailbox/send', requireAdmin, (req, res) => coordinator.sendMessageResponse(req, res));
   app.post('/api/mailbox/rewrite', requireAdmin, (req, res) =>
     coordinator.rewriteDraftResponse(req, res)

@@ -131,7 +131,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260818a/);
-  assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260812a/);
+  assert.match(readPage(), /assets\/premium-mailbox-error\.js\?v=20260818a/);
+  assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260818b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   assert.match(readPage(), /assets\/premium-mailbox-detail-state\.js\?v=20260813a/);
 });
@@ -4054,7 +4055,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260818a/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260818b/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });

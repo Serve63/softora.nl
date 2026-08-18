@@ -3572,7 +3572,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   assert.equal(persistedSnapshot.messages[1].hasBody, false);
 });
 
-test('mailbox routes expose accounts, messages, send, local hide restore, rewrite and spelling endpoints', () => {
+test('mailbox routes expose accounts, messages, send, attachments, local hide restore, rewrite and spelling endpoints', () => {
   const routes = [];
   const app = {
     get(path, ...handlers) {
@@ -3597,6 +3597,8 @@ test('mailbox routes expose accounts, messages, send, local hide restore, rewrit
       hideConversationResponse() {},
       restoreConversationResponse() {},
       preflightMessageResponse() {},
+      attachmentUploadResponse() {},
+      attachmentCleanupResponse() {},
       sendMessageResponse() {},
       rewriteDraftResponse() {},
     },
@@ -3614,6 +3616,8 @@ test('mailbox routes expose accounts, messages, send, local hide restore, rewrit
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/restore'));
   assert.ok(!routes.some(([, path]) => path === '/api/mailbox/messages/delete'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send/preflight'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/attachments/upload-url'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/attachments/cleanup'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/spelling'));

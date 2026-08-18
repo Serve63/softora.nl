@@ -9,6 +9,7 @@
     let spellingRequest = null;
     let spellingUndo = null;
     let rewriteRequestActive = false;
+    let sendRequestActive = false;
     const configuredSpellingTimeout = Number(options.spellingTimeoutMs);
     const SPELLING_TIMEOUT_MS = configuredSpellingTimeout > 0 ? configuredSpellingTimeout : 8000;
 
@@ -478,7 +479,10 @@
         options.compose.complete(rewriteBtn);
         options.toast(isSuggestedReply ? 'Reactie voorgesteld' : 'Tekst verbeterd');
       } catch (error) {
-        options.toast(String(error?.message || error || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt')));
+        options.toast(global.SoftoraMailboxError?.normalize?.(
+          error,
+          isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt'
+        ) || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt'));
       } finally {
         rewriteRequestActive = false;
         options.compose.finish(
@@ -587,6 +591,8 @@
         options.toast('Vul ontvanger en onderwerp in');
         return;
       }
+      if (sendRequestActive) return;
+      sendRequestActive = true;
       const account = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
       const sendBtn = documentRef?.querySelector('.btn-send');
       const originalSendLabel = sendBtn ? sendBtn.textContent : '';
@@ -623,44 +629,61 @@
         if (provider === 'instantly' && attachments.length) {
           throw new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
         }
+        const sendPayload = {
+          account,
+          owner: sendOwner,
+          mode: sendMode,
+          idempotencyKey,
+          ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
+          context: {
+            conversationId: String(contextAtSend?.conversationId || '').trim(),
+            id: String(contextAtSend?.mailboxId || contextAtSend?.id || '').trim(),
+            folder: String(contextAtSend?.folder || '').trim().toLowerCase(),
+            uid: Number(contextAtSend?.uid || 0) || 0,
+            messageId: String(contextAtSend?.messageId || '').trim(),
+            references: String(contextAtSend?.references || '').trim(),
+            ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
+          },
+          ...(provider
+            ? {
+                provider,
+                providerMessageId: String(canonicalIdentity?.providerMessageId || replyContext && replyContext.providerMessageId || '').trim(),
+                providerThreadId: String(canonicalIdentity?.providerThreadId || replyContext && replyContext.providerThreadId || '').trim(),
+              }
+            : {}),
+          to,
+          cc: fieldValue('c-cc'),
+          bcc: fieldValue('c-bcc'),
+          subject,
+          body: fieldValue('c-body'),
+          attachments: [],
+        };
+        if (attachments.length) {
+          if (typeof options.compose.uploadAttachments !== 'function') {
+            throw new Error('Bijlagen zijn tijdelijk niet beschikbaar; laad de mailbox opnieuw.');
+          }
+          sendPayload.attachments = await options.compose.uploadAttachments(attachments, {
+            fetch: options.fetch,
+            payload: sendPayload,
+          });
+        }
+        const serializedPayload = typeof options.compose.serializeSendPayload === 'function'
+          ? options.compose.serializeSendPayload(sendPayload)
+          : JSON.stringify(sendPayload);
         const response = await options.fetch('/api/mailbox/send', {
           method: 'POST',
           credentials: 'same-origin',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            account,
-            owner: sendOwner,
-            mode: sendMode,
-            idempotencyKey,
-            ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
-            context: {
-              conversationId: String(contextAtSend?.conversationId || '').trim(),
-              id: String(contextAtSend?.mailboxId || contextAtSend?.id || '').trim(),
-              folder: String(contextAtSend?.folder || '').trim().toLowerCase(),
-              uid: Number(contextAtSend?.uid || 0) || 0,
-              messageId: String(contextAtSend?.messageId || '').trim(),
-              references: String(contextAtSend?.references || '').trim(),
-              ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
-            },
-            ...(provider
-              ? {
-                  provider,
-                  providerMessageId: String(canonicalIdentity?.providerMessageId || replyContext && replyContext.providerMessageId || '').trim(),
-                  providerThreadId: String(canonicalIdentity?.providerThreadId || replyContext && replyContext.providerThreadId || '').trim(),
-                }
-              : {}),
-            to,
-            cc: fieldValue('c-cc'),
-            bcc: fieldValue('c-bcc'),
-            subject,
-            body: fieldValue('c-body'),
-            attachments,
-          }),
+          body: serializedPayload,
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.ok) {
-          throw new Error(data?.detail || data?.error || 'Mail verzenden mislukt');
+          throw global.SoftoraMailboxError?.fromResponse?.(
+            response,
+            data,
+            'Mail verzenden mislukt'
+          ) || new Error('Mail verzenden mislukt');
         }
         const result = data?.result && typeof data.result === 'object' ? data.result : {};
         const acceptedAt = new Date().toISOString();
@@ -738,8 +761,9 @@
         close();
         options.toast('✓ Mail verzonden');
       } catch (error) {
-        options.toast(String(error?.message || error || 'Mail verzenden mislukt'));
+        options.toast(global.SoftoraMailboxError?.normalize?.(error, 'Mail verzenden mislukt') || 'Mail verzenden mislukt');
       } finally {
+        sendRequestActive = false;
         if (sendBtn) {
           sendBtn.disabled = false;
           sendBtn.removeAttribute?.('aria-busy');
