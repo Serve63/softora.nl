@@ -19,6 +19,9 @@ function createResponseRecorder() {
       this.headers[name] = value;
       return this;
     },
+    getHeader(name) {
+      return this.headers[name];
+    },
     redirect(statusCode, location) {
       this.redirectCode = statusCode;
       this.redirectLocation = location;
@@ -29,6 +32,11 @@ function createResponseRecorder() {
       return this;
     },
     send(body) {
+      this.body = body;
+      return this;
+    },
+    json(body) {
+      this.headers['Content-Type'] = 'application/json; charset=utf-8';
       this.body = body;
       return this;
     },
@@ -436,8 +444,10 @@ test('password register page requires explicit owner configuration and blocks ot
     missingConfigRes,
     'premium-wachtwoordenregister.html'
   );
-  assert.equal(missingConfigResult.handled, true);
-  assert.equal(missingConfigRes.statusCode, 503);
+  assert.equal(missingConfigResult.handled, false);
+  assert.equal(missingConfigResult.responseStatusCode, 503);
+  assert.equal(missingConfigResult.passwordRegisterAuthRecovery.code, 'PASSWORD_REGISTER_OWNER_NOT_CONFIGURED');
+  assert.equal(missingConfigRes.statusCode, null);
 
   const otherAdminController = createPremiumHtmlPageAccessController({
     ...baseOptions,
@@ -451,12 +461,15 @@ test('password register page requires explicit owner configuration and blocks ot
     },
   });
   const otherAdminRes = createResponseRecorder();
-  await otherAdminController.resolvePremiumHtmlPageAccess(
+  const otherAdminResult = await otherAdminController.resolvePremiumHtmlPageAccess(
     req,
     otherAdminRes,
     'premium-wachtwoordenregister.html'
   );
-  assert.equal(otherAdminRes.statusCode, 403);
+  assert.equal(otherAdminResult.handled, false);
+  assert.equal(otherAdminResult.responseStatusCode, 403);
+  assert.equal(otherAdminResult.passwordRegisterAuthRecovery.code, 'PASSWORD_REGISTER_OWNER_REQUIRED');
+  assert.equal(otherAdminRes.statusCode, null);
   assert.equal(events.at(-1).reason, 'security_password_register_owner_denied');
 });
 
@@ -493,7 +506,7 @@ test('password register page allows only the configured owner', async () => {
   assert.equal(res.statusCode, null);
 });
 
-test('password register page rejects token fallback when fresh user hydration fails', async () => {
+test('password register page renders a fail-closed HTML recovery shell when fresh hydration fails', async () => {
   let resolverOptions = null;
   const events = [];
   const controller = createPremiumHtmlPageAccessController({
@@ -522,12 +535,105 @@ test('password register page rejects token fallback when fresh user hydration fa
     'premium-wachtwoordenregister.html'
   );
 
-  assert.equal(result.handled, true);
-  assert.equal(res.statusCode, 503);
+  assert.equal(result.handled, false);
+  assert.equal(result.responseStatusCode, 503);
+  assert.deepEqual(result.passwordRegisterAuthRecovery, {
+    code: 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE',
+    retryable: true,
+  });
+  assert.equal(res.statusCode, null);
+  assert.equal(res.body, null);
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
+  assert.equal(res.headers.Vary, 'Accept, Cookie');
   assert.equal(resolverOptions.allowTokenFallbackWithoutHydration, false);
   assert.equal(resolverOptions.requireFreshUserHydration, true);
   assert.equal(events.at(-1).reason, 'security_password_register_fresh_auth_required');
+});
+
+test('password register page returns a machine-readable 503 for the same fresh hydration failure', async () => {
+  const controller = createPremiumHtmlPageAccessController({
+    premiumAdminOnlyHtmlFiles: new Set(['premium-wachtwoordenregister.html']),
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: false,
+      hydrationUnavailable: true,
+    }),
+    getSafePremiumRedirectPath: (value) => String(value || '').trim(),
+  });
+  const req = createRequest({
+    originalUrl: '/premium-wachtwoordenregister',
+    get: (name) => String(name || '').toLowerCase() === 'accept' ? 'application/json' : 'agent',
+  });
+  const res = createResponseRecorder();
+
+  const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'premium-wachtwoordenregister.html');
+
+  assert.equal(result.handled, true);
+  assert.equal(res.statusCode, 503);
+  assert.deepEqual(res.body, {
+    ok: false,
+    code: 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE',
+    retryable: true,
+    error: 'De beveiligde sessiecontrole is tijdelijk niet beschikbaar. Probeer het zo opnieuw.',
+  });
+  assert.equal(res.headers.Vary, 'Accept, Cookie');
+  assert.match(res.headers['Content-Type'], /application\/json/);
+});
+
+test('password register JSON preflight distinguishes fresh, missing and expired sessions', async () => {
+  const states = [
+    {
+      state: {
+        configured: true,
+        authenticated: true,
+        isAdmin: true,
+        userId: 'usr_owner',
+        user: { id: 'usr_owner', status: 'active' },
+        freshUserValidated: true,
+      },
+      status: 200,
+      code: 'PASSWORD_REGISTER_FRESH_AUTH_CONFIRMED',
+      cleared: 0,
+    },
+    {
+      state: { configured: true, authenticated: false },
+      status: 401,
+      code: 'PREMIUM_AUTH_REQUIRED',
+      cleared: 0,
+    },
+    {
+      state: { configured: true, authenticated: false, token: 'forged-test-token', revoked: true },
+      status: 401,
+      code: 'PREMIUM_SESSION_EXPIRED',
+      cleared: 1,
+    },
+  ];
+
+  for (const fixture of states) {
+    let cleared = 0;
+    const controller = createPremiumHtmlPageAccessController({
+      premiumAdminOnlyHtmlFiles: new Set(['premium-wachtwoordenregister.html']),
+      getResolvedPremiumAuthState: async () => fixture.state,
+      clearPremiumSessionCookie: () => { cleared += 1; },
+      isPremiumAdminIpAllowed: () => true,
+      getSafePremiumRedirectPath: (value) => String(value || '').trim(),
+      passwordRegisterOwnerPolicy: {
+        getAccessDecision: () => ({ ok: true }),
+      },
+    });
+    const req = createRequest({
+      originalUrl: '/premium-wachtwoordenregister',
+      get: (name) => String(name || '').toLowerCase() === 'accept' ? 'application/json' : 'agent',
+    });
+    const res = createResponseRecorder();
+
+    await controller.resolvePremiumHtmlPageAccess(req, res, 'premium-wachtwoordenregister.html');
+
+    assert.equal(res.statusCode, fixture.status);
+    assert.equal(res.body.code, fixture.code);
+    assert.equal(cleared, fixture.cleared);
+    assert.equal(res.redirectCode, null);
+  }
 });
 
 test('live momentum renders its separate code gate on the requested page for an authenticated admin', async () => {
