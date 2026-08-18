@@ -39,6 +39,7 @@ function createLeadRadarMaintenance({ getDb = () => null, env = process.env, log
       idsFor(db, (query) => query.eq('lead_status', 'not_relevant').lt('updated_at', signalCutoff)),
       idsFor(db, (query) => query.eq('lead_status', 'archived').lt('updated_at', signalCutoff)),
       idsFor(db, (query) => query.eq('lead_status', 'new').eq('source_type', 'serp').lt('published_at', signalCutoff)),
+      idsFor(db, (query) => query.eq('lead_status', 'new').eq('source_type', 'serp').is('published_at', null).lt('found_at', signalCutoff)),
     ]);
     const signalIds = Array.from(new Set(idGroups.flat()));
     const deletedSignals = await deleteIds(db, 'softora_social_lead_signals', signalIds);
