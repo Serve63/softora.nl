@@ -1,6 +1,6 @@
 (function () {
     const pathname = (window.location.pathname || "").toLowerCase();
-    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/kvk-database-bedrijven" || pathname === "/kvk-database-bedrijven.html" || pathname === "/winnen" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
+    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/lead-radar" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/kvk-database-bedrijven" || pathname === "/kvk-database-bedrijven.html" || pathname === "/winnen" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
     const personnelStorageKey = isPremiumPersonnelContext
         ? "softora_premium_personnel_theme_mode"
         : "softora_software_personnel_theme_mode";
@@ -520,7 +520,7 @@
         if (p.indexOf("/premium-coldmailing-lead") === 0) return "coldmailing";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
-        if (p.indexOf("/premium-database") === 0) return "database";
+        if (p.indexOf("/premium-database") === 0) return "database"; if (p === "/lead-radar") return "lead_radar";
         if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-websitegenerator") === 0) {
             return "websitegenerator";

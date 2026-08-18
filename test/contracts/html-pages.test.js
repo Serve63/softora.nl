@@ -342,8 +342,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260811a/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260811a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260818a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260818a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.css\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.js\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-dashboard-ai-chat-scope\.js\?v=20260611a/);
@@ -1170,4 +1170,38 @@ test('html page coordinator injects authenticated premium sidebar profile html b
   assert.match(thinRes.body, /data-sidebar-profile-render-key="serve@softora\.nl/);
   assert.match(thinRes.body, /data-sidebar-profile-user-key="usr_serve"/);
   assert.match(thinRes.body, /data-sidebar-user-name>serve@softora\.nl</);
+});
+
+test('Lead Radar delivery initialiseert de premium sidebar precies één keer en direct klikbaar', async () => {
+  const pagesDir = path.join(__dirname, '../..');
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-lead-radar-shell.html'
+        ? 'premium-lead-radar-shell.html'
+        : '',
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: { authenticated: true, displayName: 'Servé Creusen', role: 'admin' },
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () => null,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/lead-radar', query: {} },
+    res,
+    () => {},
+    'premium-lead-radar-shell.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /<body data-sidebar-nav-ready="1">/);
+  assert.equal((res.body.match(/assets\/lead-radar-sidebar\.js\?v=20260818a/g) || []).length, 1);
+  assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20260818a/g) || []).length, 1);
+  assert.match(res.body, /assets\/personnel-theme\.js\?v=20260818a/);
 });
