@@ -34,7 +34,7 @@ function getPublicSeoGrowthEventPlan({ now = new Date() } = {}) {
 function getSeoContentGrowthEventPlan({ now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS
-    .filter((item) => item.growthEventKind && item.growthEventAt)
+    .filter((item) => item.growthEventKind && item.growthEventAt && item.growthEventKind !== 'new_url')
     .map((item) => {
       const eventMs = publicationDayMs(item.growthEventAt);
       return {

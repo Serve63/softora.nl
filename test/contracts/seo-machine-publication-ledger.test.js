@@ -10,6 +10,7 @@ const {
 } = require('../../server/services/seo-machine-publication-ledger');
 const {
   getSeoContentGrowthEventPlan,
+  getSeoMachinePublicationPlan,
   getPublicSeoGrowthEventPlan,
 } = require('../../server/services/seo-machine-publication-plan');
 
@@ -142,14 +143,17 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
-      [
-        '/kennisbank/ai-telefonist-crm-koppeling',
-        '2026-08-18',
-        'new_url',
-        'scheduled',
-      ],
     ]
   );
+});
+
+test('new content appears once when it also records an explicit new-url event', () => {
+  const events = getSeoMachinePublicationPlan({ now: new Date('2026-08-18T12:00:00.000Z') })
+    .filter((event) => event.path === '/kennisbank/ai-telefonist-crm-koppeling');
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].publicationKind, 'new_url');
+  assert.equal(events[0].eventAt, '2026-08-18');
 });
 
 test('live publication ledger counts only verified public indexable URLs', async () => {
