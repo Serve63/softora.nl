@@ -11,7 +11,9 @@
       account: mail.accountEmail || displayOptions.account,
     });
     const activityAt = mail.activityAt || mail.receivedAt || '';
-    const listDate = mail.activityListDate || mail.listDate;
+    const listDate = Object.prototype.hasOwnProperty.call(mail, 'activityListDate')
+      ? mail.activityListDate
+      : mail.listDate;
     const listTime = mail.activityTime || mail.time;
     const copyKind = mail.copyContext && mail.copyContext.evidenceKnown === true &&
       ['bcc', 'cc'].includes(String(mail.copyContext.kind || '').toLowerCase())
