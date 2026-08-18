@@ -419,8 +419,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260811a'/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260811a'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
@@ -886,19 +886,43 @@ test('websitegenerator layout gebruikt dezelfde sidebarbreedte als de premium sh
 test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw', () => {
   const shellSource = readRepoFile('premium-lead-radar-shell.html');
   const sidebarSource = readRepoFile('assets/lead-radar-sidebar.js');
+  const canonicalSource = readRepoFile('premium-personeel-dashboard.html');
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
   assert.match(shellSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*aria-label="Premium navigatie"/);
+  assert.match(shellSource, /<body data-sidebar-nav-ready="1">/);
   assert.match(shellSource, /assets\/personnel-theme\.css\?v=20260519b/);
   assert.match(shellSource, /assets\/personnel-theme\.js\?v=20260519b/);
-  assert.match(shellSource, /assets\/lead-radar-sidebar\.js\?v=20260817b/);
+  assert.doesNotMatch(shellSource, /assets\/lead-radar-sidebar\.js/);
   assert.match(shellSource, /class="sidebar-link magnetic active" data-sidebar-key="lead_radar"/);
   assert.match(shellSource, /<span class="sidebar-link-text">Lead Radar<\/span>/);
   assert.match(shellSource, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(sidebarSource, /const LINK_HREF = '\/lead-radar'/);
   assert.match(sidebarSource, /const LINK_LABEL = 'Lead Radar'/);
   assert.match(sidebarSource, /overview\.insertBefore\(link, database \|\| null\)/);
-  assert.match(sidebarSource, /item\.classList\.toggle\('active', item === link\)/);
+  assert.match(sidebarSource, /__softoraLeadRadarSidebarInitialized/);
+  assert.match(sidebarSource, /window\.setTimeout\(\(\) => observer\.disconnect\(\), 3000\)/);
+  const serverHiddenKeys = new Set(['agenda', 'coldmailing', 'websitegenerator', 'bookkeeping', 'pdfs']);
+  const visibleSections = (source) => extractSidebarSections(source).map((section) => ({
+    ...section,
+    links: section.links.filter((link) => {
+      const key = link.split(':', 1)[0];
+      return key !== 'lead_radar' && !serverHiddenKeys.has(key);
+    }),
+  }));
+  assert.deepEqual(
+    visibleSections(shellSource),
+    visibleSections(canonicalSource),
+    'Lead Radar hoort buiten zijn eigen actieve entry exact dezelfde zichtbare sidebarbron en volgorde te behouden'
+  );
+  const overviewLinks = extractSidebarSections(shellSource)[0].links;
+  assert.deepEqual(
+    overviewLinks.slice(overviewLinks.indexOf('coldmailing:Coldmailing') + 1, overviewLinks.indexOf('database:Database')),
+    ['lead_radar:Lead Radar']
+  );
+  assert.match(readRepoFile('assets/personnel-theme.js'), /pathname === "\/lead-radar"/);
+  assert.match(readRepoFile('assets/personnel-theme.js'), /if \(p === "\/lead-radar"\) return "lead_radar"/);
+  assert.match(readRepoFile('assets/premium-sidebar-stability.js'), /path === "\/lead-radar"/);
 });
 
 test('static premium sidebars share the same section order and public labels', () => {

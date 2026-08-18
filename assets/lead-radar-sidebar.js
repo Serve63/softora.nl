@@ -1,6 +1,9 @@
 (function () {
   'use strict';
 
+  if (window.__softoraLeadRadarSidebarInitialized === true) return;
+  window.__softoraLeadRadarSidebarInitialized = true;
+
   const LINK_KEY = 'lead_radar';
   const LINK_HREF = '/lead-radar';
   const LINK_LABEL = 'Lead Radar';
@@ -8,37 +11,45 @@
 
   function syncLink() {
     const sidebar = document.querySelector('.sidebar');
-    if (!sidebar) return;
+    if (!sidebar) return false;
     const overview = Array.from(sidebar.querySelectorAll('.sidebar-section')).find((section) => {
       const label = section.querySelector('.sidebar-section-label');
       return String(label?.textContent || '').trim().toLowerCase() === 'overzicht';
     });
-    if (!overview) return;
+    if (!overview) return false;
     let link = overview.querySelector(`[data-sidebar-key="${LINK_KEY}"]`);
-      if (!link) {
-        link = document.createElement('a');
-        link.className = 'sidebar-link magnetic';
-        link.dataset.sidebarKey = LINK_KEY;
-        link.innerHTML = `${LINK_ICON}<span class="sidebar-link-text">${LINK_LABEL}</span>`;
-        const database = overview.querySelector('[data-sidebar-key="database"]');
-        overview.insertBefore(link, database || null);
-      }
-    overview.querySelectorAll('.sidebar-link[data-sidebar-key]').forEach((item) => {
-      item.classList.toggle('active', item === link);
-    });
+    if (!link) {
+      link = document.createElement('a');
+      link.className = 'sidebar-link magnetic';
+      link.dataset.sidebarKey = LINK_KEY;
+      link.innerHTML = `${LINK_ICON}<span class="sidebar-link-text">${LINK_LABEL}</span>`;
+      const database = overview.querySelector('[data-sidebar-key="database"]');
+      overview.insertBefore(link, database || null);
+    }
+    if (window.location.pathname === LINK_HREF) {
+      sidebar.querySelectorAll('.sidebar-link[data-sidebar-key]').forEach((item) => {
+        item.classList.toggle('active', item === link);
+      });
+    }
     link.href = LINK_HREF;
     link.classList.remove('sidebar-link--coming-soon');
     link.removeAttribute('aria-disabled');
     link.removeAttribute('tabindex');
     link.classList.toggle('active', window.location.pathname === LINK_HREF);
+    return true;
   }
 
   function boot() {
-    syncLink();
+    if (syncLink()) return;
     const observer = new MutationObserver(syncLink);
     observer.observe(document.body, { childList: true, subtree: true });
-    window.setTimeout(syncLink, 100);
-    window.setTimeout(syncLink, 500);
+    const retry = () => {
+      if (!syncLink()) return;
+      observer.disconnect();
+    };
+    window.setTimeout(retry, 100);
+    window.setTimeout(retry, 500);
+    window.setTimeout(() => observer.disconnect(), 3000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
