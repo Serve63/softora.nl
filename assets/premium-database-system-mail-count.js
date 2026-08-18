@@ -439,7 +439,7 @@
         todaySentRefreshPromise = fetchImpl(COLDMAIL_STATS_URL, {
             credentials: "same-origin",
             headers: { Accept: "application/json" },
-            cache: "default"
+            cache: "no-store"
         }).then(function (response) {
             return response.json().then(function (payload) {
                 return { response: response, payload: payload };

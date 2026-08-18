@@ -48,7 +48,7 @@ const {
   ACTIVE_INSTANTLY_COLDMAIL_STATUSES,
   BLOCKING_INSTANTLY_COLDMAIL_STATUSES,
   COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS,
-  COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS,
+  COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS, COLDMAIL_AUTOPILOT_INTERVAL_READY_GRACE_MS,
   COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES,
   COLDMAIL_AUTOPILOT_MAX_SENDER_EMAILS,
   COLDMAIL_AUTOPILOT_STATE_VALUE_SOFT_LIMIT,
@@ -2804,7 +2804,7 @@ function createColdmailCampaignService(deps = {}) {
       }))
       .forEach((entry) => {
         const sentRecently = entry.count > 0 && parseTimestampMs(entry.at) >= cutoffMs;
-        const activePause = parseTimestampMs(entry.safetyPauseUntil) > currentMs;
+        const activePause = parseTimestampMs(entry.safetyPauseUntil) > currentMs && normalizeString(entry.safetyPauseReason).toLowerCase() !== 'historical_mailbox_guard_unavailable';
         if (!sentRecently && !activePause) return;
         const semanticKey = sentRecently ? getColdmailSendGuardSemanticSendKey(entry) : '';
         if (semanticKey && semanticSendSeen.has(semanticKey)) {
@@ -2948,6 +2948,7 @@ function createColdmailCampaignService(deps = {}) {
       }))
       .filter((entry) => {
         if (entry.untilMs <= nowMs) return false;
+        if (normalizeString(entry.reason).toLowerCase() === 'historical_mailbox_guard_unavailable') return false;
         return !entry.senderEmail || !selectedSenderEmail || entry.senderEmail === selectedSenderEmail;
       })
       .sort((left, right) => right.untilMs - left.untilMs)[0] || null;
@@ -5084,7 +5085,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!lastStartedAtMs) return { ok: true };
     const minIntervalMs = schedule.minIntervalMinutes * 60 * 1000;
     const readyAtMs = lastStartedAtMs + minIntervalMs;
-    if (readyAtMs <= now().getTime()) return { ok: true };
+    if (readyAtMs <= now().getTime() + COLDMAIL_AUTOPILOT_INTERVAL_READY_GRACE_MS) return { ok: true };
     return {
       ok: false,
       reason: 'cooldown',
@@ -8797,14 +8798,11 @@ function createColdmailCampaignService(deps = {}) {
         const errorCode = normalizeString(error && error.code);
         const guardConfirmFailed = errorCode === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
         const guardPreflightFailed = /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(errorCode);
-        const historicalMailboxGuardFailed = errorCode === 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE';
         const postSmtpPersistenceFailed = errorCode === 'COLDMAIL_POST_SMTP_PERSISTENCE_FAILED';
         const safetyReason = guardConfirmFailed
           ? 'central_outbound_guard_confirm_failed'
           : guardPreflightFailed
           ? 'central_outbound_guard_preflight_failed'
-          : historicalMailboxGuardFailed
-          ? 'historical_mailbox_guard_unavailable'
           : postSmtpPersistenceFailed
           ? 'post_smtp_persistence_failed'
           : getSmtpSafetyStopReason(error);
@@ -8856,6 +8854,8 @@ function createColdmailCampaignService(deps = {}) {
         error.code = 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE';
       } else if (senderCooldownFailure) {
         error.code = 'COLDMAIL_SENDER_COOLDOWN_ACTIVE';
+      } else if (failed.every((item) => normalizeString(item && item.code) === 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE')) {
+        error.code = 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE';
       } else if (autopilotGuardFailure) {
         error.code = normalizeString(failed[0] && failed[0].code) || 'COLDMAIL_AUTOPILOT_DISABLED';
         error.reason = normalizeString(failed[0] && failed[0].reason);

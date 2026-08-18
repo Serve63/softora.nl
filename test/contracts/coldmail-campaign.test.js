@@ -2365,6 +2365,62 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(getSendGuardState().entries.length, 2);
 });
 
+test('coldmail autopilot accepts a cron tick a few seconds before the exact interval boundary', async () => {
+  const { service, sentMessages } = createService({
+    rows: [{
+      id: 'cron-jitter-prospect',
+      bedrijf: 'Cron Jitter BV',
+      naam: 'Robin',
+      email: 'info@cron-jitter.example',
+      status: 'prospect',
+      branche: 'Horeca & Restaurants',
+      stad: 'Oisterwijk',
+      mail: true,
+    }],
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.strato.com',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'serve-secret',
+    }]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        sendJitterMinSeconds: 0,
+        sendJitterMaxSeconds: 0,
+      },
+      lastStartedAt: '2026-08-18T09:55:00.000Z',
+    },
+    now: () => new Date('2026-08-18T09:59:59.200Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+});
+
 test('coldmail autopilot bewaart de laatste operationele dagreden naast compacte nachtlogs', async () => {
   const previousReason = {
     ok: true,
@@ -4184,6 +4240,150 @@ test('coldmail autopilot skips only the mailbox with an active safety pause', as
     getSendGuardState().entries.some((entry) => entry.senderEmail === 'servec321@gmail.com' && entry.count === 1),
     true
   );
+});
+
+test('coldmail autopilot ignores a legacy historical mailbox infrastructure pause', async () => {
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows: [{
+      id: 'legacy-infrastructure-pause-prospect',
+      bedrijf: 'Herstelbare Guard BV',
+      naam: 'Sam',
+      email: 'info@herstelbare-guard.example',
+      status: 'prospect',
+      branche: 'Horeca & Restaurants',
+      stad: 'Oisterwijk',
+      mail: true,
+    }],
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.strato.com',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'serve-secret',
+    }]),
+    sendGuardState: {
+      entries: [{
+        at: '2026-08-18T09:55:00.000Z',
+        senderEmail: 'serve@softora.nl',
+        count: 0,
+        personalCount: 0,
+        safetyPauseUntil: '2026-08-18T16:00:00.000Z',
+        safetyPauseReason: 'historical_mailbox_guard_unavailable',
+      }],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+      },
+    },
+    now: () => new Date('2026-08-18T10:00:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(
+    getSendGuardState().entries.some((entry) =>
+      entry.safetyPauseReason === 'historical_mailbox_guard_unavailable'
+    ),
+    false
+  );
+});
+
+test('coldmail autopilot retries on the next cron after a historical mailbox read outage', async () => {
+  let currentNow = new Date('2026-08-18T10:00:00.000Z');
+  let historicalReads = 0;
+  const { service, sentMessages, getAutopilotState, getSendGuardState } = createService({
+    rows: [{
+      id: 'historical-read-recovery-prospect',
+      bedrijf: 'Historische Read Herstel BV',
+      naam: 'Alex',
+      email: 'info@historische-read-herstel.example',
+      status: 'prospect',
+      branche: 'Horeca & Restaurants',
+      stad: 'Oisterwijk',
+      mail: true,
+    }],
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.strato.com',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'serve-secret',
+    }]),
+    dataOpsStore: {
+      async listHistoricalOutboundMailboxMessagesByRecipientEmails() {
+        historicalReads += 1;
+        return historicalReads === 1 ? null : [];
+      },
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+      },
+    },
+    now: () => currentNow,
+  });
+
+  const failedRun = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(failedRun.ok, true);
+  assert.equal(failedRun.skipped, true);
+  assert.equal(failedRun.reason, 'coldmail_historical_mailbox_guard_unavailable');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getSendGuardState().entries.length, 0);
+  assert.equal(getAutopilotState().enabled, true);
+
+  currentNow = new Date('2026-08-18T10:05:00.000Z');
+  const recoveredRun = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(recoveredRun.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().enabled, true);
 });
 
 test('coldmail autopilot only uses explicitly configured sender emails', async () => {
@@ -9793,7 +9993,7 @@ test('coldmail campaign blocks a new address on a historically mailed business d
   assert.deepEqual(historyLookups[0].recipientDomains, ['historisch-domein.example']);
 });
 
-test('coldmail campaign fails closed before SMTP when historical mailbox lookup fails', async () => {
+test('coldmail campaign fails closed without a long sender pause when historical mailbox lookup fails', async () => {
   const { service, sentMessages, getSendGuardState } = createService({
     rows: [
       {
@@ -9822,20 +10022,17 @@ test('coldmail campaign fails closed before SMTP when historical mailbox lookup 
       senderEmail: 'info@softora.nl',
     }),
     (error) => {
-      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.equal(error.code, 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE');
       assert.match(error.message, /Historische mailbox kon niet veilig worden gecontroleerd/);
       return true;
     }
   );
 
   assert.equal(sentMessages.length, 0);
-  assert.equal(
-    getSendGuardState().entries[0].safetyPauseReason,
-    'historical_mailbox_guard_unavailable'
-  );
+  assert.equal(getSendGuardState().entries.length, 0);
 });
 
-test('coldmail campaign fails closed before SMTP when sent-mailbox coverage is unhealthy', async () => {
+test('coldmail campaign fails closed without a long sender pause when sent-mailbox coverage is unhealthy', async () => {
   let recipientLookupCalled = false;
   const { service, sentMessages } = createService({
     rows: [{
@@ -9867,7 +10064,7 @@ test('coldmail campaign fails closed before SMTP when sent-mailbox coverage is u
       senderEmail: 'info@softora.nl',
     }),
     (error) => {
-      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.equal(error.code, 'COLDMAIL_HISTORICAL_MAILBOX_GUARD_UNAVAILABLE');
       assert.match(error.message, /mailbox-index is niet volledig of actueel/);
       return true;
     }
