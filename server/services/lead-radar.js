@@ -258,7 +258,6 @@ function scoreSignal(input = {}, { targetRegion = '' } = {}) {
     reasons: Array.from(new Set(reasons)),
   };
 }
-
 function getRegionList(value, mode = '') {
   if (Array.isArray(value) && value.length) return value.map((item) => text(item, 100)).filter(Boolean).slice(0, 100);
   const normalized = text(value, 100);
@@ -266,12 +265,10 @@ function getRegionList(value, mode = '') {
   if (String(mode).toLowerCase() === 'regional') return ['Nederland', ...PROVINCES, ...IMPORTANT_CITIES];
   return ['Nederland'];
 }
-
 function getSelectedGroups(value) {
   if (!Array.isArray(value) || !value.length) return [...DEFAULT_KEYWORD_GROUPS];
   return value.map((item) => text(item, 50)).filter((item) => Object.prototype.hasOwnProperty.call(KEYWORD_GROUPS, item));
 }
-
 function getAutomaticScanConfig(env = process.env) {
   const enabled = false;
   const intervalMinutes = Math.max(
@@ -306,7 +303,6 @@ function getAutomaticScanConfig(env = process.env) {
     keywordGroups: [...DEFAULT_KEYWORD_GROUPS],
   };
 }
-
 function hasCompletedInitialBackfill(run, config) {
   const queryCount = Array.isArray(run?.query_plan) ? run.query_plan.length : 0;
   return Boolean(
@@ -316,14 +312,12 @@ function hasCompletedInitialBackfill(run, config) {
       && Number(run.query_cursor || 0) >= queryCount
   );
 }
-
 function getFreshnessSuffix(maxAgeDays) {
   const days = normalizeInteger(maxAgeDays, { min: 1, max: 3650 });
   if (!days) return '';
   const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   return ` after:${cutoff}`;
 }
-
 function buildSearchPlan(options = {}) {
   const platforms = Array.from(new Set(
     Array.isArray(options.platforms) && options.platforms.length
@@ -354,25 +348,21 @@ function buildSearchPlan(options = {}) {
   }
   return plan;
 }
-
 function safeLimit(value, fallback, max) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(1, Math.min(max, Math.round(parsed)));
 }
-
 function extractTaskItems(body) {
   const task = body?.tasks?.[0];
   const result = task?.result?.[0];
   if (!Array.isArray(result?.items)) return [];
   return result.items.map((item) => ({ ...item, retrieved_at: result.datetime || null }));
 }
-
 function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
   const login = text(env.LEAD_RADAR_DATAFORSEO_LOGIN || env.DATAFORSEO_LOGIN, 500);
   const password = text(env.LEAD_RADAR_DATAFORSEO_PASSWORD || env.DATAFORSEO_PASSWORD, 500);
   const endpoint = DATAFORSEO_ENDPOINT;
-
   async function search({ query, maxResults = 10 } = {}) {
     if (!login || !password) {
       const error = new Error('Lead Radar SERP-provider is niet geconfigureerd.');
@@ -417,7 +407,6 @@ function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fe
         rank: normalizeInteger(item.rank_absolute, { min: 1, max: 10_000 }),
       }));
   }
-
   return {
     name: 'dataforseo',
     configured: Boolean(login && password),
@@ -433,7 +422,6 @@ function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fe
     },
   };
 }
-
 function buildWebsiteSearchQuery(signal) {
   const name = text(signal.author_name || signal.authorName || '', 180)
     .split('|')[0]
@@ -445,7 +433,6 @@ function buildWebsiteSearchQuery(signal) {
   // Exclude social profiles and ask for the public company site itself.
   return `"${name}" ${region} website -site:facebook.com -site:linkedin.com`.trim();
 }
-
 function buildSignalFromProviderItem(item, context = {}) {
   const url = normalizeHttpUrl(item?.post_url || item?.postUrl || item?.url || '');
   const platform = platformFromUrl(url);
@@ -506,7 +493,6 @@ function buildSignalFromProviderItem(item, context = {}) {
   input.fingerprint = buildFingerprint(input);
   return input;
 }
-
 function mergeSignal(existing, incoming) {
   const merged = { ...(existing || {}), ...(incoming || {}) };
   for (const field of ['website_url', 'website_domain', 'website_title', 'website_http_status', 'website_checked_at', 'website_check_error']) {
@@ -531,7 +517,6 @@ function mergeSignal(existing, incoming) {
   merged.updated_at = new Date().toISOString();
   return merged;
 }
-
 function createLeadRadarService(deps = {}) {
   const {
     env = process.env,
@@ -541,7 +526,6 @@ function createLeadRadarService(deps = {}) {
     fetchImpl = globalThis.fetch,
   } = deps;
   const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger }); const enrichment = deps.enrichment || createLeadRadarEnrichment({ env, fetchImpl, logger, normalizeHttpUrl }); const maintenance = createLeadRadarMaintenance({ getDb, env, logger });
-
   function getDb() {
     if (typeof isSupabaseConfigured === 'function' && !isSupabaseConfigured()) return null;
     if (typeof getSupabaseClient !== 'function') return null;
@@ -558,7 +542,6 @@ function createLeadRadarService(deps = {}) {
       suppressFailureCooldown: true,
     });
   }
-
   function requireDb() {
     const db = getDb();
     if (!db) {
@@ -568,13 +551,11 @@ function createLeadRadarService(deps = {}) {
     }
     return db;
   }
-
   async function findByFingerprint(db, fingerprint) {
     const result = await db.from(SIGNALS_TABLE).select('*').eq('fingerprint', fingerprint).limit(1);
     if (result.error) throw result.error;
     return result.data?.[0] || null;
   }
-
   async function upsertSignal(payload) {
     const db = requireDb();
     const fingerprint = payload.fingerprint || buildFingerprint(payload);
@@ -592,7 +573,6 @@ function createLeadRadarService(deps = {}) {
     if (result.error) throw result.error;
     return { row: result.data, created: !existing };
   }
-
   async function listSignals(query = {}) {
     const db = requireDb();
     const limit = safeLimit(query.limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
@@ -630,7 +610,6 @@ function createLeadRadarService(deps = {}) {
       offset,
     };
   }
-
   async function getSignal(id) {
     const db = requireDb();
     const normalizedId = text(id, 100);
@@ -644,7 +623,6 @@ function createLeadRadarService(deps = {}) {
     }
     return result.data[0];
   }
-
   async function updateSignal(id, input = {}) {
     const db = requireDb();
     const existing = await getSignal(id);
@@ -677,7 +655,6 @@ function createLeadRadarService(deps = {}) {
     if (result.error) throw result.error;
     return result.data;
   }
-
   async function importSignal(input = {}) {
     const platform = normalizePlatform(input.platform);
     if (!platform) throw new LeadRadarValidationError('Kies Facebook of LinkedIn.');
@@ -727,7 +704,6 @@ function createLeadRadarService(deps = {}) {
     payload.fingerprint = buildFingerprint(payload);
     return upsertSignal(payload);
   }
-
   async function checkWebsiteForSignal(signal, { force = false } = {}) {
     const existingUrl = normalizeHttpUrl(signal.website_url, { allowPlatform: false });
     const existingStatus = normalizeWebsiteStatus(signal.website_status);
@@ -827,7 +803,6 @@ function createLeadRadarService(deps = {}) {
       website_candidates: candidates,
     };
   }
-
   async function verifyWebsite(url) {
     const normalized = normalizeHttpUrl(url, { allowPlatform: false });
     if (!normalized) return { ok: false, status: null, title: '', error: 'Ongeldige of niet-openbare website-URL.' };
