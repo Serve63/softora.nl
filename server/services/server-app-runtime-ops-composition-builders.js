@@ -66,6 +66,7 @@ function buildServerAppOpsWiringRuntimeContext({
       isProduction: envConfig.IS_PRODUCTION,
       isServerlessRuntime,
       assetsDirectory: `${projectRootDir}/assets`,
+      personalSitesDirectory: `${projectRootDir}/personal-sites`,
       securityContactEmail: envConfig.SECURITY_CONTACT_EMAIL,
       getEffectivePublicBaseUrl,
       sendSeoManagedHtmlPageResponse: uiSeoRuntime.sendSeoManagedHtmlPageResponse,
