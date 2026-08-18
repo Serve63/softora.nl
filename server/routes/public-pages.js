@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const {
   buildPublicSeoRobotsTxt,
@@ -53,16 +54,23 @@ function registerPersonalSiteRoutes(app, { personalSitesDirectory } = {}) {
   const rootDirectory = String(personalSitesDirectory || '').trim();
   if (!app || !rootDirectory) return;
 
+  const personalSiteRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+  });
+
   Object.entries(PERSONAL_SITE_ROUTES).forEach(([slug, config]) => {
     const siteDirectory = path.join(rootDirectory, config.directory);
     const indexFile = path.join(siteDirectory, 'index.html');
 
-    app.get(`/${slug}`, (req, res, next) => {
+    app.get(`/${slug}`, personalSiteRateLimiter, (req, res, next) => {
       if (String(req.path || '').endsWith('/')) return next();
       return res.redirect(301, appendOriginalQuery(`/${slug}/`, req.originalUrl));
     });
 
-    app.get(`/${slug}/`, (req, res, next) => {
+    app.get(`/${slug}/`, personalSiteRateLimiter, (req, res, next) => {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
       return res.sendFile(indexFile, { dotfiles: 'deny' }, (error) => {
@@ -70,7 +78,7 @@ function registerPersonalSiteRoutes(app, { personalSitesDirectory } = {}) {
       });
     });
 
-    app.use(`/${slug}`, express.static(siteDirectory, {
+    app.use(`/${slug}`, personalSiteRateLimiter, express.static(siteDirectory, {
       index: false,
       redirect: false,
       maxAge: '7d',
