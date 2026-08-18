@@ -914,6 +914,10 @@ test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw',
   assert.match(shellSource, /class="sidebar-link magnetic active" data-sidebar-key="lead_radar"/);
   assert.match(shellSource, /<span class="sidebar-link-text">Lead Radar<\/span>/);
   assert.match(shellSource, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
+  assert.match(shellSource, /html, body \{[^}]*scrollbar-width:\s*none/);
+  assert.match(shellSource, /\.lead-radar-shell \.sidebar-nav \{[^}]*scrollbar-width:\s*none !important/);
+  assert.match(shellSource, /\.lead-radar-shell \.sidebar-nav::-webkit-scrollbar \{[^}]*display:\s*none !important/);
+  assert.match(shellSource, /\.lead-radar-shell > \.sidebar \{[^}]*pointer-events:\s*auto !important/);
   assert.match(sidebarSource, /const LINK_HREF = '\/lead-radar'/);
   assert.match(sidebarSource, /const LINK_LABEL = 'Lead Radar'/);
   assert.match(sidebarSource, /overview\.insertBefore\(link, database \|\| null\)/);

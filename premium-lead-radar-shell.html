@@ -12,8 +12,12 @@
   <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
   <style>
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; overflow: hidden; background: #f4f1ed; }
+    html, body { height: 100%; margin: 0; overflow: hidden; background: #f4f1ed; scrollbar-width: none; -ms-overflow-style: none; }
+    html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
     .lead-radar-shell { display: flex; min-height: 100vh; }
+    .lead-radar-shell > .sidebar { z-index: 10 !important; pointer-events: auto !important; }
+    .lead-radar-shell .sidebar-nav { scrollbar-width: none !important; -ms-overflow-style: none !important; scrollbar-gutter: auto !important; }
+    .lead-radar-shell .sidebar-nav::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
     .lead-radar-shell__content {
       width: calc(100% - var(--premium-sidebar-width, 320px));
       min-height: 100vh;
