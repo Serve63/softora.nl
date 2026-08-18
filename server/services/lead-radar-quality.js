@@ -149,9 +149,9 @@ function createLeadRadarQuality(deps) {
 
   function extractDateText(value) {
     const raw = String(value || '');
-    const relative = raw.match(/\b(?:vandaag|gisteren|\d+\s*(?:uur|u|hour|hours|dag|dagen|day|days|week|weken|weeks)\s*(?:geleden|ago))\b/i);
+    const relative = raw.match(/\b(?:vandaag|gisteren|\d+\s*(?:uur|u|h|hour|hours|dag|dagen|d|day|days|week|weken|w|weeks)\s*(?:geleden|ago)?)\b/i);
     if (relative) return relative[0];
-    const named = raw.match(/\b\d{1,2}\s+(?:jan(?:uari)?|feb(?:ruari)?|mrt|maart|apr(?:il)?|mei|jun(?:i)?|jul(?:i)?|aug(?:ustus)?|sep(?:t(?:ember)?)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i);
+    const named = raw.match(/\b\d{1,2}\s+(?:jan(?:uari)?|feb(?:ruari)?|mrt|maart|apr(?:il)?|mei|jun(?:i)?|jul(?:i)?|aug(?:ustus)?|sep(?:t(?:ember)?)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?\b/i);
     if (named) return named[0];
     const numeric = raw.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/);
     return numeric ? numeric[0] : '';
@@ -179,22 +179,29 @@ function createLeadRadarQuality(deps) {
   }
 
   function normalizeProviderDate(value, baseValue) {
-    const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const raw = String(value || '').trim().toLowerCase().replace(/[·|•]+/g, ' ').replace(/\s+/g, ' ').replace(/[.,;]+$/, '');
     if (!raw) return null;
     const base = new Date(baseValue);
     if (Number.isNaN(base.getTime())) return null;
     if (/^(vandaag|today)$/.test(raw)) return base.toISOString();
     if (/^(gisteren|yesterday)$/.test(raw)) return new Date(base.getTime() - 86_400_000).toISOString();
-    const relative = raw.match(/^(\d+)\s*(uur|u|hour|hours|dag|dagen|day|days|week|weken|weeks)\s*(geleden|ago)$/);
+    const relative = raw.match(/^(\d+)\s*(uur|u|h|hour|hours|dag|dagen|d|day|days|week|weken|w|weeks)\s*(geleden|ago)?$/);
     if (relative) {
       const amount = Number(relative[1]);
       const unit = relative[2];
-      const multiplier = /uur|u|hour/.test(unit) ? 3_600_000 : /week/.test(unit) || /weken/.test(unit) ? 7 * 86_400_000 : 86_400_000;
+      const multiplier = /uur|u|h|hour/.test(unit) ? 3_600_000 : /week|weken|w/.test(unit) ? 7 * 86_400_000 : 86_400_000;
       return new Date(base.getTime() - amount * multiplier).toISOString();
     }
-    const dutch = raw.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
+    const dutch = raw.match(/^(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?$/);
     if (dutch && Object.prototype.hasOwnProperty.call(DUTCH_MONTHS, dutch[2])) {
-      const date = new Date(Date.UTC(Number(dutch[3]), DUTCH_MONTHS[dutch[2]], Number(dutch[1])));
+      let year = Number(dutch[3] || base.getUTCFullYear());
+      let date = new Date(Date.UTC(year, DUTCH_MONTHS[dutch[2]], Number(dutch[1])));
+      // Facebook/Google often omits the year. If that date would be in the
+      // future, it belongs to the previous year.
+      if (!dutch[3] && date.getTime() > base.getTime() + 2 * 86_400_000) {
+        year -= 1;
+        date = new Date(Date.UTC(year, DUTCH_MONTHS[dutch[2]], Number(dutch[1])));
+      }
       return Number.isNaN(date.getTime()) ? null : date.toISOString();
     }
     const numeric = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
@@ -204,6 +211,46 @@ function createLeadRadarQuality(deps) {
       return Number.isNaN(date.getTime()) ? null : date.toISOString();
     }
     return normalizeDate(value);
+  }
+
+  function getPublicPagePublicationDetails(html, retrievedAt) {
+    const source = String(html || '').slice(0, 1_500_000);
+    const base = normalizeDate(retrievedAt) || new Date().toISOString();
+    const readAttribute = (tag, name) => {
+      const match = String(tag || '').match(new RegExp(`${name}\\s*=\\s*["']([^"']+)["']`, 'i'));
+      return match ? match[1] : '';
+    };
+    const metaTags = source.match(/<meta\b[^>]*>/gi) || [];
+    const metaCandidates = [
+      ['article:published_time', 'post_meta', 100],
+      ['og:published_time', 'post_meta', 98],
+      ['datePublished', 'post_jsonld', 95],
+    ];
+    for (const [name, publicationSource, confidence] of metaCandidates) {
+      const tag = metaTags.find((candidate) => {
+        const key = (readAttribute(candidate, 'property') || readAttribute(candidate, 'name')).toLowerCase();
+        return key === name.toLowerCase();
+      });
+      const value = tag ? readAttribute(tag, 'content') : '';
+      const publishedAt = normalizeProviderDate(value, base);
+      if (publishedAt) return { publishedAt, source: publicationSource, raw: value.slice(0, 250), confidence };
+    }
+    const jsonLd = source.match(/\"datePublished\"\s*:\s*\"([^\"]+)\"/i);
+    if (jsonLd) {
+      const publishedAt = normalizeProviderDate(jsonLd[1], base);
+      if (publishedAt) return { publishedAt, source: 'post_jsonld', raw: jsonLd[1].slice(0, 250), confidence: 95 };
+    }
+    const timeTag = source.match(/<time\b[^>]*datetime\s*=\s*["']([^"']+)["'][^>]*>/i);
+    if (timeTag) {
+      const publishedAt = normalizeProviderDate(timeTag[1], base);
+      if (publishedAt) return { publishedAt, source: 'post_time', raw: timeTag[1].slice(0, 250), confidence: 90 };
+    }
+    const unixTime = source.match(/data-utime\s*=\s*["'](\d{9,12})["']/i);
+    if (unixTime) {
+      const value = new Date(Number(unixTime[1]) * 1_000).toISOString();
+      return { publishedAt: value, source: 'post_time', raw: unixTime[1], confidence: 90 };
+    }
+    return { publishedAt: null, source: 'unknown', raw: null, confidence: 0 };
   }
 
   function isRecentPublication(value, maxAgeDays = 30) {
@@ -274,7 +321,10 @@ function createLeadRadarQuality(deps) {
     if (!isLikelyDirectPlatformPostUrl(signal.post_url || signal.source_url, signal.platform)) return false;
     const hasPublicationDate = Boolean(normalizeDate(signal.published_at));
     if (!hasPublicationDate && !allowUnknownPublicationDate) return false;
-    if (hasPublicationDate && !isRecentPublication(signal.published_at, maxAgeDays)) return false;
+    // A missing post date is acceptable only when the signal itself was found
+    // recently. This prevents historic undated rows from resurfacing forever.
+    const freshnessDate = signal.published_at || signal.found_at;
+    if (freshnessDate && !isRecentPublication(freshnessDate, maxAgeDays)) return false;
     const classification = classifySignal(signal);
     return !classification.isProvider && !classification.isExcluded && classification.isWebsiteNeed;
   }
@@ -284,6 +334,7 @@ function createLeadRadarQuality(deps) {
     isEligibleAutomaticSignal,
     isLikelyDirectPlatformPostUrl,
     isRecentPublication,
+    getPublicPagePublicationDetails,
     getProviderPublicationDetails,
     normalizeProviderPublishedAt,
     searchExclusionTerms: SEARCH_EXCLUSION_TERMS,
@@ -291,4 +342,5 @@ function createLeadRadarQuality(deps) {
 }
 
 module.exports = { createLeadRadarQuality };
+
 

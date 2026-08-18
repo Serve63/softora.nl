@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('crypto');
-const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance'); const { createLeadRadarEnrichment } = require('./lead-radar-enrichment');
+const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance'); const { createLeadRadarEnrichment } = require('./lead-radar-enrichment'); const { createLeadRadarSourceVerifier } = require('./lead-radar-source');
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
 const DATAFORSEO_ENDPOINT = 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced';
@@ -24,7 +24,10 @@ const DEFAULT_SCAN_QUERY_LIMIT = 50;
 const MAX_SCAN_QUERY_LIMIT = DEFAULT_SCAN_QUERY_LIMIT;
 const DEFAULT_WEBSITE_LOOKUP_LIMIT = 10;
 const MAX_WEBSITE_LOOKUP_LIMIT = 50;
-const DEFAULT_SOURCE_CHECK_LIMIT = 10;
+// Source checks also recover missing publication dates from public post HTML.
+// Keep the number bounded so a manual round remains predictable.
+const DEFAULT_SOURCE_CHECK_LIMIT = 50;
+const MAX_LEAD_AGE_DAYS = 30;
 const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
 const DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS = 30;
 const DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS = 3;
@@ -173,6 +176,7 @@ const {
   isEligibleAutomaticSignal,
   isLikelyDirectPlatformPostUrl,
   isRecentPublication,
+  getPublicPagePublicationDetails,
   getProviderPublicationDetails,
   normalizeProviderPublishedAt,
   searchExclusionTerms,
@@ -282,12 +286,12 @@ function getAutomaticScanConfig(env = process.env) {
   const initialLookbackDays = safeLimit(
     env.LEAD_RADAR_AUTO_SCAN_INITIAL_MAX_AGE_DAYS,
     DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS,
-    365
+    MAX_LEAD_AGE_DAYS
   );
   const refreshLookbackDays = safeLimit(
     env.LEAD_RADAR_AUTO_SCAN_REFRESH_MAX_AGE_DAYS || env.LEAD_RADAR_AUTO_SCAN_MAX_AGE_DAYS,
     DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS,
-    365
+    MAX_LEAD_AGE_DAYS
   );
   return {
     enabled,
@@ -313,7 +317,7 @@ function hasCompletedInitialBackfill(run, config) {
   );
 }
 function getFreshnessSuffix(maxAgeDays) {
-  const days = normalizeInteger(maxAgeDays, { min: 1, max: 3650 });
+  const days = normalizeInteger(maxAgeDays, { min: 1, max: MAX_LEAD_AGE_DAYS });
   if (!days) return '';
   const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   return ` after:${cutoff}`;
@@ -451,7 +455,7 @@ function buildSignalFromProviderItem(item, context = {}) {
   // acquisitielead. Ook resultaten zonder echte websitevraag zijn te vaak
   // algemene content die alleen toevallig het woord website bevat.
   if (classification.isProvider || classification.isExcluded || !classification.isWebsiteNeed) return null;
-  const maxAgeDays = normalizeInteger(context.maxAgeDays, { min: 1, max: 3650 });
+  const maxAgeDays = normalizeInteger(context.maxAgeDays, { min: 1, max: MAX_LEAD_AGE_DAYS });
   if (!isLikelyDirectPlatformPostUrl(url, platform)) return null;
   const publication = getProviderPublicationDetails(item);
   if (publication.publishedAt && !isRecentPublication(publication.publishedAt, maxAgeDays || 30)) return null;
@@ -525,7 +529,7 @@ function createLeadRadarService(deps = {}) {
     isSupabaseConfigured = () => false,
     fetchImpl = globalThis.fetch,
   } = deps;
-  const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger }); const enrichment = deps.enrichment || createLeadRadarEnrichment({ env, fetchImpl, logger, normalizeHttpUrl }); const maintenance = createLeadRadarMaintenance({ getDb, env, logger });
+  const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger }); const enrichment = deps.enrichment || createLeadRadarEnrichment({ env, fetchImpl, logger, normalizeHttpUrl }); const sourceVerifier = deps.sourceVerifier || createLeadRadarSourceVerifier({ fetchImpl, normalizeHttpUrl, getPublicPagePublicationDetails }); const maintenance = createLeadRadarMaintenance({ getDb, env, logger });
   function getDb() {
     if (typeof isSupabaseConfigured === 'function' && !isSupabaseConfigured()) return null;
     if (typeof getSupabaseClient !== 'function') return null;
@@ -588,10 +592,10 @@ function createLeadRadarService(deps = {}) {
     if (query.search) request = request.or(`message_text.ilike.%${text(query.search, 100).replace(/[,()]/g, ' ')}%,author_name.ilike.%${text(query.search, 100).replace(/[,()]/g, ' ')}%,query.ilike.%${text(query.search, 100).replace(/[,()]/g, ' ')}%`);
     const minScore = normalizeInteger(query.min_score ?? query.minScore, { min: 0, max: 100 });
     if (minScore !== null) request = request.gte('relevance_score', minScore);
-    const days = normalizeInteger(query.days, { min: 0, max: 3650 });
+    const days = normalizeInteger(query.days, { min: 1, max: MAX_LEAD_AGE_DAYS }) || MAX_LEAD_AGE_DAYS;
     if (days > 0) {
       const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
-      request = typeof request.or === 'function' ? request.or(`published_at.gte.${cutoff},published_at.is.null`) : request.gte('published_at', cutoff);
+      request = typeof request.or === 'function' ? request.or(`published_at.gte.${cutoff},and(published_at.is.null,found_at.gte.${cutoff})`) : request.gte('published_at', cutoff);
     }
     if (typeof request.in === 'function' && !platform) request = request.in('platform', [...PLATFORMS]);
     if (typeof request.range === 'function') request = request.range(0, 4_999);
@@ -599,7 +603,7 @@ function createLeadRadarService(deps = {}) {
     if (result.error) throw result.error;
     const visibleSignals = (result.data || []).filter((signal) => {
       if (!PLATFORMS.includes(signal.platform)) return false;
-      const requestedDays = normalizeInteger(query.days, { min: 1, max: 3650 }) || 3650;
+      const requestedDays = days;
       return isEligibleAutomaticSignal(signal, { maxAgeDays: requestedDays });
     });
     const page = visibleSignals.slice(offset, offset + limit);
@@ -826,30 +830,6 @@ function createLeadRadarService(deps = {}) {
     }
   }
 
-  async function verifyPublicSource(url) {
-    const normalized = normalizeHttpUrl(url);
-    if (!normalized || typeof fetchImpl !== 'function') return true;
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timeout = controller ? setTimeout(() => controller.abort(), 5_000) : null;
-    try {
-      const response = await fetchImpl(normalized, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: { Accept: 'text/html,application/xhtml+xml' },
-        signal: controller?.signal,
-      });
-      if ([404, 410].includes(Number(response.status))) return false;
-      const body = await response.text().catch(() => '');
-      return !/(this content isn't available|this page isn't available|content is not available|pagina is niet beschikbaar|pagina niet gevonden)/i.test(body);
-    } catch {
-      // A platform timeout or bot protection is inconclusive; do not discard a
-      // possibly valid public lead because our server could not inspect it.
-      return true;
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
-  }
-
   async function lookupWebsite(id, { force = false } = {}) {
     const signal = await getSignal(id);
     const website = await checkWebsiteForSignal(signal, { force });
@@ -905,7 +885,7 @@ function createLeadRadarService(deps = {}) {
     let cursor = 0;
     const requestedScanMode = text(input.scanMode || input.scan_mode, 20).toLowerCase();
     const scanMode = ['automatic', 'manual'].includes(requestedScanMode) ? requestedScanMode : 'manual';
-    const maxAgeDays = normalizeInteger(input.maxAgeDays ?? input.max_age_days, { min: 1, max: 3650 }) || 30;
+    const maxAgeDays = normalizeInteger(input.maxAgeDays ?? input.max_age_days, { min: 1, max: MAX_LEAD_AGE_DAYS }) || MAX_LEAD_AGE_DAYS;
     if (input.runId || input.run_id) {
       const db = requireDb();
       const result = await db.from(SCAN_RUNS_TABLE).select('*').eq('id', text(input.runId || input.run_id, 100)).limit(1);
@@ -966,11 +946,22 @@ function createLeadRadarService(deps = {}) {
           if (!signal) continue;
           if (sourceChecksLeft > 0) {
             sourceChecksLeft -= 1;
-            const sourceAvailable = await verifyPublicSource(signal.post_url);
+            const sourceCheck = await sourceVerifier.verifyPublicSource(signal.post_url);
+            if (sourceCheck.publication?.publishedAt) {
+              signal.published_at = sourceCheck.publication.publishedAt;
+              signal.publication_date_source = sourceCheck.publication.source;
+              signal.publication_date_raw = sourceCheck.publication.raw;
+              signal.publication_date_confidence = sourceCheck.publication.confidence;
+              const rescored = scoreSignal(signal, { targetRegion: query.region });
+              signal.relevance_score = rescored.score;
+              signal.score_reasons = rescored.reasons;
+              // A date found on the public post is authoritative for freshness.
+              if (!isRecentPublication(signal.published_at, run.max_age_days || maxAgeDays)) continue;
+            }
             // Alleen een definitieve 404/410 of een expliciete platformmelding
             // dat de content niet bestaat mag een resultaat blokkeren. 403/429
             // en loginblokkades zijn geen bewijs dat de post verwijderd is.
-            if (!sourceAvailable) continue;
+            if (!sourceCheck.available) continue;
           }
           const saved = await upsertSignal(signal);
           if (saved.created) newSignalCount += 1; else duplicateCount += 1;
@@ -1122,8 +1113,11 @@ function createLeadRadarService(deps = {}) {
     const db = getDb();
     const count = async (column, value) => {
       let request = db.from(SIGNALS_TABLE).select('id', { count: 'exact', head: true });
+      const cutoff = new Date(Date.now() - MAX_LEAD_AGE_DAYS * 86_400_000).toISOString();
       if (typeof request.in === 'function') request = request.in('platform', [...PLATFORMS]);
       if (typeof request.not === 'function') request = request.not('post_url', 'is', null);
+      if (typeof request.or === 'function') request = request.or(`published_at.gte.${cutoff},and(published_at.is.null,found_at.gte.${cutoff})`);
+      else if (typeof request.gte === 'function') request = request.gte('published_at', cutoff);
       if (column) request = request.eq(column, value);
       const result = await request;
       return result.error ? null : result.count || 0;
@@ -1182,7 +1176,9 @@ module.exports = {
   hasCompletedInitialBackfill,
   classifySignal,
   isLikelyDirectPlatformPostUrl,
+  isEligibleAutomaticSignal,
   isRecentPublication,
+  getPublicPagePublicationDetails,
   normalizeProviderPublishedAt,
   getAutomaticScanConfig,
   normalizeHttpUrl,
@@ -1193,3 +1189,4 @@ module.exports = {
   WEBSITE_STATUSES,
   LEAD_STATUSES,
 };
+

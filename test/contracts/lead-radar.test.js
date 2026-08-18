@@ -10,7 +10,9 @@ const {
   classifySignal,
   createLeadRadarService,
   hasCompletedInitialBackfill,
+  isEligibleAutomaticSignal,
   isLikelyDirectPlatformPostUrl,
+  getPublicPagePublicationDetails,
   normalizeProviderPublishedAt,
   normalizeHttpUrl,
   normalizePlatform,
@@ -177,6 +179,8 @@ test('Lead Radar houdt directe posts zonder publicatiedatum zichtbaar en filtert
   assert.equal(normalizeProviderPublishedAt({ datetime: recentTimestamp }), null);
   assert.equal(normalizeProviderPublishedAt({ date: '17 aug 2026', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-17T00:00:00.000Z');
   assert.equal(normalizeProviderPublishedAt({ date: '3 dagen geleden', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-14T18:00:00.000Z');
+  assert.equal(normalizeProviderPublishedAt({ date: '29 jun', retrieved_at: '2026-08-18T18:00:00.000Z' }), '2026-06-29T00:00:00.000Z');
+  assert.equal(normalizeProviderPublishedAt({ date: '2 d', retrieved_at: '2026-08-18T18:00:00.000Z' }), '2026-08-16T18:00:00.000Z');
   assert.equal(normalizeProviderPublishedAt({ snippet: 'Gevonden op 17 aug 2026', retrieved_at: '2026-08-17T18:00:00.000Z' }), '2026-08-17T00:00:00.000Z');
   assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example/posts/123', 'facebook'), true);
   assert.equal(isLikelyDirectPlatformPostUrl('https://www.facebook.com/example', 'facebook'), false);
@@ -199,6 +203,41 @@ test('Lead Radar houdt directe posts zonder publicatiedatum zichtbaar en filtert
   assert.ok(undated);
   assert.equal(undated.published_at, null);
   assert.equal(undated.publication_date_source, 'unknown');
+  assert.equal(isEligibleAutomaticSignal({
+    platform: 'facebook',
+    post_url: 'https://www.facebook.com/example/posts/125',
+    message_text: 'Wij zoeken iemand die een website kan maken voor onze salon.',
+    found_at: new Date().toISOString(),
+  }, { maxAgeDays: 30 }), true);
+  assert.equal(isEligibleAutomaticSignal({
+    platform: 'facebook',
+    post_url: 'https://www.facebook.com/example/posts/126',
+    message_text: 'Wij zoeken iemand die een website kan maken voor onze salon.',
+    found_at: '2016-06-29T00:00:00.000Z',
+  }, { maxAgeDays: 30 }), false);
+});
+
+test('Lead Radar haalt de publicatiedatum uit openbare postmetadata wanneer SERP geen datum levert', () => {
+  const meta = getPublicPagePublicationDetails(
+    '<meta property="article:published_time" content="2026-08-17T11:32:00+00:00">',
+    '2026-08-18T12:00:00.000Z'
+  );
+  assert.equal(meta.publishedAt, '2026-08-17T11:32:00.000Z');
+  assert.equal(meta.source, 'post_meta');
+
+  const jsonLd = getPublicPagePublicationDetails(
+    '<script type="application/ld+json">{"datePublished":"2026-08-16T09:00:00Z"}</script>',
+    '2026-08-18T12:00:00.000Z'
+  );
+  assert.equal(jsonLd.publishedAt, '2026-08-16T09:00:00.000Z');
+  assert.equal(jsonLd.source, 'post_jsonld');
+});
+
+test('Lead Radar laat echte ondernemersvragen staan en blokkeert advertenties en irrelevante posts', () => {
+  assert.equal(classifySignal({ title: 'Afrodite Lucia', snippet: 'Is er iemand die een website kan maken voor me? Het gaat om beauty, voor het boeken van afspraken.' }).role, 'prospect');
+  assert.equal(classifySignal({ title: 'StartupAmsterdam', snippet: 'Wij zijn op zoek naar iemand die een website kan maken voor een internationaal netwerk.' }).role, 'prospect');
+  assert.equal(classifySignal({ title: 'Lenn Deville', snippet: 'Nexa Society is een privaat netwerk voor jonge bouwers. Beperkte plekken, founding circle is open.' }).role, 'unclear');
+  assert.equal(classifySignal({ title: 'Natalia Grab', snippet: 'In welke taal lees jij ONLINE het meest? Meer Nederlands, meer Engels.' }).role, 'unclear');
 });
 
 test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd worden', async () => {
@@ -450,7 +489,11 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /<h3 class="lead-title">/);
   assert.match(script, /const leadTitle = signal\.message_text \|\| signal\.snippet/);
   assert.match(script, /Open originele post/);
-  assert.doesNotMatch(script, /Open profiel\/pagina|Publicatiedatum:|Gevonden op:|Bedrijf en website controleren|Opnieuw controleren|Relevant|Later opvolgen|Niet relevant|Interne notitie|Notitie opslaan|lead-actions|lead-notes|data-action/i);
+  assert.match(script, /Directe postlink niet beschikbaar/);
+  assert.match(script, /post_meta/);
+  assert.match(script, /Publicatiedatum:/);
+  assert.match(script, /Gevonden op:/);
+  assert.doesNotMatch(script, /Open profiel\/pagina|Bedrijf en website controleren|Opnieuw controleren|Relevant|Later opvolgen|Niet relevant|Interne notitie|Notitie opslaan|lead-actions|lead-notes|data-action/i);
   assert.match(script, /Bedrijfscontrole/);
   assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
@@ -482,6 +525,10 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   const publicationMigration = readRepoFile('supabase/migrations/20260818160000_softora_social_lead_publication_dates.sql');
   assert.match(publicationMigration, /publication_date_source/);
   assert.match(publicationMigration, /publication_date_confidence/);
+  const postDateMigration = readRepoFile('supabase/migrations/20260818183000_softora_social_lead_post_dates.sql');
+  assert.match(postDateMigration, /post_meta/);
+  assert.match(postDateMigration, /post_jsonld/);
+  assert.match(postDateMigration, /post_time/);
   const maintenance = readRepoFile('server/services/lead-radar-maintenance.js');
   assert.match(maintenance, /not_relevant/);
   assert.match(maintenance, /archived/);
@@ -657,3 +704,4 @@ test('Lead Radar gebruikt OnPage alleen na een websitekandidaat en bewaart de ve
   assert.equal(result.website_check_provider, 'dataforseo_onpage');
   assert.equal(result.website_status, 'website_found');
 });
+

@@ -4,6 +4,12 @@
   const state = { offset: 0, limit: 50, total: 0, signals: [], status: null };
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+  const formatDate = (value) => {
+    if (!value) return 'Onbekend';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Onbekend' : new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  };
+  const publicationDateLabels = { provider_timestamp: 'Bron: DataForSEO-publicatietijd', provider_date: 'Bron: SERP-datumveld', serp_date: 'Bron: SERP-datum', serp_text: 'Bron: datum in zoekresultaattekst', post_meta: 'Bron: openbare post-metadata', post_jsonld: 'Bron: openbare post-JSON-LD', post_time: 'Bron: openbare posttijd', manual: 'Bron: handmatig ingevoerd', unknown: 'Bron vermeldde geen publicatiedatum' };
   const businessMatchLabels = { matched: 'BEDRIJF BEVESTIGD', ambiguous: 'BEDRIJF NIET ZEKER', not_found: 'BEDRIJF NIET GEVONDEN', agency_detected: 'MOGELIJK MARKETINGBUREAU', not_checked: 'BEDRIJF NOG NIET GECONTROLEERD', provider_unavailable: 'BEDRIJFSCONTROLE NIET BESCHIKBAAR', provider_error: 'BEDRIJFSCONTROLE MISLUKT' };
 
   async function api(path, options) {
@@ -41,20 +47,31 @@
     [['#metric-total', counts.total], ['#metric-new', counts.new]].forEach(([selector, value]) => { const element = $(selector); if (element) element.textContent = value == null ? '-' : Number(value).toLocaleString('nl-NL'); });
   }
 
+  function isDirectPostUrl(value, platform) {
+    try {
+      const url = new URL(String(value || ''));
+      const path = url.pathname.toLowerCase();
+      if (platform === 'linkedin') return url.hostname.endsWith('linkedin.com') && (/^\/posts\//.test(path) || /^\/feed\/update\//.test(path));
+      return (url.hostname.endsWith('facebook.com') || url.hostname.endsWith('fb.com')) && (/(?:\/posts?|\/videos?|\/reels?|\/share\/p|\/share\/r)\/[^/]+/.test(path) || url.searchParams.has('story_fbid'));
+    } catch { return false; }
+  }
+
   function signalCard(signal) {
     const platform = escapeHtml(signal.platform || 'onbekend');
-    const originalUrl = signal.post_url || signal.source_url || '';
+    const originalUrl = isDirectPostUrl(signal.post_url, signal.platform) ? signal.post_url : '';
     const websiteUrl = signal.website_url || '';
     const websiteCandidates = Array.isArray(signal.website_candidates) ? signal.website_candidates.filter((candidate) => candidate && candidate.url).slice(0, 3) : [];
     const leadTitle = signal.message_text || signal.snippet || 'Geen berichttekst beschikbaar.';
+    const publicationDate = signal.published_at ? formatDate(signal.published_at) : (signal.publication_date_raw || 'Nog niet beschikbaar via openbare bron');
+    const publicationSource = publicationDateLabels[signal.publication_date_source] || publicationDateLabels.unknown;
     const candidateLinks = websiteCandidates.map((candidate) => `<a class="website-candidate" href="${escapeHtml(candidate.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.title || candidate.url)}</a>`).join('');
     const businessStatus = signal.business_match_status || 'not_checked';
     const businessCandidates = Array.isArray(signal.business_candidates) ? signal.business_candidates.slice(0, 3).filter((candidate) => candidate && (candidate.business_domain || candidate.business_website_url)) : [];
     const businessCandidateLinks = businessCandidates.map((candidate) => { const url = candidate.business_website_url || (candidate.business_domain ? `https://${candidate.business_domain}` : ''); return url ? `<a class="website-candidate" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.business_name || candidate.business_domain)}</a>` : ''; }).join('');
-    const originalPostLink = originalUrl ? `<a class="lead-source-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Open originele post</a>` : '';
+    const originalPostLink = originalUrl ? `<a class="lead-source-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Open originele post</a>` : '<span class="lead-link-warning">Directe postlink niet beschikbaar</span>';
     return `<article class="lead-card" data-signal-id="${escapeHtml(signal.id)}">
-      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span><div class="lead-author">${escapeHtml(signal.author_name || 'Openbare pagina of profiel')}</div></div>
-      <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${originalPostLink}</div>
+      <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span><div class="lead-author">${escapeHtml(signal.author_name || 'Openbare pagina of profiel')}</div><div class="lead-date"><strong>Publicatiedatum:</strong> ${escapeHtml(publicationDate)}<small>${escapeHtml(publicationSource)}</small></div><div class="lead-source">Gevonden op: ${escapeHtml(formatDate(signal.found_at))}</div></div>
+       <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${originalPostLink}</div>
       <div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}<div class="lead-business"><strong>Bedrijfscontrole</strong><span class="business-match business-match--${escapeHtml(businessStatus)}">${escapeHtml(businessMatchLabels[businessStatus] || businessStatus)}</span>${signal.business_name ? `<span>${escapeHtml(signal.business_name)}</span>` : ''}${signal.business_city ? `<span>${escapeHtml(signal.business_city)}</span>` : ''}${signal.business_phone ? `<a href="tel:${escapeHtml(signal.business_phone)}">${escapeHtml(signal.business_phone)}</a>` : ''}${signal.business_domain ? `<a href="https://${escapeHtml(signal.business_domain)}" target="_blank" rel="noopener noreferrer">${escapeHtml(signal.business_domain)}</a>` : businessCandidateLinks ? `<div class="website-candidates">${businessCandidateLinks}</div>` : ''}</div><div class="lead-engagement"><strong>Engagement</strong>${signal.engagement_known ? `${signal.likes == null ? 'likes onbekend' : `${signal.likes} likes`} · ${signal.comments == null ? 'reacties onbekend' : `${signal.comments} reacties`}` : 'Onbekend'}</div></div>
       <div class="lead-website">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : websiteCandidates.length ? `<span class="website-url website-url--candidate">Mogelijke websites</span><div class="website-candidates">${candidateLinks}</div>` : ''}${signal.website_title ? `<small class="website-detail">Titel: ${escapeHtml(signal.website_title)}</small>` : ''}${signal.website_http_status ? `<small class="website-detail">HTTP: ${escapeHtml(signal.website_http_status)}</small>` : ''}${signal.website_redirect_url ? `<a class="website-detail" href="${escapeHtml(signal.website_redirect_url)}" target="_blank" rel="noopener noreferrer">Redirect bekijken</a>` : ''}</div>
     </article>`;
@@ -163,3 +180,4 @@
 
   Promise.all([loadStatus(), loadSignals()]).catch((error) => setInboxState(error.message, 'error'));
 })();
+

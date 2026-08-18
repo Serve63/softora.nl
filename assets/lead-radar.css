@@ -97,8 +97,9 @@ input:focus, select:focus, textarea:focus, .custom-select__trigger:focus-visible
 .website-url--candidate { color: var(--radar-text); font-weight: 700; }
 .website-candidates { display: grid; gap: 3px; margin-top: 5px; }
 .website-candidate { color: var(--radar-pink); font-size: 11px; overflow-wrap: anywhere; }
-.lead-source-link { display: inline-block; margin-top: 2px; color: var(--radar-pink); font-size: 11px; font-weight: 750; text-decoration: none; }
-.lead-source-link:hover { text-decoration: underline; }
+ .lead-source-link { display: inline-block; margin-top: 2px; color: var(--radar-pink); font-size: 11px; font-weight: 750; text-decoration: none; }
+ .lead-source-link:hover { text-decoration: underline; }
+ .lead-link-warning { display: inline-block; margin-top: 2px; color: #9c4a50; font-size: 11px; font-weight: 700; }
 .inbox-state { padding: 34px 20px; color: var(--radar-muted); text-align: center; }
 .inbox-state--error { color: var(--radar-danger); }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 16px; }
@@ -116,3 +117,4 @@ input:focus, select:focus, textarea:focus, .custom-select__trigger:focus-visible
   .lead-card { grid-template-columns: 1fr; padding: 14px 12px; }
   .lead-copy, .lead-location, .lead-engagement, .lead-website { grid-column: 1; }
 }
+
