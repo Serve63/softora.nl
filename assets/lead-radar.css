@@ -72,6 +72,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--radar-pink); box
 .runs-list { display: grid; gap: 8px; margin-top: 14px; }
 .run-row { display: grid; grid-template-columns: 1.4fr .8fr .8fr .8fr auto; gap: 12px; align-items: center; border-top: 1px solid var(--radar-line); padding: 11px 0; color: var(--radar-muted); font-size: 12px; }
 .run-row strong { display: block; color: var(--radar-text); font-size: 13px; }
+.run-rejections { grid-column: 1 / -1; color: var(--radar-muted); }
 .inbox-section { overflow: hidden; }
 .inbox-heading { padding: 20px 20px 15px; }
 .result-count { color: var(--radar-muted); font-size: 12px; }
