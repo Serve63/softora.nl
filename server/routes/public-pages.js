@@ -63,7 +63,6 @@ function registerPersonalSiteRoutes(app, { personalSitesDirectory } = {}) {
 
   Object.entries(PERSONAL_SITE_ROUTES).forEach(([slug, config]) => {
     const siteDirectory = path.join(rootDirectory, config.directory);
-    const indexFile = path.join(siteDirectory, 'index.html');
 
     app.get(`/${slug}`, personalSiteRateLimiter, (req, res, next) => {
       if (String(req.path || '').endsWith('/')) return next();
@@ -73,7 +72,7 @@ function registerPersonalSiteRoutes(app, { personalSitesDirectory } = {}) {
     app.get(`/${slug}/`, personalSiteRateLimiter, (req, res, next) => {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
-      return res.sendFile(indexFile, { dotfiles: 'deny' }, (error) => {
+      return res.sendFile('index.html', { root: siteDirectory, dotfiles: 'deny' }, (error) => {
         if (error && !res.headersSent) next();
       });
     });

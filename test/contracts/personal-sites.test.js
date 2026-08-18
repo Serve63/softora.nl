@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const fs = require('node:fs');
 const http = require('node:http');
+const os = require('node:os');
 const path = require('node:path');
 
 const {
@@ -64,5 +65,26 @@ test('personal page route serves HTML, redirects the slashless path, and serves 
     assert.match(stylesheet.headers.get('content-type') || '', /text\/css/);
   } finally {
     await closeServer(server);
+  }
+});
+
+test('personal page route keeps dotfile protection while serving from a hidden parent directory', async () => {
+  const hiddenRoot = fs.mkdtempSync(path.join(os.tmpdir(), '.softora-personal-sites-'));
+  const siteRoot = path.join(hiddenRoot, 'martijnvandeven');
+  fs.mkdirSync(siteRoot, { recursive: true });
+  fs.writeFileSync(path.join(siteRoot, 'index.html'), '<!doctype html><title>Verborgen root werkt</title>');
+
+  const app = express();
+  registerPersonalSiteRoutes(app, { personalSitesDirectory: hiddenRoot });
+  const server = await startServer(app);
+  const port = server.address().port;
+
+  try {
+    const page = await fetch(`http://127.0.0.1:${port}/martijnvandeven/`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /Verborgen root werkt/);
+  } finally {
+    await closeServer(server);
+    fs.rmSync(hiddenRoot, { recursive: true, force: true });
   }
 });
