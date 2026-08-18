@@ -144,10 +144,7 @@
   async function startScan(extra) {
     const platforms = Array.from($('#scan-platforms').selectedOptions).map((option) => option.value);
     const regionMode = $('#scan-region-mode').value;
-    const regions = regionMode === 'custom'
-      ? $('#scan-regions').value.split(',').map((value) => value.trim()).filter(Boolean)
-      : [];
-    const payload = { platforms, regionMode, regions, maxAgeDays: Number($('#scan-max-age-days').value) || 30, ...(extra || {}) };
+    const payload = { platforms, regionMode, regions: [], maxAgeDays: Number($('#scan-max-age-days').value) || 30, ...(extra || {}) };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan bezig — resultaten worden na afloop bijgewerkt.';
     try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals(), loadRuns()]); }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
@@ -175,7 +172,6 @@
   $('#previous-page-button').addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); loadSignals(); });
   $('#next-page-button').addEventListener('click', () => { if (state.offset + state.signals.length < state.total) { state.offset += state.limit; loadSignals(); } });
   $('#scan-button').addEventListener('click', () => startScan());
-  $('#scan-region-mode').addEventListener('change', (event) => { $('#scan-regions').disabled = event.target.value !== 'custom'; });
   $('#toggle-runs-button').addEventListener('click', async () => { const list = $('#runs-list'); const open = list.hidden; list.hidden = !open; $('#toggle-runs-button').textContent = open ? '−' : '+'; $('#toggle-runs-button').setAttribute('aria-expanded', String(open)); if (open) await loadRuns(); });
   $('#clear-selection-button').addEventListener('click', () => { state.selected.clear(); renderSignals(); });
   $('#bulk-website-button').addEventListener('click', async () => { try { await api('/api/lead-radar/website-lookup', { method: 'POST', body: JSON.stringify({ signalIds: Array.from(state.selected), force: true }) }); state.selected.clear(); await Promise.all([loadStatus(), loadSignals()]); } catch (error) { setInboxState(error.message, 'error'); } });

@@ -406,7 +406,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(page, /LinkedIn/);
   assert.doesNotMatch(page, /Instagram/);
   assert.doesNotMatch(script, /instagram/i);
-  assert.match(page, /id="scan-regions"/);
+  assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.match(page, /lead-radar\.css\?v=20260818a/);
   assert.match(page, /lead-radar\.js\?v=20260818a/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
@@ -415,6 +415,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /no_website_found: 'GEEN WEBSITE GEVONDEN'/);
   assert.match(script, /Leads laden/);
   assert.doesNotMatch(script, /refresh-button|open-import-button|submitImport|import-form|zoekopdrachten|Websitechecks/i);
+  assert.doesNotMatch(script, /scan-regions|regionMode\s*===\s*['"]custom['"]|scan-region-mode.*addEventListener/i);
   assert.match(script, /Open originele post/);
   assert.match(script, /Publicatiedatum:/);
   assert.match(script, /Website zoeken/);
