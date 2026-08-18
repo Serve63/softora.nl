@@ -15,7 +15,7 @@ const WEBSITE_STATUSES = Object.freeze([
   'provider_unavailable',
 ]);
 const LEAD_STATUSES = Object.freeze(['new', 'relevant', 'not_relevant', 'follow_up', 'archived']);
-const PLATFORMS = Object.freeze(['facebook', 'instagram']);
+const PLATFORMS = Object.freeze(['facebook', 'linkedin']);
 const MAX_MESSAGE_LENGTH = 20_000;
 const MAX_NOTE_LENGTH = 5_000;
 const DEFAULT_PAGE_SIZE = 50;
@@ -34,15 +34,14 @@ const DEFAULT_LEAD_RADAR_SUPABASE_TIMEOUT_MS = 10_000;
 
 const KEYWORD_GROUPS = Object.freeze({
   direct_website: [
-    'website gezocht', 'websitebouwer gezocht', 'webdesigner gezocht', 'webdeveloper gezocht',
+    'websitebouwer gezocht', 'webdesigner gezocht', 'webdeveloper gezocht',
     'website laten maken', 'website laten bouwen', 'nieuwe website nodig', 'nieuwe site nodig',
     'website laten doen', 'website hulp gezocht', 'hulp met website',
     'iemand die een website kan maken', 'wie kan een website maken', 'wie bouwt websites',
-    'professionele website gezocht', 'bedrijfswebsite laten maken', 'website voor mijn bedrijf',
+    'bedrijfswebsite laten maken', 'website voor mijn bedrijf',
     'website voor mijn onderneming', 'website voor mijn praktijk', 'website voor mijn winkel',
-    'website voor mijn zaak', 'website voor mijn vereniging', 'website laten ontwerpen',
-    'website laten ontwikkelen', 'webdesign gezocht', 'webdesign opdracht', 'website opdracht',
-    'website project', 'website offerte', 'website prijs', 'website kosten',
+    'website voor mijn zaak', 'website voor mijn vereniging',
+    'webdesign gezocht', 'website offerte', 'website nodig',
     'aanbeveling websitebouwer', 'kent iemand een goede webdesigner', 'iemand voor mijn website',
     'iemand nodig voor website',
   ],
@@ -56,14 +55,10 @@ const KEYWORD_GROUPS = Object.freeze({
   webshop: [
     'webshop laten maken', 'webshop laten bouwen', 'webwinkel laten maken', 'webwinkel laten bouwen',
     'online shop laten maken', 'webshop hulp gezocht', 'webshop vernieuwen', 'webshop werkt niet',
-    'online winkel starten', 'website voor webshop', 'betaalpagina laten maken',
-    'producten online verkopen', 'online bestellen mogelijk maken',
+    'website voor webshop',
   ],
   new_business: [
-    'bedrijf gestart', 'bedrijf begonnen', 'nieuwe onderneming', 'nieuwe zaak geopend',
-    'nieuwe winkel geopend', 'nieuwe praktijk gestart', 'nieuwe salon gestart',
-    'nieuwe studio gestart', 'startende ondernemer', 'binnenkort open', 'net ingeschreven',
-    'net begonnen als ondernemer', 'eerste klanten gezocht', 'bedrijf online zichtbaar maken',
+    'bedrijf online zichtbaar maken',
     'onderneming online zetten', 'nog geen website', 'geen website',
     'wij hebben nog geen website', 'toe aan een website', 'eindelijk online gaan',
     'online aanwezigheid nodig',
@@ -87,6 +82,7 @@ const KEYWORD_GROUPS = Object.freeze({
     'installateur', 'bouwbedrijf', 'sportschool', 'vereniging', 'stichting', 'lokaal bedrijf',
   ],
 });
+const DEFAULT_KEYWORD_GROUPS = Object.freeze(['direct_website', 'renew_or_repair', 'webshop', 'new_business']);
 
 const PROVINCES = Object.freeze([
   'Groningen', 'Friesland', 'Drenthe', 'Overijssel', 'Flevoland', 'Gelderland',
@@ -101,19 +97,9 @@ const IMPORTANT_CITIES = Object.freeze([
 const NEGATIVE_TERMS = Object.freeze([
   'vacature', 'stage', 'opleiding', 'cursus', 'tutorial', 'template', 'inspiratie',
   'gratis website maken', 'website handleiding', 'software installeren', 'website baan',
-  'webdesigner vacature', 'marketing vacature',
-]);
-const PROVIDER_PROMO_TERMS = Object.freeze([
-  'wij bouwen websites', 'wij bouwen webshops', 'wij maken websites', 'wij maken webshops',
-  'wij helpen', 'wij ontwerpen', 'wij ontwikkelen', 'website laten maken?',
-  'vraag direct een offerte aan', 'offerte aanvragen', 'neem contact op',
-  'stuur me gerust een bericht', 'stuur me gerust een dm', 'breng een nieuwe klant bij ons',
-  'verdien €', 'vanaf €', 'vanaf eur', 'scherpe prijs', 'betaalbaar', 'tijdelijk voor',
-  'seo optimalisatie', 'online marketing', 'meer bezoekers', 'maatwerk website',
-  'maatwerk websites', 'volledig via programmering', 'geschikt voor mobiel',
-  'gemakkelijk zelf wijzigingen', 'ben shopify partner', 'wij helpen je',
-  'heb je ook een nieuwe website nodig', 'heb jij ook een nieuwe website nodig',
-  'tag iemand die een nieuwe website nodig heeft', 'ken jij iemand die een nieuwe website nodig heeft',
+  'webdesigner vacature', 'marketing vacature', 'portfolio', 'showcase', 'website opgeleverd',
+  'nieuwe website opgeleverd', 'website laten maken voor klanten', 'website voor ondernemers',
+  'website voor bedrijven', 'te koop', 'te vinden', 'identieke', 'marketplace',
 ]);
 class LeadRadarValidationError extends Error {
   constructor(message) {
@@ -172,7 +158,7 @@ function isPlatformHostname(hostname) {
   const value = String(hostname || '').toLowerCase();
   return value === 'facebook.com' || value.endsWith('.facebook.com') ||
     value === 'fb.com' || value.endsWith('.fb.com') ||
-    value === 'instagram.com' || value.endsWith('.instagram.com');
+    value === 'linkedin.com' || value.endsWith('.linkedin.com');
 }
 function platformFromUrl(value) {
   const normalized = normalizeHttpUrl(value);
@@ -180,7 +166,7 @@ function platformFromUrl(value) {
   try {
     const hostname = new URL(normalized).hostname.toLowerCase();
     if (hostname === 'facebook.com' || hostname.endsWith('.facebook.com') || hostname === 'fb.com' || hostname.endsWith('.fb.com')) return 'facebook';
-    if (hostname === 'instagram.com' || hostname.endsWith('.instagram.com')) return 'instagram';
+    if (hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com')) return 'linkedin';
     return '';
   } catch {
     return '';
@@ -194,13 +180,14 @@ const {
   isLikelyDirectPlatformPostUrl,
   isRecentPublication,
   normalizeProviderPublishedAt,
+  searchExclusionTerms,
 } = leadRadarQuality;
 
 function assertSourceUrl(value, expectedPlatform = '') {
   const normalized = normalizeHttpUrl(value);
   const platform = platformFromUrl(normalized);
-  if (!normalized || !platform || (expectedPlatform && platform !== expectedPlatform)) {
-    throw new LeadRadarValidationError('Gebruik een openbare Facebook- of Instagram-URL.');
+  if (!normalized || !platform || (expectedPlatform && platform !== expectedPlatform) || !isLikelyDirectPlatformPostUrl(normalized, platform)) {
+    throw new LeadRadarValidationError('Gebruik de directe URL van een openbare Facebook- of LinkedIn-post, niet van een profielpagina.');
   }
   return normalized;
 }
@@ -294,13 +281,11 @@ function getRegionList(value, mode = '') {
 }
 
 function getSelectedGroups(value) {
-  if (!Array.isArray(value) || !value.length) return Object.keys(KEYWORD_GROUPS);
+  if (!Array.isArray(value) || !value.length) return [...DEFAULT_KEYWORD_GROUPS];
   return value.map((item) => text(item, 50)).filter((item) => Object.prototype.hasOwnProperty.call(KEYWORD_GROUPS, item));
 }
 
 function getAutomaticScanConfig(env = process.env) {
-  // Automatische rondes zijn bewust gepauzeerd. Ook als een oude Vercel-variable
-  // nog op true staat, mag Lead Radar alleen na een handmatige klik zoeken.
   const enabled = false;
   const intervalMinutes = Math.max(
     15,
@@ -331,7 +316,7 @@ function getAutomaticScanConfig(env = process.env) {
     maxAgeDays: refreshLookbackDays,
     platforms: [...PLATFORMS],
     regionMode: 'nationwide',
-    keywordGroups: Object.keys(KEYWORD_GROUPS),
+    keywordGroups: [...DEFAULT_KEYWORD_GROUPS],
   };
 }
 
@@ -360,17 +345,19 @@ function buildSearchPlan(options = {}) {
   const groups = getSelectedGroups(options.keywordGroups);
   const freshnessSuffix = getFreshnessSuffix(options.maxAgeDays || options.max_age_days);
   const plan = [];
-  for (const platform of platforms) {
-    const site = platform === 'facebook' ? 'site:facebook.com' : 'site:instagram.com';
-    for (const region of regions) {
-      for (const group of groups) {
-        for (const term of KEYWORD_GROUPS[group]) {
+  for (const region of regions) {
+    for (const group of groups) {
+      for (const term of KEYWORD_GROUPS[group]) {
+        for (const platform of platforms) {
+          const site = platform === 'facebook'
+            ? 'site:facebook.com'
+            : '(site:linkedin.com/posts OR site:linkedin.com/feed/update)';
           plan.push({
             platform,
             region,
             keywordGroup: group,
             term,
-            query: `${site} "${term}" ${region}${freshnessSuffix}`.trim(),
+            query: `${site} "${term}" ${region} ${searchExclusionTerms.join(' ')}${freshnessSuffix}`.trim(),
           });
         }
       }
@@ -388,7 +375,8 @@ function safeLimit(value, fallback, max) {
 function extractTaskItems(body) {
   const task = body?.tasks?.[0];
   const result = task?.result?.[0];
-  return Array.isArray(result?.items) ? result.items : [];
+  if (!Array.isArray(result?.items)) return [];
+  return result.items.map((item) => ({ ...item, retrieved_at: result.datetime || null }));
 }
 
 function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
@@ -433,10 +421,10 @@ function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fe
         url: text(item.url, 2_000),
         title: text(item.title, 500),
         snippet: text(item.description || item.snippet, 5_000),
-        // Do not map result.datetime here: DataForSEO documents that value as
-        // the time the SERP was retrieved, not when the Facebook/Instagram post
-        // was published. `timestamp` is the publication/indexing candidate.
-        date: item.date || item.timestamp || item.published_at || null,
+        date: item.date || null,
+        timestamp: item.timestamp || null,
+        published_at: item.published_at || item.publishedAt || null,
+        retrieved_at: item.retrieved_at || null,
         rank: normalizeInteger(item.rank_absolute, { min: 1, max: 10_000 }),
       }));
   }
@@ -466,11 +454,11 @@ function buildWebsiteSearchQuery(signal) {
   const region = text(signal.region, 100).replace(/["']/g, ' ');
   if (!name || name.length < 3) return '';
   // Exclude social profiles and ask for the public company site itself.
-  return `"${name}" ${region} website -site:facebook.com -site:instagram.com`.trim();
+  return `"${name}" ${region} website -site:facebook.com -site:linkedin.com`.trim();
 }
 
 function buildSignalFromProviderItem(item, context = {}) {
-  const url = normalizeHttpUrl(item?.url || '');
+  const url = normalizeHttpUrl(item?.post_url || item?.postUrl || item?.url || '');
   const platform = platformFromUrl(url);
   if (!platform) return null;
   const messageText = text(item?.snippet || item?.description || '', MAX_MESSAGE_LENGTH);
@@ -488,13 +476,10 @@ function buildSignalFromProviderItem(item, context = {}) {
   // algemene content die alleen toevallig het woord website bevat.
   if (classification.isProvider || classification.isExcluded || !classification.isWebsiteNeed) return null;
   const maxAgeDays = normalizeInteger(context.maxAgeDays, { min: 1, max: 3650 });
-  if (context.requireFresh) {
-    // A SERP hit is not enough. We need both a direct public post URL and a
-    // provider-supplied publication timestamp before it enters the inbox.
-    if (!isLikelyDirectPlatformPostUrl(url, platform)) return null;
-    if (!normalizeProviderPublishedAt(item)) return null;
-    if (!isRecentPublication(normalizeProviderPublishedAt(item), maxAgeDays || 30)) return null;
-  }
+  // Store only direct posts with a provider-supplied publication timestamp.
+  if (!isLikelyDirectPlatformPostUrl(url, platform)) return null;
+  if (!normalizeProviderPublishedAt(item)) return null;
+  if (!isRecentPublication(normalizeProviderPublishedAt(item), maxAgeDays || 30)) return null;
   const directWebsite = extractUrls(messageText)[0] || '';
   const publishedAt = normalizeProviderPublishedAt(item);
   const region = text(context.region, 120);
@@ -505,7 +490,7 @@ function buildSignalFromProviderItem(item, context = {}) {
     provider: text(context.provider || 'dataforseo', 100),
     source_url: url,
     post_url: url,
-    profile_url: url,
+    profile_url: normalizeHttpUrl(item?.profile_url || item?.profileUrl || item?.author_url || item?.authorUrl || ''),
     message_text: messageText,
     snippet: messageText,
     author_name: authorName,
@@ -615,7 +600,7 @@ function createLeadRadarService(deps = {}) {
     const db = requireDb();
     const limit = safeLimit(query.limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const offset = Math.max(0, Math.min(100_000, Number(query.offset) || 0));
-    let request = db.from(SIGNALS_TABLE).select('*', { count: 'exact' }).order('published_at', { ascending: false, nullsFirst: false }).order('found_at', { ascending: false }).range(offset, offset + limit - 1);
+    let request = db.from(SIGNALS_TABLE).select('*').order('published_at', { ascending: false, nullsFirst: false }).order('found_at', { ascending: false });
     const platform = normalizePlatform(query.platform);
     const leadStatus = normalizeStatus(query.status);
     const websiteStatus = normalizeWebsiteStatus(query.website_status || query.websiteStatus);
@@ -628,20 +613,19 @@ function createLeadRadarService(deps = {}) {
     if (minScore !== null) request = request.gte('relevance_score', minScore);
     const days = normalizeInteger(query.days, { min: 0, max: 3650 });
     if (days > 0) request = request.gte('published_at', new Date(Date.now() - days * 86_400_000).toISOString());
+    if (typeof request.in === 'function' && !platform) request = request.in('platform', [...PLATFORMS]);
+    if (typeof request.range === 'function') request = request.range(0, 4_999);
     const result = await request;
     if (result.error) throw result.error;
     const visibleSignals = (result.data || []).filter((signal) => {
-      // Handmatige imports blijven altijd zichtbaar. Alleen automatisch
-      // gevonden SERP-signalen worden opnieuw tegen de kwaliteitsregels gelegd.
-      const isAutomaticSignal = signal.source_type === 'serp' || signal.provider === 'dataforseo';
-      if (!isAutomaticSignal) return true;
-      const requestedDays = normalizeInteger(query.days, { min: 1, max: 3650 });
-      return isEligibleAutomaticSignal(signal, { maxAgeDays: requestedDays || 30 });
+      if (!PLATFORMS.includes(signal.platform)) return false;
+      const requestedDays = normalizeInteger(query.days, { min: 1, max: 3650 }) || 3650;
+      return isEligibleAutomaticSignal(signal, { maxAgeDays: requestedDays });
     });
-    const hiddenProviderCount = Math.max(0, (result.data || []).length - visibleSignals.length);
+    const page = visibleSignals.slice(offset, offset + limit);
     return {
-      signals: visibleSignals,
-      total: Math.max(0, Number(result.count || 0) - hiddenProviderCount),
+      signals: page,
+      total: visibleSignals.length,
       limit,
       offset,
     };
@@ -696,10 +680,16 @@ function createLeadRadarService(deps = {}) {
 
   async function importSignal(input = {}) {
     const platform = normalizePlatform(input.platform);
-    if (!platform) throw new LeadRadarValidationError('Kies Facebook of Instagram.');
+    if (!platform) throw new LeadRadarValidationError('Kies Facebook of LinkedIn.');
     const sourceUrl = assertSourceUrl(input.source_url || input.sourceUrl || input.post_url || input.postUrl, platform);
     const messageText = text(input.message_text || input.messageText || input.snippet, MAX_MESSAGE_LENGTH);
     if (!messageText) throw new LeadRadarValidationError('Voeg de tekst of snippet van het bericht toe.');
+    const publishedAt = normalizeDate(input.published_at || input.publishedAt);
+    if (!publishedAt) throw new LeadRadarValidationError('Publicatiedatum is verplicht voor een Lead Radar-lead.');
+    const classification = classifySignal({ platform, post_url: sourceUrl, author_name: input.author_name || input.authorName, message_text: messageText, snippet: messageText });
+    if (classification.isProvider || classification.isExcluded || !classification.isWebsiteNeed) {
+      throw new LeadRadarValidationError('Dit bericht lijkt geen concrete websitevraag van een ondernemer te zijn.');
+    }
     const websiteUrl = input.website_url ? normalizeHttpUrl(input.website_url, { allowPlatform: false }) : extractUrls(messageText)[0] || '';
     if (input.website_url && !websiteUrl) throw new LeadRadarValidationError('Ongeldige website-URL.');
     const payload = {
@@ -707,7 +697,7 @@ function createLeadRadarService(deps = {}) {
       source_type: 'manual',
       provider: 'manual',
       source_url: sourceUrl,
-      post_url: normalizeHttpUrl(input.post_url || input.postUrl || sourceUrl),
+      post_url: sourceUrl,
       profile_url: normalizeHttpUrl(input.profile_url || input.profileUrl || ''),
       message_text: messageText,
       snippet: messageText,
@@ -715,7 +705,7 @@ function createLeadRadarService(deps = {}) {
       region: text(input.region, 120) || null,
       query: null,
       keyword_group: 'manual',
-      published_at: normalizeDate(input.published_at || input.publishedAt),
+      published_at: publishedAt,
       found_at: new Date().toISOString(),
       likes: normalizeInteger(input.likes),
       comments: normalizeInteger(input.comments),
@@ -778,7 +768,7 @@ function createLeadRadarService(deps = {}) {
             const matchingTokens = nameTokens.filter((token) => candidateText.includes(token)).length;
             const exactMatch = exactName && candidateText.includes(exactName);
             const regionMatch = regionName && candidateText.includes(regionName);
-            const directory = /\b(facebook|instagram|linkedin|offerte|vacature|yelp|bedrijvengids|gouden gids)\b/i.test(candidateText);
+            const directory = /\b(facebook|linkedin|offerte|vacature|yelp|bedrijvengids|gouden gids)\b/i.test(candidateText);
             return (exactMatch ? 55 : Math.min(45, matchingTokens * 20)) + (regionMatch ? 15 : 0) +
               (item.title.toLowerCase().includes('website') ? 5 : 0) - (directory ? 35 : 0);
           })(),
@@ -900,7 +890,10 @@ function createLeadRadarService(deps = {}) {
     const db = requireDb();
     const result = await db.from(SCAN_RUNS_TABLE).select('*').order('started_at', { ascending: false }).limit(safeLimit(limit, 10, 50));
     if (result.error) throw result.error;
-    return result.data || [];
+    return (result.data || []).filter((run) => {
+      const platforms = Array.isArray(run.platforms) ? run.platforms : [];
+      return platforms.length === 0 || platforms.every((platform) => PLATFORMS.includes(platform));
+    });
   }
 
   async function runScan(input = {}) {
@@ -1040,7 +1033,10 @@ function createLeadRadarService(deps = {}) {
       logger.warn('[LeadRadar][automatic-status]', result.error.message || result.error);
       return null;
     }
-    return result.data?.[0] || null;
+    return (result.data || []).find((run) => {
+      const platforms = Array.isArray(run.platforms) ? run.platforms : [];
+      return platforms.length === 0 || platforms.every((platform) => PLATFORMS.includes(platform));
+    }) || null;
   }
 
   function summarizeScanRun(run) {
@@ -1128,6 +1124,8 @@ function createLeadRadarService(deps = {}) {
     const db = getDb();
     const count = async (column, value) => {
       let request = db.from(SIGNALS_TABLE).select('id', { count: 'exact', head: true });
+      if (typeof request.in === 'function') request = request.in('platform', [...PLATFORMS]);
+      if (typeof request.not === 'function') request = request.not('published_at', 'is', null).not('post_url', 'is', null);
       if (column) request = request.eq(column, value);
       const result = await request;
       return result.error ? null : result.count || 0;
@@ -1197,3 +1195,4 @@ module.exports = {
   WEBSITE_STATUSES,
   LEAD_STATUSES,
 };
+
