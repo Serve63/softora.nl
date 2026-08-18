@@ -9,6 +9,10 @@ const {
   loadSoftoraLocalEnv,
 } = require('../../server/config/load-local-env');
 
+function asPortablePath(value) {
+  return String(value || '').replace(/\\/g, '/');
+}
+
 function withEnvSnapshot(fn) {
   const original = {
     GSC_CLIENT_ID: process.env.GSC_CLIENT_ID,
@@ -71,7 +75,7 @@ test('local env candidates include the shared softora search console file', () =
     projectRootDir: '/tmp/project',
     cwd: '/tmp/project',
     homeDir: '/tmp/home',
-  });
+  }).map(asPortablePath);
 
   assert.ok(candidates.includes('/tmp/home/.config/softora/search-console.env'));
   assert.ok(candidates.includes('/tmp/project/.env'));

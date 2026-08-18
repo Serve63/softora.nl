@@ -497,6 +497,10 @@ test('agent guardrails block direct premium auth users writes', () => {
   const approvedMigration = readRepoFile(approvedMigrationPath);
   assert.equal(isApprovedPremiumAuthUsersWriteFile(approvedMigrationPath, approvedMigration), true);
   assert.equal(
+    isApprovedPremiumAuthUsersWriteFile(approvedMigrationPath, approvedMigration.replace(/\r?\n/g, '\r\n')),
+    true
+  );
+  assert.equal(
     isApprovedPremiumAuthUsersWriteFile(approvedMigrationPath, `${approvedMigration}\n-- unreviewed mutation`),
     false
   );

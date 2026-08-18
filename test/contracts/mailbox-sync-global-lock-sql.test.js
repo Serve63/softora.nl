@@ -17,6 +17,14 @@ const postgresTest = fs.readFileSync(path.resolve(
   '../postgres/mailbox-campaign-lock-order.postgres.test.js'
 ), 'utf8');
 
+function hasFunctionPrivilegeStatement(source, action, signature) {
+  const pattern = new RegExp(
+    `${action} on function public\\.${signature.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r?\\n  ` +
+      (action === 'grant execute' ? 'to service_role;' : 'from public, anon, authenticated;')
+  );
+  return pattern.test(source);
+}
+
 function lockHardeningBlock(source) {
   const match = source.match(
     /-- mailbox-sync-lock-hardening:start[\s\S]*?-- mailbox-sync-lock-hardening:end/
@@ -83,11 +91,11 @@ test('lockfuncties zijn security-invoker en uitsluitend expliciet voor service_r
     'softora_claim_mailbox_sync_lock(text, text, text, text, integer, boolean)',
   ].forEach((signature) => {
     assert.ok(
-      migration.includes(`revoke all on function public.${signature}\n  from public, anon, authenticated;`),
+      hasFunctionPrivilegeStatement(migration, 'revoke all', signature),
       `${signature} mist publieke revoke`
     );
     assert.ok(
-      migration.includes(`grant execute on function public.${signature}\n  to service_role;`),
+      hasFunctionPrivilegeStatement(migration, 'grant execute', signature),
       `${signature} mist service_role grant`
     );
   });
