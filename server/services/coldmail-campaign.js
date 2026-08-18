@@ -326,8 +326,8 @@ function createColdmailCampaignService(deps = {}) {
 
   const historicalOutboundMailboxGuard = createColdmailHistoricalOutboundGuard({
     dataOpsStore,
-    getConfiguredSenderEmails: () => getConfiguredSenderEmails(),
-    getAllowedSenderEmails: () => getAllowedSenderEmails(),
+    getConfiguredSenderEmails: () => getConfiguredSenderEmails().filter(isColdmailAutopilotAllowedSenderEmail),
+    getAllowedSenderEmails: () => getAllowedSenderEmails().filter(isColdmailAutopilotAllowedSenderEmail),
     getRowEmail, getRowCompany, getRowDomain, isTestRecipientRow, normalizeEmailAddress,
     isSharedMailboxDomain: (domain) => SHARED_MAILBOX_DOMAINS.has(normalizeString(domain).toLowerCase()), normalizeContactStatus, normalizeString,
   });
