@@ -389,6 +389,12 @@ test('Lead Radar migration is service-role-only and has one canonical website st
   assert.match(automaticMigration, /scan_mode in \('manual', 'automatic'\)/i);
   const linkedinMigration = readRepoFile('supabase/migrations/20260817150000_softora_social_lead_radar_linkedin.sql');
   assert.match(linkedinMigration, /platform in \('facebook', 'instagram', 'linkedin'\)/i);
+  const enrichmentMigration = readRepoFile('supabase/migrations/20260818170000_softora_social_lead_enrichment.sql');
+  for (const field of ['business_name', 'business_city', 'business_phone', 'business_domain', 'business_match_status', 'business_candidates', 'website_redirect_url', 'website_check_provider', 'website_technical_checks', 'website_links']) {
+    assert.match(enrichmentMigration, new RegExp(field));
+  }
+  assert.match(enrichmentMigration, /agency_detected/);
+  assert.match(enrichmentMigration, /business_match_idx/);
 });
 
 test('Lead Radar page, sidebar and user-visible website labels are wired', () => {
