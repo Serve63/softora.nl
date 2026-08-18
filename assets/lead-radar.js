@@ -115,7 +115,7 @@
   async function lookupWebsite(id, force) { await api(`/api/lead-radar/signals/${encodeURIComponent(id)}/website-lookup`, { method: 'POST', body: JSON.stringify({ force: Boolean(force) }) }); await Promise.all([loadStatus(), loadSignals()]); }
 
   async function startScan() {
-    const platforms = Array.from($('#scan-platforms').selectedOptions).map((option) => option.value);
+    const platforms = ($('#scan-platforms').value || 'facebook,linkedin').split(',').filter(Boolean);
     const regionMode = $('#scan-region-mode').value;
     const payload = { platforms, regionMode, regions: [], maxAgeDays: Number($('#scan-max-age-days').value) || 30 };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan bezig — resultaten worden na afloop bijgewerkt.';

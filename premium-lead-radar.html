@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260818b">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260818c">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -36,9 +36,10 @@
         </div>
         <div class="scan-panel__controls">
           <label>Platforms
-            <select id="scan-platforms" multiple size="2">
-              <option value="facebook" selected>Facebook</option>
-              <option value="linkedin" selected>LinkedIn</option>
+            <select id="scan-platforms">
+              <option value="facebook,linkedin" selected>Facebook en LinkedIn</option>
+              <option value="facebook">Facebook</option>
+              <option value="linkedin">LinkedIn</option>
             </select>
           </label>
           <label>Regio
@@ -86,6 +87,6 @@
     </section>
 
   </main>
-  <script src="/assets/lead-radar.js?v=20260818b" defer></script>
+  <script src="/assets/lead-radar.js?v=20260818c" defer></script>
 </body>
 </html>
