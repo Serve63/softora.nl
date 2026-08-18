@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const {
   buildPublicSeoRobotsTxt,
   buildPublicSeoSitemapXml,
@@ -43,7 +44,46 @@ function getStaticAssetCacheControl(assetPath, originalUrl = '') {
   return 'public, max-age=604800, stale-while-revalidate=86400';
 }
 
+const PERSONAL_SITE_ROUTES = Object.freeze({
+  servecreusen: Object.freeze({ directory: 'servecreusen' }),
+  martijnvandeven: Object.freeze({ directory: 'martijnvandeven' }),
+});
+
+function registerPersonalSiteRoutes(app, { personalSitesDirectory } = {}) {
+  const rootDirectory = String(personalSitesDirectory || '').trim();
+  if (!app || !rootDirectory) return;
+
+  Object.entries(PERSONAL_SITE_ROUTES).forEach(([slug, config]) => {
+    const siteDirectory = path.join(rootDirectory, config.directory);
+    const indexFile = path.join(siteDirectory, 'index.html');
+
+    app.get(`/${slug}`, (req, res, next) => {
+      if (String(req.path || '').endsWith('/')) return next();
+      return res.redirect(301, appendOriginalQuery(`/${slug}/`, req.originalUrl));
+    });
+
+    app.get(`/${slug}/`, (req, res, next) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
+      return res.sendFile(indexFile, { dotfiles: 'deny' }, (error) => {
+        if (error && !res.headersSent) next();
+      });
+    });
+
+    app.use(`/${slug}`, express.static(siteDirectory, {
+      index: false,
+      redirect: false,
+      maxAge: '7d',
+      setHeaders(res, assetPath) {
+        const originalUrl = String(res.req?.originalUrl || '');
+        res.setHeader('Cache-Control', getStaticAssetCacheControl(assetPath, originalUrl));
+      },
+    }));
+  });
+}
+
 function registerPublicPageRoutes(app, deps) {
+  const { personalSitesDirectory } = deps;
   const seoContentCollectionPaths = getSeoContentCollectionPaths();
   const seoContentArticlePaths = seoContentCollectionPaths.map((collectionPath) => `${collectionPath}/:slug`);
 
@@ -99,6 +139,8 @@ function registerPublicPageRoutes(app, deps) {
       },
     })
   );
+
+  registerPersonalSiteRoutes(app, { personalSitesDirectory });
 
   app.get('/', async (req, res, next) => {
     return deps.sendSeoManagedHtmlPageResponse(req, res, next, 'premium-website.html');
@@ -221,5 +263,7 @@ function registerPublicPageRoutes(app, deps) {
 module.exports = {
   appendOriginalQuery,
   getStaticAssetCacheControl,
+  PERSONAL_SITE_ROUTES,
+  registerPersonalSiteRoutes,
   registerPublicPageRoutes,
 };
