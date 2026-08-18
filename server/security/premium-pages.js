@@ -35,6 +35,35 @@ function createPremiumHtmlPageAccessController(options = {}) {
     return typeof req?.get === 'function' ? req.get('user-agent') : '';
   }
 
+  function getRequestAccept(req) {
+    if (typeof req?.get === 'function') {
+      return String(req.get('accept') || '').toLowerCase();
+    }
+    return String(req?.headers?.accept || '').toLowerCase();
+  }
+
+  function prefersJsonResponse(req) {
+    const accept = getRequestAccept(req);
+    return accept.includes('application/json') && !accept.includes('text/html');
+  }
+
+  function appendVaryHeader(res, values) {
+    if (!res || typeof res.setHeader !== 'function') return;
+    const current = typeof res.getHeader === 'function' ? String(res.getHeader('Vary') || '') : '';
+    const next = [...current.split(','), ...String(values || '').split(',')]
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .filter((value, index, all) => all.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index)
+      .join(', ');
+    if (next) res.setHeader('Vary', next);
+  }
+
+  function sendPasswordRegisterJson(res, statusCode, payload) {
+    if (!res || typeof res.status !== 'function' || typeof res.json !== 'function') return false;
+    res.status(statusCode).json(payload);
+    return true;
+  }
+
   function isPremiumProtectedHtmlFile(fileNameRaw) {
     const fileName = normalizeFileName(fileNameRaw);
     if (!fileName) return false;
@@ -67,6 +96,10 @@ function createPremiumHtmlPageAccessController(options = {}) {
         : null;
     const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
     const requestedPath = getSafePremiumRedirectPath(req.originalUrl || req.url || req.path || '/');
+
+    if (isPasswordRegister) {
+      appendVaryHeader(res, 'Accept, Cookie');
+    }
 
     if (logoutRequested) {
       clearPremiumSessionCookie(req, res);
@@ -116,12 +149,31 @@ function createPremiumHtmlPageAccessController(options = {}) {
           },
           'security_password_register_fresh_auth_required'
         );
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.status(503).send('Wachtwoordenregister is tijdelijk niet beschikbaar omdat de sessie niet vers kon worden bevestigd.');
+        if (prefersJsonResponse(req)) {
+          sendPasswordRegisterJson(res, 503, {
+            ok: false,
+            code: 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE',
+            retryable: true,
+            error: 'De beveiligde sessiecontrole is tijdelijk niet beschikbaar. Probeer het zo opnieuw.',
+          });
+          return {
+            handled: true,
+            authState,
+            fileName,
+            isLoginPage,
+            isProtectedPremiumPage,
+            isAdminOnlyPremiumPage,
+          };
+        }
         return {
-          handled: true,
+          handled: false,
           authState,
           fileName,
+          responseStatusCode: 503,
+          passwordRegisterAuthRecovery: {
+            code: 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE',
+            retryable: true,
+          },
           isLoginPage,
           isProtectedPremiumPage,
           isAdminOnlyPremiumPage,
@@ -129,6 +181,22 @@ function createPremiumHtmlPageAccessController(options = {}) {
       }
 
       if (!authState?.configured) {
+        if (isPasswordRegister && prefersJsonResponse(req)) {
+          sendPasswordRegisterJson(res, 503, {
+            ok: false,
+            code: 'PREMIUM_AUTH_NOT_CONFIGURED',
+            retryable: false,
+            error: 'Premium toegang is tijdelijk niet beschikbaar.',
+          });
+          return {
+            handled: true,
+            authState,
+            fileName,
+            isLoginPage,
+            isProtectedPremiumPage,
+            isAdminOnlyPremiumPage,
+          };
+        }
         res.redirect(302, `/premium-personeel-login?setup=1&next=${encodeURIComponent(requestedPath)}`);
         return {
           handled: true,
@@ -144,6 +212,24 @@ function createPremiumHtmlPageAccessController(options = {}) {
         const sessionEnded = Boolean(authState.expired || authState.revoked || authState.token);
         if (sessionEnded) {
           clearPremiumSessionCookie(req, res);
+        }
+        if (isPasswordRegister && prefersJsonResponse(req)) {
+          sendPasswordRegisterJson(res, 401, {
+            ok: false,
+            code: sessionEnded ? 'PREMIUM_SESSION_EXPIRED' : 'PREMIUM_AUTH_REQUIRED',
+            retryable: false,
+            error: sessionEnded
+              ? 'Je sessie is verlopen. Bevestig je toegang opnieuw.'
+              : 'Log in om je toegang te bevestigen.',
+          });
+          return {
+            handled: true,
+            authState,
+            fileName,
+            isLoginPage,
+            isProtectedPremiumPage,
+            isAdminOnlyPremiumPage,
+          };
         }
         res.redirect(
           302,
@@ -179,6 +265,22 @@ function createPremiumHtmlPageAccessController(options = {}) {
           'security_admin_ip_blocked'
         );
         clearPremiumSessionCookie(req, res);
+        if (isPasswordRegister && prefersJsonResponse(req)) {
+          sendPasswordRegisterJson(res, 403, {
+            ok: false,
+            code: 'PREMIUM_ADMIN_IP_BLOCKED',
+            retryable: false,
+            error: 'Toegang is vanaf deze verbinding niet toegestaan.',
+          });
+          return {
+            handled: true,
+            authState,
+            fileName,
+            isLoginPage,
+            isProtectedPremiumPage,
+            isAdminOnlyPremiumPage,
+          };
+        }
         res.redirect(302, '/premium-personeel-login?blocked=1');
         return {
           handled: true,
@@ -205,7 +307,16 @@ function createPremiumHtmlPageAccessController(options = {}) {
           },
           'security_premium_admin_page_required'
         );
-        res.redirect(302, '/premium-personeel-dashboard?forbidden=1');
+        if (isPasswordRegister && prefersJsonResponse(req)) {
+          sendPasswordRegisterJson(res, 403, {
+            ok: false,
+            code: 'PREMIUM_ADMIN_REQUIRED',
+            retryable: false,
+            error: 'Je account heeft geen toegang tot dit onderdeel.',
+          });
+        } else {
+          res.redirect(302, '/premium-personeel-dashboard?forbidden=1');
+        }
         return {
           handled: true,
           authState,
@@ -235,8 +346,45 @@ function createPremiumHtmlPageAccessController(options = {}) {
             },
             'security_password_register_owner_denied'
           );
-          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-          res.status(ownerDecision.statusCode).send(ownerDecision.error);
+          const statusCode = ownerDecision.statusCode === 503 ? 503 : 403;
+          if (prefersJsonResponse(req)) {
+            sendPasswordRegisterJson(res, statusCode, {
+              ok: false,
+              code: ownerDecision.code || 'PASSWORD_REGISTER_OWNER_REQUIRED',
+              retryable: statusCode === 503,
+              error: statusCode === 503
+                ? 'De eigenaarstoegang kan tijdelijk niet worden bevestigd.'
+                : 'Dit wachtwoordenregister is alleen beschikbaar voor de eigenaar.',
+            });
+            return {
+              handled: true,
+              authState,
+              fileName,
+              isLoginPage,
+              isProtectedPremiumPage,
+              isAdminOnlyPremiumPage,
+            };
+          }
+          return {
+            handled: false,
+            authState,
+            fileName,
+            responseStatusCode: statusCode,
+            passwordRegisterAuthRecovery: {
+              code: ownerDecision.code || 'PASSWORD_REGISTER_OWNER_REQUIRED',
+              retryable: statusCode === 503,
+            },
+            isLoginPage,
+            isProtectedPremiumPage,
+            isAdminOnlyPremiumPage,
+          };
+        }
+
+        if (prefersJsonResponse(req)) {
+          sendPasswordRegisterJson(res, 200, {
+            ok: true,
+            code: 'PASSWORD_REGISTER_FRESH_AUTH_CONFIRMED',
+          });
           return {
             handled: true,
             authState,

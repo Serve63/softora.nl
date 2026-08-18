@@ -443,6 +443,74 @@ test('html page coordinator applies a strict path-specific CSP to the password r
   assert.doesNotMatch(res.body, /softoraPageStateBootstrap|never-inline/);
 });
 
+test('password register auth failure renders a non-200 recovery shell without vault scripts or data UI', async () => {
+  const { coordinator, pagesDir } = createFixture({
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      responseStatusCode: 503,
+      passwordRegisterAuthRecovery: {
+        code: 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE',
+        retryable: true,
+      },
+      authState: {
+        configured: true,
+        authenticated: false,
+        hydrationUnavailable: true,
+      },
+    }),
+  });
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-wachtwoordenregister.html'),
+    [
+      '<!DOCTYPE html><html data-password-register-csp-ready="1"><head>',
+      '<title>Wachtwoordenregister</title>',
+      '<link rel="stylesheet" href="/assets/personnel-theme.css">',
+      '<script src="assets/premium-password-register-theme-boot.js"></script>',
+      '</head><body data-sidebar-nav-ready="1">',
+      '<div class="dashboard-layout" data-sidebar-shell="canonical">',
+      '<aside class="sidebar" data-static-sidebar="1"><a href="/premium-personeel-dashboard" class="sidebar-link" data-sidebar-key="dashboard">Dashboard</a></aside>',
+      '<main class="main-content"><div class="register-shell">',
+      '<div id="screen-pin">PIN</div><div id="screen-register">Kluis</div>',
+      '</div></main></div>',
+      '<script src="assets/premium-password-register-renderer.js"></script>',
+      '<script src="assets/premium-password-register-store.js"></script>',
+      '<script src="assets/premium-password-register-pin.js"></script>',
+      '<script src="assets/premium-password-register-security.js"></script>',
+      '<script src="assets/premium-password-register-autolock.js"></script>',
+      '<script src="assets/premium-password-register-app.js"></script>',
+      '</body></html>',
+    ].join('')
+  );
+
+  const res = createResponseRecorder();
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-wachtwoordenregister' },
+    res,
+    () => {},
+    'premium-wachtwoordenregister.html'
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
+  assert.equal(res.headers['Cache-Control'], 'no-store, private');
+  assert.equal(res.headers['X-Frame-Options'], 'DENY');
+  assert.equal(res.headers['Referrer-Policy'], 'no-referrer');
+  assert.match(res.headers['Content-Security-Policy'], /default-src 'none'/);
+  assert.match(res.body, /data-password-register-auth-recovery="1"/);
+  assert.match(res.body, /data-password-register-auth-retryable="1"/);
+  assert.match(res.body, /id="password-register-auth-recovery"/);
+  assert.match(res.body, />Opnieuw bevestigen</);
+  assert.match(res.body, /href="\/premium-instellingen#extra">Terug</);
+  assert.match(res.body, /data-static-sidebar="1"/);
+  assert.match(res.body, /premium-password-register-reauth\.css\?v=20260818a/);
+  assert.match(res.body, /premium-password-register-reauth\.js\?v=20260818a/);
+  assert.doesNotMatch(res.body, /premium-password-register-(?:theme-boot|renderer|store|pin|security|autolock|app)\.js/);
+  assert.doesNotMatch(res.body, /sessie niet vers kon worden bevestigd/i);
+  assert.doesNotMatch(res.body, /softoraPageStateBootstrap|ciphertext|master-secret-input/);
+});
+
 test('password register defers strict CSP until the external-script readiness marker is live', async () => {
   const { coordinator, pagesDir } = createFixture();
   fs.writeFileSync(

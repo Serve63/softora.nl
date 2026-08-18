@@ -60,12 +60,17 @@ function createFixture(overrides = {}) {
       normalizePremiumSessionEmail,
       isSupabaseConfigured: () =>
         overrides.isSupabaseConfigured === undefined ? true : Boolean(overrides.isSupabaseConfigured),
-      getSupabaseClient: () => client,
-      fetchSupabaseRowByKeyViaRest: async () =>
-        overrides.fetchResult || {
+      getSupabaseClient: (options = {}) => {
+        if (typeof overrides.onClientOptions === 'function') overrides.onClientOptions(options);
+        return client;
+      },
+      fetchSupabaseRowByKeyViaRest: async (_rowKey, _columns, options = {}) => {
+        if (typeof overrides.onRestOptions === 'function') overrides.onRestOptions(options);
+        return overrides.fetchResult || {
           ok: false,
           error: 'upstream timeout',
-        },
+        };
+      },
       upsertSupabaseRowViaRest: async () =>
         overrides.upsertResult || {
           ok: false,
@@ -249,6 +254,47 @@ test('fresh premium-user hydration never shares a failing non-fresh in-flight re
     assert.deepEqual(fresh.users, []);
     releaseNonFreshRead();
     await pendingNonFresh;
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
+test('fresh premium-user hydration bypasses unrelated cooldowns with its bounded security-read policy', async () => {
+  const clientOptions = [];
+  const restOptions = [];
+  const row = {
+    payload: {
+      users: [{
+        id: 'usr_owner',
+        email: 'owner@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'sha256:test-only-hash',
+      }],
+    },
+    updated_at: '2026-08-18T13:20:00.000Z',
+    revision: 4,
+  };
+  const store = createFixture({
+    config: { premiumUsersReadTimeoutMs: 4200 },
+    onClientOptions: (options) => clientOptions.push(options),
+    onRestOptions: (options) => restOptions.push(options),
+    fetchResult: { ok: true, body: [row], error: null },
+  });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  try {
+    const hydrated = await store.ensureUsersHydrated({ force: true, requireFresh: true });
+
+    assert.equal(hydrated.source, 'supabase');
+    assert.equal(hydrated.users.length, 1);
+    assert.deepEqual(clientOptions, [{
+      timeoutMs: 4200,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    }]);
+    assert.deepEqual(restOptions, clientOptions);
   } finally {
     console.error = originalConsoleError;
   }
