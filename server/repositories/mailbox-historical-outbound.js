@@ -1,5 +1,6 @@
 const HISTORICAL_OUTBOUND_MAILBOX_FOLDERS = Object.freeze(['sent', 'coldmail', 'instantly']);
 const MAILBOX_RECIPIENT_EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+const HISTORICAL_OUTBOUND_READ_RETRY_DELAYS_MS = Object.freeze([125, 350]);
 
 function createMailboxHistoricalOutboundRepository(deps = {}) {
   const {
@@ -9,6 +10,7 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     now = () => new Date(),
     readQueryTimeoutMs = 6000,
+    sleep = (durationMs) => new Promise((resolve) => setTimeout(resolve, durationMs)),
   } = deps;
 
   function getReadOptions() {
@@ -31,6 +33,28 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
       const domain = normalizedEmail.split('@')[1] || '';
       return recipientEmails.has(normalizedEmail) || recipientDomains.has(domain);
     });
+  }
+
+  function isTransientHistoricalReadError(error) {
+    const text = normalizeString(
+      error && (error.message || error.details || error.hint || error.code || error)
+    );
+    return (
+      error?.code === 'DATA_OPS_TIMEOUT' ||
+      error?.code === 'DATA_OPS_READ_COOLDOWN' ||
+      /abort|timeout|timed out|504|fetch failed|network|econnreset|etimedout|connection terminated|tijdelijk overgeslagen/i.test(text)
+    );
+  }
+
+  async function runHistoricalRead(label, operation) {
+    let result = null;
+    for (let attempt = 0; attempt <= HISTORICAL_OUTBOUND_READ_RETRY_DELAYS_MS.length; attempt += 1) {
+      result = await run(`${label}:attempt-${attempt + 1}`, operation, getReadOptions());
+      if (result.ok || !isTransientHistoricalReadError(result.error)) return result;
+      const delayMs = HISTORICAL_OUTBOUND_READ_RETRY_DELAYS_MS[attempt];
+      if (delayMs) await sleep(delayMs);
+    }
+    return result;
   }
 
   async function listHistoricalOutboundMailboxMessagesByRecipientEmails(options = {}) {
@@ -62,7 +86,7 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
       Math.min(20000, Number(options.maxCandidateRows) || 20000)
     );
     const results = await Promise.all(lookupTargets.map((target, index) =>
-      run(`list-historical-outbound-mailbox-recipient:${target.type}:${index}`, async (client) => {
+      runHistoricalRead(`list-historical-outbound-mailbox-recipient:${target.type}:${index}`, async (client) => {
         const candidates = [];
         for (let from = 0; from < maxCandidateRows; from += pageSize) {
           const to = Math.min(maxCandidateRows - 1, from + pageSize - 1);
@@ -88,7 +112,7 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
             `Historische mailbox kandidaatlimiet (${maxCandidateRows}) bereikt voor ${target.type}`
           ),
         };
-      }, getReadOptions())
+      })
     ));
     if (results.some((result) => !result.ok)) return null;
 
@@ -125,14 +149,13 @@ function createMailboxHistoricalOutboundRepository(deps = {}) {
       60 * 1000,
       Math.min(7 * 24 * 60 * 60 * 1000, Number(options.maxAgeMs) || 24 * 60 * 60 * 1000)
     );
-    const result = await run(
+    const result = await runHistoricalRead(
       'get-historical-outbound-mailbox-coverage-status',
       (client) => client
         .from(mailboxSyncStateTable)
         .select('account_email,folder,status,last_synced_at,updated_at,last_error')
         .in('account_email', accountEmails)
-        .eq('folder', 'sent'),
-      getReadOptions()
+        .eq('folder', 'sent')
     );
     if (!result.ok || !Array.isArray(result.data)) return null;
     const statesByAccount = new Map(result.data.map((row) => [

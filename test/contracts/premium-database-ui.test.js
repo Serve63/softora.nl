@@ -552,6 +552,7 @@ test('premium database mail counter keeps local diagnostics but does not render 
 test('premium database mail ROI calculator uses the live Softora mail count', async () => {
   let plusHandler = null;
   const requestedUrls = [];
+  const requestedOptions = [];
   const nodes = {
     systemMailSentTodayCount: { textContent: '' },
     systemMailBouncesTodayCount: { textContent: '' },
@@ -569,8 +570,9 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
         },
       }],
     },
-    fetch: async (url) => {
+    fetch: async (url, options) => {
       requestedUrls.push(url);
+      requestedOptions.push(options);
       return {
         ok: true,
         json: async () => ({
@@ -603,6 +605,7 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
 
   assert.equal(nodes.systemMailSentCount.textContent, '6');
   assert.equal(requestedUrls[0], '/api/coldmailing/stats');
+  assert.equal(requestedOptions[0].cache, 'no-store');
   assert.equal(nodes.mailRoiDealsCount.textContent, '0');
   assert.equal(nodes.mailRoiRatio.textContent, '—');
   plusHandler();

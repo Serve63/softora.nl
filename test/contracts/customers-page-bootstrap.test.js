@@ -148,7 +148,7 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
     now: () => new Date('2026-07-10T12:00:30.000Z'),
     getUiStateValues: async (scope, options) => {
       seenReads.push({ scope, options });
-      if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { systemSentToday: 4, totalBounces: 29, bounceTypes: { hard: 11, soft: 10, unknown: 8 }, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
+      if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { reliable: true, authoritativeSource: 'central-outbound-recipient-guard', dateKey: '2026-07-10', sentTimestampModel: 'delivery-evidence-v1', centralGuardSentToday: 4, systemSentToday: 4, totalBounces: 29, bounceTypes: { hard: 11, soft: 10, unknown: 8 }, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
       if (scope === 'premium_database_mail_roi') return { source: 'supabase', values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 2 }) } };
       if (scope === 'premium_coldmail_autopilot') return { source: 'supabase', values: { softora_coldmail_autopilot_v1: JSON.stringify({ enabled: false }) } };
       assert.equal(scope, MAIL_READY_BOOTSTRAP_CACHE_SCOPE);
@@ -180,6 +180,50 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   ]);
   assert.equal(seenReads.every((read) => read.options.uiStateReadTimeoutMs === 1200), true);
   assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
+});
+
+test('premium database bootstrap hides an unreliable or stale cached day count', async () => {
+  const snapshot = {
+    version: 1,
+    generatedAt: '2026-08-18T10:00:00.000Z',
+    total: 0,
+    customers: [],
+    availableTotal: 0,
+    availableCustomers: [],
+    foundCustomerIds: [],
+  };
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-08-18T12:00:00.000Z'),
+    getUiStateValues: async (scope) => {
+      if (scope === MAIL_READY_BOOTSTRAP_CACHE_SCOPE) {
+        return { values: { [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify(snapshot) } };
+      }
+      if (scope === 'premium_coldmail_stats_cache') {
+        return {
+          values: {
+            softora_coldmail_stats_cache_v1: JSON.stringify({
+              ok: true,
+              stats: {
+                reliable: false,
+                authoritativeSource: 'central-outbound-recipient-guard',
+                dateKey: '2026-08-17',
+                sentTimestampModel: 'delivery-evidence-v1',
+                centralGuardSentToday: 11,
+                systemSentToday: 11,
+                updatedAt: '2026-08-17T12:00:00.000Z',
+              },
+            }),
+          },
+        };
+      }
+      return { values: {} };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.mailStats.sentToday, null);
 });
 
 test('premium database bootstrap publishes an exact count from a complete 100-row cache window', async () => {

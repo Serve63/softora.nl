@@ -9,6 +9,7 @@ const {
   isMailReadySnapshotCoherent,
   parseMailReadySnapshotCacheValue,
 } = require('./premium-database-mail-ready-snapshot');
+const { COLDMAIL_SENT_TIMESTAMP_MODEL } = require('./coldmail-guard-sent-at');
 
 const DATABASE_MAIL_STATS_CACHE_SCOPE = 'premium_coldmail_stats_cache';
 const DATABASE_MAIL_STATS_CACHE_KEY = 'softora_coldmail_stats_cache_v1';
@@ -59,6 +60,33 @@ function createCustomersPageBootstrapService(deps = {}) {
     return null;
   }
 
+  function getAmsterdamDateKey(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Amsterdam',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const readPart = (type) => normalizeString(parts.find((part) => part.type === type)?.value);
+    return `${readPart('year')}-${readPart('month')}-${readPart('day')}`;
+  }
+
+  function readReliableCurrentDaySentCount(stats) {
+    const updatedAtMs = Date.parse(normalizeString(stats && stats.updatedAt));
+    const isCurrentCentralStats = Boolean(
+      stats &&
+      stats.reliable === true &&
+      normalizeString(stats.authoritativeSource) === 'central-outbound-recipient-guard' &&
+      normalizeString(stats.dateKey) === getAmsterdamDateKey(now()) &&
+      normalizeString(stats.sentTimestampModel) === COLDMAIL_SENT_TIMESTAMP_MODEL &&
+      Number.isFinite(updatedAtMs)
+    );
+    if (!isCurrentCentralStats) return null;
+    return pickNonNegativeInteger(stats, ['centralGuardSentToday', 'systemSentToday']);
+  }
+
   function buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState) {
     const statsValues = statsState && statsState.values && typeof statsState.values === 'object' ? statsState.values : {};
     const cachedStatsPayload = parseJsonObject(statsValues[DATABASE_MAIL_STATS_CACHE_KEY]);
@@ -72,7 +100,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       ?? pickNonNegativeInteger(stats.bounceTypes, ['hard']);
     return {
       mailStats: {
-        sentToday: pickNonNegativeInteger(stats, ['systemSentToday', 'sentToday', 'webdesignSentToday']),
+        sentToday: readReliableCurrentDaySentCount(stats),
         bounces: pickNonNegativeInteger(stats, ['bounces', 'totalBounces', 'bouncesTotal']),
         hardBounces,
         totalSent: pickNonNegativeInteger(stats, ['systemTotalSent', 'totalSent', 'webdesignTotalSent', 'centralGuardTotalSent']),
