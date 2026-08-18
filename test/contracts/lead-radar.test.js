@@ -425,15 +425,16 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   const shell = readRepoFile('premium-lead-radar-shell.html');
   const page = readRepoFile('premium-lead-radar.html');
   const script = readRepoFile('assets/lead-radar.js');
-  const sidebarScript = readRepoFile('assets/lead-radar-sidebar.js');
+  const theme = readRepoFile('assets/personnel-theme.js');
+  const sidebarLinks = readRepoFile('assets/premium-sidebar-links.js');
   const routing = readRepoFile('server/config/page-routing.js');
   assert.match(shell, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
   assert.match(routing, /map\.set\('lead-radar', map\.get\('premium-lead-radar-shell'\)\)/);
   assert.doesNotMatch(shell, /assets\/lead-radar-sidebar\.js/);
-  assert.match(sidebarScript, /const LINK_KEY = 'lead_radar'/);
-  assert.match(sidebarScript, /href = LINK_HREF/);
-  assert.match(sidebarScript, /__softoraLeadRadarSidebarInitialized/);
-  assert.match(sidebarScript, /observer\.disconnect\(\)/);
+  assert.doesNotMatch(shell, /data-sidebar-key="lead_radar"/);
+  assert.match(sidebarLinks, /function getLeadRadarSidebarLink\(\)/);
+  assert.match(theme, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
+  assert.match(theme, /ensureStaticSidebarLink\(sidebar, "overzicht", window\.SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\), \["database"\]\)/);
   assert.match(page, /Totale leads/);
   assert.match(page, /Nieuwe leads/);
   assert.match(page, /Nieuwe leads zoeken/);
@@ -511,10 +512,12 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
   const htmlPages = readRepoFile('server/services/html-pages.js');
+  const theme = readRepoFile('assets/personnel-theme.js');
   const vercel = readRepoFile('vercel.json');
   const envExample = readRepoFile('.env.example');
-  assert.match(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION = '20260818a'/);
-  assert.match(htmlPages, /assets\/lead-radar-sidebar\.js\?v=\$\{LEAD_RADAR_SIDEBAR_VERSION\}/);
+  assert.match(htmlPages, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818b'/);
+  assert.doesNotMatch(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
+  assert.match(theme, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\)/);
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);

@@ -58,6 +58,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical" data-live-momentum-shell>/);
   assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
+  assert.match(html, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">/);
   assert.match(html, /<span data-settings-module-back-host><\/span>[\s\S]*<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);

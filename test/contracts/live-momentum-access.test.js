@@ -143,6 +143,7 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /live-momentum-access\.js\?v=20260804a/);
   assert.match(html, /data-sidebar-shell="canonical"/);
   assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
+  assert.match(html, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(html, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.doesNotMatch(html, /data-live-momentum-page|live-momentum-endgame-cards|data-end-game-goal-track/);
   assert.doesNotMatch(html, /ATTACK, ATTACK, ATTACK\.|THE END GAME IS TO WIN|momentum-access-art/i);
