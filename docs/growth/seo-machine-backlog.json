@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-17",
+  "updatedAt": "2026-08-18",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -2043,7 +2043,9 @@
     },
     {
       "id": "voice-crm-integration-025",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-18",
+      "shippedPath": "/kennisbank/ai-telefonist-crm-koppeling",
       "path": "/kennisbank/ai-telefonist-crm-koppeling",
       "contentType": "kennisbank",
       "cluster": "ai-contact",
@@ -2128,7 +2130,96 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Herbevestig actuele Nederlandse buyer questions en werk de event- en veldmapping leveranciersneutraal uit met retries, idempotentie, herstelwachtrij en menselijke acceptatie."
+      "nextAction": "Meet op D14 indexatie, relevante niet-merkgebonden impressies, intentmatch en navigatie naar de AI-telefonistpagina zonder de URL vóór het reviewmoment te herschrijven."
+    },
+    {
+      "id": "voice-acceptance-026",
+      "status": "ready",
+      "path": "/kennisbank/ai-telefonist-acceptatietest-opstellen",
+      "contentType": "kennisbank",
+      "cluster": "ai-contact",
+      "primaryQuery": "ai telefonist testen",
+      "intent": "Een AI telefonist met echte gespreks-, actie- en herstelscenario's accepteren vóór livegang",
+      "intentClass": "risk",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-telefonist",
+      "clusterRole": "Acceptatiegids die gesprek, spraak, functies, koppelingen, overdracht en herstel vóór livegang als één toetsbare testset afbakent",
+      "demandEvidence": [
+        {
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP voor AI telefonist testen",
+          "observedAt": "2026-08-18",
+          "detail": "Actuele Nederlandse aanbiederspagina's van NeemtOp, LokaleAI, MIKE365 en Flireo gebruiken testen, zelf beoordelen en pas na akkoord live gaan als concrete kooptaal, maar publiceren geen leveranciersneutrale acceptatieset voor gesprek, systeemactie en herstel."
+        },
+        {
+          "type": "primary-source",
+          "source": "Retell AI Docs: Testing overview en LLM simulation testing",
+          "observedAt": "2026-08-18",
+          "detail": "De actuele documentatie onderscheidt handmatige playgroundtests, herhaalbare simulaties en echte web- of telefoontests, adviseert scenario's en succescriteria en ondersteunt function mocks. Dit onderbouwt een buyer task rond gelaagde acceptatie zonder tijdens simulatie echte klantacties uit te voeren."
+        }
+      ],
+      "competitorPatterns": [
+        "Een gratis demo of proefgesprek presenteren als voldoende acceptatiebewijs",
+        "Alleen antwoordkwaliteit testen zonder CRM-, agenda-, overdrachts- en foutuitkomst",
+        "Livegaan na algemene tevredenheid zonder herhaalbare scenario's, eigenaar en go-no-go"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-18",
+        "closestPaths": [
+          "/blog/ai-telefonie-menselijke-overdracht",
+          "/blog/ai-telefonist-kosten-mkb",
+          "/blog/ai-telefonist-voor-afspraakintake"
+        ],
+        "decision": "distinct",
+        "rationale": "De overdrachtspagina behandelt de grens naar een medewerker, de kostengids begroot acceptatiewerk en de afspraakpagina beschrijft één intakeflow. Deze kandidaat maakt uitsluitend de voice-specifieke acceptatieset controleerbaar: verstaanbaarheid, onderbreken, stilte, doorschakelen, systeemacties, dubbele events en menselijk herstel."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.35,
+      "brief": {
+        "title": "AI telefonist testen vóór livegang",
+        "metaDescription": "Maak een acceptatietest voor verstaanbaarheid, gesprekspaden, systeemacties, overdracht, dubbele events en menselijk herstel vóór livegang.",
+        "h1": "Hoe test je een AI telefonist vóór livegang?",
+        "outline": [
+          "Splits gesprek, spraak, actie en herstel in aparte testlagen",
+          "Maak normale, grens- en mislukte scenario's met verwacht bewijs",
+          "Mock systeemacties vóór echte CRM- of agendatests",
+          "Test onderbreken, stilte, achtergrondgeluid en menselijke overdracht",
+          "Leg beslisser, go-no-go en regressieset vast"
+        ],
+        "buyerQuestions": [
+          "Welke gesprekken moet je vóór livegang testen?",
+          "Hoe test je CRM- en agenda-acties zonder echte klantdata?",
+          "Wie beslist of een AI telefonist klaar is voor gebruik?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-telefonist-kosten-mkb",
+          "/kennisbank/ai-telefonist-crm-koppeling"
+        ],
+        "outgoingLinks": [
+          "/ai-telefonist",
+          "/blog/ai-telefonie-menselijke-overdracht"
+        ],
+        "conversionPath": "Van een bewijsbare acceptatieset naar een scopegesprek over één begrensde AI-telefonieflow, koppelingen, overdracht en beheer.",
+        "claimRisk": "Geen foutloze werking, volledige veiligheid, perfecte verstaanbaarheid of gegarandeerde bereikbaarheid beloven; benoem representatieve testdata, menselijke beslissers en blijvende monitoring.",
+        "visualConcepts": [
+          "Documentaire geluidstest met telefoon, storingsbronnen, scenariofiches en menselijke beoordelaar",
+          "Acceptatiematrix voor gesprek, spraak, actie, overdracht, fout en herstel met go-no-go"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig actuele voice-specifieke buyer questions en werk een compacte acceptatieset uit die simulatie, echte telefoontest, systeemactie, menselijke overdracht en herstel afzonderlijk bewijst."
     }
   ]
 }

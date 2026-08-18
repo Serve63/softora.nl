@@ -152,7 +152,16 @@ const AI_TELEFONIST_KOSTEN_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Koppelingen voegen datacontracten en herstelwerk toe',
       paragraphs: Object.freeze([
-        'Een agenda- of CRM-koppeling is geen enkel vinkje. Beschrijf per actie welke gegevens worden gelezen, welke velden worden geschreven, welk systeem leidend is en welke identiteit de handeling uitvoert. Bepaal wat er gebeurt bij een dubbele klant, bezette afspraak, verlopen sessie of tijdelijke storing. Als de AI alleen een voorstel klaarzet en een medewerker bevestigt, zijn de risico’s en tests anders dan bij direct boeken.',
+        Object.freeze({
+          text:
+            'Een agenda- of CRM-koppeling is geen enkel vinkje. Beschrijf per actie welke gegevens worden gelezen, welke velden worden geschreven, welk systeem leidend is en welke identiteit de handeling uitvoert. De gids over een AI telefonist koppelen aan CRM of agenda werkt de eventsleutel, duplicatecontrole, bezette afspraak en menselijke herstelwachtrij verder uit. Als de AI alleen een voorstel klaarzet en een medewerker bevestigt, zijn de risico’s en tests anders dan bij direct boeken.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'AI telefonist koppelen aan CRM of agenda',
+              href: '/kennisbank/ai-telefonist-crm-koppeling',
+            }),
+          ]),
+        }),
         Object.freeze({
           text:
             'Retell documenteert onder meer start-, einde-, analyse- en overdrachtsgebeurtenissen voor webhooks. Zulke gebeurtenissen kunnen een CRM-update of workflow starten, maar de ontvangende toepassing moet afzendercontrole, dubbele levering, time-outs en herstel afhandelen. Gebruik de uitleg over AI automatisering om te bepalen welke vervolgstap werkelijk waarde heeft; bouw niet automatisch iedere technisch mogelijke koppeling in de eerste versie.',
@@ -254,6 +263,7 @@ const AI_TELEFONIST_KOSTEN_CONTENT_ITEM = Object.freeze({
     Object.freeze({ label: 'AI telefonist of receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
     Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
     Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
+    Object.freeze({ label: 'AI telefonist koppelen aan CRM of agenda', href: '/kennisbank/ai-telefonist-crm-koppeling' }),
   ]),
 });
 
