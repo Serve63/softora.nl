@@ -412,12 +412,15 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260818b/);
-  assert.match(page, /lead-radar\.js\?v=20260818b/);
+  assert.match(page, /lead-radar\.css\?v=20260818c/);
+  assert.match(page, /lead-radar\.js\?v=20260818c/);
+  assert.match(page, /<select id="scan-platforms">\s*<option value="facebook,linkedin" selected>Facebook en LinkedIn<\/option>\s*<option value="facebook">Facebook<\/option>\s*<option value="linkedin">LinkedIn<\/option>/);
+  assert.doesNotMatch(page, /<select id="scan-platforms"[^>]*(?:multiple|size=)/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
   const stylesheet = readRepoFile('assets/lead-radar.css');
   assert.doesNotMatch(stylesheet, /lead-radar-header-actions|import-panel|import-form|metric-context/);
   assert.doesNotMatch(stylesheet, /coverage-panel|coverage-summary|coverage-stat|runs-list|run-row|filter-bar|filter-submit|filter-search|scan-region-input/i);
+  assert.doesNotMatch(stylesheet, /select\[multiple\]/);
   assert.match(script, /no_website_found: 'GEEN WEBSITE GEVONDEN'/);
   assert.match(script, /Leads laden/);
   assert.doesNotMatch(script, /refresh-button|open-import-button|submitImport|import-form|zoekopdrachten|Websitechecks/i);
@@ -431,8 +434,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
   assert.doesNotMatch(script, /Automatisch actief/);
   assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
-  assert.match(page, /assets\/lead-radar\.css\?v=20260818b/);
-  assert.match(page, /assets\/lead-radar\.js\?v=20260818b/);
+  assert.match(script, /const platforms = \(\$\('#scan-platforms'\)\.value \|\| 'facebook,linkedin'\)\.split\(','\)\.filter\(Boolean\);/);
+  assert.doesNotMatch(script, /selectedOptions/);
   assert.match(page, /maximaal 50 zoekacties/);
   assert.match(page, /directe openbare posts met een echte websitevraag/);
   assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);

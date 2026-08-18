@@ -50,8 +50,6 @@ input, select, textarea { width: 100%; border: 1px solid #d9cec5; border-radius:
 input, select { min-height: 38px; padding: 0 10px; }
 textarea { padding: 10px; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--radar-pink); box-shadow: 0 0 0 3px rgba(157, 35, 85, .10); }
-.scan-panel__controls select[multiple] { min-width: 130px; padding: 4px; }
-.scan-panel__controls select[multiple] option { padding: 3px 6px; }
 .scan-progress { display: grid; gap: 8px; margin-top: 18px; color: var(--radar-muted); font-size: 12px; }
 .scan-progress__bar { height: 8px; overflow: hidden; border-radius: 99px; background: #eee5df; }
 .scan-progress__bar span { display: block; width: 35%; height: 100%; border-radius: inherit; background: var(--radar-pink); animation: lead-radar-scan-indeterminate 1.2s ease-in-out infinite; }
