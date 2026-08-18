@@ -104,9 +104,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .menu-button { display: none; }
 
 .hero {
-  min-height: 850px;
+  min-height: 760px;
   margin-top: -86px;
-  padding: 176px max(24px, calc((100vw - 1320px) / 2)) 94px;
+  padding: 145px max(24px, calc((100vw - 1320px) / 2)) 70px;
   background: var(--ink);
   color: #fff;
   display: grid;
@@ -185,7 +185,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   font-size: 14px;
   font-weight: 650;
 }
-.hero-visual { min-height: 610px; }
+.hero-visual { min-height: 530px; }
 .portrait-frame {
   position: absolute;
   inset: 32px 0 0 34px;
