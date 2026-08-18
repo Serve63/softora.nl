@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('crypto');
-const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance');
+const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance'); const { createLeadRadarEnrichment } = require('./lead-radar-enrichment');
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
 const DATAFORSEO_ENDPOINT = 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced';
@@ -540,7 +540,7 @@ function createLeadRadarService(deps = {}) {
     isSupabaseConfigured = () => false,
     fetchImpl = globalThis.fetch,
   } = deps;
-  const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger }); const maintenance = createLeadRadarMaintenance({ getDb, env, logger });
+  const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger }); const enrichment = deps.enrichment || createLeadRadarEnrichment({ env, fetchImpl, logger, normalizeHttpUrl }); const maintenance = createLeadRadarMaintenance({ getDb, env, logger });
 
   function getDb() {
     if (typeof isSupabaseConfigured === 'function' && !isSupabaseConfigured()) return null;
@@ -745,64 +745,85 @@ function createLeadRadarService(deps = {}) {
         website_candidates: Array.isArray(signal.website_candidates) ? signal.website_candidates : [],
       };
     }
+    let business = {};
+    try { business = await enrichment.lookupBusiness(signal); }
+    catch (error) { business = { business_match_status: 'provider_error', business_source: 'business_listings', business_check_error: text(error?.message || error, 500) }; }
     const sourceText = `${signal.message_text || ''} ${signal.snippet || ''}`;
     const directUrl = extractUrls(sourceText)[0] || '';
-    let candidateUrl = existingUrl || directUrl;
-    let source = existingUrl ? (signal.website_source || 'post') : (directUrl ? 'post' : 'not_found');
-    let candidates = [];
+    const businessUrl = business.business_match_status === 'matched'
+      ? normalizeHttpUrl(business.business_website_url || (business.business_domain ? `https://${business.business_domain}` : ''), { allowPlatform: false })
+      : '';
+    let candidateUrl = existingUrl || directUrl || businessUrl;
+    let source = existingUrl ? (signal.website_source || 'post') : (directUrl ? 'post' : (businessUrl ? 'public_search' : 'not_found'));
+    let candidates = Array.isArray(business.business_candidates)
+      ? business.business_candidates.filter((candidate) => candidate.business_domain || candidate.business_website_url).map((candidate) => ({
+        url: normalizeHttpUrl(candidate.business_website_url || `https://${candidate.business_domain}`, { allowPlatform: false }),
+        title: text(candidate.business_name, 500),
+        snippet: text(candidate.business_category || '', 500),
+        score: candidate.business_match_score || 0,
+        source: 'business_listings',
+      })).filter((candidate) => candidate.url)
+      : [];
     if (!candidateUrl && provider?.configured && typeof provider.search === 'function') {
       const websiteQuery = buildWebsiteSearchQuery(signal);
       if (websiteQuery) {
         const items = await provider.search({ query: websiteQuery, maxResults: 10 });
-        candidates = items
+        const foundCandidates = items
           .map((item) => ({ url: normalizeHttpUrl(item.url, { allowPlatform: false }), title: text(item.title, 500), snippet: text(item.snippet, 2_000) }))
           .filter((item) => item.url);
         const exactName = text(signal.author_name, 120).split('|')[0].toLowerCase().trim();
-        const nameTokens = exactName
-          .replace(/[^a-z0-9\s-]/gi, ' ')
-          .split(/\s+/)
-          .filter((token) => token.length >= 3 && !['website', 'webdesign', 'media', 'bureau', 'bedrijf'].includes(token));
+        const nameTokens = exactName.replace(/[^a-z0-9\\s-]/gi, ' ').split(/\\s+/).filter((token) => token.length >= 3 && !['website', 'webdesign', 'media', 'bureau', 'bedrijf'].includes(token));
         const regionName = text(signal.region, 100).toLowerCase();
-        const scoredCandidates = candidates.map((item) => ({
+        candidates = [...candidates, ...foundCandidates.map((item) => ({
           ...item,
           score: (() => {
             const candidateText = `${item.title} ${item.snippet} ${item.url}`.toLowerCase();
             const matchingTokens = nameTokens.filter((token) => candidateText.includes(token)).length;
             const exactMatch = exactName && candidateText.includes(exactName);
             const regionMatch = regionName && candidateText.includes(regionName);
-            const directory = /\b(facebook|linkedin|offerte|vacature|yelp|bedrijvengids|gouden gids)\b/i.test(candidateText);
-            return (exactMatch ? 55 : Math.min(45, matchingTokens * 20)) + (regionMatch ? 15 : 0) +
-              (item.title.toLowerCase().includes('website') ? 5 : 0) - (directory ? 35 : 0);
+            const directory = /\\b(facebook|linkedin|offerte|vacature|yelp|bedrijvengids|gouden gids)\\b/i.test(candidateText);
+            return (exactMatch ? 55 : Math.min(45, matchingTokens * 20)) + (regionMatch ? 15 : 0) + (item.title.toLowerCase().includes('website') ? 5 : 0) - (directory ? 35 : 0);
           })(),
-        })).sort((a, b) => b.score - a.score);
-        candidates = scoredCandidates;
-        if (scoredCandidates[0] && scoredCandidates[0].score >= 30) {
-          candidateUrl = scoredCandidates[0].url;
+          source: 'public_search',
+        }))].sort((a, b) => b.score - a.score);
+        if (candidates[0] && candidates[0].score >= 30) {
+          candidateUrl = candidates[0].url;
           source = 'public_search';
         }
       }
     }
+    const businessStatus = business.business_match_status || 'not_checked';
     if (!candidateUrl) {
       const hasWebsiteCandidate = candidates.length > 0;
       return {
-        website_status: provider?.configured ? (hasWebsiteCandidate ? 'website_unverified' : 'no_website_found') : 'provider_unavailable',
+        ...business,
+        website_status: businessStatus === 'provider_error' ? 'website_unverified' : (provider?.configured ? (hasWebsiteCandidate ? 'website_unverified' : 'no_website_found') : 'provider_unavailable'),
         website_source: provider?.configured && hasWebsiteCandidate ? 'public_search' : (provider?.configured ? 'not_found' : 'not_checked'),
         website_checked_at: new Date().toISOString(),
-        website_check_error: hasWebsiteCandidate ? 'Mogelijke website gevonden, maar de koppeling is nog niet betrouwbaar genoeg bevestigd.' : null,
+        website_check_error: businessStatus === 'provider_error'
+          ? (business.business_check_error || 'Niet alle openbare controles konden worden uitgevoerd.')
+          : (hasWebsiteCandidate ? 'Mogelijke website gevonden, maar de koppeling is nog niet betrouwbaar genoeg bevestigd.' : business.business_check_error || null),
         website_candidates: candidates,
       };
     }
-    const check = await verifyWebsite(candidateUrl);
+    let inspected = {};
+    try { inspected = await enrichment.inspectWebsite(candidateUrl); } catch (error) { inspected = { available: false, error: text(error?.message || error, 500) }; }
+    const check = inspected.available ? inspected : await verifyWebsite(candidateUrl);
     return {
+      ...business,
       website_url: candidateUrl,
       website_domain: new URL(candidateUrl).hostname,
-      website_title: check.title || null,
-      website_http_status: check.status,
-      website_status: check.ok ? 'website_found' : 'website_not_working',
+      website_title: check.website_title || check.title || null,
+      website_http_status: check.website_http_status ?? check.status ?? null,
+      website_redirect_url: check.website_redirect_url || check.redirectUrl || null,
+      website_status: check.website_status || (check.ok ? 'website_found' : 'website_not_working'),
       website_source: source,
       website_confidence_score: source === 'post' ? 100 : (candidates[0]?.score >= 55 ? 90 : 60),
       website_checked_at: new Date().toISOString(),
-      website_check_error: check.ok ? null : check.error,
+      website_check_provider: check.website_check_provider || 'server_fetch',
+      website_technical_checks: check.website_technical_checks || {},
+      website_links: Array.isArray(check.website_links) ? check.website_links : [],
+      website_check_error: check.website_check_error || check.error || null,
       website_candidates: candidates,
     };
   }
@@ -822,7 +843,7 @@ function createLeadRadarService(deps = {}) {
       });
       const body = await response.text().catch(() => '');
       const title = text((body.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '', 500).replace(/\s+/g, ' ');
-      return { ok: response.ok, status: response.status, title, error: response.ok ? '' : `HTTP ${response.status}` };
+      return { ok: response.ok, status: response.status, title, redirectUrl: response.url && response.url !== normalized ? response.url : null, error: response.ok ? '' : `HTTP ${response.status}` };
     } catch (error) {
       return { ok: false, status: null, title: '', error: text(error?.message || error, 500) };
     } finally {
