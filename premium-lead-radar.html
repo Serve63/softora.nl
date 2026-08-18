@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260818b">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -64,41 +64,11 @@
       </div>
     </section>
 
-    <section class="coverage-panel" aria-label="Scanoverzicht">
-      <div class="coverage-panel__heading">
-        <div><p class="section-kicker">CONTROLE</p><h2>Scanruns en dekking</h2></div>
-        <button class="icon-button" id="toggle-runs-button" type="button" aria-expanded="false" title="Scanruns tonen">+</button>
-      </div>
-      <div class="coverage-summary" id="coverage-summary"></div>
-      <div class="runs-list" id="runs-list" hidden></div>
-    </section>
-
     <section class="inbox-section" aria-label="Lead Radar inbox">
       <div class="inbox-heading">
         <div><p class="section-kicker">INBOX</p><h2>Recente leads</h2></div>
         <span class="result-count" id="result-count">0 resultaten</span>
       </div>
-      <form class="filter-bar" id="filter-form">
-        <label>Platform
-          <select id="filter-platform"><option value="">Alle platforms</option><option value="facebook">Facebook</option><option value="linkedin">LinkedIn</option></select>
-        </label>
-        <label>Periode
-          <select id="filter-days"><option value="30" selected>Laatste 30 dagen</option><option value="1">Vandaag</option><option value="3">Laatste 3 dagen</option><option value="7">Laatste 7 dagen</option><option value="">Alle datums</option></select>
-        </label>
-        <label>Website
-          <select id="filter-website-status"><option value="">Alle statussen</option><option value="no_website_found">Geen website gevonden</option><option value="website_found">Website gevonden</option><option value="website_not_working">Website werkt niet</option><option value="website_unverified">Niet bevestigd</option><option value="website_not_checked">Nog niet gecontroleerd</option><option value="provider_unavailable">Controle niet beschikbaar</option></select>
-        </label>
-        <label>Leadstatus
-          <select id="filter-lead-status"><option value="">Alle leadstatussen</option><option value="new">Nieuw</option><option value="relevant">Relevant</option><option value="follow_up">Later opvolgen</option><option value="not_relevant">Niet relevant</option><option value="archived">Gearchiveerd</option></select>
-        </label>
-        <label>Min. score
-          <input id="filter-min-score" type="number" min="0" max="100" placeholder="0" inputmode="numeric">
-        </label>
-        <label class="filter-search">Zoeken
-          <input id="filter-search" type="search" placeholder="Naam, bericht of zoekterm">
-        </label>
-        <button class="button button-secondary filter-submit" type="submit">Filteren</button>
-      </form>
 
       <div class="bulk-bar" id="bulk-bar" hidden>
         <span><strong id="selected-count">0</strong> geselecteerd</span>

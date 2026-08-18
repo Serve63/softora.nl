@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const state = { offset: 0, limit: 50, total: 0, signals: [], selected: new Set(), runs: [], runsError: '', status: null };
+  const state = { offset: 0, limit: 50, total: 0, signals: [], selected: new Set(), status: null };
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const formatDate = (value) => {
@@ -83,7 +83,7 @@
   function renderSignals() {
     const list = $('#lead-list');
     if (!list) return;
-    if (!state.signals.length) { list.innerHTML = ''; setInboxState('Geen leads gevonden met deze filters.', ''); }
+    if (!state.signals.length) { list.innerHTML = ''; setInboxState('Geen leads gevonden.', ''); }
     else { setInboxState('', ''); list.innerHTML = state.signals.map(signalCard).join(''); }
     $('#result-count').textContent = `${state.total.toLocaleString('nl-NL')} resultaten`;
     const pagination = $('#pagination');
@@ -94,59 +94,29 @@
     updateSelectionBar();
   }
 
-  function getFilters() {
+  function getSignalQuery() {
     const params = new URLSearchParams();
-    const values = { platform: $('#filter-platform').value, days: $('#filter-days').value, website_status: $('#filter-website-status').value, status: $('#filter-lead-status').value, min_score: $('#filter-min-score').value, search: $('#filter-search').value };
-    Object.entries(values).forEach(([key, value]) => { if (value) params.set(key, value); });
     params.set('limit', String(state.limit)); params.set('offset', String(state.offset));
     return params.toString();
   }
 
-  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); renderCoverage(); }
+  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); }
   async function loadSignals({ silent = false } = {}) {
     if (!silent) setInboxState('Leads laden...', '');
-    try { const body = await api(`/api/lead-radar/signals?${getFilters()}`); state.signals = body.signals || []; state.total = Number(body.total) || 0; renderSignals(); }
+    try { const body = await api(`/api/lead-radar/signals?${getSignalQuery()}`); state.signals = body.signals || []; state.total = Number(body.total) || 0; renderSignals(); }
     catch (error) { state.signals = []; state.total = 0; renderSignals(); setInboxState(error.message, 'error'); }
-  }
-  async function loadRuns() {
-    try {
-      const body = await api('/api/lead-radar/runs?limit=10');
-      state.runsError = '';
-      state.runs = body.runs || [];
-      renderRuns();
-    } catch (error) {
-      state.runsError = error?.message || 'Onbekende fout.';
-      renderRuns();
-    }
-  }
-
-  function renderCoverage() {
-    const status = state.status || {};
-    const provider = status.provider || {};
-    $('#coverage-summary').innerHTML = [
-      ['Zoektermen', Object.values(status.keywordGroups || {}).reduce((sum, count) => sum + Number(count || 0), 0)],
-      ['Provincies', status.regionalCoverage?.provinces || 0], ['Belangrijke steden', status.regionalCoverage?.cities || 0],
-      ['Provider', provider.configured ? 'Geconfigureerd' : 'Niet ingesteld'], ['Opslag', status.storageConfigured ? 'Supabase' : 'Niet beschikbaar'],
-    ].map(([label, value]) => `<div class="coverage-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join('');
-  }
-  function renderRuns() {
-    renderCoverage();
-    const list = $('#runs-list');
-    if (state.runsError) { list.innerHTML = `<div class="inbox-state inbox-state--error">Scanruns konden niet worden geladen: ${escapeHtml(state.runsError)}</div>`; return; }
-    if (!state.runs.length) { list.innerHTML = '<div class="inbox-state">Nog geen scanruns.</div>'; return; }
-    list.innerHTML = state.runs.map((run) => { const total = Array.isArray(run.query_plan) ? run.query_plan.length : 0; const cursor = Number(run.query_cursor) || 0; const canResume = ['paused', 'running', 'completed_with_errors'].includes(run.status) && cursor < total; return `<div class="run-row"><div><strong>${escapeHtml(formatDate(run.started_at))}</strong><span>${escapeHtml(run.provider || 'onbekend')} · ${escapeHtml((run.platforms || []).join(', '))}</span></div><div>${cursor}/${total} zoekacties</div><div>${Number(run.result_count || 0)} ruwe</div><div>${Number(run.new_signal_count || 0)} nieuw · ${Number(run.duplicate_count || 0)} dubbel</div><div class="run-action"><span>${escapeHtml(run.status || 'onbekend')}</span>${canResume ? `<button class="button button-secondary" type="button" data-resume-run="${escapeHtml(run.id)}">Hervatten</button>` : ''}</div></div>`; }).join('');
   }
   function updateSelectionBar() { const bar = $('#bulk-bar'); bar.hidden = state.selected.size === 0; $('#selected-count').textContent = String(state.selected.size); }
 
   async function updateSignal(id, patch) { await api(`/api/lead-radar/signals/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }); await Promise.all([loadStatus(), loadSignals()]); }
   async function lookupWebsite(id, force) { await api(`/api/lead-radar/signals/${encodeURIComponent(id)}/website-lookup`, { method: 'POST', body: JSON.stringify({ force: Boolean(force) }) }); await Promise.all([loadStatus(), loadSignals()]); }
 
-  async function startScan(extra) {
+  async function startScan() {
     const platforms = Array.from($('#scan-platforms').selectedOptions).map((option) => option.value);
     const regionMode = $('#scan-region-mode').value;
-    const payload = { platforms, regionMode, regions: [], maxAgeDays: Number($('#scan-max-age-days').value) || 30, ...(extra || {}) };
+    const payload = { platforms, regionMode, regions: [], maxAgeDays: Number($('#scan-max-age-days').value) || 30 };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan bezig — resultaten worden na afloop bijgewerkt.';
-    try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals(), loadRuns()]); }
+    try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals()]); }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
     finally {
       button.disabled = !state.status?.provider?.configured;
@@ -164,15 +134,11 @@
         else await updateSignal(id, { lead_status: kind });
       } catch (error) { setInboxState(error.message, 'error'); }
     }
-    const resume = event.target.closest('[data-resume-run]');
-    if (resume) await startScan({ runId: resume.dataset.resumeRun });
   });
   document.addEventListener('change', (event) => { const checkbox = event.target.closest('[data-select-signal]'); if (!checkbox) return; if (checkbox.checked) state.selected.add(checkbox.dataset.selectSignal); else state.selected.delete(checkbox.dataset.selectSignal); updateSelectionBar(); });
-  $('#filter-form').addEventListener('submit', (event) => { event.preventDefault(); state.offset = 0; loadSignals(); });
   $('#previous-page-button').addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); loadSignals(); });
   $('#next-page-button').addEventListener('click', () => { if (state.offset + state.signals.length < state.total) { state.offset += state.limit; loadSignals(); } });
   $('#scan-button').addEventListener('click', () => startScan());
-  $('#toggle-runs-button').addEventListener('click', async () => { const list = $('#runs-list'); const open = list.hidden; list.hidden = !open; $('#toggle-runs-button').textContent = open ? '−' : '+'; $('#toggle-runs-button').setAttribute('aria-expanded', String(open)); if (open) await loadRuns(); });
   $('#clear-selection-button').addEventListener('click', () => { state.selected.clear(); renderSignals(); });
   $('#bulk-website-button').addEventListener('click', async () => { try { await api('/api/lead-radar/website-lookup', { method: 'POST', body: JSON.stringify({ signalIds: Array.from(state.selected), force: true }) }); state.selected.clear(); await Promise.all([loadStatus(), loadSignals()]); } catch (error) { setInboxState(error.message, 'error'); } });
 
@@ -181,5 +147,5 @@
     Promise.all([loadStatus(), loadSignals({ silent: true })]).catch(() => {});
   }, 60_000);
 
-  Promise.all([loadStatus(), loadSignals(), loadRuns()]).catch((error) => setInboxState(error.message, 'error'));
+  Promise.all([loadStatus(), loadSignals()]).catch((error) => setInboxState(error.message, 'error'));
 })();
