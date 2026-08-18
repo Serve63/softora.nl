@@ -419,8 +419,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260818e/);
-  assert.match(page, /lead-radar\.js\?v=20260818e/);
+  assert.match(page, /lead-radar\.css\?v=20260818f/);
+  assert.match(page, /lead-radar\.js\?v=20260818f/);
   assert.match(page, /id="scan-platforms" data-value="facebook,linkedin"/);
   assert.match(page, /data-custom-select-trigger[\s\S]*aria-haspopup="listbox"[\s\S]*aria-controls="scan-platforms-menu"/);
   assert.match(page, /data-value="facebook,linkedin" aria-selected="true">Facebook en LinkedIn<\/button>[\s\S]*data-value="facebook" aria-selected="false">Facebook<\/button>[\s\S]*data-value="linkedin" aria-selected="false">LinkedIn<\/button>/);
@@ -438,7 +438,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(stylesheet, /lead-radar-header-actions|import-panel|import-form|metric-context/);
   assert.doesNotMatch(stylesheet, /coverage-panel|coverage-summary|coverage-stat|runs-list|run-row|filter-bar|filter-submit|filter-search|scan-region-input/i);
   assert.doesNotMatch(stylesheet, /select\[multiple\]/);
-  assert.doesNotMatch(stylesheet, /lead-actions|lead-notes|lead-date|lead-source\s*\{/);
+  assert.doesNotMatch(stylesheet, /lead-actions|lead-notes|lead-date|lead-source\s*\{|lead-author|lead-business|lead-engagement|business-match/);
   assert.match(stylesheet, /\.custom-select__menu/);
   assert.match(stylesheet, /html, body[\s\S]*scrollbar-width:\s*none/);
   assert.match(stylesheet, /::-webkit-scrollbar[\s\S]*display:\s*none/);
@@ -448,10 +448,10 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|getFilters|loadRuns|renderCoverage|renderRuns|toggle-runs-button|runs-list|coverage-summary|data-resume-run/i);
   assert.doesNotMatch(script, /relevance_score|score_reasons|lead-score|lead-select|selected-count|bulk-website-button|clear-selection-button|Geen website-URL opgeslagen|lead-copy__query/);
   assert.match(script, /<h3 class="lead-title">/);
-  assert.match(script, /const leadTitle = signal\.message_text \|\| signal\.snippet/);
+  assert.match(script, /const leadTitle = signal\.author_name \|\| signal\.message_text/);
+  assert.match(script, /<p class="lead-summary">/);
   assert.match(script, /Open originele post/);
-  assert.doesNotMatch(script, /Open profiel\/pagina|Publicatiedatum:|Gevonden op:|Bedrijf en website controleren|Opnieuw controleren|Relevant|Later opvolgen|Niet relevant|Interne notitie|Notitie opslaan|lead-actions|lead-notes|data-action/i);
-  assert.match(script, /Bedrijfscontrole/);
+  assert.doesNotMatch(script, /Open profiel\/pagina|Publicatiedatum:|Gevonden op:|Bedrijf en website controleren|Opnieuw controleren|Relevant|Later opvolgen|Niet relevant|Interne notitie|Notitie opslaan|lead-actions|lead-notes|data-action|Bedrijfscontrole|BEDRIJF NOG NIET GECONTROLEERD|Engagement|business-match|lead-business|lead-engagement/i);
   assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
   assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
