@@ -40,6 +40,7 @@ test('Lead Radar bouwt kleine Facebook- en LinkedIn-queryfamilies met regionale 
   assert.ok(nationwide.every((item) => !item.query.includes('instagram')));
   assert.ok(nationwide.every((item) => item.query.includes('-marketingbureau')));
   assert.ok(nationwide.every((item) => item.query.includes('Nederland')));
+  assert.deepEqual(nationwide.slice(0, 8).map((item) => item.platform), ['facebook', 'linkedin', 'facebook', 'linkedin', 'facebook', 'linkedin', 'facebook', 'linkedin']);
 
   const regional = buildSearchPlan({ platforms: ['facebook'], regionMode: 'regional', keywordGroups: ['webshop'] });
   assert.ok(regional.some((item) => item.region === 'Noord-Brabant'));
@@ -395,15 +396,27 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(shell, /assets\/lead-radar-sidebar\.js/);
   assert.match(sidebarScript, /const LINK_KEY = 'lead_radar'/);
   assert.match(sidebarScript, /href = LINK_HREF/);
+  assert.match(sidebarScript, /__softoraLeadRadarSidebarInitialized/);
+  assert.match(sidebarScript, /observer\.disconnect\(\)/);
+  assert.match(page, /Totale leads/);
+  assert.match(page, /Nieuwe leads/);
+  assert.match(page, /Nieuwe leads zoeken/);
+  assert.match(page, /Recente leads/);
   assert.match(page, /Geen website gevonden/);
   assert.match(page, /LinkedIn/);
   assert.doesNotMatch(page, /Instagram/);
   assert.doesNotMatch(script, /instagram/i);
   assert.match(page, /id="scan-regions"/);
+  assert.match(page, /lead-radar\.css\?v=20260818a/);
+  assert.match(page, /lead-radar\.js\?v=20260818a/);
+  assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
+  const stylesheet = readRepoFile('assets/lead-radar.css');
+  assert.doesNotMatch(stylesheet, /lead-radar-header-actions|import-panel|import-form|metric-context/);
   assert.match(script, /no_website_found: 'GEEN WEBSITE GEVONDEN'/);
+  assert.match(script, /Leads laden/);
+  assert.doesNotMatch(script, /refresh-button|open-import-button|submitImport|import-form|zoekopdrachten|Websitechecks/i);
   assert.match(script, /Open originele post/);
   assert.match(script, /Publicatiedatum:/);
-  assert.match(script, /import-published-at/);
   assert.match(script, /Website zoeken/);
   assert.match(script, /website-candidate/);
   assert.match(script, /setInterval/);
@@ -415,7 +428,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(page, /directe openbare posts met een betrouwbare publicatiedatum/);
   assert.match(page, /<option value="30" selected>Laatste 30 dagen<\/option>/);
   assert.match(page, /id="scan-max-age-days"/);
-  assert.match(page, /id="scan-max-queries"[^>]*max="12"/);
+  assert.doesNotMatch(page, /id="scan-max-queries"|id="scan-website-limit"/);
 });
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
@@ -428,4 +441,3 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
 });
-

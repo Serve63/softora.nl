@@ -338,21 +338,22 @@ function getFreshnessSuffix(maxAgeDays) {
 }
 
 function buildSearchPlan(options = {}) {
-  const platforms = Array.isArray(options.platforms) && options.platforms.length
+  const requestedPlatforms = Array.isArray(options.platforms) && options.platforms.length
     ? options.platforms.map(normalizePlatform).filter(Boolean)
     : [...PLATFORMS];
+  const platforms = Array.from(new Set(requestedPlatforms));
   const regions = getRegionList(options.regions || options.region, options.regionMode);
   const groups = getSelectedGroups(options.keywordGroups);
   const freshnessSuffix = getFreshnessSuffix(options.maxAgeDays || options.max_age_days);
-  const plan = [];
-  for (const region of regions) {
-    for (const group of groups) {
-      for (const term of KEYWORD_GROUPS[group]) {
-        for (const platform of platforms) {
-          const site = platform === 'facebook'
-            ? 'site:facebook.com'
-            : '(site:linkedin.com/posts OR site:linkedin.com/feed/update)';
-          plan.push({
+  const platformPlans = platforms.map((platform) => {
+    const site = platform === 'facebook'
+      ? 'site:facebook.com'
+      : '(site:linkedin.com/posts OR site:linkedin.com/feed/update)';
+    const platformPlan = [];
+    for (const region of regions) {
+      for (const group of groups) {
+        for (const term of KEYWORD_GROUPS[group]) {
+          platformPlan.push({
             platform,
             region,
             keywordGroup: group,
@@ -362,6 +363,20 @@ function buildSearchPlan(options = {}) {
         }
       }
     }
+    return platformPlan;
+  });
+
+  // A batch limit is global, so round-robin the queues to keep a scan that
+  // selected multiple platforms from spending the whole batch on Facebook.
+  const plan = [];
+  for (let index = 0; ; index += 1) {
+    let added = false;
+    for (const platformPlan of platformPlans) {
+      if (!platformPlan[index]) continue;
+      plan.push(platformPlan[index]);
+      added = true;
+    }
+    if (!added) break;
   }
   return plan;
 }
@@ -1195,4 +1210,3 @@ module.exports = {
   WEBSITE_STATUSES,
   LEAD_STATUSES,
 };
-
