@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { createLeadRadarQuality } = require('./lead-radar-quality');
+const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance');
 
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
@@ -20,7 +20,7 @@ const MAX_MESSAGE_LENGTH = 20_000;
 const MAX_NOTE_LENGTH = 5_000;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
-const DEFAULT_SCAN_QUERY_LIMIT = 12;
+const DEFAULT_SCAN_QUERY_LIMIT = 50;
 // Een ronde blijft bewust begrensd op de huidige batchgrootte. Dat houdt kosten,
 // looptijd en de hoeveelheid nieuwe ruis per handmatige scan beheersbaar.
 const MAX_SCAN_QUERY_LIMIT = DEFAULT_SCAN_QUERY_LIMIT;
@@ -43,7 +43,7 @@ const KEYWORD_GROUPS = Object.freeze({
     'website voor mijn zaak', 'website voor mijn vereniging',
     'webdesign gezocht', 'website offerte', 'website nodig',
     'aanbeveling websitebouwer', 'kent iemand een goede webdesigner', 'iemand voor mijn website',
-    'iemand nodig voor website',
+    'iemand nodig voor website', 'ik zoek iemand voor mijn website', 'wij zoeken iemand voor onze website', 'wie kan een website maken voor mijn bedrijf', 'websitebouwer gezocht voor mijn bedrijf', 'webdesigner gezocht voor mijn bedrijf', 'website nodig voor mijn bedrijf', 'website opdracht ondernemer',
   ],
   renew_or_repair: [
     'website vernieuwen', 'website moderniseren', 'bestaande website vernieuwen',
@@ -423,9 +423,9 @@ function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fe
         url: text(item.url, 2_000),
         title: text(item.title, 500),
         snippet: text(item.description || item.snippet, 5_000),
-        date: item.date || null,
-        timestamp: item.timestamp || null,
-        published_at: item.published_at || item.publishedAt || null,
+        date: item.date || item.date_text || item.dateText || null,
+        timestamp: item.timestamp || item.posted_at || item.postedAt || null,
+        published_at: item.published_at || item.publishedAt || item.publication_date || item.publicationDate || null,
         retrieved_at: item.retrieved_at || null,
         rank: normalizeInteger(item.rank_absolute, { min: 1, max: 10_000 }),
       }));
@@ -545,7 +545,7 @@ function createLeadRadarService(deps = {}) {
     isSupabaseConfigured = () => false,
     fetchImpl = globalThis.fetch,
   } = deps;
-  const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger });
+  const provider = deps.provider || createDataForSeoProvider({ env, fetchImpl, logger }); const maintenance = createLeadRadarMaintenance({ getDb, env, logger });
 
   function getDb() {
     if (typeof isSupabaseConfigured === 'function' && !isSupabaseConfigured()) return null;
@@ -943,7 +943,7 @@ function createLeadRadarService(deps = {}) {
     if (!provider?.configured || typeof provider.search !== 'function') {
       return updateRun(run.id, { status: 'provider_unavailable', finished_at: new Date().toISOString(), last_error: 'SERP-provider is niet geconfigureerd.' });
     }
-    const end = Math.min(plan.length, cursor + maxQueries);
+    try { await maintenance.cleanup(); } catch (error) { logger.warn('[LeadRadar][cleanup]', error?.message || error); } const end = Math.min(plan.length, cursor + maxQueries);
     const usedQueries = Array.isArray(run.used_queries) ? [...run.used_queries] : [];
     let resultCount = Number(run.result_count) || 0;
     let newSignalCount = Number(run.new_signal_count) || 0;
