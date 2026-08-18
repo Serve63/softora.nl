@@ -435,6 +435,10 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(sidebarLinks, /function getLeadRadarSidebarLink\(\)/);
   assert.match(theme, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
   assert.match(theme, /ensureStaticSidebarLink\(sidebar, "overzicht", window\.SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\), \["database"\]\)/);
+  assert.match(
+    theme,
+    /function stabilizePremiumStaticSidebar\(sidebar, activeKey\) \{[\s\S]*?syncPremiumSidebarManagementLinks\(sidebar, activeKey\);/
+  );
   assert.match(page, /Totale leads/);
   assert.match(page, /Nieuwe leads/);
   assert.match(page, /Nieuwe leads zoeken/);
