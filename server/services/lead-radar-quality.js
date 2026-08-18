@@ -147,16 +147,35 @@ function createLeadRadarQuality(deps) {
     }
   }
 
-  function normalizeProviderPublishedAt(item = {}) {
-    // DataForSEO's result-level datetime is retrieval time, not publication time.
-    // Relative SERP labels such as "3 days ago" are resolved against that
-    // retrieval time so the inbox can still show a useful publication date.
+  function extractDateText(value) {
+    const raw = String(value || '');
+    const relative = raw.match(/\b(?:vandaag|gisteren|\d+\s*(?:uur|u|hour|hours|dag|dagen|day|days|week|weken|weeks)\s*(?:geleden|ago))\b/i);
+    if (relative) return relative[0];
+    const named = raw.match(/\b\d{1,2}\s+(?:jan(?:uari)?|feb(?:ruari)?|mrt|maart|apr(?:il)?|mei|jun(?:i)?|jul(?:i)?|aug(?:ustus)?|sep(?:t(?:ember)?)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i);
+    if (named) return named[0];
+    const numeric = raw.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/);
+    return numeric ? numeric[0] : '';
+  }
+
+  function getProviderPublicationDetails(item = {}) {
     const base = normalizeDate(item.retrieved_at) || new Date().toISOString();
-    for (const candidate of [item.timestamp, item.published_at, item.publishedAt, item.date]) {
-      const normalized = normalizeProviderDate(candidate, base);
-      if (normalized) return normalized;
+    const candidates = [
+      ['provider_timestamp', item.timestamp, 100],
+      ['provider_date', item.published_at || item.publishedAt, 95],
+      ['serp_date', item.date || item.date_text || item.dateText, 90],
+      ['serp_text', extractDateText(item.snippet || item.description), 60],
+    ];
+    for (const [source, value, confidence] of candidates) {
+      const raw = String(value || '').trim();
+      if (!raw) continue;
+      const publishedAt = normalizeProviderDate(raw, base);
+      if (publishedAt) return { publishedAt, source, raw: raw.slice(0, 250), confidence };
     }
-    return null;
+    return { publishedAt: null, source: 'unknown', raw: null, confidence: 0 };
+  }
+
+  function normalizeProviderPublishedAt(item = {}) {
+    return getProviderPublicationDetails(item).publishedAt;
   }
 
   function normalizeProviderDate(value, baseValue) {
@@ -251,9 +270,11 @@ function createLeadRadarQuality(deps) {
     };
   }
 
-  function isEligibleAutomaticSignal(signal, { maxAgeDays = 30 } = {}) {
+  function isEligibleAutomaticSignal(signal, { maxAgeDays = 30, allowUnknownPublicationDate = true } = {}) {
     if (!isLikelyDirectPlatformPostUrl(signal.post_url || signal.source_url, signal.platform)) return false;
-    if (!isRecentPublication(signal.published_at, maxAgeDays)) return false;
+    const hasPublicationDate = Boolean(normalizeDate(signal.published_at));
+    if (!hasPublicationDate && !allowUnknownPublicationDate) return false;
+    if (hasPublicationDate && !isRecentPublication(signal.published_at, maxAgeDays)) return false;
     const classification = classifySignal(signal);
     return !classification.isProvider && !classification.isExcluded && classification.isWebsiteNeed;
   }
@@ -263,6 +284,7 @@ function createLeadRadarQuality(deps) {
     isEligibleAutomaticSignal,
     isLikelyDirectPlatformPostUrl,
     isRecentPublication,
+    getProviderPublicationDetails,
     normalizeProviderPublishedAt,
     searchExclusionTerms: SEARCH_EXCLUSION_TERMS,
   };
