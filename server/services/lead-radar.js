@@ -740,7 +740,7 @@ function createLeadRadarService(deps = {}) {
         source: 'business_listings',
       })).filter((candidate) => candidate.url)
       : [];
-    if (!candidateUrl && provider?.configured && typeof provider.search === 'function') {
+    if (!candidateUrl && business.business_match_status !== 'agency_detected' && provider?.configured && typeof provider.search === 'function') {
       const websiteQuery = buildWebsiteSearchQuery(signal);
       if (websiteQuery) {
         const items = await provider.search({ query: websiteQuery, maxResults: 10 });
