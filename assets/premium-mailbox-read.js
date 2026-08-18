@@ -373,10 +373,23 @@
       return action.isRoot ? mail : action.message;
     }
 
-    async function dismissReply(mail, hooks = {}) {
-      const target = getDismissTarget(mail);
+    function resolveDismissTarget(mail, requestedTarget) {
+      if (!requestedTarget) return null;
+      const requestedIdentity = getIdentity(requestedTarget);
+      const requestedKey = requestedIdentity ? getIdentityKey(requestedIdentity) : '';
+      if (!requestedKey || !mail) return requestedTarget;
+      return [mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])]
+        .find((candidate) => {
+          const identity = getIdentity(candidate);
+          return identity && getIdentityKey(identity) === requestedKey;
+        }) || requestedTarget;
+    }
+
+    async function dismissReplyTarget(mail, requestedTarget, hooks = {}) {
+      const conversation = mail || requestedTarget;
+      const target = resolveDismissTarget(mail, requestedTarget);
       if (!target || target.replyDismissedAt || target.replyDismissPending) return { ok: false };
-      const targets = getConversationTargets(mail);
+      const targets = getConversationTargets(conversation);
       if (!targets.includes(target)) targets.push(target);
       if (targets.some((candidate) => candidate.readPending || candidate.replyDismissPending || getStateFor(candidate)?.pending)) return { ok: false, pending: true };
       const snapshots = snapshotTargets(targets);
@@ -397,21 +410,21 @@
         targetKey,
         replyDismissedAt: optimisticReplyDismissedAt,
       });
-      render(hooks, mail, target);
+      render(hooks, conversation, target);
       const outcome = await persist(target, {
         dismissReply: true,
-        conversation: mail,
+        conversation,
         previous: { unread: previous.unread, replyDismissedAt: previous.replyDismissedAt },
       });
       if (outcome.ok && outcome.pending && outcome.record) {
         pendingOperations.set(outcome.record.mutationId, {
-          kind: 'dismiss', mail, target, targets, snapshots, previous, hooks, targetKey,
+          kind: 'dismiss', mail: conversation, target, targets, snapshots, previous, hooks, targetKey,
         });
         return { ok: true, pending: true, mutationId: outcome.record.mutationId };
       }
       clearPendingStates(targets);
       if (!outcome.ok || !outcome.result?.replyDismissedAt) {
-        setFailure(target, previous, outcome.error || new Error('Gelezen status opslaan mislukt'), hooks, mail, snapshots, { dismissReply: true, targetKey });
+        setFailure(target, previous, outcome.error || new Error('Gelezen status opslaan mislukt'), hooks, conversation, snapshots, { dismissReply: true, targetKey });
         return { ok: false, error: outcome.error };
       }
       targets.forEach((candidate) => {
@@ -422,9 +435,13 @@
       target.replyDismissPending = false;
       target.replyDismissedAt = outcome.result.replyDismissedAt;
       rememberConfirmedStates(targets, outcome.result, { dismissReply: true, targetKey });
-      render(hooks, mail, target);
+      render(hooks, conversation, target);
       options.toast?.('Gesprek als gelezen afgehandeld');
       return { ok: true, result: outcome.result };
+    }
+
+    function dismissReply(mail, hooks = {}) {
+      return dismissReplyTarget(mail, getDismissTarget(mail), hooks);
     }
 
     function rememberOutboxRecord(record, type, detail = {}) {
@@ -591,6 +608,7 @@
 
     return {
       dismissReply,
+      dismissReplyTarget,
       getIdentity,
       getConversationTargets,
       markRead,

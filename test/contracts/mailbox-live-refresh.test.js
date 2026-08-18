@@ -618,7 +618,7 @@ test('outreach refresh toont IMAP-mail voordat de Instantly-provider start', asy
   controller.destroy();
 });
 
-test('refresh status is exclusive while active, successful, partial and failed', async () => {
+test('foreground refresh status is exclusive while active, successful, partial and failed', async () => {
   const ageLabel = {
     textContent: '',
     attributes: {},
@@ -648,12 +648,13 @@ test('refresh status is exclusive while active, successful, partial and failed',
     clearTimeout() {},
   });
 
+  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
   assert.equal(await controller.refresh(), true);
   assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   assert.match(ageLabel.attributes.title, /^Laatste volledige providercontrole voor serve:/);
 
   mode = 'pending';
-  const pendingRefresh = controller.refresh();
+  const pendingRefresh = controller.refresh({ manual: true });
   await Promise.resolve();
   assert.equal(ageLabel.textContent, 'Controleren…');
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
@@ -672,6 +673,96 @@ test('refresh status is exclusive while active, successful, partial and failed',
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
   assert.match(ageLabel.attributes.title, /Tijdelijke verbindingsstoring/);
   assert.doesNotMatch(ageLabel.textContent, /mislukt/i);
+  controller.destroy();
+});
+
+test('background poll blijft stil en een handmatige overlap coalescet naar dezelfde request', async () => {
+  const ageLabel = {
+    textContent: '', attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  const button = {
+    disabled: false, attributes: {},
+    classList: { values: new Set(), toggle(name, active) { active ? this.values.add(name) : this.values.delete(name); } },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener() {},
+  };
+  let release;
+  let requestCount = 0;
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    button,
+    getFolder: () => 'inbox',
+    getAccount: () => 'martijn@softora.nl',
+    fetch: () => {
+      requestCount += 1;
+      return new Promise((resolve) => { release = resolve; });
+    },
+    loadMessages: async () => true,
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  const background = controller.refresh();
+  await Promise.resolve();
+  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
+  assert.equal(button.disabled, false);
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 1, status: 'idle' });
+
+  const foreground = controller.refresh({ manual: true });
+  assert.equal(foreground, background);
+  assert.equal(requestCount, 1);
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(button.disabled, true);
+  assert.equal(controller.snapshot().foregroundInFlight, 1);
+
+  release(successfulResponse());
+  assert.equal(await foreground, true);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(button.disabled, false);
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
+  controller.destroy();
+});
+
+test('handmatige provider-timeout ruimt foreground token en spinner direct in finally op', async () => {
+  const timeoutHandlers = [];
+  const ageLabel = { textContent: '', setAttribute() {} };
+  const button = {
+    disabled: false,
+    classList: { toggle() {} },
+    setAttribute() {}, addEventListener() {},
+  };
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    button,
+    getFolder: () => 'inbox',
+    getAccount: () => 'martijn@softora.nl',
+    fetch: (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    }),
+    setTimeout(handler, delay) {
+      if (delay === refreshModule.REFRESH_REQUEST_TIMEOUT_MS) timeoutHandlers.push(handler);
+      return timeoutHandlers.length || 1;
+    },
+    clearTimeout() {},
+  });
+
+  const pending = controller.refresh({ manual: true });
+  await Promise.resolve();
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(button.disabled, true);
+  assert.equal(timeoutHandlers.length, 1);
+  timeoutHandlers[0]();
+  assert.equal(await pending, false);
+  assert.equal(button.disabled, false);
+  assert.equal(ageLabel.textContent, 'Opnieuw verbinden…');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'recovering' });
   controller.destroy();
 });
 
@@ -766,6 +857,8 @@ test('achtergrondrefresh wacht wanneer een user-detailrequest actief is', async 
 
 test('nieuwe detailselectie onderbreekt lopende achtergrondproviderrefresh', async () => {
   const windowListeners = new Map();
+  const timers = [];
+  const ageLabel = { textContent: '', setAttribute() {} };
   let requestSignal;
   const windowRef = {
     addEventListener(event, handler) { windowListeners.set(event, handler); },
@@ -774,6 +867,7 @@ test('nieuwe detailselectie onderbreekt lopende achtergrondproviderrefresh', asy
   const controller = refreshModule.create({
     autoStart: false,
     window: windowRef,
+    ageLabel,
     document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
     getFolder: () => 'outreach',
     getOwner: () => 'serve',
@@ -781,17 +875,22 @@ test('nieuwe detailselectie onderbreekt lopende achtergrondproviderrefresh', asy
       requestSignal = init.signal;
       init.signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error); }, { once: true });
     }),
-    setTimeout: () => 1,
+    setTimeout: (_handler, delay) => { timers.push(delay); return timers.length; },
     clearTimeout() {},
     setInterval: () => 1,
     clearInterval() {},
   });
   controller.start();
+  timers.length = 0;
   const refresh = controller.refresh();
   await Promise.resolve();
   windowListeners.get('softora:mailbox-detail-priority')();
   assert.equal(requestSignal.aborted, true);
   assert.equal(await refresh, false);
+  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'idle' });
+  assert.equal(timers.includes(0), false);
+  assert.equal(timers.at(-1), 1500);
   controller.destroy();
 });
 

@@ -211,9 +211,10 @@
   }
 
   function getReceivedTimestamp(mail) {
-    const value = mail && (mail.latestInboundAt || mail.activityAt || mail.receivedAt || mail.internalDate || mail.date);
-    const timestamp = Date.parse(value || '');
-    return Number.isFinite(timestamp) ? timestamp : 0;
+    return [mail?.activityAt, mail?.latestInboundAt, mail?.latestOutboundAt, mail?.receivedAt, mail?.internalDate, mail?.date]
+      .map((value) => Date.parse(value || ''))
+      .filter(Number.isFinite)
+      .sort((left, right) => right - left)[0] || 0;
   }
 
   function getMessageTimestamp(mail) {
@@ -391,10 +392,13 @@
         .map((message) => message.receivedAt || message.internalDate || message.date)
         .filter((value) => Number.isFinite(Date.parse(value || '')))
         .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || primary.latestOutboundAt || '';
+      const activityAt = [latestInboundAt, latestOutboundAt]
+        .filter((value) => Number.isFinite(Date.parse(value || '')))
+        .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || latestInboundAt;
       return {
         ...primary,
         conversationId,
-        activityAt: latestInboundAt,
+        activityAt,
         latestInboundAt,
         latestOutboundAt,
         unread: groupedMessages.some((message) => Boolean(message && message.unread)),
@@ -456,7 +460,11 @@
     const mailboxId = String(message.mailboxId || message.id || mail && mail.id || '').trim();
     const accountEmail = normalizeEmail(message.accountEmail || mail && mail.accountEmail);
     const receivedAtValue = message.receivedAt || message.date || mail && mail.receivedAt;
-    const activityAtValue = message.latestInboundAt || receivedAtValue || message.activityAt;
+    const latestInboundAtValue = message.latestInboundAt || receivedAtValue;
+    const latestOutboundAtValue = message.latestOutboundAt || '';
+    const activityAtValue = [message.activityAt, latestInboundAtValue, latestOutboundAtValue]
+      .filter((value) => Number.isFinite(Date.parse(value || '')))
+      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || latestInboundAtValue;
     return {
       ...mail,
       id: accountEmail && mailboxId ? `${accountEmail}|${mailboxId}` : (mail && mail.id) || mailboxId,
@@ -468,11 +476,11 @@
       activityAt: Number.isFinite(Date.parse(activityAtValue || ''))
         ? new Date(activityAtValue).toISOString()
         : '',
-      latestInboundAt: Number.isFinite(Date.parse(activityAtValue || ''))
-        ? new Date(activityAtValue).toISOString()
+      latestInboundAt: Number.isFinite(Date.parse(latestInboundAtValue || ''))
+        ? new Date(latestInboundAtValue).toISOString()
         : '',
-      latestOutboundAt: Number.isFinite(Date.parse(message.latestOutboundAt || ''))
-        ? new Date(message.latestOutboundAt).toISOString()
+      latestOutboundAt: Number.isFinite(Date.parse(latestOutboundAtValue || ''))
+        ? new Date(latestOutboundAtValue).toISOString()
         : '',
       provider: String(message.provider || mail && mail.provider || '').trim().toLowerCase(),
       providerMessageId: String(message.providerMessageId || '').trim(),
