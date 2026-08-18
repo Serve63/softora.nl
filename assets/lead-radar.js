@@ -15,6 +15,14 @@
     website_not_checked: 'NOG NIET GECONTROLEERD', provider_unavailable: 'CONTROLE NIET BESCHIKBAAR',
   };
   const leadLabels = { new: 'Nieuw', relevant: 'Relevant', not_relevant: 'Niet relevant', follow_up: 'Later opvolgen', archived: 'Gearchiveerd' };
+  const rejectionLabels = { provider_or_showcase: 'webbouwer/showcase', excluded_content: 'uitgesloten inhoud', not_buyer_request: 'geen kopersvraag', not_direct_post: 'geen directe post', missing_publication_date: 'geen publicatiedatum', outside_date_window: 'buiten periode', source_not_available: 'bron niet bereikbaar', unsupported_platform: 'platform niet ondersteund' };
+  function scanRejectionSummary(run) {
+    const reasons = run.rejection_reasons || (run.used_queries || []).reduce((all, query) => {
+      Object.entries(query.rejectionReasons || {}).forEach(([reason, count]) => { all[reason] = (all[reason] || 0) + (Number(count) || 0); });
+      return all;
+    }, {});
+    return Object.entries(reasons).sort((left, right) => Number(right[1]) - Number(left[1])).slice(0, 3).map(([reason, count]) => `${rejectionLabels[reason] || reason}: ${count}`).join(' · ');
+  }
 
   async function api(path, options) {
     const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...options, headers: { 'Content-Type': 'application/json', ...(options && options.headers || {}) } });
@@ -123,7 +131,14 @@
     renderCoverage();
     const list = $('#runs-list');
     if (!state.runs.length) { list.innerHTML = '<div class="inbox-state">Nog geen scanruns.</div>'; return; }
-    list.innerHTML = state.runs.map((run) => { const total = Array.isArray(run.query_plan) ? run.query_plan.length : 0; const cursor = Number(run.query_cursor) || 0; const canResume = ['paused', 'running', 'completed_with_errors'].includes(run.status) && cursor < total; return `<div class="run-row"><div><strong>${escapeHtml(formatDate(run.started_at))}</strong><span>${escapeHtml(run.provider || 'onbekend')} · ${escapeHtml((run.platforms || []).join(', '))}</span></div><div>${cursor}/${total} zoekopdrachten</div><div>${Number(run.new_signal_count || 0)} nieuw</div><div>${Number(run.result_count || 0)} resultaten</div><div class="run-action"><span>${escapeHtml(run.status || 'onbekend')}</span>${canResume ? `<button class="button button-secondary" type="button" data-resume-run="${escapeHtml(run.id)}">Hervatten</button>` : ''}</div></div>`; }).join('');
+    list.innerHTML = state.runs.map((run) => {
+      const total = Array.isArray(run.query_plan) ? run.query_plan.length : 0;
+      const cursor = Number(run.query_cursor) || 0;
+      const accepted = Number(run.accepted_signal_count) || (Number(run.new_signal_count || 0) + Number(run.duplicate_count || 0));
+      const rejectionSummary = scanRejectionSummary(run);
+      const canResume = ['paused', 'running', 'completed_with_errors'].includes(run.status) && cursor < total;
+      return `<div class="run-row"><div><strong>${escapeHtml(formatDate(run.started_at))}</strong><span>${escapeHtml(run.provider || 'onbekend')} · ${escapeHtml((run.platforms || []).join(', '))}</span></div><div>${cursor}/${total} zoekopdrachten</div><div>${Number(run.result_count || 0)} ruwe · ${accepted} geschikt</div><div>${Number(run.new_signal_count || 0)} nieuw</div><div class="run-action"><span>${escapeHtml(run.status || 'onbekend')}</span>${canResume ? `<button class="button button-secondary" type="button" data-resume-run="${escapeHtml(run.id)}">Hervatten</button>` : ''}</div>${rejectionSummary ? `<small class="run-rejections">Afgewezen: ${escapeHtml(rejectionSummary)}</small>` : ''}</div>`;
+    }).join('');
   }
   function updateSelectionBar() { const bar = $('#bulk-bar'); bar.hidden = state.selected.size === 0; $('#selected-count').textContent = String(state.selected.size); }
 
@@ -137,8 +152,8 @@
       ? $('#scan-regions').value.split(',').map((value) => value.trim()).filter(Boolean)
       : [];
     const websiteLookupInput = Number($('#scan-website-limit').value);
-    const requestedQueries = Number($('#scan-max-queries').value) || 12;
-    const payload = { platforms, regionMode, regions, maxAgeDays: Number($('#scan-max-age-days').value) || 30, maxQueries: Math.min(12, Math.max(1, requestedQueries)), websiteLookupLimit: Number.isFinite(websiteLookupInput) ? websiteLookupInput : 10, ...(extra || {}) };
+    const requestedQueries = Number($('#scan-max-queries').value) || 50;
+    const payload = { platforms, regionMode, regions, maxAgeDays: Number($('#scan-max-age-days').value) || 30, maxQueries: Math.min(50, Math.max(1, requestedQueries)), websiteLookupLimit: Number.isFinite(websiteLookupInput) ? websiteLookupInput : 10, ...(extra || {}) };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan wordt uitgevoerd...'; $('#scan-progress-bar').style.width = '15%';
     try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-bar').style.width = '100%'; $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals(), loadRuns()]); }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
