@@ -34,6 +34,7 @@ const DEFAULT_LEAD_RADAR_SUPABASE_TIMEOUT_MS = 10_000;
 
 const KEYWORD_GROUPS = Object.freeze({
   direct_website: [
+    'ik zoek iemand voor mijn website', 'wij zoeken iemand voor onze website', 'wie kan een website maken voor mijn bedrijf', 'websitebouwer gezocht voor mijn bedrijf', 'webdesigner gezocht voor mijn bedrijf', 'website nodig voor mijn bedrijf', 'website opdracht ondernemer',
     'websitebouwer gezocht', 'webdesigner gezocht', 'webdeveloper gezocht',
     'website laten maken', 'website laten bouwen', 'nieuwe website nodig', 'nieuwe site nodig',
     'website laten doen', 'website hulp gezocht', 'hulp met website',
@@ -43,7 +44,7 @@ const KEYWORD_GROUPS = Object.freeze({
     'website voor mijn zaak', 'website voor mijn vereniging',
     'webdesign gezocht', 'website offerte', 'website nodig',
     'aanbeveling websitebouwer', 'kent iemand een goede webdesigner', 'iemand voor mijn website',
-    'iemand nodig voor website', 'ik zoek iemand voor mijn website', 'wij zoeken iemand voor onze website', 'wie kan een website maken voor mijn bedrijf', 'websitebouwer gezocht voor mijn bedrijf', 'webdesigner gezocht voor mijn bedrijf', 'website nodig voor mijn bedrijf', 'website opdracht ondernemer',
+    'iemand nodig voor website',
   ],
   renew_or_repair: [
     'website vernieuwen', 'website moderniseren', 'bestaande website vernieuwen',
