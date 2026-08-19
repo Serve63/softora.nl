@@ -55,7 +55,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819b/);
-  assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260819a/);
+  assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260819b/);
   assert.match(bootstrapScriptSource, /remoteBootstrapVersion/);
   assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
   assert.match(bootstrapScriptSource, /localDay\.orders\.length > 0/);
@@ -66,7 +66,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819c/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819d/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -92,6 +92,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.doesNotMatch(scriptSource, /\/api\/sportschool-logboek['"]/);
   assert.match(scriptSource, /PUBLIC_BOOTSTRAP_URL = '\/api\/sportschool-logboek-public'/);
   assert.match(scriptSource, /SoftoraSportschoolLogbookBootstrap/);
+  assert.match(scriptSource, /readRemoteSnapshotValue\(payload\?\.values\)/);
+  assert.match(bootstrapScriptSource, /REMOTE_STORAGE_KEY = 'sportschool_logboek_v1'/);
+  assert.match(bootstrapScriptSource, /LOCAL_STORAGE_KEY = 'softora_sportschool_logboek_v1'/);
   assert.match(scriptSource, /remoteBootstrapVersion/);
   assert.match(scriptSource, /snapshotHasExercisesForDay/);
   assert.match(scriptSource, /mergeRemoteSnapshot\(remoteSnapshot, localSnapshot\)/);
