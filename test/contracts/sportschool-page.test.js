@@ -22,6 +22,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   const manifestPath = path.join(__dirname, '../../assets/sportschool-logboek.webmanifest');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
+  const bootstrapScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-bootstrap.js'), 'utf8');
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
   const inputScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-input.js'), 'utf8');
   const stateScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-state.js'), 'utf8');
@@ -54,6 +55,10 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819b/);
+  assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260819a/);
+  assert.match(bootstrapScriptSource, /remoteBootstrapVersion/);
+  assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
+  assert.match(bootstrapScriptSource, /localDay\.orders\.length > 0/);
   assert.doesNotMatch(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.doesNotMatch(pageSource, /sportschool-logboek-sync\.js/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-supabase-config\.js/);
@@ -61,7 +66,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819b/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819c/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -86,6 +91,10 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.doesNotMatch(scriptSource, /SoftoraUiStateClient/);
   assert.doesNotMatch(scriptSource, /\/api\/sportschool-logboek['"]/);
   assert.match(scriptSource, /PUBLIC_BOOTSTRAP_URL = '\/api\/sportschool-logboek-public'/);
+  assert.match(scriptSource, /SoftoraSportschoolLogbookBootstrap/);
+  assert.match(scriptSource, /remoteBootstrapVersion/);
+  assert.match(scriptSource, /snapshotHasExercisesForDay/);
+  assert.match(scriptSource, /mergeRemoteSnapshot\(remoteSnapshot, localSnapshot\)/);
   assert.match(scriptSource, /scheduleLocalSave/);
   assert.match(scriptSource, /persistLocalState/);
   assert.match(scriptSource, /normalizeFormHistory/);
@@ -118,7 +127,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /createDefaultState/);
   assert.match(scriptSource, /function boot/);
   assert.match(scriptSource, /loadLocalState\(\)/);
-  assert.match(scriptSource, /loadRemoteState\(\)/);
+  assert.match(scriptSource, /loadRemoteState\(localState\.snapshot\)/);
   assert.match(scriptSource, /cache: 'no-store'/);
   assert.doesNotMatch(scriptSource, /render\(\);\s*loadLocalState\(\);/);
   assert.match(scriptSource, /dayChoiceTitle/);
