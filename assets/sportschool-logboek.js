@@ -1,5 +1,6 @@
 (() => {
   const LOCAL_STORAGE_KEY = 'softora_sportschool_logboek_v1';
+  const PUBLIC_BOOTSTRAP_URL = '/api/sportschool-logboek-public';
   const LOCAL_SAVE_DELAY_MS = 150;
   const REORDER_START_THRESHOLD = 6;
   const DRAFT_EXERCISE_TITLE = 'NIEUWE OEFENING';
@@ -44,6 +45,7 @@
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
+  const loadStatusMessage = app.querySelector('[data-logbook-status]');
   const dayTrigger = app.querySelector('[data-day-trigger]');
   const dayPicker = app.querySelector('[data-day-picker]');
   const dayGrid = app.querySelector('[data-day-grid]');
@@ -57,6 +59,7 @@
   let stateRevision = 0;
   let lastSavedRevision = 0;
   let logbookState = createDefaultState();
+  let logbookLoadStatus = 'loading';
   let cleanedLegacyNotesDuringLoad = false;
   let shouldPersistLoadedSnapshot = false;
   let lastRenderedDateKey = currentDateKey();
@@ -409,6 +412,13 @@
     }
   }
 
+  function snapshotHasExercises(snapshot) {
+    return STORAGE_DAYS.some((day) => {
+      const orders = snapshot?.days?.[day]?.orders;
+      return Array.isArray(orders) && orders.length > 0;
+    });
+  }
+
   function applyStoredSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return false;
     isApplyingStoredState = true;
@@ -498,7 +508,29 @@
     lastSavedRevision = 0;
     pendingLocalSave = false;
     if (cleanedLegacyNotesDuringLoad) shouldPersistLoadedSnapshot = true;
-    return true;
+    return {
+      snapshot,
+      hasExercises: snapshotHasExercises(snapshot),
+    };
+  }
+
+  async function loadRemoteState() {
+    try {
+      const response = await window.fetch(PUBLIC_BOOTSTRAP_URL, {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      const payload = await response.json().catch(() => null);
+      const remoteSnapshot = parseStoredSnapshot(payload?.values?.[LOCAL_STORAGE_KEY]);
+      if (!response.ok || !payload?.ok || !remoteSnapshot) return false;
+      if (!applyStoredSnapshot(remoteSnapshot)) return false;
+      shouldPersistLoadedSnapshot = true;
+      return true;
+    } catch (_error) {
+      return false;
+    }
   }
 
   function scheduleLocalSave() {
@@ -908,7 +940,15 @@
     const exercises = readOrders(selectedDay).map((order) => readExercise(selectedDay, order));
 
     list.replaceChildren(...exercises.map((exercise) => createExerciseCard(selectedDay, exercise)));
-    restDay.hidden = exercises.length > 0;
+    if (loadStatusMessage) {
+      loadStatusMessage.dataset.state = logbookLoadStatus;
+      loadStatusMessage.hidden = logbookLoadStatus === 'ready';
+      loadStatusMessage.textContent =
+        logbookLoadStatus === 'error'
+          ? 'LOGBOEK KON NIET WORDEN GELADEN.'
+          : 'LOGBOEK LADEN...';
+    }
+    restDay.hidden = logbookLoadStatus !== 'ready' || exercises.length > 0;
     restDay.textContent = `${title} IS EEN RUSTDAG`;
     renderDayChoices();
     lastRenderedDateKey = currentDateKey();
@@ -928,6 +968,7 @@
 
   addButton.addEventListener('click', () => {
     if (!isReady) return;
+    logbookLoadStatus = 'ready';
     const orders = readOrders(selectedDay);
     const nextOrder = Math.max(100, ...orders) + 1;
     saveOrders(selectedDay, [...orders, nextOrder], { silent: true });
@@ -945,8 +986,14 @@
   });
   window.addEventListener('pagehide', flushLocalSave);
 
-  function boot() {
-    loadLocalState();
+  async function boot() {
+    const localState = loadLocalState();
+    if (!localState.hasExercises) {
+      const remoteLoaded = await loadRemoteState();
+      logbookLoadStatus = remoteLoaded ? 'ready' : 'error';
+    } else {
+      logbookLoadStatus = 'ready';
+    }
     isReady = true;
     addButton.disabled = false;
     render();
@@ -956,5 +1003,10 @@
     }
   }
 
-  boot();
+  boot().catch(() => {
+    logbookLoadStatus = 'error';
+    isReady = true;
+    addButton.disabled = false;
+    render();
+  });
 })();

@@ -254,6 +254,29 @@ test('sportschool logboek route weigert anonieme reads en writes', async () => {
   assert.equal(invalidResult.body.values, undefined);
 });
 
+test('publieke sportschool logboek bootstrap leest alleen de canonieke snapshot', async () => {
+  const readResult = await getJson('/api/sportschool-logboek-public');
+  assert.ok([200, 503].includes(readResult.response.status));
+  assert.equal(readResult.response.headers.get('cache-control'), 'no-store');
+  assert.equal(
+    readResult.response.headers.get('x-robots-tag'),
+    'noindex, nofollow, noarchive, nosnippet'
+  );
+  if (readResult.response.status === 200) {
+    assert.equal(readResult.body.ok, true);
+    assert.equal(readResult.body.scope, 'sportschool_logboek');
+    assert.equal(typeof readResult.body.values?.sportschool_logboek_v1, 'string');
+  } else {
+    assert.equal(readResult.body.ok, false);
+    assert.equal(readResult.body.values, undefined);
+  }
+
+  const authState = await getJson('/api/auth/session');
+  const writeResult = await postJson('/api/sportschool-logboek-public', {});
+  assert.equal(writeResult.response.status, authState.body?.configured ? 401 : 503);
+  assert.equal(writeResult.body.values, undefined);
+});
+
 test('active order routes keep their auth boundaries and validation contracts', async () => {
   const generateResult = await postProtectedApiExpectation(
     '/api/active-orders/generate-site',

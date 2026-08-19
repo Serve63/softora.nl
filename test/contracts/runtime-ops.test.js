@@ -482,6 +482,46 @@ test('runtime ops coordinator leest sportschool logboek primair uit formele spor
   assert.equal(legacyRead, true);
 });
 
+test('runtime ops coordinator biedt een read-only publieke bootstrap zonder legacy-fallback', async () => {
+  const snapshot = {
+    version: 2,
+    days: {
+      wednesday: {
+        orders: [1],
+        exercises: { 1: { title: 'Chest Press', kg: '82' } },
+      },
+    },
+  };
+  let writes = 0;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      throw new Error('publieke bootstrap mag legacy UI-state niet lezen');
+    },
+    sportschoolLogbookStore: {
+      readLogbookState: async () => ({
+        values: { sportschool_logboek_v1: JSON.stringify(snapshot) },
+        source: 'supabase:sportschool',
+        updatedAt: '2026-08-19T12:35:33.380Z',
+      }),
+      writeLogbookSnapshot: async () => {
+        writes += 1;
+        return null;
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookPublicGetResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], 'no-store');
+  assert.equal(res.headers['X-Robots-Tag'], 'noindex, nofollow, noarchive, nosnippet');
+  assert.equal(res.body.source, 'supabase:sportschool-public');
+  assert.deepEqual(Object.keys(res.body.values), ['sportschool_logboek_v1']);
+  assert.deepEqual(JSON.parse(res.body.values.sportschool_logboek_v1), snapshot);
+  assert.equal(writes, 0);
+});
+
 test('runtime ops coordinator herstelt nieuwer legacy sportschool logboek naar formele tabel', async () => {
   const recovered = [];
   const { coordinator } = createFixture({

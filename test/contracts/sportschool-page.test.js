@@ -53,7 +53,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819b/);
   assert.doesNotMatch(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.doesNotMatch(pageSource, /sportschool-logboek-sync\.js/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-supabase-config\.js/);
@@ -61,11 +61,12 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819b/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
   assert.match(pageSource, /data-exercise-list/);
+  assert.match(pageSource, /data-logbook-status/);
   assert.doesNotMatch(pageSource, /<script>[\s\S]*<\/script>/i);
   assert.match(stylesSource, /font-family: Oswald/);
   assert.match(stylesSource, /html\s*\{[\s\S]*?overflow-y: auto;[\s\S]*?-webkit-overflow-scrolling: touch;/);
@@ -83,7 +84,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.doesNotMatch(scriptSource, /\/rest\/v1\//);
   assert.doesNotMatch(scriptSource, /getDirectSupabaseConfig/);
   assert.doesNotMatch(scriptSource, /SoftoraUiStateClient/);
-  assert.doesNotMatch(scriptSource, /\/api\/sportschool-logboek/);
+  assert.doesNotMatch(scriptSource, /\/api\/sportschool-logboek['"]/);
+  assert.match(scriptSource, /PUBLIC_BOOTSTRAP_URL = '\/api\/sportschool-logboek-public'/);
   assert.match(scriptSource, /scheduleLocalSave/);
   assert.match(scriptSource, /persistLocalState/);
   assert.match(scriptSource, /normalizeFormHistory/);
@@ -116,6 +118,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /createDefaultState/);
   assert.match(scriptSource, /function boot/);
   assert.match(scriptSource, /loadLocalState\(\)/);
+  assert.match(scriptSource, /loadRemoteState\(\)/);
+  assert.match(scriptSource, /cache: 'no-store'/);
   assert.doesNotMatch(scriptSource, /render\(\);\s*loadLocalState\(\);/);
   assert.match(scriptSource, /dayChoiceTitle/);
   assert.match(scriptSource, /day\.id === currentWeekday\(\) \? 'Vandaag' : day\.title/);
