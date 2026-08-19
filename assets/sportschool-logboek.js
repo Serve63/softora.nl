@@ -41,7 +41,9 @@
   const logbookStateApi = window.SoftoraSportschoolLogbookState;
   const logbookInputApi = window.SoftoraSportschoolLogbookInput;
   const logbookGestureApi = window.SoftoraSportschoolLogbookGesture;
-  if (!logbookStateApi || !logbookInputApi || !logbookGestureApi) return;
+  const logbookBootstrapApi = window.SoftoraSportschoolLogbookBootstrap;
+  if (!logbookStateApi || !logbookInputApi || !logbookGestureApi || !logbookBootstrapApi) return;
+  const REMOTE_BOOTSTRAP_VERSION = logbookBootstrapApi.VERSION;
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
@@ -60,6 +62,7 @@
   let lastSavedRevision = 0;
   let logbookState = createDefaultState();
   let logbookLoadStatus = 'loading';
+  let remoteBootstrapVersion = 0;
   let cleanedLegacyNotesDuringLoad = false;
   let shouldPersistLoadedSnapshot = false;
   let lastRenderedDateKey = currentDateKey();
@@ -393,12 +396,16 @@
       if (sources[exerciseKey]) exerciseSources[exerciseKey] = normalizeExerciseSource('monday', 0, sources[exerciseKey]);
     });
 
-    return {
+    const snapshot = {
       version: 2,
       updatedAt: new Date().toISOString(),
       exerciseSources,
       days,
     };
+    if (remoteBootstrapVersion === REMOTE_BOOTSTRAP_VERSION) {
+      snapshot.remoteBootstrapVersion = REMOTE_BOOTSTRAP_VERSION;
+    }
+    return snapshot;
   }
 
   function parseStoredSnapshot(raw) {
@@ -417,6 +424,11 @@
       const orders = snapshot?.days?.[day]?.orders;
       return Array.isArray(orders) && orders.length > 0;
     });
+  }
+
+  function snapshotHasExercisesForDay(snapshot, day) {
+    const orders = snapshot?.days?.[storageDay(day)]?.orders;
+    return Array.isArray(orders) && orders.length > 0;
   }
 
   function applyStoredSnapshot(snapshot) {
@@ -498,6 +510,9 @@
     cleanedLegacyNotesDuringLoad = false;
     shouldPersistLoadedSnapshot = false;
     const snapshot = readLocalSnapshot();
+    remoteBootstrapVersion = Number(snapshot?.remoteBootstrapVersion) === REMOTE_BOOTSTRAP_VERSION
+      ? REMOTE_BOOTSTRAP_VERSION
+      : 0;
     if (snapshot) {
       applyStoredSnapshot(snapshot);
     } else {
@@ -514,7 +529,7 @@
     };
   }
 
-  async function loadRemoteState() {
+  async function loadRemoteState(localSnapshot) {
     try {
       const response = await window.fetch(PUBLIC_BOOTSTRAP_URL, {
         method: 'GET',
@@ -525,7 +540,9 @@
       const payload = await response.json().catch(() => null);
       const remoteSnapshot = parseStoredSnapshot(payload?.values?.[LOCAL_STORAGE_KEY]);
       if (!response.ok || !payload?.ok || !remoteSnapshot) return false;
-      if (!applyStoredSnapshot(remoteSnapshot)) return false;
+      const hydratedSnapshot = logbookBootstrapApi.mergeRemoteSnapshot(remoteSnapshot, localSnapshot);
+      if (!applyStoredSnapshot(hydratedSnapshot)) return false;
+      remoteBootstrapVersion = REMOTE_BOOTSTRAP_VERSION;
       shouldPersistLoadedSnapshot = true;
       return true;
     } catch (_error) {
@@ -988,9 +1005,9 @@
 
   async function boot() {
     const localState = loadLocalState();
-    if (!localState.hasExercises) {
-      const remoteLoaded = await loadRemoteState();
-      logbookLoadStatus = remoteLoaded ? 'ready' : 'error';
+    if (!localState.remoteBootstrapVersion) {
+      const remoteLoaded = await loadRemoteState(localState.snapshot);
+      logbookLoadStatus = remoteLoaded || snapshotHasExercisesForDay(localState.snapshot, selectedDay) ? 'ready' : 'error';
     } else {
       logbookLoadStatus = 'ready';
     }
