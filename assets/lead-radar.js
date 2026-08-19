@@ -22,6 +22,8 @@
   function renderProviderStatus() {
     const banner = $('#provider-banner');
     const provider = state.status && state.status.provider;
+    const lastRun = state.status && state.status.lastRun;
+    const providerBlocked = provider?.configured && lastRun?.status === 'provider_unavailable';
     const scanButton = $('#scan-button');
     if (scanButton) {
       scanButton.disabled = !provider || !provider.configured;
@@ -29,9 +31,11 @@
         ? ''
         : 'Configureer de DataForSEO-provider om scans te starten.';
     }
-    if (!banner || !provider || provider.configured) { if (banner) banner.hidden = true; return; }
+    if (!banner || !provider || (provider.configured && !providerBlocked)) { if (banner) banner.hidden = true; return; }
     banner.hidden = false;
-    banner.innerHTML = `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Websitecontrole van bestaande leads blijft beschikbaar.</span>`;
+    banner.innerHTML = providerBlocked
+      ? `<strong>DataForSEO heeft de laatste scan geblokkeerd</strong><span>${escapeHtml(lastRun.last_error || 'Controleer het DataForSEO-account en saldo.')} Er zijn geen geldige Facebook- of LinkedIn-resultaten uit die ronde opgeslagen.</span>`
+      : `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Websitecontrole van bestaande leads blijft beschikbaar.</span>`;
   }
 
   function getLeadTitle(signal = {}) {
@@ -118,7 +122,16 @@
     const maxAgeDays = Number($('#scan-max-age-days').dataset.value) || 30;
     const payload = { platforms, regionMode, regions: [], maxAgeDays };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan bezig — resultaten worden na afloop bijgewerkt.';
-    try { const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) }); $('#scan-progress-label').textContent = body.run?.status === 'provider_unavailable' ? 'Provider niet geconfigureerd.' : 'Scan afgerond.'; await Promise.all([loadStatus(), loadSignals()]); }
+    try {
+      const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) });
+      const run = body.run || {};
+      const facebook = run.platform_stats?.facebook || {};
+      const linkedin = run.platform_stats?.linkedin || {};
+      $('#scan-progress-label').textContent = run.status === 'provider_unavailable'
+        ? (run.last_error || 'DataForSEO heeft de scan geblokkeerd.')
+        : `Scan afgerond. Facebook: ${Number(facebook.verified || 0)} bevestigd. LinkedIn: ${Number(linkedin.verified || 0)} bevestigd. ${Number(run.rejected_count || 0) + Number(run.unverified_count || 0)} niet getoond na broncontrole.`;
+      await Promise.all([loadStatus(), loadSignals()]);
+    }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
     finally {
       button.disabled = !state.status?.provider?.configured;

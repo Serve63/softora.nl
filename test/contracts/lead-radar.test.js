@@ -8,6 +8,7 @@ const {
   buildSearchPlan,
   buildSignalFromProviderItem,
   classifySignal,
+  createDataForSeoProvider,
   getPublicPagePublicationDetails,
   createLeadRadarService,
   hasCompletedInitialBackfill,
@@ -17,6 +18,12 @@ const {
   normalizePlatform,
   scoreSignal,
 } = require('../../server/services/lead-radar');
+const {
+  contentMatchScore,
+  createLeadRadarSourceVerifier,
+  decodeHtml,
+  extractPostId,
+} = require('../../server/services/lead-radar-source');
 const { registerLeadRadarRoutes } = require('../../server/routes/lead-radar');
 const { createLeadRadarEnrichment } = require('../../server/services/lead-radar-enrichment');
 
@@ -38,6 +45,7 @@ test('Lead Radar bouwt kleine Facebook- en LinkedIn-queryfamilies met regionale 
   assert.ok(nationwide.length > 20);
   assert.ok(nationwide.some((item) => item.query.startsWith('site:facebook.com')));
   assert.ok(nationwide.some((item) => item.query.includes('site:linkedin.com/posts')));
+  assert.ok(nationwide.filter((item) => item.platform === 'linkedin').every((item) => !item.query.includes('feed/update')));
   assert.deepEqual(new Set(nationwide.slice(0, 2).map((item) => item.platform)), new Set(['facebook', 'linkedin']));
   assert.ok(nationwide.every((item) => !item.query.includes('instagram')));
   assert.ok(nationwide.every((item) => item.query.includes('-marketingbureau')));
@@ -53,6 +61,50 @@ test('Lead Radar bouwt kleine Facebook- en LinkedIn-queryfamilies met regionale 
 
   const recent = buildSearchPlan({ platforms: ['facebook'], regions: ['Nederland'], keywordGroups: ['direct_website'], maxAgeDays: 7 });
   assert.ok(recent.every((item) => / after:\d{4}-\d{2}-\d{2}$/.test(item.query)));
+});
+
+test('Lead Radar accepteert alleen organische DataForSEO-resultaten en meldt betaalblokkades eerlijk', async () => {
+  const responses = [
+    {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status_code: 20000,
+        status_message: 'Ok.',
+        tasks: [{
+          status_code: 20000,
+          status_message: 'Ok.',
+          result: [{
+            datetime: '2026-08-19T10:00:00Z',
+            items: [
+              { type: 'organic', url: 'https://www.linkedin.com/posts/softora_website-123', title: 'Softora', description: 'Wij zoeken iemand voor onze website.' },
+              { type: 'people_also_ask', url: 'https://www.facebook.com/groups/example/posts/2', title: 'Vraag', description: 'Geen organisch resultaat.' },
+            ],
+          }],
+        }],
+      }),
+    },
+    {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status_code: 20000,
+        status_message: 'Ok.',
+        tasks: [{ status_code: 40200, status_message: 'Payment Required.', result: null }],
+      }),
+    },
+  ];
+  const provider = createDataForSeoProvider({
+    env: { LEAD_RADAR_DATAFORSEO_LOGIN: 'login', LEAD_RADAR_DATAFORSEO_PASSWORD: 'password' },
+    fetchImpl: async () => responses.shift(),
+  });
+  const items = await provider.search({ query: 'site:linkedin.com/posts "website gezocht" Nederland' });
+  assert.equal(items.length, 1);
+  assert.match(items[0].url, /linkedin\.com\/posts/);
+  await assert.rejects(
+    provider.search({ query: 'site:facebook.com "website gezocht" Nederland' }),
+    (error) => error.message === 'Payment Required.' && error.fatal === true && Number(error.providerStatusCode) === 40200
+  );
 });
 
 test('Lead Radar scoreert directe en recente websitevragen hoger', () => {
@@ -216,6 +268,67 @@ test('Lead Radar haalt de publicatiedatum uit openbare postmetadata wanneer SERP
   );
   assert.equal(jsonLd.publishedAt, '2026-08-16T09:00:00.000Z');
   assert.equal(jsonLd.source, 'post_jsonld');
+});
+
+test('Lead Radar bevestigt dat posttekst, directe URL en publicatiedatum bij elkaar horen', async () => {
+  const sourceUrl = 'https://www.facebook.com/groups/2998390776854288/posts/28421724800760869';
+  const expected = 'Is er iemand die een website kan maken voor me? Gaat om beauty en het boeken van afspraken.';
+  const verifier = createLeadRadarSourceVerifier({
+    normalizeHttpUrl,
+    getPublicPagePublicationDetails,
+    fetchImpl: async () => ({
+      status: 200,
+      text: async () => `<html><head>
+        <link rel="canonical" href="${sourceUrl}">
+        <meta property="og:description" content="${expected}">
+        <meta property="article:published_time" content="2026-08-18T09:15:00Z">
+      </head></html>`,
+    }),
+  });
+  const result = await verifier.verifyPublicSource(sourceUrl, { expectedText: expected });
+  assert.equal(result.status, 'verified');
+  assert.equal(result.publication.publishedAt, '2026-08-18T09:15:00.000Z');
+  assert.equal(result.postId, 'facebook:28421724800760869');
+  assert.ok(result.contentMatchScore >= 90);
+});
+
+test('Lead Radar weigert een aantrekkelijke snippet die naar een andere Facebook-post wijst', async () => {
+  const sourceUrl = 'https://www.facebook.com/groups/2998390776854288/posts/28421724800760869';
+  const verifier = createLeadRadarSourceVerifier({
+    normalizeHttpUrl,
+    getPublicPagePublicationDetails,
+    fetchImpl: async () => ({
+      status: 200,
+      text: async () => `<html><head>
+        <link rel="canonical" href="${sourceUrl}">
+        <meta property="og:description" content="Ik ben eigenaar van interieurontwerp bedrijf Atelier Somia en zoek extra opdrachten.">
+        <meta property="article:published_time" content="2026-06-29T09:15:00Z">
+      </head></html>`,
+    }),
+  });
+  const result = await verifier.verifyPublicSource(sourceUrl, {
+    expectedText: 'Is er iemand die een website kan maken voor me? Gaat om beauty en het boeken van afspraken.',
+  });
+  assert.equal(result.status, 'rejected');
+  assert.match(result.reason, /niet dezelfde aanvraagtekst/i);
+  assert.ok(result.contentMatchScore < 65);
+});
+
+test('Lead Radar toont een login-shell zonder controleerbare tekst of datum niet als lead', async () => {
+  const verifier = createLeadRadarSourceVerifier({
+    normalizeHttpUrl,
+    getPublicPagePublicationDetails,
+    fetchImpl: async () => ({ status: 200, text: async () => '<html><body><div id="facebook-root"></div></body></html>' }),
+  });
+  const result = await verifier.verifyPublicSource(
+    'https://www.facebook.com/groups/2998390776854288/posts/28421724800760869',
+    { expectedText: 'Wij zoeken iemand die een website voor ons bedrijf kan maken.' }
+  );
+  assert.equal(result.status, 'unverified');
+  assert.match(result.reason, /geen controleerbare posttekst/i);
+  assert.equal(contentMatchScore('website gezocht', 'website gezocht'), 0);
+  assert.equal(decodeHtml('&amp;quot;website&amp;quot;'), '&quot;website&quot;');
+  assert.equal(extractPostId('https://www.linkedin.com/feed/update/urn:li:activity:1234567890'), 'linkedin:1234567890');
 });
 
 test('Lead Radar laat echte ondernemersvragen staan en blokkeert advertenties en irrelevante posts', () => {
@@ -419,6 +532,12 @@ test('Lead Radar migration is service-role-only and has one canonical website st
   }
   assert.match(enrichmentMigration, /agency_detected/);
   assert.match(enrichmentMigration, /business_match_idx/);
+  const sourceIntegrityMigration = readRepoFile('supabase/migrations/20260819093410_lead_radar_source_integrity.sql');
+  assert.match(sourceIntegrityMigration, /source_verification_status/);
+  assert.match(sourceIntegrityMigration, /source_content_match_score/);
+  assert.match(sourceIntegrityMigration, /platform_stats/);
+  assert.match(sourceIntegrityMigration, /enable row level security/);
+  assert.doesNotMatch(sourceIntegrityMigration, /grant .* to anon|grant .* to authenticated/i);
 });
 
 test('Lead Radar page, sidebar and user-visible website labels are wired', () => {
@@ -449,8 +568,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260818i/);
-  assert.match(page, /lead-radar\.js\?v=20260818i/);
+  assert.match(page, /lead-radar\.css\?v=20260819a/);
+  assert.match(page, /lead-radar\.js\?v=20260819a/);
   assert.match(page, /id="scan-platforms" data-value="facebook,linkedin"/);
   assert.match(page, /data-custom-select-trigger[\s\S]*aria-haspopup="listbox"[\s\S]*aria-controls="scan-platforms-menu"/);
   assert.match(page, /data-value="facebook,linkedin" aria-selected="true">Facebook en LinkedIn<\/button>[\s\S]*data-value="facebook" aria-selected="false">Facebook<\/button>[\s\S]*data-value="linkedin" aria-selected="false">LinkedIn<\/button>/);

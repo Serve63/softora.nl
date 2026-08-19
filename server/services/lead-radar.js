@@ -1,9 +1,9 @@
 'use strict';
 const crypto = require('crypto');
 const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance'); const { createLeadRadarEnrichment } = require('./lead-radar-enrichment'); const { createLeadRadarSourceVerifier } = require('./lead-radar-source');
+const { createDataForSeoProvider } = require('./lead-radar-provider');
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
-const DATAFORSEO_ENDPOINT = 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced';
 const WEBSITE_STATUSES = Object.freeze([
   'website_found',
   'no_website_found',
@@ -338,7 +338,7 @@ function buildSearchPlan(options = {}) {
         for (const platform of platforms) {
           const site = platform === 'facebook'
             ? 'site:facebook.com'
-            : '(site:linkedin.com/posts OR site:linkedin.com/feed/update)';
+            : 'site:linkedin.com/posts';
           plan.push({
             platform,
             region,
@@ -356,75 +356,6 @@ function safeLimit(value, fallback, max) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(1, Math.min(max, Math.round(parsed)));
-}
-function extractTaskItems(body) {
-  const task = body?.tasks?.[0];
-  const result = task?.result?.[0];
-  if (!Array.isArray(result?.items)) return [];
-  return result.items.map((item) => ({ ...item, retrieved_at: result.datetime || null }));
-}
-function createDataForSeoProvider({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
-  const login = text(env.LEAD_RADAR_DATAFORSEO_LOGIN || env.DATAFORSEO_LOGIN, 500);
-  const password = text(env.LEAD_RADAR_DATAFORSEO_PASSWORD || env.DATAFORSEO_PASSWORD, 500);
-  const endpoint = DATAFORSEO_ENDPOINT;
-  async function search({ query, maxResults = 10 } = {}) {
-    if (!login || !password) {
-      const error = new Error('Lead Radar SERP-provider is niet geconfigureerd.');
-      error.code = 'LEAD_RADAR_PROVIDER_UNAVAILABLE';
-      throw error;
-    }
-    if (typeof fetchImpl !== 'function') throw new Error('Fetch is niet beschikbaar.');
-    const auth = Buffer.from(`${login}:${password}`).toString('base64');
-    const response = await fetchImpl(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify([{
-        language_code: 'nl',
-        location_name: 'Netherlands',
-        keyword: text(query, 700),
-        depth: safeLimit(maxResults, 10, 100),
-        device: 'desktop',
-      }]),
-    });
-    const body = await response.json().catch(() => null);
-    const taskStatusCode = body?.tasks?.[0]?.status_code;
-    if (!response.ok || body?.status_code !== 20000 || taskStatusCode !== 20000) {
-      const message = text(body?.status_message || body?.tasks?.[0]?.status_message || `SERP-provider HTTP ${response.status}`, 500);
-      const error = new Error(message || 'SERP-provider gaf een fout.');
-      error.code = 'LEAD_RADAR_PROVIDER_ERROR';
-      throw error;
-    }
-    return extractTaskItems(body)
-      .filter((item) => item && (item.type === 'organic' || item.url))
-      .slice(0, safeLimit(maxResults, 10, 100))
-      .map((item) => ({
-        url: text(item.url, 2_000),
-        title: text(item.title, 500),
-        snippet: text(item.description || item.snippet, 5_000),
-        date: item.date || item.date_text || item.dateText || null,
-        timestamp: item.timestamp || item.posted_at || item.postedAt || null,
-        published_at: item.published_at || item.publishedAt || item.publication_date || item.publicationDate || null,
-        retrieved_at: item.retrieved_at || null,
-        rank: normalizeInteger(item.rank_absolute, { min: 1, max: 10_000 }),
-      }));
-  }
-  return {
-    name: 'dataforseo',
-    configured: Boolean(login && password),
-    endpoint,
-    search,
-    getStatus() {
-      return {
-        configured: Boolean(login && password),
-        provider: 'dataforseo',
-        endpoint: login && password ? endpoint : null,
-        message: login && password ? 'SERP-provider is geconfigureerd.' : 'Configureer LEAD_RADAR_DATAFORSEO_LOGIN en LEAD_RADAR_DATAFORSEO_PASSWORD.',
-      };
-    },
-  };
 }
 function buildWebsiteSearchQuery(signal) {
   const name = text(signal.author_name || signal.authorName || '', 180)
@@ -490,6 +421,12 @@ function buildSignalFromProviderItem(item, context = {}) {
     website_status: 'website_not_checked',
     website_source: directWebsite ? 'post' : 'not_checked',
     website_confidence_score: directWebsite ? 100 : null,
+    source_verification_status: 'unverified',
+    source_verification_reason: 'Broncontrole nog niet uitgevoerd.',
+    source_verified_at: null,
+    source_canonical_url: null,
+    source_post_id: null,
+    source_content_match_score: null,
   };
   const scored = scoreSignal(input, { targetRegion: context.targetRegion || '' });
   input.relevance_score = scored.score;
@@ -581,7 +518,9 @@ function createLeadRadarService(deps = {}) {
     const db = requireDb();
     const limit = safeLimit(query.limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const offset = Math.max(0, Math.min(100_000, Number(query.offset) || 0));
-    let request = db.from(SIGNALS_TABLE).select('*').order('published_at', { ascending: false, nullsFirst: false }).order('found_at', { ascending: false });
+    let request = db.from(SIGNALS_TABLE).select('*').eq('source_verification_status', 'verified');
+    if (typeof request.not === 'function') request = request.not('published_at', 'is', null);
+    request = request.order('published_at', { ascending: false, nullsFirst: false });
     const platform = normalizePlatform(query.platform);
     const leadStatus = normalizeStatus(query.status);
     const websiteStatus = normalizeWebsiteStatus(query.website_status || query.websiteStatus);
@@ -595,7 +534,7 @@ function createLeadRadarService(deps = {}) {
     const days = normalizeInteger(query.days, { min: 1, max: MAX_LEAD_AGE_DAYS }) || MAX_LEAD_AGE_DAYS;
     if (days > 0) {
       const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
-      request = typeof request.or === 'function' ? request.or(`published_at.gte.${cutoff},and(published_at.is.null,found_at.gte.${cutoff})`) : request.gte('published_at', cutoff);
+      request = request.gte('published_at', cutoff);
     }
     if (typeof request.in === 'function' && !platform) request = request.in('platform', [...PLATFORMS]);
     if (typeof request.range === 'function') request = request.range(0, 4_999);
@@ -604,7 +543,8 @@ function createLeadRadarService(deps = {}) {
     const visibleSignals = (result.data || []).filter((signal) => {
       if (!PLATFORMS.includes(signal.platform)) return false;
       const requestedDays = days;
-      return isEligibleAutomaticSignal(signal, { maxAgeDays: requestedDays });
+      return signal.source_verification_status === 'verified' && Boolean(signal.published_at) &&
+        isEligibleAutomaticSignal(signal, { maxAgeDays: requestedDays, allowUnknownPublicationDate: false });
     });
     const page = visibleSignals.slice(offset, offset + limit);
     return {
@@ -912,6 +852,10 @@ function createLeadRadarService(deps = {}) {
         duplicate_count: 0,
         website_check_count: 0,
         website_found_count: 0,
+        verified_count: 0,
+        rejected_count: 0,
+        unverified_count: 0,
+        platform_stats: {},
         error_count: 0,
         status: 'running',
       });
@@ -926,13 +870,23 @@ function createLeadRadarService(deps = {}) {
     let duplicateCount = Number(run.duplicate_count) || 0;
     let websiteCheckCount = Number(run.website_check_count) || 0;
     let websiteFoundCount = Number(run.website_found_count) || 0;
+    let verifiedCount = Number(run.verified_count) || 0;
+    let rejectedCount = Number(run.rejected_count) || 0;
+    let unverifiedCount = Number(run.unverified_count) || 0;
+    const platformStats = run.platform_stats && typeof run.platform_stats === 'object' ? { ...run.platform_stats } : {};
     let errorCount = Number(run.error_count) || 0;
     let websiteLookupsLeft = websiteLookupLimit;
     let sourceChecksLeft = DEFAULT_SOURCE_CHECK_LIMIT;
+    let nextCursor = cursor;
+    let fatalProviderError = '';
     for (let index = cursor; index < end; index += 1) {
       const query = plan[index];
+      const stats = platformStats[query.platform] || { queries: 0, results: 0, verified: 0, rejected: 0, unverified: 0, errors: 0 };
+      platformStats[query.platform] = stats;
       try {
         const items = await provider.search({ query: query.query, maxResults: 10 });
+        stats.queries += 1;
+        stats.results += items.length;
         resultCount += items.length;
         usedQueries.push({ ...query, executedAt: new Date().toISOString(), resultCount: items.length, status: 'completed' });
         for (const item of items) {
@@ -944,26 +898,48 @@ function createLeadRadarService(deps = {}) {
             requireFresh: true,
           });
           if (!signal) continue;
-          if (sourceChecksLeft > 0) {
-            sourceChecksLeft -= 1;
-            const sourceCheck = await sourceVerifier.verifyPublicSource(signal.post_url);
-            if (sourceCheck.publication?.publishedAt) {
-              signal.published_at = sourceCheck.publication.publishedAt;
-              signal.publication_date_source = sourceCheck.publication.source;
-              signal.publication_date_raw = sourceCheck.publication.raw;
-              signal.publication_date_confidence = sourceCheck.publication.confidence;
-              const rescored = scoreSignal(signal, { targetRegion: query.region });
-              signal.relevance_score = rescored.score;
-              signal.score_reasons = rescored.reasons;
-              // A date found on the public post is authoritative for freshness.
-              if (!isRecentPublication(signal.published_at, run.max_age_days || maxAgeDays)) continue;
-            }
-            // Alleen een definitieve 404/410 of een expliciete platformmelding
-            // dat de content niet bestaat mag een resultaat blokkeren. 403/429
-            // en loginblokkades zijn geen bewijs dat de post verwijderd is.
-            if (!sourceCheck.available) continue;
+          if (sourceChecksLeft <= 0) {
+            unverifiedCount += 1;
+            stats.unverified += 1;
+            continue;
           }
+          sourceChecksLeft -= 1;
+          const providerPublication = getProviderPublicationDetails(item);
+          const sourceCheck = await sourceVerifier.verifyPublicSource(signal.post_url, {
+            expectedText: signal.message_text,
+            providerPublication,
+          });
+          if (sourceCheck.status !== 'verified') {
+            if (sourceCheck.status === 'rejected') {
+              rejectedCount += 1;
+              stats.rejected += 1;
+            } else {
+              unverifiedCount += 1;
+              stats.unverified += 1;
+            }
+            continue;
+          }
+          signal.published_at = sourceCheck.publication.publishedAt;
+          signal.publication_date_source = sourceCheck.publication.source;
+          signal.publication_date_raw = sourceCheck.publication.raw;
+          signal.publication_date_confidence = sourceCheck.publication.confidence;
+          signal.source_verification_status = 'verified';
+          signal.source_verification_reason = sourceCheck.reason;
+          signal.source_verified_at = new Date().toISOString();
+          signal.source_canonical_url = sourceCheck.canonicalUrl || null;
+          signal.source_post_id = sourceCheck.postId || null;
+          signal.source_content_match_score = sourceCheck.contentMatchScore;
+          if (!isRecentPublication(signal.published_at, run.max_age_days || maxAgeDays)) {
+            rejectedCount += 1;
+            stats.rejected += 1;
+            continue;
+          }
+          const rescored = scoreSignal(signal, { targetRegion: query.region });
+          signal.relevance_score = rescored.score;
+          signal.score_reasons = rescored.reasons;
           const saved = await upsertSignal(signal);
+          verifiedCount += 1;
+          stats.verified += 1;
           if (saved.created) newSignalCount += 1; else duplicateCount += 1;
           if (websiteLookupsLeft > 0 && signal.website_status === 'website_not_checked' && signal.author_name && signal.author_name.length > 3) {
             websiteLookupsLeft -= 1;
@@ -980,33 +956,47 @@ function createLeadRadarService(deps = {}) {
         }
       } catch (error) {
         errorCount += 1;
+        stats.errors += 1;
         usedQueries.push({ ...query, executedAt: new Date().toISOString(), resultCount: 0, status: 'error', error: text(error?.message || error, 500) });
         logger.warn('[LeadRadar][scan-query]', error?.message || error);
+        if (error?.fatal) fatalProviderError = text(error.message || 'DataForSEO heeft de scan geblokkeerd.', 500);
       }
+      nextCursor = index + 1;
       await updateRun(run.id, {
-        query_cursor: index + 1,
+        query_cursor: nextCursor,
         used_queries: usedQueries,
         result_count: resultCount,
         new_signal_count: newSignalCount,
         duplicate_count: duplicateCount,
         website_check_count: websiteCheckCount,
         website_found_count: websiteFoundCount,
+        verified_count: verifiedCount,
+        rejected_count: rejectedCount,
+        unverified_count: unverifiedCount,
+        platform_stats: platformStats,
         error_count: errorCount,
-        status: 'running',
+        last_error: fatalProviderError || null,
+        status: fatalProviderError ? 'provider_unavailable' : 'running',
       });
+      if (fatalProviderError) break;
     }
-    const completed = end >= plan.length;
+    const completed = !fatalProviderError && nextCursor >= plan.length;
     return updateRun(run.id, {
-      query_cursor: end,
+      query_cursor: nextCursor,
       used_queries: usedQueries,
       result_count: resultCount,
       new_signal_count: newSignalCount,
       duplicate_count: duplicateCount,
       website_check_count: websiteCheckCount,
       website_found_count: websiteFoundCount,
+      verified_count: verifiedCount,
+      rejected_count: rejectedCount,
+      unverified_count: unverifiedCount,
+      platform_stats: platformStats,
       error_count: errorCount,
-      status: completed ? (errorCount ? 'completed_with_errors' : 'completed') : 'paused',
-      finished_at: completed ? new Date().toISOString() : null,
+      last_error: fatalProviderError || null,
+      status: fatalProviderError ? 'provider_unavailable' : (completed ? (errorCount ? 'completed_with_errors' : 'completed') : 'paused'),
+      finished_at: completed || fatalProviderError ? new Date().toISOString() : null,
     });
   }
 
@@ -1042,7 +1032,12 @@ function createLeadRadarService(deps = {}) {
       result_count: Number(run.result_count || 0),
       new_signal_count: Number(run.new_signal_count || 0),
       duplicate_count: Number(run.duplicate_count || 0),
+      verified_count: Number(run.verified_count || 0),
+      rejected_count: Number(run.rejected_count || 0),
+      unverified_count: Number(run.unverified_count || 0),
+      platform_stats: run.platform_stats && typeof run.platform_stats === 'object' ? run.platform_stats : {},
       error_count: Number(run.error_count || 0),
+      last_error: run.last_error || null,
     };
   }
 
@@ -1112,17 +1107,18 @@ function createLeadRadarService(deps = {}) {
     if (!storageConfigured) return status;
     const db = getDb();
     const count = async (column, value) => {
-      let request = db.from(SIGNALS_TABLE).select('id', { count: 'exact', head: true });
+      let request = db.from(SIGNALS_TABLE).select('id', { count: 'exact', head: true })
+        .eq('source_verification_status', 'verified');
+      if (typeof request.not === 'function') request = request.not('published_at', 'is', null);
       const cutoff = new Date(Date.now() - MAX_LEAD_AGE_DAYS * 86_400_000).toISOString();
       if (typeof request.in === 'function') request = request.in('platform', [...PLATFORMS]);
       if (typeof request.not === 'function') request = request.not('post_url', 'is', null);
-      if (typeof request.or === 'function') request = request.or(`published_at.gte.${cutoff},and(published_at.is.null,found_at.gte.${cutoff})`);
-      else if (typeof request.gte === 'function') request = request.gte('published_at', cutoff);
+      if (typeof request.gte === 'function') request = request.gte('published_at', cutoff);
       if (column) request = request.eq(column, value);
       const result = await request;
       return result.error ? null : result.count || 0;
     };
-    const [total, newCount, websiteFound, noWebsiteFound, notChecked, notWorking, latestAutomaticRun] = await Promise.all([
+    const [total, newCount, websiteFound, noWebsiteFound, notChecked, notWorking, latestAutomaticRun, latestRuns] = await Promise.all([
       count(),
       count('lead_status', 'new'),
       count('website_status', 'website_found'),
@@ -1130,8 +1126,10 @@ function createLeadRadarService(deps = {}) {
       count('website_status', 'website_not_checked'),
       count('website_status', 'website_not_working'),
       getLatestAutomaticRun(),
+      listRuns(1),
     ]);
     status.counts = { total, new: newCount, websiteFound, noWebsiteFound, notChecked, notWorking };
+    status.lastRun = summarizeScanRun(latestRuns?.[0]);
     status.autoScan.lastRun = summarizeScanRun(latestAutomaticRun);
     status.autoScan.initialBackfillCompleted = hasCompletedInitialBackfill(latestAutomaticRun, autoScanConfig);
     status.autoScan.nextLookbackDays = status.autoScan.initialBackfillCompleted
