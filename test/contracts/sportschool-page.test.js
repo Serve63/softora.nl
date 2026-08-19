@@ -54,7 +54,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819b/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819c/);
   assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260819b/);
   assert.match(bootstrapScriptSource, /remoteBootstrapVersion/);
   assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
@@ -66,7 +66,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819d/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819e/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -168,6 +168,10 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.metric-kg\s*\{[\s\S]*?width: 46px;/);
   assert.match(stylesSource, /\.metric-input\s*\{[\s\S]*?width: 100%;[\s\S]*?height: 22px;[\s\S]*?padding: 0;/);
   assert.match(stylesSource, /\.form-history\s*\{/);
+  assert.match(stylesSource, /\.exercise-controls\s*\{[\s\S]*?justify-items: end;/);
+  assert.match(stylesSource, /\.form-status:nth-child\(3\)\s*\{[\s\S]*?width: 46px;/);
+  assert.doesNotMatch(scriptSource, /title\.textContent = 'Vorm'/);
+  assert.doesNotMatch(scriptSource, /form-status-index/);
   assert.match(stylesSource, /\.form-status-select\[data-status="up"\]/);
   assert.match(stylesSource, /\.form-status-select\[data-status="down"\]/);
   assert.match(stylesSource, /\.form-status-select\[data-status="same"\]/);

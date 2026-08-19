@@ -630,10 +630,6 @@
     wrap.className = 'form-history';
     wrap.setAttribute('aria-label', `Vormontwikkeling ${exercise.title}`);
 
-    const title = document.createElement('span');
-    title.className = 'form-history-title';
-    title.textContent = 'Vorm';
-
     const slots = document.createElement('div');
     slots.className = 'form-history-slots';
     normalizeFormHistory(exercise.formHistory).forEach((status, index) => {
@@ -665,15 +661,11 @@
         setFormHistory(day, exercise.order, Number(select.dataset.formSlot), nextStatus);
       });
 
-      const indexLabel = document.createElement('span');
-      indexLabel.className = 'form-status-index';
-      indexLabel.textContent = String(index + 1);
-
-      slot.append(select, indexLabel);
+      slot.append(select);
       slots.append(slot);
     });
 
-    wrap.append(title, slots);
+    wrap.append(slots);
     return wrap;
   }
 
@@ -736,6 +728,10 @@
       createMetric(day, exercise, 'kg', 'Kg', 'decimal')
     );
 
+    const controls = document.createElement('div');
+    controls.className = 'exercise-controls';
+    controls.append(metricGroup, createFormHistory(day, exercise));
+
     const notes = document.createElement('input');
     notes.className = 'exercise-notes';
     notes.type = 'text';
@@ -755,8 +751,8 @@
       writeField(day, exercise.order, 'notes', notes.value);
     });
 
-    top.append(dragHandle, title, metricGroup);
-    card.append(top, createFormHistory(day, exercise), notes);
+    top.append(dragHandle, title, controls);
+    card.append(top, notes);
     swipe.append(deleteButton, completionAction, card);
     bindReorder(swipe, card, dragHandle, day, exercise.order);
     bindSwipe(swipe, card, completionAction, day, exercise.order, exercise.completed);
