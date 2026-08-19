@@ -9,14 +9,19 @@ const STOP_WORDS = new Set([
 ]);
 
 function decodeHtml(value) {
-  return String(value || '')
-    .replace(/&quot;|&#34;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, decimal) => String.fromCodePoint(Number(decimal)));
+  return String(value || '').replace(
+    /&(?:quot|apos|amp|lt|gt|#34|#39|#x[0-9a-f]+|#\d+);/gi,
+    (entity) => {
+      const normalized = entity.toLowerCase();
+      if (normalized === '&quot;' || normalized === '&#34;') return '"';
+      if (normalized === '&apos;' || normalized === '&#39;') return "'";
+      if (normalized === '&amp;') return '&';
+      if (normalized === '&lt;') return '<';
+      if (normalized === '&gt;') return '>';
+      if (normalized.startsWith('&#x')) return String.fromCodePoint(Number.parseInt(normalized.slice(3, -1), 16));
+      return String.fromCodePoint(Number(normalized.slice(2, -1)));
+    }
+  );
 }
 
 function decodeJsonText(value) {
@@ -166,6 +171,7 @@ module.exports = {
   CONTENT_MATCH_THRESHOLD,
   contentMatchScore,
   createLeadRadarSourceVerifier,
+  decodeHtml,
   extractPostId,
   extractPublicPostText,
 };
