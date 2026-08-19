@@ -27,7 +27,6 @@ const PAGE_STATE_SCOPES = Object.freeze({
   'premium-seo-crm-system.html': Object.freeze(['premium_seo_crm']),
   'premium-vaste-lasten.html': Object.freeze(['premium_monthly_costs']),
   'premium-word.html': Object.freeze(['premium_word']),
-  'sportschool.html': Object.freeze(['sportschool_logboek']),
 });
 
 function normalizeFileName(value) {

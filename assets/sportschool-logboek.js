@@ -1,10 +1,6 @@
 (() => {
-  const REMOTE_SCOPE = 'sportschool_logboek';
-  const REMOTE_STATE_KEY = 'sportschool_logboek_v1';
-  const REMOTE_LOGBOOK_ENDPOINT = '/api/sportschool-logboek';
-  const REMOTE_SAVE_DELAY_MS = 450;
-  const REMOTE_RETRY_DELAY_MS = 1800;
-  const REMOTE_REFRESH_DEDUPE_MS = 900;
+  const LOCAL_STORAGE_KEY = 'softora_sportschool_logboek_v1';
+  const LOCAL_SAVE_DELAY_MS = 150;
   const REORDER_START_THRESHOLD = 6;
   const DRAFT_EXERCISE_TITLE = 'NIEUWE OEFENING';
   const DEFAULT_DAY_EXERCISES = {
@@ -36,14 +32,15 @@
     '4 SETS - 8 TOT 10 HERHALINGEN',
     '3 RONDES - 45 SECONDEN',
   ]);
+  const FORM_HISTORY_LENGTH = 3;
+  const FORM_STATUSES = new Set(['up', 'down', 'same']);
 
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
-  const logbookSync = window.SoftoraSportschoolLogbookSync;
   const logbookStateApi = window.SoftoraSportschoolLogbookState;
   const logbookInputApi = window.SoftoraSportschoolLogbookInput;
   const logbookGestureApi = window.SoftoraSportschoolLogbookGesture;
-  if (!logbookSync || !logbookStateApi || !logbookInputApi || !logbookGestureApi) return;
+  if (!logbookStateApi || !logbookInputApi || !logbookGestureApi) return;
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
@@ -53,18 +50,12 @@
   const addButton = app.querySelector('[data-add-exercise]');
   const closeDays = app.querySelector('[data-close-days]');
   let selectedDay = currentWeekday();
-  let isApplyingRemoteState = false;
+  let isApplyingStoredState = false;
   let isReady = false;
-  let remoteSaveTimer = null;
-  let remoteRetryTimer = null;
-  let remoteSaveInFlight = false;
-  let pendingRemoteSave = false;
+  let localSaveTimer = null;
+  let pendingLocalSave = false;
   let stateRevision = 0;
   let lastSavedRevision = 0;
-  let lastRemoteSnapshotJson = '';
-  let lastRemoteUpdatedAtMs = 0;
-  let lastRemoteVersionToken = '';
-  let resumeRevalidator = null;
   let logbookState = createDefaultState();
   let cleanedLegacyNotesDuringLoad = false;
   let shouldPersistLoadedSnapshot = false;
@@ -78,6 +69,14 @@
 
   function normalizeExerciseTitle(value) {
     return upper(value).replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizeFormHistory(value) {
+    const entries = Array.isArray(value) ? value : [];
+    return Array.from({ length: FORM_HISTORY_LENGTH }, (_, index) => {
+      const status = String(entries[index] || '').trim().toLowerCase();
+      return FORM_STATUSES.has(status) ? status : '';
+    });
   }
 
   function exerciseSlotKey(day, order) {
@@ -169,7 +168,10 @@
           const normalized = normalizeExerciseSource(day, exercise.order, exercise);
           const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, exercise.order));
           if (!sources[exerciseKey]) sources[exerciseKey] = normalized;
-          return [String(exercise.order), { exerciseKey, ...normalized, completedDates: [] }];
+          return [
+            String(exercise.order),
+            { exerciseKey, ...normalized, completedDates: [], formHistory: normalizeFormHistory() },
+          ];
         })
       ),
     };
@@ -218,9 +220,9 @@
   }
 
   function markStateChanged(options = {}) {
-    if (isApplyingRemoteState || !isReady) return;
+    if (isApplyingStoredState || !isReady) return;
     stateRevision += 1;
-    if (!options.silent) scheduleRemoteSave();
+    if (!options.silent) scheduleLocalSave();
   }
 
   function saveOrders(day, orders, options = {}) {
@@ -238,7 +240,12 @@
         const normalized = normalizeExerciseSource(day, order);
         const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, order));
         ensureExerciseSources()[exerciseKey] = normalized;
-        dayState.exercises[key] = { exerciseKey, ...normalized, completedDates: [] };
+        dayState.exercises[key] = {
+          exerciseKey,
+          ...normalized,
+          completedDates: [],
+          formHistory: normalizeFormHistory(),
+        };
         changed = true;
       }
     });
@@ -250,7 +257,8 @@
     const stored = dayState.exercises?.[String(order)] || {};
     const { exerciseKey, source } = getExerciseSource(day, order, stored);
     const completedDates = logbookStateApi.normalizeCompletionDates(stored.completedDates);
-    dayState.exercises[String(order)] = { exerciseKey, ...source, completedDates };
+    const formHistory = normalizeFormHistory(stored.formHistory);
+    dayState.exercises[String(order)] = { exerciseKey, ...source, completedDates, formHistory };
     return {
       order,
       exerciseKey,
@@ -260,8 +268,25 @@
       reps: source.reps,
       kg: source.kg,
       completedDates,
+      formHistory,
       completed: logbookStateApi.isCompletedOnDate({ completedDates }, currentDateKey()),
     };
+  }
+
+  function setFormHistory(day, order, slotIndex, status) {
+    const dayState = getDayState(day);
+    const key = String(order);
+    const current = readExercise(day, order);
+    const formHistory = normalizeFormHistory(current.formHistory);
+    const nextStatus = FORM_STATUSES.has(status) ? status : '';
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= FORM_HISTORY_LENGTH) return;
+    if (formHistory[slotIndex] === nextStatus) return;
+    formHistory[slotIndex] = nextStatus;
+    dayState.exercises[key] = {
+      ...dayState.exercises[key],
+      formHistory,
+    };
+    markStateChanged();
   }
 
   function setExerciseCompleted(day, order, completed) {
@@ -296,6 +321,7 @@
         exerciseKey: nextExerciseKey,
         ...sources[nextExerciseKey],
         completedDates: logbookStateApi.normalizeCompletionDates(previousExercise.completedDates),
+        formHistory: normalizeFormHistory(previousExercise.formHistory),
       };
       changed =
         previousExercise.exerciseKey !== nextExercise.exerciseKey ||
@@ -314,6 +340,7 @@
         exerciseKey,
         ...source,
         completedDates: logbookStateApi.normalizeCompletionDates(dayState.exercises[key]?.completedDates),
+        formHistory: normalizeFormHistory(dayState.exercises[key]?.formHistory),
       };
     }
     if (changed) markStateChanged();
@@ -350,6 +377,7 @@
                 reps: exercise.reps,
                 kg: exercise.kg,
                 completedDates: exercise.completedDates,
+                formHistory: exercise.formHistory,
               },
             ];
           })
@@ -370,7 +398,7 @@
     };
   }
 
-  function parseRemoteSnapshot(raw) {
+  function parseStoredSnapshot(raw) {
     if (!raw) return null;
     try {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -381,9 +409,9 @@
     }
   }
 
-  function applyRemoteSnapshot(snapshot) {
+  function applyStoredSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return false;
-    isApplyingRemoteState = true;
+    isApplyingStoredState = true;
     try {
       const canonicalSources = {};
       const nextDays = {};
@@ -424,271 +452,82 @@
             source: normalized,
             fallback: normalizeExerciseSource(day, order),
             completedDates: logbookStateApi.normalizeCompletionDates(stored.completedDates),
+            formHistory: normalizeFormHistory(stored.formHistory),
           });
           if (!stored.exerciseKey) shouldPersistLoadedSnapshot = true;
           if (!Array.isArray(stored.completedDates)) shouldPersistLoadedSnapshot = true;
+          if (!Array.isArray(stored.formHistory)) shouldPersistLoadedSnapshot = true;
         });
       });
       const reconciled = logbookStateApi.reconcileExerciseSources(canonicalSources, entries);
-      reconciled.entries.forEach(({ day, order, exerciseKey, source, completedDates }) => {
+      reconciled.entries.forEach(({ day, order, exerciseKey, source, completedDates, formHistory }) => {
         nextDays[day].exercises[String(order)] = {
           exerciseKey,
           ...source,
           completedDates: logbookStateApi.normalizeCompletionDates(completedDates),
+          formHistory: normalizeFormHistory(formHistory),
         };
       });
       if (reconciled.repaired) shouldPersistLoadedSnapshot = true;
       logbookState = { version: 2, exerciseSources: reconciled.exerciseSources, days: nextDays };
       return true;
     } finally {
-      isApplyingRemoteState = false;
+      isApplyingStoredState = false;
     }
   }
 
-  async function fetchRemoteState() {
-    const response = await fetch(REMOTE_LOGBOOK_ENDPOINT, {
-      method: 'GET',
-      cache: 'no-store',
-    });
-    if (response.ok) return response.json();
-    if (response.status !== 404) {
-      throw new Error(`Sportschool opslag laden mislukt (${response.status})`);
-    }
-
-    if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === 'function') {
-      return window.SoftoraUiStateClient.get(REMOTE_SCOPE);
-    }
-
-    throw new Error('Sportschool opslag endpoint ontbreekt.');
-  }
-
-  async function saveRemoteState(snapshotJson, options = {}) {
-    const body = {
-      patch: { [REMOTE_STATE_KEY]: snapshotJson },
-      source: 'sportschool-logboek',
-      actor: 'serve',
-    };
-
-    const response = await fetch(REMOTE_LOGBOOK_ENDPOINT, {
-      method: 'POST',
-      keepalive: options.keepalive === true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        snapshot: JSON.parse(snapshotJson),
-        source: 'sportschool-logboek',
-        actor: 'serve',
-        baseUpdatedAt: options.baseUpdatedAt || undefined,
-      }),
-    });
-    const responseBody = await response.json().catch(() => null);
-    if (response.ok) return responseBody;
-    if (response.status === 409) {
-      return {
-        ...(responseBody || {}),
-        conflict: true,
-      };
-    }
-    if (response.status !== 404) {
-      throw new Error(`Sportschool opslag opslaan mislukt (${response.status})`);
-    }
-
-    if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
-      return window.SoftoraUiStateClient.set(REMOTE_SCOPE, body, options);
-    }
-
-    const fallbackResponse = await fetch(`/api/ui-state-set?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
-      method: 'POST',
-      keepalive: options.keepalive === true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!fallbackResponse.ok) throw new Error(`Sportschool opslag opslaan mislukt (${fallbackResponse.status})`);
-    return fallbackResponse.json();
-  }
-
-  async function loadRemoteState() {
+  function readLocalSnapshot() {
     try {
-      const state = await fetchRemoteState();
-      const info = readRemoteSnapshotInfo(state);
-      if (!info) return false;
-      lastRemoteSnapshotJson = info.snapshotJson;
-      lastRemoteUpdatedAtMs = info.updatedAtMs;
-      lastRemoteVersionToken = info.versionToken;
-      cleanedLegacyNotesDuringLoad = false;
-      shouldPersistLoadedSnapshot = false;
-      applyRemoteSnapshot(info.snapshot);
-      stateRevision = 0;
-      lastSavedRevision = 0;
-      pendingRemoteSave = false;
-      if (cleanedLegacyNotesDuringLoad) shouldPersistLoadedSnapshot = true;
-      return true;
+      return parseStoredSnapshot(window.localStorage?.getItem(LOCAL_STORAGE_KEY));
     } catch (_error) {
-      return false;
+      return null;
     }
   }
 
-  function readRemoteSnapshotInfo(state) {
-    const values = state?.values && typeof state.values === 'object' ? state.values : {};
-    const normalizedState =
-      Object.prototype.hasOwnProperty.call(values, REMOTE_STATE_KEY) || !values.gymLogbookJson
-        ? state
-        : {
-            ...state,
-            values: {
-              ...values,
-              [REMOTE_STATE_KEY]: values.gymLogbookJson,
-            },
-          };
-    return logbookSync.readRemoteSnapshotInfo(normalizedState, REMOTE_STATE_KEY, parseRemoteSnapshot);
-  }
-
-  function hasLocalChangesOrSaveInFlight() {
-    return (
-      stateRevision !== lastSavedRevision ||
-      pendingRemoteSave ||
-      remoteSaveInFlight ||
-      logbookInputApi.isExerciseInputActive(document, list)
-    );
-  }
-
-  function rememberRemoteSnapshot(info) {
-    lastRemoteSnapshotJson = info.snapshotJson;
-    lastRemoteUpdatedAtMs = info.updatedAtMs;
-    lastRemoteVersionToken = info.versionToken;
-  }
-
-  function applyFreshRemoteSnapshot(snapshot, info) {
-    if (hasLocalChangesOrSaveInFlight()) return false;
-    window.clearTimeout(remoteSaveTimer);
-    clearRemoteRetryTimer();
+  function loadLocalState() {
     cleanedLegacyNotesDuringLoad = false;
     shouldPersistLoadedSnapshot = false;
-    applyRemoteSnapshot(snapshot);
-    rememberRemoteSnapshot(info);
+    const snapshot = readLocalSnapshot();
+    if (snapshot) {
+      applyStoredSnapshot(snapshot);
+    } else {
+      logbookState = createDefaultState();
+      shouldPersistLoadedSnapshot = true;
+    }
     stateRevision = 0;
     lastSavedRevision = 0;
-    pendingRemoteSave = false;
-    render();
-    if (cleanedLegacyNotesDuringLoad || shouldPersistLoadedSnapshot) {
-      markStateChanged({ silent: true });
-      persistRemoteSave();
-    }
+    pendingLocalSave = false;
+    if (cleanedLegacyNotesDuringLoad) shouldPersistLoadedSnapshot = true;
     return true;
   }
 
-  function resolveRemoteSaveConflict(remoteState) {
-    const info = readRemoteSnapshotInfo(remoteState);
-    if (!info) {
-      pendingRemoteSave = true;
-      scheduleRemoteRetry();
-      return;
-    }
-    const baseSnapshot = parseRemoteSnapshot(lastRemoteSnapshotJson) || {};
-    const currentLocalSnapshot = buildSnapshotFromState();
-    const mergedSnapshot = logbookSync.mergeConflictSnapshots(
-      baseSnapshot,
-      currentLocalSnapshot,
-      info.snapshot
-    );
-    const revisionBeforeMerge = stateRevision;
-    cleanedLegacyNotesDuringLoad = false;
-    shouldPersistLoadedSnapshot = false;
-    applyRemoteSnapshot(mergedSnapshot);
-    rememberRemoteSnapshot(info);
-    stateRevision = Math.max(revisionBeforeMerge, lastSavedRevision) + 1;
-    pendingRemoteSave = true;
-    render();
-    window.clearTimeout(remoteSaveTimer);
-    remoteSaveTimer = window.setTimeout(() => persistRemoteSave(), 0);
+  function scheduleLocalSave() {
+    if (isApplyingStoredState || !isReady) return;
+    window.clearTimeout(localSaveTimer);
+    localSaveTimer = window.setTimeout(() => {
+      persistLocalState();
+    }, LOCAL_SAVE_DELAY_MS);
   }
 
-  function clearRemoteRetryTimer() {
-    window.clearTimeout(remoteRetryTimer);
-    remoteRetryTimer = null;
-  }
-
-  function scheduleRemoteRetry() {
-    if (isApplyingRemoteState || !isReady) return;
-    window.clearTimeout(remoteRetryTimer);
-    remoteRetryTimer = window.setTimeout(() => {
-      remoteRetryTimer = null;
-      persistRemoteSave();
-    }, REMOTE_RETRY_DELAY_MS);
-  }
-
-  function scheduleRemoteSave() {
-    if (isApplyingRemoteState || !isReady) return;
-    clearRemoteRetryTimer();
-    window.clearTimeout(remoteSaveTimer);
-    remoteSaveTimer = window.setTimeout(() => {
-      persistRemoteSave();
-    }, REMOTE_SAVE_DELAY_MS);
-  }
-
-  async function persistRemoteSave(options = {}) {
-    if (isApplyingRemoteState || !isReady) return;
-    window.clearTimeout(remoteSaveTimer);
-    if (remoteSaveInFlight && options.allowConcurrent !== true) {
-      pendingRemoteSave = true;
-      return;
-    }
+  function persistLocalState(options = {}) {
+    if (isApplyingStoredState || !isReady) return;
+    window.clearTimeout(localSaveTimer);
+    if (!options.force && stateRevision === lastSavedRevision) return;
     const revisionAtStart = stateRevision;
-    if (!options.force && revisionAtStart === lastSavedRevision) return;
-    const snapshot = buildSnapshotFromState();
-    const snapshotJson = JSON.stringify(snapshot);
-    if (!options.force && revisionAtStart === lastSavedRevision && snapshotJson === lastRemoteSnapshotJson) return;
-    const tracksInFlight = options.allowConcurrent !== true;
-    let saved = false;
-    if (tracksInFlight) remoteSaveInFlight = true;
+    const snapshotJson = JSON.stringify(buildSnapshotFromState());
     try {
-      const savedState = await saveRemoteState(snapshotJson, {
-        ...options,
-        baseUpdatedAt: lastRemoteVersionToken,
-      });
-      if (savedState?.conflict) {
-        resolveRemoteSaveConflict(savedState);
-        return;
-      }
-      saved = true;
-      if (revisionAtStart === stateRevision) {
-        const savedInfo = readRemoteSnapshotInfo(
-          savedState || {
-            values: { [REMOTE_STATE_KEY]: snapshotJson },
-            updatedAt: snapshot.updatedAt,
-          }
-        );
-        if (savedInfo) rememberRemoteSnapshot(savedInfo);
-        else lastRemoteSnapshotJson = snapshotJson;
-        lastSavedRevision = revisionAtStart;
-        pendingRemoteSave = false;
-      } else {
-        pendingRemoteSave = true;
-      }
+      window.localStorage?.setItem(LOCAL_STORAGE_KEY, snapshotJson);
+      lastSavedRevision = revisionAtStart;
+      pendingLocalSave = false;
     } catch (_error) {
-      pendingRemoteSave = true;
-      if (!options.keepalive) scheduleRemoteRetry();
-    } finally {
-      if (tracksInFlight) {
-        remoteSaveInFlight = false;
-        if (saved && (pendingRemoteSave || stateRevision !== lastSavedRevision)) {
-          pendingRemoteSave = false;
-          window.clearTimeout(remoteSaveTimer);
-          remoteSaveTimer = window.setTimeout(() => {
-            persistRemoteSave();
-          }, 0);
-        }
-      }
-      if (saved && resumeRevalidator && !hasLocalChangesOrSaveInFlight()) {
-        resumeRevalidator.notifyLocalStateSettled();
-      }
+      pendingLocalSave = false;
     }
   }
 
-  function flushRemoteSave() {
-    window.clearTimeout(remoteSaveTimer);
-    clearRemoteRetryTimer();
-    if (stateRevision === lastSavedRevision && !pendingRemoteSave) return;
-    persistRemoteSave({ keepalive: true, allowConcurrent: true });
+  function flushLocalSave() {
+    window.clearTimeout(localSaveTimer);
+    if (stateRevision === lastSavedRevision && !pendingLocalSave) return;
+    persistLocalState({ force: true });
   }
 
   function renderDayChoices() {
@@ -737,6 +576,58 @@
     return wrap;
   }
 
+  function createFormHistory(day, exercise) {
+    const wrap = document.createElement('div');
+    wrap.className = 'form-history';
+    wrap.setAttribute('aria-label', `Vormontwikkeling ${exercise.title}`);
+
+    const title = document.createElement('span');
+    title.className = 'form-history-title';
+    title.textContent = 'Vorm';
+
+    const slots = document.createElement('div');
+    slots.className = 'form-history-slots';
+    normalizeFormHistory(exercise.formHistory).forEach((status, index) => {
+      const slot = document.createElement('label');
+      slot.className = 'form-status';
+
+      const select = document.createElement('select');
+      select.className = 'form-status-select';
+      select.value = status;
+      select.dataset.status = status;
+      select.dataset.formSlot = String(index);
+      select.setAttribute('aria-label', `${exercise.title} vormmoment ${index + 1}`);
+      select.title = 'Kies: sterker, zwakker of gelijk';
+      [
+        ['', '·'],
+        ['up', '↑'],
+        ['down', '↓'],
+        ['same', '—'],
+      ].forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        select.append(option);
+      });
+      select.value = status;
+      select.addEventListener('change', () => {
+        const nextStatus = select.value;
+        select.dataset.status = nextStatus;
+        setFormHistory(day, exercise.order, Number(select.dataset.formSlot), nextStatus);
+      });
+
+      const indexLabel = document.createElement('span');
+      indexLabel.className = 'form-status-index';
+      indexLabel.textContent = String(index + 1);
+
+      slot.append(select, indexLabel);
+      slots.append(slot);
+    });
+
+    wrap.append(title, slots);
+    return wrap;
+  }
+
   function createExerciseCard(day, exercise) {
     const swipe = document.createElement('div');
     swipe.className = 'exercise-swipe';
@@ -749,7 +640,7 @@
     deleteButton.addEventListener('click', () => {
       saveOrders(day, readOrders(day).filter((order) => order !== exercise.order), { silent: true });
       render();
-      persistRemoteSave();
+      persistLocalState();
     });
 
     const completionAction = document.createElement('div');
@@ -816,7 +707,7 @@
     });
 
     top.append(dragHandle, title, metricGroup);
-    card.append(top, notes);
+    card.append(top, createFormHistory(day, exercise), notes);
     swipe.append(deleteButton, completionAction, card);
     bindReorder(swipe, card, dragHandle, day, exercise.order);
     bindSwipe(swipe, card, completionAction, day, exercise.order, exercise.completed);
@@ -899,7 +790,7 @@
       nextOrders.splice(nextIndex, 0, movedOrder);
       saveOrders(day, nextOrders, { silent: true });
       render();
-      persistRemoteSave();
+      persistLocalState();
     };
 
     handle.addEventListener('pointerup', finish);
@@ -1044,53 +935,24 @@
     writeField(selectedDay, exercise.order, 'name', upper(exercise.title));
     writeField(selectedDay, exercise.order, 'notes', upper(exercise.notes));
     render();
-    persistRemoteSave();
+    persistLocalState();
   });
 
   dayTrigger.addEventListener('click', openDayPicker);
   closeDays.addEventListener('click', closeDayPicker);
-  list.addEventListener('focusout', () => {
-    window.setTimeout(() => {
-      if (!logbookInputApi.isExerciseInputActive(document, list) && resumeRevalidator) resumeRevalidator.notifyLocalStateSettled();
-    }, 0);
-  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeDayPicker();
   });
-  window.addEventListener('online', scheduleRemoteSave);
-  window.addEventListener('pagehide', flushRemoteSave);
-  resumeRevalidator = logbookSync.createResumeRevalidator({
-    fetchRemoteState,
-    readSnapshotInfo: readRemoteSnapshotInfo,
-    getKnownRemoteUpdatedAtMs: () => lastRemoteUpdatedAtMs,
-    hasLocalChanges: hasLocalChangesOrSaveInFlight,
-    isReady: () => isReady,
-    isVisible: () => document.visibilityState !== 'hidden',
-    applyRemoteSnapshot: applyFreshRemoteSnapshot,
-    dedupeMs: REMOTE_REFRESH_DEDUPE_MS,
-  });
-  logbookSync.bindResumeEvents({
-    windowTarget: window,
-    documentTarget: document,
-    requestRefresh: (source) => {
-      if (lastRenderedDateKey !== currentDateKey() && !logbookInputApi.isExerciseInputActive(document, list)) render();
-      return resumeRevalidator.requestRefresh(source);
-    },
-    onHidden: flushRemoteSave,
-  });
+  window.addEventListener('pagehide', flushLocalSave);
 
-  async function boot() {
-    const loaded = await loadRemoteState();
-    if (!loaded) {
-      window.setTimeout(boot, REMOTE_RETRY_DELAY_MS);
-      return;
-    }
+  function boot() {
+    loadLocalState();
     isReady = true;
     addButton.disabled = false;
     render();
     if (shouldPersistLoadedSnapshot) {
       markStateChanged({ silent: true });
-      persistRemoteSave();
+      persistLocalState({ force: true });
     }
   }
 
