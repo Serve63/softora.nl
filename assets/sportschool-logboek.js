@@ -538,7 +538,7 @@
         headers: { Accept: 'application/json' },
       });
       const payload = await response.json().catch(() => null);
-      const remoteSnapshot = parseStoredSnapshot(payload?.values?.[LOCAL_STORAGE_KEY]);
+      const remoteSnapshot = parseStoredSnapshot(logbookBootstrapApi.readRemoteSnapshotValue(payload?.values));
       if (!response.ok || !payload?.ok || !remoteSnapshot) return false;
       const hydratedSnapshot = logbookBootstrapApi.mergeRemoteSnapshot(remoteSnapshot, localSnapshot);
       if (!applyStoredSnapshot(hydratedSnapshot)) return false;

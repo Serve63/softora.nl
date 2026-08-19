@@ -1,7 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { VERSION, mergeRemoteSnapshot } = require('../../assets/sportschool-logboek-bootstrap');
+const {
+  VERSION,
+  mergeRemoteSnapshot,
+  readRemoteSnapshotValue,
+} = require('../../assets/sportschool-logboek-bootstrap');
 
 function day(orders, exercises = {}) {
   return { orders, exercises };
@@ -49,4 +53,16 @@ test('logboek bootstrap behoudt een bewust lege lokale dag als de bron ook leeg 
 test('logboek bootstrap weigert ongeldige remote snapshots', () => {
   assert.equal(mergeRemoteSnapshot(null, {}), null);
   assert.equal(mergeRemoteSnapshot({ days: [] }, {}), null);
+});
+
+test('logboek bootstrap leest de canonieke API-sleutel en ondersteunt de lokale alias', () => {
+  assert.equal(
+    readRemoteSnapshotValue({ sportschool_logboek_v1: '{"days":{}}' }),
+    '{"days":{}}'
+  );
+  assert.equal(
+    readRemoteSnapshotValue({ softora_sportschool_logboek_v1: '{"days":{"monday":{}}}' }),
+    '{"days":{"monday":{}}}'
+  );
+  assert.equal(readRemoteSnapshotValue(null), null);
 });
