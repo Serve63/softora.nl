@@ -314,7 +314,8 @@ input:focus-visible {
 
 .exercise-title,
 .exercise-notes,
-.metric-input {
+.metric-input,
+.form-status-select {
   border: 0;
   outline: 0;
   background: transparent;
@@ -346,16 +347,16 @@ input:focus-visible {
 .metric {
   display: grid;
   justify-items: center;
-  width: 44px;
-  min-height: 44px;
-  padding: 4px 2px 3px;
+  width: 36px;
+  min-height: 36px;
+  padding: 3px 2px 2px;
   border: 1px solid rgba(240, 220, 230, 0.86);
   border-radius: 8px;
   background: rgba(252, 248, 251, 0.75);
 }
 
 .metric-kg {
-  width: 54px;
+  width: 46px;
 }
 
 .metric:focus-within {
@@ -366,25 +367,100 @@ input:focus-visible {
 .metric-input {
   width: 100%;
   min-width: 0;
-  height: 27px;
+  height: 22px;
   padding: 0;
   color: var(--softora-ink);
   font-family: Oswald, Inter, sans-serif;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
 }
 
 .metric-kg .metric-input {
-  font-size: 11.5px;
+  font-size: 10.5px;
 }
 
 .metric-label {
   color: rgba(127, 125, 141, 0.8);
-  font-size: 6.5px;
+  font-size: 6px;
   font-weight: 700;
   letter-spacing: 0.3px;
+}
+
+.form-history {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+}
+
+.form-history-title {
+  min-width: 35px;
+  color: rgba(127, 125, 141, 0.8);
+  font-family: Oswald, Inter, sans-serif;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.form-history-slots {
+  display: flex;
+  gap: 2px;
+}
+
+.form-status {
+  display: grid;
+  width: 36px;
+  min-height: 34px;
+  justify-items: center;
+  padding: 2px 2px 1px;
+  border: 1px solid rgba(240, 220, 230, 0.86);
+  border-radius: 8px;
+  background: rgba(252, 248, 251, 0.75);
+}
+
+.form-status:focus-within {
+  border-color: rgba(155, 35, 85, 0.46);
+  box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
+}
+
+.form-status-select {
+  width: 100%;
+  min-width: 0;
+  height: 23px;
+  padding: 0;
+  color: rgba(127, 125, 141, 0.55);
+  font-family: Inter, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.form-status-select[data-status="up"] {
+  color: #3d945c;
+}
+
+.form-status-select[data-status="down"] {
+  color: #bd3f4d;
+}
+
+.form-status-select[data-status="same"] {
+  color: #c9991b;
+}
+
+.form-status-index {
+  color: rgba(127, 125, 141, 0.65);
+  font-family: Oswald, Inter, sans-serif;
+  font-size: 6px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .exercise-notes {

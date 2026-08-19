@@ -70,6 +70,7 @@ const APPROVED_BROWSER_STORAGE_PATHS = Object.freeze([
   'assets/personnel-theme.js',
   'assets/premium-sidebar-profile-prefill.js',
   'assets/premium-page-bootstrap-session.js',
+  'assets/sportschool-logboek.js',
 ]);
 
 const TEST_WEAKENING_PATTERNS = Object.freeze([

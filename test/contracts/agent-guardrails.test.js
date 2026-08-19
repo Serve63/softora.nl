@@ -229,11 +229,12 @@ test('agent guardrails detect newly added browser storage in production frontend
   assert.match(violations[0], /Nieuwe browser-opslag in productiecode gedetecteerd/i);
 });
 
-test('agent guardrails allow browser storage only in central premium cache helpers', () => {
+test('agent guardrails allow browser storage only in approved local-state helpers', () => {
   assert.equal(isApprovedBrowserStoragePath('assets/premium-browser-storage.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-page-bootstrap-session.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/personnel-theme.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-sidebar-profile-prefill.js'), true);
+  assert.equal(isApprovedBrowserStoragePath('assets/sportschool-logboek.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-campaign-inbox.js'), false);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-state-outbox.js'), false);
 });

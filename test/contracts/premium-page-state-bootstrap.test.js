@@ -24,7 +24,7 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
   ]);
   assert.deepEqual(PAGE_STATE_SCOPES['premium-seo-crm-system.html'], ['premium_seo_crm']);
   assert.deepEqual(PAGE_STATE_SCOPES['premium-vaste-lasten.html'], ['premium_monthly_costs']);
-  assert.deepEqual(PAGE_STATE_SCOPES['sportschool.html'], ['sportschool_logboek']);
+  assert.equal(PAGE_STATE_SCOPES['sportschool.html'], undefined);
   assert.equal(PAGE_STATE_SCOPES['premium-wachtwoordenregister.html'], undefined);
 
   const primaryBootstrapMarkers = {
