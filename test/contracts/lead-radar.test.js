@@ -21,6 +21,7 @@ const {
 const {
   contentMatchScore,
   createLeadRadarSourceVerifier,
+  decodeHtml,
   extractPostId,
 } = require('../../server/services/lead-radar-source');
 const { registerLeadRadarRoutes } = require('../../server/routes/lead-radar');
@@ -326,6 +327,7 @@ test('Lead Radar toont een login-shell zonder controleerbare tekst of datum niet
   assert.equal(result.status, 'unverified');
   assert.match(result.reason, /geen controleerbare posttekst/i);
   assert.equal(contentMatchScore('website gezocht', 'website gezocht'), 0);
+  assert.equal(decodeHtml('&amp;quot;website&amp;quot;'), '&quot;website&quot;');
   assert.equal(extractPostId('https://www.linkedin.com/feed/update/urn:li:activity:1234567890'), 'linkedin:1234567890');
 });
 
