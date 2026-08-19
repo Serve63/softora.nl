@@ -483,6 +483,19 @@ input:focus-visible {
   text-align: center;
 }
 
+.logbook-status {
+  margin: 22px 0 0;
+  color: var(--softora-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.55px;
+  text-align: center;
+}
+
+.logbook-status[data-state="error"] {
+  color: #a43f57;
+}
+
 .day-picker[hidden] {
   display: none;
 }

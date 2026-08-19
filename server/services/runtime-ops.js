@@ -956,6 +956,33 @@ function createRuntimeOpsCoordinator(deps = {}) {
     });
   }
 
+  async function sendSportschoolLogbookPublicGetResponse(_req, res) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+
+    const state =
+      sportschoolLogbookStore &&
+      typeof sportschoolLogbookStore.readLogbookState === 'function'
+        ? await sportschoolLogbookStore.readLogbookState()
+        : null;
+    if (!state || !hasSportschoolLogbookValue(state)) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Sportschool logboek is tijdelijk niet beschikbaar.',
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+      values: {
+        [SPORTSCHOOL_LOGBOOK_KEY]: state.values[SPORTSCHOOL_LOGBOOK_KEY],
+      },
+      source: 'supabase:sportschool-public',
+      updatedAt: state.updatedAt || null,
+    });
+  }
+
   async function sendSportschoolLogbookSetResponse(req, res) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const snapshotJson = normalizeSportschoolLogbookSnapshot(
@@ -1080,6 +1107,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     sendDashboardCustomersResponse,
     sendSecurityAuditLogResponse,
     sendSportschoolLogbookGetResponse,
+    sendSportschoolLogbookPublicGetResponse,
     sendSportschoolLogbookSetResponse,
     sendUiStateGetResponse,
     sendUiStateSetResponse,

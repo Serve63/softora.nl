@@ -102,6 +102,9 @@ function registerRuntimeOpsRoutes(app, deps) {
   app.get('/api/sportschool-logboek', requirePremiumAdminApiAccess, async (req, res) =>
     deps.coordinator.sendSportschoolLogbookGetResponse(req, res)
   );
+  app.get('/api/sportschool-logboek-public', async (req, res) =>
+    deps.coordinator.sendSportschoolLogbookPublicGetResponse(req, res)
+  );
   app.post('/api/sportschool-logboek', requirePremiumAdminApiAccess, async (req, res) =>
     deps.coordinator.sendSportschoolLogbookSetResponse(req, res)
   );
