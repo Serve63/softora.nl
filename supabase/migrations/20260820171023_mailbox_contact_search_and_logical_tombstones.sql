@@ -1,3 +1,4 @@
+-- Production migration version 20260820171023.
 -- Mailbox search has two distinct identity layers:
 --   1. a contact dossier is canonical owner + exact external email;
 --   2. a logical message is exact mailbox account + normalized RFC Message-ID.

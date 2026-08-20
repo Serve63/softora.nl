@@ -49,7 +49,7 @@ if (!databaseUrl) {
   ), 'utf8');
   const contactSearchAndLogicalTombstonesMigration = fs.readFileSync(path.resolve(
     __dirname,
-    '../../supabase/migrations/20260820141236_mailbox_contact_search_and_logical_tombstones.sql'
+    '../../supabase/migrations/20260820171023_mailbox_contact_search_and_logical_tombstones.sql'
   ), 'utf8');
   const logicalTombstoneMarker =
     'create or replace function public.softora_normalize_mailbox_message_id(';
