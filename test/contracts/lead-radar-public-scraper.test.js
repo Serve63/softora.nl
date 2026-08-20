@@ -11,6 +11,7 @@ const {
   createLeadRadarScraperProvider,
   isRobotsAllowed,
   parsePublicFeed,
+  stripHtml,
 } = require('../../server/services/lead-radar-public-scraper');
 
 function fetchResponse(body = '', { status = 200, headers = {} } = {}) {
@@ -36,6 +37,7 @@ test('Lead Radar leest RSS en Atom rechtstreeks als controleerbaar bronbewijs', 
   assert.equal(items[0].source_verified, true);
   assert.equal(items[0].author_name, 'Studio Noord');
   assert.match(items[0].snippet, /website kan vernieuwen/i);
+  assert.equal(stripHtml('<p>Welkom<script >alert(1)</script ><br>Ondernemer</p>'), 'Welkom\nOndernemer');
 });
 
 test('Lead Radar respecteert robots.txt, redirect-SSRF en responslimieten', async () => {

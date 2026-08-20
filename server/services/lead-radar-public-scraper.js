@@ -1,5 +1,6 @@
 'use strict';
 
+const { parseDocument } = require('htmlparser2');
 const { assertWebsitePreviewUrlIsPublic } = require('../security/public-url');
 
 const DEFAULT_PUBLIC_FEEDS = Object.freeze([
@@ -12,6 +13,7 @@ const BLUESKY_SEARCH_ENDPOINT = 'https://public.api.bsky.app/xrpc/app.bsky.feed.
 const DEFAULT_USER_AGENT = 'SoftoraLeadRadar/1.0 (+https://www.softora.nl/lead-radar)';
 const MAX_RESPONSE_BYTES = 2_000_000;
 const ROBOTS_CACHE_MS = 6 * 60 * 60 * 1_000;
+const REQUEST_TIMEOUT_MS = 8_000;
 
 function text(value, maxLength = 500) {
   return String(value ?? '').trim().slice(0, maxLength);
@@ -54,15 +56,20 @@ function decodeEntities(value) {
 }
 
 function stripHtml(value, maxLength = 20_000) {
-  return text(decodeEntities(String(value || '')
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p\s*>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
+  const document = parseDocument(String(value || ''), { decodeEntities: true });
+  function readNodes(nodes = []) {
+    return nodes.map((node) => {
+      if (node?.type === 'text') return node.data || '';
+      const name = String(node?.name || '').toLowerCase();
+      if (name === 'script' || name === 'style') return '';
+      const content = readNodes(node?.children || []);
+      return ['br', 'p', 'div', 'li', 'article', 'section'].includes(name) ? `${content}\n` : content;
+    }).join('');
+  }
+  return text(readNodes(document.children)
     .replace(/[\t\r ]+/g, ' ')
     .replace(/\n\s+/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')), maxLength);
+    .replace(/\n{3,}/g, '\n\n'), maxLength);
 }
 
 function firstTag(block, names) {
@@ -96,7 +103,7 @@ function parsePublicFeed(xml, feedUrl) {
   const atomEntries = source.match(/<entry\b[^>]*>[\s\S]*?<\/entry>/gi) || [];
   return [...rssItems, ...atomEntries].map((block) => {
     const linkValue = firstTag(block, ['link']) || atomLink(block);
-    const url = absoluteUrl(linkValue.replace(/<[^>]+>/g, ''), feedUrl);
+    const url = absoluteUrl(stripHtml(linkValue, 2_000), feedUrl);
     const title = stripHtml(firstTag(block, ['title']), 500);
     const description = stripHtml(firstTag(block, ['content:encoded', 'content', 'description', 'summary']), 20_000);
     const publishedAt = firstTag(block, ['pubDate', 'published', 'updated', 'dc:date']);
@@ -173,7 +180,7 @@ function isRobotsAllowed(body, targetUrl, userAgent = DEFAULT_USER_AGENT) {
 }
 
 function createLeadRadarPublicFetcher({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
-  const timeoutMs = Math.max(1_000, Math.min(20_000, Number(env.LEAD_RADAR_SCRAPER_TIMEOUT_MS) || 8_000));
+  const timeoutMs = REQUEST_TIMEOUT_MS;
   const maxBytes = Math.max(50_000, Math.min(5_000_000, Number(env.LEAD_RADAR_SCRAPER_MAX_BYTES) || MAX_RESPONSE_BYTES));
   const configuredInterval = Number(env.LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS);
   const minIntervalMs = Number.isFinite(configuredInterval)
