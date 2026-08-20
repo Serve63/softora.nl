@@ -1,6 +1,5 @@
 (function initSoftoraMailboxSignature(global) {
   'use strict';
-
   const SIGNOFF_PHRASES = new Set([
     'met vriendelijke groet',
     'met vriendelijke groeten',
@@ -23,7 +22,6 @@
     'yours sincerely',
     'cheers',
   ]);
-
   const FIELD_PATTERNS = [
     { key: 'phone', pattern: /^(?:[-*•]\s*)?(?:phone|tel(?:efoon)?|mobiel|mobile|t)\.?\s*(?::\s*|\s+)(.*)$/i },
     { key: 'street', pattern: /^(?:[-*•]\s*)?(?:street|straat|address|adres)\s*:\s*(.*)$/i },
@@ -31,33 +29,27 @@
     { key: 'city', pattern: /^(?:[-*•]\s*)?(?:city|plaats|stad)\s*:\s*(.*)$/i },
     { key: 'country', pattern: /^(?:[-*•]\s*)?(?:country|land)\s*:\s*(.*)$/i },
   ];
-
   let commonJsQuotedThread;
-
   function normalizeWhitespace(value) {
     return String(value == null ? '' : value)
       .replace(/\u00a0/g, ' ')
       .replace(/[\t ]+/g, ' ')
       .trim();
   }
-
   function normalizeBody(value) {
     return String(value == null ? '' : value)
       .replace(/\r\n?/g, '\n')
       .replace(/\u00a0/g, ' ');
   }
-
   function emptyContact() {
     return { phone: '', phoneHref: '', addressLines: [] };
   }
-
   function normalizeSignoffPart(value) {
     return normalizeWhitespace(value)
       .toLowerCase()
       .replace(/[.,!;:]+$/g, '')
       .trim();
   }
-
   function isStandaloneSignoff(value) {
     const line = normalizeWhitespace(value);
     if (!line || /^>/.test(line)) return false;
@@ -65,7 +57,6 @@
     const parts = line.split(/\s*(?:\/|\|)\s*/).filter(Boolean);
     return Boolean(parts.length && parts.every((part) => SIGNOFF_PHRASES.has(normalizeSignoffPart(part))));
   }
-
   function getQuotedThreadApi() {
     if (global && global.SoftoraMailboxQuotedThread) return global.SoftoraMailboxQuotedThread;
     if (commonJsQuotedThread !== undefined) return commonJsQuotedThread;
@@ -79,7 +70,6 @@
     }
     return commonJsQuotedThread;
   }
-
   function findDirectBodyEnd(body, lines) {
     const quotedThread = getQuotedThreadApi();
     if (quotedThread && typeof quotedThread.findQuotedSegments === 'function') {
