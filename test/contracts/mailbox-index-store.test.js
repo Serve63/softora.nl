@@ -345,6 +345,7 @@ test('mailbox index zoekt forwarded parentmails per exact account, onderwerp en 
           eq(column, value) { calls.push(['eq', column, value]); return query; },
           ilike(column, value) { calls.push(['ilike', column, value]); return query; },
           is(column, value) { calls.push(['is', column, value]); return query; },
+          lte(column, value) { calls.push(['lte', column, value]); return query; },
           order(column, options) { calls.push(['order', column, options]); return query; },
           limit(value) {
             calls.push(['limit', value]);
@@ -361,6 +362,7 @@ test('mailbox index zoekt forwarded parentmails per exact account, onderwerp en 
       accountEmail: 'MARTIJN@SOFTORA.NL',
       canonicalSubject: 'kleine vraag over jullie website',
       recipientEmail: 'INFO@TTVIRENE.NL',
+      beforeAt: '2026-07-16T18:17:01.000Z',
     }],
     limitPerTarget: 10,
   });
@@ -375,6 +377,9 @@ test('mailbox index zoekt forwarded parentmails per exact account, onderwerp en 
   assert.deepEqual(calls.filter((call) => call[0] === 'ilike'), [
     ['ilike', 'subject', '%kleine vraag over jullie website%'],
     ['ilike', 'recipients_text', '%info@ttvirene.nl%'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'lte'), [
+    'lte', 'date', '2026-07-16T18:17:01.000Z',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 10]);
 });

@@ -10,6 +10,7 @@ const {
 const {
   buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
+  extractQuotedOriginalBody,
 } = require('../../server/services/instantly-original-message-source');
 const { createMailboxService } = require('../../server/services/mailbox');
 const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
@@ -298,6 +299,39 @@ test('exact customer and delivered quote restore Ramon emoji and the proven dire
   assert.equal(restored.webdesignLinkUrl, exactUrl);
   assert.match(restored.body, /😁/u);
   assert.equal(requests.some((request) => /\/leads(?:\/|$)/.test(new URL(request.url).pathname)), false);
+});
+
+test('Instantly gebruikt de canonieke parser voor een inline Gmail-citaat', () => {
+  const providerBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website jt-voorbeeld.nl tegen.',
+    'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const rawSent = incoming({
+    id: 'jt-inline-sent',
+    body: { text: providerBody },
+  });
+  const rawReceived = incoming({
+    id: 'jt-inline-received',
+    body: {
+      text: [
+        'Dank voor je bericht, maar we hebben geen interesse.',
+        '',
+        'Op 19-08-2026 12:59 schreef Servé Creusen <serve-sender@example.com>: Goedendag,',
+        '',
+        ...providerBody.split('\n').slice(2),
+      ].join('\n'),
+    },
+  });
+
+  assert.equal(extractQuotedOriginalBody([rawSent, rawReceived], {
+    accountEmail: 'serve-sender@example.com',
+    providerBody,
+    sourceMessageId: 'jt-inline-sent',
+  }), providerBody);
 });
 
 test('MHC current CTA restores the exact quoted body and link across a proven same-owner alias', async () => {

@@ -26,8 +26,14 @@ const ownerSessionModule = require('../../assets/premium-mailbox-owner-session.j
 const provenanceModule = require('../../assets/premium-mailbox-message-provenance.js');
 global.SoftoraMailboxMessageProvenance = provenanceModule;
 const quotedThreadModule = require('../../assets/premium-mailbox-quoted-thread.js');
-global.SoftoraMailboxQuotedThread = quotedThreadModule;
+delete global.SoftoraMailboxQuotedThread;
 const campaignInboxModule = require('../../assets/premium-mailbox-campaign-inbox.js');
+const commonJsCanonicalQuoteBody = campaignInboxModule.stripQuotedReply([
+  'Nieuw menselijk antwoord.',
+  '',
+  'Op 19-08-2026 12:59 schreef Servé Creusen: Geciteerd bericht.',
+].join('\n'));
+global.SoftoraMailboxQuotedThread = quotedThreadModule;
 global.SoftoraMailboxCampaignInbox = campaignInboxModule;
 const imagesModule = require('../../assets/premium-mailbox-images.js');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
@@ -118,9 +124,9 @@ function readUiStateScript() {
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260820a/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260818a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260820a/);
   assert.match(readPage(), /assets\/premium-mailbox-discovery\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(readPage(), /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
@@ -130,11 +136,15 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260817d/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260818a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260820a/);
   assert.match(readPage(), /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(readPage(), /assets\/premium-mailbox-compose\.js\?v=20260818b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   assert.match(readPage(), /assets\/premium-mailbox-detail-state\.js\?v=20260813a/);
+});
+
+test('campaign inbox laadt de canonieke quoteparser ook zelfstandig via CommonJS', () => {
+  assert.equal(commonJsCanonicalQuoteBody, 'Nieuw menselijk antwoord.');
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -2648,6 +2658,253 @@ test('mailbox bewaart Moniques handtekening na een bewezen Gmail-citaat', () => 
   assert.equal((html.match(/Afgelopen week kwam ik jullie website dierenkliniektspoor\.nl tegen\./g) || []).length, 1);
 });
 
+test('mailbox verwijdert JT inline Gmail-citaat uit grijs en toont de bewezen Servé-mail eenmaal roze', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website jt-voorbeeld.nl tegen.',
+    'Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const incomingBody = [
+    'Dank voor je bericht, maar we hebben op dit moment geen interesse.',
+    '',
+    'Op 19-08-2026 12:59 schreef Servé Creusen: Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website jt-voorbeeld.nl tegen.',
+    'Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:jt-inline',
+    mail: {
+      id: 'inbox:jt-inline',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-19T11:03:00.000Z',
+      inReplyTo: '<jt-parent@softora.nl>',
+      threadMessages: [{
+        id: 'sent:jt-parent',
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        messageId: '<jt-parent@softora.nl>',
+        date: '2026-08-19T10:59:00.000Z',
+        body: sentBody,
+        originalCampaignOutbound: true,
+      }],
+    },
+  });
+
+  assert.match(html, /Dank voor je bericht, maar we hebben op dit moment geen interesse\./);
+  assert.doesNotMatch(html, /Op 19-08-2026 12:59 schreef Servé Creusen/);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website jt-voorbeeld\.nl tegen\./g) || []).length, 1);
+  assert.match(html, /detail-mail-section-sent/);
+  assert.match(html, /Jouw bericht/);
+
+  const noParentHtml = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:jt-inline-without-parent',
+    mail: {
+      id: 'inbox:jt-inline-without-parent',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-19T11:03:00.000Z',
+      threadMessages: [],
+    },
+  });
+  assert.match(noParentHtml, /Dank voor je bericht, maar we hebben op dit moment geen interesse\./);
+  assert.doesNotMatch(noParentHtml, /Op 19-08-2026|jt-voorbeeld\.nl/);
+});
+
+test('quoteparent mag een ander alias van dezelfde eigenaar gebruiken maar kruist Servé en Martijn nooit', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Dit is een lang genoeg exact campagnebericht voor dezelfde eigenaar en een ander afzenderalias.',
+  ].join('\n');
+  const incomingBody = [
+    'Dit is de menselijke reactie.',
+    '',
+    'Op 19 aug 2026 om 12:59 schreef Servé Creusen <serve290@gmail.com>:',
+    ...sentBody.split('\n').map((line) => `> ${line}`),
+  ].join('\n');
+  const baseMail = {
+    id: 'inbox:same-owner-alias',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    receivedAt: '2026-08-19T11:03:00.000Z',
+  };
+  const serveAlias = {
+    id: 'sent:serve-alias',
+    folder: 'sent',
+    accountEmail: 'serve290@gmail.com',
+    date: '2026-08-19T10:59:00.000Z',
+    body: sentBody,
+  };
+
+  assert.equal(
+    campaignInboxModule.stripProvenQuotedOutbound(incomingBody, {
+      ...baseMail,
+      threadMessages: [serveAlias],
+    }),
+    'Dit is de menselijke reactie.'
+  );
+  assert.equal(
+    campaignInboxModule.stripProvenQuotedOutbound(incomingBody, {
+      ...baseMail,
+      threadMessages: [{
+        ...serveAlias,
+        id: 'sent:martijn-alias',
+        accountEmail: 'martijnven123@gmail.com',
+      }],
+    }),
+    incomingBody
+  );
+});
+
+test('quoteparent moet ouder zijn dan de reactie en een gewone Van-zin blijft zichtbaar', () => {
+  const sentBody = 'Dit is een lang genoeg identiek uitgaand bericht dat nooit vanuit de toekomst als parent mag worden gekozen.';
+  const incomingBody = [
+    'Dit is de menselijke reactie.',
+    '',
+    'Op 19 aug 2026 om 12:59 schreef Servé Creusen:',
+    `> ${sentBody}`,
+  ].join('\n');
+  const future = quotedThreadModule.stripProvenQuotedOutbound(incomingBody, [{
+    id: 'sent:future',
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    date: '2026-08-19T13:30:00.000Z',
+    body: sentBody,
+  }], {
+    incomingAt: '2026-08-19T11:03:00.000Z',
+  });
+  const past = quotedThreadModule.stripProvenQuotedOutbound(incomingBody, [{
+    id: 'sent:past',
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    date: '2026-08-19T10:59:00.000Z',
+    body: sentBody,
+  }], {
+    incomingAt: '2026-08-19T11:03:00.000Z',
+  });
+
+  assert.equal(future.body, incomingBody);
+  assert.deepEqual(future.matchedMessages, []);
+  assert.equal(past.body, 'Dit is de menselijke reactie.');
+
+  const legitimateBody = [
+    'Mijn echte antwoord bevat onderstaande afspraak.',
+    'Van: onze kant is dit akkoord.',
+    'Daarmee kunnen jullie verder.',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(legitimateBody, [], {
+    replyMailId: 'inbox:legitimate-van',
+    mail: {
+      id: 'inbox:legitimate-van',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-19T11:03:00.000Z',
+      threadMessages: [],
+    },
+  });
+  assert.match(html, /Van: onze kant is dit akkoord\./);
+  assert.match(html, /Daarmee kunnen jullie verder\./);
+});
+
+test('normale schreef-zinnen worden nooit citaatheaders en houden autoreplydetectie intact', () => {
+  const dutchBody = [
+    'Op basis hiervan schreef ik: de klant krijgt vandaag antwoord.',
+    'Dit bericht is automatisch gegenereerd.',
+  ].join('\n');
+  const englishBody = [
+    'On Tuesday we wrote: this internal note together.',
+    'This is an automated message.',
+  ].join('\n');
+
+  assert.deepEqual(quotedThreadModule.findQuotedSegments(dutchBody).segments, []);
+  assert.deepEqual(quotedThreadModule.findQuotedSegments(englishBody).segments, []);
+  assert.equal(campaignInboxModule.stripQuotedReply(dutchBody), dutchBody);
+  assert.equal(campaignInboxModule.stripQuotedReply(englishBody), englishBody);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply({ body: dutchBody }), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply({ body: englishBody }), true);
+
+  const html = renderMailboxBodyForTest(dutchBody, [], {
+    replyMailId: 'inbox:natural-wrote-sentence',
+    mail: {
+      id: 'inbox:natural-wrote-sentence',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-19T11:03:00.000Z',
+      threadMessages: [],
+    },
+  });
+  assert.match(html, /Op basis hiervan schreef ik: de klant krijgt vandaag antwoord\./);
+  assert.match(html, /Dit bericht is automatisch gegenereerd\./);
+});
+
+test('kort bewezen citaat verdwijnt uit grijs en blijft exact eenmaal roze', () => {
+  const sentBody = 'Kunnen we bellen?';
+  const incomingBody = [
+    'Ja, morgenmiddag past goed.',
+    '',
+    'Op 19 aug 2026 om 12:59 schreef Servé Creusen:',
+    `> ${sentBody}`,
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:short-proven-quote',
+    mail: {
+      id: 'inbox:short-proven-quote',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-19T11:03:00.000Z',
+      threadMessages: [{
+        id: 'sent:short-proven-quote',
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        date: '2026-08-19T10:59:00.000Z',
+        body: sentBody,
+        originalCampaignOutbound: true,
+      }],
+    },
+  });
+
+  assert.match(html, /Ja, morgenmiddag past goed\./);
+  assert.doesNotMatch(html, /Op 19 aug 2026 om 12:59 schreef/);
+  assert.equal((html.match(/Kunnen we bellen\?/g) || []).length, 1);
+  assert.match(html, /detail-mail-section-sent/);
+});
+
+test('ongeldige receivedAt valt terug op internalDate en laat geen toekomstige quoteparent toe', () => {
+  const sentBody = 'Dit is een lang genoeg bewezen uitgaand bericht dat nooit vanuit de volgende dag als quoteparent mag worden gekozen.';
+  const incomingBody = [
+    'Dit antwoord moet volledig zichtbaar blijven.',
+    '',
+    'Op 19 aug 2026 om 12:59 schreef Servé Creusen:',
+    `> ${sentBody}`,
+  ].join('\n');
+  const mail = {
+    id: 'inbox:invalid-received-at',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    receivedAt: 'geen-geldige-datum',
+    internalDate: '2026-08-19T11:03:00.000Z',
+    threadMessages: [{
+      id: 'sent:future-invalid-received-at',
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      date: '2026-08-20T11:03:00.000Z',
+      body: sentBody,
+      originalCampaignOutbound: true,
+    }],
+  };
+
+  assert.equal(campaignInboxModule.stripProvenQuotedOutbound(incomingBody, mail), incomingBody);
+});
+
 test('mailbox toont TTV Irene als nieuwe Steven-tekst plus één bewezen roze coldmail', () => {
   const sentBody = [
     'Goedendag,',
@@ -3118,9 +3375,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260818a/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260818a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260820a/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260820a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260820a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -3216,7 +3473,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260818a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260818a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260820a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -6149,7 +6406,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260817d/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260818a/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260820a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);

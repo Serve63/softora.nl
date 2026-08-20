@@ -1,4 +1,5 @@
 const SENT_CAMPAIGN_IMAGE_OWNER = 'sent-campaign';
+const quotedThread = require('../../assets/premium-mailbox-quoted-thread.js');
 
 function normalizeCampaignText(value) {
   return String(value || '')
@@ -10,10 +11,7 @@ function normalizeCampaignText(value) {
 }
 
 function getAuthoredMessageText(value) {
-  const source = String(value || '').replace(/\r\n?/g, '\n');
-  const replyHeader = /^(?:op .+\b(?:schreef(?:\s+[^:\n]+)?|heeft .+ geschreven)\s*:|on .+\bwrote\s*:|van:\s|from:\s|[- ]*oorspronkelijk(?:e)? bericht[- ]*)/im;
-  const match = replyHeader.exec(source);
-  return (match ? source.slice(0, match.index) : source).trim();
+  return quotedThread.splitQuotedThread(value).authored;
 }
 
 function isOriginalCampaignOutboundMessage(message = {}) {
