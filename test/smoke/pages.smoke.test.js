@@ -149,6 +149,21 @@ test('page smoke: /premium-pakketten blijft de interne premium pakkettenroute', 
   assert.notEqual(locationPath.split('?')[0], '/pakketten');
 });
 
+test('page smoke: /premium-samenvatten is een beschermde premiumroute', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/premium-samenvatten`, {
+    cache: 'no-store',
+    redirect: 'manual',
+  });
+  const location = response.headers.get('location') || '';
+  const locationPath = location.startsWith('http')
+    ? `${new URL(location).pathname}${new URL(location).search}`
+    : location;
+
+  assert.equal(response.status, 302);
+  assert.match(locationPath, /^\/premium-personeel-login\?/);
+  assert.match(locationPath, /(?:\?|&)next=%2Fpremium-samenvatten(?:&|$)/);
+});
+
 test('page smoke: /premium-blog redirects to the public blog foundation', async () => {
   const response = await fetch(`${serverRef.baseUrl}/premium-blog`, {
     cache: 'no-store',
@@ -297,6 +312,7 @@ const premiumSidebarThemeVersionTargets = [
   'premium-mailbox.html',
   'premium-opdracht-dossier.html',
   'premium-pakketten.html',
+  'premium-samenvatten.html',
   'premium-pdfs.html',
   'premium-personeel-agenda.html',
   'premium-personeel-dashboard.html',

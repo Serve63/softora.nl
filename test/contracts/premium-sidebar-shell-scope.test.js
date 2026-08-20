@@ -1085,6 +1085,24 @@ test('static premium sidebars share the same section order and public labels', (
   }
 });
 
+test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar', () => {
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
+  const pageSource = readRepoFile('premium-samenvatten.html');
+
+  assert.match(themeSource, /if \(p\.indexOf\("\/premium-samenvatten"\) === 0\) return "summarize"/);
+  assert.match(sidebarLinksSource, /function getSummarizeSidebarLink\(\)[\s\S]*key:\s*'summarize'[\s\S]*href:\s*'\/premium-samenvatten'[\s\S]*label:\s*'Samenvatten'/);
+  assert.match(sidebarLinksSource, /Object\.freeze\(\{ getLeadRadarSidebarLink, getSummarizeSidebarLink \}\)/);
+  assert.match(themeSource, /getMailboxSidebarLink\(\),\s*window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\),/);
+  assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "beheer", window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\), \["websitegenerator", "seo", "qr_code", "packages"\]\)/);
+  const comingSoonKeys = themeSource.match(/const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
+  assert.doesNotMatch(comingSoonKeys, /"summarize"/);
+  assert.match(pageSource, /<title>Samenvatten – Softora\.nl<\/title>/);
+  assert.match(pageSource, /data-sidebar-shell="canonical"/);
+  assert.match(pageSource, /assets\/premium-sidebar-links\.js\?v=20260818a/);
+  assert.match(pageSource, /assets\/personnel-theme\.js\?v=20260519b/);
+});
+
 test('unified premium sidebar splits ad channels from social media channels', () => {
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
 

@@ -10,5 +10,14 @@
     };
   }
 
-  window.SoftoraPremiumSidebarLinks = Object.freeze({ getLeadRadarSidebarLink });
+  function getSummarizeSidebarLink() {
+    return {
+      key: 'summarize',
+      href: '/premium-samenvatten',
+      label: 'Samenvatten',
+      icon: '<svg class="sidebar-link-summarize-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg>',
+    };
+  }
+
+  window.SoftoraPremiumSidebarLinks = Object.freeze({ getLeadRadarSidebarLink, getSummarizeSidebarLink });
 }());
