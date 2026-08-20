@@ -416,8 +416,14 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(updateCardSource, /updateProgress\(\);\s*onStateChange\(\);/);
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
-  assert.match(endGameCardsJs, /officeDetail\.className = \`end-game-card-office-detail end-game-card-office-detail--\\\${card\.officeDetail}\`/);
-  assert.match(endGameCardsJs, /artwork\.classList\.add\(\`end-game-card-photo--office-\\\${card\.officeDetail}\`\)/);
+  assert.equal(
+    endGameCardsJs.includes('officeDetail.className = `end-game-card-office-detail end-game-card-office-detail--${card.officeDetail}`;'),
+    true
+  );
+  assert.equal(
+    endGameCardsJs.includes('artwork.classList.add(`end-game-card-photo--office-${card.officeDetail}`);'),
+    true
+  );
   assert.match(endGameCardsJs, /if \(card\.officeDetail\) artwork\.append\(officeDetail\)/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /const imageId = card\.imageId \|\| card\.id/);
