@@ -624,11 +624,19 @@ test('foreground refresh status is exclusive while active, successful, partial a
     attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
   };
+  const button = {
+    disabled: false,
+    attributes: {},
+    classList: { values: new Set(), toggle(name, active) { active ? this.values.add(name) : this.values.delete(name); } },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener() {},
+  };
   let mode = 'success';
   let releaseFirstRequest;
   const controller = refreshModule.create({
     autoStart: false,
     ageLabel,
+    button,
     getFolder: () => 'outreach',
     getOwner: () => 'serve',
     fetch: async (url) => {
@@ -649,9 +657,12 @@ test('foreground refresh status is exclusive while active, successful, partial a
   });
 
   assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
+  assert.equal(button.attributes['aria-label'], 'Mailbox nu controleren voor serve');
+  assert.equal(button.attributes.title, 'Mailbox nu controleren voor serve');
   assert.equal(await controller.refresh(), true);
   assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   assert.match(ageLabel.attributes.title, /^Laatste volledige providercontrole voor serve:/);
+  assert.match(button.attributes['aria-label'], /^Mailbox opnieuw controleren voor serve; laatste volledige controle om /);
 
   mode = 'pending';
   const pendingRefresh = controller.refresh({ manual: true });
@@ -659,6 +670,9 @@ test('foreground refresh status is exclusive while active, successful, partial a
   assert.equal(ageLabel.textContent, 'Controleren…');
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
   assert.equal(ageLabel.attributes['aria-label'], 'Mailboxproviders worden gecontroleerd voor serve.');
+  assert.equal(button.attributes['aria-label'], 'Mailboxcontrole bezig voor serve');
+  assert.equal(button.attributes.title, 'Mailboxcontrole bezig voor serve');
+  assert.equal(button.attributes['aria-busy'], 'true');
   releaseFirstRequest(successfulResponse());
   assert.equal(await pendingRefresh, true);
 
@@ -666,17 +680,21 @@ test('foreground refresh status is exclusive while active, successful, partial a
   assert.equal(await controller.refresh(), false);
   assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
+  assert.equal(button.attributes['aria-label'], 'Mailbox deels bijgewerkt voor serve; opnieuw controleren');
+  assert.equal(button.attributes['aria-busy'], 'false');
 
   mode = 'error';
   assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
-  assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
-  assert.match(ageLabel.attributes.title, /Tijdelijke verbindingsstoring/);
-  assert.doesNotMatch(ageLabel.textContent, /mislukt/i);
+  assert.equal(ageLabel.textContent, 'Verbindingsfout · opnieuw proberen');
+  assert.doesNotMatch(ageLabel.textContent, /geleden/);
+  assert.match(ageLabel.attributes.title, /Verbindingsfout/);
+  assert.match(ageLabel.attributes.title, /automatisch herstel blijft actief/);
+  assert.equal(button.attributes['aria-label'], 'Verbindingsfout voor serve; mailbox opnieuw controleren');
+  assert.equal(button.attributes.title, 'Verbindingsfout voor serve; mailbox opnieuw controleren');
   controller.destroy();
 });
 
-test('background poll blijft stil en een handmatige overlap coalescet naar dezelfde request', async () => {
+test('automatische initial background poll toont checking en een handmatige overlap coalescet', async () => {
   const ageLabel = {
     textContent: '', attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
@@ -689,6 +707,7 @@ test('background poll blijft stil en een handmatige overlap coalescet naar dezel
   };
   let release;
   let requestCount = 0;
+  const timers = [];
   const controller = refreshModule.create({
     autoStart: false,
     ageLabel,
@@ -700,18 +719,24 @@ test('background poll blijft stil en een handmatige overlap coalescet naar dezel
       return new Promise((resolve) => { release = resolve; });
     },
     loadMessages: async () => true,
-    setTimeout: () => 1,
+    setTimeout(handler, delay) { timers.push({ handler, delay }); return timers.length; },
     clearTimeout() {},
+    setInterval: () => 1,
+    clearInterval() {},
   });
 
-  const background = controller.refresh();
+  controller.start();
+  assert.equal(timers[0].delay, 0);
+  timers[0].handler();
   await Promise.resolve();
-  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
-  assert.equal(button.disabled, false);
-  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 1, status: 'idle' });
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(ageLabel.attributes['aria-label'], 'Mailboxproviders worden gecontroleerd voor martijn@softora.nl.');
+  assert.equal(button.disabled, true);
+  assert.equal(button.attributes['aria-busy'], 'true');
+  assert.equal(button.attributes['aria-label'], 'Mailboxcontrole bezig voor martijn@softora.nl');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 1, status: 'checking' });
 
   const foreground = controller.refresh({ manual: true });
-  assert.equal(foreground, background);
   assert.equal(requestCount, 1);
   assert.equal(ageLabel.textContent, 'Controleren…');
   assert.equal(button.disabled, true);
@@ -721,7 +746,151 @@ test('background poll blijft stil en een handmatige overlap coalescet naar dezel
   assert.equal(await foreground, true);
   assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   assert.equal(button.disabled, false);
+  assert.equal(button.attributes['aria-busy'], 'false');
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
+  controller.destroy();
+});
+
+test('eerste background failure toont expliciet herstel zonder eerdere succesvolle controle', async () => {
+  const ageLabel = {
+    textContent: '', attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  const button = {
+    disabled: false, attributes: {},
+    classList: { values: new Set(), toggle(name, active) { active ? this.values.add(name) : this.values.delete(name); } },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener() {},
+  };
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    button,
+    getFolder: () => 'inbox',
+    getAccount: () => 'serve@softora.nl',
+    fetch: async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'provider niet bereikbaar' }),
+    }),
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  const background = controller.refresh();
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(button.disabled, true);
+  assert.equal(await background, false);
+  assert.equal(ageLabel.textContent, 'Verbindingsfout · opnieuw proberen');
+  assert.equal(ageLabel.attributes['aria-label'], 'Verbindingsfout voor serve@softora.nl; de huidige mailbox blijft zichtbaar. Klik om opnieuw te proberen; automatisch herstel blijft actief.');
+  assert.equal(button.attributes['aria-label'], 'Verbindingsfout voor serve@softora.nl; mailbox opnieuw controleren');
+  assert.equal(button.disabled, false);
+  assert.equal(button.attributes['aria-busy'], 'false');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'recovering' });
+  controller.destroy();
+});
+
+test('ownerwissel tijdens checking toont nooit de status van de oude owner', async () => {
+  const ageLabel = {
+    textContent: '', attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  const button = {
+    disabled: false, attributes: {},
+    classList: { values: new Set(), toggle(name, active) { active ? this.values.add(name) : this.values.delete(name); } },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener() {},
+  };
+  let owner = 'serve';
+  let releaseOldOwner;
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    button,
+    getFolder: () => 'outreach',
+    getOwner: () => owner,
+    fetch: () => new Promise((resolve) => { releaseOldOwner = resolve; }),
+    loadMessages: async () => true,
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  const oldOwnerRefresh = controller.refresh();
+  await Promise.resolve();
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(ageLabel.attributes['aria-label'], 'Mailboxproviders worden gecontroleerd voor serve.');
+
+  owner = 'martijn';
+  controller.scopeChanged();
+  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
+  assert.equal(ageLabel.attributes['aria-label'], 'Laatste volledige providercontrole voor martijn: nog niet voltooid');
+  assert.equal(button.attributes['aria-label'], 'Mailbox nu controleren voor martijn');
+  assert.equal(button.disabled, false);
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'idle' });
+
+  releaseOldOwner(successfulResponse());
+  assert.equal(await oldOwnerRefresh, false);
+  assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
+  assert.equal(ageLabel.attributes['aria-label'], 'Laatste volledige providercontrole voor martijn: nog niet voltooid');
+  assert.equal(button.attributes['aria-label'], 'Mailbox nu controleren voor martijn');
+  assert.doesNotMatch(ageLabel.attributes['aria-label'], /serve/);
+  assert.doesNotMatch(button.attributes['aria-label'], /serve/);
+  controller.destroy();
+});
+
+test('uitgestelde mailboxboot toont direct controleren en houdt automatisch herstel bereikbaar', async () => {
+  const ageLabel = {
+    textContent: '', attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  const button = {
+    disabled: false, attributes: {},
+    classList: { values: new Set(), toggle(name, active) { active ? this.values.add(name) : this.values.delete(name); } },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener() {},
+  };
+  const timers = [];
+  const releases = [];
+  const controller = refreshModule.create({
+    autoStart: false,
+    initiallyChecking: true,
+    ageLabel,
+    button,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: () => new Promise((resolve) => { releases.push(resolve); }),
+    loadMessages: async () => true,
+    setTimeout(handler, delay) { timers.push({ handler, delay }); return timers.length; },
+    clearTimeout() {},
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(button.disabled, true);
+  assert.equal(button.attributes['aria-busy'], 'true');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'checking' });
+
+  controller.scopeChanged();
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(button.disabled, true);
+  assert.equal(button.attributes['aria-busy'], 'true');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'checking' });
+
+  controller.start();
+  assert.equal(timers[0].delay, 0);
+  timers[0].handler();
+  await Promise.resolve();
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.equal(button.disabled, true);
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 1, status: 'checking' });
+
+  releases[0](successfulResponse());
+  await new Promise((resolve) => setImmediate(resolve));
+  releases[1](successfulResponse());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(button.disabled, false);
   controller.destroy();
 });
 
@@ -761,7 +930,7 @@ test('handmatige provider-timeout ruimt foreground token en spinner direct in fi
   timeoutHandlers[0]();
   assert.equal(await pending, false);
   assert.equal(button.disabled, false);
-  assert.equal(ageLabel.textContent, 'Opnieuw verbinden…');
+  assert.equal(ageLabel.textContent, 'Verbindingsfout · opnieuw proberen');
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'recovering' });
   controller.destroy();
 });

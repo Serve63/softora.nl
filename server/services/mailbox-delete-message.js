@@ -29,9 +29,15 @@ function createMailboxVisibilityService(deps = {}) {
     const supplied = Array.isArray(input.messages) && input.messages.length
       ? input.messages
       : [input];
+    if (supplied.length > MAX_CONVERSATION_MESSAGES) {
+      throw createStatusError(
+        `Dit gesprek bevat meer dan ${MAX_CONVERSATION_MESSAGES} geladen berichten en is daarom niet gedeeltelijk verborgen.`,
+        413
+      );
+    }
     const targets = [];
     const seen = new Set();
-    supplied.slice(0, MAX_CONVERSATION_MESSAGES).forEach((source) => {
+    supplied.forEach((source) => {
       const requestedAccount = source.account || source.accountEmail || input.accountEmail;
       const requestedFolder = String(source.folder || input.folder || '').trim().toLowerCase();
       const account = requestedFolder === 'instantly'
@@ -71,6 +77,8 @@ function createMailboxVisibilityService(deps = {}) {
       throw createStatusError('Softora-mailboxweergave kan deze actie nog niet duurzaam opslaan.');
     }
     const completed = [];
+    const resolvedMessages = [];
+    const resolvedKeys = new Set();
     try {
       for (const target of targets) {
         await assertTargetAuthorized(target);
@@ -92,6 +100,25 @@ function createMailboxVisibilityService(deps = {}) {
           throw error;
         }
         completed.push(target);
+        const rows = Array.isArray(result.data) && result.data.length ? result.data : [{}];
+        rows.forEach((row) => {
+          const accountEmail = String(row.account_email || row.accountEmail || target.account.email).trim().toLowerCase();
+          const folder = String(row.folder || target.messageRef.folder).trim().toLowerCase();
+          const uid = Number(row.uid || target.messageRef.uid) || 0;
+          const id = String(row.provider_id || row.id || target.id).trim();
+          const key = `${accountEmail}|${folder}|${uid || id}`;
+          if (!accountEmail || (!uid && !id) || resolvedKeys.has(key)) return;
+          resolvedKeys.add(key);
+          resolvedMessages.push({
+            account: accountEmail,
+            accountEmail,
+            folder,
+            uid,
+            id,
+            messageId: String(row.message_id || row.messageId || '').trim(),
+            messageKey: String(row.message_key || row.messageKey || '').trim(),
+          });
+        });
       }
     } catch (error) {
       const rollback = hidden
@@ -111,6 +138,7 @@ function createMailboxVisibilityService(deps = {}) {
       }
       throw error;
     }
+    return resolvedMessages;
   }
 
   async function removeTargetsFromCampaignSnapshot(targets) {
@@ -121,11 +149,20 @@ function createMailboxVisibilityService(deps = {}) {
       let serialized = rawValue;
       let changed = false;
       targets.forEach((target) => {
+        const accountEmail = String(
+          target?.accountEmail || target?.account?.email || target?.account || ''
+        ).trim().toLowerCase();
+        const folder = String(
+          target?.folder || target?.messageRef?.folder || 'inbox'
+        ).trim().toLowerCase();
+        const uid = Number(target?.uid || target?.messageRef?.uid) || 0;
         const result = removeMailboxCampaignSnapshotMessage(serialized, {
-          accountEmail: target.account.email,
-          folder: target.messageRef.folder,
+          accountEmail,
+          folder,
           id: target.id,
-          uid: target.messageRef.uid,
+          uid,
+          messageId: target.messageId,
+          messageKey: target.messageKey,
         });
         serialized = result.serialized;
         changed = changed || result.changed;
@@ -134,7 +171,12 @@ function createMailboxVisibilityService(deps = {}) {
       await setUiStateValues(
         MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
         { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serialized },
-        { source: 'mailbox-view-hide', actor: targets[0].account.email }
+        {
+          source: 'mailbox-view-hide',
+          actor: String(
+            targets[0]?.accountEmail || targets[0]?.account?.email || targets[0]?.account || ''
+          ).trim().toLowerCase(),
+        }
       );
       return true;
     } catch (error) {
@@ -145,23 +187,27 @@ function createMailboxVisibilityService(deps = {}) {
 
   async function hideConversation(input) {
     const targets = normalizeTargets(input);
-    await updateIndex(targets, true);
-    const snapshotUpdated = await removeTargetsFromCampaignSnapshot(targets);
+    const resolvedMessages = await updateIndex(targets, true);
+    const snapshotUpdated = await removeTargetsFromCampaignSnapshot(resolvedMessages);
     return {
       hidden: true,
       sourceMailboxMutated: false,
       messageCount: targets.length,
+      resolvedMessageCount: resolvedMessages.length,
+      resolvedMessages,
       snapshotUpdated,
     };
   }
 
   async function restoreConversation(input) {
     const targets = normalizeTargets(input);
-    await updateIndex(targets, false);
+    const resolvedMessages = await updateIndex(targets, false);
     return {
       restored: true,
       sourceMailboxMutated: false,
       messageCount: targets.length,
+      resolvedMessageCount: resolvedMessages.length,
+      resolvedMessages,
     };
   }
 

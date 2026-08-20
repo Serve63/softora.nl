@@ -62,10 +62,17 @@
   function mergeContactTimeline(root, messages, contactEmail, totalCount, options = {}) {
     const normalizedContact = normalizeEmail(contactEmail);
     const accountEmails = Array.isArray(options.accountEmails) ? options.accountEmails : [];
+    const allowedAccounts = new Set(accountEmails.map(normalizeEmail).filter(Boolean));
+    const canonicalOwner = String(options.canonicalOwner || '').trim().toLowerCase();
     let rejectedCount = Math.max(0, Number(options.rejectedCountOffset) || 0);
     const normalized = (Array.isArray(messages) ? messages : []).filter((message) => {
       if (!accountEmails.length || getMessageIdentity(message) === getMessageIdentity(root)) return true;
-      const matches = resolveExternalContact(message, accountEmails) === normalizedContact;
+      const messageAccount = normalizeEmail(message?.accountEmail || message?.providerAccountEmail);
+      const matchesOwner = canonicalOwner && typeof options.getMessageOwner === 'function'
+        ? String(options.getMessageOwner(message) || '').trim().toLowerCase() === canonicalOwner
+        : allowedAccounts.has(messageAccount);
+      const matches = matchesOwner &&
+        resolveExternalContact(message, accountEmails) === normalizedContact;
       if (!matches) rejectedCount += 1;
       return matches;
     });
@@ -98,8 +105,11 @@
   }
 
   function getSearchResultKey(message) {
+    const owner = String(message?.canonicalOwner || message?.owner || '').trim().toLowerCase();
+    const contact = normalizeEmail(message?.externalContactEmail);
+    if (owner && contact) return `contact|${owner}|${contact}`;
     return [
-      String(message?.owner || message?.canonicalOwner || '').trim().toLowerCase(),
+      owner,
       String(message?.provider || message?.providerKind || '').trim().toLowerCase(),
       normalizeEmail(message?.accountEmail || message?.providerAccountEmail),
       normalizeEmail(message?.externalContactEmail),
@@ -229,11 +239,12 @@
           normalized.searchQuery = query;
           normalized.externalContactEmail = message.externalContactEmail || normalized.externalContactEmail || '';
           normalized.technicalThreadKey = message.technicalThreadKey || normalized.technicalThreadKey || '';
+          normalized.canonicalOwner = message.canonicalOwner || normalized.canonicalOwner || '';
           return normalized;
         });
         const existing = append ? (options.getMessages?.() || []) : [];
-        const byIdentity = new Map(existing.map((message) => [getMessageIdentity(message), message]));
-        incoming.forEach((message) => byIdentity.set(getMessageIdentity(message), message));
+        const byIdentity = new Map(existing.map((message) => [getSearchResultKey(message), message]));
+        incoming.forEach((message) => byIdentity.set(getSearchResultKey(message), message));
         const resultMessages = Array.from(byIdentity.values());
         resultMessages.forEach((message) => { message.searchResultKey = getSearchResultKey(message); });
         searchResultKeys = new Set(resultMessages.map(getSearchResultKey));
@@ -305,7 +316,13 @@
       timelineController = typeof AbortController === 'function' ? new AbortController() : null;
       mail.contactTimelineLoading = true;
       try {
-        const params = new URLSearchParams({ contact: contactEmail, owner: options.getOwner?.() || 'both', limit: '50' });
+        const timelineOwner = mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || 'both';
+        const timelineAccounts = options.getAccountEmails?.();
+        const params = new URLSearchParams({
+          contact: contactEmail,
+          owner: timelineOwner,
+          limit: '50',
+        });
         if (append && mail.contactTimelineNextCursor) params.set('cursor', mail.contactTimelineNextCursor);
         const response = await fetchImpl(`/api/mailbox/contact-timeline?${params}`, {
           credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
@@ -318,7 +335,9 @@
         const prior = append && mail.contactTimelineLoaded ? [mail, ...(mail.threadMessages || [])] : [];
         const rows = [...prior, ...incoming];
         mergeContactTimeline(mail, rows, contactEmail, data.totalCount, {
-          accountEmails: options.getAccountEmails?.(),
+          accountEmails: timelineAccounts,
+          canonicalOwner: timelineOwner,
+          getMessageOwner: options.getMessageOwner,
           rejectedCountOffset: append ? mail.contactTimelineRejectedCount : 0,
         });
         mail.contactTimelineNeedsRefresh = false;

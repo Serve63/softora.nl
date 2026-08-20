@@ -225,7 +225,6 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
     ]),
   });
   const res = createResponseRecorder();
-
   await service.accountsResponse({}, res);
 
   assert.equal(res.statusCode, 200);
@@ -2870,6 +2869,23 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     },
   });
   const res = createResponseRecorder();
+  const expectedResolvedMessages = [{
+    account: 'serve@softora.nl',
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+    id: 'inbox:42',
+    messageId: '',
+    messageKey: '',
+  }, {
+    account: 'serve@softora.nl',
+    accountEmail: 'serve@softora.nl',
+    folder: 'sent',
+    uid: 7,
+    id: 'sent:7',
+    messageId: '',
+    messageKey: '',
+  }];
 
   await service.hideConversationResponse(
     {
@@ -2891,6 +2907,8 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     hidden: true,
     sourceMailboxMutated: false,
     messageCount: 2,
+    resolvedMessageCount: 2,
+    resolvedMessages: expectedResolvedMessages,
     snapshotUpdated: true,
   });
   assert.equal(imapClientCreations, 0);
@@ -2937,6 +2955,8 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
     restored: true,
     sourceMailboxMutated: false,
     messageCount: 2,
+    resolvedMessageCount: 2,
+    resolvedMessages: expectedResolvedMessages,
   });
   assert.equal(imapClientCreations, 0);
   assert.deepEqual(persistenceCalls.slice(-2), [
@@ -2953,6 +2973,42 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
       uid: 7,
     }],
   ]);
+});
+
+test('mailbox service weigert meer dan honderd gesprekberichten vóór elke gedeeltelijke tombstone-write', async () => {
+  const persistenceCalls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      name: 'Servé',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      markMessageDeleted: async (input) => {
+        persistenceCalls.push(input);
+        return { ok: true };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+  const messages = Array.from({ length: 101 }, (_value, index) => ({
+    account: 'serve@softora.nl',
+    id: `inbox:${index + 1}`,
+    uid: index + 1,
+    folder: 'inbox',
+  }));
+
+  await service.hideConversationResponse({ body: { messages } }, res);
+
+  assert.equal(res.statusCode, 413);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'Gesprek verbergen mislukt');
+  assert.deepEqual(persistenceCalls, []);
 });
 
 test('mailbox service strips tracking and standalone asset urls from display text', () => {

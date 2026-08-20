@@ -30,8 +30,25 @@
     return language === 'op' || core.includes(',');
   }
 
+  function isPlausibleReplyAuthor(value) {
+    const author = String(value || '').trim();
+    if (!author || author.length > 160 || author.split(/\s+/).length > 16) return false;
+    if (/^(?:ik|wij|we|jij|je|u|hij|zij|ze|i|you|he|she|they)$/i.test(author)) return false;
+    if (/^(?:volgens|omdat|toen|hier|daar|deze|dit|dat|ons|onze|mijn|jouw|uw|according|because|when|here|there|this|that|our|my|your)\b/i.test(author)) return false;
+    return /(?:[a-z\u00c0-\u024f]{2}|@)/i.test(author);
+  }
+
+  function isPlausibleReverseReplyHeaderCore(value) {
+    const core = cleanHeaderLine(value);
+    const match = /^(.+?)\s+(schreef\s+op|wrote\s+on)\s+(.+)$/i.exec(core);
+    if (!match || !isPlausibleReplyAuthor(match[1])) return false;
+    const datePart = String(match[3] || '').trim();
+    return REPLY_NUMERIC_DATE_PATTERN.test(datePart) || REPLY_MONTH_PATTERN.test(datePart);
+  }
+
   function isPlausibleReplyHeaderCore(value) {
     const core = cleanHeaderLine(value);
+    if (isPlausibleReverseReplyHeaderCore(core)) return true;
     const language = /^op\s+/i.test(core) ? 'op' : /^on\s+/i.test(core) ? 'on' : '';
     if (!language || !hasReplyDateEvidence(core, language)) return false;
 
@@ -53,6 +70,16 @@
 
   function parseReplyHeaderLine(value) {
     const line = cleanHeaderLine(value);
+    for (let index = 0; index < line.length; index += 1) {
+      if (line[index] !== ':') continue;
+      if (/\d/.test(line[index - 1] || '') && /\d/.test(line[index + 1] || '')) continue;
+      const core = line.slice(0, index).trim();
+      if (!isPlausibleReverseReplyHeaderCore(core)) continue;
+      return {
+        header: `${core}:`,
+        remainder: line.slice(index + 1).trim(),
+      };
+    }
     const colonPatterns = [
       /^(op\s+.+?\bheeft\s+.+?\s+(?:het\s+volgende\s+)?geschreven)\s*:\s*(.*)$/i,
       /^(op\s+.+?\bschreef(?:\s+[^:\n]+?)?)\s*:\s*(.*)$/i,
@@ -71,6 +98,8 @@
       /^op\s+.+?\bheeft\s+.+?\s+(?:het\s+volgende\s+)?geschreven$/i,
       /^op\s+.+?\bschreef(?:\s+[^:\n]+)?$/i,
       /^on\s+.+?\bwrote(?:\s+[^:\n]+)?$/i,
+      /^.+?\s+schreef\s+op\s+.+$/i,
+      /^.+?\s+wrote\s+on\s+.+$/i,
     ];
     if (
       !colonlessPatterns.some((pattern) => pattern.test(line)) ||
@@ -93,18 +122,18 @@
 
   const HEADER_PATTERNS = Object.freeze({
     from: /^(?:van|from|afzender|sender):\s*(?:\S|$)/i,
-    sent: /^(?:verzonden|sent|datum|date):\s*(?:\S|$)/i,
+    sent: /^(?:verzonden|verstuurd|sent|datum|date):\s*(?:\S|$)/i,
     to: /^(?:aan|to|ontvanger|recipient):\s*(?:\S|$)/i,
     subject: /^(?:onderwerp|subject):\s*(?:\S|$)/i,
     replyTo: /^(?:antwoord[ -]?aan|reply-to):\s*(?:\S|$)/i,
   });
 
-  const HEADER_LABEL_PATTERN = /^(van|from|afzender|sender|verzonden|sent|datum|date|aan|to|ontvanger|recipient|onderwerp|subject|antwoord[ -]?aan|reply-to):\s*(.*)$/i;
+  const HEADER_LABEL_PATTERN = /^(van|from|afzender|sender|verzonden|verstuurd|sent|datum|date|aan|to|ontvanger|recipient|onderwerp|subject|antwoord[ -]?aan|reply-to):\s*(.*)$/i;
 
   function normalizeHeaderField(value) {
     const label = String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
     if (['van', 'from', 'afzender', 'sender'].includes(label)) return 'from';
-    if (['verzonden', 'sent', 'datum', 'date'].includes(label)) return 'sent';
+    if (['verzonden', 'verstuurd', 'sent', 'datum', 'date'].includes(label)) return 'sent';
     if (['aan', 'to', 'ontvanger', 'recipient'].includes(label)) return 'to';
     if (['onderwerp', 'subject'].includes(label)) return 'subject';
     if (['antwoord aan', 'antwoord-aan', 'reply-to'].includes(label)) return 'replyTo';
@@ -309,6 +338,44 @@
     return `${account}|${messageId || id}`;
   }
 
+  function findTrailingReferenceAppendix(lines, minimumStart, evidenceSegments = []) {
+    const source = Array.isArray(lines) ? lines : [];
+    const startAt = Math.max(0, Number(minimumStart) || 0);
+    const evidenceText = (Array.isArray(evidenceSegments) ? evidenceSegments : [])
+      .map((segment) => source.slice(segment.start, segment.end).join('\n'))
+      .join('\n');
+    for (let index = source.length - 1; index >= startAt; index -= 1) {
+      const heading = String(source[index] || '').trim();
+      if (!/^(?:links|references|referenties):$/i.test(heading)) continue;
+      let targetCount = 0;
+      let valid = true;
+      const referenceNumbers = [];
+      for (let cursor = index + 1; cursor < source.length; cursor += 1) {
+        const line = String(source[cursor] || '').trim();
+        if (!line) continue;
+        if (/^[-_=]{2,}$/.test(line)) continue;
+        const numbered = /^(?:\[(\d+)\]|(\d+)[.)])\s+(.+)$/.exec(line);
+        if (!numbered) { valid = false; break; }
+        const target = String(numbered[3] || '').trim();
+        const markdownTarget = /^\[((?:https?:\/\/|mailto:)[^\]\s]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)$/i.exec(target);
+        const plainTarget = /^(?:<?https?:\/\/\S+>?|mailto:\S+)$/i.test(target);
+        if (!plainTarget && !(markdownTarget && markdownTarget[1] === markdownTarget[2])) {
+          valid = false;
+          break;
+        }
+        referenceNumbers.push(numbered[1] || numbered[2]);
+        targetCount += 1;
+      }
+      const hasCorrespondingMarker = referenceNumbers.some((number) => (
+        new RegExp(`\\[\\s*${number}\\s*\\]`).test(evidenceText)
+      ));
+      if (valid && targetCount && hasCorrespondingMarker) {
+        return { start: index, end: source.length };
+      }
+    }
+    return null;
+  }
+
   function normalizeMessageId(value) {
     return String(value || '')
       .trim()
@@ -389,13 +456,25 @@
     });
     if (!removed.length) return { body: String(value || '').trim(), removed: [], matchedMessages: [] };
 
-    const kept = parsed.lines.filter((_line, index) => !removed.some((segment) => (
-      index >= segment.start && index < segment.end
-    )));
+    const uniqueMatches = new Map();
+    matchedMessages.forEach((message) => {
+      const identity = messageIdentity(message);
+      if (identity && !uniqueMatches.has(identity)) uniqueMatches.set(identity, message);
+    });
+    const lastRemovedEnd = Math.max(...removed.map((segment) => segment.end));
+    const referenceAppendix = options.stripReferenceAppendixWhenSingleMatch === true && uniqueMatches.size === 1
+      ? findTrailingReferenceAppendix(parsed.lines, lastRemovedEnd, removed)
+      : null;
+
+    const kept = parsed.lines.filter((_line, index) => (
+      !removed.some((segment) => index >= segment.start && index < segment.end) &&
+      !(referenceAppendix && index >= referenceAppendix.start && index < referenceAppendix.end)
+    ));
     return {
       body: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
       removed,
       matchedMessages,
+      removedReferenceAppendix: Boolean(referenceAppendix),
     };
   }
 

@@ -64,7 +64,7 @@ function createMailboxIndexStore(deps = {}) {
 
   function isSoftIndexError(error) {
     const text = normalizeString(error && (error.message || error.details || error.hint || error.code || error));
-    return /(?:abort|timeout|timed out|fetch failed|network|econnreset|etimedout|temporar)/i.test(text);
+    return /(?:abort|timeout|timed out|fetch failed|network|econnreset|etimedout|temporar|serializ)/i.test(text);
   }
 
   function logSoftIndexError(label, error) {
@@ -993,51 +993,37 @@ function createMailboxIndexStore(deps = {}) {
     return { ...result, upserted: rows.length };
   }
 
-  async function markMessageDeleted({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+  async function setMessageVisibility({ accountEmail, folder = 'inbox', id = '', uid = 0 }, hidden) {
     const normalizedFolder = normalizeFolder(folder);
     const normalizedId = normalizeString(id);
     const parsedUid = normalizedFolder === 'instantly'
       ? 0
       : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
-    const result = await run('mark-message-deleted', (client) => {
-      const deletedAt = isoNow();
-      const query = client
-        .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ deleted_at: deletedAt, updated_at: deletedAt })
-        .eq('account_email', normalizeEmail(accountEmail))
-        .eq('folder', normalizedFolder);
-      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
-        return query.eq('uid', parsedUid).select('message_key');
-      }
-      return query.eq('provider_id', normalizedId).select('message_key');
-    });
+    const result = await runDurableWrite(hidden ? 'mark-message-deleted' : 'restore-message', (client) =>
+      client.rpc('softora_set_mailbox_message_visibility', {
+        p_account_email: normalizeEmail(accountEmail),
+        p_folder: normalizedFolder,
+        p_uid: Number.isSafeInteger(parsedUid) && parsedUid > 0 ? parsedUid : 0,
+        p_provider_id: normalizedId,
+        p_hidden: Boolean(hidden),
+      })
+    );
     if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
-    const error = new Error('Mailboxbericht ontbreekt in de duurzame index.');
-    error.code = 'MAILBOX_INDEX_MESSAGE_NOT_FOUND';
+    const error = new Error(hidden
+      ? 'Mailboxbericht ontbreekt in de duurzame index.'
+      : 'Verborgen Softora-mailboxbericht is niet gevonden.');
+    error.code = hidden
+      ? 'MAILBOX_INDEX_MESSAGE_NOT_FOUND'
+      : 'MAILBOX_INDEX_HIDDEN_MESSAGE_NOT_FOUND';
     return { ok: false, unavailable: false, data: [], error };
   }
 
-  async function restoreMessage({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
-    const normalizedFolder = normalizeFolder(folder);
-    const normalizedId = normalizeString(id);
-    const parsedUid = normalizedFolder === 'instantly'
-      ? 0
-      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
-    const result = await run('restore-message', (client) => {
-      const query = client
-        .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ deleted_at: null, updated_at: isoNow() })
-        .eq('account_email', normalizeEmail(accountEmail))
-        .eq('folder', normalizedFolder);
-      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
-        return query.eq('uid', parsedUid).select('message_key');
-      }
-      return query.eq('provider_id', normalizedId).select('message_key');
-    });
-    if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
-    const error = new Error('Verborgen Softora-mailboxbericht is niet gevonden.');
-    error.code = 'MAILBOX_INDEX_HIDDEN_MESSAGE_NOT_FOUND';
-    return { ok: false, unavailable: false, data: [], error };
+  async function markMessageDeleted(input) {
+    return setMessageVisibility(input, true);
+  }
+
+  async function restoreMessage(input) {
+    return setMessageVisibility(input, false);
   }
 
   async function getSyncState({ accountEmail, folder = 'inbox' }) {

@@ -531,6 +531,76 @@ test('mailbox campaign snapshot verwijdert alleen de exact gekozen mail', () => 
   ]);
 });
 
+test('mailbox campaign snapshot verwijdert alle logische RFC-kopieën maar nooit een ander account', () => {
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:101', uid: 101, folder: 'inbox', accountEmail: 'serve@softora.nl',
+      messageId: '<logical-copy@example.test>', subject: 'Inbox-kopie',
+    }, {
+      id: 'allmail:202', uid: 202, folder: 'allmail', accountEmail: 'serve@softora.nl',
+      messageId: 'LOGICAL-COPY@EXAMPLE.TEST', subject: 'All Mail-kopie',
+    }, {
+      id: 'inbox:303', uid: 303, folder: 'inbox', accountEmail: 'serve@softora.nl',
+      messageId: '<container@example.test>', subject: 'Container blijft',
+      threadMessages: [{
+        id: 'coldmail:404', uid: 404, folder: 'coldmail', accountEmail: 'serve@softora.nl',
+        messageId: '<logical-copy@example.test>', subject: 'Geneste kopie',
+      }, {
+        id: 'sent:405', uid: 405, folder: 'sent', accountEmail: 'serve@softora.nl',
+        messageId: '<other@example.test>', subject: 'Andere threadmail',
+      }],
+    }, {
+      id: 'inbox:505', uid: 505, folder: 'inbox', accountEmail: 'martijn@softora.nl',
+      messageId: '<logical-copy@example.test>', subject: 'Martijn blijft',
+    }],
+  }, { savedAt: '2026-08-20T12:00:00.000Z' });
+
+  const next = removeMailboxCampaignSnapshotMessage(serialized, {
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 101,
+    messageId: '<LOGICAL-COPY@EXAMPLE.TEST>',
+  }, { savedAt: '2026-08-20T12:01:00.000Z' });
+  const parsed = parseMailboxCampaignSnapshot(next.serialized);
+
+  assert.equal(next.changed, true);
+  assert.deepEqual(parsed.messages.map((message) => message.subject), [
+    'Container blijft',
+    'Martijn blijft',
+  ]);
+  assert.deepEqual(parsed.messages[0].threadMessages.map((message) => message.subject), [
+    'Andere threadmail',
+  ]);
+});
+
+test('mailbox campaign snapshot houdt een bericht zonder RFC-id beperkt tot de fysieke rij', () => {
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl',
+      messageId: '', subject: 'Exact weg',
+    }, {
+      id: 'allmail:42', uid: 42, folder: 'allmail', accountEmail: 'serve@softora.nl',
+      messageId: '', subject: 'Andere map blijft',
+    }, {
+      id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'martijn@softora.nl',
+      messageId: '', subject: 'Ander account blijft',
+    }],
+  });
+
+  const next = removeMailboxCampaignSnapshotMessage(serialized, {
+    accountEmail: 'serve@softora.nl', folder: 'inbox', uid: 42, messageId: '',
+  });
+  const parsed = parseMailboxCampaignSnapshot(next.serialized);
+
+  assert.equal(next.changed, true);
+  assert.deepEqual(parsed.messages.map((message) => message.subject), [
+    'Andere map blijft',
+    'Ander account blijft',
+  ]);
+});
+
 test('mailbox campaign snapshot weigert lege en ongeldige data', () => {
   assert.equal(serializeMailboxCampaignSnapshot({ ok: true, messages: [] }), '');
   assert.equal(parseMailboxCampaignSnapshot('{kapot'), null);
