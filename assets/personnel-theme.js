@@ -521,7 +521,7 @@
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-database") === 0) return "database"; if (p === "/lead-radar") return "lead_radar";
-        if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox";
+        if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox"; if (p.indexOf("/premium-samenvatten") === 0) return "summarize";
         if (p.indexOf("/premium-websitegenerator") === 0) {
             return "websitegenerator";
         }
@@ -785,7 +785,7 @@
         ];
         const managementLinks = [
             getCustomersSidebarLink(),
-            getMailboxSidebarLink(),
+            getMailboxSidebarLink(), window.SoftoraPremiumSidebarLinks.getSummarizeSidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -1040,7 +1040,7 @@
                 "beheer",
                 getCustomersSidebarLink(),
                 ["mailbox", "websitegenerator", "seo", "packages"]
-            );
+            ); ensureStaticSidebarLink(sidebar, "beheer", window.SoftoraPremiumSidebarLinks.getSummarizeSidebarLink(), ["websitegenerator", "seo", "qr_code", "packages"]);
         }
 
         if (overviewSection) {
