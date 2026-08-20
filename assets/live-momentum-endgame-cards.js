@@ -22,6 +22,13 @@
     { id: 'leuke-vriendin', title: 'Leuke vriendin' },
     { id: 'eigen-cinema', title: 'Eigen Cinema' },
     { id: 'eigen-kantoor', title: 'Eigen kantoor' },
+    { id: 'tv-scherm-op-kantoor', title: 'TV-scherm aan muur op kantoor', imageId: 'eigen-kantoor', officeDetail: 'tv' },
+    { id: 'prikbord-op-kantoor', title: 'Prikbord op kantoor', imageId: 'eigen-kantoor', officeDetail: 'noticeboard' },
+    { id: 'kapstok-op-kantoor', title: 'Kapstok op kantoor', imageId: 'eigen-kantoor', officeDetail: 'coat-rack' },
+    { id: 'zelfde-bureau-als-martijn', title: 'Zelfde bureau als Martijn', imageId: 'eigen-kantoor', officeDetail: 'matching-desk' },
+    { id: 'kantoor-aangekleed-met-planten', title: 'Kantoor aangekleed met planten', imageId: 'eigen-kantoor', officeDetail: 'plants' },
+    { id: 'verfvlekken-weg', title: 'Verfvlekken weg', imageId: 'eigen-kantoor', officeDetail: 'clean-paint' },
+    { id: 'boekhouding-naar-boven', title: 'Boekhouding verplaatst naar boven', imageId: 'eigen-kantoor', officeDetail: 'accounting-upstairs' },
     { id: 'kantoorpand-in-haaren', title: 'Kantoorpand in Haaren' },
     { id: 'nieuwe-whoop', title: 'Nieuwe Whoop' },
     { id: 'nieuwe-fiets', title: 'Nieuwe fiets' },
@@ -157,6 +164,7 @@
     const artwork = document.createElement('div');
     const image = document.createElement('img');
     const imageId = card.imageId || card.id;
+    const officeDetail = document.createElement('span');
     const shade = document.createElement('div');
     const top = document.createElement('span');
     const title = document.createElement('strong');
@@ -174,6 +182,11 @@
     image.decoding = 'async';
     if (['kantoorpand-in-haaren', 'eigen-koophuis-kopen'].includes(imageId)) {
       artwork.classList.add('end-game-card-photo--edge-crop');
+    }
+    if (card.officeDetail) {
+      artwork.classList.add(`end-game-card-photo--office-${card.officeDetail}`);
+      officeDetail.className = `end-game-card-office-detail end-game-card-office-detail--${card.officeDetail}`;
+      officeDetail.setAttribute('aria-hidden', 'true');
     }
     shade.className = 'end-game-card-photo-shade';
     top.className = 'end-game-card-kicker';
@@ -207,7 +220,9 @@
       mission.textContent = 'MISSIE';
       target.className = 'end-game-card-target';
       target.append(createTargetIcon());
-      artwork.append(image, shade, top, title);
+      artwork.append(image);
+      if (card.officeDetail) artwork.append(officeDetail);
+      artwork.append(shade, top, title);
       if (card.subtitle) artwork.append(subtitle);
       if (card.missionText) artwork.append(missionCopy);
       artwork.append(mission, target);
