@@ -29,6 +29,16 @@ const { createLeadRadarEnrichment } = require('../../server/services/lead-radar-
 
 const repoRoot = path.join(__dirname, '../..');
 const readRepoFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+const fetchResponse = (body = '', { status = 200, headers = {} } = {}) => {
+  const normalizedHeaders = new Map(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), String(value)]));
+  const buffer = Buffer.from(String(body));
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name) => normalizedHeaders.get(String(name).toLowerCase()) || null },
+    arrayBuffer: async () => buffer,
+  };
+};
 
 test('Lead Radar normaliseert alleen toegestane openbare URLs', () => {
   assert.equal(normalizePlatform('https://www.facebook.com/groups/softora/posts/1'), 'facebook');
@@ -371,8 +381,10 @@ test('Lead Radar controleert bestaande websitekandidaten voordat ze bevestigd wo
   const service = createLeadRadarService({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => db,
-    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<title>Voorbeeld</title>' }),
-    env: {},
+    fetchImpl: async (url) => String(url).endsWith('/robots.txt')
+      ? fetchResponse('User-agent: *\nAllow: /')
+      : fetchResponse('<!doctype html><title>Voorbeeld</title><h1>Welkom</h1>', { headers: { 'content-type': 'text/html' } }),
+    env: { LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0' },
   });
   const result = await service.lookupWebsite(existing.id);
   assert.equal(result.website_status, 'website_found');
@@ -419,8 +431,10 @@ test('Lead Radar zoekt een openbare bedrijfswebsite en bewaart de klikbare kandi
       configured: true,
       search: async () => [{ url: 'https://kapsalonnijlen.nl', title: 'Kapsalon Nijlen', snippet: 'Officiele website van Kapsalon Nijlen' }],
     },
-    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<title>Kapsalon Nijlen</title>' }),
-    env: {},
+    fetchImpl: async (url) => String(url).endsWith('/robots.txt')
+      ? fetchResponse('User-agent: *\nAllow: /')
+      : fetchResponse('<!doctype html><title>Kapsalon Nijlen</title><h1>Kapsalon</h1>', { headers: { 'content-type': 'text/html' } }),
+    env: { LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0' },
   });
 
   const result = await service.lookupWebsite(existing.id, { force: true });
@@ -659,97 +673,51 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
 test('Lead Radar verrijkt een lead met bedrijfsgegevens en technische websitegegevens', async () => {
   const calls = [];
   const enrichment = createLeadRadarEnrichment({
-    env: { LEAD_RADAR_DATAFORSEO_LOGIN: 'login', LEAD_RADAR_DATAFORSEO_PASSWORD: 'password' },
+    env: { LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0' },
     normalizeHttpUrl,
     fetchImpl: async (url) => {
-      calls.push(url);
-      if (url.includes('/business_data/business_listings/search/live')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            status_code: 20000,
-            tasks: [{
-              status_code: 20000,
-              result: [{
-                items: [{
-                  type: 'business_listing',
-                  title: 'Kapsalon Nijlen',
-                  category: 'Kapsalon',
-                  address: 'Dorpsstraat 1, Nijlen',
-                  address_info: { city: 'Nijlen', region: 'Antwerpen', zip: '2560' },
-                  phone: '+32 123 45 67',
-                  domain: 'kapsalonnijlen.nl',
-                  place_id: 'place-1',
-                  cid: 'cid-1',
-                  is_claimed: true,
-                  rating: { value: 4.8, votes_count: 42 },
-                }],
-              }],
-            }],
-          }),
-        };
-      }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          status_code: 20000,
-          tasks: [{
-            status_code: 20000,
-            result: [{
-              items: [{
-                resource_type: 'html',
-                status_code: 200,
-                location: 'https://kapsalonnijlen.nl/',
-                url: 'https://kapsalonnijlen.nl',
-                meta: { title: 'Kapsalon Nijlen' },
-                checks: { is_redirect: false, is_4xx_code: false, is_5xx_code: false, is_broken: false, is_https: true, broken_links: false },
-                links: [{ url: 'https://kapsalonnijlen.nl/contact', title: 'Contact' }],
-              }],
-            }],
-          }],
-        }),
-      };
+      calls.push(String(url));
+      if (String(url).endsWith('/robots.txt')) return fetchResponse('User-agent: *\nAllow: /');
+      return fetchResponse(`<!doctype html><html><head><title>Kapsalon Nijlen</title></head>
+        <body><h1>Kapsalon Nijlen</h1><a href="https://booking.example/afspraak">Boeken</a></body></html>`, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
     },
   });
-  const business = await enrichment.lookupBusiness({ author_name: 'Kapsalon Nijlen', region: 'Nijlen' });
+  const business = await enrichment.lookupBusiness({
+    author_name: 'Kapsalon Nijlen',
+    region: 'Nijlen',
+    website_url: 'https://kapsalonnijlen.nl',
+  });
   assert.equal(business.business_match_status, 'matched');
-  assert.equal(business.business_phone, '+32 123 45 67');
   assert.equal(business.business_domain, 'kapsalonnijlen.nl');
-  assert.equal(business.business_city, 'Nijlen');
+  assert.equal(business.business_source, 'direct_public_source');
   const website = await enrichment.inspectWebsite('https://kapsalonnijlen.nl');
   assert.equal(website.website_status, 'website_found');
-  assert.equal(website.website_check_provider, 'dataforseo_onpage');
+  assert.equal(website.website_check_provider, 'softora_direct_fetch');
   assert.equal(website.website_title, 'Kapsalon Nijlen');
-  assert.equal(website.website_redirect_url, 'https://kapsalonnijlen.nl/');
+  assert.equal(website.website_redirect_url, null);
   assert.equal(website.website_technical_checks.is_https, true);
-  assert.equal(website.website_links[0].url, 'https://kapsalonnijlen.nl/contact');
+  assert.equal(website.website_links[0].url, 'https://booking.example/afspraak');
   assert.equal(calls.length, 2);
 });
 
 test('Lead Radar markeert een waarschijnlijke webdesignpartij als agency in plaats van hem automatisch te koppelen', async () => {
   const enrichment = createLeadRadarEnrichment({
-    env: { LEAD_RADAR_DATAFORSEO_LOGIN: 'login', LEAD_RADAR_DATAFORSEO_PASSWORD: 'password' },
+    env: {},
     normalizeHttpUrl,
-    fetchImpl: async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        status_code: 20000,
-        tasks: [{
-          status_code: 20000,
-          result: [{ items: [{ title: 'Websitedesigner', category: 'Webdesign bureau', domain: 'websitedesigner.nl' }] }],
-        }],
-      }),
-    }),
+    fetchImpl: async () => { throw new Error('lookupBusiness hoort niet te fetchen'); },
   });
-  const business = await enrichment.lookupBusiness({ author_name: 'Websitedesigner', region: 'Nederland' });
+  const business = await enrichment.lookupBusiness({
+    author_name: 'Websitedesigner',
+    message_text: 'Wij bouwen websites en webshops.',
+    website_url: 'https://websitedesigner.nl',
+  });
   assert.equal(business.business_match_status, 'agency_detected');
   assert.equal(business.business_domain, 'websitedesigner.nl');
 });
 
-test('Lead Radar gebruikt OnPage alleen na een websitekandidaat en bewaart de verrijking in de lead', async () => {
+test('Lead Radar doet alleen een directe websitecontrole na een kandidaat en bewaart de verrijking', async () => {
   let calls = 0;
   const enrichment = createLeadRadarEnrichment({
     env: {},
@@ -798,10 +766,8 @@ test('Lead Radar gebruikt OnPage alleen na een websitekandidaat en bewaart de ve
     enrichment: {
       lookupBusiness: async () => ({
         business_match_status: 'matched',
-        business_source: 'business_listings',
+        business_source: 'direct_public_source',
         business_name: 'Kapsalon Nijlen',
-        business_city: 'Nijlen',
-        business_phone: '+32 123 45 67',
         business_domain: 'kapsalonnijlen.nl',
         business_website_url: 'https://kapsalonnijlen.nl',
         business_candidates: [],
@@ -809,18 +775,17 @@ test('Lead Radar gebruikt OnPage alleen na een websitekandidaat en bewaart de ve
       inspectWebsite: async () => ({
         available: true,
         website_status: 'website_found',
-        website_check_provider: 'dataforseo_onpage',
+        website_check_provider: 'softora_direct_fetch',
         website_http_status: 200,
         website_title: 'Kapsalon Nijlen',
         website_technical_checks: { is_https: true },
         website_links: [],
       }),
-      getStatus: () => ({ configured: true, businessListingsConfigured: true, onPageConfigured: true }),
+      getStatus: () => ({ configured: true, businessListingsConfigured: false, onPageConfigured: true, paid: false }),
     },
   });
   const result = await service.lookupWebsite(existing.id, { force: true });
-  assert.equal(result.business_phone, '+32 123 45 67');
   assert.equal(result.business_domain, 'kapsalonnijlen.nl');
-  assert.equal(result.website_check_provider, 'dataforseo_onpage');
+  assert.equal(result.website_check_provider, 'softora_direct_fetch');
   assert.equal(result.website_status, 'website_found');
 });

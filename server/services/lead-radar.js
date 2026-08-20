@@ -728,7 +728,23 @@ function createLeadRadarService(deps = {}) {
     }
     let inspected = {};
     try { inspected = await enrichment.inspectWebsite(candidateUrl); } catch (error) { inspected = { available: false, error: text(error?.message || error, 500) }; }
-    const check = inspected.available ? inspected : await verifyWebsite(candidateUrl);
+    if (!inspected.available) {
+      return {
+        ...business,
+        website_url: candidateUrl,
+        website_domain: new URL(candidateUrl).hostname,
+        website_status: 'website_unverified',
+        website_source: source,
+        website_confidence_score: source === 'post' ? 100 : 60,
+        website_checked_at: new Date().toISOString(),
+        website_check_provider: 'softora_direct_fetch',
+        website_technical_checks: {},
+        website_links: [],
+        website_check_error: inspected.error || 'Website kon niet veilig worden gecontroleerd.',
+        website_candidates: candidates,
+      };
+    }
+    const check = inspected;
     return {
       ...business,
       website_url: candidateUrl,
@@ -746,28 +762,6 @@ function createLeadRadarService(deps = {}) {
       website_check_error: check.website_check_error || check.error || null,
       website_candidates: candidates,
     };
-  }
-  async function verifyWebsite(url) {
-    const normalized = normalizeHttpUrl(url, { allowPlatform: false });
-    if (!normalized) return { ok: false, status: null, title: '', error: 'Ongeldige of niet-openbare website-URL.' };
-    if (typeof fetchImpl !== 'function') return { ok: false, status: null, title: '', error: 'Fetch is niet beschikbaar.' };
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timeout = controller ? setTimeout(() => controller.abort(), 8_000) : null;
-    try {
-      const response = await fetchImpl(normalized, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: { Accept: 'text/html,application/xhtml+xml' },
-        signal: controller?.signal,
-      });
-      const body = await response.text().catch(() => '');
-      const title = text((body.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '', 500).replace(/\s+/g, ' ');
-      return { ok: response.ok, status: response.status, title, redirectUrl: response.url && response.url !== normalized ? response.url : null, error: response.ok ? '' : `HTTP ${response.status}` };
-    } catch (error) {
-      return { ok: false, status: null, title: '', error: text(error?.message || error, 500) };
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
   }
 
   async function lookupWebsite(id, { force = false } = {}) {
@@ -1187,4 +1181,3 @@ module.exports = {
   WEBSITE_STATUSES,
   LEAD_STATUSES,
 };
-
