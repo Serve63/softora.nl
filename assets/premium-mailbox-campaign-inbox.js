@@ -30,6 +30,9 @@
   const replyIdentityApi = global.SoftoraMailboxReplyIdentity || (
     typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-reply-identity.js') : null
   );
+  const quotedThreadApi = global.SoftoraMailboxQuotedThread || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-quoted-thread.js') : null
+  );
   const ownerPreference = ownerPreferenceApi?.create?.() || null;
   const pageBootstrapConsumedOwners = new Set();
 
@@ -218,9 +221,11 @@
   }
 
   function getMessageTimestamp(mail) {
-    const value = mail && (mail.receivedAt || mail.internalDate || mail.date);
-    const timestamp = Date.parse(value || '');
-    return Number.isFinite(timestamp) ? timestamp : 0;
+    for (const value of [mail?.receivedAt, mail?.internalDate, mail?.date]) {
+      const timestamp = Date.parse(value || '');
+      if (Number.isFinite(timestamp)) return timestamp;
+    }
+    return 0;
   }
 
   function isSentMessageByProvenance(message, account) {
@@ -607,102 +612,45 @@
   }
 
   function splitQuotedReply(value) {
-    const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
-    const directQuoteStart = lines.findIndex((line) => {
-      const content = String(line || '').trim();
-      return (
-        /^>/.test(content) ||
-        /^(?:on .+\bwrote\b|op .+\bschreef\b.*|op .+\bheeft\s+.+\s+geschreven)\s*:\s*$/i.test(content) ||
-        /^-{2,}\s*(?:original message|oorspronkelijk(?:e)? bericht)/i.test(content)
-      );
-    });
-    const headerPatterns = {
-      from: /^(?:van|from):\s*\S/i,
-      sent: /^(?:verzonden|sent|datum|date):\s*\S/i,
-      to: /^(?:aan|to):\s*\S/i,
-      subject: /^(?:onderwerp|subject):\s*\S/i,
-    };
-    function isHeaderCluster(startIndex) {
-      const windowLines = lines
-        .slice(startIndex, startIndex + 8)
-        .map((line) => String(line || '').trim())
-        .filter(Boolean);
-      if (!windowLines.length || !headerPatterns.from.test(windowLines[0])) return false;
-      const matchedFields = ['sent', 'to', 'subject']
-        .filter((field) => windowLines.some((line) => headerPatterns[field].test(line)));
-      return matchedFields.length >= 2;
-    }
-    let structuredQuoteStart = -1;
-    for (let index = 0; index < lines.length; index += 1) {
-      const content = String(lines[index] || '').trim();
-      const separator = /^(?:_{5,}|-{5,})$/.test(content);
-      if (separator) {
-        let headerIndex = index + 1;
-        while (headerIndex < lines.length && !String(lines[headerIndex] || '').trim()) headerIndex += 1;
-        if (isHeaderCluster(headerIndex)) {
-          structuredQuoteStart = index;
-          break;
-        }
-      }
-      if (isHeaderCluster(index)) {
-        structuredQuoteStart = index;
-        break;
-      }
-    }
-    const quoteStarts = [directQuoteStart, structuredQuoteStart].filter((index) => index >= 0);
-    const quoteStart = quoteStarts.length ? Math.min(...quoteStarts) : -1;
-    return {
-      authored: (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim(),
-      quoted: quoteStart >= 0 ? lines.slice(quoteStart).join('\n').trim() : '',
-    };
+    const parsed = quotedThreadApi?.splitQuotedThread?.(value);
+    return parsed || { authored: String(value || '').trim(), quoted: '' };
   }
 
   function stripQuotedReply(value) {
     return splitQuotedReply(value).authored;
   }
 
-  function normalizeThreadMatchText(value) {
-    return global.SoftoraMailboxQuotedThread?.normalizeMatchText?.(value) || '';
-  }
-
-  function stripStructuredQuoteMetadata(lines) {
-    const metadataPattern = /^(?:verzonden|sent|datum|date|aan|to|onderwerp|subject):\s*/i;
-    const values = Array.isArray(lines) ? lines.slice() : [];
-    while (values.length && (!String(values[0] || '').trim() || metadataPattern.test(String(values[0] || '').trim()))) {
-      values.shift();
-    }
-    return values;
-  }
-
   function stripQuotedThreadEnvelope(value) {
-    const values = String(value || '').replace(/\r\n?/g, '\n').split('\n');
-    while (values.length && !String(values[0] || '').trim()) values.shift();
-    const firstLine = String(values[0] || '').trim();
-    if (
-      /^(?:on .+\bwrote\b|op .+\bschreef\b.*|op .+\bheeft\s+.+\s+geschreven)\s*:\s*$/i.test(firstLine) ||
-      /^-{2,}\s*(?:original message|oorspronkelijk(?:e)? bericht)\b/i.test(firstLine)
-    ) {
-      values.shift();
-    }
-    return stripStructuredQuoteMetadata(values).join('\n');
-  }
-
-  function stripOneQuotedDepth(value) {
-    return String(value || '')
-      .replace(/\r\n?/g, '\n')
-      .split('\n')
-      .map((line) => String(line || '').replace(/^\s*>\s?/, ''))
-      .join('\n');
+    return quotedThreadApi?.stripQuotedEnvelope?.(value) || String(value || '').trim();
   }
 
   function isForwardedConversation(mail) {
     return /^(?:(?:re)\s*:\s*)*(?:fw|fwd)\s*:/i.test(String(mail && mail.subject || '').trim());
   }
 
-  function isSameProvenMailboxScope(message, mail) {
+  function getQuotedSenderEmails(value) {
+    const parser = quotedThreadApi;
+    const segments = parser?.findQuotedSegments?.(value)?.segments || [];
+    const candidates = segments.flatMap((segment) => [
+      segment && segment.header,
+      ...(segment && segment.headerFields && segment.headerFields.from || []),
+      ...(segment && segment.headerFields && segment.headerFields.replyTo || []),
+    ]);
+    return new Set(candidates.flatMap((candidate) => (
+      String(candidate || '').toLowerCase().match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || []
+    )));
+  }
+
+  function isSameProvenMailboxScope(message, mail, quotedValue = '') {
     const messageAccount = normalizeEmail(message && message.accountEmail);
     const mailAccount = normalizeEmail(mail && mail.accountEmail);
     if (messageAccount && mailAccount && messageAccount === mailAccount) return true;
+    const messageOwner = getMessageOwner(message);
+    const mailOwner = getMessageOwner(mail);
+    if (
+      messageOwner && mailOwner && messageOwner === mailOwner &&
+      getQuotedSenderEmails(quotedValue).has(messageAccount)
+    ) return true;
     const copyContext = mail && mail.copyContext;
     return Boolean(
       copyContext && copyContext.evidenceKnown === true &&
@@ -711,27 +659,31 @@
     );
   }
 
-  function getProvenOutboundThreadMessages(mail) {
+  function getProvenOutboundThreadMessages(mail, quotedValue = '') {
     return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
       .filter((message) => (
         isSentMessageByProvenance(message, mail && mail.accountEmail) &&
-        isSameProvenMailboxScope(message, mail)
+        isSameProvenMailboxScope(message, mail, quotedValue)
       ));
   }
 
   function findExactQuotedOutbound(quotedValue, mail) {
     const quotedEnvelope = stripQuotedThreadEnvelope(quotedValue);
-    return global.SoftoraMailboxQuotedThread?.findExactProvenOutbound?.(
+    return quotedThreadApi?.findExactProvenOutbound?.(
       quotedEnvelope,
-      getProvenOutboundThreadMessages(mail)
+      getProvenOutboundThreadMessages(mail, quotedValue)
     ) || null;
   }
 
   function stripProvenQuotedOutbound(value, mail, messageContext = mail) {
-    const result = global.SoftoraMailboxQuotedThread?.stripProvenQuotedOutbound?.(
+    const incomingTimestamp = getMessageTimestamp(messageContext);
+    const result = quotedThreadApi?.stripProvenQuotedOutbound?.(
       value,
-      getProvenOutboundThreadMessages(mail),
-      { directParentMessageIds: getDirectParentMessageIds(messageContext) }
+      getProvenOutboundThreadMessages(mail, value),
+      {
+        directParentMessageIds: getDirectParentMessageIds(messageContext),
+        incomingAt: incomingTimestamp ? new Date(incomingTimestamp).toISOString() : '',
+      }
     );
     return result && typeof result.body === 'string' ? result.body : String(value || '').trim();
   }

@@ -19,12 +19,68 @@
       .trim();
   }
 
-  function isReplyHeaderLine(value) {
+  const REPLY_MONTH_PATTERN = /\b(?:jan(?:uari|uary)?|feb(?:ruari|ruary)?|mrt|maa?rt|mar(?:ch)?|apr(?:il)?|mei|may|jun(?:i|e)?|jul(?:i|y)?|aug(?:ustus)?|sep(?:tember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\b/i;
+  const REPLY_WEEKDAY_PATTERN = /\b(?:ma|di|wo|do|vr|za|zo|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\.?\b/i;
+  const REPLY_NUMERIC_DATE_PATTERN = /(?:\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?\b|\b\d{1,2}:\d{2}\b)/;
+
+  function hasReplyDateEvidence(value, language) {
+    const core = String(value || '').trim();
+    if (REPLY_NUMERIC_DATE_PATTERN.test(core) || REPLY_MONTH_PATTERN.test(core)) return true;
+    if (!REPLY_WEEKDAY_PATTERN.test(core)) return false;
+    return language === 'op' || core.includes(',');
+  }
+
+  function isPlausibleReplyHeaderCore(value) {
+    const core = cleanHeaderLine(value);
+    const language = /^op\s+/i.test(core) ? 'op' : /^on\s+/i.test(core) ? 'on' : '';
+    if (!language || !hasReplyDateEvidence(core, language)) return false;
+
+    if (language === 'on') {
+      const match = /^on\s+(.+?)\bwrote(?:\s+[^:\n]+)?$/i.exec(core);
+      if (!match) return false;
+      return !/\b(?:i|we|you|he|she|they)\s*$/i.test(String(match[1] || '').trim());
+    }
+
+    const wroteMatch = /^op\s+.+?\bschreef(?:\s+([^:\n]+))?$/i.exec(core);
+    if (wroteMatch) {
+      const authorAfterVerb = String(wroteMatch[1] || '').trim();
+      return !/^(?:ik|wij|we|jij|je|u|hij|zij|ze)$/i.test(authorAfterVerb);
+    }
+    const hasWrittenMatch = /^op\s+.+?\bheeft\s+(.+?)\s+(?:het\s+volgende\s+)?geschreven$/i.exec(core);
+    if (!hasWrittenMatch) return false;
+    return !/^(?:ik|wij|we|jij|je|u|hij|zij|ze)$/i.test(String(hasWrittenMatch[1] || '').trim());
+  }
+
+  function parseReplyHeaderLine(value) {
     const line = cleanHeaderLine(value);
-    return (
-      /^(?:op\s.+\b(?:schreef(?:\s+[^:\n]+)?|heeft\s+.+\s+geschreven)\s*:?)$/i.test(line) ||
-      /^(?:on\s.+\bwrote\s*:?)$/i.test(line)
-    );
+    const colonPatterns = [
+      /^(op\s+.+?\bheeft\s+.+?\s+(?:het\s+volgende\s+)?geschreven)\s*:\s*(.*)$/i,
+      /^(op\s+.+?\bschreef(?:\s+[^:\n]+?)?)\s*:\s*(.*)$/i,
+      /^(on\s+.+?\bwrote)\s*:\s*(.*)$/i,
+    ];
+    for (const pattern of colonPatterns) {
+      const match = pattern.exec(line);
+      if (match && isPlausibleReplyHeaderCore(match[1])) {
+        return {
+          header: `${String(match[1] || '').trim()}:`,
+          remainder: String(match[2] || '').trim(),
+        };
+      }
+    }
+    const colonlessPatterns = [
+      /^op\s+.+?\bheeft\s+.+?\s+(?:het\s+volgende\s+)?geschreven$/i,
+      /^op\s+.+?\bschreef(?:\s+[^:\n]+)?$/i,
+      /^on\s+.+?\bwrote(?:\s+[^:\n]+)?$/i,
+    ];
+    if (
+      !colonlessPatterns.some((pattern) => pattern.test(line)) ||
+      !isPlausibleReplyHeaderCore(line)
+    ) return null;
+    return { header: line, remainder: '' };
+  }
+
+  function isReplyHeaderLine(value) {
+    return Boolean(parseReplyHeaderLine(value));
   }
 
   function isForwardSeparatorLine(value) {
@@ -36,25 +92,97 @@
   }
 
   const HEADER_PATTERNS = Object.freeze({
-    from: /^(?:van|from):\s*\S/i,
-    sent: /^(?:verzonden|sent|datum|date):\s*\S/i,
-    to: /^(?:aan|to):\s*\S/i,
-    subject: /^(?:onderwerp|subject):\s*\S/i,
+    from: /^(?:van|from|afzender|sender):\s*(?:\S|$)/i,
+    sent: /^(?:verzonden|sent|datum|date):\s*(?:\S|$)/i,
+    to: /^(?:aan|to|ontvanger|recipient):\s*(?:\S|$)/i,
+    subject: /^(?:onderwerp|subject):\s*(?:\S|$)/i,
+    replyTo: /^(?:antwoord[ -]?aan|reply-to):\s*(?:\S|$)/i,
   });
 
+  const HEADER_LABEL_PATTERN = /^(van|from|afzender|sender|verzonden|sent|datum|date|aan|to|ontvanger|recipient|onderwerp|subject|antwoord[ -]?aan|reply-to):\s*(.*)$/i;
+
+  function normalizeHeaderField(value) {
+    const label = String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (['van', 'from', 'afzender', 'sender'].includes(label)) return 'from';
+    if (['verzonden', 'sent', 'datum', 'date'].includes(label)) return 'sent';
+    if (['aan', 'to', 'ontvanger', 'recipient'].includes(label)) return 'to';
+    if (['onderwerp', 'subject'].includes(label)) return 'subject';
+    if (['antwoord aan', 'antwoord-aan', 'reply-to'].includes(label)) return 'replyTo';
+    return '';
+  }
+
+  function extractHeaderFields(value) {
+    const lines = Array.isArray(value) ? value.map(String) : normalizeLines(value);
+    const fields = { from: [], sent: [], to: [], subject: [], replyTo: [] };
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = cleanHeaderLine(lines[index]);
+      const match = HEADER_LABEL_PATTERN.exec(line);
+      if (!match) continue;
+      const field = normalizeHeaderField(match[1]);
+      if (!field) continue;
+      let fieldValue = String(match[2] || '').trim();
+      if (!fieldValue) {
+        let nextIndex = index + 1;
+        while (nextIndex < lines.length && !cleanHeaderLine(lines[nextIndex])) nextIndex += 1;
+        const nextLine = cleanHeaderLine(lines[nextIndex]);
+        if (nextLine && !HEADER_LABEL_PATTERN.test(nextLine)) {
+          fieldValue = nextLine;
+          index = nextIndex;
+        }
+      }
+      if (fieldValue && !fields[field].includes(fieldValue)) fields[field].push(fieldValue);
+    }
+    return fields;
+  }
+
   function isHeaderClusterAt(lines, startIndex) {
+    const firstLine = cleanHeaderLine(lines[startIndex]);
+    if (!firstLine || !HEADER_PATTERNS.from.test(firstLine)) return false;
     const windowLines = lines
       .slice(startIndex, startIndex + 10)
       .map(cleanHeaderLine)
       .filter(Boolean);
-    if (!windowLines.length || !HEADER_PATTERNS.from.test(windowLines[0])) return false;
     const matchedFields = ['sent', 'to', 'subject']
       .filter((field) => windowLines.some((line) => HEADER_PATTERNS[field].test(line)));
     return matchedFields.length >= 2;
   }
 
+  function isStandaloneSenderQuoteLine(value) {
+    const line = cleanHeaderLine(value);
+    const match = /^(?:van|from):\s*(.+)$/i.exec(line);
+    return Boolean(match && /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(match[1]));
+  }
+
   function isQuotePrefixedLine(value) {
     return /^\s*>/.test(String(value || ''));
+  }
+
+  function stripOneQuotePrefix(value) {
+    return String(value || '').replace(/^\s*>\s?/, '');
+  }
+
+  function buildSegment(lines, start, end, marker, replyHeader) {
+    const rawLines = lines.slice(start, end);
+    const displayLines = replyHeader
+      ? [
+          replyHeader.header,
+          ...(replyHeader.remainder ? [replyHeader.remainder] : []),
+          ...rawLines.slice(1).map(stripOneQuotePrefix),
+        ]
+      : rawLines.map(stripOneQuotePrefix);
+    const quotePayloadLines = replyHeader ? displayLines.slice(1) : displayLines.slice();
+    return {
+      start,
+      end,
+      marker,
+      header: replyHeader ? replyHeader.header : '',
+      headerRemainder: replyHeader ? replyHeader.remainder : '',
+      headerFields: extractHeaderFields(displayLines),
+      rawText: rawLines.join('\n').trim(),
+      text: displayLines.join('\n').trim(),
+      quotePayload: quotePayloadLines.join('\n').trim(),
+      displayLines,
+    };
   }
 
   function findQuotedSegments(value) {
@@ -62,11 +190,13 @@
     const segments = [];
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index];
-      const gmailHeader = isReplyHeaderLine(line);
+      const replyHeader = parseReplyHeaderLine(line);
+      const gmailHeader = Boolean(replyHeader);
       const forwardSeparator = isForwardSeparatorLine(line);
       const headerCluster = isHeaderClusterAt(lines, index);
+      const standaloneSender = isStandaloneSenderQuoteLine(line);
       const quotedLine = isQuotePrefixedLine(line);
-      if (!gmailHeader && !forwardSeparator && !headerCluster && !quotedLine) continue;
+      if (!gmailHeader && !forwardSeparator && !headerCluster && !standaloneSender && !quotedLine) continue;
 
       let end = lines.length;
       if (gmailHeader || quotedLine) {
@@ -89,14 +219,65 @@
         }
       }
 
-      segments.push({
-        start: index,
-        end,
-        text: lines.slice(index, end).join('\n').trim(),
-      });
+      const marker = gmailHeader
+        ? 'reply-header'
+        : forwardSeparator
+          ? 'forward-separator'
+          : headerCluster
+            ? 'header-cluster'
+            : standaloneSender
+              ? 'sender-header'
+              : 'quote-prefix';
+      segments.push(buildSegment(lines, index, end, marker, replyHeader));
       index = Math.max(index, end - 1);
     }
     return { lines, segments };
+  }
+
+  function removeSegments(value, segments) {
+    const parsed = findQuotedSegments(value);
+    const removed = Array.isArray(segments) ? segments : parsed.segments;
+    if (!removed.length) return String(value || '').trim();
+    return parsed.lines
+      .filter((_line, index) => !removed.some((segment) => index >= segment.start && index < segment.end))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function splitQuotedThread(value) {
+    const parsed = findQuotedSegments(value);
+    const first = parsed.segments[0] || null;
+    return {
+      ...parsed,
+      authored: removeSegments(value, parsed.segments),
+      authoredPrefix: first ? parsed.lines.slice(0, first.start).join('\n').trim() : String(value || '').trim(),
+      quoted: first ? parsed.lines.slice(first.start, first.end).join('\n').trim() : '',
+      quotePayload: first ? first.quotePayload : '',
+    };
+  }
+
+  function stripQuotedEnvelope(value) {
+    const parsed = findQuotedSegments(value);
+    const first = parsed.segments[0];
+    if (!first) return String(value || '').trim();
+    if (first.marker === 'reply-header') return first.quotePayload;
+    const lines = first.displayLines.slice();
+    while (lines.length && !String(lines[0] || '').trim()) lines.shift();
+    if (lines.length && isForwardSeparatorLine(lines[0])) lines.shift();
+    while (lines.length) {
+      while (lines.length && !String(lines[0] || '').trim()) lines.shift();
+      const match = HEADER_LABEL_PATTERN.exec(cleanHeaderLine(lines[0]));
+      if (!match) break;
+      const hasInlineValue = Boolean(String(match[2] || '').trim());
+      lines.shift();
+      if (!hasInlineValue) {
+        while (lines.length && !String(lines[0] || '').trim()) lines.shift();
+        if (lines.length && !HEADER_LABEL_PATTERN.test(cleanHeaderLine(lines[0]))) lines.shift();
+      }
+    }
+    while (lines.length && !String(lines[0] || '').trim()) lines.shift();
+    return lines.join('\n').trim();
   }
 
   function normalizeMatchText(value) {
@@ -136,20 +317,36 @@
   }
 
   function getAuthoredPrefix(value) {
-    const parsed = findQuotedSegments(value);
-    const firstQuotedStart = parsed.segments.length
-      ? Math.min(...parsed.segments.map((segment) => segment.start))
-      : -1;
-    return firstQuotedStart > 0
-      ? parsed.lines.slice(0, firstQuotedStart).join('\n').trim()
-      : String(value || '').trim();
+    return splitQuotedThread(value).authoredPrefix;
+  }
+
+  function getMessageTimestamp(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    for (const value of [source.receivedAt, source.internalDate, source.date, source.activityAt]) {
+      const timestamp = Date.parse(value || '');
+      if (Number.isFinite(timestamp)) return timestamp;
+    }
+    return 0;
   }
 
   function findExactProvenOutbound(quotedValue, outboundMessages, options = {}) {
     const quotedText = normalizeMatchText(quotedValue);
     if (!quotedText) return null;
+    const directParentMessageIds = new Set(
+      (Array.isArray(options.directParentMessageIds) ? options.directParentMessageIds : [])
+        .map(normalizeMessageId)
+        .filter(Boolean)
+    );
+    const incomingTimestamp = Date.parse(options.incomingAt || options.beforeAt || '');
+    const maxClockSkewMs = Math.max(0, Number(options.maxClockSkewMs) || 5 * 60 * 1000);
     const matches = (Array.isArray(outboundMessages) ? outboundMessages : [])
       .filter((message) => {
+        if (Number.isFinite(incomingTimestamp)) {
+          const candidateTimestamp = getMessageTimestamp(message);
+          const exactDirectParent = directParentMessageIds.has(normalizeMessageId(message && message.messageId));
+          if (!candidateTimestamp && !exactDirectParent) return false;
+          if (candidateTimestamp && candidateTimestamp > incomingTimestamp + maxClockSkewMs) return false;
+        }
         const bodyText = normalizeMatchText(message && (message.body || message.text || ''));
         const authoredText = normalizeMatchText(getAuthoredPrefix(
           message && (message.body || message.text || '')
@@ -172,11 +369,6 @@
     // Text matching alone then produces multiple valid candidates. Prefer only
     // an exact RFC Message-ID from the current message's In-Reply-To header;
     // references/subject/date are deliberately not used as a guess.
-    const directParentMessageIds = new Set(
-      (Array.isArray(options.directParentMessageIds) ? options.directParentMessageIds : [])
-        .map(normalizeMessageId)
-        .filter(Boolean)
-    );
     if (!directParentMessageIds.size) return null;
     const directParents = Array.from(unique.values()).filter((message) => (
       directParentMessageIds.has(normalizeMessageId(message && message.messageId))
@@ -190,7 +382,7 @@
     const removed = [];
     const matchedMessages = [];
     parsed.segments.forEach((segment) => {
-      const match = findExactProvenOutbound(segment.text, outboundMessages, options);
+      const match = findExactProvenOutbound(stripQuotedEnvelope(segment.text), outboundMessages, options);
       if (!match) return;
       removed.push(segment);
       matchedMessages.push(match);
@@ -209,15 +401,21 @@
 
   const api = {
     cleanHeaderLine,
+    extractHeaderFields,
     findExactProvenOutbound,
     findQuotedSegments,
     getAuthoredPrefix,
     isForwardSeparatorLine,
     isHeaderClusterAt,
     isReplyHeaderLine,
+    isStandaloneSenderQuoteLine,
     normalizeMatchText,
+    parseReplyHeaderLine,
+    removeSegments,
+    splitQuotedThread,
+    stripQuotedEnvelope,
     stripProvenQuotedOutbound,
   };
-  global.SoftoraMailboxQuotedThread = api;
+  if (typeof window !== 'undefined') global.SoftoraMailboxQuotedThread = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

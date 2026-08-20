@@ -1,83 +1,21 @@
-const QUOTED_MATCH_IGNORABLE_LINE_PATTERNS = [
-  /^\[image:\s*[^\]]+\]\s*$/i,
-  /^hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.?\s*$/i,
-];
-
-function cleanQuotedHeaderLine(value) {
-  return String(value || '')
-    .replace(/^\s*(?:>\s*)+/, '')
-    .trim()
-    .replace(/^\*{1,2}([^*\n]{1,40}:)\*{1,2}\s*/, '$1 ')
-    .trim();
-}
+const quotedThread = require('../../assets/premium-mailbox-quoted-thread.js');
+const QUOTED_PARENT_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function findStructuredQuoteStart(value) {
-  const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
-  const headerPatterns = {
-    from: /^(?:van|from):\s*\S/i,
-    sent: /^(?:verzonden|sent|datum|date):\s*\S/i,
-    to: /^(?:aan|to):\s*\S/i,
-    subject: /^(?:onderwerp|subject):\s*\S/i,
-  };
-  function isHeaderClusterAt(index) {
-    const windowLines = lines.slice(index, index + 10).map(cleanQuotedHeaderLine).filter(Boolean);
-    if (!windowLines.length || !headerPatterns.from.test(windowLines[0])) return false;
-    return ['sent', 'to', 'subject']
-      .filter((field) => windowLines.some((line) => headerPatterns[field].test(line)))
-      .length >= 2;
-  }
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = cleanQuotedHeaderLine(lines[index]);
-    if (
-      /^(?:op\s.+\b(?:schreef(?:\s+[^:\n]+)?|heeft\s+.+\s+geschreven)\s*:?)$/i.test(line) ||
-      /^(?:on\s.+\bwrote\s*:?)$/i.test(line) ||
-      /^(?:begin|start)\s+(?:doorgestuurd|forwarded)\s+bericht\s*:?$/i.test(line) ||
-      /^(?:-{2,}|_{2,})\s*(?:original message|oorspronkelijk(?:e)? bericht|forwarded message|doorgestuurd bericht)/i.test(line) ||
-      isHeaderClusterAt(index)
-    ) return { lines, index };
-  }
-  return { lines, index: -1 };
+  const parsed = quotedThread.findQuotedSegments(value);
+  const segment = parsed.segments[0] || null;
+  return { lines: parsed.lines, index: segment ? segment.start : -1, segment };
 }
 
 function normalizeQuotedMatchText(value) {
-  return String(value || '')
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((line) => String(line || '')
-      .replace(/^\s*(?:>\s*)+/, '')
-      .replace(/\s+>\s+/g, ' ')
-      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-      .trim())
-    .filter((line) => line && !QUOTED_MATCH_IGNORABLE_LINE_PATTERNS.some((pattern) => pattern.test(line)))
-    .join(' ')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\[\s*\d+\s*\]/g, ' ')
-    .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, ' ')
-    .replace(/<?https?:\/\/[^\s>]+>?/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  return quotedThread.normalizeMatchText(value);
 }
 
 function extractQuotedRecipientEmails(value, extractEmailAddresses) {
   const parsed = findStructuredQuoteStart(value);
   if (parsed.index < 0) return [];
-  const lines = parsed.lines.slice(parsed.index).map(cleanQuotedHeaderLine);
-  const recipients = [];
-  lines.forEach((line, index) => {
-    const match = /^(?:aan|to|ontvanger|recipient):\s*(.*)$/i.exec(line);
-    if (!match) return;
-    let valueAfterLabel = String(match[1] || '').trim();
-    if (!valueAfterLabel) {
-      let nextIndex = index + 1;
-      while (nextIndex < lines.length && !String(lines[nextIndex] || '').trim()) nextIndex += 1;
-      const nextLine = String(lines[nextIndex] || '').trim();
-      if (!/^[a-z][a-z-]{1,30}:\s*/i.test(nextLine)) valueAfterLabel = nextLine;
-    }
-    recipients.push(...extractEmailAddresses(valueAfterLabel));
-  });
-  return Array.from(new Set(recipients));
+  const fields = quotedThread.extractHeaderFields(parsed.segment.displayLines);
+  return Array.from(new Set(fields.to.flatMap(extractEmailAddresses)));
 }
 
 function createMailboxCampaignThreadRecovery(helpers = {}) {
@@ -85,6 +23,7 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
     dedupeCampaignMessages,
     extractEmailAddresses,
     getCanonicalCampaignSubject,
+    getAccountOwner,
     getMailboxMessageDirection,
     getMessageIdentity,
     getMessageReferenceIds,
@@ -94,6 +33,33 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
     normalizeText,
     resolveConversationActivity,
   } = helpers;
+
+  function accountsShareOwner(left, right) {
+    if (typeof getAccountOwner !== 'function') return false;
+    const leftOwner = normalizeText(getAccountOwner(normalizeEmail(left))).toLowerCase();
+    const rightOwner = normalizeText(getAccountOwner(normalizeEmail(right))).toLowerCase();
+    return Boolean(leftOwner && rightOwner && leftOwner === rightOwner);
+  }
+
+  function getQuotedMessageTimestamp(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    for (const value of [source.receivedAt, source.internalDate, source.date, source.activityAt]) {
+      const timestamp = Date.parse(value || '');
+      if (Number.isFinite(timestamp)) return timestamp;
+    }
+    return 0;
+  }
+
+  function extractQuotedSenderEmails(value) {
+    const parsed = findStructuredQuoteStart(value);
+    if (parsed.index < 0) return [];
+    const fields = quotedThread.extractHeaderFields(parsed.segment.displayLines);
+    return Array.from(new Set([
+      parsed.segment.header,
+      ...fields.from,
+      ...fields.replyTo,
+    ].flatMap(extractEmailAddresses)));
+  }
 
   function canMergeProvenConversationSegments(groupedConversations) {
     if (groupedConversations.length < 2) return true;
@@ -207,10 +173,28 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
         getMailboxMessageDirection(message) === 'sent' && message && message.originalCampaignOutbound === true
       ));
       if (alreadyHasOriginal) return [];
-      const recipientEmails = Array.from(new Set(messages
+      const evidence = messages
         .filter((message) => getMailboxMessageDirection(message) !== 'sent')
-        .flatMap((message) => extractQuotedRecipientEmails(message && message.body, extractEmailAddresses))));
-      return recipientEmails.map((recipientEmail) => ({ accountEmail, canonicalSubject, recipientEmail }));
+        .flatMap((message) => {
+          const parsedQuote = findStructuredQuoteStart(message && message.body);
+          const headerRecipients = extractQuotedRecipientEmails(message && message.body, extractEmailAddresses);
+          const fallbackRecipient = normalizeEmail(conversation && conversation.email);
+          const recipients = headerRecipients.length
+            ? headerRecipients
+            : parsedQuote.segment && parsedQuote.segment.marker === 'reply-header' && fallbackRecipient
+              ? [fallbackRecipient]
+              : [];
+          const senderEmails = extractQuotedSenderEmails(message && message.body);
+          const at = getQuotedMessageTimestamp(message);
+          return recipients.map((recipientEmail) => ({ recipientEmail, senderEmails, at }));
+        });
+      return evidence.map(({ recipientEmail, senderEmails, at }) => ({
+        accountEmail,
+        canonicalSubject,
+        recipientEmail,
+        senderEmails,
+        beforeAt: at ? new Date(at + QUOTED_PARENT_CLOCK_SKEW_MS).toISOString() : '',
+      }));
     });
   }
 
@@ -229,8 +213,12 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
       .filter((message) => getMailboxMessageDirection(message) !== 'sent')
       .some((message) => {
         const body = normalizeText(message && message.body);
-        if (!body || findStructuredQuoteStart(body).index < 0) return false;
-        return extractQuotedRecipientEmails(body, extractEmailAddresses).length > 0;
+        const parsed = findStructuredQuoteStart(body);
+        if (!body || parsed.index < 0) return false;
+        return (
+          extractQuotedRecipientEmails(body, extractEmailAddresses).length > 0 ||
+          (parsed.segment.marker === 'reply-header' && Boolean(normalizeEmail(conversation && conversation.email)))
+        );
       });
     return forwardedSubject || exactQuotedRecipient;
   }
@@ -255,10 +243,17 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
         .map((message) => {
           const parsed = findStructuredQuoteStart(message && message.body);
           if (parsed.index < 0) return null;
+          const quotedRecipients = extractQuotedRecipientEmails(message && message.body, extractEmailAddresses);
+          const fallbackRecipient = normalizeEmail(conversation && conversation.email);
           return {
-            at: getMessageTimestamp(message),
-            body: parsed.lines.slice(parsed.index).join('\n'),
-            recipients: extractQuotedRecipientEmails(message && message.body, extractEmailAddresses),
+            at: getQuotedMessageTimestamp(message),
+            body: parsed.segment.text,
+            recipients: quotedRecipients.length
+              ? quotedRecipients
+              : parsed.segment.marker === 'reply-header' && fallbackRecipient
+                ? [fallbackRecipient]
+                : [],
+            senderEmails: extractQuotedSenderEmails(message && message.body),
           };
         })
         .filter(Boolean);
@@ -268,16 +263,26 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
         .filter((candidate) => (
           getMailboxMessageDirection(candidate) === 'sent' &&
           candidate && candidate.originalCampaignOutbound === true &&
-          normalizeEmail(candidate.accountEmail) === accountEmail &&
           getCanonicalCampaignSubject(candidate.subject) === canonicalSubject
         ))
         .filter((candidate) => {
+          const candidateAccount = normalizeEmail(candidate && candidate.accountEmail);
           const candidateBody = normalizeQuotedMatchText(candidate && candidate.body);
           if (candidateBody.length < 80) return false;
           const candidateRecipients = extractEmailAddresses(candidate && candidate.to);
           if (candidateRecipients.length !== 1) return false;
+          const candidateAt = getQuotedMessageTimestamp(candidate);
           return incomingEvidence.some((evidence) => (
-            evidence.at > getMessageTimestamp(candidate) &&
+            (
+              candidateAccount === accountEmail ||
+              (
+                accountsShareOwner(candidateAccount, accountEmail) &&
+                evidence.senderEmails.includes(candidateAccount)
+              )
+            ) &&
+            evidence.at > 0 &&
+            candidateAt > 0 &&
+            candidateAt <= evidence.at + QUOTED_PARENT_CLOCK_SKEW_MS &&
             evidence.recipients.includes(candidateRecipients[0]) &&
             normalizeQuotedMatchText(evidence.body).includes(candidateBody)
           ));
@@ -286,7 +291,9 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
 
       const candidate = {
         ...matches[0],
-        threadCorrelationEvidence: 'exact-account-subject-quoted-body-and-recipient',
+        threadCorrelationEvidence: normalizeEmail(matches[0] && matches[0].accountEmail) === accountEmail
+          ? 'exact-account-subject-quoted-body-and-recipient'
+          : 'same-owner-alias-subject-quoted-body-and-recipient',
       };
       const primaryIdentity = getMessageIdentity(conversation);
       const threadMessages = dedupeCampaignMessages([
@@ -334,7 +341,17 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
       ? await mailboxIndexStore.hydrateMessageBodies({ messages: hydrationCandidates })
       : hydrationCandidates;
     const recoveryCandidates = hydrated.filter(isQuotedSentRecoveryCandidate);
-    const targets = getQuotedSentRecoveryTargets(recoveryCandidates);
+    const baseTargets = getQuotedSentRecoveryTargets(recoveryCandidates);
+    const selectedAccountList = Array.from(selectedAccounts);
+    const targets = baseTargets.flatMap((target) => {
+      const exact = [target.accountEmail];
+      const quotedAliases = selectedAccountList.filter((candidateAccount) => (
+        candidateAccount !== target.accountEmail &&
+        accountsShareOwner(candidateAccount, target.accountEmail) &&
+        target.senderEmails.includes(candidateAccount)
+      ));
+      return [...exact, ...quotedAliases].map((accountEmail) => ({ ...target, accountEmail }));
+    });
     const sentCandidates = targets.length &&
       mailboxIndexStore && typeof mailboxIndexStore.listSentCandidatesForQuotedReplies === 'function'
       ? await mailboxIndexStore.listSentCandidatesForQuotedReplies({

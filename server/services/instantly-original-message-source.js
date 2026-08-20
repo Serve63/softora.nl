@@ -1,4 +1,5 @@
 const { parseProviderHtml } = require('./mailbox-provider-rich-body');
+const quotedThread = require('../../assets/premium-mailbox-quoted-thread.js');
 
 const SOFTORA_SOURCE_HTML_KEYS = Object.freeze([
   'softora_instantly_email_html',
@@ -8,7 +9,6 @@ const SOFTORA_SOURCE_TEXT_KEYS = Object.freeze([
   'softora_instantly_email_body',
   'softora_mail_body',
 ]);
-const QUOTED_REPLY_HEADER_PATTERN = /^(?:op\s.+\sschreef\s.+:|op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|on\s.+\swrote:)/i;
 const OUTLOOK_FROM_HEADER_PATTERN = /^(?:van|from):\s*(.+)$/i;
 const OUTLOOK_SUBJECT_HEADER_PATTERN = /^(?:onderwerp|subject):/i;
 
@@ -264,14 +264,11 @@ function extractQuotedOriginalBodyEvidence(rawMessages = [], options = {}) {
     }
     const body = getRawMessageBody(rawMessage);
     if (!body) continue;
-    const lines = body.split(/\r?\n/);
-    const quoteIndex = lines.findIndex((line) => {
-      const normalized = stripQuotePrefix(line);
-      return QUOTED_REPLY_HEADER_PATTERN.test(normalized) &&
-        (!expectedSender || email(extractEmail(normalized)) === expectedSender);
-    });
-    if (quoteIndex >= 0) {
-      const quotedLines = lines.slice(quoteIndex + 1);
+    const parsed = quotedThread.findQuotedSegments(body);
+    for (const segment of parsed.segments.filter((candidate) => candidate.marker === 'reply-header')) {
+      const quotedSender = email(extractEmail(segment.header));
+      if (expectedSender && quotedSender !== expectedSender) continue;
+      const quotedLines = segment.quotePayload.split(/\r?\n/);
       const startIndex = findProviderBodyStart(quotedLines, providerBody);
       const quotedBody = quotedLines
         .slice(startIndex)
@@ -287,28 +284,31 @@ function extractQuotedOriginalBodyEvidence(rawMessages = [], options = {}) {
       }
     }
 
-    const outlookFromIndex = lines.findIndex((line) => {
-      const match = stripQuotePrefix(line).match(OUTLOOK_FROM_HEADER_PATTERN);
-      return match && (!expectedSender || email(extractEmail(match[1])) === expectedSender);
-    });
-    if (outlookFromIndex < 0) continue;
-    const subjectOffset = lines
-      .slice(outlookFromIndex + 1, outlookFromIndex + 12)
-      .findIndex((line) => OUTLOOK_SUBJECT_HEADER_PATTERN.test(stripQuotePrefix(line)));
-    if (subjectOffset < 0) continue;
-    const quotedLines = lines.slice(outlookFromIndex + subjectOffset + 2);
-    const startIndex = findProviderBodyStart(quotedLines, providerBody);
-    const quotedBody = quotedLines
-      .slice(startIndex)
-      .map((line) => line.replace(/^\s*>\s?/, ''))
-      .join('\n')
-      .trim();
-    if (quotedBody) {
-      return {
-        body: quotedBody,
-        senderEmail: expectedSender,
-        source: 'outlook-original-message-header',
-      };
+    for (const segment of parsed.segments.filter((candidate) => candidate.marker !== 'reply-header')) {
+      const lines = segment.displayLines;
+      const outlookFromIndex = lines.findIndex((line) => {
+        const match = stripQuotePrefix(line).match(OUTLOOK_FROM_HEADER_PATTERN);
+        return match && (!expectedSender || email(extractEmail(match[1])) === expectedSender);
+      });
+      if (outlookFromIndex < 0) continue;
+      const subjectOffset = lines
+        .slice(outlookFromIndex + 1, outlookFromIndex + 12)
+        .findIndex((line) => OUTLOOK_SUBJECT_HEADER_PATTERN.test(stripQuotePrefix(line)));
+      if (subjectOffset < 0) continue;
+      const envelopeBodyLines = lines.slice(outlookFromIndex + subjectOffset + 2);
+      const startIndex = findProviderBodyStart(envelopeBodyLines, providerBody);
+      const quotedBody = envelopeBodyLines
+        .slice(startIndex)
+        .map((line) => line.replace(/^\s*>\s?/, ''))
+        .join('\n')
+        .trim();
+      if (quotedBody) {
+        return {
+          body: quotedBody,
+          senderEmail: expectedSender,
+          source: 'outlook-original-message-header',
+        };
+      }
     }
   }
 

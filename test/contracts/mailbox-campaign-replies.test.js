@@ -1540,6 +1540,86 @@ test('campaign reply service herstelt een Bossche Brouwers origineel uit een los
   );
 });
 
+test('campaign reply service herstelt JT inline via same-owner alias en weigert een toekomstige dubbelganger', async () => {
+  const originalBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website jt-voorbeeld.nl tegen.',
+    'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const incoming = {
+    id: 'inbox:jt-inline-alias',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'jt@example.nl',
+    to: 'serve@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    receivedAt: 'geen-geldige-datum',
+    internalDate: '2026-08-19T11:03:00.000Z',
+    date: '2026-08-19T11:03:00.000Z',
+    body: [
+      'Dank voor je bericht, maar we hebben geen interesse.',
+      '',
+      'Op 19-08-2026 12:59 schreef Servé Creusen <serve290@gmail.com>: Goedendag,',
+      '',
+      ...originalBody.split('\n').slice(2),
+    ].join('\n'),
+  };
+  const original = {
+    id: 'sent:jt-inline-alias',
+    folder: 'sent',
+    accountEmail: 'serve290@gmail.com',
+    email: 'serve290@gmail.com',
+    to: 'jt@example.nl',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-08-19T10:59:00.000Z',
+    body: originalBody,
+    messageId: '<jt-original@gmail.com>',
+    originalCampaignOutbound: true,
+  };
+  const futureDuplicate = {
+    ...original,
+    id: 'sent:jt-future',
+    messageId: '<jt-future@gmail.com>',
+    date: '2026-08-19T13:30:00.000Z',
+  };
+  let quotedTargets = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      hydrateMessageBodies: async ({ messages }) => messages,
+      listSentCandidatesForQuotedReplies: async ({ targets }) => {
+        quotedTargets = targets;
+        return [futureDuplicate, original];
+      },
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'jt-inline', bedrijf: 'JT', email: 'jt@example.nl',
+        campaignType: 'webdesign', lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'serve' });
+
+  assert.ok(quotedTargets.some((target) => (
+    target.accountEmail === 'serve290@gmail.com' &&
+    target.recipientEmail === 'jt@example.nl' &&
+    target.beforeAt === '2026-08-19T11:08:00.000Z'
+  )), JSON.stringify(quotedTargets));
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), ['sent:jt-inline-alias']);
+  assert.equal(
+    replies[0].threadMessages[0].threadCorrelationEvidence,
+    'same-owner-alias-subject-quoted-body-and-recipient'
+  );
+});
+
 test('campaign reply service koppelt forwarded originals niet bij ambiguïteit of ander account', async () => {
   const originalBody = [
     'Goedendag,',

@@ -487,6 +487,7 @@ const {
 } = createMailboxCampaignThreadRecovery({
   dedupeCampaignMessages,
   extractEmailAddresses,
+  getAccountOwner: (accountEmail) => getOutboundSenderIdentity(accountEmail)?.profileKey || '',
   getCanonicalCampaignSubject,
   getMailboxMessageDirection,
   getMessageIdentity,

@@ -163,16 +163,6 @@ const MAILBOX_TRACKING_HOST_PATTERNS = [
 const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
 const MAILBOX_COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const MAILBOX_REPLY_HEADER_PATTERNS = [
-  /^op .+\bheeft\s+.+\s+het volgende geschreven\s*:\s*$/i,
-  /^op .+\bschreef\b.+:\s*$/i,
-  /^op .+\bschreef\b\s+[^:\r\n]+?\s*$/i,
-  /^op .+\bschreef\b[:\s]*$/i,
-  /^on .+\bwrote\b\s+[^:\r\n]+?\s*$/i,
-  /^on .+\bwrote\b[:\s]*$/i,
-  /^van:\s.+$/i,
-  /^from:\s.+$/i,
-];
 const MAILBOX_OWN_REPLY_AUTHOR_PATTERN = /\b(?:serv[eé]\s+creusen|martijn\s+van\s+de\s+ven|serv[eé](?:creusen)?@softora\.nl|martijn(?:vandeven)?@softora\.nl)\b/i;
 const MAILBOX_SIGNATURE_START_PATTERNS = [
   /^met vriendelijke groet[,!]*$/i,
@@ -246,7 +236,10 @@ function cleanMailboxText(value) {
 }
 function isMailboxReplyHeaderLine(line) {
   const value = String(line || '').trim();
-  return MAILBOX_REPLY_HEADER_PATTERNS.some((pattern) => pattern.test(value));
+  return Boolean(
+    window.SoftoraMailboxQuotedThread?.isReplyHeaderLine?.(value) ||
+    /^(?:van|from):\s*\S/i.test(value)
+  );
 }
 function isMailboxOwnReplyHeaderLine(line) {
   return isMailboxReplyHeaderLine(line) && MAILBOX_OWN_REPLY_AUTHOR_PATTERN.test(String(line || ''));
@@ -310,11 +303,12 @@ function buildMailboxBodySections(value) {
     return [{ type: 'body', lines: ['Geen inhoud.'] }];
   }
   const sections = [];
-  const lines = text.split('\n');
+  const lines = window.SoftoraMailboxDisplay.joinBrokenWebdesignLinkLines(text.split('\n'));
+  const quotedSegments = window.SoftoraMailboxQuotedThread?.findQuotedSegments?.(lines.join('\n'))?.segments || [];
+  const quotedSegmentByStart = new Map(quotedSegments.map((segment) => [segment.start, segment]));
   let currentType = 'body';
   let currentLines = [];
   let signatureStarted = false;
-  let quotedThreadStarted = false;
   function pushSection() {
     if (!currentLines.length) return;
     if (!currentLines.some((line) => String(line || '').trim())) {
@@ -324,39 +318,25 @@ function buildMailboxBodySections(value) {
     sections.push({ type: currentType, lines: currentLines.slice() });
     currentLines = [];
   }
-  window.SoftoraMailboxDisplay.joinBrokenWebdesignLinkLines(lines).forEach((line) => {
+  for (let index = 0; index < lines.length; index += 1) {
+    const quoteSegment = quotedSegmentByStart.get(index);
+    if (quoteSegment) {
+      pushSection();
+      const quoteLines = Array.isArray(quoteSegment.displayLines)
+        ? quoteSegment.displayLines
+        : lines.slice(quoteSegment.start, quoteSegment.end).map(stripMailboxQuotePrefix);
+      if (quoteLines.some((line) => String(line || '').trim())) {
+        sections.push({ type: 'quote', lines: quoteLines });
+      }
+      currentType = 'body';
+      currentLines = [];
+      signatureStarted = false;
+      index = Math.max(index, quoteSegment.end - 1);
+      continue;
+    }
+    const line = lines[index];
     const rawLine = String(line || '');
     const trimmed = rawLine.trim();
-    const isReplyHeader = isMailboxReplyHeaderLine(trimmed);
-    const isQuoteLine = /^\s*>/.test(rawLine);
-    if (isReplyHeader) {
-      quotedThreadStarted = true;
-      signatureStarted = false;
-      if (currentType !== 'quote') {
-        pushSection();
-        currentType = 'quote';
-      }
-      currentLines.push(trimmed);
-      return;
-    }
-    if (isQuoteLine) {
-      quotedThreadStarted = true;
-      signatureStarted = false;
-      if (currentType !== 'quote') {
-        pushSection();
-        currentType = 'quote';
-      }
-      currentLines.push(stripMailboxQuotePrefix(rawLine));
-      return;
-    }
-    if (quotedThreadStarted) {
-      if (currentType !== 'quote') {
-        pushSection();
-        currentType = 'quote';
-      }
-      currentLines.push(rawLine);
-      return;
-    }
     if (!signatureStarted && isMailboxSignatureStartLine(trimmed)) {
       signatureStarted = true;
       if (currentType !== 'signature') {
@@ -364,7 +344,7 @@ function buildMailboxBodySections(value) {
         currentType = 'signature';
       }
       if (trimmed !== '--') currentLines.push(rawLine);
-      return;
+      continue;
     }
     if (signatureStarted) {
       if (currentType !== 'signature') {
@@ -372,14 +352,14 @@ function buildMailboxBodySections(value) {
         currentType = 'signature';
       }
       currentLines.push(rawLine);
-      return;
+      continue;
     }
     if (currentType !== 'body') {
       pushSection();
       currentType = 'body';
     }
     currentLines.push(rawLine);
-  });
+  }
   pushSection();
   return sections.length ? sections : [{ type: 'body', lines: ['Geen inhoud.'] }];
 }
