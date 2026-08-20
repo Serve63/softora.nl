@@ -449,6 +449,7 @@ if (!databaseUrl) {
         starred boolean not null default false, reply_dismissed_at timestamptz,
         payload jsonb not null default '{}'::jsonb, created_at timestamptz not null default now(),
         updated_at timestamptz not null default now(), deleted_at timestamptz,
+        uid_validity bigint, generation_superseded_at timestamptz,
         unique (account_email, folder, uid)
       );
       create table public.softora_mailbox_sync_state (
@@ -467,6 +468,67 @@ if (!databaseUrl) {
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       );
+      create or replace function public.softora_normalize_mailbox_message_id(p_value text)
+      returns text
+      language sql
+      immutable
+      set search_path = ''
+      as $function$
+        select nullif(
+          lower(
+            regexp_replace(
+              btrim(coalesce(p_value, '')),
+              '^[<>,[:space:]]+|[<>,[:space:]]+$',
+              '',
+              'g'
+            )
+          ),
+          ''
+        );
+      $function$;
+      create or replace function public.softora_mailbox_direct_parent_ids(
+        p_in_reply_to text,
+        p_references_text text
+      )
+      returns text[]
+      language plpgsql
+      immutable
+      set search_path = ''
+      as $function$
+      declare
+        v_source text;
+        v_token text;
+        v_normalized text;
+        v_ids text[] := '{}'::text[];
+        v_uses_references boolean := nullif(btrim(coalesce(p_in_reply_to, '')), '') is null;
+      begin
+        v_source := case
+          when v_uses_references then coalesce(p_references_text, '')
+          else coalesce(p_in_reply_to, '')
+        end;
+        foreach v_token in array regexp_split_to_array(
+          regexp_replace(v_source, ',', ' ', 'g'),
+          '[[:space:]]+'
+        ) loop
+          v_normalized := public.softora_normalize_mailbox_message_id(v_token);
+          if v_normalized is not null and not v_normalized = any (v_ids) then
+            v_ids := array_append(v_ids, v_normalized);
+          end if;
+        end loop;
+        if v_uses_references and cardinality(v_ids) > 1 then
+          return array[v_ids[cardinality(v_ids)]];
+        end if;
+        return v_ids;
+      end;
+      $function$;
+      revoke all on function public.softora_normalize_mailbox_message_id(text)
+        from public, anon, authenticated;
+      revoke all on function public.softora_mailbox_direct_parent_ids(text, text)
+        from public, anon, authenticated;
+      grant execute on function public.softora_normalize_mailbox_message_id(text)
+        to service_role;
+      grant execute on function public.softora_mailbox_direct_parent_ids(text, text)
+        to service_role;
     `;
     const legacySendSeedSql = `
       insert into public.softora_mailbox_send_provenance (
@@ -487,6 +549,149 @@ if (!databaseUrl) {
 
   test.after(async () => {
     await Promise.all(Array.from(clients, (client) => client.end().catch(() => null)));
+  });
+
+  test('logische tombstonemigratie behoudt het live Message-ID-normalizercontract', async () => {
+    const client = await connect();
+    const normalizer = (await client.query(`
+      select
+        p.proargnames,
+        p.proparallel,
+        public.softora_normalize_mailbox_message_id(null) is null as null_stays_null,
+        public.softora_normalize_mailbox_message_id('') is null as empty_stays_null,
+        public.softora_normalize_mailbox_message_id(' <>, ') is null as punctuation_stays_null,
+        public.softora_normalize_mailbox_message_id(' <<Mixed@Id.COM>>, ')
+          = 'mixed@id.com' as valid_id_normalized,
+        public.softora_mailbox_direct_parent_ids('', ' <>, ,  ') as empty_parent_ids
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname = 'softora_normalize_mailbox_message_id'
+    `)).rows[0];
+    assert.deepEqual(normalizer, {
+      proargnames: ['p_value'],
+      proparallel: 'u',
+      null_stays_null: true,
+      empty_stays_null: true,
+      punctuation_stays_null: true,
+      valid_id_normalized: true,
+      empty_parent_ids: [],
+    });
+  });
+
+  test('UIDVALIDITY-retirement maakt geen logische verwijdertombstone', async () => {
+    const client = await connect();
+    await client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        date, payload, uid_validity
+      ) values (
+        'uidvalidity-old', 'serve@softora.nl', 'inbox', 9801,
+        'inbox:9801', '<uidvalidity-retirement@test>', now(), '{}', 111
+      );
+      update public.softora_mailbox_messages
+      set
+        deleted_at = clock_timestamp(),
+        generation_superseded_at = clock_timestamp(),
+        updated_at = clock_timestamp()
+      where message_key = 'uidvalidity-old';
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        date, payload, uid_validity
+      ) values (
+        'uidvalidity-new', 'serve@softora.nl', 'inbox', 9802,
+        'inbox:9802', '<UIDVALIDITY-RETIREMENT@TEST>', now(), '{}', 222
+      );
+    `);
+    const states = (await client.query(`
+      select message_key, deleted_at is not null as deleted,
+        generation_superseded_at is not null as generation_superseded
+      from public.softora_mailbox_messages
+      where message_key in ('uidvalidity-old', 'uidvalidity-new')
+      order by message_key
+    `)).rows;
+    assert.deepEqual(states, [
+      { message_key: 'uidvalidity-new', deleted: false, generation_superseded: false },
+      { message_key: 'uidvalidity-old', deleted: true, generation_superseded: true },
+    ]);
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = 'serve@softora.nl'
+        and normalized_message_id = 'uidvalidity-retirement@test'
+    `)).rows[0].count, 0);
+  });
+
+  test('logische hide en restore muteren nooit een UIDVALIDITY-retired kopie', async () => {
+    const client = await connect();
+    await client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        date, payload, deleted_at, uid_validity, generation_superseded_at
+      ) values
+        (
+          'visibility-retired', 'serve@softora.nl', 'inbox', 9811,
+          'inbox:9811', '<visibility-generation@test>', now(), '{}',
+          clock_timestamp(), 111, clock_timestamp()
+        ),
+        (
+          'visibility-current', 'serve@softora.nl', 'allmail', 9812,
+          'allmail:9812', '<VISIBILITY-GENERATION@TEST>', now(), '{}',
+          null, 222, null
+        );
+    `);
+    const retiredBefore = (await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where message_key = 'visibility-retired'
+    `)).rows[0].deleted_at;
+    const hidden = await client.query(`
+      select * from public.softora_set_mailbox_message_visibility(
+        'serve@softora.nl', 'allmail', 9812, 'allmail:9812', true
+      )
+    `);
+    assert.equal(hidden.rowCount, 1);
+    const retiredAfterHide = (await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where message_key = 'visibility-retired'
+    `)).rows[0].deleted_at;
+    assert.equal(retiredAfterHide, retiredBefore);
+
+    const restored = await client.query(`
+      select * from public.softora_set_mailbox_message_visibility(
+        'serve@softora.nl', 'allmail', 9812, 'allmail:9812', false
+      )
+    `);
+    assert.equal(restored.rowCount, 1);
+    const states = (await client.query(`
+      select message_key, deleted_at is not null as deleted,
+        generation_superseded_at is not null as generation_superseded
+      from public.softora_mailbox_messages
+      where message_key in ('visibility-retired', 'visibility-current')
+      order by message_key
+    `)).rows;
+    assert.deepEqual(states, [
+      { message_key: 'visibility-current', deleted: false, generation_superseded: false },
+      { message_key: 'visibility-retired', deleted: true, generation_superseded: true },
+    ]);
+    assert.equal((await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where message_key = 'visibility-retired'
+    `)).rows[0].deleted_at, retiredBefore);
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = 'serve@softora.nl'
+        and normalized_message_id = 'visibility-generation@test'
+    `)).rows[0].count, 0);
+    const staleTarget = await client.query(`
+      select * from public.softora_set_mailbox_message_visibility(
+        'serve@softora.nl', 'inbox', 9811, 'inbox:9811', true
+      )
+    `);
+    assert.equal(staleTarget.rowCount, 0);
   });
 
   test('nieuwe-copy INSERT versus hide en restore vermijdt de global/logical-deadlock', async (t) => {

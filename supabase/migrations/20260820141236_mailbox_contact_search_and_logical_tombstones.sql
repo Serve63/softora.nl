@@ -239,19 +239,23 @@ grant execute on function public.softora_search_mailbox_contact_dossiers(
 ) to service_role;
 
 create or replace function public.softora_normalize_mailbox_message_id(
-  p_message_id text
+  p_value text
 )
 returns text
 language sql
 immutable
-parallel safe
 set search_path = ''
 as $function$
-  select pg_catalog.regexp_replace(
-    pg_catalog.lower(pg_catalog.btrim(coalesce(p_message_id, ''))),
-    '^<+|>+$',
-    '',
-    'g'
+  select nullif(
+    pg_catalog.lower(
+      pg_catalog.regexp_replace(
+        pg_catalog.btrim(coalesce(p_value, '')),
+        '^[<>,[:space:]]+|[<>,[:space:]]+$',
+        '',
+        'g'
+      )
+    ),
+    ''
   );
 $function$;
 
@@ -268,7 +272,7 @@ create table if not exists public.softora_mailbox_message_tombstones (
     ),
   constraint softora_mailbox_message_tombstones_message_id_normalized_check
     check (
-      normalized_message_id <> ''
+      public.softora_normalize_mailbox_message_id(normalized_message_id) is not null
       and normalized_message_id
         = public.softora_normalize_mailbox_message_id(normalized_message_id)
     )
@@ -286,7 +290,8 @@ on public.softora_mailbox_messages (
   (pg_catalog.lower(pg_catalog.btrim(account_email))),
   (public.softora_normalize_mailbox_message_id(message_id))
 )
-where nullif(pg_catalog.btrim(message_id), '') is not null;
+where generation_superseded_at is null
+  and public.softora_normalize_mailbox_message_id(message_id) is not null;
 
 create or replace function public.softora_inherit_mailbox_message_tombstone()
 returns trigger
@@ -301,7 +306,7 @@ declare
 begin
   v_account_email := pg_catalog.lower(pg_catalog.btrim(coalesce(new.account_email, '')));
   v_message_id := public.softora_normalize_mailbox_message_id(new.message_id);
-  if v_account_email = '' or v_message_id = '' then
+  if v_account_email = '' or v_message_id is null then
     return new;
   end if;
 
@@ -324,13 +329,17 @@ begin
     new.deleted_at := v_deleted_at;
   elsif tg_op = 'UPDATE'
     and old.deleted_at is null
-    and new.deleted_at is not null then
+    and new.deleted_at is not null
+    and old.generation_superseded_at is null
+    and new.generation_superseded_at is null then
     -- Compatibility for the production version that predates the visibility
     -- RPC: a legacy direct hide must still create durable logical intent. The
     -- statement-level campaign lock is already held before this row trigger,
     -- so this keeps the global -> row/tombstone order without adding the
     -- advisory lock after a row lock. A direct NULL update never removes the
     -- tombstone; only the serialized visibility RPC may restore a message.
+    -- UIDVALIDITY retirement also sets deleted_at, but is system lifecycle
+    -- state rather than user deletion intent and must never mint a tombstone.
     insert into public.softora_mailbox_message_tombstones as tombstone (
       account_email, normalized_message_id, deleted_at, updated_at
     ) values (
@@ -404,6 +413,7 @@ begin
   from public.softora_mailbox_messages m
   where pg_catalog.lower(pg_catalog.btrim(m.account_email)) = v_account_email
     and pg_catalog.lower(pg_catalog.btrim(m.folder)) = v_folder
+    and m.generation_superseded_at is null
     and (
       (coalesce(p_uid, 0) > 0 and m.uid = p_uid)
       or (
@@ -420,16 +430,17 @@ begin
   end if;
 
   v_message_id := public.softora_normalize_mailbox_message_id(v_anchor.message_id);
-  if v_message_id = '' then
+  if v_message_id is null then
     select m.*
     into v_anchor
     from public.softora_mailbox_messages m
     where m.message_key = v_anchor.message_key
+      and m.generation_superseded_at is null
     for update;
     if not found then
       return;
     end if;
-    if public.softora_normalize_mailbox_message_id(v_anchor.message_id) <> '' then
+    if public.softora_normalize_mailbox_message_id(v_anchor.message_id) is not null then
       raise exception using
         errcode = '40001',
         message = 'Mailbox Message-ID veranderde tijdens zichtbaarheidstransactie.';
@@ -454,11 +465,13 @@ begin
   into v_anchor
   from public.softora_mailbox_messages m
   where m.message_key = v_anchor.message_key
+    and m.generation_superseded_at is null
   for update;
   if not found then
     return;
   end if;
-  if public.softora_normalize_mailbox_message_id(v_anchor.message_id) <> v_message_id then
+  if public.softora_normalize_mailbox_message_id(v_anchor.message_id)
+    is distinct from v_message_id then
     raise exception using
       errcode = '40001',
       message = 'Mailbox Message-ID veranderde tijdens zichtbaarheidstransactie.';
@@ -484,6 +497,7 @@ begin
       deleted_at = case when p_hidden then v_changed_at else null end,
       updated_at = v_changed_at
     where pg_catalog.lower(pg_catalog.btrim(m.account_email)) = v_account_email
+      and m.generation_superseded_at is null
       and public.softora_normalize_mailbox_message_id(m.message_id) = v_message_id
     returning m.message_key, m.account_email, m.folder, m.uid,
       m.provider_id, m.message_id;
