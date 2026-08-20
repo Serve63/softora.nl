@@ -35,12 +35,13 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813b" defer><\/script>/);
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260820a"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260804a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-office-details\.css\?v=20260820a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260804a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-subtitle\.css\?v=20260809a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-vakantieradar\.css\?v=20260810a"/);
@@ -131,6 +132,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const settingsBackCss = read('assets/settings-module-back.css');
   const progressCss = read('assets/live-momentum-endgame-progress.css');
   const endGameNumbersCss = read('assets/live-momentum-endgame-numbers.css');
+  const officeDetailsCss = read('assets/live-momentum-endgame-office-details.css');
   const checkpointCss = read('assets/live-momentum-endgame-checkpoint.css');
   const subtitleCss = read('assets/live-momentum-endgame-subtitle.css');
   const vacationRadarCss = read('assets/live-momentum-endgame-vakantieradar.css');
@@ -223,9 +225,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(endGameNumbersCss, /@media \(max-width:\s*900px\)[\s\S]*flex-basis:\s*min\(74vw, 280px\);/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
-  assert.match(css, /\.end-game-card-office-detail\s*\{[\s\S]*position:\s*absolute;[\s\S]*pointer-events:\s*none;/);
+  assert.match(officeDetailsCss, /\.end-game-card-office-detail\s*\{[\s\S]*position:\s*absolute;[\s\S]*pointer-events:\s*none;/);
   ['tv', 'noticeboard', 'coat-rack', 'matching-desk', 'plants', 'clean-paint', 'accounting-upstairs']
-    .forEach((detail) => assert.equal(css.includes(`.end-game-card-office-detail--${detail}`), true, `missing office visual: ${detail}`));
+    .forEach((detail) => assert.equal(officeDetailsCss.includes(`.end-game-card-office-detail--${detail}`), true, `missing office visual: ${detail}`));
   assert.match(css, /\.end-game-card-name\s*\{[\s\S]*text-transform:\s*uppercase;/);
   assert.match(missionCopyCss, /\.end-game-card-mission-copy\s*\{[\s\S]*font-size:\s*\.58rem;[\s\S]*text-wrap:\s*balance;/);
   assert.match(missionCopyCss, /@media \(max-width: 700px\)[\s\S]*\.end-game-card-mission-copy\s*\{[^}]*-webkit-line-clamp:\s*2;[^}]*font-size:\s*8px;/);
