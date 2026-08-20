@@ -193,6 +193,15 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .detail-mail-quote-meta { font-size: 12px; color: var(--text-light); }
 .detail-mail-quote-body { color: var(--text-mid); }
 .detail-mail-section-signature { padding-top: 16px; color: var(--text-mid); }
+.detail-mail-contact-card { display: grid; gap: 8px; margin: 4px 0 0; padding: 12px 14px; border: 1px solid rgba(82,86,99,.18); border-radius: 6px; background: rgba(255,255,255,.72); color: var(--text-dark); font-style: normal; }
+.detail-mail-contact-title { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-light); }
+.detail-mail-contact-grid { display: grid; gap: 5px; margin: 0; }
+.detail-mail-contact-item { display: grid; grid-template-columns: 72px minmax(0,1fr); gap: 10px; align-items: start; }
+.detail-mail-contact-item dt { color: var(--text-light); font-size: 12px; font-weight: 600; }
+.detail-mail-contact-item dd { min-width: 0; margin: 0; color: var(--text-dark); font-size: 13px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.detail-mail-contact-link { color: var(--crimson); text-decoration: none; }
+.detail-mail-contact-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.detail-mail-contact-link:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; border-radius: 2px; }
 .detail-footer { margin: 0; padding: 2px 0 16px; border-bottom: 0; }
 .detail-contact-action { padding: 14px 0 2px; }
 .detail-reply { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; border: 1px solid rgba(155,35,85,.34); border-radius: 6px; padding: 8px 14px; background: var(--card); color: var(--crimson); box-shadow: 0 1px 2px rgba(24,24,36,.06); font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
@@ -408,7 +417,7 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
   color: var(--crimson);
 }
 </style>
-<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260817d">
+<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260820a">
 </head>
 <body>
 <div class="dashboard-layout">
@@ -507,10 +516,10 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
     <div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"></div>
   </div>
   <div class="topbar-refresh-wrap">
-    <button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen" title="Mailbox vernieuwen">
+    <button class="topbar-refresh is-refreshing" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailboxproviders worden gecontroleerd." title="Mailboxproviders worden gecontroleerd." aria-busy="true" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11"></path><path d="M17.9 15a7 7 0 0 1-11.7 2.6L4 13"></path></svg>
     </button>
-      <span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">Nog niet gecontroleerd</span>
+      <span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite" aria-label="Mailboxproviders worden gecontroleerd.">Controleren…</span>
   </div>
 </div>
 
@@ -594,8 +603,8 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
 <script src="assets/premium-mailbox-body-section.js?v=20260818c"></script>
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260817d"></script><script src="assets/premium-mailbox-owner-preference.js?v=20260806a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-quoted-thread.js?v=20260820a"></script><script src="assets/premium-mailbox-reply-identity.js?v=20260812a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260820a"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260813a"></script><script src="assets/premium-mailbox-discovery.js?v=20260817d"></script><script src="assets/premium-mailbox-list.js?v=20260818b"></script><script src="assets/premium-mailbox-detail-state.js?v=20260813a"></script><script src="assets/premium-mailbox-index.js?v=20260813a"></script><script src="assets/premium-mailbox-refresh.js?v=20260818a"></script><script src="assets/premium-mailbox-error.js?v=20260818a"></script><script src="assets/premium-mailbox-compose.js?v=20260818b"></script><script src="assets/premium-mailbox-compose-window.js?v=20260817c"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260818b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-browser-storage.js?v=20260814a"></script><script src="assets/premium-mailbox-state-outbox.js?v=20260814b"></script><script src="assets/premium-mailbox-read.js?v=20260818a"></script><script src="assets/premium-mailbox-ui-state.js?v=20260818a"></script>
-<script src="assets/premium-mailbox-boot.js?v=20260806a"></script><script src="assets/premium-mailbox.js?v=20260820a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260817d"></script><script src="assets/premium-mailbox-owner-preference.js?v=20260806a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-quoted-thread.js?v=20260820b"></script><script src="assets/premium-mailbox-signature.js?v=20260820a"></script><script src="assets/premium-mailbox-message-presentation.js?v=20260820a"></script><script src="assets/premium-mailbox-logical-delete.js?v=20260820a"></script><script src="assets/premium-mailbox-reply-identity.js?v=20260812a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260820b"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260813a"></script><script src="assets/premium-mailbox-discovery.js?v=20260817d"></script><script src="assets/premium-mailbox-list.js?v=20260818b"></script><script src="assets/premium-mailbox-detail-state.js?v=20260813a"></script><script src="assets/premium-mailbox-index.js?v=20260813a"></script><script src="assets/premium-mailbox-refresh.js?v=20260820b"></script><script src="assets/premium-mailbox-error.js?v=20260818a"></script><script src="assets/premium-mailbox-compose.js?v=20260818b"></script><script src="assets/premium-mailbox-compose-window.js?v=20260817c"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260818b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-browser-storage.js?v=20260814a"></script><script src="assets/premium-mailbox-state-outbox.js?v=20260814b"></script><script src="assets/premium-mailbox-read.js?v=20260818a"></script><script src="assets/premium-mailbox-ui-state.js?v=20260818a"></script>
+<script src="assets/premium-mailbox-boot.js?v=20260806a"></script><script src="assets/premium-mailbox.js?v=20260820b"></script>
 <script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
 </html>

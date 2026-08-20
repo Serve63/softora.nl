@@ -38,6 +38,10 @@ const outreachScoreOnceMigrationPath = path.resolve(
   __dirname,
   '../../supabase/migrations/20260817153000_mailbox_search_score_once.sql'
 );
+const contactDossierMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260820171023_mailbox_contact_search_and_logical_tombstones.sql'
+);
 
 function createElement() {
   const listeners = {};
@@ -75,6 +79,8 @@ test('mailbox discovery beperkt owner-scope server-side en valideert query en cu
     'martijnven123@gmail.com',
     'contact.venvisuals@gmail.com',
   ]);
+  assert.deepEqual(Object.keys(calls[0].ownerAccounts), ['martijn']);
+  assert.deepEqual(calls[0].ownerAccounts.martijn, calls[0].accountEmails);
   assert.equal(first.query, 'Ziggo.nl');
   assert.ok(first.nextCursor);
   await service.searchMailbox({ owner: 'martijn', query: 'ziggo', cursor: first.nextCursor, limit: 20 });
@@ -139,7 +145,7 @@ test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart techn
   );
 });
 
-test('contacttijdlijn laat alleen berichten met exact bewezen alias en externe identiteit toe', () => {
+test('contacttijdlijn laat alleen hetzelfde externe adres binnen exact dezelfde eigenaar toe', () => {
   const root = {
     id: 'martijn@softora.nl|sent:1',
     messageId: '<root@example.test>',
@@ -165,12 +171,78 @@ test('contacttijdlijn laat alleen berichten met exact bewezen alias en externe i
   ];
 
   discoveryUi.mergeContactTimeline(root, rows, 'secretariaat@seniorenhaaren.nl', 4, {
-    accountEmails: ['martijn@softora.nl', 'martijnvandeven@softora.nl', 'serve290@gmail.com'],
+    accountEmails: ['martijn@softora.nl', 'martijnvandeven@softora.nl'],
   });
 
-  assert.deepEqual(root.threadMessages.map((message) => message.id), ['inbox:correct', 'sent:serve-alias']);
-  assert.equal(root.contactTimelineRejectedCount, 1);
-  assert.equal(root.contactTimelineTotal, 3);
+  assert.deepEqual(root.threadMessages.map((message) => message.id), ['inbox:correct']);
+  assert.equal(root.contactTimelineRejectedCount, 2);
+  assert.equal(root.contactTimelineTotal, 2);
+});
+
+test('contacttijdlijn gebruikt in beide-scope altijd de concrete eigenaar van zoekresultaat of normaal bericht', async () => {
+  const cases = [{
+    label: 'zoekresultaat',
+    root: {
+      id: 'search-result', messageId: '<search-root@test>', canonicalOwner: 'serve',
+      accountEmail: 'serve@softora.nl', folder: 'inbox', email: 'contact@example.nl',
+      to: 'serve@softora.nl', externalContactEmail: 'contact@example.nl',
+    },
+    expectedOwner: 'serve',
+  }, {
+    label: 'normaal bericht',
+    root: {
+      id: 'normal-message', messageId: '<normal-root@test>',
+      accountEmail: 'martijn@softora.nl', folder: 'inbox', email: 'contact@example.nl',
+      to: 'martijn@softora.nl', externalContactEmail: 'contact@example.nl',
+    },
+    expectedOwner: 'martijn',
+  }];
+
+  for (const fixture of cases) {
+    const elements = {
+      'mailbox-search-input': createElement(),
+      'mailbox-search-clear': createElement(),
+      'mailbox-search-status': createElement(),
+      'mailbox-search-more': createElement(),
+    };
+    const requests = [];
+    const controller = discoveryUi.create({
+      document: { getElementById: (id) => elements[id] || null, querySelector: () => null },
+      async fetch(url) {
+        requests.push(new URL(url, 'https://softora.test'));
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            totalCount: 2,
+            messages: [{
+              id: `${fixture.label}-serve`, messageId: `<${fixture.label}-serve@test>`,
+              accountEmail: 'serve@softora.nl', folder: 'inbox', email: 'contact@example.nl',
+              to: 'serve@softora.nl', technicalThreadKey: 'serve-thread',
+            }, {
+              id: `${fixture.label}-martijn`, messageId: `<${fixture.label}-martijn@test>`,
+              accountEmail: 'martijn@softora.nl', folder: 'inbox', email: 'contact@example.nl',
+              to: 'martijn@softora.nl', technicalThreadKey: 'martijn-thread',
+            }],
+          }),
+        };
+      },
+      getOwner: () => 'both',
+      getMessageOwner: (message) => String(message?.accountEmail || '').startsWith('martijn@') ? 'martijn' : 'serve',
+      getAccountEmails: () => ['serve@softora.nl', 'martijn@softora.nl'],
+      getActiveMail: () => fixture.root.id,
+      normalizeMessage: (value) => ({ ...value }),
+      openMail() {},
+    });
+
+    assert.equal(await controller.loadContactTimeline(fixture.root), true, fixture.label);
+    assert.equal(requests.length, 1, fixture.label);
+    assert.equal(requests[0].searchParams.get('owner'), fixture.expectedOwner, fixture.label);
+    assert.ok(
+      fixture.root.threadMessages.every((message) => message.accountEmail.startsWith(`${fixture.expectedOwner}@`)),
+      fixture.label
+    );
+  }
 });
 
 test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt selectie en scroll', async () => {
@@ -423,6 +495,11 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
       intent_id text primary key, account_email text, recipient_email text,
       provider text, status text, accepted_at timestamptz
     );
+    create table public.softora_mailbox_campaign_consistency (
+      scope text primary key, content_version bigint not null default 0
+    );
+    insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+    values ('campaign', 0);
   `);
   let migration = fs.readFileSync(migrationPath, 'utf8');
   migration = migration.replace(
@@ -448,6 +525,100 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
   await database.exec(fs.readFileSync(outreachEligibilitySetMigrationPath, 'utf8'));
   await database.exec(fs.readFileSync(outreachNarrowPlanMigrationPath, 'utf8'));
   await database.exec(fs.readFileSync(outreachScoreOnceMigrationPath, 'utf8'));
+  await database.exec(`
+    insert into public.softora_mailbox_messages (
+      message_key, account_email, folder, uid, provider_id, message_id,
+      deleted_at, updated_at
+    ) values
+      ('backfill-hidden','serve@softora.nl','inbox',901,'inbox:901',
+        '<Backfill-Copy@Test>','2026-08-19T10:00:00Z','2026-08-19T10:00:00Z'),
+      ('backfill-active','serve@softora.nl','allmail',902,'allmail:902',
+        'backfill-copy@test',null,'2026-08-19T10:01:00Z'),
+      ('backfill-other-owner','martijn@softora.nl','inbox',901,'inbox:901',
+        '<BACKFILL-COPY@TEST>',null,'2026-08-19T10:02:00Z'),
+      ('backfill-empty-hidden','serve@softora.nl','inbox',903,'inbox:903',
+        '', '2026-08-19T10:03:00Z','2026-08-19T10:03:00Z'),
+      ('backfill-empty-active','serve@softora.nl','allmail',904,'allmail:904',
+        '', null,'2026-08-19T10:04:00Z');
+  `);
+  await database.exec(fs.readFileSync(contactDossierMigrationPath, 'utf8'));
+
+  const preMigrationDeleteState = await database.query(`
+    select message_key, deleted_at
+    from public.softora_mailbox_messages
+    where message_key like 'backfill-%'
+    order by message_key
+  `);
+  assert.equal(preMigrationDeleteState.rows.find((row) => row.message_key === 'backfill-active').deleted_at, null);
+  assert.ok(preMigrationDeleteState.rows.find((row) => row.message_key === 'backfill-hidden').deleted_at);
+  assert.equal(preMigrationDeleteState.rows.find((row) => row.message_key === 'backfill-other-owner').deleted_at, null);
+  assert.equal(preMigrationDeleteState.rows.find((row) => row.message_key === 'backfill-empty-active').deleted_at, null);
+  assert.equal((await database.query(`
+    select count(*)::integer as count
+    from public.softora_mailbox_message_tombstones
+    where account_email = 'serve@softora.nl'
+      and normalized_message_id = 'backfill-copy@test'
+  `)).rows[0].count, 0);
+
+  await database.exec(`
+    update public.softora_mailbox_messages
+    set
+      account_email = account_email,
+      message_id = message_id,
+      updated_at = '2026-08-20T13:59:00Z'
+    where message_key = 'backfill-hidden';
+  `);
+  assert.equal((await database.query(`
+    select count(*)::integer as count
+    from public.softora_mailbox_message_tombstones
+    where account_email = 'serve@softora.nl'
+      and normalized_message_id = 'backfill-copy@test'
+  `)).rows[0].count, 0);
+  assert.equal((await database.query(`
+    select count(*)::integer as count
+    from public.softora_mailbox_messages
+    where message_key = 'backfill-active'
+      and deleted_at is null
+  `)).rows[0].count, 1);
+  assert.equal((await database.query(`
+    select count(*)::integer as count
+    from public.softora_mailbox_message_tombstones
+    where normalized_message_id = ''
+  `)).rows[0].count, 0);
+
+  await database.exec(`
+    insert into public.softora_mailbox_messages (
+      message_key, account_email, folder, uid, provider_id, message_id, updated_at
+    ) values (
+      'legacy-window-hidden','serve@softora.nl','inbox',905,'inbox:905',
+      '<Legacy-Window@Test>','2026-08-20T14:00:00Z'
+    );
+    update public.softora_mailbox_messages
+    set deleted_at = '2026-08-20T14:01:00Z', updated_at = '2026-08-20T14:01:00Z'
+    where message_key = 'legacy-window-hidden';
+    insert into public.softora_mailbox_messages (
+      message_key, account_email, folder, uid, provider_id, message_id, updated_at
+    ) values
+      ('legacy-window-later','serve@softora.nl','allmail',906,'allmail:906',
+        'legacy-window@test','2026-08-20T14:02:00Z'),
+      ('legacy-window-other-owner','martijn@softora.nl','allmail',905,'allmail:905',
+        '<LEGACY-WINDOW@TEST>','2026-08-20T14:02:00Z');
+  `);
+  const legacyWindowState = await database.query(`
+    select message_key, deleted_at
+    from public.softora_mailbox_messages
+    where message_key like 'legacy-window-%'
+    order by message_key
+  `);
+  assert.ok(legacyWindowState.rows.find((row) => row.message_key === 'legacy-window-hidden').deleted_at);
+  assert.ok(legacyWindowState.rows.find((row) => row.message_key === 'legacy-window-later').deleted_at);
+  assert.equal(legacyWindowState.rows.find((row) => row.message_key === 'legacy-window-other-owner').deleted_at, null);
+  assert.equal((await database.query(`
+    select count(*)::integer as count
+    from public.softora_mailbox_message_tombstones
+    where account_email = 'serve@softora.nl'
+      and normalized_message_id = 'legacy-window@test'
+  `)).rows[0].count, 1);
 
   const payload = (extra = {}) => JSON.stringify({ source: 'imap-sync', provider: 'imap', ...extra });
   const rows = [
@@ -460,6 +631,16 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
     ['serve-contact', 'serve@softora.nl', 'inbox', 7, 'inbox:7', '<serve@test>', '', '', 'Peter', 'psonnemans@ziggo.nl', 'serve@softora.nl', 'Servé onderwerp', 'serve', 'serve', '2026-08-14T08:33:00Z', payload()],
     ['instantly-copy', 'martijn@softora.nl', 'instantly', 8, 'instantly:copy', '<old-in@test>', '', '', 'Peter', 'psonnemans@ziggo.nl', 'martijn@softora.nl', 'Kleine vraag', 'oude vraag', 'Crème inhoud', '2026-07-31T16:39:00Z', payload({ provider: 'instantly', providerThreadId: 'inst-thread', direction: 'received' })],
     ['bericht-address', 'martijn@softora.nl', 'coldmail', 10, 'coldmail:10', '<bericht-address@test>', '', '', 'Contact', 'bericht@outreach.example', 'martijn@softora.nl', 'Los onderwerp', 'gewone tekst', 'Geen zoekterm aanwezig', '2026-08-17T08:45:00Z', payload()],
+    ['tessa-back-a-in', 'martijn@softora.nl', 'coldmail', 20, 'coldmail:20', '<tessa-a-1@test>', '', '', 'Tessa de Backer', 'communicatie@schakel-nu.nl', 'martijn@softora.nl', 'Kennismaking A', 'Tessa reageert', 'Eerste reactie', '2026-08-10T08:00:00Z', payload()],
+    ['tessa-back-a-out', 'martijn@softora.nl', 'sent', 21, 'sent:21', '<tessa-a-2@test>', '<tessa-a-1@test>', '<tessa-a-1@test>', 'Martijn', 'martijn@softora.nl', 'communicatie@schakel-nu.nl', 'Re: Kennismaking A', 'Antwoord aan Tessa', 'Eerste antwoord', '2026-08-10T09:00:00Z', payload()],
+    ['tessa-back-a-later', 'martijn@softora.nl', 'inbox', 22, 'inbox:22', '<tessa-a-3@test>', '<tessa-a-2@test>', '<tessa-a-1@test> <tessa-a-2@test>', 'Tessa de Backer', 'communicatie@schakel-nu.nl', 'martijn@softora.nl', 'Re: Kennismaking A', 'Tessa vervolgt', 'Tweede reactie', '2026-08-10T10:00:00Z', payload()],
+    ['tessa-back-b-in', 'martijn@softora.nl', 'coldmail', 23, 'coldmail:23', '<tessa-b-1@test>', '', '', 'Tessa de Backer', 'communicatie@schakel-nu.nl', 'martijn@softora.nl', 'Kennismaking B', 'Tessa reageert opnieuw', 'Derde reactie', '2026-08-11T08:00:00Z', payload()],
+    ['tessa-back-b-out', 'martijn@softora.nl', 'sent', 24, 'sent:24', '<tessa-b-2@test>', '<tessa-b-1@test>', '<tessa-b-1@test>', 'Martijn', 'martijn@softora.nl', 'communicatie@schakel-nu.nl', 'Re: Kennismaking B', 'Antwoord aan Tessa', 'Tweede antwoord', '2026-08-11T09:00:00Z', payload()],
+    ['tessa-back-c-in', 'martijn@softora.nl', 'coldmail', 25, 'coldmail:25', '<tessa-c-1@test>', '', '', 'Tessa de Backer', 'communicatie@schakel-nu.nl', 'martijn@softora.nl', 'Kennismaking C', 'Tessa derde onderwerp', 'Vierde reactie', '2026-08-12T08:00:00Z', payload()],
+    ['tessa-back-c-out', 'martijn@softora.nl', 'sent', 26, 'sent:26', '<tessa-c-2@test>', '<tessa-c-1@test>', '<tessa-c-1@test>', 'Martijn', 'martijn@softora.nl', 'communicatie@schakel-nu.nl', 'Re: Kennismaking C', 'Antwoord aan Tessa', 'Derde antwoord', '2026-08-12T09:00:00Z', payload()],
+    ['tessa-dongen', 'martijn@softora.nl', 'coldmail', 27, 'coldmail:27', '<tessa-dongen@test>', '', '', 'Tessa van Dongen', 'tessa.van.dongen@gele-ster.nl', 'martijn@softora.nl', 'Los contact', 'Tessa van Dongen', 'Apart dossier', '2026-08-13T08:00:00Z', payload()],
+    ['tessa-mensink', 'martijn@softora.nl', 'coldmail', 28, 'coldmail:28', '<tessa-mensink@test>', '', '', 'Tessa Mensink', 'mensink9@planet.nl', 'martijn@softora.nl', 'Los contact', 'Tessa Mensink', 'Apart dossier', '2026-08-14T08:00:00Z', payload()],
+    ['tessa-back-serve', 'serve@softora.nl', 'coldmail', 29, 'coldmail:29', '<tessa-serve@test>', '', '', 'Tessa de Backer', 'communicatie@schakel-nu.nl', 'serve@softora.nl', 'Eigen Servé-contact', 'Tessa bij Servé', 'Apart eigenaardossier', '2026-08-15T08:00:00Z', payload()],
   ];
   for (const row of rows) {
     await database.query(`
@@ -524,10 +705,139 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
   );
   assert.equal(exactEricSearch.rows.length, 1);
   assert.equal(exactEricSearch.rows[0].sender_email, 'eric@outreach.example');
+  const tessaDossiers = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'tessa', 20, 0
+    )
+  `);
+  assert.equal(tessaDossiers.rows.length, 3);
+  assert.equal(Number(tessaDossiers.rows[0].total_count), 3);
+  assert.deepEqual(
+    tessaDossiers.rows.map((row) => row.external_contact_email).sort(),
+    ['communicatie@schakel-nu.nl', 'mensink9@planet.nl', 'tessa.van.dongen@gele-ster.nl']
+  );
+  assert.ok(tessaDossiers.rows.every((row) => row.canonical_owner === 'martijn'));
+  const tessaPage = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'tessa', 2, 0
+    )
+  `);
+  assert.equal(tessaPage.rows.length, 2);
+  assert.ok(tessaPage.rows.every((row) => Number(row.total_count) === 3));
+  const tessaBothOwners = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"serve":["serve@softora.nl"],"martijn":["martijn@softora.nl"]}'::jsonb,
+      'tessa', 20, 0
+    )
+  `);
+  assert.equal(tessaBothOwners.rows.length, 4);
+  assert.deepEqual(
+    tessaBothOwners.rows
+      .filter((row) => row.external_contact_email === 'communicatie@schakel-nu.nl')
+      .map((row) => row.canonical_owner)
+      .sort(),
+    ['martijn', 'serve']
+  );
+  const tessaTimeline = await database.query(
+    "select * from public.softora_mailbox_contact_timeline(array['martijn@softora.nl'],'communicatie@schakel-nu.nl',50,0)"
+  );
+  assert.equal(tessaTimeline.rows.length, 7);
+  assert.equal(new Set(tessaTimeline.rows.map((row) => row.technical_thread_key)).size, 3);
   const excludedTimeline = await database.query(
     "select * from public.softora_mailbox_contact_timeline(array['martijn@softora.nl'],'ander@ziggo.nl',50,0)"
   );
   assert.equal(excludedTimeline.rows.length, 0);
+
+  await database.exec(`
+    insert into public.softora_mailbox_messages (
+      message_key, account_email, folder, uid, provider_id, message_id, payload
+    ) values
+      ('serve-logical-coldmail','serve@softora.nl','coldmail',101,'coldmail:101','<Logical-Copy@Test>','{}'),
+      ('serve-logical-inbox','serve@softora.nl','inbox',102,'inbox:102','logical-copy@test','{}'),
+      ('serve-logical-allmail','serve@softora.nl','allmail',103,'allmail:103','<logical-copy@test>','{}'),
+      ('martijn-logical-inbox','martijn@softora.nl','inbox',101,'inbox:101','<logical-copy@test>','{}'),
+      ('serve-empty-coldmail','serve@softora.nl','coldmail',201,'coldmail:201','','{}'),
+      ('serve-empty-allmail','serve@softora.nl','allmail',202,'allmail:202','','{}');
+  `);
+  const hiddenCopies = await database.query(`
+    select * from public.softora_set_mailbox_message_visibility(
+      'serve@softora.nl', 'coldmail', 101, 'coldmail:101', true
+    )
+  `);
+  assert.deepEqual(
+    hiddenCopies.rows.map((row) => row.folder).sort(),
+    ['allmail', 'coldmail', 'inbox']
+  );
+  const hiddenState = await database.query(`
+    select account_email, folder, deleted_at
+    from public.softora_mailbox_messages
+    where message_key like '%logical-%'
+    order by account_email, folder
+  `);
+  assert.ok(hiddenState.rows
+    .filter((row) => row.account_email === 'serve@softora.nl')
+    .every((row) => row.deleted_at));
+  assert.equal(hiddenState.rows
+    .find((row) => row.account_email === 'martijn@softora.nl').deleted_at, null);
+  const tombstones = await database.query(`
+    select * from public.softora_mailbox_message_tombstones
+    where account_email = 'serve@softora.nl'
+      and normalized_message_id = 'logical-copy@test'
+  `);
+  assert.equal(tombstones.rows.length, 1);
+  assert.equal(tombstones.rows[0].normalized_message_id, 'logical-copy@test');
+
+  await database.exec(`
+    insert into public.softora_mailbox_messages (
+      message_key, account_email, folder, uid, provider_id, message_id, payload
+    ) values (
+      'serve-logical-later','serve@softora.nl','inbox',104,'inbox:104',
+      '<LOGICAL-COPY@TEST>','{}'
+    );
+    update public.softora_mailbox_messages
+    set deleted_at = null
+    where message_key = 'serve-logical-allmail';
+  `);
+  const inheritedState = await database.query(`
+    select message_key, deleted_at
+    from public.softora_mailbox_messages
+    where message_key in ('serve-logical-later', 'serve-logical-allmail')
+    order by message_key
+  `);
+  assert.ok(inheritedState.rows.every((row) => row.deleted_at));
+
+  const restoredCopies = await database.query(`
+    select * from public.softora_set_mailbox_message_visibility(
+      'serve@softora.nl', 'inbox', 102, 'inbox:102', false
+    )
+  `);
+  assert.equal(restoredCopies.rows.length, 4);
+  const restoredState = await database.query(`
+    select deleted_at from public.softora_mailbox_messages
+    where account_email = 'serve@softora.nl'
+      and public.softora_normalize_mailbox_message_id(message_id) = 'logical-copy@test'
+  `);
+  assert.ok(restoredState.rows.every((row) => row.deleted_at === null));
+  assert.equal((await database.query(`
+    select count(*)::integer as count
+    from public.softora_mailbox_message_tombstones
+    where account_email = 'serve@softora.nl'
+      and normalized_message_id = 'logical-copy@test'
+  `)).rows[0].count, 0);
+
+  const hiddenEmpty = await database.query(`
+    select * from public.softora_set_mailbox_message_visibility(
+      'serve@softora.nl', 'coldmail', 201, 'coldmail:201', true
+    )
+  `);
+  assert.equal(hiddenEmpty.rows.length, 1);
+  const emptyState = await database.query(`
+    select folder, deleted_at from public.softora_mailbox_messages
+    where message_key in ('serve-empty-coldmail', 'serve-empty-allmail')
+    order by folder
+  `);
+  assert.equal(emptyState.rows.find((row) => row.folder === 'coldmail').deleted_at !== null, true);
+  assert.equal(emptyState.rows.find((row) => row.folder === 'allmail').deleted_at, null);
   await database.close();
 });
 
@@ -539,6 +849,7 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   const eligibilitySetSource = fs.readFileSync(outreachEligibilitySetMigrationPath, 'utf8');
   const narrowPlanSource = fs.readFileSync(outreachNarrowPlanMigrationPath, 'utf8');
   const scoreOnceSource = fs.readFileSync(outreachScoreOnceMigrationPath, 'utf8');
+  const contactDossierSource = fs.readFileSync(contactDossierMigrationPath, 'utf8');
   assert.match(source, /using gin[\s\S]*extensions\.gin_trgm_ops/);
   assert.match(source, /body_text/);
   assert.match(source, /generation_superseded_at is null/);
@@ -584,4 +895,19 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   assert.match(scoreOnceSource, /from paged[\s\S]*join public\.softora_mailbox_messages/);
   assert.doesNotMatch(scoreOnceSource, /candidates as materialized \(\s*select\s+m\.\*,/);
   assert.doesNotMatch(scoreOnceSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(contactDossierSource, /distinct on \(\s*eligible_matches\.canonical_owner,\s*eligible_matches\.contact_email\s*\)/);
+  assert.match(contactDossierSource, /canonical_owner text/);
+  assert.match(contactDossierSource, /p_owner_accounts jsonb/);
+  assert.match(contactDossierSource, /revoke all on function public\.softora_search_mailbox_contact_dossiers[\s\S]*from public, anon, authenticated/);
+  assert.match(contactDossierSource, /alter table public\.softora_mailbox_message_tombstones enable row level security/);
+  assert.match(contactDossierSource, /Deliberately do not backfill tombstones from historical deleted_at rows/);
+  assert.doesNotMatch(contactDossierSource, /from public\.softora_mailbox_messages messages[\s\S]*messages\.deleted_at is not null[\s\S]*softora_normalize_mailbox_message_id\(messages\.message_id\) <> ''/);
+  assert.doesNotMatch(contactDossierSource, /update public\.softora_mailbox_messages as messages[\s\S]*from public\.softora_mailbox_message_tombstones tombstone/);
+  assert.match(contactDossierSource, /before insert or update of account_email, message_id, deleted_at/);
+  assert.match(contactDossierSource, /tg_op = 'UPDATE'[\s\S]*old\.deleted_at is null[\s\S]*new\.deleted_at is not null/);
+  assert.match(contactDossierSource, /if tg_op = 'INSERT' then[\s\S]*pg_advisory_xact_lock[\s\S]*end if;[\s\S]*select tombstone\.deleted_at/);
+  assert.match(contactDossierSource, /softora_set_mailbox_message_visibility[\s\S]*security invoker/);
+  assert.match(contactDossierSource, /softora_set_mailbox_message_visibility[\s\S]*softora_mailbox_campaign_consistency[\s\S]*for update;[\s\S]*select m\.\*[\s\S]*limit 1;[\s\S]*pg_advisory_xact_lock[\s\S]*select m\.\*[\s\S]*for update;/);
+  assert.match(contactDossierSource, /where pg_catalog\.lower\(pg_catalog\.btrim\(m\.account_email\)\) = v_account_email[\s\S]*softora_normalize_mailbox_message_id\(m\.message_id\) = v_message_id/);
+  assert.doesNotMatch(contactDossierSource, /grant execute[\s\S]*to authenticated/);
 });

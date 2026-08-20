@@ -47,6 +47,21 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260810012150_mailbox_send_provider_outcome_state.sql'
   ), 'utf8');
+  const contactSearchAndLogicalTombstonesMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260820171023_mailbox_contact_search_and_logical_tombstones.sql'
+  ), 'utf8');
+  const logicalTombstoneMarker =
+    'create or replace function public.softora_normalize_mailbox_message_id(';
+  const logicalTombstoneStart = contactSearchAndLogicalTombstonesMigration.indexOf(
+    logicalTombstoneMarker
+  );
+  if (logicalTombstoneStart < 0) {
+    throw new Error('Logische mailbox-tombstonemigratie mist het verwachte startpunt.');
+  }
+  const logicalTombstoneMigration = contactSearchAndLogicalTombstonesMigration.slice(
+    logicalTombstoneStart
+  );
   const clients = new Set();
 
   function applyTrackedSql(sql) {
@@ -204,6 +219,215 @@ if (!databaseUrl) {
     assert.equal(early, marker, `${label} blokkeerde niet zoals verwacht`);
   }
 
+  function logicalMessageFixture(suffix) {
+    const accountEmail = 'serve@softora.nl';
+    const messageId = `<logical-lock-${suffix}@test.softora.nl>`;
+    return {
+      accountEmail,
+      messageId,
+      normalizedMessageId: messageId.slice(1, -1),
+      anchor: {
+        messageKey: `logical-lock-${suffix}-inbox`,
+        folder: 'inbox',
+        uid: 800_000 + suffix,
+        providerId: `logical-provider-${suffix}-inbox`,
+      },
+      copy: {
+        messageKey: `logical-lock-${suffix}-coldmail`,
+        folder: 'coldmail',
+        uid: 810_000 + suffix,
+        providerId: `logical-provider-${suffix}-coldmail`,
+      },
+      newCopy: {
+        messageKey: `logical-lock-${suffix}-sent`,
+        folder: 'sent',
+        uid: 820_000 + suffix,
+        providerId: `logical-provider-${suffix}-sent`,
+      },
+    };
+  }
+
+  async function seedLogicalMessageCopies(client, fixture) {
+    await client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key,account_email,folder,uid,provider_id,message_id,sender_email,
+        recipients_text,subject,body_text,date,unread,payload
+      ) values
+        ($1,$2,$3,$4,$5,$6,'prospect@example.org',$2,'Seed inbox','Seed inbox',now(),true,'{"source":"imap-sync"}'::jsonb),
+        ($7,$2,$8,$9,$10,$6,'prospect@example.org',$2,'Seed coldmail','Seed coldmail',now(),true,'{"source":"imap-sync"}'::jsonb)
+    `, [
+      fixture.anchor.messageKey,
+      fixture.accountEmail,
+      fixture.anchor.folder,
+      fixture.anchor.uid,
+      fixture.anchor.providerId,
+      fixture.messageId,
+      fixture.copy.messageKey,
+      fixture.copy.folder,
+      fixture.copy.uid,
+      fixture.copy.providerId,
+    ]);
+  }
+
+  function setLogicalMessageVisibility(client, fixture, hidden) {
+    return client.query(
+      `select * from public.softora_set_mailbox_message_visibility($1,$2,$3,$4,$5)`,
+      [
+        fixture.accountEmail,
+        fixture.anchor.folder,
+        fixture.anchor.uid,
+        fixture.anchor.providerId,
+        hidden,
+      ]
+    );
+  }
+
+  function syncUpsertLogicalMessage(client, fixture, label) {
+    return client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key,account_email,folder,uid,provider_id,message_id,sender_email,
+        recipients_text,subject,body_text,date,unread,payload,deleted_at
+      ) values (
+        $1,$2,$3,$4,$5,$6,'prospect@example.org',$2,$7,$8,now(),true,$9::jsonb,null
+      )
+      on conflict (message_key) do update set
+        account_email=excluded.account_email,
+        folder=excluded.folder,
+        uid=excluded.uid,
+        provider_id=excluded.provider_id,
+        message_id=excluded.message_id,
+        subject=excluded.subject,
+        body_text=excluded.body_text,
+        payload=excluded.payload,
+        deleted_at=excluded.deleted_at,
+        updated_at=clock_timestamp()
+      returning message_key,subject,deleted_at
+    `, [
+      fixture.anchor.messageKey,
+      fixture.accountEmail,
+      fixture.anchor.folder,
+      fixture.anchor.uid,
+      fixture.anchor.providerId,
+      fixture.messageId,
+      label,
+      `${label} body`,
+      JSON.stringify({ source: 'imap-sync' }),
+    ]);
+  }
+
+  function syncInsertLogicalMessageCopy(client, fixture, label) {
+    return client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key,account_email,folder,uid,provider_id,message_id,sender_email,
+        recipients_text,subject,body_text,date,unread,payload,deleted_at
+      ) values (
+        $1,$2,$3,$4,$5,$6,'prospect@example.org',$2,$7,$8,now(),true,$9::jsonb,null
+      )
+      returning message_key,subject,deleted_at
+    `, [
+      fixture.newCopy.messageKey,
+      fixture.accountEmail,
+      fixture.newCopy.folder,
+      fixture.newCopy.uid,
+      fixture.newCopy.providerId,
+      fixture.messageId,
+      label,
+      `${label} body`,
+      JSON.stringify({ source: 'imap-sync', lockOrderProbe: 'pause-before-tombstone' }),
+    ]);
+  }
+
+  async function assertLogicalMessageVisibility(client, fixture, {
+    hidden,
+    syncLabel,
+    syncMessageKey = fixture.anchor.messageKey,
+    expectedCopies = 2,
+  }) {
+    const rows = (await client.query(`
+      select message_key,subject,deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where account_email=$1
+        and public.softora_normalize_mailbox_message_id(message_id)=$2
+      order by message_key
+    `, [fixture.accountEmail, fixture.normalizedMessageId])).rows;
+    assert.equal(rows.length, expectedCopies);
+    assert.equal(
+      rows.find((row) => row.message_key === syncMessageKey)?.subject,
+      syncLabel
+    );
+    const tombstones = (await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_message_tombstones
+      where account_email=$1 and normalized_message_id=$2
+    `, [fixture.accountEmail, fixture.normalizedMessageId])).rows;
+    if (hidden) {
+      assert.equal(tombstones.length, 1);
+      assert.ok(rows.every((row) => row.deleted_at === tombstones[0].deleted_at));
+    } else {
+      assert.equal(tombstones.length, 0);
+      assert.ok(rows.every((row) => row.deleted_at === null));
+    }
+  }
+
+  async function waitForBackendPgSleep(observer, backendPid, label) {
+    const deadline = Date.now() + 1_000;
+    while (Date.now() < deadline) {
+      const state = (await observer.query(`
+        select state,wait_event_type,wait_event
+        from pg_catalog.pg_stat_activity where pid=$1
+      `, [backendPid])).rows[0];
+      if (state?.state === 'active' && state?.wait_event === 'PgSleep') return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.fail(`${label} bereikte het gecontroleerde rowlock-venster niet`);
+  }
+
+  async function assertLogicalTombstoneLockProtocol(client) {
+    const triggerDefinition = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_inherit_mailbox_message_tombstone()'::regprocedure
+      ) as definition
+    `)).rows[0].definition.toLowerCase();
+    const advisoryMatches = triggerDefinition.match(/pg_advisory_xact_lock/g) || [];
+    const insertBranch = triggerDefinition.indexOf("if tg_op = 'insert' then");
+    const advisoryLock = triggerDefinition.indexOf('pg_advisory_xact_lock', insertBranch);
+    const insertBranchEnd = triggerDefinition.indexOf('end if;', advisoryLock);
+    assert.equal(advisoryMatches.length, 1);
+    assert.ok(insertBranch >= 0 && advisoryLock > insertBranch && insertBranchEnd > advisoryLock);
+
+    const visibilityDefinition = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_set_mailbox_message_visibility(text,text,bigint,text,boolean)'::regprocedure
+      ) as definition
+    `)).rows[0].definition.toLowerCase();
+    const visibilityAdvisory = visibilityDefinition.indexOf('pg_advisory_xact_lock');
+    const logicalRowLock = visibilityDefinition.indexOf('for update', visibilityAdvisory);
+    assert.ok(visibilityAdvisory >= 0 && logicalRowLock > visibilityAdvisory);
+  }
+
+  async function installTombstonePauseTrigger(client) {
+    await client.query(`
+      create or replace function public.softora_test_pause_before_tombstone()
+      returns trigger
+      language plpgsql
+      set search_path = ''
+      as $function$
+      begin
+        if new.payload->>'lockOrderProbe' = 'pause-before-tombstone' then
+          perform pg_catalog.pg_sleep(1.5);
+        end if;
+        return new;
+      end;
+      $function$;
+      drop trigger if exists aaa_softora_test_pause_before_tombstone
+        on public.softora_mailbox_messages;
+      create trigger aaa_softora_test_pause_before_tombstone
+      before insert
+      on public.softora_mailbox_messages
+      for each row execute function public.softora_test_pause_before_tombstone();
+    `);
+  }
+
   test.before(() => {
     const bootstrapSql = `
       drop schema public cascade;
@@ -225,6 +449,7 @@ if (!databaseUrl) {
         starred boolean not null default false, reply_dismissed_at timestamptz,
         payload jsonb not null default '{}'::jsonb, created_at timestamptz not null default now(),
         updated_at timestamptz not null default now(), deleted_at timestamptz,
+        uid_validity bigint, generation_superseded_at timestamptz,
         unique (account_email, folder, uid)
       );
       create table public.softora_mailbox_sync_state (
@@ -243,6 +468,67 @@ if (!databaseUrl) {
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       );
+      create or replace function public.softora_normalize_mailbox_message_id(p_value text)
+      returns text
+      language sql
+      immutable
+      set search_path = ''
+      as $function$
+        select nullif(
+          lower(
+            regexp_replace(
+              btrim(coalesce(p_value, '')),
+              '^[<>,[:space:]]+|[<>,[:space:]]+$',
+              '',
+              'g'
+            )
+          ),
+          ''
+        );
+      $function$;
+      create or replace function public.softora_mailbox_direct_parent_ids(
+        p_in_reply_to text,
+        p_references_text text
+      )
+      returns text[]
+      language plpgsql
+      immutable
+      set search_path = ''
+      as $function$
+      declare
+        v_source text;
+        v_token text;
+        v_normalized text;
+        v_ids text[] := '{}'::text[];
+        v_uses_references boolean := nullif(btrim(coalesce(p_in_reply_to, '')), '') is null;
+      begin
+        v_source := case
+          when v_uses_references then coalesce(p_references_text, '')
+          else coalesce(p_in_reply_to, '')
+        end;
+        foreach v_token in array regexp_split_to_array(
+          regexp_replace(v_source, ',', ' ', 'g'),
+          '[[:space:]]+'
+        ) loop
+          v_normalized := public.softora_normalize_mailbox_message_id(v_token);
+          if v_normalized is not null and not v_normalized = any (v_ids) then
+            v_ids := array_append(v_ids, v_normalized);
+          end if;
+        end loop;
+        if v_uses_references and cardinality(v_ids) > 1 then
+          return array[v_ids[cardinality(v_ids)]];
+        end if;
+        return v_ids;
+      end;
+      $function$;
+      revoke all on function public.softora_normalize_mailbox_message_id(text)
+        from public, anon, authenticated;
+      revoke all on function public.softora_mailbox_direct_parent_ids(text, text)
+        from public, anon, authenticated;
+      grant execute on function public.softora_normalize_mailbox_message_id(text)
+        to service_role;
+      grant execute on function public.softora_mailbox_direct_parent_ids(text, text)
+        to service_role;
     `;
     const legacySendSeedSql = `
       insert into public.softora_mailbox_send_provenance (
@@ -256,12 +542,298 @@ if (!databaseUrl) {
     `;
     applyTrackedSql(
       `${bootstrapSql}\n${foundation}\n${forwardMigration}\n${globalLockMigration}\n${globalLockProbe}` +
-      `\n${sendProvenanceFoundation}\n${legacySendSeedSql}\n${providerOutcomeMigration}`
+      `\n${sendProvenanceFoundation}\n${legacySendSeedSql}\n${providerOutcomeMigration}` +
+      `\n${logicalTombstoneMigration}`
     );
   });
 
   test.after(async () => {
     await Promise.all(Array.from(clients, (client) => client.end().catch(() => null)));
+  });
+
+  test('logische tombstonemigratie behoudt het live Message-ID-normalizercontract', async () => {
+    const client = await connect();
+    const normalizer = (await client.query(`
+      select
+        p.proargnames,
+        p.proparallel,
+        public.softora_normalize_mailbox_message_id(null) is null as null_stays_null,
+        public.softora_normalize_mailbox_message_id('') is null as empty_stays_null,
+        public.softora_normalize_mailbox_message_id(' <>, ') is null as punctuation_stays_null,
+        public.softora_normalize_mailbox_message_id(' <<Mixed@Id.COM>>, ')
+          = 'mixed@id.com' as valid_id_normalized,
+        public.softora_mailbox_direct_parent_ids('', ' <>, ,  ') as empty_parent_ids
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname = 'softora_normalize_mailbox_message_id'
+    `)).rows[0];
+    assert.deepEqual(normalizer, {
+      proargnames: ['p_value'],
+      proparallel: 'u',
+      null_stays_null: true,
+      empty_stays_null: true,
+      punctuation_stays_null: true,
+      valid_id_normalized: true,
+      empty_parent_ids: [],
+    });
+  });
+
+  test('UIDVALIDITY-retirement maakt geen logische verwijdertombstone', async () => {
+    const client = await connect();
+    await client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        date, payload, uid_validity
+      ) values (
+        'uidvalidity-old', 'serve@softora.nl', 'inbox', 9801,
+        'inbox:9801', '<uidvalidity-retirement@test>', now(), '{}', 111
+      );
+      update public.softora_mailbox_messages
+      set
+        deleted_at = clock_timestamp(),
+        generation_superseded_at = clock_timestamp(),
+        updated_at = clock_timestamp()
+      where message_key = 'uidvalidity-old';
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        date, payload, uid_validity
+      ) values (
+        'uidvalidity-new', 'serve@softora.nl', 'inbox', 9802,
+        'inbox:9802', '<UIDVALIDITY-RETIREMENT@TEST>', now(), '{}', 222
+      );
+    `);
+    const states = (await client.query(`
+      select message_key, deleted_at is not null as deleted,
+        generation_superseded_at is not null as generation_superseded
+      from public.softora_mailbox_messages
+      where message_key in ('uidvalidity-old', 'uidvalidity-new')
+      order by message_key
+    `)).rows;
+    assert.deepEqual(states, [
+      { message_key: 'uidvalidity-new', deleted: false, generation_superseded: false },
+      { message_key: 'uidvalidity-old', deleted: true, generation_superseded: true },
+    ]);
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = 'serve@softora.nl'
+        and normalized_message_id = 'uidvalidity-retirement@test'
+    `)).rows[0].count, 0);
+  });
+
+  test('logische hide en restore muteren nooit een UIDVALIDITY-retired kopie', async () => {
+    const client = await connect();
+    await client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key, account_email, folder, uid, provider_id, message_id,
+        date, payload, deleted_at, uid_validity, generation_superseded_at
+      ) values
+        (
+          'visibility-retired', 'serve@softora.nl', 'inbox', 9811,
+          'inbox:9811', '<visibility-generation@test>', now(), '{}',
+          clock_timestamp(), 111, clock_timestamp()
+        ),
+        (
+          'visibility-current', 'serve@softora.nl', 'allmail', 9812,
+          'allmail:9812', '<VISIBILITY-GENERATION@TEST>', now(), '{}',
+          null, 222, null
+        );
+    `);
+    const retiredBefore = (await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where message_key = 'visibility-retired'
+    `)).rows[0].deleted_at;
+    const hidden = await client.query(`
+      select * from public.softora_set_mailbox_message_visibility(
+        'serve@softora.nl', 'allmail', 9812, 'allmail:9812', true
+      )
+    `);
+    assert.equal(hidden.rowCount, 1);
+    const retiredAfterHide = (await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where message_key = 'visibility-retired'
+    `)).rows[0].deleted_at;
+    assert.equal(retiredAfterHide, retiredBefore);
+
+    const restored = await client.query(`
+      select * from public.softora_set_mailbox_message_visibility(
+        'serve@softora.nl', 'allmail', 9812, 'allmail:9812', false
+      )
+    `);
+    assert.equal(restored.rowCount, 1);
+    const states = (await client.query(`
+      select message_key, deleted_at is not null as deleted,
+        generation_superseded_at is not null as generation_superseded
+      from public.softora_mailbox_messages
+      where message_key in ('visibility-retired', 'visibility-current')
+      order by message_key
+    `)).rows;
+    assert.deepEqual(states, [
+      { message_key: 'visibility-current', deleted: false, generation_superseded: false },
+      { message_key: 'visibility-retired', deleted: true, generation_superseded: true },
+    ]);
+    assert.equal((await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages
+      where message_key = 'visibility-retired'
+    `)).rows[0].deleted_at, retiredBefore);
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = 'serve@softora.nl'
+        and normalized_message_id = 'visibility-generation@test'
+    `)).rows[0].count, 0);
+    const staleTarget = await client.query(`
+      select * from public.softora_set_mailbox_message_visibility(
+        'serve@softora.nl', 'inbox', 9811, 'inbox:9811', true
+      )
+    `);
+    assert.equal(staleTarget.rowCount, 0);
+  });
+
+  test('nieuwe-copy INSERT versus hide en restore vermijdt de global/logical-deadlock', async (t) => {
+    const cases = [
+      { operation: 'hide', hidden: true, suffix: 691 },
+      { operation: 'restore', hidden: false, suffix: 692 },
+    ];
+    for (const [index, entry] of cases.entries()) {
+      await t.test(entry.operation, { timeout: 10_000 }, async () => {
+        const sync = await connect();
+        const visibility = await connect();
+        const fixture = logicalMessageFixture(entry.suffix);
+        if (index === 0) {
+          await assertLogicalTombstoneLockProtocol(sync);
+          const settings = (await sync.query(`
+            select current_setting('statement_timeout') as statement_timeout,
+              current_setting('lock_timeout') as lock_timeout
+          `)).rows[0];
+          assert.deepEqual(settings, { statement_timeout: '8s', lock_timeout: '6s' });
+        }
+        await installTombstonePauseTrigger(sync);
+        await seedLogicalMessageCopies(sync, fixture);
+        if (!entry.hidden) {
+          const hiddenSeed = await setLogicalMessageVisibility(sync, fixture, true);
+          assert.equal(hiddenSeed.rowCount, 2);
+        }
+
+        const backendPid = (await sync.query(
+          'select pg_catalog.pg_backend_pid()::integer as pid'
+        )).rows[0].pid;
+        const syncLabel = `Nieuwe sync-kopie tijdens ${entry.operation}`;
+        let syncTransactionOpen = false;
+        let insertPromise = null;
+        let visibilityPromise = null;
+        try {
+          await sync.query('begin');
+          syncTransactionOpen = true;
+          // BEFORE STATEMENT owns the global consistency row; the probe pauses
+          // the new row before the production INSERT trigger takes its logical lock.
+          insertPromise = syncInsertLogicalMessageCopy(sync, fixture, syncLabel);
+          void insertPromise.catch(() => null);
+          await waitForBackendPgSleep(
+            visibility,
+            backendPid,
+            `nieuwe-copy INSERT vóór ${entry.operation}`
+          );
+
+          // The fixed RPC waits on sync's global consistency lock before taking
+          // the logical lock; the old order held logical here and formed a cycle.
+          visibilityPromise = setLogicalMessageVisibility(visibility, fixture, entry.hidden);
+          void visibilityPromise.catch(() => null);
+          await assertBlocked(
+            visibilityPromise,
+            `${entry.operation}-RPC achter INSERT statement-global lock`
+          );
+
+          const firstCompleted = await Promise.race([
+            insertPromise.then((result) => ({ operation: 'insert', result })),
+            visibilityPromise.then((result) => ({ operation: 'visibility', result })),
+          ]);
+          let insertResult;
+          let visibilityResult;
+          if (firstCompleted.operation === 'insert') {
+            insertResult = firstCompleted.result;
+            insertPromise = null;
+            await sync.query('commit');
+            syncTransactionOpen = false;
+            visibilityResult = await visibilityPromise;
+            visibilityPromise = null;
+          } else {
+            visibilityResult = firstCompleted.result;
+            visibilityPromise = null;
+            insertResult = await insertPromise;
+            insertPromise = null;
+            await sync.query('commit');
+            syncTransactionOpen = false;
+          }
+
+          assert.equal(insertResult.rowCount, 1);
+          assert.ok([2, 3].includes(visibilityResult.rowCount));
+          await assertLogicalMessageVisibility(visibility, fixture, {
+            hidden: entry.hidden,
+            syncLabel,
+            syncMessageKey: fixture.newCopy.messageKey,
+            expectedCopies: 3,
+          });
+        } finally {
+          if (syncTransactionOpen) await sync.query('rollback').catch(() => null);
+          if (insertPromise) await insertPromise.catch(() => null);
+          if (visibilityPromise) await visibilityPromise.catch(() => null);
+        }
+      });
+    }
+  });
+
+  test('gecommitteerde hide en restore blijven correct na een wachtende sync-upsert UPDATE', async (t) => {
+    const cases = [
+      { operation: 'hide', hidden: true, suffix: 711 },
+      { operation: 'restore', hidden: false, suffix: 712 },
+    ];
+    for (const entry of cases) {
+      await t.test(entry.operation, { timeout: 10_000 }, async () => {
+        const visibility = await connect();
+        const sync = await connect();
+        const fixture = logicalMessageFixture(entry.suffix);
+        await seedLogicalMessageCopies(visibility, fixture);
+        if (!entry.hidden) {
+          const hiddenSeed = await setLogicalMessageVisibility(visibility, fixture, true);
+          assert.equal(hiddenSeed.rowCount, 2);
+        }
+
+        const syncLabel = `Sync na ${entry.operation}`;
+        let visibilityTransactionOpen = false;
+        let syncPromise = null;
+        try {
+          await visibility.query('begin');
+          visibilityTransactionOpen = true;
+          const visibilityResult = await setLogicalMessageVisibility(
+            visibility,
+            fixture,
+            entry.hidden
+          );
+          assert.equal(visibilityResult.rowCount, 2);
+
+          syncPromise = syncUpsertLogicalMessage(sync, fixture, syncLabel);
+          await assertBlocked(syncPromise, `sync-upsert achter ${entry.operation}-rowlock`);
+          await visibility.query('commit');
+          visibilityTransactionOpen = false;
+
+          const syncResult = await syncPromise;
+          syncPromise = null;
+          assert.equal(syncResult.rowCount, 1);
+          await assertLogicalMessageVisibility(sync, fixture, {
+            hidden: entry.hidden,
+            syncLabel,
+          });
+        } finally {
+          if (visibilityTransactionOpen) await visibility.query('rollback').catch(() => null);
+          if (syncPromise) await syncPromise.catch(() => null);
+        }
+      });
+    }
   });
 
   test('atomic-wint same-row matrix blokkeert iedere directe app-writeklasse afzonderlijk', async (t) => {
@@ -810,5 +1382,59 @@ if (!databaseUrl) {
       authenticated_trigger: false,
       service_trigger: true,
     });
+
+    const tombstonePrivileges = (await client.query(`
+      select
+        c.relrowsecurity as rls_enabled,
+        has_table_privilege('service_role','public.softora_mailbox_message_tombstones','SELECT') as service_select,
+        has_table_privilege('service_role','public.softora_mailbox_message_tombstones','INSERT') as service_insert,
+        has_table_privilege('service_role','public.softora_mailbox_message_tombstones','UPDATE') as service_update,
+        has_table_privilege('service_role','public.softora_mailbox_message_tombstones','DELETE') as service_delete,
+        has_table_privilege('service_role','public.softora_mailbox_message_tombstones','TRUNCATE') as service_truncate,
+        has_table_privilege('anon','public.softora_mailbox_message_tombstones','SELECT') as anon_select,
+        has_table_privilege('authenticated','public.softora_mailbox_message_tombstones','SELECT') as authenticated_select
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public'
+        and c.relname = 'softora_mailbox_message_tombstones'
+    `)).rows[0];
+    assert.deepEqual(tombstonePrivileges, {
+      rls_enabled: true,
+      service_select: true,
+      service_insert: true,
+      service_update: true,
+      service_delete: true,
+      service_truncate: false,
+      anon_select: false,
+      authenticated_select: false,
+    });
+
+    const logicalFunctions = (await client.query(`
+      select
+        p.proname,
+        p.prosecdef as security_definer,
+        coalesce(pg_catalog.array_to_string(p.proconfig, ','), '')
+          ~ '^search_path=(""|)$' as empty_search_path,
+        has_function_privilege('service_role', p.oid, 'EXECUTE') as service_execute,
+        has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
+        has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname = any(array[
+          'softora_normalize_mailbox_message_id',
+          'softora_inherit_mailbox_message_tombstone',
+          'softora_set_mailbox_message_visibility'
+        ]::text[])
+      order by p.proname
+    `)).rows;
+    assert.equal(logicalFunctions.length, 3);
+    for (const functionAcl of logicalFunctions) {
+      assert.equal(functionAcl.security_definer, false, functionAcl.proname);
+      assert.equal(functionAcl.empty_search_path, true, functionAcl.proname);
+      assert.equal(functionAcl.service_execute, true, functionAcl.proname);
+      assert.equal(functionAcl.anon_execute, false, functionAcl.proname);
+      assert.equal(functionAcl.authenticated_execute, false, functionAcl.proname);
+    }
   });
 }

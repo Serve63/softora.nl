@@ -81,6 +81,7 @@
     let requestGeneration = 0;
     let lifecycleGeneration = 0;
     let failureCount = 0;
+    let initialCheckPending = options.initiallyChecking === true;
 
     function handleDetailPriority() {
       if (!activeRequest || activeRequest.foreground) return;
@@ -100,27 +101,17 @@
       return freshnessByScope.get(key);
     }
 
-    function isForegroundChecking(scopeKey = getScopeKey(getScope())) {
-      return Array.from(inFlightRequests.values())
-        .some((requestState) => requestState.foreground && requestState.scopeKey === scopeKey);
+    function isChecking(scopeKey = getScopeKey(getScope())) {
+      return initialCheckPending || Array.from(inFlightRequests.values())
+        .some((requestState) => requestState.scopeKey === scopeKey);
     }
 
     function updateRefreshAge() {
-      if (!ageLabel) return;
       const scope = getScope();
       const scopeKey = getScopeKey(scope);
       const state = getFreshness(scope);
       const age = formatRefreshAge(state.lastSuccessfulAt, getNow());
-      const checking = isForegroundChecking(scopeKey);
-      if (checking) {
-        ageLabel.textContent = 'Controleren…';
-      } else if (state.status === 'partial') {
-        ageLabel.textContent = 'Deels bijgewerkt';
-      } else if (state.status === 'recovering') {
-        ageLabel.textContent = age ? `${age} gecontroleerd` : 'Opnieuw verbinden…';
-      } else {
-        ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
-      }
+      const checking = isChecking(scopeKey);
       const ownerText = scope.folder === 'outreach' ? ` voor ${scope.owner}` : ` voor ${scope.account || scope.folder}`;
       const checkedText = state.lastSuccessfulAt
         ? new Date(state.lastSuccessfulAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -130,13 +121,38 @@
         : state.status === 'partial'
           ? `Niet alle mailboxproviders konden worden bijgewerkt${ownerText}.`
           : state.status === 'recovering'
-            ? `Tijdelijke verbindingsstoring${ownerText}; de huidige mailbox blijft zichtbaar en wordt automatisch opnieuw gecontroleerd.`
+            ? `Verbindingsfout${ownerText}; de huidige mailbox blijft zichtbaar. Klik om opnieuw te proberen; automatisch herstel blijft actief.`
             : `Laatste volledige providercontrole${ownerText}: ${checkedText}`;
-      ageLabel.setAttribute('title', statusText);
-      ageLabel.setAttribute('aria-label', statusText);
+      if (ageLabel) {
+        if (checking) {
+          ageLabel.textContent = 'Controleren…';
+        } else if (state.status === 'partial') {
+          ageLabel.textContent = 'Deels bijgewerkt';
+        } else if (state.status === 'recovering') {
+          ageLabel.textContent = 'Verbindingsfout · opnieuw proberen';
+        } else {
+          ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
+        }
+        ageLabel.setAttribute('title', statusText);
+        ageLabel.setAttribute('aria-label', statusText);
+      }
+      if (button) {
+        const actionText = checking
+          ? `Mailboxcontrole bezig${ownerText}`
+          : state.status === 'partial'
+            ? `Mailbox deels bijgewerkt${ownerText}; opnieuw controleren`
+            : state.status === 'recovering'
+              ? `Verbindingsfout${ownerText}; mailbox opnieuw controleren`
+              : state.lastSuccessfulAt
+                ? `Mailbox opnieuw controleren${ownerText}; laatste volledige controle om ${checkedText}`
+                : `Mailbox nu controleren${ownerText}`;
+        button.setAttribute('title', actionText);
+        button.setAttribute('aria-label', actionText);
+      }
+      setRefreshing(checking);
     }
 
-    function setRefreshing(refreshing = isForegroundChecking()) {
+    function setRefreshing(refreshing = isChecking()) {
       if (!button) return;
       button.disabled = Boolean(refreshing);
       button.classList.toggle('is-refreshing', Boolean(refreshing));
@@ -282,6 +298,7 @@
       };
       activeRequest = requestState;
       inFlightRequests.set(requestState.token, requestState);
+      initialCheckPending = false;
       setRefreshing();
       updateRefreshAge();
       const signal = requestState.controller?.signal;
@@ -364,6 +381,7 @@
 
     function scopeChanged() {
       lifecycleGeneration += 1;
+      initialCheckPending = initialCheckPending || started;
       activeRequest?.controller?.abort?.();
       if (activeRequest) inFlightRequests.delete(activeRequest.token);
       activeRequest = null;
@@ -426,6 +444,7 @@
       if (destroyed) return;
       destroyed = true;
       paused = false;
+      initialCheckPending = false;
       lifecycleGeneration += 1;
       activeRequest?.controller?.abort?.();
       if (activeRequest) inFlightRequests.delete(activeRequest.token);
@@ -452,7 +471,7 @@
       snapshot: () => ({
         foregroundInFlight: Array.from(inFlightRequests.values()).filter((entry) => entry.foreground).length,
         inFlight: inFlightRequests.size,
-        status: getFreshness().status,
+        status: isChecking() ? 'checking' : getFreshness().status,
       }),
       scopeChanged,
       start,

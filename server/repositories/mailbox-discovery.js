@@ -46,6 +46,7 @@ function createMailboxDiscoveryRepository(deps = {}) {
       messageKey: String(row.message_key || ''),
       technicalThreadKey: String(row.technical_thread_key || ''),
       externalContactEmail: String(row.external_contact_email || '').trim().toLowerCase(),
+      canonicalOwner: String(row.canonical_owner || '').trim().toLowerCase(),
       searchMatch: row.match_message_key ? {
         messageKey: String(row.match_message_key),
         field: String(row.match_field || ''),
@@ -54,7 +55,7 @@ function createMailboxDiscoveryRepository(deps = {}) {
     };
   }
 
-  async function search({ accountEmails, query, limit, offset }) {
+  async function search({ ownerAccounts, query, limit, offset }) {
     const client = getClient();
     if (!client) {
       const error = new Error('De duurzame mailboxindex is niet beschikbaar.');
@@ -62,8 +63,8 @@ function createMailboxDiscoveryRepository(deps = {}) {
       error.status = 503;
       throw error;
     }
-    const rows = await withTimeout(client.rpc('softora_search_mailbox_messages', {
-      p_account_emails: accountEmails,
+    const rows = await withTimeout(client.rpc('softora_search_mailbox_contact_dossiers', {
+      p_owner_accounts: ownerAccounts,
       p_query: query,
       p_limit: limit,
       p_offset: offset,

@@ -466,12 +466,35 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
   const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
   const uid = Number(identity.uid) || 0;
   const id = text(identity.id, 500);
-  const messages = snapshot.messages.filter((message) => {
-    if (message.accountEmail !== accountEmail || message.folder !== folder) return true;
-    if (uid > 0 && Number(message.uid) > 0) return Number(message.uid) !== uid;
-    return message.mailboxId !== id && message.id !== id;
+  const messageId = text(identity.messageId, 1000).toLowerCase().replace(/^<+|>+$/g, '');
+  let changed = false;
+  const matches = (message, fallbackAccount = '') => {
+    const candidateAccount = text(message.accountEmail || fallbackAccount, 320).toLowerCase();
+    if (!accountEmail || candidateAccount !== accountEmail) return false;
+    const candidateMessageId = text(message.messageId, 1000).toLowerCase().replace(/^<+|>+$/g, '');
+    if (messageId && candidateMessageId) return messageId === candidateMessageId;
+    const candidateFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
+    const candidateUid = Number(message.storageUid || message.uid) || 0;
+    if (candidateFolder !== folder) return false;
+    if (uid > 0 && candidateUid > 0) return uid === candidateUid;
+    return message.mailboxId === id || message.id === id;
+  };
+  const messages = snapshot.messages.flatMap((message) => {
+    if (matches(message)) {
+      changed = true;
+      return [];
+    }
+    const threadMessages = (Array.isArray(message.threadMessages) ? message.threadMessages : [])
+      .filter((threadMessage) => {
+        const keep = !matches(threadMessage, message.accountEmail);
+        if (!keep) changed = true;
+        return keep;
+      });
+    return threadMessages.length === message.threadMessages.length
+      ? [message]
+      : [{ ...message, threadMessages }];
   });
-  if (messages.length === snapshot.messages.length) {
+  if (!changed) {
     return { changed: false, serialized: String(rawValue || '') };
   }
   return {

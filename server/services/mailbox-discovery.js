@@ -40,6 +40,15 @@ function createMailboxDiscoveryService(deps = {}) {
       .filter(Boolean);
   }
 
+  function getOwnerAccounts(ownerValue) {
+    const owner = normalizeOwner(ownerValue);
+    const owners = owner ? [owner] : ['serve', 'martijn'];
+    return Object.fromEntries(owners.map((canonicalOwner) => [
+      canonicalOwner,
+      getScopedAccounts(canonicalOwner),
+    ]));
+  }
+
   function parseCursor(value) {
     if (!value) return 0;
     try {
@@ -90,8 +99,13 @@ function createMailboxDiscoveryService(deps = {}) {
     const query = normalizeSearchQuery(input.query);
     const limit = normalizeLimit(input.limit, SEARCH_LIMIT_DEFAULT, 40);
     const offset = parseCursor(input.cursor);
+    const ownerAccounts = getOwnerAccounts(input.owner);
     const result = await repository.search({
-      accountEmails: getScopedAccounts(input.owner), query, limit, offset,
+      ownerAccounts,
+      accountEmails: Object.values(ownerAccounts).flat(),
+      query,
+      limit,
+      offset,
     });
     const nextOffset = offset + result.messages.length;
     return {

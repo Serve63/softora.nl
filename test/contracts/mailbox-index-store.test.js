@@ -736,15 +736,11 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
 });
 
 test('mailbox index store meldt het als een tombstone geen bericht raakt', async () => {
-  const query = {
-    update() { return query; },
-    eq() { return query; },
-    select() { return query; },
-    then(resolve) { resolve({ data: [], error: null }); },
-  };
   const store = createMailboxIndexStore({
     isSupabaseConfigured: () => true,
-    getSupabaseClient: () => ({ from: () => query }),
+    getSupabaseClient: () => ({
+      rpc: async () => ({ data: [], error: null }),
+    }),
   });
 
   const result = await store.markMessageDeleted({
@@ -759,32 +755,24 @@ test('mailbox index store meldt het als een tombstone geen bericht raakt', async
 
 test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder sync-resurrectie', async () => {
   const calls = [];
-  const query = {
-    update(patch) {
-      calls.push(['update', patch]);
-      return query;
-    },
-    eq(column, value) {
-      calls.push(['eq', column, value]);
-      return query;
-    },
-    select(columns) {
-      calls.push(['select', columns]);
-      return query;
-    },
-    then(resolve) {
-      resolve({ data: [{ message_key: 'serve@softora.nl|inbox|42' }], error: null });
-    },
-  };
   const store = createMailboxIndexStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => ({
-      from(table) {
-        calls.push(['from', table]);
-        return query;
+      async rpc(name, params) {
+        calls.push(['rpc', name, params]);
+        return {
+          data: [{
+            message_key: 'serve@softora.nl|inbox|42',
+            account_email: 'serve@softora.nl',
+            folder: 'inbox',
+            uid: 42,
+            provider_id: '',
+            message_id: '<logical-copy@example.test>',
+          }],
+          error: null,
+        };
       },
     }),
-    now: () => new Date('2026-07-23T09:00:00.000Z'),
   });
 
   const result = await store.markMessageDeleted({
@@ -795,46 +783,37 @@ test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder syn
 
   assert.equal(result.ok, true);
   assert.deepEqual(calls, [
-    ['from', 'softora_mailbox_messages'],
-    ['update', {
-      deleted_at: '2026-07-23T09:00:00.000Z',
-      updated_at: '2026-07-23T09:00:00.000Z',
+    ['rpc', 'softora_set_mailbox_message_visibility', {
+      p_account_email: 'serve@softora.nl',
+      p_folder: 'inbox',
+      p_uid: 42,
+      p_provider_id: 'inbox:42',
+      p_hidden: true,
     }],
-    ['eq', 'account_email', 'serve@softora.nl'],
-    ['eq', 'folder', 'inbox'],
-    ['eq', 'uid', 42],
-    ['select', 'message_key'],
   ]);
+  assert.equal(result.data[0].message_id, '<logical-copy@example.test>');
 });
 
 test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht', async () => {
   const calls = [];
-  const query = {
-    update(patch) {
-      calls.push(['update', patch]);
-      return query;
-    },
-    eq(column, value) {
-      calls.push(['eq', column, value]);
-      return query;
-    },
-    select(columns) {
-      calls.push(['select', columns]);
-      return query;
-    },
-    then(resolve) {
-      resolve({ data: [{ message_key: 'serve@softora.nl|inbox|42' }], error: null });
-    },
-  };
   const store = createMailboxIndexStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => ({
-      from(table) {
-        calls.push(['from', table]);
-        return query;
+      async rpc(name, params) {
+        calls.push(['rpc', name, params]);
+        return {
+          data: [{
+            message_key: 'serve@softora.nl|inbox|42',
+            account_email: 'serve@softora.nl',
+            folder: 'inbox',
+            uid: 42,
+            provider_id: '',
+            message_id: '',
+          }],
+          error: null,
+        };
       },
     }),
-    now: () => new Date('2026-07-23T09:05:00.000Z'),
   });
 
   const result = await store.restoreMessage({
@@ -845,15 +824,13 @@ test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht
 
   assert.equal(result.ok, true);
   assert.deepEqual(calls, [
-    ['from', 'softora_mailbox_messages'],
-    ['update', {
-      deleted_at: null,
-      updated_at: '2026-07-23T09:05:00.000Z',
+    ['rpc', 'softora_set_mailbox_message_visibility', {
+      p_account_email: 'serve@softora.nl',
+      p_folder: 'inbox',
+      p_uid: 42,
+      p_provider_id: 'inbox:42',
+      p_hidden: false,
     }],
-    ['eq', 'account_email', 'serve@softora.nl'],
-    ['eq', 'folder', 'inbox'],
-    ['eq', 'uid', 42],
-    ['select', 'message_key'],
   ]);
 });
 

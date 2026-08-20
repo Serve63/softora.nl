@@ -33,6 +33,13 @@
   const quotedThreadApi = global.SoftoraMailboxQuotedThread || (
     typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-quoted-thread.js') : null
   );
+  const messagePresentationModule = global.SoftoraMailboxMessagePresentation || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-message-presentation.js') : null
+  );
+  const logicalDeleteApi = global.SoftoraMailboxLogicalDelete || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-logical-delete.js') : null
+  );
+  const messagePresentation = messagePresentationModule.create({ quotedThread: quotedThreadApi, splitQuotedReply, getProvenOutboundThreadMessages, getMessageTimestamp, getDirectParentMessageIds, isSentMessageByProvenance, findExactQuotedOutbound });
   const ownerPreference = ownerPreferenceApi?.create?.() || null;
   const pageBootstrapConsumedOwners = new Set();
 
@@ -675,37 +682,6 @@
     ) || null;
   }
 
-  function stripProvenQuotedOutbound(value, mail, messageContext = mail) {
-    const incomingTimestamp = getMessageTimestamp(messageContext);
-    const result = quotedThreadApi?.stripProvenQuotedOutbound?.(
-      value,
-      getProvenOutboundThreadMessages(mail, value),
-      {
-        directParentMessageIds: getDirectParentMessageIds(messageContext),
-        incomingAt: incomingTimestamp ? new Date(incomingTimestamp).toISOString() : '',
-      }
-    );
-    return result && typeof result.body === 'string' ? result.body : String(value || '').trim();
-  }
-
-  function getSourceSafeThreadBody(message, mail) {
-    const body = String(message && message.body || '');
-    if (!body || isSentMessageByProvenance(message, mail && mail.accountEmail)) {
-      return stripQuotedReply(body);
-    }
-    return stripProvenQuotedOutbound(body, mail, message);
-  }
-
-  function isDuplicateStructuredOwnQuote(section, mail, isReplyHeaderLine) {
-    if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
-    const firstLine = String(section.lines[0] || '').trim();
-    const hasReplyHeader = typeof isReplyHeaderLine === 'function' && isReplyHeaderLine(firstLine);
-    return Boolean(findExactQuotedOutbound(
-      (hasReplyHeader ? section.lines.slice(1) : section.lines).join('\n'),
-      mail
-    ));
-  }
-
   function isMessageBodyPending(message) {
     const source = message && typeof message === 'object' ? message : {};
     if (source.bodyLoading === true) return true;
@@ -749,10 +725,10 @@
     return messages.map((message) => {
       const loadError = String(message && message.bodyLoadError || '').trim();
       const loading = !loadError && isMessageBodyPending(message);
-      const body = loading ? '' : getSourceSafeThreadBody(message, mail);
-      if (!body && !loading && !loadError) return '';
-      const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const sent = isSentMessageByProvenance(message, mail.accountEmail);
+      const { body, contactHtml } = messagePresentation.getThreadPresentation(message, mail, { loading, loadError, sent, escapeHtml });
+      if (!body && !contactHtml && !loading && !loadError) return '';
+      const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const messageOwner = sent ? getMessageOwner(message) : '';
       const owner = messageOwner ? getOwnerLabel(messageOwner) : '';
       const sentLabel = messageOwner && messageOwner === mailboxOwner ? 'Jouw bericht' : 'Eerdere mail';
@@ -762,6 +738,8 @@
         ? `<div class="detail-mail-load-error" role="alert"><span>${escapeHtml(loadError)}</span><button type="button" data-mailbox-action="retry-thread-message" data-mailbox-id="${escapeHtml(mail.id)}" data-mailbox-thread-key="${escapeHtml(getActionMessageKey(message))}">Opnieuw proberen</button></div>`
         : loading
         ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
+        : !body
+        ? ''
         : typeof options.renderMessageBody === 'function'
         ? options.renderMessageBody({ message, body, sent })
         : `<div class="detail-mail-lines">${body.split('\n').map((line) => {
@@ -784,7 +762,7 @@
       return `${actionBefore}<section class="${sectionClass}">
           <div class="detail-mail-section-label">${sent ? sentLabel : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
-          ${renderedRouting}${renderedBody}${renderedAttachments}${actionInside}
+          ${renderedRouting}${renderedBody}${contactHtml}${renderedAttachments}${actionInside}
         </section>`;
     }).filter(Boolean).join('');
   }
@@ -896,18 +874,21 @@
   function getDeletionIdentity(mail) {
     if (!mail || typeof mail !== 'object') return null;
     const accountEmail = getAccount(mail, '');
+    const messageId = normalizeMessageId(mail.messageId);
     const folder = getFolder(mail, 'inbox');
     const uid = Number(mail.uid) || 0;
     const id = getRequestId(mail);
-    if (!accountEmail || (!uid && !id)) return null;
-    return { accountEmail, folder, uid, id };
+    if (!accountEmail || (!messageId && !uid && !id)) return null;
+    return { accountEmail, ...(messageId ? { messageId } : {}), folder, uid, id };
   }
 
   function matchesMessageIdentity(mail, identity) {
     const candidate = getDeletionIdentity(mail);
     const deleted = getDeletionIdentity(identity);
     if (!candidate || !deleted) return false;
-    if (candidate.accountEmail !== deleted.accountEmail || candidate.folder !== deleted.folder) return false;
+    if (candidate.accountEmail !== deleted.accountEmail) return false;
+    if (candidate.messageId && deleted.messageId) return candidate.messageId === deleted.messageId;
+    if (candidate.folder !== deleted.folder) return false;
     if (candidate.uid > 0 && deleted.uid > 0) return candidate.uid === deleted.uid;
     return Boolean(candidate.id && deleted.id && candidate.id === deleted.id);
   }
@@ -919,12 +900,12 @@
     Array.from(new Set([owner, 'both'])).forEach((cacheOwner) => {
       const snapshot = readSessionMailboxSnapshot(cacheOwner);
       if (!snapshot) return;
-      const messages = snapshot.messages.filter((candidate) => !matchesMessageIdentity(candidate, mail));
-      if (messages.length === snapshot.messages.length) return;
+      const removal = logicalDeleteApi.withoutDeletedMessages(snapshot.messages, mail, matchesMessageIdentity);
+      if (!removal.changed) return;
       updated = writeSessionMailboxSnapshot({
         ...snapshot,
         savedAt: new Date().toISOString(),
-        messages,
+        messages: removal.messages,
       }, cacheOwner) || updated;
     });
     return updated;
@@ -974,11 +955,11 @@
       const removedActiveMessage = messages.find((mail) => (
         String(mail && mail.id) === String(activeId) && matchesMessageIdentity(mail, identity)
       ));
-      const remainingMessages = messages.filter((mail) => !matchesMessageIdentity(mail, identity));
-      if (remainingMessages.length === messages.length) return;
+      const removal = logicalDeleteApi.withoutDeletedMessages(messages, identity, matchesMessageIdentity);
+      if (!removal.changed) return;
       const nextMessages = typeof options.filterMessages === 'function'
-        ? options.filterMessages(remainingMessages)
-        : remainingMessages;
+        ? options.filterMessages(removal.messages)
+        : removal.messages;
       options.setMessages?.(nextMessages);
       if (removedActiveMessage) options.setActiveId?.(null);
       options.renderList?.({ openLatest: false });
@@ -1104,10 +1085,13 @@
     getOwnerPinKeyForIdentity,
     getPageBootstrapSession,
     getRequestId,
+    getRootMessagePresentation: messagePresentation.getRootPresentation,
+    getSourceSafeMessageBody: messagePresentation.getSourceSafeMessageBody,
+    getSourceSafeMessagePresentation: messagePresentation.getSourceSafeMessagePresentation,
     groupConversationMessages,
     initializeOwnerPreference,
     isAutomatedCampaignReply,
-    isDuplicateStructuredOwnQuote,
+    isDuplicateStructuredOwnQuote: messagePresentation.isDuplicateStructuredOwnQuote,
     isOwner,
     isPersonalOwner,
     isSafeImageSource,
@@ -1131,7 +1115,7 @@
     resolveOwnerForSession,
     setOwner,
     sortMessagesNewestFirst,
-    stripProvenQuotedOutbound,
+    stripProvenQuotedOutbound: messagePresentation.stripProvenQuotedOutbound,
     stripQuotedReply,
     subscribeToMessageDeletions,
   };

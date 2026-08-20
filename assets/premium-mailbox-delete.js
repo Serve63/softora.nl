@@ -15,9 +15,19 @@
     }
 
     function filterMessages(messages) {
-      return (Array.isArray(messages) ? messages : []).filter(
-        (mail) => !hiddenMessageKeys.has(getMessageKey(mail))
-      );
+      return (Array.isArray(messages) ? messages : []).flatMap((mail) => {
+        if (hiddenMessageKeys.has(getMessageKey(mail))) return [];
+        if (!Array.isArray(mail && mail.threadMessages)) return [mail];
+        const threadMessages = filterMessages(mail.threadMessages);
+        return threadMessages.length === mail.threadMessages.length
+          ? [mail]
+          : [{ ...mail, threadMessages }];
+      });
+    }
+
+    function getResolvedMessages(mail, data) {
+      const resolved = data?.result?.resolvedMessages;
+      return Array.isArray(resolved) && resolved.length ? resolved : [mail];
     }
 
     async function confirmDeletion(mail) {
@@ -86,7 +96,8 @@
       const transaction = hooks.optimistic?.(mail);
       try {
         const data = await requestVisibility(mail, 'hide');
-        options.removeCached?.(mail);
+        getResolvedMessages(mail, data).forEach((message) => hiddenMessageKeys.add(getMessageKey(message)));
+        options.removeCached?.(mail, data);
         hooks.commit?.(mail, transaction, data);
         return { ok: true, data };
       } catch (error) {
@@ -101,6 +112,7 @@
       if (!mail) return { ok: false };
       try {
         const data = await requestVisibility(mail, 'restore');
+        getResolvedMessages(mail, data).forEach((message) => hiddenMessageKeys.delete(getMessageKey(message)));
         hiddenMessageKeys.delete(getMessageKey(mail));
         options.restoreCached?.(mail);
         return { ok: true, data };
