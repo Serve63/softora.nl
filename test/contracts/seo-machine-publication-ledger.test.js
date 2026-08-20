@@ -143,6 +143,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/kennisbank/wat-is-procesautomatisering',
+        '2026-08-20',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });

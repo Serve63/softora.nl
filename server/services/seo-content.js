@@ -478,6 +478,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({
+        label: 'Wat is procesautomatisering?',
+        href: '/kennisbank/wat-is-procesautomatisering',
+        availableFrom: '2026-06-24',
+      }),
     ]),
   }),
   Object.freeze({
@@ -1866,55 +1871,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         href: '/kennisbank/wat-is-procesautomatisering',
         availableFrom: '2026-06-24',
       }),
-    ]),
-  }),
-  Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-procesautomatisering',
-    title: 'Wat is procesautomatisering?',
-    description:
-      'Een heldere uitleg van procesautomatisering: welke stappen je vastlegt, wanneer AI helpt en waarom controle belangrijk blijft.',
-    category: 'AI processen automatiseren',
-    intent: 'Uitleg',
-    publishedAt: '2026-06-24',
-    updatedAt: '2026-06-24',
-    image: Object.freeze({
-      src: '/assets/seo-content/ai-automatisering-workflow-softora.jpg',
-      alt: 'Team bespreekt procesautomatisering met workflowstappen, overdracht en meetbare opvolging voor het MKB.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Procesautomatisering betekent dat terugkerende stappen volgens een vaste route worden voorbereid, uitgevoerd of doorgezet.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'De simpele betekenis',
-        paragraphs: Object.freeze([
-          'Procesautomatisering is het vastleggen en automatiseren van werk dat steeds terugkomt. Dat kan gaan om formulieren verwerken, taken aanmaken, klantvragen verdelen, rapportages voorbereiden of gegevens van het ene systeem naar het andere brengen.',
-          'AI kan daar een extra laag aan toevoegen wanneer de input tekst, gesprekken of context bevat. De automatisering blijft dan niet beperkt tot vaste velden, maar kan ook samenvatten, classificeren en een vervolgstap voorstellen.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Wat je eerst moet uittekenen',
-        paragraphs: Object.freeze([
-          'Een proces automatiseren begint met de route: welke informatie komt binnen, wie is eigenaar, welke status hoort erbij en wanneer is het klaar? Zonder die afspraken wordt automatisering vooral sneller chaos maken.',
-          'Daarom is het verstandig om eerst een klein proces te kiezen. Bijvoorbeeld intake, offertevoorbereiding, leadopvolging of klantvragen. Als die flow werkt, kun je daarna koppelingen met CRM, agenda, mailbox of dashboard toevoegen.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Waar AI wel en niet geschikt voor is',
-        paragraphs: Object.freeze([
-          'AI is sterk in taalwerk: samenvatten, vragen herkennen, ontbrekende informatie signaleren en conceptteksten voorbereiden. Dat maakt AI nuttig voor processen met veel variatie in tekst of gesprekken.',
-          'Belangrijke keuzes blijven beter controleerbaar wanneer een medewerker de laatste stap ziet. Zo combineer je snelheid met verantwoordelijkheid en voorkom je dat automatisering onduidelijk wordt voor het team.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'AI processen automatiseren', href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen' }),
-      Object.freeze({ label: 'AI klantintake', href: '/blog/ai-automatisering-klantintake-mkb' }),
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
     ]),
   }),
   Object.freeze({
