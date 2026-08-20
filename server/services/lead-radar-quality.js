@@ -25,6 +25,14 @@ const BUYER_INTENT_TERMS = Object.freeze([
   'website voor mijn bedrijf', 'website voor mijn onderneming', 'website voor mijn praktijk',
   'website voor mijn winkel', 'website voor mijn zaak', 'website voor mijn dienst',
   'online aanwezigheid nodig',
+  'ik zoek iemand voor software', 'wij zoeken iemand voor software', 'software laten maken',
+  'maatwerk software gezocht', 'softwareontwikkelaar gezocht', 'app laten maken',
+  'app ontwikkelaar gezocht', 'crm laten maken', 'crm systeem nodig', 'portaal laten bouwen',
+  'klantenportaal laten maken', 'koppeling laten maken', 'api koppeling gezocht',
+  'iemand die kan automatiseren', 'automatisering hulp gezocht', 'processen automatiseren',
+  'ai automatisering gezocht', 'chatbot laten maken', 'webapp laten maken',
+  'dashboard laten maken', 'systeem laten bouwen', 'ai agent laten maken',
+  'ai assistent laten bouwen',
 ]);
 
 const CLIENT_CONTEXT_TERMS = Object.freeze([
@@ -32,7 +40,8 @@ const CLIENT_CONTEXT_TERMS = Object.freeze([
   'onze webwinkel', 'voor mijn bedrijf', 'voor mijn onderneming', 'voor mijn dienst',
   'voor mijn praktijk', 'voor mijn winkel', 'voor mijn zaak', 'voor ons bedrijf',
   'voor onze onderneming', 'voor onze zaak', 'voor mijn klanten', 'ons bedrijf',
-  'onze onderneming', 'mijn bedrijf', 'mijn onderneming',
+  'onze onderneming', 'mijn bedrijf', 'mijn onderneming', 'onze software', 'mijn software',
+  'ons systeem', 'mijn systeem', 'ons proces', 'onze processen',
 ]);
 
 const BUYER_REQUEST_TERMS = Object.freeze([
@@ -44,7 +53,8 @@ const BUYER_REQUEST_TERMS = Object.freeze([
   'ik zoek een webdeveloper', 'wij zoeken een webdeveloper', 'we zoeken een webdeveloper',
   'nog geen website', 'toe aan een website', 'website nodig voor mijn', 'ik wil een website',
   'wij willen een website', 'we willen een website', 'aanbeveling', 'tip gevraagd', 'hulp gevraagd',
-  'hulp gezocht',
+  'hulp gezocht', 'softwareontwikkelaar gezocht', 'app ontwikkelaar gezocht',
+  'automatisering hulp gezocht', 'iemand die kan automatiseren', 'koppeling laten maken',
 ]);
 
 const RECRUITMENT_TERMS = Object.freeze([
@@ -67,7 +77,8 @@ const PROVIDER_ROLE_TERMS = Object.freeze([
   'webshopbouwer', 'online marketing', 'marketingbureau', 'marketing bureau',
   'digital agency', 'marketing agency', 'seo bureau', 'seo specialist',
   'wordpress specialist', 'shopify partner', 'web tech bureau', 'websites en logo',
-  'website onderhoud', 'website voor ondernemers',
+  'website onderhoud', 'website voor ondernemers', 'softwarebureau', 'software bedrijf',
+  'app developer', 'app ontwikkelaar', 'automation agency', 'automatiseringsbureau',
 ]);
 
 const PROVIDER_PROMO_TERMS = Object.freeze([
@@ -125,6 +136,9 @@ function createLeadRadarQuality(deps) {
       if (platformFromUrl(normalized) === 'linkedin') {
         return /^(in|company)\//i.test(segments.join('/'));
       }
+      if (platformFromUrl(normalized) === 'bluesky') return /^profile\/[^/]+\/?$/i.test(segments.join('/'));
+      if (platformFromUrl(normalized) === 'mastodon') return segments.length <= 1 || /^@[^/]+\/?$/i.test(segments.join('/'));
+      if (platformFromUrl(normalized) === 'web') return false;
       return segments.length <= 1;
     } catch {
       return false;
@@ -145,6 +159,9 @@ function createLeadRadarQuality(deps) {
       if (normalizedPlatform === 'linkedin' && !isLinkedInHost) return false;
       const path = parsed.pathname.toLowerCase();
       if (normalizedPlatform === 'linkedin') return /^\/posts\//.test(path) || /^\/feed\/update\//.test(path);
+      if (normalizedPlatform === 'bluesky') return parsed.hostname.toLowerCase() === 'bsky.app' && /^\/profile\/[^/]+\/post\/[^/]+/.test(path);
+      if (normalizedPlatform === 'mastodon') return /^\/@[^/]+\/\d+/.test(path) || /^\/users\/[^/]+\/statuses\/\d+/.test(path);
+      if (normalizedPlatform === 'web') return true;
       return /\/(?:posts?|videos?|reels?|share\/p|share\/r)\/[^/]+/.test(path) ||
         (/\/(?:permalink|photo)\.php$/.test(path) && (parsed.searchParams.has('story_fbid') || parsed.searchParams.has('fbid'))) ||
         parsed.searchParams.has('story_fbid');
@@ -279,14 +296,16 @@ function createLeadRadarQuality(deps) {
     const recruitmentHits = countPhraseHits(message, RECRUITMENT_TERMS);
     const productSearch = countPhraseHits(message, PRODUCT_SEARCH_TERMS) > 0;
     const profileOnly = isLikelyPlatformProfileUrl(sourceUrl);
-    const hasWebsiteContext = /\b(websites?|websitebouwers?|webshops?|webwinkels?|webdesign|webdevelopers?|site)\b/i.test(message);
+    const hasWebsiteContext = /\b(websites?|websitebouwers?|webshops?|webwinkels?|webdesign|webdevelopers?|webapps?|dashboard|site|software|softwareontwikkelaars?|apps?|applicatie|systeem|crm|portaal|klantenportaal|automatisering|automatiseren|koppeling|api|chatbot|ai[- ]?(?:agent|assistent|oplossing|automatisering))\b/i.test(message);
+    const directCustomerHelpRequest = /\bkan\s+iemand\s+(?:mij|me|ons)\b[^.!?]{0,180}\b(?:helpen|maken|bouwen|ontwikkelen|vernieuwen|verbeteren|automatiseren|koppelen)\b/i.test(message) ||
+      /\b(?:ik\s+ben|wij\s+zijn|we\s+zijn)\s+op\s*zoek\s+naar\s+(?:iemand|een\s+(?:partij|bureau|freelancer|ontwikkelaar))\b/i.test(message);
     const hasClientContext = countPhraseHits(message, CLIENT_CONTEXT_TERMS) > 0 ||
       /\b(ik|wij|we)\s+(?:ben|zijn)\s+op\s*zoek naar iemand\b/i.test(message) ||
-      /\b(ik|wij|we)\s+(?:wil|willen|zoek|zoeken)\b[^.]{0,120}\b(website|webshop|webdesigner|websitebouwer)\b/i.test(message);
-    const hasConcreteWebsiteNeed = buyerIntentHits > 0;
+      /\b(ik|wij|we)\s+(?:wil|willen|zoek|zoeken)\b[^.]{0,160}\b(website|webshop|webdesigner|websitebouwer|software|ontwikkelaar|app|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
+    const hasConcreteDigitalNeed = buyerIntentHits > 0 || directCustomerHelpRequest;
     const buyerRequestHits = countPhraseHits(message, BUYER_REQUEST_TERMS);
-    const firstPersonWebsiteNeed = /\b(?:ik|wij|we|mijn|onze|ons)\b[^.]{0,160}\b(?:website|webshop|webwinkel|webdesigner|websitebouwer|webdeveloper)\b/i.test(message);
-    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed;
+    const firstPersonWebsiteNeed = /\b(?:ik|wij|we|mijn|onze|ons)\b[^.]{0,180}\b(?:website|webshop|webwinkel|webdesigner|websitebouwer|webdeveloper|software|ontwikkelaar|app|applicatie|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
+    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed || directCustomerHelpRequest;
     const designerHiringPhrase = /\b(webdesigner|webdeveloper)\s+gezocht\b/i.test(message);
     const isRecruitment = Boolean(hasWebsiteContext && !hasClientContext && (recruitmentHits > 0 || designerHiringPhrase));
     const strongPromotion = providerPromoHits >= 2 ||
@@ -300,16 +319,16 @@ function createLeadRadarQuality(deps) {
     const isProvider = Boolean(
       hasWebsiteContext && !hasClientContext && !isRecruitment &&
       ((strongPromotion && (providerRoleHits > 0 || providerMessageRoleHits > 0 || profileOnly || providerPromoHits >= 2)) ||
-        (profileOnly && commercialCopy && (providerRoleHits > 0 || providerPromoHits > 0 || hasConcreteWebsiteNeed)) ||
+        (profileOnly && commercialCopy && (providerRoleHits > 0 || providerPromoHits > 0 || hasConcreteDigitalNeed)) ||
         (providerRoleHits > 0 && commercialCopy) || providerShowcaseHits > 0 || directSalesCta)
     );
-    const isWebsiteNeed = hasWebsiteContext && hasConcreteWebsiteNeed && hasBuyerVoice && !isRecruitment && !productSearch;
+    const isWebsiteNeed = hasWebsiteContext && hasConcreteDigitalNeed && hasBuyerVoice && !isRecruitment && !productSearch;
     const reasons = [];
     if (isRecruitment) reasons.push('Recruitment- of vacaturebericht, geen klantvraag');
     if (isProvider) reasons.push('Zelfpromotie van webdesign-, SEO- of marketingaanbieder');
     if (productSearch) reasons.push('Product- of marktplaatszoekopdracht, geen websitevraag');
-    if (!hasWebsiteContext) reasons.push('Geen duidelijke websitecontext in het bericht');
-    if (!hasConcreteWebsiteNeed) reasons.push('Geen concrete vraag om websitebouw of verbetering gevonden');
+    if (!hasWebsiteContext) reasons.push('Geen duidelijke website-, software- of automatiseringscontext in het bericht');
+    if (!hasConcreteDigitalNeed) reasons.push('Geen concrete digitale hulpvraag gevonden');
     if (!hasBuyerVoice) reasons.push('Geen herkenbare klantvraag vanuit ondernemer gevonden');
     return {
       role: isRecruitment ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
@@ -348,5 +367,3 @@ function createLeadRadarQuality(deps) {
 }
 
 module.exports = { createLeadRadarQuality };
-
-
