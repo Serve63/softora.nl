@@ -14,6 +14,7 @@ const {
 } = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 const { closeMailboxClientQuietly } = require('../../server/services/mailbox-imap-fetch');
+const { MAILBOX_VISIBILITY_PROTOCOL } = require('../../server/services/mailbox-delete-message');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -2890,6 +2891,7 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
   await service.hideConversationResponse(
     {
       body: {
+        visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
         account: 'serve@softora.nl',
         id: 'inbox:42',
         messages: [
@@ -2940,6 +2942,7 @@ test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder 
   await service.restoreConversationResponse(
     {
       body: {
+        visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
         account: 'serve@softora.nl',
         id: 'inbox:42',
         messages: [
@@ -3003,12 +3006,196 @@ test('mailbox service weigert meer dan honderd gesprekberichten vóór elke gede
     folder: 'inbox',
   }));
 
-  await service.hideConversationResponse({ body: { messages } }, res);
+  await service.hideConversationResponse({ body: {
+    visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
+    messages,
+  } }, res);
 
   assert.equal(res.statusCode, 413);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.error, 'Gesprek verbergen mislukt');
   assert.deepEqual(persistenceCalls, []);
+});
+
+test('mailbox service weigert oude hide- en restoreclients vóór iedere zichtbaarheidwrite', async () => {
+  let writes = 0;
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      name: 'Servé',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      markMessageDeleted: async () => { writes += 1; return { ok: true }; },
+      restoreMessage: async () => { writes += 1; return { ok: true }; },
+    },
+  });
+  const request = {
+    body: {
+      owner: 'serve', account: 'serve@softora.nl',
+      id: 'inbox:42', uid: 42, folder: 'inbox',
+      messages: [{ account: 'serve@softora.nl', id: 'inbox:42', uid: 42, folder: 'inbox' }],
+    },
+  };
+
+  for (const operation of ['hideConversationResponse', 'restoreConversationResponse']) {
+    const res = createResponseRecorder();
+    await service[operation](request, res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body.detail, /verouderd.*vernieuw/i);
+  }
+  assert.equal(writes, 0);
+});
+
+test('mailbox service verbergt een outreachcontact atomisch over uitsluitend server-bepaalde owneraccounts', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+      {
+        email: 'servec321@gmail.com',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'servec321@gmail.com',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxOutreachScope: {
+      getScopedAccounts(owner) {
+        calls.push(['scope', owner]);
+        return ['servec321@gmail.com', 'serve@softora.nl'];
+      },
+      filterConversations: async ({ messages }) => messages,
+    },
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      async setContactVisibility(input, hidden) {
+        calls.push(['contact-visibility', input, hidden]);
+        return {
+          ok: true,
+          data: [
+            {
+              message_key: 'serve@softora.nl|inbox|42',
+              account_email: 'serve@softora.nl', folder: 'inbox', uid: 42,
+              provider_id: '', message_id: '<grow@example.test>',
+            },
+            {
+              message_key: 'servec321@gmail.com|inbox|88',
+              account_email: 'servec321@gmail.com', folder: 'inbox', uid: 88,
+              provider_id: '', message_id: '<grow@example.test>',
+            },
+          ],
+        };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.hideConversationResponse({ body: {
+    visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
+    owner: 'serve',
+    visibilityScope: 'outreach-contact',
+    contactEmail: 'serve@growsocialmedia.nl',
+    expectedMessageCount: 1,
+    account: 'serve@softora.nl',
+    id: 'inbox:42', uid: 42, folder: 'inbox',
+    messages: [{ account: 'serve@softora.nl', id: 'inbox:42', uid: 42, folder: 'inbox' }],
+  } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(calls, [
+    ['scope', 'serve'],
+    ['scope', ''],
+    ['contact-visibility', {
+      accountEmails: ['serve@softora.nl', 'servec321@gmail.com'],
+      contactEmail: 'serve@growsocialmedia.nl',
+      accountEmail: 'serve@softora.nl',
+      id: 'inbox:42', folder: 'inbox', uid: 42,
+      expectedMessageCount: 1,
+    }, true],
+  ]);
+  assert.equal(res.body.result.messageCount, 1);
+  assert.equal(res.body.result.resolvedMessageCount, 2);
+  assert.equal(res.body.result.sourceMailboxMutated, false);
+});
+
+test('mailbox service weigert een outreachdoel buiten de server-bepaalde eigenaarsscope vóór writes', async () => {
+  let writes = 0;
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'martijn@softora.nl', name: 'Martijn', imapHost: 'imap.example.test',
+      imapUser: 'martijn@softora.nl', imapPass: 'secret',
+    }]),
+    mailboxOutreachScope: {
+      getScopedAccounts: () => ['serve@softora.nl', 'servec321@gmail.com'],
+      filterConversations: async ({ messages }) => messages,
+    },
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      setContactVisibility: async () => { writes += 1; return { ok: true, data: [] }; },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.hideConversationResponse({ body: {
+    visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
+    owner: 'serve', visibilityScope: 'outreach-contact',
+    contactEmail: 'contact@example.nl', expectedMessageCount: 1,
+    messages: [{ account: 'martijn@softora.nl', id: 'inbox:7', uid: 7, folder: 'inbox' }],
+  } }, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(writes, 0);
+  assert.match(res.body.detail, /buiten de gekozen persoonlijke mailbox/i);
+});
+
+test('mailbox service behandelt een account van de andere eigenaar nooit als extern contactdossier', async () => {
+  let writes = 0;
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl', name: 'Servé', imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl', imapPass: 'secret',
+    }]),
+    mailboxOutreachScope: {
+      getScopedAccounts: (owner) => owner === 'serve'
+        ? ['serve@softora.nl']
+        : ['serve@softora.nl', 'martijn@softora.nl'],
+      filterConversations: async ({ messages }) => messages,
+    },
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      setContactVisibility: async () => { writes += 1; return { ok: true, data: [] }; },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.hideConversationResponse({ body: {
+    visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
+    owner: 'serve', visibilityScope: 'outreach-contact',
+    contactEmail: 'martijn@softora.nl', expectedMessageCount: 1,
+    messages: [{ account: 'serve@softora.nl', id: 'inbox:8', uid: 8, folder: 'inbox' }],
+  } }, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(writes, 0);
+  assert.match(res.body.detail, /eigen mailbox/i);
 });
 
 test('mailbox service strips tracking and standalone asset urls from display text', () => {

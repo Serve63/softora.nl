@@ -522,9 +522,11 @@ test('verbergen gebruikt uitsluitend Softora hide en restore en nooit een bronma
   assert.equal((await controller.remove(mail)).ok, true);
   assert.equal(requests[0].url, '/api/mailbox/messages/hide');
   assert.equal(JSON.parse(requests[0].options.body).owner, 'serve');
+  assert.equal(JSON.parse(requests[0].options.body).visibilityProtocol, 'atomic-contact-v1');
   assert.equal(JSON.parse(requests[0].options.body).messages.length, 2);
   assert.equal((await controller.restore(mail)).ok, true);
   assert.equal(requests[1].url, '/api/mailbox/messages/restore');
+  assert.equal(JSON.parse(requests[1].options.body).visibilityProtocol, 'atomic-contact-v1');
   assert.doesNotMatch(
     assetSource('premium-mailbox-delete.js'),
     /messages\/delete|messageDelete|messageMove|createImapClient/

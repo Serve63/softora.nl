@@ -1,10 +1,13 @@
 (function (global) {
+  const VISIBILITY_PROTOCOL = 'atomic-contact-v1';
+
   function normalize(value) {
     return String(value || '').trim();
   }
 
   function create(options = {}) {
     const hiddenMessageKeys = new Set();
+    const pendingMessageKeys = new Set();
 
     function getMessageKey(mail) {
       const account = normalize(options.getAccount?.(mail)).toLowerCase();
@@ -66,18 +69,29 @@
     async function requestVisibility(mail, action) {
       const targets = getConversationTargets(mail);
       const root = targets[0] || {};
+      const conversationScope = normalize(options.getConversationScope?.(mail)).toLowerCase();
+      const contactEmail = normalize(
+        options.getContactEmail?.(mail) || mail && mail.externalContactEmail
+      ).toLowerCase();
+      const outreachContact = conversationScope === 'outreach' && Boolean(contactEmail);
       const response = await options.fetch(`/api/mailbox/messages/${action}`, {
         method: 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
+          visibilityProtocol: VISIBILITY_PROTOCOL,
           owner: normalize(options.getOwner?.(mail)),
           account: root.account,
           id: root.id,
           uid: root.uid,
           folder: root.folder,
           messages: targets,
+          ...(outreachContact ? {
+            visibilityScope: 'outreach-contact',
+            contactEmail,
+            expectedMessageCount: action === 'hide' ? targets.length : 0,
+          } : {}),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -90,21 +104,38 @@
     }
 
     async function remove(mail, hooks = {}) {
-      if (!mail || !(await confirmDeletion(mail))) return { ok: false, cancelled: true };
+      if (!mail) return { ok: false, cancelled: true };
       const messageKey = getMessageKey(mail);
-      hiddenMessageKeys.add(messageKey);
-      const transaction = hooks.optimistic?.(mail);
+      if (pendingMessageKeys.has(messageKey)) return { ok: false, pending: true };
+      pendingMessageKeys.add(messageKey);
       try {
-        const data = await requestVisibility(mail, 'hide');
-        getResolvedMessages(mail, data).forEach((message) => hiddenMessageKeys.add(getMessageKey(message)));
-        options.removeCached?.(mail, data);
-        hooks.commit?.(mail, transaction, data);
-        return { ok: true, data };
-      } catch (error) {
-        hiddenMessageKeys.delete(messageKey);
-        hooks.rollback?.(mail, transaction, error);
-        options.toast?.(String(error?.message || error || 'Gesprek verbergen mislukt'));
-        return { ok: false, error };
+        if (!(await confirmDeletion(mail))) return { ok: false, cancelled: true };
+        if (typeof options.prepareConversation === 'function') {
+          try {
+            if ((await options.prepareConversation(mail)) !== true) {
+              throw new Error('Gesprek kon niet volledig worden geladen; er is niets verborgen. Probeer opnieuw.');
+            }
+          } catch (error) {
+            options.toast?.(String(error?.message || error || 'Gesprek kon niet volledig worden geladen; er is niets verborgen. Probeer opnieuw.'));
+            return { ok: false, incomplete: true, error };
+          }
+        }
+        hiddenMessageKeys.add(messageKey);
+        const transaction = hooks.optimistic?.(mail);
+        try {
+          const data = await requestVisibility(mail, 'hide');
+          getResolvedMessages(mail, data).forEach((message) => hiddenMessageKeys.add(getMessageKey(message)));
+          options.removeCached?.(mail, data);
+          hooks.commit?.(mail, transaction, data);
+          return { ok: true, data };
+        } catch (error) {
+          hiddenMessageKeys.delete(messageKey);
+          hooks.rollback?.(mail, transaction, error);
+          options.toast?.(String(error?.message || error || 'Gesprek verbergen mislukt'));
+          return { ok: false, error };
+        }
+      } finally {
+        pendingMessageKeys.delete(messageKey);
       }
     }
 

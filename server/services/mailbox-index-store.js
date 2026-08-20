@@ -9,6 +9,7 @@ const {
 } = require('../repositories/mailbox-message-reference-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
 const { createMailboxIndexTargetedLookups } = require('../repositories/mailbox-index-targeted-lookups');
+const { createMailboxIndexVisibilityStore } = require('./mailbox-index-visibility-store');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -993,39 +994,6 @@ function createMailboxIndexStore(deps = {}) {
     return { ...result, upserted: rows.length };
   }
 
-  async function setMessageVisibility({ accountEmail, folder = 'inbox', id = '', uid = 0 }, hidden) {
-    const normalizedFolder = normalizeFolder(folder);
-    const normalizedId = normalizeString(id);
-    const parsedUid = normalizedFolder === 'instantly'
-      ? 0
-      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
-    const result = await runDurableWrite(hidden ? 'mark-message-deleted' : 'restore-message', (client) =>
-      client.rpc('softora_set_mailbox_message_visibility', {
-        p_account_email: normalizeEmail(accountEmail),
-        p_folder: normalizedFolder,
-        p_uid: Number.isSafeInteger(parsedUid) && parsedUid > 0 ? parsedUid : 0,
-        p_provider_id: normalizedId,
-        p_hidden: Boolean(hidden),
-      })
-    );
-    if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
-    const error = new Error(hidden
-      ? 'Mailboxbericht ontbreekt in de duurzame index.'
-      : 'Verborgen Softora-mailboxbericht is niet gevonden.');
-    error.code = hidden
-      ? 'MAILBOX_INDEX_MESSAGE_NOT_FOUND'
-      : 'MAILBOX_INDEX_HIDDEN_MESSAGE_NOT_FOUND';
-    return { ok: false, unavailable: false, data: [], error };
-  }
-
-  async function markMessageDeleted(input) {
-    return setMessageVisibility(input, true);
-  }
-
-  async function restoreMessage(input) {
-    return setMessageVisibility(input, false);
-  }
-
   async function getSyncState({ accountEmail, folder = 'inbox' }) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const result = await run('get-sync-state', (client) =>
@@ -1116,6 +1084,9 @@ function createMailboxIndexStore(deps = {}) {
     normalizeMessageRow,
     listMatchingMessagesForAccounts,
   });
+  const visibilityStore = createMailboxIndexVisibilityStore({
+    runDurableWrite, normalizeEmail, normalizeFolder, normalizeString,
+  });
 
   const { applyStateMutation, getStateMutationStatus, markMessageRead, markMessageReplyDismissed } = createMailboxStateMutationStore({
     run,
@@ -1161,15 +1132,14 @@ function createMailboxIndexStore(deps = {}) {
     listProviderActiveConversationAuditMessages,
     applyStateMutation,
     getStateMutationStatus,
-    markMessageDeleted,
     markMessageRead,
     markMessageReplyDismissed,
-    restoreMessage,
     normalizeMessageRow,
     stableProviderUid,
     upsertMessages,
     upsertProviderMessages,
     ...targetedLookups,
+    ...visibilityStore,
   };
 }
 
