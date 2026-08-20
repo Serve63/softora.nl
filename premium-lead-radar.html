@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260819a">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260820a">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -16,7 +16,7 @@
       <div>
         <p class="lead-radar-eyebrow">SOFTORA ACQUISITIE</p>
         <h1>Lead Radar</h1>
-        <p class="lead-radar-subtitle">Openbare websitevragen uit Facebook en LinkedIn.</p>
+        <p class="lead-radar-subtitle">Eigen scanner voor openbare website-, software- en automatiseringsvragen.</p>
       </div>
     </header>
 
@@ -35,15 +35,16 @@
         </div>
         <div class="scan-panel__controls">
           <div class="scan-field">
-            <span class="scan-field__label">Platforms</span>
-            <div class="custom-select" id="scan-platforms" data-value="facebook,linkedin">
+            <span class="scan-field__label">Bronnen</span>
+            <div class="custom-select" id="scan-platforms" data-value="web,mastodon,bluesky">
               <button class="custom-select__trigger" type="button" data-custom-select-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="scan-platforms-menu">
-                <span class="custom-select__value">Facebook en LinkedIn</span>
+                <span class="custom-select__value">Alle openbare bronnen</span>
               </button>
               <div class="custom-select__menu" id="scan-platforms-menu" role="listbox" tabindex="-1" hidden>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="facebook,linkedin" aria-selected="true">Facebook en LinkedIn</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="facebook" aria-selected="false">Facebook</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="linkedin" aria-selected="false">LinkedIn</button>
+                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="web,mastodon,bluesky" aria-selected="true">Alle openbare bronnen</button>
+                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="web" aria-selected="false">Open webfeeds</button>
+                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="mastodon" aria-selected="false">Mastodon</button>
+                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="bluesky" aria-selected="false">Bluesky</button>
               </div>
             </div>
           </div>
@@ -98,6 +99,6 @@
     </section>
 
   </main>
-  <script src="/assets/lead-radar.js?v=20260819a" defer></script>
+  <script src="/assets/lead-radar.js?v=20260820a" defer></script>
 </body>
 </html>

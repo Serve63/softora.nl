@@ -24,24 +24,28 @@
     const provider = state.status && state.status.provider;
     const lastRun = state.status && state.status.lastRun;
     const providerBlocked = provider?.configured && lastRun?.status === 'provider_unavailable';
+    const partialFailure = provider?.configured && lastRun?.status === 'completed_with_errors';
     const scanButton = $('#scan-button');
     if (scanButton) {
       scanButton.disabled = !provider || !provider.configured;
       scanButton.title = provider && provider.configured
         ? ''
-        : 'Configureer de DataForSEO-provider om scans te starten.';
+        : 'Voeg minimaal één toegestane openbare scraperbron toe.';
     }
-    if (!banner || !provider || (provider.configured && !providerBlocked)) { if (banner) banner.hidden = true; return; }
+    if (!banner || !provider || (provider.configured && !providerBlocked && !partialFailure)) { if (banner) banner.hidden = true; return; }
     banner.hidden = false;
     banner.innerHTML = providerBlocked
-      ? `<strong>DataForSEO heeft de laatste scan geblokkeerd</strong><span>${escapeHtml(lastRun.last_error || 'Controleer het DataForSEO-account en saldo.')} Er zijn geen geldige Facebook- of LinkedIn-resultaten uit die ronde opgeslagen.</span>`
-      : `<strong>Zoekprovider niet geconfigureerd</strong><span>${escapeHtml(provider.message || 'Voeg de server-side providercredentials toe om scans te starten.')} Websitecontrole van bestaande leads blijft beschikbaar.</span>`;
+      ? `<strong>Alle openbare scraperbronnen zijn geblokkeerd</strong><span>${escapeHtml(lastRun.last_error || 'Controleer de bronstatus en robots-regels.')} Er worden geen resultaten verzonnen of via een betaalde fallback opgehaald.</span>`
+      : partialFailure
+        ? `<strong>Scan gedeeltelijk afgerond</strong><span>${Number(lastRun.error_count || 0)} broncontrole(s) mislukten; werkende bronnen zijn wel verwerkt. Lead Radar gebruikt geen betaalde zoekprovider.</span>`
+        : `<strong>Geen openbare scraperbron beschikbaar</strong><span>${escapeHtml(provider.message || 'Voeg een toegestane openbare feed of bron toe.')} Websitecontrole van bestaande leads blijft beschikbaar.</span>`;
   }
 
   function getLeadTitle(signal = {}) {
     const keywordGroup = String(signal.keyword_group || '').trim().toLowerCase();
     const message = `${signal.message_text || ''} ${signal.snippet || ''}`.toLowerCase();
     if (keywordGroup === 'webshop' || /\b(webshop|webwinkel|online shop)\b/.test(message)) return 'Webshop aanvraag';
+    if (keywordGroup === 'software_automation' || /\b(software|webapp|applicatie|dashboard|systeem|crm|portaal|automatisering|koppeling|chatbot|ai[- ]?(?:agent|assistent))\b/.test(message)) return 'Software- of automatiseringsvraag';
     if (keywordGroup === 'renew_or_repair' || /\b(vernieuw|moderniseer|redesign|verbeter|aanpas|onderhoud|werkt niet|doet het niet)\b/.test(message)) return 'Website verbeteren';
     return 'Website aanvraag';
   }
@@ -65,7 +69,10 @@
       const isLinkedInHost = hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com');
       const isFacebookHost = hostname === 'facebook.com' || hostname.endsWith('.facebook.com') || hostname === 'fb.com' || hostname.endsWith('.fb.com');
       if (platform === 'linkedin') return isLinkedInHost && (/^\/posts\//.test(path) || /^\/feed\/update\//.test(path));
-      return isFacebookHost && (/(?:\/posts?|\/videos?|\/reels?|\/share\/p|\/share\/r)\/[^/]+/.test(path) || url.searchParams.has('story_fbid'));
+      if (platform === 'facebook') return isFacebookHost && (/(?:\/posts?|\/videos?|\/reels?|\/share\/p|\/share\/r)\/[^/]+/.test(path) || url.searchParams.has('story_fbid'));
+      if (platform === 'bluesky') return hostname === 'bsky.app' && /^\/profile\/[^/]+\/post\/[^/]+/.test(path);
+      if (platform === 'mastodon') return /^\/@[^/]+\/\d+/.test(path) || /^\/users\/[^/]+\/statuses\/\d+/.test(path);
+      return platform === 'web' && ['http:', 'https:'].includes(url.protocol);
     } catch { return false; }
   }
 
@@ -117,7 +124,7 @@
     catch (error) { state.signals = []; state.total = 0; renderSignals(); setInboxState(error.message, 'error'); }
   }
   async function startScan() {
-    const platforms = ($('#scan-platforms').dataset.value || 'facebook,linkedin').split(',').filter(Boolean);
+    const platforms = ($('#scan-platforms').dataset.value || 'web,mastodon,bluesky').split(',').filter(Boolean);
     const regionMode = $('#scan-region-mode').dataset.value || 'nationwide';
     const maxAgeDays = Number($('#scan-max-age-days').dataset.value) || 30;
     const payload = { platforms, regionMode, regions: [], maxAgeDays };
@@ -125,11 +132,11 @@
     try {
       const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) });
       const run = body.run || {};
-      const facebook = run.platform_stats?.facebook || {};
-      const linkedin = run.platform_stats?.linkedin || {};
+      const stats = run.platform_stats || {};
+      const sourceSummary = Object.entries(stats).map(([source, values]) => `${source}: ${Number(values?.verified || 0)} bevestigd`).join('. ');
       $('#scan-progress-label').textContent = run.status === 'provider_unavailable'
-        ? (run.last_error || 'DataForSEO heeft de scan geblokkeerd.')
-        : `Scan afgerond. Facebook: ${Number(facebook.verified || 0)} bevestigd. LinkedIn: ${Number(linkedin.verified || 0)} bevestigd. ${Number(run.rejected_count || 0) + Number(run.unverified_count || 0)} niet getoond na broncontrole.`;
+        ? (run.last_error || 'Alle openbare bronnen zijn geblokkeerd.')
+        : `Scan afgerond. ${sourceSummary || 'Geen bronresultaten.'}. ${Number(run.rejected_count || 0) + Number(run.unverified_count || 0)} niet getoond na broncontrole.`;
       await Promise.all([loadStatus(), loadSignals()]);
     }
     catch (error) { $('#scan-progress-label').textContent = error.message; }
