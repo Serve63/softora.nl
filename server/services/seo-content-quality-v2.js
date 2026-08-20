@@ -12,6 +12,7 @@ const { CONVERSION_WEBSITE_CONTENT_ITEM } = require('./seo-content-conversion-we
 const { ADVISORY_FIRMS_CONTENT_ITEM } = require('./seo-content-adviesbureaus');
 const { AI_TELEFONIST_KOSTEN_CONTENT_ITEM } = require('./seo-content-ai-telefonist-kosten');
 const { AI_TELEFONIST_CRM_CONTENT_ITEM } = require('./seo-content-ai-telefonist-crm');
+const { PROCESS_AUTOMATION_CONTENT_ITEM } = require('./seo-content-procesautomatisering');
 
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
@@ -28,6 +29,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   ADVISORY_FIRMS_CONTENT_ITEM,
   AI_TELEFONIST_KOSTEN_CONTENT_ITEM,
   AI_TELEFONIST_CRM_CONTENT_ITEM,
+  PROCESS_AUTOMATION_CONTENT_ITEM,
 ]);
 
 module.exports = {

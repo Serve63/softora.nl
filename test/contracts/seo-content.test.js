@@ -1390,6 +1390,71 @@ test('AI-telefonist CRM-gids maakt events, duplicatecontrole en herstel toetsbaa
   ]);
 });
 
+test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs toetsbaar', () => {
+  const now = new Date('2026-08-20T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'wat-is-procesautomatisering', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const aiDefinitionHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('kennisbank', 'wat-is-ai-automatisering', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const intakeHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-klantintake-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-08-20');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.targetMoneyPage, '/ai-automatisering');
+  assert.ok(item.informationGain.includes('negendelige proceskaart'));
+  assert.ok(item.informationGain.includes('fout- en herstelroute'));
+  assert.ok(item.wordCount >= 1300);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.visualBrief.hero.visualType, 'object-study');
+  assert.equal(item.visualBrief.hero.visualFamily, 'tactile-accordion-process-bench');
+  assert.equal(item.visualBrief.support.visualType, 'process-diagram');
+  assert.equal(item.visualBrief.support.visualFamily, 'swiss-yellow-exception-route');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+  assert.equal(item.image.src, '/assets/seo-content/procesautomatisering-proceskaart-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/procesautomatisering-foutpad-softora.jpg');
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
+    assert.ok(fs.statSync(imagePath).size < 300 * 1024);
+    assert.equal(image.sourceType, 'trainedAlgorithmicMedia');
+  }
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-procesautomatisering">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="900">/);
+  assert.match(html, /"datePublished":"2026-06-24"/);
+  assert.match(html, /"dateModified":"2026-08-20"/);
+  assert.match(html, /Vul een proceskaart met negen vaste velden/);
+  assert.match(html, /Ontwerp de fout- en herstelroute vóór de succesroute live gaat/);
+  assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-ai-workflow">een AI workflow<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-crm-integratie">gids over een CRM-integratie<\/a>/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat<\/a>/);
+  assert.match(aiDefinitionHtml, /href="\/kennisbank\/wat-is-procesautomatisering"><span>Wat is procesautomatisering\?<\/span><\/a>/);
+  assert.match(intakeHtml, /href="\/kennisbank\/wat-is-procesautomatisering"><span>Wat is procesautomatisering\?<\/span><\/a>/);
+  assert.doesNotMatch(html, /gegarandeerde tijdwinst|foutloze automatisering|volledig autonoom|altijd correct/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/wat-is-procesautomatisering');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/procesautomatisering-proceskaart-softora.jpg',
+    '/assets/seo-content/procesautomatisering-foutpad-softora.jpg',
+  ]);
+});
+
 test('adviesbureauspagina maakt projectstart en overdracht controleerbaar', () => {
   const now = new Date('2026-08-16T12:00:00.000Z');
   const item = getSeoContentItem('branches', 'adviesbureaus', { now });
