@@ -80,6 +80,9 @@ input:focus, select:focus, textarea:focus, .custom-select__trigger:focus-visible
 .platform-label { display: inline-flex; align-items: center; min-height: 22px; border-radius: 4px; padding: 0 7px; background: #eee8e3; color: #5f534d; font-size: 10px; font-weight: 900; text-transform: uppercase; }
 .platform-label--facebook { background: #e8eef9; color: #345a94; }
 .platform-label--linkedin { background: #e8f2f7; color: #1b6f91; }
+.platform-label--web { background: #f1eadf; color: #76542b; }
+.platform-label--mastodon { background: #eceafd; color: #5146a8; }
+.platform-label--bluesky { background: #e4f3ff; color: #17679b; }
 .lead-copy { min-width: 0; }
 .lead-title { display: -webkit-box; overflow: hidden; margin: 0 0 6px; color: var(--radar-text); font-size: 20px; line-height: 1.25; font-weight: 850; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .lead-summary { display: -webkit-box; overflow: hidden; margin: 0 0 8px; color: #3c3430; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
