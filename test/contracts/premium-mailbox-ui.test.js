@@ -143,9 +143,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   const page = readPage();
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
-  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260820b/);
+  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260820c/);
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260820a/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260820a/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260820b/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260820c/);
@@ -164,9 +164,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260818b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260813a/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260813a/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260820b') < page.indexOf('premium-mailbox-signature.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260820a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260820c') < page.indexOf('premium-mailbox-signature.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260820a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260820b'));
   assert.match(readSignatureScript(), /renderContactCard/);
   assert.match(readMessagePresentationScript(), /getSourceSafeMessagePresentation/);
@@ -2488,7 +2488,7 @@ test('grijze threadkaart verbergt alleen exact bewezen geciteerd Martijn-bericht
   assert.match(html, /Jouw bericht/);
 });
 
-test('grijze threadkaart bewaart een niet overeenkomend citaat en doorgestuurde inhoud', () => {
+test('grijze threadkaart verbergt een duidelijke quote-tail zonder bewezen parent en bewaart canonieke doorgestuurde inhoud', () => {
   const sentBody = 'Hoi,\n\nDit is de echte bewezen uitgaande tekst.';
   const unmatchedIncoming = [
     'Mijn nieuwe antwoord.',
@@ -2510,7 +2510,8 @@ test('grijze threadkaart bewaart een niet overeenkomend citaat en doorgestuurde 
       }],
     },
   });
-  assert.match(unmatchedHtml, /Dit is andere tekst die niet als outbound is bewezen\./);
+  assert.match(unmatchedHtml, /Mijn nieuwe antwoord\./);
+  assert.doesNotMatch(unmatchedHtml, /Dit is andere tekst die niet als outbound is bewezen\.|Martijn van de Ven wrote/);
 
   const forwardedHtml = renderMailboxBodyForTest([
     'Hierbij stuur ik de mail door.',
@@ -3436,7 +3437,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260820c/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260820b/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260820c/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260820b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
@@ -7058,6 +7059,234 @@ test('Resin Art JR reverse-header en References-footer verdwijnen alleen bij é�
   assert.match(noParent, /Servé Creusen schreef op 2026-08-19 10:10:/);
   assert.match(noParent, /References:/);
   assert.match(noParent, /\[2\] https:\/\/www\.resinartjr\.nl\//);
+});
+
+test('Tessa quote blijft bewezen bij formatteringsdrift en verliest ook de gekoppelde Links-footer', () => {
+  const sentAuthoredBody = [
+    'Hoi Tessa,',
+    '',
+    'Dankjewel voor je leuke reactie!',
+    'Fijn om te horen dat de sfeerimpressie goed overkomt. Ik denk graag even met je mee over de indeling en wat er mogelijk is binnen het budget.',
+    'Is het een idee dat ik volgende week maandag of donderdag met een collega kort langskom?',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+    '________________________________',
+  ].join('\n');
+  const sentBody = [
+    sentAuthoredBody,
+    'From: Tessa de Backer <communicatie@schakel-nu.nl>',
+    'Sent: Tuesday, July 7, 2026 9:41 PM',
+    'To: martijnvandeven@softora.nl',
+    'Subject: Re: Fwd: Kleine vraag over jullie website',
+    '',
+    'Goedenavond Martijn,',
+    'Dankjewel voor je leuke sfeerimpressie.',
+  ].join('\n');
+  const incomingBody = [
+    'Hoi Martijn,',
+    '',
+    'De vakantie loopt ten einde, dus we starten weer op.',
+    'Komt donderdag in De Schalm voor jou uit?',
+    '',
+    'martijnvandeven@softora.nl schreef op 2026-07-08 13:45:',
+    '> Hoi Tessa,',
+    '> > Dankjewel voor je leuke reactie!',
+    '> > Fijn om te horen dat de sfeerimpressie goed overkomt. Ik denk graag > even met je mee over de indeling en wat er mogelijk is binnen het > budget.',
+    '> > Is het een idee dat ik volgende week maandag of donderdag met een > collega kort langskom?',
+    '> >',
+    '> > Met vriendelijke groet,',
+    '> > Martijn van de Ven',
+    '> > -------------------------',
+    '> > From: Tessa de Backer',
+    '> Sent: Tuesday, July 7, 2026 9:41 PM',
+    '> To: martijnvandeven@softora.nl',
+    '> Subject: Re: Fwd: Kleine vraag over jullie website',
+    '> > Goedenavond Martijn,',
+    '> > Dankjewel voor je leuke sfeerimpressie [1].',
+    '',
+    'Links:',
+    '------',
+    '[1] http://www.schakel-nu.nl',
+  ].join('\n');
+  const parent = {
+    id: 'sent:tessa-145',
+    messageId: '<tessa-145@softora.nl>',
+    folder: 'sent',
+    direction: 'sent',
+    accountEmail: 'martijnvandeven@softora.nl',
+    date: '2026-07-08T11:45:00.000Z',
+    body: sentBody,
+  };
+  const incoming = {
+    id: 'inbox:tessa-39',
+    messageId: '<tessa-39@schakel-nu.nl>',
+    inReplyTo: '<tessa-145@softora.nl>',
+    folder: 'inbox',
+    direction: 'received',
+    accountEmail: 'martijnvandeven@softora.nl',
+    email: 'communicatie@schakel-nu.nl',
+    receivedAt: '2026-08-18T10:14:00.000Z',
+    body: incomingBody,
+  };
+  const direct = quotedThreadModule.stripProvenQuotedOutbound(incomingBody, [parent], {
+    directParentMessageIds: ['<tessa-145@softora.nl>'],
+    incomingAt: incoming.receivedAt,
+    stripReferenceAppendixWhenSingleMatch: true,
+  });
+  const html = renderMailboxBodyForTest('Nieuwste hoofdbericht.', [], {
+    mail: {
+      id: 'inbox:tessa-root',
+      folder: 'inbox',
+      accountEmail: 'martijnvandeven@softora.nl',
+      receivedAt: '2026-08-20T12:26:00.000Z',
+      threadMessages: [incoming, parent],
+    },
+  });
+
+  assert.equal(direct.body, [
+    'Hoi Martijn,',
+    '',
+    'De vakantie loopt ten einde, dus we starten weer op.',
+    'Komt donderdag in De Schalm voor jou uit?',
+  ].join('\n'));
+  assert.deepEqual(direct.matchedMessages.map((message) => message.id), ['sent:tessa-145']);
+  assert.equal(direct.removedReferenceAppendix, true);
+  assert.match(html, /De vakantie loopt ten einde, dus we starten weer op\./);
+  assert.equal((html.match(/Dankjewel voor je leuke reactie!/g) || []).length, 1);
+  assert.doesNotMatch(html, /schreef op 2026-07-08|Goedenavond Martijn|Links:|http:\/\/www\.schakel-nu\.nl/);
+  assert.match(html, /detail-mail-section-sent/);
+});
+
+test('korte exacte In-Reply-To-parent verdwijnt ook uit de root zonder eigenaar- of parentgok', () => {
+  const parentBody = 'Tot zo.';
+  assert.ok(quotedThreadModule.normalizeMatchText(parentBody).length < 8);
+  const incomingBody = [
+    'Hoi Martijn,',
+    '',
+    'Half elf staat genoteerd.',
+    '',
+    'martijnvandeven@softora.nl schreef op 2026-08-19 10:10:',
+    '> Tot zo.',
+    '> > Oudere afspraaktekst [1].',
+    '',
+    'Links:',
+    '------',
+    '[1] https://www.softora.nl/webdesign/oude-afspraak',
+  ].join('\n');
+  const parent = {
+    id: 'sent:tessa-short-parent',
+    messageId: '<tessa-short-parent@softora.nl>',
+    folder: 'sent',
+    direction: 'sent',
+    accountEmail: 'martijnvandeven@softora.nl',
+    date: '2026-08-19T08:10:00.000Z',
+    body: parentBody,
+  };
+  const incoming = {
+    id: 'inbox:tessa-short-root',
+    messageId: '<tessa-short-root@schakel-nu.nl>',
+    inReplyTo: '<tessa-short-parent@softora.nl>',
+    folder: 'inbox',
+    direction: 'received',
+    accountEmail: 'martijnvandeven@softora.nl',
+    receivedAt: '2026-08-19T08:20:00.000Z',
+    body: incomingBody,
+    threadMessages: [parent],
+  };
+
+  const presentation = campaignInboxModule.getSourceSafeMessagePresentation(incoming, incoming);
+  assert.equal(presentation.body, 'Hoi Martijn,\n\nHalf elf staat genoteerd.');
+
+  const wrongParent = campaignInboxModule.getSourceSafeMessagePresentation(
+    { ...incoming, inReplyTo: '<ander-parent@softora.nl>' },
+    { ...incoming, inReplyTo: '<ander-parent@softora.nl>' }
+  );
+  assert.equal(wrongParent.body, incomingBody);
+
+  const wrongOwnerParent = { ...parent, accountEmail: 'serve@softora.nl' };
+  const wrongOwner = campaignInboxModule.getSourceSafeMessagePresentation(
+    { ...incoming, threadMessages: [wrongOwnerParent] },
+    { ...incoming, threadMessages: [wrongOwnerParent] }
+  );
+  assert.equal(wrongOwner.body, incomingBody);
+});
+
+test('inkomende threadkaarten tonen alleen de nieuwe tekst bij expliciete en samengeplakte quote-tails', () => {
+  const explicitQuote = [
+    'Goedenavond Martijn,',
+    '',
+    'Dankjewel voor je leuke sfeerimpressie.',
+    '',
+    '> www.schakel-nu.nl [1]',
+    '>> -------- Oorspronkelijke bericht --------',
+    '>> Goedendag, dit is het oude coldmailbericht [2].',
+    '',
+    'Links:',
+    '------',
+    '[1] http://www.schakel-nu.nl',
+    '[2] https://www.softora.nl/webdesign/weekblad-de-schakel',
+  ].join('\n');
+  const collapsedQuote = [
+    'Hoi Martijn,Half 11 is prima. Hoofdredacteur Noortje sluit ook aan. Met vriendelijke groet,Tessa de Backer',
+    '-------- Oorspronkelijk bericht --------Van: Martijn van de Ven Datum: 18-08-2026 16:13 (GMT+01:00) Aan: communicatie@schakel-nu.nl Onderwerp: Re: Kleine vraag Hoi Tessa,',
+    'Dit is het oude antwoord van Martijn.',
+  ].join('\n');
+  const html = campaignInboxModule.renderThreadMessages({
+    id: 'inbox:tessa-thread-root',
+    accountEmail: 'martijnvandeven@softora.nl',
+    threadMessages: [{
+      id: 'inbox:tessa-explicit-quote',
+      folder: 'inbox',
+      accountEmail: 'martijnvandeven@softora.nl',
+      date: '2026-07-07T19:41:00.000Z',
+      body: explicitQuote,
+    }, {
+      id: 'inbox:tessa-collapsed-quote',
+      folder: 'inbox',
+      accountEmail: 'martijnvandeven@softora.nl',
+      date: '2026-08-19T09:00:00.000Z',
+      body: collapsedQuote,
+    }],
+  }, String, () => ({ date: '19 augustus', time: '11:00' }));
+
+  assert.match(html, /Dankjewel voor je leuke sfeerimpressie\./);
+  assert.match(html, /Half 11 is prima/);
+  assert.match(html, /Hoofdredacteur Noortje sluit ook aan/);
+  assert.doesNotMatch(html, /Oorspronkelijk|oude coldmailbericht|oude antwoord van Martijn|Links:|softora\.nl\/webdesign/);
+});
+
+test('inline original-message-termen en ongekoppelde eigen Links-inhoud blijven gewone tekst', () => {
+  const naturalBodies = [
+    'Let op: schrijf -- original message -- alleen als Engelse term in deze handleiding.',
+    'De knopnaam -------- oorspronkelijk bericht -------- hoort letterlijk in deze uitleg.',
+  ];
+  naturalBodies.forEach((body) => {
+    const parsed = quotedThreadModule.splitQuotedThread(body);
+    assert.equal(parsed.authored, body);
+    assert.deepEqual(parsed.segments, []);
+  });
+
+  const twoDashCollapsed = [
+    'Nieuw inhoudelijk antwoord.',
+    '-- Original Message --From: Martijn van de Ven Sent: 20-08-2026 10:10 To: Tessa Subject: Re: afspraak Oude tekst.',
+  ].join('');
+  const parsedCollapsed = quotedThreadModule.splitQuotedThread(twoDashCollapsed);
+  assert.equal(parsedCollapsed.authored, 'Nieuw inhoudelijk antwoord.');
+  assert.equal(parsedCollapsed.segments[0] && parsedCollapsed.segments[0].marker, 'forward-separator');
+
+  const ownLinksBody = [
+    'Dit is mijn nieuwe antwoord.',
+    '> Een oud los detail zonder verwijzingsmarker.',
+    '',
+    'Links:',
+    '------',
+    '[1] https://voorbeeld.nl/eigen-agenda',
+  ].join('\n');
+  const parsedLinks = quotedThreadModule.splitQuotedThread(ownLinksBody);
+  assert.equal(parsedLinks.removedReferenceAppendix, false);
+  assert.match(parsedLinks.authored, /Links:/);
+  assert.match(parsedLinks.authored, /https:\/\/voorbeeld\.nl\/eigen-agenda/);
 });
 
 test('gewone Links-inhoud met een eigen URL blijft staan nadat één bewezen parent is verwijderd', () => {
