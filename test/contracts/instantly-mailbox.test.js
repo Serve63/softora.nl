@@ -13,6 +13,7 @@ const {
   extractQuotedOriginalBody,
 } = require('../../server/services/instantly-original-message-source');
 const { createMailboxService } = require('../../server/services/mailbox');
+const { MAILBOX_VISIBILITY_PROTOCOL } = require('../../server/services/mailbox-delete-message');
 const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
@@ -1984,6 +1985,7 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
     accountEmail: 'serve-sender@example.com',
     folder: 'instantly',
     id: 'instantly:incoming-serve-1',
+    visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
   });
   assert.equal(imapCreated, false);
   assert.deepEqual(mutations.map((mutation) => mutation.operation), ['read', 'hide']);
@@ -1996,6 +1998,7 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
       accountEmail: 'serve-sender@example.com',
       folder: 'instantly',
       id: 'instantly:incoming-serve-1',
+      visibilityProtocol: MAILBOX_VISIBILITY_PROTOCOL,
     }),
     { code: 'INSTANTLY_MESSAGE_OWNER_MISMATCH' }
   );

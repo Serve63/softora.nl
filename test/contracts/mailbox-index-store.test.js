@@ -834,6 +834,55 @@ test('mailbox index store herstelt uitsluitend het exact gekozen Softora-bericht
   ]);
 });
 
+test('mailbox index store verstuurt een owner-breed contactdossier als één duurzame RPC', async () => {
+  const calls = [];
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      async rpc(name, params) {
+        calls.push(['rpc', name, params]);
+        return {
+          data: [{
+            message_key: 'servec321@gmail.com|inbox|42',
+            account_email: 'servec321@gmail.com',
+            folder: 'inbox',
+            uid: 42,
+            provider_id: '',
+            message_id: '<grow@example.test>',
+          }],
+          error: null,
+        };
+      },
+    }),
+  });
+
+  const result = await store.setContactVisibility({
+    accountEmails: ['SERVEC321@GMAIL.COM', 'serve@softora.nl', 'serve@softora.nl'],
+    contactEmail: 'Serve@GrowSocialMedia.nl',
+    accountEmail: 'SERVEC321@GMAIL.COM',
+    folder: 'INBOX',
+    id: 'inbox:42',
+    uid: 42,
+    expectedMessageCount: 10,
+  }, true);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [[
+    'rpc',
+    'softora_set_mailbox_contact_visibility',
+    {
+      p_owner_accounts: ['serve@softora.nl', 'servec321@gmail.com'],
+      p_contact_email: 'serve@growsocialmedia.nl',
+      p_anchor_account_email: 'servec321@gmail.com',
+      p_anchor_folder: 'inbox',
+      p_anchor_uid: 42,
+      p_anchor_provider_id: 'inbox:42',
+      p_expected_message_count: 10,
+      p_hidden: true,
+    },
+  ]]);
+});
+
 test('mailbox index sync laat ontbrekende tombstonevelden ongemoeid bij upsert', async () => {
   let upsertOptions = null;
   let upsertRows = null;

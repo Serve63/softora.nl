@@ -688,6 +688,9 @@ const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
   getRequestId: (mail) => window.SoftoraMailboxCampaignInbox.getRequestId(mail),
   getFolder: (mail) => window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
+  getConversationScope: () => activeFolder,
+  getContactEmail: (mail) => mail?.externalContactEmail || '',
+  prepareConversation: (mail) => activeFolder !== 'outreach' || mailboxDiscoveryController?.prepareCompleteContactTimelineForHide?.(mail),
   removeCached: (mail, data) => mailboxLogicalDeleteBridge.removeCached(mail, data),
   toast,
 }); const mailboxLogicalDeleteBridge = window.SoftoraMailboxLogicalDelete.createViewBridge({ getMessages: () => mails, setMessages: (messages) => { mails = messages; }, getActiveId: () => activeMail, setActiveId: (id) => { activeMail = id; }, filterMessages: mailboxDeleteController.filterMessages, findMessage: findMailById, renderList, resetDetail: resetDetailEmpty, removeAndPublish: (message) => window.SoftoraMailboxCampaignInbox.removeAndPublishMessageDeletion(message) }); window.SoftoraMailboxCampaignInbox?.bindMessageDeletionSync?.({ getMessages: () => mails, setMessages: (messages) => { mails = messages; }, getActiveId: () => activeMail, setActiveId: (id) => { activeMail = id; }, filterMessages: mailboxDeleteController.filterMessages, renderList, openMail, resetDetail: resetDetailEmpty });

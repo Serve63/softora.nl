@@ -3,6 +3,7 @@
 
   const SEARCH_DEBOUNCE_MS = 280;
   const SEARCH_MIN_LENGTH = 2;
+  const MAX_HIDE_CONTACT_MESSAGES = 100;
   const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
   function normalizeEmail(value) {
@@ -71,8 +72,9 @@
       const matchesOwner = canonicalOwner && typeof options.getMessageOwner === 'function'
         ? String(options.getMessageOwner(message) || '').trim().toLowerCase() === canonicalOwner
         : allowedAccounts.has(messageAccount);
-      const matches = matchesOwner &&
-        resolveExternalContact(message, accountEmails) === normalizedContact;
+      const messageContact = normalizeEmail(message?.externalContactEmail) ||
+        resolveExternalContact(message, accountEmails);
+      const matches = matchesOwner && messageContact === normalizedContact;
       if (!matches) rejectedCount += 1;
       return matches;
     });
@@ -307,7 +309,7 @@
 
     async function loadContactTimeline(mail, { append = false, force = false } = {}) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
-      if (mail.contactTimelineLoading && !append) return false;
+      if (mail.contactTimelineLoading && !append && !force) return false;
       if (mail.contactTimelineLoaded && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
       const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
       if (!contactEmail) return false;
@@ -315,6 +317,7 @@
       timelineController?.abort?.();
       timelineController = typeof AbortController === 'function' ? new AbortController() : null;
       mail.contactTimelineLoading = true;
+      mail.contactTimelineRequestGeneration = generation;
       try {
         const timelineOwner = mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || 'both';
         const timelineAccounts = options.getAccountEmails?.();
@@ -354,7 +357,124 @@
         mail.contactTimelineError = 'Contacthistorie wordt bij de volgende poging opnieuw geladen.';
         return false;
       } finally {
-        mail.contactTimelineLoading = false;
+        if (mail.contactTimelineRequestGeneration === generation) mail.contactTimelineLoading = false;
+      }
+    }
+
+    async function prepareCompleteContactTimelineForHide(mail) {
+      if (!mail || options.getActiveMail?.() !== mail.id) return false;
+      const frozenId = String(mail.id);
+      const frozenAccounts = Array.from(new Set([
+        ...(options.getAccountEmails?.() || []).map(normalizeEmail),
+        normalizeEmail(mail.accountEmail || mail.providerAccountEmail),
+      ].filter(Boolean))).sort();
+      const frozenContact = normalizeEmail(mail.externalContactEmail) || resolveExternalContact(mail, frozenAccounts);
+      const frozenOwner = String(
+        mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || ''
+      ).trim().toLowerCase();
+      const rootIdentity = getMessageIdentity(mail);
+      if (!frozenContact || !frozenOwner || !rootIdentity || !frozenAccounts.length) return false;
+      const scopeIsCurrent = () => {
+        const currentAccounts = Array.from(new Set([
+          ...(options.getAccountEmails?.() || []).map(normalizeEmail),
+          normalizeEmail(mail.accountEmail || mail.providerAccountEmail),
+        ].filter(Boolean))).sort();
+        const currentContact = normalizeEmail(mail.externalContactEmail) || resolveExternalContact(mail, currentAccounts);
+        const currentOwner = String(
+          mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || ''
+        ).trim().toLowerCase();
+        return String(options.getActiveMail?.() || '') === frozenId &&
+          currentContact === frozenContact && currentOwner === frozenOwner;
+      };
+      const generation = ++timelineGeneration;
+      timelineController?.abort?.();
+      timelineController = typeof AbortController === 'function' ? new AbortController() : null;
+      mail.contactTimelineLoading = true;
+      mail.contactTimelineRequestGeneration = generation;
+      const seenCursors = new Set();
+      const seenIdentities = new Set();
+      const messages = [];
+      let cursor = '';
+      let expectedTotal = null;
+      try {
+        while (true) {
+          if (generation !== timelineGeneration || !scopeIsCurrent()) return false;
+          const params = new URLSearchParams({
+            contact: frozenContact,
+            owner: frozenOwner,
+            limit: '50',
+          });
+          if (cursor) params.set('cursor', cursor);
+          const response = await fetchImpl(`/api/mailbox/contact-timeline?${params}`, {
+            credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
+            ...(timelineController ? { signal: timelineController.signal } : {}),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (generation !== timelineGeneration || !scopeIsCurrent()) return false;
+          if (!response.ok || data?.ok !== true) throw new Error('Contacthistorie kon niet volledig worden geladen.');
+          const pageTotal = Number(data.totalCount);
+          if (!Number.isInteger(pageTotal) || pageTotal < 1 || pageTotal > MAX_HIDE_CONTACT_MESSAGES) {
+            throw new Error(pageTotal > MAX_HIDE_CONTACT_MESSAGES
+              ? `Dit contactdossier bevat meer dan ${MAX_HIDE_CONTACT_MESSAGES} berichten en kan niet gedeeltelijk worden verborgen.`
+              : 'Contacthistorie kon niet volledig worden geladen.');
+          }
+          if (expectedTotal == null) expectedTotal = pageTotal;
+          else if (expectedTotal !== pageTotal) throw new Error('Contacthistorie veranderde tijdens het laden.');
+          const incoming = Array.isArray(data.messages)
+            ? data.messages.map((message) => options.normalizeMessage?.(message) || message)
+            : [];
+          if (!incoming.length) throw new Error('Contacthistorie kon niet volledig worden geladen.');
+          incoming.forEach((message) => {
+            const identity = getMessageIdentity(message);
+            const account = normalizeEmail(message?.accountEmail || message?.providerAccountEmail);
+            const owner = String(
+              message?.canonicalOwner || message?.owner || options.getMessageOwner?.(message) || ''
+            ).trim().toLowerCase();
+            const contact = normalizeEmail(message?.externalContactEmail) ||
+              resolveExternalContact(message, [...frozenAccounts, account]);
+            if (!identity || seenIdentities.has(identity) || !account ||
+              owner !== frozenOwner || contact !== frozenContact) {
+              throw new Error('Contacthistorie bevatte een onverwacht bericht en is niet verborgen.');
+            }
+            seenIdentities.add(identity);
+            messages.push(message);
+          });
+          const nextCursor = String(data.nextCursor || '');
+          if (!nextCursor) break;
+          if (seenCursors.has(nextCursor) || seenIdentities.size >= expectedTotal) {
+            throw new Error('Contacthistorie kon niet volledig worden geladen.');
+          }
+          seenCursors.add(nextCursor);
+          cursor = nextCursor;
+        }
+        if (seenIdentities.size !== expectedTotal || !seenIdentities.has(rootIdentity)) {
+          throw new Error('Contacthistorie was niet volledig en is daarom niet verborgen.');
+        }
+        mergeContactTimeline(mail, messages, frozenContact, expectedTotal, {
+          accountEmails: frozenAccounts,
+          canonicalOwner: frozenOwner,
+          getMessageOwner: options.getMessageOwner,
+        });
+        const loadedCount = 1 + (Array.isArray(mail.threadMessages) ? mail.threadMessages.length : 0);
+        if (!scopeIsCurrent() || loadedCount !== expectedTotal) {
+          throw new Error('Contacthistorie was niet volledig en is daarom niet verborgen.');
+        }
+        mail.contactTimelineNeedsRefresh = false;
+        mail.contactTimelineError = '';
+        mail.contactTimelineNextCursor = '';
+        options.openMail?.(mail.id, {
+          skipBodyFetch: true,
+          skipContactTimeline: true,
+          skipReadPersist: true,
+        });
+        return true;
+      } catch (error) {
+        if (error?.name !== 'AbortError' && generation === timelineGeneration && scopeIsCurrent()) {
+          mail.contactTimelineError = String(error?.message || 'Contacthistorie kon niet volledig worden geladen.');
+        }
+        return false;
+      } finally {
+        if (mail.contactTimelineRequestGeneration === generation) mail.contactTimelineLoading = false;
       }
     }
 
@@ -388,6 +508,7 @@
     return {
       clearSearch,
       canOpenResult: (mail) => !isSearchActive() || searchResultKeys.has(getSearchResultKey(mail)),
+      prepareCompleteContactTimelineForHide,
       isSearchActive,
       loadContactTimeline,
       loadMoreContactTimeline: (mail) => loadContactTimeline(mail, { append: true }),

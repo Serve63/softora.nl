@@ -51,6 +51,52 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260820171023_mailbox_contact_search_and_logical_tombstones.sql'
   ), 'utf8');
+  const fullHistorySearchMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260817102256_mailbox_full_history_search.sql'
+  ), 'utf8');
+  const participantHelpersMarker =
+    'create or replace function public.softora_mailbox_search_normalize(';
+  const participantHelpersEndMarker =
+    'create or replace function public.softora_mailbox_technical_thread_key(';
+  const participantHelpersStart = fullHistorySearchMigration.indexOf(participantHelpersMarker);
+  const participantHelpersEnd = fullHistorySearchMigration.indexOf(
+    participantHelpersEndMarker,
+    participantHelpersStart
+  );
+  if (participantHelpersStart < 0 || participantHelpersEnd <= participantHelpersStart) {
+    throw new Error('Getrackte mailbox-participanthelpers missen het verwachte bereik.');
+  }
+  const participantHelpersMigration = fullHistorySearchMigration.slice(
+    participantHelpersStart,
+    participantHelpersEnd
+  );
+  const contactAtomicVisibilityMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260820174711_mailbox_contact_atomic_visibility.sql'
+  ), 'utf8');
+  const outreachEligibilityMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260817145600_mailbox_outreach_eligibility_set.sql'
+  ), 'utf8');
+  const outreachEligibilityMarker =
+    'create or replace function public.softora_mailbox_outreach_contacts(';
+  const outreachEligibilityEndMarker =
+    'create or replace function public.softora_filter_mailbox_outreach_contacts(';
+  const outreachEligibilityStart = outreachEligibilityMigration.indexOf(
+    outreachEligibilityMarker
+  );
+  const outreachEligibilityEnd = outreachEligibilityMigration.indexOf(
+    outreachEligibilityEndMarker,
+    outreachEligibilityStart
+  );
+  if (outreachEligibilityStart < 0 || outreachEligibilityEnd <= outreachEligibilityStart) {
+    throw new Error('Getrackte mailbox-outreachpredicate mist het verwachte bereik.');
+  }
+  const outreachEligibilityHelpersMigration = outreachEligibilityMigration.slice(
+    outreachEligibilityStart,
+    outreachEligibilityEnd
+  );
   const logicalTombstoneMarker =
     'create or replace function public.softora_normalize_mailbox_message_id(';
   const logicalTombstoneStart = contactSearchAndLogicalTombstonesMigration.indexOf(
@@ -369,6 +415,101 @@ if (!databaseUrl) {
     }
   }
 
+  async function seedContactRows(client, rows) {
+    await client.query(`
+      insert into public.softora_mailbox_messages (
+        message_key,account_email,folder,uid,provider_id,message_id,sender_name,
+        sender_email,recipients_text,subject,preview,body_text,date,internal_date,
+        unread,payload
+      )
+      select
+        incoming.message_key,incoming.account_email,incoming.folder,incoming.uid,
+        incoming.provider_id,incoming.message_id,'Contact',incoming.sender_email,
+        incoming.recipients_text,incoming.subject,incoming.subject,incoming.subject,
+        incoming.date,incoming.date,true,incoming.payload
+      from pg_catalog.jsonb_to_recordset($1::jsonb) as incoming(
+        message_key text,account_email text,folder text,uid bigint,provider_id text,
+        message_id text,sender_email text,recipients_text text,subject text,
+        date timestamptz,payload jsonb
+      )
+    `, [JSON.stringify(rows)]);
+  }
+
+  function contactRow({
+    prefix,
+    accountEmail,
+    contactEmail,
+    logicalNumber,
+    copyNumber = 1,
+    uidBase,
+    folder = 'inbox',
+    messageId = `<${prefix}-${logicalNumber}@contact.test>`,
+  }) {
+    const uid = uidBase + (logicalNumber * 10) + copyNumber;
+    return {
+      message_key: `${prefix}|${accountEmail}|${logicalNumber}|${copyNumber}`,
+      account_email: accountEmail,
+      folder,
+      uid,
+      provider_id: `${folder}:${uid}:${prefix}`,
+      message_id: messageId,
+      sender_email: contactEmail,
+      recipients_text: accountEmail,
+      subject: `${prefix} logisch bericht ${logicalNumber}`,
+      date: new Date(Date.UTC(2026, 7, 20, 8, logicalNumber, copyNumber)).toISOString(),
+      payload: { source: 'imap-sync' },
+    };
+  }
+
+  function setContactVisibility(client, {
+    ownerAccounts,
+    contactEmail,
+    anchor,
+    expectedMessageCount,
+    hidden,
+  }) {
+    return client.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        $1::text[],$2,$3,$4,$5,$6,$7,$8
+      )
+    `, [
+      ownerAccounts,
+      contactEmail,
+      anchor.account_email,
+      anchor.folder,
+      anchor.uid,
+      anchor.provider_id,
+      expectedMessageCount,
+      hidden,
+    ]);
+  }
+
+  async function contactVisibilityState(client, { ownerAccounts, contactEmail }) {
+    const messages = (await client.query(`
+      select message_key,account_email,message_id,deleted_at::text as deleted_at,
+        updated_at::text as updated_at
+      from public.softora_mailbox_messages m
+      where pg_catalog.lower(pg_catalog.btrim(m.account_email)) = any($1::text[])
+        and $2 = any(public.softora_mailbox_message_participants(
+          m.sender_email,m.recipients_text,m.payload
+        ))
+        and m.generation_superseded_at is null
+      order by message_key
+    `, [ownerAccounts, contactEmail])).rows;
+    const messageIds = Array.from(new Set(messages.map((row) =>
+      String(row.message_id || '').replace(/^<|>$/g, '').toLowerCase()
+    ))).filter(Boolean).sort();
+    const tombstones = (await client.query(`
+      select account_email,normalized_message_id,deleted_at::text as deleted_at,
+        updated_at::text as updated_at
+      from public.softora_mailbox_message_tombstones
+      where account_email = any($1::text[])
+        and normalized_message_id = any($2::text[])
+      order by account_email,normalized_message_id
+    `, [ownerAccounts, messageIds])).rows;
+    return { messages, tombstones };
+  }
+
   async function waitForBackendPgSleep(observer, backendPid, label) {
     const deadline = Date.now() + 1_000;
     while (Date.now() < deadline) {
@@ -403,6 +544,44 @@ if (!databaseUrl) {
     const visibilityAdvisory = visibilityDefinition.indexOf('pg_advisory_xact_lock');
     const logicalRowLock = visibilityDefinition.indexOf('for update', visibilityAdvisory);
     assert.ok(visibilityAdvisory >= 0 && logicalRowLock > visibilityAdvisory);
+
+    const contactVisibilityDefinition = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_set_mailbox_contact_visibility(text[],text,text,text,bigint,text,integer,boolean)'::regprocedure
+      ) as definition
+    `)).rows[0].definition.toLowerCase();
+    const globalConsistencyLock = contactVisibilityDefinition.indexOf(
+      'from public.softora_mailbox_campaign_consistency'
+    );
+    const globalForUpdate = contactVisibilityDefinition.indexOf(
+      'for update',
+      globalConsistencyLock
+    );
+    const sortedLogicalPairs = contactVisibilityDefinition.indexOf(
+      'order by owner_account, normalized_message_id'
+    );
+    const contactAdvisory = contactVisibilityDefinition.indexOf(
+      'pg_advisory_xact_lock',
+      sortedLogicalPairs
+    );
+    const concreteRows = contactVisibilityDefinition.indexOf(
+      'order by m.message_key',
+      contactAdvisory
+    );
+    const concreteForUpdate = contactVisibilityDefinition.indexOf(
+      'for update',
+      concreteRows
+    );
+    const outreachCheck = contactVisibilityDefinition.indexOf(
+      'softora_mailbox_is_outreach_contact'
+    );
+    const tombstoneWrite = contactVisibilityDefinition.indexOf(
+      'insert into public.softora_mailbox_message_tombstones'
+    );
+    assert.ok(globalConsistencyLock >= 0 && globalForUpdate > globalConsistencyLock);
+    assert.ok(sortedLogicalPairs > globalForUpdate && contactAdvisory > sortedLogicalPairs);
+    assert.ok(concreteRows > contactAdvisory && concreteForUpdate > concreteRows);
+    assert.ok(outreachCheck > concreteForUpdate && tombstoneWrite > outreachCheck);
   }
 
   async function installTombstonePauseTrigger(client) {
@@ -467,6 +646,15 @@ if (!databaseUrl) {
         last_error text,
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
+      );
+      create table public.softora_outbound_recipient_guards (
+        key_type text not null,
+        key_value text not null,
+        recipient_email text,
+        sender_email text not null,
+        channel text not null,
+        provider text not null,
+        permanent boolean not null default true
       );
       create or replace function public.softora_normalize_mailbox_message_id(p_value text)
       returns text
@@ -543,7 +731,8 @@ if (!databaseUrl) {
     applyTrackedSql(
       `${bootstrapSql}\n${foundation}\n${forwardMigration}\n${globalLockMigration}\n${globalLockProbe}` +
       `\n${sendProvenanceFoundation}\n${legacySendSeedSql}\n${providerOutcomeMigration}` +
-      `\n${logicalTombstoneMigration}`
+      `\n${participantHelpersMigration}\n${logicalTombstoneMigration}` +
+      `\n${outreachEligibilityHelpersMigration}\n${contactAtomicVisibilityMigration}`
     );
   });
 
@@ -692,6 +881,424 @@ if (!databaseUrl) {
       )
     `);
     assert.equal(staleTarget.rowCount, 0);
+  });
+
+  test('Grow-analogie verbergt 10 logische en 14 fysieke Serve-kopieën volledig, duurzaam en retry-idempotent', async () => {
+    const client = await connect();
+    const ownerAccounts = ['servec321@gmail.com', 'serve@softora.nl'];
+    const contactEmail = 'serve@growsocialmedia.nl';
+    const rows = [];
+    for (let logicalNumber = 1; logicalNumber <= 10; logicalNumber += 1) {
+      rows.push(contactRow({
+        prefix: 'grow-analogy',
+        accountEmail: ownerAccounts[0],
+        contactEmail,
+        logicalNumber,
+        uidBase: 1_000_000,
+        folder: logicalNumber === 1 ? 'coldmail' : (logicalNumber % 2 ? 'inbox' : 'sent'),
+      }));
+    }
+    for (let logicalNumber = 1; logicalNumber <= 4; logicalNumber += 1) {
+      rows.push(contactRow({
+        prefix: 'grow-analogy',
+        accountEmail: ownerAccounts[1],
+        contactEmail,
+        logicalNumber,
+        copyNumber: 2,
+        uidBase: 1_100_000,
+        folder: logicalNumber % 2 ? 'inbox' : 'sent',
+      }));
+    }
+    const martijnCopy = contactRow({
+      prefix: 'grow-analogy',
+      accountEmail: 'martijn@softora.nl',
+      contactEmail,
+      logicalNumber: 1,
+      copyNumber: 3,
+      uidBase: 1_200_000,
+      folder: 'inbox',
+    });
+    await seedContactRows(client, [...rows, martijnCopy]);
+    const anchor = rows[0];
+
+    const hidden = await setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail,
+      anchor,
+      expectedMessageCount: 10,
+      hidden: true,
+    });
+    assert.equal(hidden.rowCount, 14);
+    const hiddenState = await contactVisibilityState(client, { ownerAccounts, contactEmail });
+    assert.equal(hiddenState.messages.length, 14);
+    assert.ok(hiddenState.messages.every((row) => row.deleted_at));
+    assert.equal(hiddenState.tombstones.length, 20);
+    assert.equal((await client.query(`
+      select deleted_at is null as visible
+      from public.softora_mailbox_messages where message_key=$1
+    `, [martijnCopy.message_key])).rows[0].visible, true);
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email='martijn@softora.nl'
+        and normalized_message_id like 'grow-analogy-%@contact.test'
+    `)).rows[0].count, 0);
+
+    const hideReplay = await setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail,
+      anchor,
+      expectedMessageCount: 10,
+      hidden: true,
+    });
+    assert.equal(hideReplay.rowCount, 14);
+    assert.deepEqual(
+      await contactVisibilityState(client, { ownerAccounts, contactEmail }),
+      hiddenState,
+      'ambiguous timeout-retry mag hidden/tombstone timestamps niet herschrijven'
+    );
+
+    const laterCopy = contactRow({
+      prefix: 'grow-analogy',
+      accountEmail: ownerAccounts[1],
+      contactEmail,
+      logicalNumber: 10,
+      copyNumber: 2,
+      uidBase: 1_100_000,
+      folder: 'inbox',
+    });
+    await seedContactRows(client, [laterCopy]);
+    const inherited = (await client.query(`
+      select deleted_at::text as deleted_at
+      from public.softora_mailbox_messages where message_key=$1
+    `, [laterCopy.message_key])).rows[0];
+    assert.ok(inherited.deleted_at, 'latere kopie op tweede Serve-account erft tombstone');
+
+    const restored = await setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail,
+      anchor,
+      expectedMessageCount: 0,
+      hidden: false,
+    });
+    assert.equal(restored.rowCount, 15);
+    const restoredState = await contactVisibilityState(client, { ownerAccounts, contactEmail });
+    assert.equal(restoredState.messages.length, 15);
+    assert.ok(restoredState.messages.every((row) => row.deleted_at === null));
+    assert.equal(restoredState.tombstones.length, 0);
+
+    const restoreReplay = await setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail,
+      anchor,
+      expectedMessageCount: 0,
+      hidden: false,
+    });
+    assert.equal(restoreReplay.rowCount, 15);
+    assert.deepEqual(
+      await contactVisibilityState(client, { ownerAccounts, contactEmail }),
+      restoredState,
+      'ambiguous restore-retry mag zichtbare rows niet opnieuw muteren'
+    );
+  });
+
+  test('contact-RPC vult legacy partial hide aan en normaliseert partial restore zonder andere eigenaar', async () => {
+    const client = await connect();
+    const ownerAccounts = ['serve@softora.nl', 'servec321@gmail.com'];
+    const hideContact = 'partial-hide@example.org';
+    const hideRows = [1, 2, 3].map((logicalNumber) => contactRow({
+      prefix: 'partial-hide',
+      accountEmail: ownerAccounts[0],
+      contactEmail: hideContact,
+      logicalNumber,
+      uidBase: 1_300_000,
+      folder: logicalNumber === 1 ? 'coldmail' : 'inbox',
+    }));
+    await seedContactRows(client, hideRows);
+    await client.query(`
+      update public.softora_mailbox_messages
+      set deleted_at=clock_timestamp(),updated_at=clock_timestamp()
+      where message_key=$1
+    `, [hideRows[2].message_key]);
+    const partialBefore = await contactVisibilityState(client, {
+      ownerAccounts,
+      contactEmail: hideContact,
+    });
+    assert.equal(partialBefore.messages.filter((row) => row.deleted_at).length, 1);
+    assert.equal(partialBefore.tombstones.length, 1);
+
+    const completedHide = await setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail: hideContact,
+      anchor: hideRows[0],
+      expectedMessageCount: 2,
+      hidden: true,
+    });
+    assert.equal(completedHide.rowCount, 3);
+    const completedState = await contactVisibilityState(client, {
+      ownerAccounts,
+      contactEmail: hideContact,
+    });
+    assert.ok(completedState.messages.every((row) => row.deleted_at));
+    assert.equal(completedState.tombstones.length, 6);
+
+    const restoreContact = 'partial-restore@example.org';
+    const restoreRows = [1, 2, 3].map((logicalNumber) => contactRow({
+      prefix: 'partial-restore',
+      accountEmail: ownerAccounts[0],
+      contactEmail: restoreContact,
+      logicalNumber,
+      uidBase: 1_400_000,
+      folder: logicalNumber === 1 ? 'coldmail' : 'inbox',
+    }));
+    await seedContactRows(client, restoreRows);
+    await client.query(`
+      update public.softora_mailbox_messages
+      set deleted_at=clock_timestamp(),updated_at=clock_timestamp()
+      where message_key=$1
+    `, [restoreRows[1].message_key]);
+    const repairedRestore = await setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail: restoreContact,
+      anchor: restoreRows[0],
+      expectedMessageCount: 0,
+      hidden: false,
+    });
+    assert.equal(repairedRestore.rowCount, 3);
+    const repairedState = await contactVisibilityState(client, {
+      ownerAccounts,
+      contactEmail: restoreContact,
+    });
+    assert.ok(repairedState.messages.every((row) => row.deleted_at === null));
+    assert.equal(repairedState.tombstones.length, 0);
+  });
+
+  test('contact-RPC weigert count-drift, 101 logische berichten en ontbrekende RFC-ID vóór writes', async () => {
+    const client = await connect();
+    const ownerAccounts = ['serve@softora.nl', 'servec321@gmail.com'];
+    const mismatchContact = 'count-mismatch@example.org';
+    const mismatchRows = [1, 2].map((logicalNumber) => contactRow({
+      prefix: 'count-mismatch',
+      accountEmail: ownerAccounts[0],
+      contactEmail: mismatchContact,
+      logicalNumber,
+      uidBase: 1_500_000,
+      folder: logicalNumber === 1 ? 'coldmail' : 'inbox',
+    }));
+    await seedContactRows(client, mismatchRows);
+    await assert.rejects(setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail: mismatchContact,
+      anchor: mismatchRows[0],
+      expectedMessageCount: 1,
+      hidden: true,
+    }), (error) => error.code === '22023');
+
+    const capContact = 'over-cap@example.org';
+    const capRows = Array.from({ length: 101 }, (_, index) => contactRow({
+      prefix: 'over-cap',
+      accountEmail: ownerAccounts[0],
+      contactEmail: capContact,
+      logicalNumber: index + 1,
+      uidBase: 1_600_000,
+      folder: index === 0 ? 'coldmail' : 'inbox',
+    }));
+    await seedContactRows(client, capRows);
+    await assert.rejects(setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail: capContact,
+      anchor: capRows[0],
+      expectedMessageCount: 100,
+      hidden: true,
+    }), (error) => error.code === '22023');
+
+    const noRfcContact = 'no-rfc@example.org';
+    const noRfcRow = contactRow({
+      prefix: 'no-rfc',
+      accountEmail: ownerAccounts[0],
+      contactEmail: noRfcContact,
+      logicalNumber: 1,
+      uidBase: 1_700_000,
+      folder: 'coldmail',
+      messageId: '',
+    });
+    await seedContactRows(client, [noRfcRow]);
+    await assert.rejects(setContactVisibility(client, {
+      ownerAccounts,
+      contactEmail: noRfcContact,
+      anchor: noRfcRow,
+      expectedMessageCount: 1,
+      hidden: true,
+    }), (error) => error.code === '22023');
+
+    for (const [contactEmail, expectedRows] of [
+      [mismatchContact, 2],
+      [capContact, 101],
+      [noRfcContact, 1],
+    ]) {
+      const state = await contactVisibilityState(client, { ownerAccounts, contactEmail });
+      assert.equal(state.messages.length, expectedRows);
+      assert.ok(state.messages.every((row) => row.deleted_at === null));
+      assert.equal(state.tombstones.length, 0);
+    }
+  });
+
+  test('contact-RPC weigert verkeerde anchor, eigenaar en contact zonder enige mutatie', async () => {
+    const client = await connect();
+    const ownerAccounts = ['serve@softora.nl', 'servec321@gmail.com'];
+    const contactEmail = 'anchor-scope@example.org';
+    const anchor = contactRow({
+      prefix: 'anchor-scope',
+      accountEmail: ownerAccounts[0],
+      contactEmail,
+      logicalNumber: 1,
+      uidBase: 1_800_000,
+      folder: 'coldmail',
+    });
+    await seedContactRows(client, [anchor]);
+    const attempts = [
+      { ownerAccounts, contactEmail, anchor: { ...anchor, provider_id: 'wrong-provider' } },
+      { ownerAccounts: ['martijn@softora.nl'], contactEmail, anchor },
+      { ownerAccounts, contactEmail: 'other-contact@example.org', anchor },
+      { ownerAccounts, contactEmail, anchor: { ...anchor, uid: anchor.uid + 1 } },
+    ];
+    for (const attempt of attempts) {
+      await assert.rejects(setContactVisibility(client, {
+        ...attempt,
+        expectedMessageCount: 1,
+        hidden: true,
+      }), (error) => error.code === '22023');
+    }
+    const state = await contactVisibilityState(client, { ownerAccounts, contactEmail });
+    assert.equal(state.messages.length, 1);
+    assert.equal(state.messages[0].deleted_at, null);
+    assert.equal(state.tombstones.length, 0);
+  });
+
+  test('contact-hide rolt cartesiaanse tombstones terug als message-update halverwege faalt', async () => {
+    const client = await connect();
+    const ownerAccounts = ['serve@softora.nl', 'servec321@gmail.com'];
+    const contactEmail = 'rollback-after-tombstones@example.org';
+    const anchor = {
+      ...contactRow({
+        prefix: 'rollback-after-tombstones',
+        accountEmail: ownerAccounts[0],
+        contactEmail,
+        logicalNumber: 1,
+        uidBase: 1_850_000,
+        folder: 'coldmail',
+      }),
+      payload: { source: 'imap-sync', contactVisibilityRollbackProbe: '1' },
+    };
+    await seedContactRows(client, [anchor]);
+    await client.query(`
+      create or replace function public.softora_test_reject_contact_visibility_update()
+      returns trigger
+      language plpgsql
+      set search_path = ''
+      as $function$
+      begin
+        if new.payload->>'contactVisibilityRollbackProbe' = '1'
+          and old.deleted_at is null
+          and new.deleted_at is not null then
+          raise exception 'gecontroleerde message-updatefout na tombstonewrites';
+        end if;
+        return new;
+      end;
+      $function$;
+      drop trigger if exists zzz_softora_test_reject_contact_visibility_update
+        on public.softora_mailbox_messages;
+      create trigger zzz_softora_test_reject_contact_visibility_update
+      before update of deleted_at
+      on public.softora_mailbox_messages
+      for each row execute function public.softora_test_reject_contact_visibility_update();
+    `);
+    try {
+      await assert.rejects(setContactVisibility(client, {
+        ownerAccounts,
+        contactEmail,
+        anchor,
+        expectedMessageCount: 1,
+        hidden: true,
+      }), (error) => error.code === 'P0001');
+      const state = await contactVisibilityState(client, { ownerAccounts, contactEmail });
+      assert.equal(state.messages.length, 1);
+      assert.equal(state.messages[0].deleted_at, null);
+      assert.equal(state.tombstones.length, 0);
+    } finally {
+      await client.query(`
+        drop trigger if exists zzz_softora_test_reject_contact_visibility_update
+          on public.softora_mailbox_messages;
+        drop function if exists public.softora_test_reject_contact_visibility_update();
+      `);
+    }
+  });
+
+  test('contact-hide versus nieuwe cross-account synckopie eindigt zonder deadlock volledig hidden', { timeout: 10_000 }, async () => {
+    const setup = await connect();
+    const sync = await connect();
+    const visibility = await connect();
+    const ownerAccounts = ['serve@softora.nl', 'servec321@gmail.com'];
+    const contactEmail = 'contact-race@example.org';
+    const rows = [1, 2].map((logicalNumber) => contactRow({
+      prefix: 'contact-race',
+      accountEmail: ownerAccounts[0],
+      contactEmail,
+      logicalNumber,
+      uidBase: 1_900_000,
+      folder: logicalNumber === 1 ? 'coldmail' : 'inbox',
+    }));
+    await seedContactRows(setup, rows);
+    await installTombstonePauseTrigger(setup);
+    const newCopy = {
+      ...contactRow({
+        prefix: 'contact-race',
+        accountEmail: ownerAccounts[1],
+        contactEmail,
+        logicalNumber: 1,
+        copyNumber: 2,
+        uidBase: 2_000_000,
+        folder: 'inbox',
+      }),
+      payload: { source: 'imap-sync', lockOrderProbe: 'pause-before-tombstone' },
+    };
+    const backendPid = (await sync.query(
+      'select pg_catalog.pg_backend_pid()::integer as pid'
+    )).rows[0].pid;
+    let syncTransactionOpen = false;
+    let insertPromise = null;
+    let hidePromise = null;
+    try {
+      await sync.query('begin');
+      syncTransactionOpen = true;
+      insertPromise = seedContactRows(sync, [newCopy]);
+      void insertPromise.catch(() => null);
+      await waitForBackendPgSleep(visibility, backendPid, 'contact-sync vóór hide');
+      hidePromise = setContactVisibility(visibility, {
+        ownerAccounts,
+        contactEmail,
+        anchor: rows[0],
+        expectedMessageCount: 2,
+        hidden: true,
+      });
+      void hidePromise.catch(() => null);
+      await assertBlocked(hidePromise, 'contact-hide achter sync-global lock');
+      await insertPromise;
+      insertPromise = null;
+      await sync.query('commit');
+      syncTransactionOpen = false;
+      const hidden = await hidePromise;
+      hidePromise = null;
+      assert.equal(hidden.rowCount, 3);
+      const state = await contactVisibilityState(visibility, { ownerAccounts, contactEmail });
+      assert.equal(state.messages.length, 3);
+      assert.ok(state.messages.every((row) => row.deleted_at));
+      assert.equal(state.tombstones.length, 4);
+    } finally {
+      if (syncTransactionOpen) await sync.query('rollback').catch(() => null);
+      if (insertPromise) await insertPromise.catch(() => null);
+      if (hidePromise) await hidePromise.catch(() => null);
+    }
   });
 
   test('nieuwe-copy INSERT versus hide en restore vermijdt de global/logical-deadlock', async (t) => {
@@ -1424,11 +2031,12 @@ if (!databaseUrl) {
         and p.proname = any(array[
           'softora_normalize_mailbox_message_id',
           'softora_inherit_mailbox_message_tombstone',
-          'softora_set_mailbox_message_visibility'
+          'softora_set_mailbox_message_visibility',
+          'softora_set_mailbox_contact_visibility'
         ]::text[])
       order by p.proname
     `)).rows;
-    assert.equal(logicalFunctions.length, 3);
+    assert.equal(logicalFunctions.length, 4);
     for (const functionAcl of logicalFunctions) {
       assert.equal(functionAcl.security_definer, false, functionAcl.proname);
       assert.equal(functionAcl.empty_search_path, true, functionAcl.proname);

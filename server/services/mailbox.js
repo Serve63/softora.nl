@@ -2103,8 +2103,7 @@ function createMailboxService(deps = {}) {
     getAccount,
     ...getInstantlyVisibilityDeps(instantlyMailboxService),
     parseMessageReference,
-    canUseMailboxIndex,
-    mailboxIndexStore,
+    canUseMailboxIndex, mailboxIndexStore, mailboxOutreachScope,
     getUiStateValues, setUiStateValues,
     logger,
   });
@@ -2350,8 +2349,8 @@ function createMailboxService(deps = {}) {
         accountEmail: body.account, owner: body.owner,
         id: body.id || body.messageId,
         folder: body.folder,
-        uid: body.uid,
-        messages: body.messages,
+        uid: body.uid, messages: body.messages, visibilityProtocol: body.visibilityProtocol, visibilityScope: body.visibilityScope,
+        contactEmail: body.contactEmail, expectedMessageCount: body.expectedMessageCount,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
@@ -2371,8 +2370,8 @@ function createMailboxService(deps = {}) {
         accountEmail: body.account, owner: body.owner,
         id: body.id || body.messageId,
         folder: body.folder,
-        uid: body.uid,
-        messages: body.messages,
+        uid: body.uid, messages: body.messages, visibilityProtocol: body.visibilityProtocol, visibilityScope: body.visibilityScope,
+        contactEmail: body.contactEmail, expectedMessageCount: body.expectedMessageCount,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
