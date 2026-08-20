@@ -40,6 +40,7 @@
         options.getProvenOutboundThreadMessages(mail, value),
         {
           directParentMessageIds: options.getDirectParentMessageIds(messageContext),
+          directParentScopeProven: true,
           incomingAt: incomingTimestamp ? new Date(incomingTimestamp).toISOString() : '',
           stripReferenceAppendixWhenSingleMatch: true,
         }
@@ -53,7 +54,7 @@
       return getProvenQuotedOutboundResult(value, mail, messageContext).body;
     }
 
-    function getSourceSafeMessagePresentation(message, mail, bodyOverride) {
+    function getSourceSafeMessagePresentation(message, mail, bodyOverride, presentationOptions = {}) {
       const body = typeof bodyOverride === 'string'
         ? bodyOverride
         : String(message && message.body || '');
@@ -64,7 +65,14 @@
       ) {
         return { body: getSentAuthoredBody(body), contact: emptyContact(), signatureMatched: false };
       }
-      const sourceSafeBody = getProvenQuotedOutboundResult(body, mail, message).body;
+      const provenBody = getProvenQuotedOutboundResult(body, mail, message).body;
+      const parsedDisplayBody = presentationOptions.stripDetectedQuotes === true &&
+        typeof options.splitQuotedReply === 'function'
+        ? options.splitQuotedReply(provenBody)
+        : null;
+      const sourceSafeBody = parsedDisplayBody && typeof parsedDisplayBody.authored === 'string'
+        ? parsedDisplayBody.authored
+        : provenBody;
       if (!message || typeof message !== 'object' || Array.isArray(message)) {
         return { body: sourceSafeBody, contact: emptyContact(), signatureMatched: false };
       }
@@ -84,7 +92,11 @@
     }
 
     function getThreadPresentation(message, mail, state = {}) {
-      const presentation = state.loading ? emptyPresentation() : getSourceSafeMessagePresentation(message, mail);
+      const presentation = state.loading
+        ? emptyPresentation()
+        : getSourceSafeMessagePresentation(message, mail, undefined, {
+            stripDetectedQuotes: !state.sent,
+          });
       const contactHtml = !state.sent && !state.loading && !state.loadError
         ? signature?.renderContactCard?.(presentation.contact, state.escapeHtml) || ''
         : '';

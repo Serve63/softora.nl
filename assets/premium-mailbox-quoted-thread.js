@@ -3,12 +3,36 @@
 
   const IGNORABLE_MATCH_LINE_PATTERNS = [
     /^\[image:\s*[^\]]+\]\s*$/i,
+    /^[-_=]{2,}\s*$/,
     /^hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.?\s*$/i,
     /^geen webdesign willen ontvangen\?\s*laat het me weten!.*$/i,
   ];
 
+  const COLLAPSED_FORWARD_SEPARATOR_PATTERN = /(?:-{2,}|_{2,})[ \t]*(?:original message|oorspronkelijk(?:e)? bericht|forwarded message|doorgestuurd bericht)[ \t]*(?:-{2,}|_{2,})/gi;
+
+  function hasCollapsedForwardHeaderEvidence(value) {
+    const headerWindow = String(value || '').slice(0, 1600);
+    if (!/^[ \t]*(?:van|from|afzender|sender):\s*\S/i.test(headerWindow)) return false;
+    const supportingFields = [
+      /(?:^|\s)(?:verzonden|verstuurd|sent|datum|date):\s*\S/i,
+      /(?:^|\s)(?:aan|to|ontvanger|recipient):\s*\S/i,
+      /(?:^|\s)(?:onderwerp|subject):\s*\S/i,
+    ];
+    return supportingFields.filter((pattern) => pattern.test(headerWindow)).length >= 2;
+  }
+
   function normalizeLines(value) {
-    return String(value || '').replace(/\r\n?/g, '\n').split('\n');
+    const normalized = String(value || '').replace(/\r\n?/g, '\n');
+    return normalized.replace(
+      COLLAPSED_FORWARD_SEPARATOR_PATTERN,
+      (separator, offset, source) => {
+        const suffix = source.slice(offset + separator.length);
+        if (!hasCollapsedForwardHeaderEvidence(suffix)) return separator;
+        const before = source[offset - 1] || '';
+        const after = source[offset + separator.length] || '';
+        return `${before && before !== '\n' ? '\n' : ''}${separator.trim()}${after && after !== '\n' ? '\n' : ''}`;
+      }
+    ).split('\n');
   }
 
   function cleanHeaderLine(value) {
@@ -277,12 +301,22 @@
   function splitQuotedThread(value) {
     const parsed = findQuotedSegments(value);
     const first = parsed.segments[0] || null;
+    const lastSegmentEnd = parsed.segments.length
+      ? Math.max(...parsed.segments.map((segment) => segment.end))
+      : 0;
+    const referenceAppendix = parsed.segments.length
+      ? findTrailingReferenceAppendix(parsed.lines, lastSegmentEnd, parsed.segments)
+      : null;
+    const removed = referenceAppendix
+      ? [...parsed.segments, { ...referenceAppendix, marker: 'reference-appendix' }]
+      : parsed.segments;
     return {
       ...parsed,
-      authored: removeSegments(value, parsed.segments),
+      authored: removeSegments(value, removed),
       authoredPrefix: first ? parsed.lines.slice(0, first.start).join('\n').trim() : String(value || '').trim(),
       quoted: first ? parsed.lines.slice(first.start, first.end).join('\n').trim() : '',
       quotePayload: first ? first.quotePayload : '',
+      removedReferenceAppendix: Boolean(referenceAppendix),
     };
   }
 
@@ -408,9 +442,11 @@
     const maxClockSkewMs = Math.max(0, Number(options.maxClockSkewMs) || 5 * 60 * 1000);
     const matches = (Array.isArray(outboundMessages) ? outboundMessages : [])
       .filter((message) => {
+        const exactDirectParent = directParentMessageIds.has(
+          normalizeMessageId(message && message.messageId)
+        );
         if (Number.isFinite(incomingTimestamp)) {
           const candidateTimestamp = getMessageTimestamp(message);
-          const exactDirectParent = directParentMessageIds.has(normalizeMessageId(message && message.messageId));
           if (!candidateTimestamp && !exactDirectParent) return false;
           if (candidateTimestamp && candidateTimestamp > incomingTimestamp + maxClockSkewMs) return false;
         }
@@ -419,10 +455,21 @@
           message && (message.body || message.text || '')
         ));
         if (!bodyText) return false;
-        if (quotedText === bodyText) return bodyText.length >= 8;
+        const exactScopedDirectParent = options.directParentScopeProven === true &&
+          exactDirectParent;
+        if (quotedText === bodyText) return bodyText.length >= 8 || exactScopedDirectParent;
+        const containsScopedDirectParentText = (candidateText) => Boolean(
+          candidateText && (
+            candidateText.length >= 8
+              ? quotedText.includes(candidateText)
+              : quotedText === candidateText || quotedText.startsWith(`${candidateText} `)
+          )
+        );
         return (
           (bodyText.length >= 80 && quotedText.includes(bodyText)) ||
-          (authoredText.length >= 80 && quotedText.includes(authoredText))
+          (authoredText.length >= 80 && quotedText.includes(authoredText)) ||
+          (exactScopedDirectParent && containsScopedDirectParentText(bodyText)) ||
+          (exactScopedDirectParent && containsScopedDirectParentText(authoredText))
         );
       });
     const unique = new Map();
