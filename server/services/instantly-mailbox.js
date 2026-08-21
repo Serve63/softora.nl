@@ -905,6 +905,7 @@ function createInstantlyMailboxService(deps = {}) {
       accountEmails: accounts.map((account) => account.email),
       limit: Math.max(100, Math.min(500, Number(limit) * 5 || 500)),
       includeBody: true,
+      priorityRead: true,
     });
     if (!Array.isArray(rows)) {
       throw createInstantlyMailboxError(

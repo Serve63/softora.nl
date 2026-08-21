@@ -1873,6 +1873,8 @@ test('campaign reply service koppelt Brigit, Karlien en Marjolein via exacte oud
   const replies = await service.listReplies({ limit: 100 });
 
   assert.equal(targetedLookups.length, 1);
+  assert.equal(targetedLookups[0].folder, 'sent');
+  assert.equal(targetedLookups[0].priorityRead, true);
   fixtures.forEach((fixture) => {
     assert.ok(targetedLookups[0].messageIds.includes(fixture.parentMessageId));
     const conversation = replies.find((message) => message.id === fixture.id);

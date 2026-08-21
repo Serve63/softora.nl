@@ -1327,6 +1327,12 @@ test('sync rehydrates a visible older thread only when its exact provider HTML i
 
 test('owner conversation listing never leaks the other owner and preserves exact thread chronology', async () => {
   const { service, store } = buildService();
+  const providerReadOptions = [];
+  const listProviderMessages = store.listProviderMessages;
+  store.listProviderMessages = async (options) => {
+    providerReadOptions.push(options);
+    return listProviderMessages(options);
+  };
   const serveIncoming = service.normalizeInstantlyMessage(incoming());
   const serveSent = service.normalizeInstantlyMessage(incoming({
     id: 'serve-sent',
@@ -1356,6 +1362,13 @@ test('owner conversation listing never leaks the other owner and preserves exact
     ['serve-sent']
   );
   assert.equal(JSON.stringify(conversations).includes('martijn-incoming'), false);
+  assert.deepEqual(providerReadOptions, [{
+    provider: 'instantly',
+    accountEmails: ['serve-sender@example.com'],
+    limit: 500,
+    includeBody: true,
+    priorityRead: true,
+  }]);
 });
 
 test('Instantly conversation listing hides automatic ticket receipts but preserves later human replies', async () => {
