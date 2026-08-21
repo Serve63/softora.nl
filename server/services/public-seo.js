@@ -107,6 +107,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/blog/crm-systeem-op-maat-spreadsheets-vervangen',
       '/kennisbank/wat-is-een-sales-pipeline-crm',
       '/kennisbank/wat-is-crm-datakwaliteit',
+      '/kennisbank/wat-is-een-klantportaal',
       '/vergelijkingen/crm-op-maat-vs-standaard-crm',
       '/blog/ai-automatisering-mkb-waar-beginnen',
     ],

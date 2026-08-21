@@ -149,6 +149,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/kennisbank/wat-is-een-klantportaal',
+        '2026-08-21',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });

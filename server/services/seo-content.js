@@ -1721,55 +1721,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-een-klantportaal',
-    title: 'Wat is een klantportaal?',
-    description:
-      'Heldere uitleg van klantportalen: wanneer een portal handig is, welke functies vaak nodig zijn en hoe het samenhangt met CRM.',
-    category: 'Bedrijfssoftware',
-    intent: 'Uitleg',
-    publishedAt: '2026-06-19',
-    updatedAt: '2026-06-19',
-    image: Object.freeze({
-      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
-      alt: 'Dashboard op laptop voor klantportaal, CRM-informatie, taken en overzichtelijke digitale klantprocessen.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Een klantportaal is een beveiligde digitale omgeving waar klanten informatie, documenten, status of acties kunnen terugvinden.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'De simpele definitie',
-        paragraphs: Object.freeze([
-          'Een klantportaal is een online omgeving waar klanten kunnen inloggen om informatie te bekijken of acties uit te voeren. Denk aan documenten, opdrachten, afspraken, berichten, statusupdates, formulieren of factuurinformatie.',
-          'Voor bedrijven is een portaal vooral interessant wanneer veel klantvragen gaan over dezelfde informatie. In plaats van steeds losse mails te sturen, staat de belangrijkste informatie op een vaste plek.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Welke functies vaak nodig zijn',
-        paragraphs: Object.freeze([
-          'De inhoud hangt af van het proces. Een eenvoudig portaal kan starten met status, documenten en berichten. Een uitgebreider portaal kan ook formulieren, goedkeuringen, taken, rapportages of koppelingen met CRM bevatten.',
-          'Belangrijk is dat het portaal niet los staat van de interne workflow. Als medewerkers informatie dubbel moeten invoeren, verschuift het probleem alleen naar een ander scherm.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Wanneer maatwerk logisch wordt',
-        paragraphs: Object.freeze([
-          'Maatwerk wordt logisch wanneer standaard klantportalen niet passen bij je proces, rollen of data. Bijvoorbeeld omdat klanten verschillende rechten hebben, statussen specifiek zijn of het portaal moet koppelen met CRM, planning of offertes.',
-          'Een goed klantportaal begint klein: welke informatie wil de klant terugzien, welke actie moet minder handmatig worden en welke gegevens moeten intern betrouwbaar blijven?',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/kennisbank/wat-is-bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'CRM op maat vs standaard CRM', href: '/vergelijkingen/crm-op-maat-vs-standaard-crm' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'regio',
     slug: 'tilburg-ai-automatisering',
     title: 'AI automatisering Tilburg voor MKB-processen',
