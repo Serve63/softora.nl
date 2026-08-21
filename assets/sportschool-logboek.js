@@ -633,35 +633,40 @@
     const slots = document.createElement('div');
     slots.className = 'form-history-slots';
     normalizeFormHistory(exercise.formHistory).forEach((status, index) => {
-      const slot = document.createElement('label');
+      const slot = document.createElement('div');
       slot.className = 'form-status';
 
-      const select = document.createElement('select');
-      select.className = 'form-status-select';
-      select.value = status;
-      select.dataset.status = status;
-      select.dataset.formSlot = String(index);
-      select.setAttribute('aria-label', `${exercise.title} vormmoment ${index + 1}`);
-      select.title = 'Kies: sterker, zwakker of gelijk';
-      [
-        ['', '·'],
-        ['up', '↑'],
-        ['down', '↓'],
-        ['same', '—'],
-      ].forEach(([value, label]) => {
-        const option = document.createElement('option');
-        option.value = value;
-        option.textContent = label;
-        select.append(option);
-      });
-      select.value = status;
-      select.addEventListener('change', () => {
-        const nextStatus = select.value;
-        select.dataset.status = nextStatus;
-        setFormHistory(day, exercise.order, Number(select.dataset.formSlot), nextStatus);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'form-status-button';
+      button.dataset.status = status;
+      button.dataset.formSlot = String(index);
+      button.title = 'Tik: rood omlaag, geel gelijk, groen omhoog';
+
+      const renderStatusButton = () => {
+        const currentStatus = button.dataset.status || '';
+        const statusPresentation = {
+          '': ['·', 'niet ingevuld'],
+          down: ['↓', 'zwakker'],
+          same: ['—', 'gelijk'],
+          up: ['↑', 'sterker'],
+        }[currentStatus] || ['·', 'niet ingevuld'];
+        button.textContent = statusPresentation[0];
+        button.setAttribute(
+          'aria-label',
+          `${exercise.title} vormmoment ${index + 1}: ${statusPresentation[1]}`
+        );
+      };
+
+      renderStatusButton();
+      button.addEventListener('click', () => {
+        const nextStatus = logbookStateApi.nextFormStatus(button.dataset.status);
+        button.dataset.status = nextStatus;
+        renderStatusButton();
+        setFormHistory(day, exercise.order, Number(button.dataset.formSlot), nextStatus);
       });
 
-      slot.append(select);
+      slot.append(button);
       slots.append(slot);
     });
 
