@@ -250,7 +250,16 @@
       options.select?.(mail.id);
       options.onSelect?.(mail, openOptions);
       options.renderList?.({ openLatest: false });
-      const pendingMarker = setPending(mail.id);
+      const detail = getDetail();
+      const preserveVisibleDetail = Boolean(
+        openOptions.preserveVisibleDetail === true &&
+        String(committedId || '') === String(mail.id || '') &&
+        String(detail?.dataset?.mailboxCommittedId || '') === String(mail.id || '')
+      );
+      const keepDetailVisible = Boolean(
+        preserveVisibleDetail && !detail?.classList?.contains?.('is-detail-pending')
+      );
+      const pendingMarker = keepDetailVisible ? '' : setPending(mail.id);
       const isSelectionCurrent = () => Boolean(
         options.isTokenCurrent?.(token) !== false &&
         String(options.getActiveMail?.() || '') === String(mail.id || '') &&
@@ -275,7 +284,9 @@
           return commit(currentMail);
         },
         onError: options.onError,
-      }).finally(() => clearPending(pendingMarker));
+      }).finally(() => {
+        if (pendingMarker) clearPending(pendingMarker);
+      });
     }
 
     function invalidate() {

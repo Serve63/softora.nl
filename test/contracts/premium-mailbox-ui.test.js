@@ -183,7 +183,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
   assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260821a/);
-  assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260817d/);
+  assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260820b/);
@@ -191,13 +191,13 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260818b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
-  assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260821a/);
+  assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260821b/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260820c') < page.indexOf('premium-mailbox-signature.js?v=20260821a'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260821a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260820b'));
-  assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260821a'));
-  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260821a') < page.indexOf('premium-mailbox-index.js?v=20260821a'));
+  assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260821b'));
+  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260821b') < page.indexOf('premium-mailbox-index.js?v=20260821a'));
   assert.match(readSignatureScript(), /renderContactCard/);
   assert.match(readMessagePresentationScript(), /getSourceSafeMessagePresentation/);
   assert.match(readDetailStabilityScript(), /function create\(\)/);
@@ -3793,7 +3793,8 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /activeFolder === 'outreach'[\s\S]*skipProviderRefresh: true/);
   assert.match(scriptSource, /mailboxRefreshController\?\.scopeChanged\?\.\(\)/);
   assert.match(scriptSource, /let mailboxSyncState = null;/);
-  assert.match(ownerSessionSource, /void hydrateOutreachContexts\(candidate\)\.catch/);
+  assert.match(ownerSessionSource, /void hydrateOutreachContexts\(candidate, loadOptions\)\.catch/);
+  assert.match(ownerSessionSource, /loadOptions\.showLoader === false[\s\S]*preserveVisibleDetail = true/);
   assert.match(ownerSessionSource, /skipPageBootstrap: true,[\s\S]*skipProviderRefresh: true/);
   assert.match(ownerSessionSource, /sync\?\.refreshRecommended/);
   assert.match(ownerSessionSource, /Mailbox wordt bijgewerkt/);
@@ -6154,6 +6155,242 @@ test('premium mailbox herschrijft identieke detailhtml niet opnieuw', async () =
   assert.equal(detail.hasAttribute('inert'), false);
 });
 
+test('achtergrondrefresh houdt hetzelfde gecommitte detail zichtbaar tijdens verrijking', async () => {
+  let releasePreparation;
+  const preparation = new Promise((resolve) => { releasePreparation = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: () => [],
+      prepareForCommit: () => preparation,
+    },
+  });
+  await mailbox.ready;
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:focus-stable',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Stabiele afzender',
+    email: 'stabiel@example.nl',
+    subject: 'Focus blijft stabiel',
+    body: 'Reeds zichtbare inhoud.',
+    receivedAt: '2026-08-21T13:00:00.000Z',
+  });
+  mailbox.setMails([mail]);
+  await mailbox.openMail(mail.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+  const detail = mailbox.getElement('mail-detail');
+  const htmlBefore = detail.innerHTML;
+  const writesBefore = detail.innerHTMLWrites;
+
+  mail.body = 'Bijgewerkte inhoud na achtergrondcontrole.';
+  const pending = mailbox.openMail(mail.id, {
+    preserveVisibleDetail: true,
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+  });
+  await Promise.resolve();
+
+  assert.equal(detail.innerHTML, htmlBefore);
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+  assert.notEqual(detail.getAttribute('aria-busy'), 'true');
+
+  releasePreparation();
+  assert.equal((await pending).committed, true);
+  assert.match(detail.innerHTML, /Bijgewerkte inhoud na achtergrondcontrole\./);
+  assert.equal(detail.innerHTMLWrites, writesBefore + 1);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+});
+
+test('behoud-zichtbaar geldt nooit voor een andere nieuw geselecteerde mail', async () => {
+  let releasePreparation;
+  const preparation = new Promise((resolve) => { releasePreparation = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: () => [],
+      prepareForCommit: () => preparation,
+    },
+  });
+  await mailbox.ready;
+  const first = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:visible-a', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Afzender A', email: 'a@example.nl', subject: 'A', body: 'Mail A.',
+    receivedAt: '2026-08-21T13:00:00.000Z',
+  });
+  const second = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:visible-b', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Afzender B', email: 'b@example.nl', subject: 'B', body: 'Mail B.',
+    receivedAt: '2026-08-21T13:01:00.000Z',
+  });
+  mailbox.setMails([first, second]);
+  await mailbox.openMail(first.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true,
+    skipContactTimeline: true, imagesPrepared: true,
+  });
+  const detail = mailbox.getElement('mail-detail');
+
+  const pending = mailbox.openMail(second.id, {
+    preserveVisibleDetail: true,
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+  });
+  await Promise.resolve();
+
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+  assert.equal(detail.hasAttribute('inert'), true);
+  assert.equal(detail.dataset.mailboxPendingId, second.id);
+  releasePreparation();
+  assert.equal((await pending).committed, true);
+  assert.match(detail.innerHTML, /Afzender B/);
+});
+
+test('stale stille A-refresh kan de laadlaag van een nieuwere B-selectie niet wissen', async () => {
+  let releaseA;
+  let releaseB;
+  const waitA = new Promise((resolve) => { releaseA = resolve; });
+  const waitB = new Promise((resolve) => { releaseB = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: (mail) => [{ id: mail.id }],
+      prepareForCommit: (images) => images[0]?.id === 'serve:inbox:race-a' ? waitA : waitB,
+    },
+  });
+  await mailbox.ready;
+  const first = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:race-a', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Afzender A', email: 'a@example.nl', subject: 'A', body: 'Mail A.',
+    receivedAt: '2026-08-21T13:00:00.000Z',
+  });
+  const second = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:race-b', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Afzender B', email: 'b@example.nl', subject: 'B', body: 'Mail B.',
+    receivedAt: '2026-08-21T13:01:00.000Z',
+  });
+  mailbox.setMails([first, second]);
+  await mailbox.openMail(first.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true,
+    skipContactTimeline: true, imagesPrepared: true,
+  });
+  first.body = 'A wordt stil verrijkt.';
+  const silentA = mailbox.openMail(first.id, {
+    preserveVisibleDetail: true,
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+  });
+  await Promise.resolve();
+  const pendingB = mailbox.openMail(second.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+  });
+  await Promise.resolve();
+  const detail = mailbox.getElement('mail-detail');
+  assert.equal(detail.dataset.mailboxPendingId, second.id);
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+
+  releaseA();
+  assert.equal((await silentA).stale, true);
+  assert.equal(detail.dataset.mailboxPendingId, second.id);
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+  assert.equal(detail.hasAttribute('inert'), true);
+
+  releaseB();
+  assert.equal((await pendingB).committed, true);
+  assert.match(detail.innerHTML, /Afzender B/);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+});
+
+test('stille same-ID refresh bindt tokenvervanging en objectvervanging elk zelfstandig', async () => {
+  async function runScenario({ label, replaceToken, replaceObject }) {
+    const classes = new Set();
+    const attributes = new Map();
+    const loaderActivations = [];
+    const detail = {
+      dataset: {},
+      innerHTML: '',
+      classList: {
+        add(...names) {
+          if (names.includes('is-detail-pending')) loaderActivations.push('class');
+          names.forEach((name) => classes.add(name));
+        },
+        remove(...names) { names.forEach((name) => classes.delete(name)); },
+        contains(name) { return classes.has(name); },
+      },
+      setAttribute(name, value) {
+        if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') {
+          loaderActivations.push(name);
+        }
+        attributes.set(name, String(value));
+      },
+      removeAttribute(name) { attributes.delete(name); },
+      querySelector() { return null; },
+    };
+    let activeId = '';
+    let token = { generation: 1, signal: new AbortController().signal };
+    let mail = { id: `serve:inbox:same-id-${label}`, body: 'Oude zichtbare inhoud.' };
+    const controller = detailStabilityModule.createController({
+      getMail: (id) => String(id) === mail.id ? mail : null,
+      ensureToken: () => token,
+      isTokenCurrent: (candidate) => candidate === token,
+      getScope: () => ({ folder: 'inbox', account: 'serve@softora.nl' }),
+      getActiveMail: () => activeId,
+      setActiveMail: (id) => { activeId = id; },
+      select() {},
+      renderList() {},
+      getDetailElement: () => detail,
+      renderHtml: (current) => `<p>${current.body}</p>`,
+      prepare: (current) => current.preparation,
+    });
+
+    assert.equal((await controller.open(mail.id, { skipContactTimeline: true })).committed, true, label);
+    loaderActivations.length = 0;
+    let releaseStalePreparation;
+    mail.preparation = new Promise((resolve) => { releaseStalePreparation = resolve; });
+    const staleRun = controller.open(mail.id, {
+      preserveVisibleDetail: true,
+      skipContactTimeline: true,
+    });
+    assert.deepEqual(loaderActivations, [], label);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(controller.snapshot().pending, true, label);
+
+    if (replaceToken) token = { generation: 2, signal: new AbortController().signal };
+    if (replaceObject) {
+      mail = { id: mail.id, body: 'Actuele inhoud na refresh.', preparation: Promise.resolve() };
+    } else {
+      mail.body = 'Actuele inhoud na refresh.';
+      mail.preparation = Promise.resolve();
+    }
+    const currentRun = controller.open(mail.id, {
+      preserveVisibleDetail: true,
+      skipContactTimeline: true,
+    });
+    assert.deepEqual(loaderActivations, [], label);
+    assert.equal((await currentRun).committed, true, label);
+    assert.equal(detail.innerHTML, '<p>Actuele inhoud na refresh.</p>', label);
+    assert.equal(detail.classList.contains('is-detail-pending'), false, label);
+
+    releaseStalePreparation();
+    assert.equal((await staleRun).stale, true, label);
+    assert.equal(detail.innerHTML, '<p>Actuele inhoud na refresh.</p>', label);
+    assert.deepEqual(loaderActivations, [], label);
+  }
+
+  await runScenario({ label: 'new-token-same-object', replaceToken: true, replaceObject: false });
+  await runScenario({ label: 'same-token-new-object', replaceToken: false, replaceObject: true });
+});
+
 test('premium mailbox herstelt bewust gemuteerde detail-DOM ook bij identieke HTML', async () => {
   const mailbox = loadMailboxHelpersForTest();
   await mailbox.ready;
@@ -7050,6 +7287,415 @@ test('verse mailboxlijst behoudt de reeds gehydrateerde actieve body en objectre
   assert.strictEqual(messages[0], bootstrapMail);
   assert.equal(messages[0].body, 'Exact geladen bericht.');
   assert.equal(messages[0].bodyLoaded, true);
+});
+
+test('ownerrefresh geeft de no-loader-intentie door aan alle behouden detailpaden', async () => {
+  const current = {
+    id: 'serve@softora.nl|inbox:focus-owner',
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    body: 'Bestaande inhoud.',
+    bodyLoaded: true,
+  };
+  let messages = [current];
+  const opens = [];
+  const ownerView = ownerSessionModule.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: { async load() { return null; } },
+    index: {
+      async hydrateOutreachContexts({ getActiveMail, openMail }) {
+        openMail(getActiveMail(), { skipBodyFetch: true, skipReadPersist: true });
+      },
+    },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        messages: [{ ...current }],
+        sync: {},
+      }),
+    }),
+    normalizeMessage: (message) => message,
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => current.id,
+    setActiveMail() {},
+    renderList() {},
+    openMail(id, openOptions) { opens.push({ id, openOptions }); },
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  await ownerView.load({
+    showLoader: false,
+    openLatest: false,
+    skipBackgroundSync: true,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(opens.length, 2);
+  assert.deepEqual(opens[0], {
+    id: current.id,
+    openOptions: { preserveVisibleDetail: true },
+  });
+  assert.deepEqual(opens[1], {
+    id: current.id,
+    openOptions: {
+      skipBodyFetch: true,
+      skipReadPersist: true,
+      preserveVisibleDetail: true,
+    },
+  });
+
+  const errorOpens = [];
+  const errorView = ownerSessionModule.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: { async load() { return null; } },
+    fetch: async () => { throw new Error('Tijdelijke lijstfout'); },
+    filterDeleted: (value) => value,
+    getMessages: () => [current],
+    setMessages() {},
+    getActiveMail: () => current.id,
+    setActiveMail() {},
+    renderList() {},
+    openMail(id, openOptions) { errorOpens.push({ id, openOptions }); },
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+  assert.equal(await errorView.load({
+    showLoader: false,
+    openLatest: false,
+    preserveOnError: true,
+  }), false);
+  assert.deepEqual(errorOpens, [{
+    id: current.id,
+    openOptions: { skipReadPersist: true, preserveVisibleDetail: true },
+  }]);
+});
+
+test('focus en visibilitychange verversen dezelfde zichtbare mail zonder enige laadlaagactivatie', async () => {
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const current = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:lifecycle-stable',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Stabiele afzender',
+    email: 'stabiel@example.nl',
+    subject: 'Zelfde mail blijft staan',
+    body: 'Deze inhoud is al volledig zichtbaar.',
+    bodyLoaded: true,
+    receivedAt: '2026-08-21T13:00:00.000Z',
+  });
+  let messages = [current];
+  mailbox.setMails(messages);
+  await mailbox.openMail(current.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+
+  const detail = mailbox.getElement('mail-detail');
+  const loaderActivations = [];
+  const originalAdd = detail.classList.add.bind(detail.classList);
+  const originalSetAttribute = detail.setAttribute.bind(detail);
+  detail.classList.add = (...names) => {
+    if (names.includes('is-detail-pending')) loaderActivations.push('class');
+    originalAdd(...names);
+  };
+  detail.setAttribute = (name, value) => {
+    if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') {
+      loaderActivations.push(name);
+    }
+    originalSetAttribute(name, value);
+  };
+  Object.defineProperty(detail, 'offsetHeight', { configurable: true, value: 877 });
+
+  const htmlBefore = detail.innerHTML;
+  const writesBefore = detail.innerHTMLWrites;
+  const heightBefore = detail.offsetHeight;
+  const ownerView = ownerSessionModule.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: { async load() { return null; } },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        messages: [{ ...messages[0] }],
+        sync: {},
+      }),
+    }),
+    normalizeMessage: (message) => mailbox.normalizeMailboxApiMessage(message),
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages: (value) => {
+      messages = value;
+      mailbox.setMails(value);
+    },
+    getActiveMail: mailbox.getActiveMail,
+    setActiveMail() {},
+    renderList() {},
+    openMail(id, openOptions) {
+      return mailbox.openMail(id, {
+        ...openOptions,
+        skipBodyFetch: true,
+        skipThreadBodyFetch: true,
+        skipContactTimeline: true,
+        imagesPrepared: true,
+      });
+    },
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const documentRef = {
+    visibilityState: 'visible',
+    addEventListener(type, handler) { documentListeners.set(type, handler); },
+    removeEventListener(type) { documentListeners.delete(type); },
+    getElementById() { return null; },
+  };
+  const windowRef = {
+    addEventListener(type, handler) { windowListeners.set(type, handler); },
+    removeEventListener(type) { windowListeners.delete(type); },
+  };
+  let nextTimerId = 0;
+  const timers = new Map();
+  const scheduleTimeout = (handler, delay) => {
+    const id = ++nextTimerId;
+    timers.set(id, { delay, handler });
+    return id;
+  };
+  const cancelTimeout = (id) => { timers.delete(id); };
+  const loadOptionsSeen = [];
+  let resolveNextLoad = null;
+  const refreshController = refreshModule.create({
+    autoStart: false,
+    document: documentRef,
+    window: windowRef,
+    button: {
+      disabled: false,
+      classList: { toggle() {} },
+      setAttribute() {},
+      addEventListener() {},
+    },
+    ageLabel: { textContent: '', setAttribute() {} },
+    getAccount: () => 'serve@softora.nl',
+    getFolder: () => 'inbox',
+    fetch: async () => ({ ok: true, json: async () => ({ ok: true }) }),
+    loadMessages: async (loadOptions) => {
+      loadOptionsSeen.push(loadOptions);
+      const result = await ownerView.load(loadOptions);
+      resolveNextLoad?.();
+      resolveNextLoad = null;
+      return result;
+    },
+    setTimeout: scheduleTimeout,
+    clearTimeout: cancelTimeout,
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+
+  async function triggerLifecycle(handler) {
+    const loaded = new Promise((resolve) => { resolveNextLoad = resolve; });
+    handler();
+    const scheduled = Array.from(timers.entries()).find(([, timer]) => timer.delay === 0);
+    assert.ok(scheduled, 'lifecycle-event moet een directe achtergrondcontrole plannen');
+    timers.delete(scheduled[0]);
+    scheduled[1].handler();
+    await loaded;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(refreshController.snapshot().inFlight, 0);
+  }
+
+  refreshController.start();
+  await triggerLifecycle(windowListeners.get('focus'));
+  documentRef.visibilityState = 'visible';
+  await triggerLifecycle(documentListeners.get('visibilitychange'));
+
+  assert.equal(loadOptionsSeen.length, 2);
+  assert.ok(loadOptionsSeen.every((options) => options.showLoader === false));
+  assert.deepEqual(loaderActivations, []);
+  assert.equal(detail.innerHTML, htmlBefore);
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+  assert.equal(detail.offsetHeight, heightBefore);
+  assert.equal(mailbox.getActiveMail(), current.id);
+  assert.equal(detail.dataset.mailboxCommittedId, current.id);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+  assert.notEqual(detail.getAttribute('aria-busy'), 'true');
+  refreshController.destroy();
+});
+
+test('focus en visibilitychange houden outreach stabiel door beide providerbatches', async () => {
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const current = mailbox.normalizeMailboxApiMessage({
+    id: 'contact:serve:lifecycle-outreach',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    owner: 'serve',
+    canonicalOwner: 'serve',
+    externalContactEmail: 'stabiel@example.nl',
+    from: 'Stabiele outreachreactie',
+    email: 'stabiel@example.nl',
+    subject: 'Zelfde outreachgesprek blijft staan',
+    body: 'Deze outreachinhoud is al volledig zichtbaar.',
+    bodyLoaded: true,
+    receivedAt: '2026-08-21T13:00:00.000Z',
+  });
+  let messages = [current];
+  mailbox.setMails(messages);
+  await mailbox.openMail(current.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+
+  const detail = mailbox.getElement('mail-detail');
+  const loaderActivations = [];
+  const originalAdd = detail.classList.add.bind(detail.classList);
+  const originalSetAttribute = detail.setAttribute.bind(detail);
+  detail.classList.add = (...names) => {
+    if (names.includes('is-detail-pending')) loaderActivations.push('class');
+    originalAdd(...names);
+  };
+  detail.setAttribute = (name, value) => {
+    if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') {
+      loaderActivations.push(name);
+    }
+    originalSetAttribute(name, value);
+  };
+  Object.defineProperty(detail, 'offsetHeight', { configurable: true, value: 877 });
+  const htmlBefore = detail.innerHTML;
+  const writesBefore = detail.innerHTMLWrites;
+  const heightBefore = detail.offsetHeight;
+  const campaignLoads = [];
+  const ownerView = ownerSessionModule.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load(folder, normalizeMessage, _fetch, options) {
+        campaignLoads.push({ folder, owner: options.owner });
+        return {
+          fromBootstrap: false,
+          fromCache: false,
+          messages: [{ ...messages[0] }].map(normalizeMessage),
+          sync: {},
+        };
+      },
+      filterMessages: (value) => value,
+    },
+    normalizeMessage: (message) => mailbox.normalizeMailboxApiMessage(message),
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; mailbox.setMails(value); },
+    getActiveMail: mailbox.getActiveMail,
+    setActiveMail() {},
+    renderList() {},
+    openMail(id, openOptions) {
+      return mailbox.openMail(id, {
+        ...openOptions,
+        skipBodyFetch: true,
+        skipThreadBodyFetch: true,
+        skipContactTimeline: true,
+        imagesPrepared: true,
+      });
+    },
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const documentRef = {
+    visibilityState: 'visible',
+    addEventListener(type, handler) { documentListeners.set(type, handler); },
+    removeEventListener(type) { documentListeners.delete(type); },
+    getElementById() { return null; },
+  };
+  const windowRef = {
+    addEventListener(type, handler) { windowListeners.set(type, handler); },
+    removeEventListener(type) { windowListeners.delete(type); },
+  };
+  let nextTimerId = 0;
+  const timers = new Map();
+  const loadOptionsSeen = [];
+  const providerUrls = [];
+  const refreshController = refreshModule.create({
+    autoStart: false,
+    document: documentRef,
+    window: windowRef,
+    button: { disabled: false, classList: { toggle() {} }, setAttribute() {}, addEventListener() {} },
+    ageLabel: { textContent: '', setAttribute() {} },
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async (url) => {
+      providerUrls.push(String(url));
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    },
+    loadMessages: async (loadOptions) => {
+      loadOptionsSeen.push(loadOptions);
+      return ownerView.load(loadOptions);
+    },
+    setTimeout(handler, delay) {
+      const id = ++nextTimerId;
+      timers.set(id, { delay, handler });
+      return id;
+    },
+    clearTimeout(id) { timers.delete(id); },
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+
+  async function triggerLifecycle(handler) {
+    const expectedLoads = loadOptionsSeen.length + 2;
+    const expectedRequests = providerUrls.length + 2;
+    handler();
+    const scheduled = Array.from(timers.entries()).find(([, timer]) => timer.delay === 0);
+    assert.ok(scheduled, 'outreach-lifecycle moet een directe achtergrondcontrole plannen');
+    timers.delete(scheduled[0]);
+    scheduled[1].handler();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (
+        loadOptionsSeen.length === expectedLoads &&
+        providerUrls.length === expectedRequests &&
+        refreshController.snapshot().inFlight === 0
+      ) break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(loadOptionsSeen.length, expectedLoads);
+    assert.equal(providerUrls.length, expectedRequests);
+    assert.equal(refreshController.snapshot().inFlight, 0);
+  }
+
+  refreshController.start();
+  await triggerLifecycle(windowListeners.get('focus'));
+  documentRef.visibilityState = 'hidden';
+  documentListeners.get('visibilitychange')();
+  documentRef.visibilityState = 'visible';
+  await triggerLifecycle(documentListeners.get('visibilitychange'));
+
+  assert.deepEqual(providerUrls, [
+    '/api/mailbox/sync', '/api/mailbox/instantly/sync',
+    '/api/mailbox/sync', '/api/mailbox/instantly/sync',
+  ]);
+  assert.equal(campaignLoads.length, 4);
+  assert.ok(campaignLoads.every((load) => load.folder === 'outreach' && load.owner === 'serve'));
+  assert.ok(loadOptionsSeen.every((options) => options.showLoader === false && options.openLatest === false));
+  assert.deepEqual(loaderActivations, []);
+  assert.equal(detail.innerHTML, htmlBefore);
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+  assert.equal(detail.offsetHeight, heightBefore);
+  assert.equal(mailbox.getActiveMail(), current.id);
+  assert.equal(detail.dataset.mailboxCommittedId, current.id);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+  assert.notEqual(detail.getAttribute('aria-busy'), 'true');
+  refreshController.destroy();
 });
 
 test('threadbody-spinner eindigt eveneens binnen het gedeelde laadbudget', async () => {
