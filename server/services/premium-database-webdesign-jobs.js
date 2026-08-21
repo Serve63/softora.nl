@@ -1,5 +1,4 @@
 const { randomUUID } = require('crypto');
-const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
 
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
@@ -30,15 +29,6 @@ const WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE =
   'Webdesign maken is mislukt. De lead is vrijgegeven; probeer opnieuw.';
 const WEBDESIGN_VARIANT_V1 = 'v1-prompt-only';
 const WEBDESIGN_VARIANT_V2 = 'v2-visual-dna';
-const SOFTORA_WEBDESIGN_OUTREACH_ROLE = 'WEBDESIGN & SOFTWARE ONTWIKKELING';
-const DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
-  name: 'Servé Creusen',
-  roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
-});
-const MARTIJN_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
-  name: 'Martijn van de Ven',
-  roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
-});
 let cachedSharp = null;
 
 function normalizeWebdesignVariant(value) {
@@ -615,22 +605,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
     const uid = normalizeString(req?.premiumAuth?.userId || '');
     return email || uid ? `${email}::${uid}` : '';
-  }
-
-  function ownerEmailFromOwnerKey(ownerKey) {
-    return normalizeString(ownerKey).split('::')[0].toLowerCase();
-  }
-
-  function resolveWebdesignOutreachProfile(ownerKey) {
-    const ownerEmail = ownerEmailFromOwnerKey(ownerKey);
-    const identity = getOutboundSenderIdentity(ownerEmail);
-    const profile = identity && identity.profileKey === 'martijn'
-      ? MARTIJN_WEBDESIGN_OUTREACH_PROFILE
-      : DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE;
-    return {
-      ...profile,
-      source: 'premium-database-webdesign-jobs',
-    };
   }
 
   function normalizeJobId(value) {
@@ -1288,7 +1262,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         variant,
         company: job.customer.bedrijf,
         domain: job.customer.dom,
-        softoraOutreachProfile: resolveWebdesignOutreachProfile(job.ownerKey),
       },
     });
 

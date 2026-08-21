@@ -118,7 +118,7 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.equal(fileName, 'softora.nl-preview.png');
 });
 
-test('website generation preview prompt locks the Softora outreach profile identity', () => {
+test('website generation preview prompt keeps outreach identities outside the customer website', () => {
   const helpers = createHelpers();
   const prompt = helpers.buildWebsitePreviewPromptFromScan({
     host: 'kboheikant.test',
@@ -132,13 +132,12 @@ test('website generation preview prompt locks the Softora outreach profile ident
     },
   });
 
-  assert.match(prompt, /SOFTORA OUTREACH PROFILE LOCK/);
-  assert.match(prompt, /zichtbare persoonsnaam exact: Servé Creusen/);
-  assert.match(prompt, /zichtbare rolregel\/eyebrow exact: WEBDESIGN & SOFTWARE ONTWIKKELING/);
-  assert.match(prompt, /Gebruik nooit "Softora", "Softora.nl", "Webdesign en software"/);
-  assert.match(prompt, /"ik heb", "ik ben begonnen" en "ik heb meegenomen"/);
-  assert.match(prompt, /Vermijd "we zijn begonnen"/);
-  assert.match(prompt, /Softora mag alleen als bedrijfsmerk voorkomen, nooit als persoonlijke afzendernaam/);
+  assert.match(prompt, /KLANTIDENTITEIT EN OUTREACH-SCHEIDING/);
+  assert.match(prompt, /uitsluitend de website van het gescande klantbedrijf/);
+  assert.match(prompt, /geen afzender, webdesigner, softwareontwikkelaar, maker, auteur, outreach-profiel/);
+  assert.match(prompt, /geen persoonsnaam, portret of teamlid/);
+  assert.doesNotMatch(prompt, /Servé Creusen|Martijn van de Ven|SOFTORA OUTREACH PROFILE LOCK/);
+  assert.doesNotMatch(prompt, /WEBDESIGN & SOFTWARE ONTWIKKELING/);
 });
 
 test('website generation helpers normalize html documents and detect unusable strict html', () => {

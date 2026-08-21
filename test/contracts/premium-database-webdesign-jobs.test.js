@@ -488,11 +488,9 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
   assert.equal(pipelineCalls[0].options.body.source, 'premium-database');
   assert.deepEqual(snapshotPromotions, [['customer-1']]);
-  assert.deepEqual(pipelineCalls[0].options.body.softoraOutreachProfile, {
-    name: 'Servé Creusen',
-    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
-    source: 'premium-database-webdesign-jobs',
-  });
+  assert.equal(pipelineCalls[0].options.body.softoraOutreachProfile, undefined);
+  assert.equal(pipelineCalls[0].options.body.senderProfile, undefined);
+  assert.equal(pipelineCalls[0].options.body.outreachProfile, undefined);
 
   const martijnRes = createResponseRecorder();
   await coordinator.startJobResponse(
@@ -515,11 +513,9 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(martijnRes.statusCode, 202);
   const martijnJob = await waitForJobDone(coordinator, 'job_venvisual_123456789');
   assert.equal(martijnJob.status, 'done');
-  assert.deepEqual(pipelineCalls[1].options.body.softoraOutreachProfile, {
-    name: 'Martijn van de Ven',
-    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
-    source: 'premium-database-webdesign-jobs',
-  });
+  assert.equal(pipelineCalls[1].options.body.softoraOutreachProfile, undefined);
+  assert.equal(pipelineCalls[1].options.body.senderProfile, undefined);
+  assert.equal(pipelineCalls[1].options.body.outreachProfile, undefined);
 
   const v2Res = createResponseRecorder();
   await coordinator.startJobResponse(
