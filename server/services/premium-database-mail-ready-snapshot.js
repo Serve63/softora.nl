@@ -518,6 +518,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         pageSize: SNAPSHOT_CUSTOMER_PAGE_SIZE,
         timeoutMs: SNAPSHOT_CUSTOMER_PAGE_TIMEOUT_MS,
         bypassReadCache: true,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
         suppressTransientReadFailureLog: true,
       });
     }
@@ -534,6 +536,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     if (dataOpsStore && typeof dataOpsStore.listDesignPhotoAssetFlags === 'function') {
       return dataOpsStore.listDesignPhotoAssetFlags({
         bypassReadCache: true,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
         suppressTransientReadFailureLog: true,
       });
     }
