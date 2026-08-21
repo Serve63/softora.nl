@@ -1139,7 +1139,37 @@ test('mailbox index store filtert campagneberichten in SQL en dedupliceert overl
 
 test('mailbox index store haalt vervolgberichten gericht op afzender en ontvanger op', async () => {
   const calls = [];
+  const rpcCalls = [];
+  const sentRows = [{
+    message_key: 'martijnven123@gmail.com|sent|361',
+    account_email: 'martijnven123@gmail.com',
+    folder: 'sent',
+    uid: 361,
+    provider_id: 'sent:361',
+    message_id: '<karoena-follow-up@example.nl>',
+    sender_name: 'Martijn van de Ven',
+    sender_email: 'martijnven123@gmail.com',
+    recipients_text: 'Praktijk Karoena <info@praktijkkaroena.nl>',
+    subject: 'Voorstel samenwerking: rebranding website',
+    date: '2026-05-28T12:52:58.000Z',
+  }, {
+    message_key: 'martijnven123@gmail.com|sent|362',
+    account_email: 'martijnven123@gmail.com',
+    folder: 'sent',
+    uid: 362,
+    provider_id: 'sent:362',
+    message_id: '<other-contact@example.nl>',
+    sender_name: 'Martijn van de Ven',
+    sender_email: 'martijnven123@gmail.com',
+    recipients_text: 'ander-contact@example.nl',
+    subject: 'Andere mail',
+    date: '2026-05-28T11:52:58.000Z',
+  }];
   const client = {
+    async rpc(name, args) {
+      rpcCalls.push([name, args]);
+      return { data: sentRows, error: null };
+    },
     from() {
       const filters = {};
       const query = {
@@ -1154,60 +1184,23 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
           filters[column] = value;
           return query;
         },
-        ilike(column, value) {
-          calls.push(['ilike', column, value]);
-          filters[column] = value;
-          return query;
-        },
-        or(value) {
-          calls.push(['or', value]);
-          filters.recipientFilter = value;
-          return query;
-        },
         is() { return query; },
         order() { return query; },
         limit() {
-          const sent = filters.folder === 'sent';
           return Promise.resolve({
-            data: sent
-              ? [{
-                  message_key: 'martijnven123@gmail.com|sent|361',
-                  account_email: 'martijnven123@gmail.com',
-                  folder: 'sent',
-                  uid: 361,
-                  provider_id: 'sent:361',
-                  message_id: '<karoena-follow-up@example.nl>',
-                  sender_name: 'Martijn van de Ven',
-                  sender_email: 'martijnven123@gmail.com',
-                  recipients_text: 'Praktijk Karoena <info@praktijkkaroena.nl>',
-                  subject: 'Voorstel samenwerking: rebranding website',
-                  date: '2026-05-28T12:52:58.000Z',
-                }, {
-                  message_key: 'martijnven123@gmail.com|sent|362',
-                  account_email: 'martijnven123@gmail.com',
-                  folder: 'sent',
-                  uid: 362,
-                  provider_id: 'sent:362',
-                  message_id: '<other-contact@example.nl>',
-                  sender_name: 'Martijn van de Ven',
-                  sender_email: 'martijnven123@gmail.com',
-                  recipients_text: 'ander-contact@example.nl',
-                  subject: 'Andere mail',
-                  date: '2026-05-28T11:52:58.000Z',
-                }]
-              : [{
-                  message_key: 'martijnven123@gmail.com|inbox|35057',
-                  account_email: 'martijnven123@gmail.com',
-                  folder: 'inbox',
-                  uid: 35057,
-                  provider_id: 'inbox:35057',
-                  message_id: '<karoena-reply@example.nl>',
-                  sender_name: 'Praktijk Karoena',
-                  sender_email: 'info@praktijkkaroena.nl',
-                  recipients_text: 'martijnven123@gmail.com',
-                  subject: 'Voorstel samenwerking: rebranding website',
-                  date: '2026-05-28T12:52:58.000Z',
-                }],
+            data: [{
+              message_key: 'martijnven123@gmail.com|inbox|35057',
+              account_email: 'martijnven123@gmail.com',
+              folder: 'inbox',
+              uid: 35057,
+              provider_id: 'inbox:35057',
+              message_id: '<karoena-reply@example.nl>',
+              sender_name: 'Praktijk Karoena',
+              sender_email: 'info@praktijkkaroena.nl',
+              recipients_text: 'martijnven123@gmail.com',
+              subject: 'Voorstel samenwerking: rebranding website',
+              date: '2026-05-28T12:52:58.000Z',
+            }],
             error: null,
           });
         },
@@ -1239,14 +1232,66 @@ test('mailbox index store haalt vervolgberichten gericht op afzender en ontvange
   assert.deepEqual(calls.filter((call) => call[0] === 'in'), [
     ['in', 'account_email', ['martijnven123@gmail.com']],
     ['in', 'sender_email', ['info@praktijkkaroena.nl']],
-    ['in', 'account_email', ['martijnven123@gmail.com']],
-    ['in', 'account_email', ['martijnven123@gmail.com']],
   ]);
-  assert.deepEqual(calls.filter((call) => call[0] === 'ilike'), [
-    ['ilike', 'recipients_text', '%info@praktijkkaroena.nl%'],
-    ['ilike', 'recipients_text', '%unrelated@example.nl%'],
-  ]);
-  assert.equal(calls.filter((call) => call[0] === 'or').length, 0);
+  assert.deepEqual(rpcCalls, [[
+    'softora_list_mailbox_messages_by_recipients',
+    {
+      p_account_emails: ['martijnven123@gmail.com'],
+      p_folder: 'sent',
+      p_recipient_emails: ['info@praktijkkaroena.nl', 'unrelated@example.nl'],
+      p_limit: 20,
+    },
+  ]]);
+});
+
+test('mailbox index store batcht honderden ontvangers in exact één RPC en verifieert lokaal exact', async () => {
+  const rpcCalls = [];
+  const recipientEmails = Array.from({ length: 400 }, (_value, index) => `contact-${index}@example.nl`);
+  const client = {
+    async rpc(name, args) {
+      rpcCalls.push([name, args]);
+      return {
+        error: null,
+        data: [{
+          message_key: 'serve@softora.nl|sent|1',
+          account_email: 'serve@softora.nl',
+          folder: 'sent',
+          uid: 1,
+          provider_id: 'sent:1',
+          recipients_text: 'Contact <contact-399@example.nl>',
+          date: '2026-08-21T10:00:00.000Z',
+        }, {
+          message_key: 'serve@softora.nl|sent|2',
+          account_email: 'serve@softora.nl',
+          folder: 'sent',
+          uid: 2,
+          provider_id: 'sent:2',
+          recipients_text: 'not-contact-399@example.nl',
+          date: '2026-08-21T09:00:00.000Z',
+        }],
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.listMessagesByRecipientEmailsForAccounts({
+    accountEmails: [' SERVE@SOFTORA.NL '],
+    folder: 'SENT',
+    recipientEmails,
+    limit: 2000,
+  });
+
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0][0], 'softora_list_mailbox_messages_by_recipients');
+  assert.equal(rpcCalls[0][1].p_recipient_emails.length, 400);
+  assert.deepEqual(rpcCalls[0][1].p_account_emails, ['serve@softora.nl']);
+  assert.equal(rpcCalls[0][1].p_folder, 'sent');
+  assert.equal(rpcCalls[0][1].p_limit, 2000);
+  assert.deepEqual(messages.map((message) => message.id), ['sent:1']);
 });
 
 test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id op', async () => {
@@ -1961,6 +2006,147 @@ test('exact IMAP reply proof bypasses an unrelated mailbox index cooldown', asyn
   assert.equal(message.email, 'info@salontof.nl');
   assert.equal(requestedClientOptions.at(-1).ignoreFailureCooldown, true);
   assert.equal(requestedClientOptions.at(-1).suppressFailureCooldown, true);
+});
+
+test('campaign priority-read omzeilt alleen op verzoek de cooldown en probeert één soft failure opnieuw', async () => {
+  let messageReadCalls = 0;
+  const requestedClientOptions = [];
+  const transientError = new Error('Supabase client timeout na 8000ms');
+  transientError.name = 'AbortError';
+  const client = {
+    from(table) {
+      if (table === 'softora_mailbox_sync_state') {
+        return {
+          select() {
+            return {
+              eq() { return this; },
+              limit() { return this; },
+              maybeSingle() { return new Promise(() => {}); },
+            };
+          },
+        };
+      }
+      const query = {
+        select() { return query; },
+        in() { return query; },
+        eq() { return query; },
+        is() { return query; },
+        order() { return query; },
+        async limit() {
+          messageReadCalls += 1;
+          if (messageReadCalls === 1) return { data: null, error: transientError };
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return {
+            error: null,
+            data: [{
+              message_key: 'serve@softora.nl|inbox|42',
+              account_email: 'serve@softora.nl',
+              folder: 'inbox',
+              uid: 42,
+              provider_id: 'inbox:42',
+              sender_email: 'contact@example.nl',
+              recipients_text: 'serve@softora.nl',
+              date: '2026-08-21T10:00:00.000Z',
+            }],
+          };
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options || {});
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  await store.getSyncState({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
+  const normalRead = await store.listMessagesForAccounts({
+    accountEmails: ['serve@softora.nl'], folder: 'inbox', limit: 20,
+  });
+  const priorityRead = await store.listMessagesForAccounts({
+    accountEmails: ['serve@softora.nl'], folder: 'inbox', limit: 20, priorityRead: true,
+  });
+
+  assert.equal(normalRead, null);
+  assert.equal(messageReadCalls, 2);
+  assert.deepEqual(priorityRead.map((message) => message.id), ['inbox:42']);
+  assert.deepEqual(requestedClientOptions.slice(-2), [{
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }, {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
+});
+
+test('sync-lockclaim gebruikt duurzame timeouts, omzeilt cooldown en retryt één soft failure', async () => {
+  let lockCalls = 0;
+  const requestedClientOptions = [];
+  const transientError = new Error('fetch failed: transient timeout');
+  transientError.name = 'AbortError';
+  const client = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() { return this; },
+            limit() { return this; },
+            maybeSingle() { return new Promise(() => {}); },
+          };
+        },
+      };
+    },
+    async rpc(name, args) {
+      assert.equal(name, 'softora_claim_mailbox_sync_lock');
+      lockCalls += 1;
+      if (lockCalls === 1) return { data: null, error: transientError };
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return {
+        error: null,
+        data: [{
+          acquired: true,
+          locked: false,
+          claimed_lock_token: args.p_lock_token,
+          lock_expires_at: '2026-08-21T10:02:00.000Z',
+        }],
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options || {});
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  await store.getSyncState({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
+  const claim = await store.acquireSyncLock({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', lockTtlMs: 90_000,
+  });
+
+  assert.equal(claim.ok, true);
+  assert.equal(lockCalls, 2);
+  assert.deepEqual(requestedClientOptions.slice(-2), [{
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }, {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
 });
 
 test('mailbox index store durably persists fetched messages despite another index timeout', async () => {
