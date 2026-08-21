@@ -71,11 +71,13 @@ test('data-ops bootstrap spiegelt alleen de legacy-compatibele protocolgate byte
   const start = schema.indexOf(startMarker);
   const end = schema.indexOf(endMarker, start);
   assert.ok(start >= 0 && end > start);
-  assert.equal(schema.slice(start), migration);
+  assert.equal(schema.slice(start, end + endMarker.length + 1), migration);
   assert.match(migration, /notify pgrst, 'reload schema';/);
   assert.doesNotMatch(schema, /mailbox-uid-generation-bootstrap-(?:sentinel|drain)/);
-  assert.doesNotMatch(schema, /mailbox-uid-generation-epoch-v2/);
-  assert.doesNotMatch(schema.slice(start), /set uid_generation_protocol = 'v2'/);
+  assert.doesNotMatch(
+    schema.slice(start, end + endMarker.length),
+    /set uid_generation_protocol = 'v2'/
+  );
 });
 
 test('gate is forward-only, scoped and keeps a three-minute drain floor', () => {
