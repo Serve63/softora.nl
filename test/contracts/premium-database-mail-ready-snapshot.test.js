@@ -207,7 +207,11 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].maxRows, 25000);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].pageSize, 250);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].timeoutMs, 12000);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].bypassReadFailureCooldown, true);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].suppressReadFailureCooldown, true);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'photo-flags-options')[1].bypassReadCache, true);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'photo-flags-options')[1].bypassReadFailureCooldown, true);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'photo-flags-options')[1].suppressReadFailureCooldown, true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'guard-keys'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
