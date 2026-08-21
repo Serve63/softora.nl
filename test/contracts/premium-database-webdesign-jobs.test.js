@@ -1586,6 +1586,9 @@ test('premium database webdesign jobs store trimmed webdesign photos before mock
   assert.equal(storedMetadata.height, 1536);
   assert.equal(mockupMetadata.width, 1600);
   assert.equal(mockupMetadata.height, 1000);
+  assert.equal(uploadedPhotos[0].legacyMeta.generationPolicy, 'customer-website-only-v2');
+  assert.equal(uploadedPhotos[0].legacyMeta.generationJobId, 'job_trim12345678');
+  assert.equal(uploadedPhotos[0].legacyMeta.generationVariant, 'v1-prompt-only');
   assert.equal(uploadedPhotos[0].legacyMeta.webdesignCanvasRepair.type, 'trimmed_uniform_side_gutters');
 });
 

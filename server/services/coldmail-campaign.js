@@ -20,6 +20,7 @@ const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-rec
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
 const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard');
 const previewImageCache = require('./coldmail-preview-image-cache');
+const { markIncidentQuarantinedDesignPhotosAuthoritative, markMissingDesignPhotosAuthoritative } = require('./design-photo-generation-policy');
 const {
   fitWebdesignPreviewForEmail,
   removeDecorativeWebdesignFrameForEmail,
@@ -1871,9 +1872,9 @@ function createColdmailCampaignService(deps = {}) {
       return itemId && itemId.toLowerCase() === lowerId ? { ...item, id: itemId } : null;
     }, null);
   }
-
   function preferFreshRowPhotoFields(row, storedPhoto) {
     const base = storedPhoto && typeof storedPhoto === 'object' ? { ...storedPhoto } : {};
+    if (base.authoritativeMissing === true) return base;
     const next = { ...base };
     const rowPhotoSource = getWebdesignPhotoSource(row);
     const rowMockupSource = getWebdesignMockupSource(row);
@@ -7336,7 +7337,6 @@ function createColdmailCampaignService(deps = {}) {
       return loadCustomerPhotoMap(safeRows);
     }
     const photoMap = {};
-
     const rowsByCustomerId = new Map();
     safeRows.forEach((row) => {
       const customerId = getExplicitRowId(row);
@@ -7359,6 +7359,7 @@ function createColdmailCampaignService(deps = {}) {
       } catch (error) {
         logger.warn('[ColdmailCampaign][exact-design-assets]', error && error.message ? error.message : error);
       }
+      markIncidentQuarantinedDesignPhotosAuthoritative(photoMap, rowsByCustomerId, signedRows);
       (Array.isArray(signedRows) ? signedRows : []).forEach((signed) => {
         const exactMatch = rowsByCustomerId.get(normalizeString(signed && signed.customerId).toLowerCase());
         if (!exactMatch) return;
@@ -7389,12 +7390,11 @@ function createColdmailCampaignService(deps = {}) {
     if (unresolvedRows.length) {
       const legacyPhotoMap = await loadCustomerPhotoMap(unresolvedRows);
       Object.keys(legacyPhotoMap).forEach((key) => {
-        if (!hasReadyWebdesignAssetRecord(photoMap[key])) photoMap[key] = legacyPhotoMap[key];
+        if (photoMap[key]?.authoritativeMissing !== true && !hasReadyWebdesignAssetRecord(photoMap[key])) photoMap[key] = legacyPhotoMap[key];
       });
     }
-    return photoMap;
+    return markMissingDesignPhotosAuthoritative(photoMap, rowsByCustomerId, hasReadyWebdesignAssetRecord);
   }
-
   async function loadCustomerPhotoMapCached(rows = []) {
     const canReuseRows = !Array.isArray(rows) || rows.length === 0;
     if (
