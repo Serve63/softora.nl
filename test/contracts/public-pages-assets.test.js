@@ -7,6 +7,7 @@ const { getStaticAssetCacheControl } = require('../../server/routes/public-pages
 
 const REPO_ROOT = path.join(__dirname, '../..');
 const SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png';
+const GOOGLE_SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png?v=20260821a';
 const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260616a';
 const HOME_SCREEN_ICON_HREF = '/assets/softora-touch-icon.png?v=20260615a';
 const STRUCTURED_DATA_LOGO_URL = 'https://www.softora.nl/assets/softora-touch-icon.png';
@@ -34,7 +35,7 @@ test('public asset cache still allows immutable caching for hashed assets and me
   );
 });
 
-test('html pages use the search favicon, round favicon, and filled home-screen icon sitewide', () => {
+test('html pages use the filled square search favicon, browser favicon, and home-screen icon sitewide', () => {
   const searchFaviconPath = path.join(REPO_ROOT, 'assets/softora-search-favicon.png');
   const faviconPath = path.join(REPO_ROOT, 'assets/softora-favicon-round.png');
   const homeScreenIconPath = path.join(REPO_ROOT, 'assets/softora-touch-icon.png');
@@ -43,7 +44,8 @@ test('html pages use the search favicon, round favicon, and filled home-screen i
   const searchFaviconWidth = searchFavicon.readUInt32BE(16);
   const searchFaviconHeight = searchFavicon.readUInt32BE(20);
   const searchFaviconColorType = searchFavicon.readUInt8(25);
-  const pngSignature = fs.readFileSync(faviconPath).subarray(0, 8).toString('hex');
+  const favicon = fs.readFileSync(faviconPath);
+  const pngSignature = favicon.subarray(0, 8).toString('hex');
   const homeScreenIcon = fs.readFileSync(homeScreenIconPath);
   const homeScreenIconSignature = homeScreenIcon.subarray(0, 8).toString('hex');
   const homeScreenIconWidth = homeScreenIcon.readUInt32BE(16);
@@ -56,7 +58,8 @@ test('html pages use the search favicon, round favicon, and filled home-screen i
   assert.equal(searchFaviconSignature, '89504e470d0a1a0a');
   assert.equal(searchFaviconWidth, 512);
   assert.equal(searchFaviconHeight, 512);
-  assert.equal(searchFaviconColorType, 6, 'search favicon should be RGBA with transparent corners');
+  assert.equal(searchFaviconColorType, 2, 'search favicon should be RGB without transparent corners');
+  assert.deepEqual(searchFavicon, favicon, 'Google Search favicon should exactly match the browser favicon');
   assert.equal(pngSignature, '89504e470d0a1a0a');
   assert.equal(homeScreenIconSignature, '89504e470d0a1a0a');
   assert.equal(homeScreenIconWidth, 512);
@@ -69,7 +72,9 @@ test('html pages use the search favicon, round favicon, and filled home-screen i
     assert.doesNotMatch(source, BROKEN_STRUCTURED_DATA_LOGO_PATTERN, `${fileName} should not reference the missing structured-data logo`);
     if (!source.includes('rel="icon"')) return;
     pagesWithFavicons.push(fileName);
-    const searchFaviconTag = `<link rel="icon" type="image/png" href="${SEARCH_FAVICON_HREF}" sizes="512x512">`;
+    const expectedSearchFaviconHref =
+      fileName === 'premium-website.html' ? GOOGLE_SEARCH_FAVICON_HREF : SEARCH_FAVICON_HREF;
+    const searchFaviconTag = `<link rel="icon" type="image/png" href="${expectedSearchFaviconHref}" sizes="512x512">`;
     const roundFaviconTag = `<link rel="icon" type="image/png" href="${ROUND_FAVICON_HREF}" sizes="any">`;
     assert.match(
       source,
