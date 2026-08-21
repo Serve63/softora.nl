@@ -756,8 +756,8 @@
       writeField(day, exercise.order, 'notes', notes.value);
     });
 
-    top.append(dragHandle, title, controls);
-    card.append(top, notes);
+    top.append(dragHandle, title, controls, notes);
+    card.append(top);
     swipe.append(deleteButton, completionAction, card);
     bindReorder(swipe, card, dragHandle, day, exercise.order);
     bindSwipe(swipe, card, completionAction, day, exercise.order, exercise.completed);

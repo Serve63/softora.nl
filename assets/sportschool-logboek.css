@@ -275,8 +275,15 @@ input:focus-visible {
 .exercise-top {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 5px;
+  grid-template-rows: 38px 34px;
+  column-gap: 5px;
+  row-gap: 2px;
   align-items: center;
+}
+
+.drag-handle,
+.exercise-title {
+  grid-row: 1;
 }
 
 .drag-handle {
@@ -346,6 +353,8 @@ input:focus-visible {
 
 .exercise-controls {
   display: grid;
+  grid-column: 3;
+  grid-row: 1 / span 2;
   gap: 2px;
   justify-items: end;
 }
@@ -453,11 +462,14 @@ input:focus-visible {
 }
 
 .exercise-notes {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+  align-self: center;
   width: 100%;
   min-width: 0;
   min-height: 28px;
   color: var(--softora-muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.15px;
