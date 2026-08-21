@@ -9,7 +9,7 @@ const {
   CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
-  createMailboxSyncService,
+  createMailboxSyncService: createRawMailboxSyncService,
   getMailboxSyncFoldersForAccount,
 } = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
@@ -21,6 +21,9 @@ const {
   parseMailboxCampaignSnapshot,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
+const {
+  createMailboxSyncLegacyStore,
+} = require('../testlib/mailbox-sync-legacy');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -76,8 +79,18 @@ function createMailboxService(deps = {}) {
   };
   return createRawMailboxService({
     ...deps,
+    ...(deps.mailboxIndexStore
+      ? { mailboxIndexStore: createMailboxSyncLegacyStore(deps.mailboxIndexStore) }
+      : {}),
     mailboxSendProvenanceStore,
     mailboxComposeThreadContext,
+  });
+}
+
+function createMailboxSyncService(options = {}) {
+  return createRawMailboxSyncService({
+    ...options,
+    mailboxIndexStore: createMailboxSyncLegacyStore(options.mailboxIndexStore),
   });
 }
 
@@ -2116,7 +2129,7 @@ test('mailbox service keeps link-only webdesign sends free of recovered image pl
   assert.deepEqual(requestedScopes, []);
 });
 
-test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink uit MIME-html', async () => {
+test('mailbox service herstelt de exacte MIME-link zonder een ongefencete indexwrite', async () => {
   const exactUrl =
     'https://www.softora.nl/webdesign/salon-tof?cid=safe-row-247&sender=serve';
   const plainBody = [
@@ -2205,8 +2218,7 @@ test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink ui
   assert.equal(message.body.toLowerCase().includes('<script'), false);
   assert.equal(message.webdesignLinkEvidenceKnown, true);
   assert.equal(message.webdesignLinkUrl, exactUrl);
-  assert.equal(upserts.length, 1);
-  assert.equal(upserts[0].messages[0].webdesignLinkUrl, exactUrl);
+  assert.equal(upserts.length, 0);
 });
 
 test('mailbox service exposes hidden coldmail opt-out links for clickable mail previews', async () => {

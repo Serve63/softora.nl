@@ -2074,13 +2074,6 @@ function createMailboxService(deps = {}) {
       error.status = 404;
       throw error;
     }
-    if (canUseMailboxIndex() && typeof mailboxIndexStore.upsertMessages === 'function') {
-      await mailboxIndexStore.upsertMessages({
-        accountEmail: account.email,
-        folder: normalizedFolder,
-        messages: [live],
-      }).catch((error) => logger.error('[Mailbox][MessageIndex]', error?.message || error));
-    }
     return assertMailboxMessageVisible(live);
   }
 
