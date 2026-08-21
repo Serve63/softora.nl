@@ -247,7 +247,7 @@
   .detail-mail-section-history-sent,
   .detail-mail-section-sent,
   .detail-mail-section-received { padding: 14px; }
-  .detail-mail-contact-card { padding: 11px 12px; }
+  .detail-mail-contact-card { padding: 0; }
   .detail-mail-contact-item { grid-template-columns: 62px minmax(0,1fr); gap: 8px; }
 
   .compose-overlay {
