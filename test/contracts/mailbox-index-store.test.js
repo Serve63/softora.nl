@@ -2128,6 +2128,48 @@ test('campaign priority-read omzeilt alleen op verzoek de cooldown en probeert �
   }]);
 });
 
+test('gerichte campaign-indexreads gebruiken priority-read alleen op expliciet verzoek', async () => {
+  const requestedClientOptions = [];
+  const emptyResult = { data: [], error: null };
+  const query = {
+    select() { return query; },
+    in() { return query; },
+    eq() { return query; },
+    is() { return query; },
+    order() { return query; },
+    limit() { return Promise.resolve(emptyResult); },
+    then(resolve, reject) { return Promise.resolve(emptyResult).then(resolve, reject); },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options || {});
+      return { from: () => query };
+    },
+    logger: { error() {}, info() {} },
+  });
+
+  await store.listMessagesByMessageIdsForAccounts({
+    accountEmails: ['serve@softora.nl'], folder: 'sent', messageIds: ['<normal@example.nl>'],
+  });
+  await store.listMessagesByMessageIdsForAccounts({
+    accountEmails: ['serve@softora.nl'], folder: 'sent', messageIds: ['<priority@example.nl>'], priorityRead: true,
+  });
+  await store.listProviderMessages({
+    provider: 'instantly', accountEmails: ['serve-sender@example.com'],
+  });
+  await store.listProviderMessages({
+    provider: 'instantly', accountEmails: ['serve-sender@example.com'], priorityRead: true,
+  });
+
+  const priorityOptions = {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  };
+  assert.deepEqual(requestedClientOptions, [{}, priorityOptions, {}, priorityOptions]);
+});
+
 test('sync-lockclaim gebruikt duurzame timeouts, omzeilt cooldown en retryt één soft failure', async () => {
   let lockCalls = 0;
   const requestedClientOptions = [];
