@@ -2,9 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const databaseUrl = String(process.env.MAILBOX_POSTGRES_TEST_URL || '').trim();
 const destructiveAllowed = process.env.MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE === '1';
+const postgresContainerId = String(process.env.MAILBOX_POSTGRES_TEST_CONTAINER_ID || '').trim();
 
 if (!databaseUrl) {
   test('echte PostgreSQL UID-generation-v2-tests vereisen MAILBOX_POSTGRES_TEST_URL', {
@@ -12,7 +14,11 @@ if (!databaseUrl) {
   }, () => {});
 } else {
   const parsedUrl = new URL(databaseUrl);
-  if (!destructiveAllowed || !/^\/softora_mailbox_(?:uid_generation|lock)_test(?:_|$)/.test(parsedUrl.pathname)) {
+  if (
+    !destructiveAllowed
+    || !/^\/softora_mailbox_(?:uid_generation|lock)_test(?:_|$)/.test(parsedUrl.pathname)
+    || !new Set(['localhost', '127.0.0.1', '[::1]', '::1']).has(parsedUrl.hostname)
+  ) {
     throw new Error('Weiger destructieve UID-generation-test buiten een expliciete lokale testdatabase.');
   }
 
@@ -22,6 +28,37 @@ if (!databaseUrl) {
     '../../supabase/migrations/20260821202054_mailbox_uid_generation_epoch_v2.sql'
   ), 'utf8');
   const clients = new Set();
+
+  function applyTrackedSql(sql) {
+    const databaseName = decodeURIComponent(parsedUrl.pathname.slice(1));
+    const username = decodeURIComponent(parsedUrl.username || 'postgres');
+    const password = decodeURIComponent(parsedUrl.password || '');
+    let command = 'psql';
+    let args = [
+      '-v', 'ON_ERROR_STOP=1', '-h', parsedUrl.hostname,
+      '-p', parsedUrl.port || '5432', '-U', username, '-d', databaseName,
+    ];
+    if (postgresContainerId) {
+      if (!/^[a-f0-9]{12,64}$/i.test(postgresContainerId)) {
+        throw new Error('Ongeldig PostgreSQL-servicecontainer-id voor UID-generation-test.');
+      }
+      command = 'docker';
+      args = [
+        'exec', '-i', '-e', `PGPASSWORD=${password}`, postgresContainerId,
+        'psql', '-v', 'ON_ERROR_STOP=1', '-U', username, '-d', databaseName,
+      ];
+    }
+    const result = spawnSync(command, args, {
+      input: sql,
+      encoding: 'utf8',
+      env: { ...process.env, PGPASSWORD: password },
+      maxBuffer: 1024 * 1024,
+    });
+    if (result.error || result.status !== 0) {
+      const detail = String(result.stderr || result.error?.message || 'onbekende fout').trim();
+      throw new Error(`Kon getrackte UID-generation-migratie niet toepassen: ${detail}`);
+    }
+  }
 
   async function connect() {
     const client = new Client({ connectionString: databaseUrl });
@@ -313,7 +350,7 @@ if (!databaseUrl) {
       update public.softora_mailbox_messages
       set deleted_at=clock_timestamp() where provider_id='legacy:2';
     `);
-    await client.query(migration);
+    applyTrackedSql(migration);
   });
 
   test.after(async () => {
