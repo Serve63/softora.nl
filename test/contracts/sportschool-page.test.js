@@ -54,7 +54,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260819c/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260821a/);
   assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260819b/);
   assert.match(bootstrapScriptSource, /remoteBootstrapVersion/);
   assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
@@ -63,10 +63,10 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.doesNotMatch(pageSource, /sportschool-logboek-sync\.js/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
-  assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260811a/);
+  assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260821a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260819e/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260821a/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -103,7 +103,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /normalizeFormHistory/);
   assert.match(scriptSource, /setFormHistory/);
   assert.match(scriptSource, /formHistory/);
-  assert.match(scriptSource, /form-status-select/);
+  assert.match(scriptSource, /form-status-button/);
+  assert.match(scriptSource, /nextFormStatus\(button\.dataset\.status\)/);
+  assert.doesNotMatch(scriptSource, /form-status-select|createElement\('select'\)/);
   assert.match(scriptSource, /stateRevision/);
   assert.match(scriptSource, /lastSavedRevision/);
   assert.match(scriptSource, /exerciseSources/);
@@ -172,9 +174,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.form-status:nth-child\(3\)\s*\{[\s\S]*?width: 46px;/);
   assert.doesNotMatch(scriptSource, /title\.textContent = 'Vorm'/);
   assert.doesNotMatch(scriptSource, /form-status-index/);
-  assert.match(stylesSource, /\.form-status-select\[data-status="up"\]/);
-  assert.match(stylesSource, /\.form-status-select\[data-status="down"\]/);
-  assert.match(stylesSource, /\.form-status-select\[data-status="same"\]/);
+  assert.match(stylesSource, /\.form-status-button\[data-status="up"\]/);
+  assert.match(stylesSource, /\.form-status-button\[data-status="down"\]/);
+  assert.match(stylesSource, /\.form-status-button\[data-status="same"\]/);
   assert.doesNotMatch(stylesSource, /\.exercise-complete/);
   assert.match(stylesSource, /\.completion-action\s*\{[\s\S]*?background: #3d945c;[\s\S]*?pointer-events: none;/);
   assert.match(stylesSource, /\.exercise-card\.is-complete\s*\{[\s\S]*?background: linear-gradient/);

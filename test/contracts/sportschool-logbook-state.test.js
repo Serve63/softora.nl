@@ -3,10 +3,18 @@ const assert = require('node:assert/strict');
 
 const {
   isCompletedOnDate,
+  nextFormStatus,
   readCanonicalExerciseSource,
   reconcileExerciseSources,
   setCompletedOnDate,
 } = require('../../assets/sportschool-logboek-state');
+
+test('vormstatus doorloopt per tik rood omlaag, geel gelijk en groen omhoog', () => {
+  assert.equal(nextFormStatus(''), 'down');
+  assert.equal(nextFormStatus('down'), 'same');
+  assert.equal(nextFormStatus('same'), 'up');
+  assert.equal(nextFormStatus('up'), 'down');
+});
 
 function exercise(kg, overrides = {}) {
   return {

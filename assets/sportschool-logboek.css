@@ -315,7 +315,7 @@ input:focus-visible {
 .exercise-title,
 .exercise-notes,
 .metric-input,
-.form-status-select {
+.form-status-button {
   border: 0;
   outline: 0;
   background: transparent;
@@ -423,7 +423,7 @@ input:focus-visible {
   box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
 }
 
-.form-status-select {
+.form-status-button {
   width: 100%;
   min-width: 0;
   height: 28px;
@@ -440,15 +440,15 @@ input:focus-visible {
   cursor: pointer;
 }
 
-.form-status-select[data-status="up"] {
+.form-status-button[data-status="up"] {
   color: #3d945c;
 }
 
-.form-status-select[data-status="down"] {
+.form-status-button[data-status="down"] {
   color: #bd3f4d;
 }
 
-.form-status-select[data-status="same"] {
+.form-status-button[data-status="same"] {
   color: #c9991b;
 }
 

@@ -5,6 +5,12 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   const SOURCE_FIELDS = ['title', 'notes', 'sets', 'reps', 'kg'];
   const COMPLETION_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+  const FORM_STATUS_CYCLE = ['down', 'same', 'up'];
+
+  function nextFormStatus(value) {
+    const currentIndex = FORM_STATUS_CYCLE.indexOf(String(value || '').trim().toLowerCase());
+    return FORM_STATUS_CYCLE[(currentIndex + 1) % FORM_STATUS_CYCLE.length];
+  }
 
   function normalizeCompletionDates(value) {
     const candidates = Array.isArray(value)
@@ -95,6 +101,7 @@
   return {
     isCompletedOnDate,
     mergeExerciseSource,
+    nextFormStatus,
     normalizeCompletionDates,
     readCanonicalExerciseSource,
     reconcileExerciseSources,
