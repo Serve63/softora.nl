@@ -11,6 +11,8 @@ const steps = [
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],
   ['run', 'test:postgres:mailbox-locks'],
+  ['run', 'test:postgres:mailbox-uid-generations'],
+  ['run', 'test:postgres:mailbox-uid-protocol-gate'],
   ['run', 'check:secrets'],
 ];
 
