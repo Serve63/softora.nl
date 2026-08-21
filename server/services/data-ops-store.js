@@ -1087,8 +1087,8 @@ function createSoftoraDataOpsStore(deps = {}) {
           .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at')
           .is('deleted_at', null)
           .order('updated_at', { ascending: false }),
-      { maxRows: 25000,
-        timeoutMs: dataOpsReadQueryTimeoutMs,
+      { maxRows: 25000, pageSize: options.pageSize,
+        timeoutMs: Math.max(dataOpsReadQueryTimeoutMs, Math.min(30_000, Number(options.timeoutMs) || dataOpsReadQueryTimeoutMs)),
         bypassReadFailureCooldown: options.bypassReadFailureCooldown,
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
