@@ -51,12 +51,14 @@ test('mailbox image loader haalt een afbeelding eenmalig op en wacht op decode',
       created += 1;
       this.complete = false;
       this.naturalWidth = 0;
+      this.naturalHeight = 0;
     }
 
     set src(_value) {
       this.complete = true;
       this.naturalWidth = 1200;
-      queueMicrotask(() => this.onload());
+      this.naturalHeight = 675;
+      queueMicrotask(() => this.onload?.());
     }
 
     async decode() {
@@ -83,7 +85,8 @@ test('mailbox image loader warmt alleen de eerste twee beeldmails vooruit', asyn
       requested.push(value);
       this.complete = true;
       this.naturalWidth = 1200;
-      queueMicrotask(() => this.onload());
+      this.naturalHeight = 675;
+      queueMicrotask(() => this.onload?.());
     }
 
     async decode() {}
@@ -144,6 +147,131 @@ test('mailbox image loader toont alleen de laatst gekozen mail na de decode', as
     assert.deepEqual(rendered, ['second']);
   } finally {
     loaded.restore();
+  }
+});
+
+test('mailbox image loader bewaart afmetingen voor een detailbatch boven de cachelimiet', async () => {
+  class FakeImage {
+    constructor() {
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+    }
+
+    set src(_value) {
+      this.complete = true;
+      this.naturalWidth = 1600;
+      this.naturalHeight = 900;
+    }
+  }
+
+  const loaded = loadModuleWithImage(FakeImage);
+  try {
+    const images = Array.from({ length: 25 }, (_unused, index) => (
+      proxyImage(`batch-${index + 1}`, `Afbeelding ${index + 1}`)
+    ));
+    const lease = await loaded.module.prepareForCommit(images);
+    assert.match(
+      loaded.module.renderInlineImage(images[0], String),
+      /width="1600" height="900"/
+    );
+    assert.match(
+      loaded.module.renderInlineImage(images.at(-1), String),
+      /width="1600" height="900"/
+    );
+    lease.release();
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox image loader herstelt een mislukte prewarm bij de detailcommit', async () => {
+  let attempts = 0;
+  class RetryImage {
+    constructor() {
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+    }
+
+    set src(_value) {
+      attempts += 1;
+      if (attempts === 1) {
+        queueMicrotask(() => this.onerror?.());
+        return;
+      }
+      this.complete = true;
+      this.naturalWidth = 1280;
+      this.naturalHeight = 720;
+    }
+  }
+
+  const loaded = loadModuleWithImage(RetryImage);
+  try {
+    const image = proxyImage('retry', 'Hersteld beeld');
+    await loaded.module.prepare([image]);
+    assert.equal(loaded.module.renderInlineImage(image, String), '');
+
+    const lease = await loaded.module.prepareForCommit([image]);
+    assert.match(loaded.module.renderInlineImage(image, String), /width="1280" height="720"/);
+    assert.equal(attempts, 2);
+    lease.release();
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox image loader begrenst een decode die nooit afrondt', async () => {
+  let deadline;
+  class HangingDecodeImage {
+    constructor() {
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+    }
+
+    set src(_value) {
+      this.complete = true;
+      this.naturalWidth = 1440;
+      this.naturalHeight = 810;
+    }
+
+    decode() {
+      return new Promise(() => {});
+    }
+  }
+
+  const modulePath = require.resolve('../../assets/premium-mailbox-images.js');
+  delete require.cache[modulePath];
+  const originalImage = global.Image;
+  const originalInbox = global.SoftoraMailboxCampaignInbox;
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  global.Image = HangingDecodeImage;
+  global.setTimeout = (handler, delay) => {
+    assert.equal(delay, 15_000);
+    deadline = handler;
+    return 1;
+  };
+  global.clearTimeout = () => {};
+  global.SoftoraMailboxCampaignInbox = {
+    isSafeImageSource: (source) => String(source || '').startsWith('/api/mailbox/message-image?'),
+  };
+  const api = require(modulePath);
+  try {
+    const image = proxyImage('decode-hang', 'Begrensde decode');
+    const leasePending = api.prepareForCommit([image]);
+    deadline();
+    const lease = await leasePending;
+    assert.match(api.renderInlineImage(image, String), /width="1440" height="810"/);
+    lease.release();
+  } finally {
+    global.Image = originalImage;
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+    global.SoftoraMailboxCampaignInbox = originalInbox;
+    delete global.SoftoraMailboxImages;
+    delete require.cache[modulePath];
   }
 });
 

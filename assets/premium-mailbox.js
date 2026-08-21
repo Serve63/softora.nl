@@ -669,7 +669,7 @@ let activeFolder = 'outreach';
 let activeMail = null;
 let inboxUnreadCount = 0;
 let mailboxSyncState = null;
-let mailboxOwnerView = null, mailboxRefreshController = null, mailboxDiscoveryController = null;
+let mailboxOwnerView = null, mailboxRefreshController = null, mailboxDiscoveryController = null, mailboxDetailController = null;
 const mailboxToastController = window.SoftoraMailboxToast.create({ document });
 function toast(message, actionOptions) {
   mailboxToastController.show(message, actionOptions);
@@ -739,7 +739,13 @@ mailboxOwnerView = window.SoftoraMailboxOwnerSession.createView({
 });
 function isMailboxViewCurrent(token) { return mailboxOwnerView.isCurrent(token); }
 function resetDetailEmpty() {
-  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+  mailboxDetailController?.invalidate?.();
+  const detail = document.getElementById('mail-detail');
+  if (detail) {
+    detail.innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+    if (detail.dataset) delete detail.dataset.mailboxCommittedId;
+    if (detail.dataset) delete detail.dataset.mailboxDomDirty;
+  }
 }
 function formatMailDate(value, nowValue) {
   return window.SoftoraMailboxDisplay.formatMailDate(value, nowValue);
@@ -875,14 +881,14 @@ function renderList(options = {}) {
   let list = getMailsForFolder(activeFolder);
   const displayOptions = { activeFolder, account: getMailboxAccount() };
   const wrap = document.getElementById('mail-items'); const scrollWrap = document.getElementById('mail-results-scroll') || wrap;
-  if (!wrap) return;
+  if (!wrap) return null;
   const listScrollTop = Number.isFinite(Number(scrollWrap.scrollTop)) ? Number(scrollWrap.scrollTop) : 0;
   syncInboxBadgeFromCurrentFolder();
   if (!list.length) {
     const emptyText = mailboxSyncState?.warming ? 'Mailbox wordt bijgewerkt…' : 'Geen e-mails gevonden.';
     wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(emptyText)}</div>`;
     scrollWrap.scrollTop = listScrollTop;
-    return;
+    return null;
   }
   const hasVisibleActiveMail = activeMail != null && list.some((mail) => String(mail.id) === String(activeMail));
   if (!hasVisibleActiveMail) activeMail = null;
@@ -890,11 +896,12 @@ function renderList(options = {}) {
     activeMail, displayOptions, escapeHtml, display: window.SoftoraMailboxDisplay,
   })).join('');
   scrollWrap.scrollTop = listScrollTop;
-  if (!activeMail && options.openLatest !== false) openMail(list[0].id);
+  if (!activeMail && options.openLatest !== false) return openMail(list[0].id);
+  return null;
 }
-async function loadMailboxMessageBody(id) {
+async function loadMailboxMessageBody(id, options = {}) {
   if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.loadBody !== 'function') return; const mail = findMailById(id); if (!mail) return;
-  const token = mailboxOwnerView.getToken();
+  const token = options.token || mailboxOwnerView.getToken();
   if (!isMailboxViewCurrent(token)) return;
   await window.SoftoraMailboxIndex.loadBody({
     id, requestId: window.SoftoraMailboxCampaignInbox.getRequestId(mail),
@@ -904,7 +911,7 @@ async function loadMailboxMessageBody(id) {
     normalizeBodyImages: normalizeMailboxBodyImages,
     normalizeOptOutUrl: normalizeMailboxOptOutUrl,
     getActiveMail: () => activeMail,
-    openMail,
+    openMail: typeof options.openMail === 'function' ? options.openMail : openMail,
     isCurrent: () => isMailboxViewCurrent(token),
     signal: token.signal,
   });
@@ -915,41 +922,16 @@ function retryMailboxThreadMessage(id, messageKey) {
   const message = (Array.isArray(mail.threadMessages) ? mail.threadMessages : []).find((candidate) => window.SoftoraMailboxCampaignInbox.getActionMessageKey(candidate) === String(messageKey || ''));
   if (!message) return;
   message.bodyLoadError = ''; message.bodyLoading = true;
-  openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
-  void window.SoftoraMailboxIndex.loadThreadBodies({ mail, targetMessages: [message], retryFailed: true, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail, isCurrent: () => isMailboxViewCurrent(token), signal: token.signal });
+  void openMail(mail.id, { skipBodyFetch: true, skipContactTimeline: true, skipReadPersist: true });
 }
-function openMail(id, options = {}) {
-  const m = findMailById(id);
-  if (!m) return;
-  const token = mailboxOwnerView.ensureToken();
-  if (!isMailboxViewCurrent(token)) return;
-  const detailElement = document.getElementById('mail-detail');
-  const preserveDetailScroll = String(activeMail || '') === String(m.id || '');
-  const previousDetailBody = preserveDetailScroll ? detailElement?.querySelector?.('.detail-body') : null;
-  const detailScrollTop = previousDetailBody && Number.isFinite(Number(previousDetailBody.scrollTop)) ? Number(previousDetailBody.scrollTop) : 0;
-  const wasUnread = m.unread;
-  activeMail = m.id;
-  window.SoftoraMailboxDetailState?.select?.(m.id);
-  if (wasUnread) window.SoftoraMailboxUiState.markReadOnOpen({ mail: m, skipReadPersist: options.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail });
-  renderList({ openLatest: false });
-  if ((!m.bodyLoaded || m.recipientRoutingNeedsHydration) && !options.skipBodyFetch) void loadMailboxMessageBody(m.id);
-  if (!options.skipThreadBodyFetch && activeFolder === 'outreach' && (window.SoftoraMailboxCampaignInbox.isCampaignMail(m) || m.contactTimelineLoaded)) void window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail: m, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail, isCurrent: () => isMailboxViewCurrent(token), signal: token.signal });
-  const conversationBodyImages = window.SoftoraMailboxImages?.getConversationImages?.(m) || m.bodyImages;
-  const imagesPending = !options.imagesPrepared && Boolean(window.SoftoraMailboxImages?.stage?.(
-    conversationBodyImages,
-    () => isMailboxViewCurrent(token) && String(activeMail) === String(m.id),
-    () => {
-      if (isMailboxViewCurrent(token)) openMail(m.id, { skipBodyFetch: true, imagesPrepared: true, skipReadPersist: true });
-    }
-  ));
+function renderMailboxDetailHtml(m) {
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions); const contactDossier = window.SoftoraMailboxDiscovery.getContactDossier(m, { activeFolder, accountEmails: getMailboxAccounts(), campaignInbox: window.SoftoraMailboxCampaignInbox, fallbackTitle: window.SoftoraMailboxDisplay.formatDetailSubject(m.subject) }); const contactDossierMode = contactDossier.active; const detailTitle = contactDossier.title;
   const detailBody = m.safeBodyPreviewOnly ? (m.preview || '') : (m.body || m.preview || '');
-  const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
   const readState = window.SoftoraMailboxUiState.getReadState(m, window.SoftoraMailboxCampaignInbox);
-  detailElement.innerHTML = `
+  return `
     <div class="detail-body">
       <article class="detail-mail-block">
         <div class="detail-header">
@@ -974,15 +956,12 @@ function openMail(id, options = {}) {
           ${window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml)}${contactDossier.newMessageAction ? renderMailboxConversationAction(contactDossier.newMessageAction, m.id, { placement: 'contact-header' }) : ''}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending, contactDossierMode }))}</div>
+        <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: true, contactDossierMode }))}</div>
       </article>
     </div>`;
-  if (preserveDetailScroll) {
-    const nextDetailBody = detailElement.querySelector?.('.detail-body');
-    if (nextDetailBody) nextDetailBody.scrollTop = detailScrollTop;
-  }
-  window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: m.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail });
-  if (!options.skipContactTimeline) void mailboxDiscoveryController?.loadContactTimeline?.(m);
+}
+function openMail(id, options = {}) {
+  return mailboxDetailController?.open?.(id, options) || Promise.resolve({ committed: false, stale: true });
 }
 async function deleteMail(id) {
   const m = findMailById(id);
@@ -1082,9 +1061,23 @@ function bindMailboxActions() {
   });
   mailboxComposeController.bind();
 }
-bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody, openMail });
+bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: (id) => openMail(id, { skipReadPersist: true }), openMail });
 mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getMessageOwner: (mail) => window.SoftoraMailboxCampaignInbox.getMessageOwner(mail), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail, resetDetail: resetDetailEmpty });
 mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, initiallyChecking: true, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
+mailboxDetailController = window.SoftoraMailboxDetailStability?.createController?.({
+  getMail: findMailById, ensureToken: () => mailboxOwnerView.ensureToken(), isTokenCurrent: isMailboxViewCurrent,
+  getScope: () => ({ folder: activeFolder, owner: activeFolder === 'outreach' ? window.SoftoraMailboxCampaignInbox.getOwner() : '', account: activeFolder === 'outreach' ? '' : activeMailboxAccount }),
+  getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, select: (id) => window.SoftoraMailboxDetailState?.select?.(id), renderList,
+  onSelect: (mail, openOptions) => { if (mail.unread) window.SoftoraMailboxUiState.markReadOnOpen({ mail, skipReadPersist: openOptions.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail }); },
+  getDetailElement: () => document.getElementById('mail-detail'), renderHtml: renderMailboxDetailHtml,
+  needsRootHydration: (mail, openOptions) => (!mail.bodyLoaded || mail.recipientRoutingNeedsHydration) && !openOptions.skipBodyFetch,
+  hydrateRoot: ({ mail, token, signal, requestRender }) => loadMailboxMessageBody(mail.id, { token: { ...token, signal }, openMail: requestRender }),
+  hydrateTimeline: ({ mail, signal }) => mailboxDiscoveryController?.loadContactTimeline?.(mail, { deferRender: true, signal }),
+  shouldHydrateThread: (mail, openOptions) => !openOptions.skipThreadBodyFetch && activeFolder === 'outreach' && (window.SoftoraMailboxCampaignInbox.isCampaignMail(mail) || mail.contactTimelineLoaded),
+  hydrateThread: ({ mail, signal, isCurrent, requestRender }) => window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail: requestRender, isCurrent, signal }),
+  prepare: (mail, openOptions) => openOptions.imagesPrepared ? null : window.SoftoraMailboxImages?.prepareForCommit?.(window.SoftoraMailboxImages?.getConversationImages?.(mail) || mail.bodyImages),
+  afterCommit: (mail, { changed }) => { window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: mail.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail }); if (changed) { try { window.dispatchEvent?.(new CustomEvent('softora:mailbox-detail-committed', { detail: { id: String(mail.id || '') } })); } catch (_) {} } },
+});
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
 if (mailboxAccountSwitcher) {
@@ -1171,7 +1164,8 @@ window.addEventListener('keydown', (event) => {
   } catch (error) {
     toast(String(error?.message || 'Mailbox laden mislukt'));
   } finally {
-    mailboxRefreshController?.start?.(); window.SoftoraMailboxBoot?.markReady?.();
+    window.SoftoraMailboxBoot?.markReady?.();
+    mailboxRefreshController?.start?.();
   }
 })();
 })();

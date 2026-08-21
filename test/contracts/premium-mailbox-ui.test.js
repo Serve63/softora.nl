@@ -25,6 +25,7 @@ const listScriptPath = path.join(__dirname, '../../assets/premium-mailbox-list.j
 const deleteScriptPath = path.join(__dirname, '../../assets/premium-mailbox-delete.js');
 const readScriptPath = path.join(__dirname, '../../assets/premium-mailbox-read.js');
 const uiStateScriptPath = path.join(__dirname, '../../assets/premium-mailbox-ui-state.js');
+const detailStabilityScriptPath = path.join(__dirname, '../../assets/premium-mailbox-detail-stability.js');
 const ownerSessionModule = require('../../assets/premium-mailbox-owner-session.js');
 const provenanceModule = require('../../assets/premium-mailbox-message-provenance.js');
 global.SoftoraMailboxMessageProvenance = provenanceModule;
@@ -53,6 +54,7 @@ const readModule = require('../../assets/premium-mailbox-read.js');
 const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
 const bodySectionModule = require('../../assets/premium-mailbox-body-section.js');
 const detailStateModule = require('../../assets/premium-mailbox-detail-state.js');
+const detailStabilityModule = require('../../assets/premium-mailbox-detail-stability.js');
 const discoveryModule = require('../../assets/premium-mailbox-discovery.js');
 
 function readPage() {
@@ -139,6 +141,25 @@ function readUiStateScript() {
   return fs.readFileSync(uiStateScriptPath, 'utf8');
 }
 
+function readDetailStabilityScript() {
+  return fs.readFileSync(detailStabilityScriptPath, 'utf8');
+}
+
+function loadMailboxImagesModuleForTest(options = {}) {
+  const window = {
+    Image: options.Image,
+    clearTimeout: options.clearTimeout || (() => {}),
+    setTimeout: options.setTimeout || (() => 0),
+    SoftoraMailboxCampaignInbox: {
+      isSafeImageSource: (value) => Boolean(String(value || '').trim()),
+    },
+  };
+  const context = { window };
+  vm.createContext(context);
+  vm.runInContext(readImagesScript(), context);
+  return window.SoftoraMailboxImages;
+}
+
 test('mailbox gebruikt de juiste browsertitel', () => {
   const page = readPage();
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
@@ -147,9 +168,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260820b/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
-  assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20260820c/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260820a/);
+  assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20260821a/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260818a/);
@@ -162,14 +183,18 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260820b/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260818b/);
-  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260813a/);
-  assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260813a/);
+  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260821a/);
+  assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
+  assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260821a/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260820c') < page.indexOf('premium-mailbox-signature.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260820a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260820b'));
+  assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260821a'));
+  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260821a') < page.indexOf('premium-mailbox-index.js?v=20260821a'));
   assert.match(readSignatureScript(), /renderContactCard/);
   assert.match(readMessagePresentationScript(), /getSourceSafeMessagePresentation/);
+  assert.match(readDetailStabilityScript(), /function create\(\)/);
 });
 
 test('campaign inbox laadt de canonieke quoteparser ook zelfstandig via CommonJS', () => {
@@ -210,39 +235,201 @@ test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
 test('mailbox initialiseert met de opgeslagen eigenaar en toont geen verkeerde scope tijdens boot', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
+  const stabilitySource = readDetailStabilityScript();
   const campaignSource = readCampaignInboxScript();
   assert.match(campaignSource, /SoftoraMailboxOwnerPreference/);
   assert.match(pageSource, /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
   assert.match(scriptSource, /SoftoraMailboxBoot\?\.markReady\?\.\(\);/);
+  assert.doesNotMatch(scriptSource, /mailboxBootDetailPromise|await firstDetail/);
+  assert.match(scriptSource, /finally \{\s*window\.SoftoraMailboxBoot\?\.markReady\?\.\(\);\s*mailboxRefreshController\?\.start\?\.\(\);/);
+  assert.match(stabilitySource, /setAttribute\?\.\('inert', ''\)/);
+  assert.match(pageSource, /\.mail-detail\.is-detail-pending::after \{ content: 'E-mail laden…';/);
+  assert.match(readOwnerSessionScript(), /if \(campaignResult\.fromBootstrap && canApply\(candidate\)\) \{\s*void load\(\{/);
   assert.match(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-boot.js'), 'utf8'), /if \(!ready\) return;/);
   assert.match(pageSource, /main\.is-premium-boot-host > \.premium-boot-shell\.is-booting \{ visibility: hidden; \}/);
 });
 
+test('detailstabiliteit hergebruikt dezelfde loader-run en commit pas na hydrate en prepare', async () => {
+  const stability = detailStabilityModule.create();
+  const identity = {};
+  const events = [];
+  let releaseHydration;
+  const hydration = new Promise((resolve) => { releaseHydration = resolve; });
+  const options = {
+    id: 'contact:serve:test',
+    key: '1|outreach|serve||contact:serve:test',
+    identity,
+    isCurrent: () => true,
+    hydrate: async () => { events.push('hydrate'); await hydration; return identity; },
+    prepare: async () => {
+      events.push('prepare');
+      return { release: () => events.push('release') };
+    },
+    commit: () => { events.push('commit'); return true; },
+  };
+
+  const first = stability.run(options);
+  await Promise.resolve();
+  const reused = stability.run({ ...options, commit: () => { throw new Error('dubbele commit'); } });
+  assert.strictEqual(reused, first);
+  assert.deepEqual(events, ['hydrate']);
+
+  releaseHydration();
+  const result = await first;
+  assert.equal(result.committed, true);
+  assert.deepEqual(events, ['hydrate', 'prepare', 'commit', 'release']);
+});
+
+test('detailstabiliteit laat A naar B naar A en reset nooit een stale run committen', async () => {
+  const stability = detailStabilityModule.create();
+  const commits = [];
+  let releaseFirstA;
+  let releaseB;
+  let releaseDeleted;
+  const firstAWait = new Promise((resolve) => { releaseFirstA = resolve; });
+  const bWait = new Promise((resolve) => { releaseB = resolve; });
+  const deletedWait = new Promise((resolve) => { releaseDeleted = resolve; });
+  const firstA = stability.run({
+    id: 'a', key: 'scope|a', identity: {}, isCurrent: () => true,
+    hydrate: () => firstAWait, commit: () => { commits.push('stale-a'); return true; },
+  });
+  await Promise.resolve();
+  const b = stability.run({
+    id: 'b', key: 'scope|b', identity: {}, isCurrent: () => true,
+    hydrate: () => bWait, commit: () => { commits.push('stale-b'); return true; },
+  });
+  await Promise.resolve();
+  const finalA = stability.run({
+    id: 'a', key: 'scope|a', identity: {}, isCurrent: () => true,
+    hydrate: async () => 'final-a', commit: () => { commits.push('final-a'); return true; },
+  });
+  assert.equal((await finalA).committed, true);
+  releaseFirstA();
+  releaseB();
+  assert.equal((await firstA).committed, false);
+  assert.equal((await b).committed, false);
+
+  const deleted = stability.run({
+    id: 'deleted', key: 'scope|deleted', identity: {}, isCurrent: () => true,
+    hydrate: () => deletedWait, commit: () => { commits.push('deleted'); return true; },
+  });
+  await Promise.resolve();
+  stability.invalidate();
+  releaseDeleted();
+  assert.equal((await deleted).committed, false);
+  assert.deepEqual(commits, ['final-a']);
+});
+
+test('detailstabiliteit ruimt een stale laadlaag op zonder een nieuwere run te raken', async () => {
+  const classes = new Set();
+  const attributes = new Map();
+  const detail = {
+    dataset: {},
+    innerHTML: '',
+    classList: {
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
+      contains(name) { return classes.has(name); },
+    },
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    removeAttribute(name) { attributes.delete(name); },
+    querySelector() { return null; },
+  };
+  const mail = { id: 'a' };
+  let currentToken = { generation: 1, signal: new AbortController().signal };
+  let releasePreparation;
+  const preparation = new Promise((resolve) => { releasePreparation = resolve; });
+  const controller = detailStabilityModule.createController({
+    getMail: (id) => id === mail.id ? mail : null,
+    ensureToken: () => currentToken,
+    isTokenCurrent: (token) => token === currentToken,
+    getScope: () => ({ folder: 'inbox', account: 'serve@softora.nl' }),
+    getActiveMail: () => mail.id,
+    setActiveMail() {},
+    select() {},
+    renderList() {},
+    getDetailElement: () => detail,
+    renderHtml: () => '<p>A</p>',
+    prepare: () => preparation,
+  });
+
+  const pending = controller.open(mail.id);
+  await Promise.resolve();
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+  currentToken = { generation: 2, signal: new AbortController().signal };
+  releasePreparation();
+  assert.equal((await pending).stale, true);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(attributes.has('inert'), false);
+});
+
+test('contacttijdlijn heeft een harde deadline zodat maildetail altijd kan committen', async () => {
+  const mail = {
+    id: 'contact:deadline',
+    externalContactEmail: 'klant@example.nl',
+    canonicalOwner: 'serve',
+  };
+  const discovery = discoveryModule.create({
+    document: { getElementById() { return null; } },
+    fetch: () => new Promise(() => {}),
+    timelineTimeoutMs: 20,
+    getActiveMail: () => mail.id,
+    getAccountEmails: () => ['serve@softora.nl'],
+    getMessageOwner: () => 'serve',
+  });
+  const startedAt = Date.now();
+  const loaded = await discovery.loadContactTimeline(mail, { deferRender: true });
+  assert.equal(loaded, false);
+  assert.ok(Date.now() - startedAt < 250);
+  assert.equal(mail.contactTimelineLoading, false);
+  assert.match(mail.contactTimelineError, /volgende poging/);
+});
+
 function loadMailboxHelpersForTest(options = {}) {
   const elements = new Map();
+  const documentListeners = new Map();
   function getElement(id) {
     if (!elements.has(id)) {
-      elements.set(id, {
-        innerHTML: '',
+      const classes = new Set();
+      const attributes = Object.create(null);
+      const element = {
+        _innerHTML: '',
+        innerHTMLWrites: 0,
         textContent: '',
         value: '',
         hidden: false,
         dataset: {},
         addEventListener() {},
         appendChild() {},
-        classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} },
-        setAttribute() {},
-        getAttribute() { return ''; },
+        classList: {
+          add(...names) { names.forEach((name) => classes.add(name)); },
+          remove(...names) { names.forEach((name) => classes.delete(name)); },
+          contains(name) { return classes.has(name); },
+          toggle(name, force) { const enabled = force == null ? !classes.has(name) : Boolean(force); if (enabled) classes.add(name); else classes.delete(name); return enabled; },
+        },
+        setAttribute(name, value) { attributes[name] = String(value); },
+        getAttribute(name) { return Object.prototype.hasOwnProperty.call(attributes, name) ? attributes[name] : null; },
+        hasAttribute(name) { return Object.prototype.hasOwnProperty.call(attributes, name); },
+        removeAttribute(name) { delete attributes[name]; },
         contains() { return false; },
         querySelector() { return null; },
         closest() { return null; },
+      };
+      Object.defineProperty(element, 'innerHTML', {
+        configurable: true,
+        get() { return this._innerHTML; },
+        set(value) { this._innerHTML = String(value); this.innerHTMLWrites += 1; },
       });
+      elements.set(id, element);
     }
     return elements.get(id);
   }
   const document = {
     readyState: 'complete',
-    addEventListener() {},
+    addEventListener(type, handler) {
+      if (!documentListeners.has(type)) documentListeners.set(type, []);
+      documentListeners.get(type).push(handler);
+    },
     getElementById(id) { return getElement(id); },
     createElement(tagName) {
       return {
@@ -282,7 +469,8 @@ function loadMailboxHelpersForTest(options = {}) {
     SoftoraMailboxBodySection: bodySectionModule,
     SoftoraUiStateClient: null,
     SoftoraMailboxDetailState: detailStateModule.createMailboxDetailState(),
-    SoftoraMailboxDiscovery: discoveryModule,
+    SoftoraMailboxDetailStability: detailStabilityModule,
+    SoftoraMailboxDiscovery: options.SoftoraMailboxDiscovery || discoveryModule,
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
     confirm: options.confirm || (() => false),
@@ -302,19 +490,24 @@ function loadMailboxHelpersForTest(options = {}) {
     AbortController,
     console,
     document,
+    documentListeners,
     window,
     clearTimeout: options.clearTimeout || (() => {}),
     setTimeout: options.setTimeout || (() => 0),
     fetch: fetchImpl,
   };
-  const source = readScript().replace(
-    'bindMailboxActions();',
-    'window.__mailboxTest = { renderMailBody, renderMailboxRootIncomingMeta, normalizeMailboxApiMessage, formatMailDate, display: window.SoftoraMailboxDisplay, index: window.SoftoraMailboxIndex, openMail, loadMailboxMessageBody, setMails(value) { mails = value; }, getActiveMail() { return activeMail; }, getElement(id) { return document.getElementById(id); } }; bindMailboxActions();'
-  );
+  const source = readScript()
+    .replace('(async function initMailboxAccount() {', 'window.__mailboxInitPromise = (async function initMailboxAccount() { return;')
+    .replace(
+      'bindMailboxActions();',
+      'window.__mailboxTest = { renderMailBody, renderMailboxRootIncomingMeta, normalizeMailboxApiMessage, formatMailDate, display: window.SoftoraMailboxDisplay, index: window.SoftoraMailboxIndex, openMail, deleteMail, loadMailboxMessageBody, setMails(value) { mails = value; }, setActiveFolder(value) { activeFolder = value; }, getActiveMail() { return activeMail; }, getElement(id) { return document.getElementById(id); }, dispatchDocumentEvent(type, event) { (documentListeners.get(type) || []).forEach((handler) => handler(event)); } }; bindMailboxActions();'
+    );
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
   vm.runInContext(readIndexScript(), context);
+  if (options.SoftoraMailboxIndex) Object.assign(context.window.SoftoraMailboxIndex, options.SoftoraMailboxIndex);
   vm.runInContext(source, context);
+  context.window.__mailboxTest.ready = context.window.__mailboxInitPromise || Promise.resolve();
   return context.window.__mailboxTest;
 }
 
@@ -890,7 +1083,7 @@ test('elk inkomend bericht toont datum tijd en afzender direct boven de eigen in
   const pageSource = readPage();
   assert.match(
     scriptSource,
-    /renderMailBody\(detailBody, detailBodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady/
+    /renderMailBody\(detailBody, m\.bodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady: true/
   );
   assert.doesNotMatch(scriptSource, /detail-body-text">\$\{rootIncomingMeta\}/);
   assert.doesNotMatch(scriptSource, /<div class="detail-date">/);
@@ -1229,7 +1422,7 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
   assert.equal(mail.threadMessages[2].body, 'Dit bericht was al volledig.');
   assert.equal(mail.threadMessages[3].body, '');
   assert.equal(mail.threadMessages[3].bodyTruncated, true);
-  assert.equal(rerenders.length, 3);
+  assert.equal(rerenders.length, 1);
   assert.ok(rerenders.every((entry) => entry.id === mail.id));
   assert.ok(rerenders.every((entry) => (
     entry.options.skipBodyFetch === true && entry.options.skipThreadBodyFetch === true
@@ -1562,10 +1755,11 @@ test('mailbox lekt geen previews uit gesorteerde inkomende en uitgaande threadka
   );
 });
 
-test('mailbox toont legacy snapshotmedia nooit kort voordat de exacte body geladen is', () => {
+test('mailbox toont legacy snapshotmedia nooit kort voordat de exacte body geladen is', async () => {
   const mailbox = loadMailboxHelpersForTest({
     fetch: async () => new Promise(() => {}),
   });
+  await mailbox.ready;
   const legacyCaption =
     'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
   const mail = mailbox.normalizeMailboxApiMessage({
@@ -1594,15 +1788,17 @@ test('mailbox toont legacy snapshotmedia nooit kort voordat de exacte body gelad
   mailbox.setMails([mail]);
   mailbox.openMail(mail.id);
 
-  const html = mailbox.getElement('mail-detail').innerHTML;
-  assert.match(html, /Met welk programma werk je/);
-  assert.match(html, /Volledige inhoud wordt opgehaald…/);
+  const detail = mailbox.getElement('mail-detail');
+  const html = detail.innerHTML;
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+  assert.equal(detail.hasAttribute('inert'), true);
   assert.doesNotMatch(html, /korte indruk van de eerste versie/);
   assert.doesNotMatch(html, /salontof\.nl-preview/);
 });
 
-test('Salon TOF contactdossier toont contacttitel en één nieuwe-berichtactie boven twaalf berichten', () => {
+test('Salon TOF contactdossier toont contacttitel en één nieuwe-berichtactie boven twaalf berichten', async () => {
   const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
   const contact = 'info@salontof.nl';
   const account = 'serve@softora.nl';
   const messages = Array.from({ length: 12 }, (_unused, index) => {
@@ -1644,7 +1840,7 @@ test('Salon TOF contactdossier toont contacttitel en één nieuwe-berichtactie b
   root.externalContactEmail = contact;
   root.threadMessages = messages.slice(0, 11);
   mailbox.setMails([root]);
-  mailbox.openMail(root.id, {
+  await mailbox.openMail(root.id, {
     skipBodyFetch: true,
     skipThreadBodyFetch: true,
     skipContactTimeline: true,
@@ -3436,10 +3632,10 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260820c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260821a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260820c/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260820b/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260813a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260821a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -3534,7 +3730,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260820b/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260820c/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260821a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3557,7 +3753,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /async function loadMailboxMessages\(options = \{\}\)/);
   assert.match(scriptSource, /window\.SoftoraMailboxRefresh\?\.create\(/);
   assert.match(scriptSource, /SoftoraMailboxRefresh\?\.create\(\{ autoStart: false, initiallyChecking: true,/);
-  assert.match(scriptSource, /\} catch \(error\) \{[\s\S]*\} finally \{\s*mailboxRefreshController\?\.start\?\.\(\);/);
+  assert.match(scriptSource, /\} catch \(error\) \{[\s\S]*\} finally \{\s*window\.SoftoraMailboxBoot\?\.markReady\?\.\(\);\s*mailboxRefreshController\?\.start\?\.\(\);/);
   assert.equal((scriptSource.match(/mailboxRefreshController\?\.start\?\.\(\)/g) || []).length, 1);
   assert.match(refreshSource, /const VISIBLE_REFRESH_INTERVAL_MS = 60 \* 1000;/);
   assert.match(refreshSource, /const HIDDEN_REFRESH_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -4156,7 +4352,7 @@ test('mailbox opent bij eerste paginalaad automatisch de meest recente zichtbare
 
   assert.match(renderListSource, /const hasVisibleActiveMail = activeMail != null && list\.some/);
   assert.match(renderListSource, /if \(!hasVisibleActiveMail\) activeMail = null;/);
-  assert.match(renderListSource, /if \(!activeMail && options\.openLatest !== false\) openMail\(list\[0\]\.id\);/);
+  assert.match(renderListSource, /if \(!activeMail && options\.openLatest !== false\) return openMail\(list\[0\]\.id\);/);
   assert.match(readOwnerSessionScript(), /renderList\?\.\(\{ openLatest: loadOptions\.openLatest !== false \}\)/);
   assert.match(scriptSource, /openLatest: !\(intent\.message \|\| intent\.email \|\| intent\.query\)/);
 });
@@ -5021,6 +5217,7 @@ test('mislukte reply voegt geen roze bericht toe en herstelt de composer exact',
 
 test('premium mailbox bewaart gelezen status optimistisch zonder mailboxreload', () => {
   const scriptSource = readScript();
+  const stabilitySource = readDetailStabilityScript();
   const readSource = readReadScript();
   const uiStateSource = readUiStateScript();
 
@@ -5032,9 +5229,9 @@ test('premium mailbox bewaart gelezen status optimistisch zonder mailboxreload',
   assert.match(readSource, /function setFailure\([\s\S]*target\.unread = previous\.unread;[\s\S]*target\.readError =/);
   assert.match(readSource, /function applyConfirmedState\(mail\)[\s\S]*mail\.unread = false/);
   assert.doesNotMatch(readSource, /loadMailboxMessages|campaign-replies/);
-  assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*SoftoraMailboxUiState\.markReadOnOpen\(/);
+  assert.match(scriptSource, /onSelect: \(mail, openOptions\) => \{ if \(mail\.unread\) window\.SoftoraMailboxUiState\.markReadOnOpen\(/);
   assert.match(scriptSource, /const scrollWrap = document\.getElementById\('mail-results-scroll'\) \|\| wrap;[\s\S]*const listScrollTop = Number\.isFinite\(Number\(scrollWrap\.scrollTop\)\)/);
-  assert.match(scriptSource, /const detailScrollTop = previousDetailBody && Number\.isFinite\(Number\(previousDetailBody\.scrollTop\)\)/);
+  assert.match(stabilitySource, /const scrollTop = previousBody && Number\.isFinite\(Number\(previousBody\.scrollTop\)\)/);
   assert.match(uiStateSource, /class="detail-mark-read[\s\S]*is-pending[\s\S]*aria-busy=/);
   assert.match(uiStateSource, /data-mailbox-action="retry-read"/);
   assert.match(readSource, /Gelezen status opslaan mislukt/);
@@ -5477,7 +5674,7 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| ''\)/);
   assert.doesNotMatch(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview/);
   assert.match(readDisplayScript(), /function renderDetailBody\(mail, content\)[\s\S]*Volledige inhoud wordt opgehaald…/);
-  assert.match(scriptSource, /renderMailBody\(detailBody, detailBodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady/);
+  assert.match(scriptSource, /renderMailBody\(detailBody, m\.bodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady: true/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
 
@@ -5745,16 +5942,105 @@ test('premium mailbox behoudt mail-enters en vervangt image placeholders inline'
   assert.doesNotMatch(labelOnlyHtml, />https:\/\/www\.softora\.nl\/afmelden/);
 });
 
-test('premium mailbox toont een beeldmail pas nadat de afbeelding is voorbereid', () => {
-  const script = readScript();
-  assert.match(readOwnerSessionScript(), /options\.prewarm\?\.\(messages\)/);
-  assert.match(script, /SoftoraMailboxImages\?\.stage\?\.\(\s*conversationBodyImages/);
-  assert.match(script, /imagesPrepared:\s*true/);
-  assert.match(script, /const detailBodyImages = imagesPending \? \[\] : m\.bodyImages;/);
+test('beeldvoorbereiding reserveert de exacte verhouding en sluit mislukte bronnen voor de detailcommit uit', async () => {
+  let loadedImage;
+  let decodeCalls = 0;
+  class LoadedImage {
+    constructor() {
+      loadedImage = this;
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+    }
+    set src(value) { this.source = value; }
+    async decode() { decodeCalls += 1; }
+  }
+  const loadedApi = loadMailboxImagesModuleForTest({ Image: LoadedImage });
+  const loaded = { alt: 'Stabiel beeld', dataUrl: '/api/mailbox/message-image?case=loaded' };
+  const loadedPending = loadedApi.prepare([loaded]);
+  loadedImage.complete = true;
+  loadedImage.naturalWidth = 1600;
+  loadedImage.naturalHeight = 900;
+  loadedImage.onload();
+  await loadedPending;
+  const loadedHtml = loadedApi.renderInlineImage(loaded, String);
+  assert.equal(decodeCalls, 1);
+  assert.match(loadedHtml, /width="1600" height="900"/);
+
+  let failedImage;
+  class FailedImage {
+    constructor() {
+      failedImage = this;
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+    }
+    set src(value) { this.source = value; }
+  }
+  const failedApi = loadMailboxImagesModuleForTest({ Image: FailedImage });
+  const failed = { alt: 'Defect beeld', dataUrl: '/api/mailbox/message-image?case=failed' };
+  const failedPending = failedApi.prepare([failed]);
+  failedImage.onerror();
+  await failedPending;
+  assert.equal(failedApi.renderInlineImage(failed, String), '');
 });
 
-test('premium mailbox vervangt het oude detail direct wanneer een nieuwe mail nog geladen wordt', () => {
-  const mailbox = loadMailboxHelpersForTest();
+test('beeldtimeout blijft definitief buiten de DOM wanneer een late load alsnog arriveert', async () => {
+  let delayedImage;
+  let timeoutHandler;
+  class DelayedImage {
+    constructor() {
+      delayedImage = this;
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+    }
+    set src(value) { this.source = value; }
+    async decode() {}
+  }
+  const api = loadMailboxImagesModuleForTest({
+    Image: DelayedImage,
+    setTimeout(handler, delay) {
+      assert.equal(delay, 15_000);
+      timeoutHandler = handler;
+      return 1;
+    },
+  });
+  const delayed = { alt: 'Te laat beeld', dataUrl: '/api/mailbox/message-image?case=timeout' };
+  const pending = api.prepare([delayed]);
+  const lateLoad = delayedImage.onload;
+  timeoutHandler();
+  await pending;
+  assert.equal(api.renderInlineImage(delayed, String), '');
+
+  delayedImage.complete = true;
+  delayedImage.naturalWidth = 1200;
+  delayedImage.naturalHeight = 800;
+  lateLoad();
+  await Promise.resolve();
+  assert.equal(api.renderInlineImage(delayed, String), '');
+});
+
+test('premium mailbox toont een beeldmail pas nadat de afbeelding is voorbereid', () => {
+  const script = readScript();
+  const stability = readDetailStabilityScript();
+  assert.match(readOwnerSessionScript(), /options\.prewarm\?\.\(messages\)/);
+  assert.match(script, /prepare: \(mail, openOptions\) => openOptions\.imagesPrepared \? null : window\.SoftoraMailboxImages\?\.prepareForCommit\?\./);
+  assert.match(stability, /await options\.prepare\(value, context\)/);
+  assert.match(stability, /if \(!isCurrent\(candidate\)\) return \{ committed: false, stale: true, error \};[\s\S]*options\.commit/);
+});
+
+test('premium mailbox houdt het oude detail stabiel tot de nieuwe mail volledig kan committen', async () => {
+  let releaseImages;
+  const imagePreparation = new Promise((resolve) => { releaseImages = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: () => [{ alt: 'Voorbereiden', dataUrl: 'data:image/png;base64,AA==' }],
+      prepareForCommit: () => imagePreparation,
+    },
+  });
+  await mailbox.ready;
   const previous = mailbox.normalizeMailboxApiMessage({
     id: 'serve:inbox:1',
     folder: 'inbox',
@@ -5777,18 +6063,432 @@ test('premium mailbox vervangt het oude detail direct wanneer een nieuwe mail no
   });
   mailbox.setMails([previous, next]);
 
-  mailbox.openMail(previous.id, { skipBodyFetch: true });
+  await mailbox.openMail(previous.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
   assert.match(mailbox.getElement('mail-detail').innerHTML, /Vorige afzender/);
   assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Vorige mail/);
 
-  mailbox.openMail(next.id);
+  const detail = mailbox.getElement('mail-detail');
+  const writesBefore = detail.innerHTMLWrites;
+  const pending = mailbox.openMail(next.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+  });
+  await Promise.resolve();
 
   assert.equal(mailbox.getActiveMail(), next.id);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Nieuwe afzender/);
-  assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Nieuwe mail/);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledige inhoud wordt opgehaald…/);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Dit is alvast de nieuwe mail\./);
-  assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Vorige mail|Dit is de oude mail\./);
+  assert.match(detail.innerHTML, /Vorige afzender/);
+  assert.doesNotMatch(detail.innerHTML, /Nieuwe afzender/);
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+  assert.equal(detail.hasAttribute('inert'), true);
+
+  releaseImages();
+  assert.equal((await pending).committed, true);
+  assert.match(detail.innerHTML, /Nieuwe afzender/);
+  assert.match(detail.innerHTML, /Dit is alvast de nieuwe mail\./);
+  assert.doesNotMatch(detail.innerHTML, /Vorige afzender|Dit is de oude mail\./);
+  assert.equal(detail.innerHTMLWrites, writesBefore + 1);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+});
+
+test('premium mailbox herschrijft identieke detailhtml niet opnieuw', async () => {
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:stable',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Stabiele afzender',
+    email: 'stabiel@example.nl',
+    subject: 'Stabiel detail',
+    body: 'Deze inhoud verandert niet.',
+    receivedAt: '2026-08-20T12:00:00.000Z',
+  });
+  mailbox.setMails([mail]);
+  const detail = mailbox.getElement('mail-detail');
+
+  const first = await mailbox.openMail(mail.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+  assert.equal(first.committed, true);
+  const writesAfterFirstCommit = detail.innerHTMLWrites;
+
+  const repeated = await mailbox.openMail(mail.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+  assert.equal(repeated.stale, false);
+  assert.equal(detail.innerHTMLWrites, writesAfterFirstCommit);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+});
+
+test('premium mailbox herstelt bewust gemuteerde detail-DOM ook bij identieke HTML', async () => {
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:image-recovery', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Beeldafzender', email: 'beeld@example.nl', subject: 'Beeldherstel',
+    body: 'Ongewijzigde inhoud.', receivedAt: '2026-08-20T12:00:00.000Z',
+  });
+  mailbox.setMails([mail]);
+  const detail = mailbox.getElement('mail-detail');
+  await mailbox.openMail(mail.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true, imagesPrepared: true,
+  });
+  const writesAfterFirstCommit = detail.innerHTMLWrites;
+  detail.dataset.mailboxDomDirty = 'true';
+
+  const recovered = await mailbox.openMail(mail.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true, imagesPrepared: true,
+  });
+  assert.equal(recovered.committed, true);
+  assert.equal(detail.innerHTMLWrites, writesAfterFirstCommit + 1);
+  assert.equal(detail.dataset.mailboxDomDirty, undefined);
+});
+
+test('mailbox afbeeldingsfout invalidereert de exacte bron en forceert zichtbaar herstel', async () => {
+  const invalidated = [];
+  const source = '/api/mailbox/message-image?mail=recovery&index=0';
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: (mail) => mail.bodyImages,
+      prepareForCommit: () => null,
+      invalidate(value) { invalidated.push(value); return true; },
+    },
+    SoftoraMailboxIndex: {
+      async loadBody({ id, getMail }) {
+        const mail = getMail(id);
+        mail.bodyLoaded = true;
+        mail.bodyImagesTruncated = false;
+      },
+    },
+  });
+  await mailbox.ready;
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:image-error', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'Beeldafzender', email: 'beeld@example.nl', subject: 'Beeldfout', body: 'Met afbeelding.',
+    bodyImages: [{ alt: 'Herstelbeeld', dataUrl: source }], bodyImageEvidenceKnown: true,
+    receivedAt: '2026-08-20T12:00:00.000Z',
+  });
+  mailbox.setMails([mail]);
+  const detail = mailbox.getElement('mail-detail');
+  await mailbox.openMail(mail.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true, imagesPrepared: true,
+  });
+  const writesBeforeRecovery = detail.innerHTMLWrites;
+  assert.match(detail.innerHTML, /data-mailbox-inline-image/);
+  const figure = { classList: { add() {} } };
+  const image = {
+    style: {},
+    currentSrc: `https://www.softora.nl${source}`,
+    src: `https://www.softora.nl${source}`,
+    getAttribute(name) { return name === 'src' ? source : null; },
+    matches(selector) { return selector === '[data-mailbox-inline-image]'; },
+    closest(selector) {
+      if (selector === '.mail-detail') return detail;
+      if (selector === '.detail-mail-image') return figure;
+      return null;
+    },
+  };
+
+  mailbox.dispatchDocumentEvent('error', { target: image });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(invalidated, [source]);
+  assert.equal(detail.innerHTMLWrites, writesBeforeRecovery + 1);
+  assert.equal(detail.dataset.mailboxDomDirty, undefined);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+});
+
+test('afbeeldingsfout tijdens pending A muteert geen mail en forceert de ene eindcommit', async () => {
+  let releaseImages;
+  const imageWait = new Promise((resolve) => { releaseImages = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: () => [{ alt: 'A', dataUrl: '/api/mailbox/message-image?mail=a' }],
+      prepareForCommit: () => imageWait,
+    },
+  });
+  await mailbox.ready;
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:a-again', folder: 'inbox', accountEmail: 'serve@softora.nl',
+    from: 'A', email: 'a@example.nl', subject: 'A opnieuw', body: 'A blijft intact.',
+    receivedAt: '2026-08-20T12:00:00.000Z',
+  });
+  mailbox.setMails([mail]);
+  const detail = mailbox.getElement('mail-detail');
+  await mailbox.openMail(mail.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true, imagesPrepared: true,
+  });
+  const writesBeforePending = detail.innerHTMLWrites;
+
+  const pending = mailbox.openMail(mail.id, {
+    skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true,
+  });
+  assert.equal(detail.dataset.mailboxPendingId, mail.id);
+  let figureMarked = false;
+  const figure = { classList: { add() { figureMarked = true; } } };
+  const oldImage = {
+    style: {},
+    matches(selector) { return selector === '[data-mailbox-inline-image]'; },
+    closest(selector) {
+      if (selector === '.mail-detail') return detail;
+      if (selector === '.detail-mail-image') return figure;
+      return null;
+    },
+  };
+  mailbox.dispatchDocumentEvent('error', { target: oldImage });
+  assert.equal(figureMarked, false);
+  assert.equal(oldImage.style.visibility, undefined);
+  assert.equal(Boolean(mail.imageRecoveryAttempted), false);
+  assert.equal(mail.bodyLoaded, true);
+
+  releaseImages();
+  await pending;
+  assert.equal(detail.innerHTMLWrites, writesBeforePending + 1);
+  assert.equal(detail.dataset.mailboxDomDirty, undefined);
+});
+
+test('optimistische verwijdering neutraliseert oude detailacties voordat de volgende mail klaar is', async () => {
+  let releaseNextImages;
+  let nextPreparationStarted = false;
+  const nextImagesReady = new Promise((resolve) => { releaseNextImages = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraDialogs: { confirm: async () => true },
+    SoftoraMailboxDiscovery: {
+      ...discoveryModule,
+      create() {
+        return {
+          canOpenResult: () => true,
+          isSearchActive: () => false,
+          prepareCompleteContactTimelineForHide: async () => true,
+          refreshActiveTimeline: async () => true,
+          resetForScopeChange() {},
+          loadContactTimeline: async () => true,
+        };
+      },
+    },
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages(mail) {
+        return String(mail?.id || '').endsWith('|serve:inbox:delete-next')
+          ? [{ alt: 'Volgende afbeelding', dataUrl: 'data:image/png;base64,AA==' }]
+          : [];
+      },
+      prepareForCommit(images) {
+        if (!Array.isArray(images) || !images.length) return null;
+        nextPreparationStarted = true;
+        return nextImagesReady;
+      },
+    },
+    fetch: async (url) => {
+      if (String(url) === '/api/mailbox/messages/hide') {
+        return { ok: true, json: async () => ({ ok: true, result: { resolvedMessages: [] } }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          accounts: [{ email: 'serve@softora.nl', imapConfigured: true, smtpConfigured: true }],
+          messages: [],
+        }),
+      };
+    },
+  });
+  await mailbox.ready;
+  mailbox.setActiveFolder('inbox');
+  const previous = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:delete-current',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Te verwijderen afzender',
+    email: 'verwijderen@example.nl',
+    subject: 'Verwijderen',
+    body: 'Oude mail met acties.',
+    receivedAt: '2026-08-20T12:00:00.000Z',
+  });
+  const next = mailbox.normalizeMailboxApiMessage({
+    id: 'serve:inbox:delete-next',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Volgende afzender',
+    email: 'volgende@example.nl',
+    subject: 'Volgende mail',
+    body: 'Nieuwe stabiele inhoud.',
+    receivedAt: '2026-08-20T12:05:00.000Z',
+  });
+  mailbox.setMails([previous, next]);
+  await mailbox.openMail(previous.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+  const detail = mailbox.getElement('mail-detail');
+  assert.match(detail.innerHTML, /data-mailbox-action="delete-mail"/);
+
+  const deletion = mailbox.deleteMail(previous.id);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(nextPreparationStarted, true);
+  assert.equal(mailbox.getActiveMail(), next.id);
+  assert.equal(detail.dataset.mailboxPendingId, next.id);
+  assert.equal(detail.classList.contains('is-detail-pending'), true);
+  assert.equal(detail.hasAttribute('inert'), true);
+  assert.match(detail.innerHTML, /Te verwijderen afzender/);
+  assert.doesNotMatch(detail.innerHTML, /Volgende afzender/);
+
+  let oldFigureMarkedFailed = false;
+  const oldFigure = {
+    classList: { add() { oldFigureMarkedFailed = true; } },
+  };
+  const oldImage = {
+    style: {},
+    matches(selector) { return selector === '[data-mailbox-inline-image]'; },
+    closest(selector) {
+      if (selector === '.mail-detail') return detail;
+      if (selector === '.detail-mail-image') return oldFigure;
+      return null;
+    },
+  };
+  const nextBodyLoadedBeforeLateError = next.bodyLoaded;
+  mailbox.dispatchDocumentEvent('error', { target: oldImage });
+  assert.equal(next.bodyLoaded, nextBodyLoadedBeforeLateError);
+  assert.equal(Boolean(next.imageRecoveryAttempted), false);
+  assert.equal(oldFigureMarkedFailed, false);
+  assert.equal(oldImage.style.visibility, undefined);
+
+  releaseNextImages();
+  await deletion;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+  assert.match(detail.innerHTML, /Volgende afzender/);
+  assert.doesNotMatch(detail.innerHTML, /Te verwijderen afzender/);
+});
+
+test('premium mailbox commit gecombineerde body timeline thread en images exact eenmaal', async () => {
+  const events = [];
+  let releaseBody;
+  let releaseTimeline;
+  let releaseThread;
+  let releaseImages;
+  const bodyWait = new Promise((resolve) => { releaseBody = resolve; });
+  const timelineWait = new Promise((resolve) => { releaseTimeline = resolve; });
+  const threadWait = new Promise((resolve) => { releaseThread = resolve; });
+  const imagesWait = new Promise((resolve) => { releaseImages = resolve; });
+  const atomicDiscovery = {
+    ...discoveryModule,
+    create() {
+      return {
+        canOpenResult: () => true,
+        isSearchActive: () => false,
+        prepareCompleteContactTimelineForHide: async () => true,
+        refreshActiveTimeline: async () => true,
+        resetForScopeChange() {},
+        async loadContactTimeline(mail, options = {}) {
+          assert.equal(options.deferRender, true);
+          events.push('timeline:start');
+          await timelineWait;
+          mail.contactTimelineLoaded = true;
+          mail.threadMessages = [{
+            id: 'sent:atomic', mailboxId: 'sent:atomic', uid: 22, folder: 'sent',
+            accountEmail: 'serve@softora.nl', from: 'Servé Creusen', to: 'klant@example.nl',
+            body: '', preview: 'Oude preview', hasBody: true, bodyLoaded: false, bodyTruncated: true,
+            recipientRoutingEvidenceKnown: true, date: '2026-08-20T09:00:00.000Z',
+          }];
+          events.push('timeline:end');
+          return true;
+        },
+      };
+    },
+  };
+  const mailbox = loadMailboxHelpersForTest({
+    SoftoraMailboxDiscovery: atomicDiscovery,
+    SoftoraMailboxIndex: {
+      async loadBody({ id, getMail, openMail }) {
+        events.push('body:start');
+        await bodyWait;
+        const mail = getMail(id);
+        mail.body = 'Volledige ontvangen inhoud.';
+        mail.bodyLoaded = true;
+        mail.bodyLoading = false;
+        mail.bodyTruncated = false;
+        events.push('body:end');
+        openMail(id, { skipBodyFetch: true, skipReadPersist: true });
+      },
+      async loadThreadBodies({ mail, openMail }) {
+        events.push('thread:start');
+        await threadWait;
+        mail.threadMessages[0].body = 'Volledige eerdere mail.';
+        mail.threadMessages[0].bodyLoaded = true;
+        mail.threadMessages[0].bodyLoading = false;
+        mail.threadMessages[0].bodyTruncated = false;
+        events.push('thread:end');
+        openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
+        return true;
+      },
+    },
+    SoftoraMailboxImages: {
+      ...imagesModule,
+      getConversationImages: () => [{ alt: 'Atomisch', dataUrl: 'data:image/png;base64,AA==' }],
+      async prepareForCommit() { events.push('images:start'); await imagesWait; events.push('images:end'); },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'serve@softora.nl|inbox:atomic', mailboxId: 'inbox:atomic', folder: 'inbox',
+    accountEmail: 'serve@softora.nl', from: 'Klant', email: 'klant@example.nl',
+    to: 'serve@softora.nl', subject: 'Atomische conversatie', preview: 'Veilige preview',
+    body: '', hasBody: true, bodyTruncated: true, recipientRoutingEvidenceKnown: true,
+    receivedAt: '2026-08-20T10:00:00.000Z',
+  });
+  mail.body = '';
+  mail.bodyLoaded = false;
+  mail.hasBody = true;
+  mailbox.setMails([mail]);
+  const detail = mailbox.getElement('mail-detail');
+  const writesBefore = detail.innerHTMLWrites;
+
+  const pending = mailbox.openMail(mail.id);
+  await Promise.resolve();
+  assert.deepEqual(events, ['body:start', 'timeline:start']);
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+
+  releaseBody();
+  await Promise.resolve();
+  assert.doesNotMatch(events.join('|'), /thread:start/);
+  releaseTimeline();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(events.at(-1), 'thread:start');
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+
+  releaseThread();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(events.at(-1), 'images:start');
+  releaseImages();
+  assert.equal((await pending).committed, true);
+  assert.equal(detail.innerHTMLWrites, writesBefore + 1);
+  assert.match(detail.innerHTML, /Volledige ontvangen inhoud\./);
+  assert.match(detail.innerHTML, /Volledige eerdere mail\./);
+  assert.deepEqual(events, [
+    'body:start', 'timeline:start', 'body:end', 'timeline:end',
+    'thread:start', 'thread:end', 'images:start', 'images:end',
+  ]);
 });
 
 test('trage detailresponse houdt preview zichtbaar en verrijkt daarna automatisch naar ready', async () => {
@@ -6071,7 +6771,7 @@ test('client- en providerdeadline zijn gecoördineerd en tonen vroeg een partial
   assert.match(readIndexScript(), /const MAILBOX_BODY_PARTIAL_STATUS_DELAY_MS = 1200;/);
 });
 
-test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder terminale fout', () => {
+test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder terminale fout', async () => {
   const timers = [];
   let nextTimerId = 0;
   const mailbox = loadMailboxHelpersForTest({
@@ -6085,6 +6785,7 @@ test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder ter
       if (timer) timer.cancelled = true;
     },
   });
+  await mailbox.ready;
   const makePendingMail = () => mailbox.normalizeMailboxApiMessage({
     id: 'serve@softora.nl|inbox:bootstrap-slow',
     mailboxId: 'inbox:bootstrap-slow',
@@ -6097,7 +6798,7 @@ test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder ter
   });
 
   mailbox.setMails([makePendingMail()]);
-  mailbox.openMail('serve@softora.nl|inbox:bootstrap-slow', {
+  await mailbox.openMail('serve@softora.nl|inbox:bootstrap-slow', {
     skipBodyFetch: true,
     skipThreadBodyFetch: true,
   });
@@ -6108,7 +6809,7 @@ test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder ter
 
   const refreshedMail = makePendingMail();
   mailbox.setMails([refreshedMail]);
-  mailbox.openMail(refreshedMail.id, {
+  await mailbox.openMail(refreshedMail.id, {
     skipBodyFetch: true,
     skipThreadBodyFetch: true,
   });
@@ -6119,11 +6820,98 @@ test('zichtbare body blijft partial tijdens bootstrap-tokenvervanging zonder ter
   );
 
   firstDeadline.callback();
+  await Promise.resolve();
+  await Promise.resolve();
   const html = mailbox.getElement('mail-detail').innerHTML;
   assert.match(html, /Volledige inhoud wordt opgehaald…/);
   assert.doesNotMatch(html, /Laden duurde te lang/);
   assert.equal(refreshedMail.bodyLoadError || '', '');
   assert.equal(refreshedMail.bodyLoadState, 'partial');
+});
+
+test('geaborteerde same-mail bodyflight blokkeert de directe actuele vervanger niet', async () => {
+  let resolveStaleRequest;
+  let bodyFetches = 0;
+  const mailbox = loadMailboxHelpersForTest({
+    setTimeout,
+    clearTimeout,
+    fetch: async (url) => {
+      if (String(url) !== '/api/mailbox/messages/bodies') {
+        throw new Error(`Onverwachte fallback: ${url}`);
+      }
+      bodyFetches += 1;
+      if (bodyFetches === 1) {
+        return new Promise((resolve) => { resolveStaleRequest = resolve; });
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          messages: [{
+            resolved: true,
+            body: 'Actuele volledige inhoud.',
+            hasBody: true,
+            bodyTruncated: false,
+            bodyImageEvidenceKnown: true,
+            embeddedImageCount: 0,
+            originalCampaignOutbound: false,
+            webdesignLinkEvidenceKnown: true,
+            recipientRoutingEvidenceKnown: true,
+          }],
+        }),
+      };
+    },
+  });
+  const mail = {
+    id: 'serve@softora.nl|inbox:same-flight',
+    body: '',
+    hasBody: true,
+    bodyLoaded: false,
+  };
+  const staleOwner = new AbortController();
+  const currentOwner = new AbortController();
+  const base = {
+    id: mail.id,
+    requestId: 'inbox:same-flight',
+    getMail: () => mail,
+    account: 'serve@softora.nl',
+    folder: 'inbox',
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+    getActiveMail: () => mail.id,
+    openMail() {},
+    bodyFetchTimeoutMs: 1000,
+    bodyLoadDeadlineMs: 2000,
+  };
+
+  const staleLoad = mailbox.index.loadBody({
+    ...base,
+    signal: staleOwner.signal,
+    isCurrent: () => !staleOwner.signal.aborted,
+  });
+  await Promise.resolve();
+  staleOwner.abort();
+  const currentLoad = mailbox.index.loadBody({
+    ...base,
+    signal: currentOwner.signal,
+    isCurrent: () => !currentOwner.signal.aborted,
+  });
+  await currentLoad;
+
+  assert.equal(bodyFetches, 2);
+  assert.equal(mail.body, 'Actuele volledige inhoud.');
+  assert.equal(mail.bodyLoaded, true);
+  assert.equal(mail.bodyLoading, false);
+  assert.equal(mail.bodyLoadState, 'ready');
+  assert.equal(Boolean(mail.bodyLoadToken), false);
+
+  resolveStaleRequest({
+    ok: true,
+    json: async () => ({ ok: true, messages: [{ resolved: true, body: 'Stale inhoud.' }] }),
+  });
+  await staleLoad;
+  assert.equal(mail.body, 'Actuele volledige inhoud.');
+  assert.equal(mail.bodyLoadState, 'ready');
 });
 
 test('bootstrapachtergrondrefresh annuleert een direct gestarte bodyhydratie niet', async () => {
@@ -6318,6 +7106,7 @@ test('top-level bodyfout vervangt de spinner en kan het bericht opnieuw laden', 
       return { ok: true, json: async () => ({ ok: true, messages: [] }) };
     },
   });
+  await mailbox.ready;
   const mail = mailbox.normalizeMailboxApiMessage({
     id: 'inbox:retry-root',
     mailboxId: 'inbox:retry-root',
@@ -6328,7 +7117,7 @@ test('top-level bodyfout vervangt de spinner en kan het bericht opnieuw laden', 
   });
   mail.bodyLoadError = 'Laden duurde te lang. Opnieuw proberen.';
   mailbox.setMails([mail]);
-  mailbox.openMail(mail.id, { skipBodyFetch: true });
+  await mailbox.openMail(mail.id, { skipBodyFetch: true, skipContactTimeline: true });
 
   const failedHtml = mailbox.getElement('mail-detail').innerHTML;
   assert.match(failedHtml, /data-mailbox-action="retry-mail-body"/);
@@ -6337,14 +7126,15 @@ test('top-level bodyfout vervangt de spinner en kan het bericht opnieuw laden', 
   assert.equal(mailbox.index.retryBody({
     id: mail.id,
     getMail: () => mail,
-    loadMessageBody: mailbox.loadMailboxMessageBody,
+    loadMessageBody: (id) => mailbox.openMail(id, { skipContactTimeline: true, skipReadPersist: true }),
     openMail: mailbox.openMail,
   }), true);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledige inhoud wordt opgehaald…/);
+  assert.equal(mailbox.getElement('mail-detail').classList.contains('is-detail-pending'), true);
+  assert.equal(mailbox.getElement('mail-detail').hasAttribute('inert'), true);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(mail.body, 'Hersteld volledig bericht.');
   assert.equal(mail.bodyLoaded, true);
-  const recoveredHtml = mailbox.display.renderDetailBody(mail, mail.body);
+  const recoveredHtml = mailbox.getElement('mail-detail').innerHTML;
   assert.match(recoveredHtml, /Hersteld volledig bericht\./);
   assert.doesNotMatch(recoveredHtml, /detail-mail-load-error|Volledige inhoud wordt opgehaald…/);
 });
@@ -6503,8 +7293,8 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260820a/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260820c/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260821a/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260821a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -6533,23 +7323,26 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(composeControllerSource, /action === 'new-message'/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
   assert.match(readIndexScript(), /function bindImageRecovery\([\s\S]*document\.addEventListener\('error',[\s\S]*\[data-mailbox-inline-image\][\s\S]*mail\.imageRecoveryAttempted = true;[\s\S]*void loadMessageBody\(mail\.id\);[\s\S]*, true\);/);
-  assert.match(scriptSource, /SoftoraMailboxIndex\?\.bindImageRecovery\(\{ getActiveMail: \(\) => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody, openMail \}\)/);
+  assert.match(scriptSource, /SoftoraMailboxIndex\?\.bindImageRecovery\(\{ getActiveMail: \(\) => activeMail, getMail: findMailById, loadMessageBody: \(id\) => openMail\(id, \{ skipReadPersist: true \}\), openMail \}\)/);
   assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
   assert.match(scriptSource, /renderLinkedMailboxText\(value, options\)/);
-  assert.match(scriptSource, /renderMailBody\(detailBody, detailBodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady/);
+  assert.match(scriptSource, /renderMailBody\(detailBody, m\.bodyImages, \{[\s\S]*rootIncomingMeta,[\s\S]*threadImagesReady: true/);
 });
 
 test('geopende mail staat als één rustig mailblok met antwoordactie na het ontvangen bericht', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
+  const stabilitySource = readDetailStabilityScript();
 
-  assert.match(scriptSource, /const wasUnread = m\.unread;[\s\S]*activeMail = m\.id;[\s\S]*SoftoraMailboxDetailState\?\.select\?\.\(m\.id\);[\s\S]*SoftoraMailboxUiState\.markReadOnOpen\([\s\S]*renderList\(\{ openLatest: false \}\);[\s\S]*if \(\(!m\.bodyLoaded \|\| m\.recipientRoutingNeedsHydration\) && !options\.skipBodyFetch\) void loadMailboxMessageBody\(m\.id\);/);
+  assert.match(stabilitySource, /options\.setActiveMail\?\.\(mail\.id\);[\s\S]*options\.select\?\.\(mail\.id\);[\s\S]*options\.onSelect\?\.\(mail, openOptions\);[\s\S]*options\.renderList\?\.\(\{ openLatest: false \}\);[\s\S]*setPending\(mail\.id\);/);
+  assert.match(scriptSource, /onSelect: \(mail, openOptions\) => \{ if \(mail\.unread\) window\.SoftoraMailboxUiState\.markReadOnOpen\(/);
+  assert.match(scriptSource, /needsRootHydration: \(mail, openOptions\) => \(!mail\.bodyLoaded \|\| mail\.recipientRoutingNeedsHydration\) && !openOptions\.skipBodyFetch/);
   assert.match(readIndexScript(), /function hasUnverifiedLegacyMedia\(message\)/);
   assert.match(readIndexScript(), /bodyLoaded:[\s\S]*Boolean\(message\.body\)[\s\S]*!legacyMediaNeedsHydration/);
   assert.match(readIndexScript(), /mail\.bodyImagesTruncated = false;/);
   assert.match(readIndexScript(), /String\(getActiveMail\(\)\) === String\(id\)/);
   assert.match(readIndexScript(), /function loadThreadBodies\(/);
-  assert.match(scriptSource, /if \(!options\.skipThreadBodyFetch && activeFolder === 'outreach' && \(window\.SoftoraMailboxCampaignInbox\.isCampaignMail\(m\) \|\| m\.contactTimelineLoaded\)\) void window\.SoftoraMailboxIndex\?\.loadThreadBodies\?\.\(\{ mail: m,/);
+  assert.match(scriptSource, /shouldHydrateThread: \(mail, openOptions\) => !openOptions\.skipThreadBodyFetch && activeFolder === 'outreach'/);
   assert.match(scriptSource, /const detailBody = m\.safeBodyPreviewOnly \? \(m\.preview \|\| ''\) : \(m\.body \|\| m\.preview \|\| ''\);/);
   assert.match(readDisplayScript(), /Volledige inhoud wordt opgehaald…/);
 

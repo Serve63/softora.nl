@@ -305,12 +305,14 @@ async function loadBody({
   bodyLoadDeadlineMs,
 }) {
   const mail = getMail(id);
-  if (!mail || mail.bodyLoading) return;
+  if (!mail) return;
   const detailState = window.SoftoraMailboxDetailState;
   const flight = detailState?.begin?.(id, { partial: Boolean(normalizeText(mail.body || mail.preview)), signal });
   if (flight?.duplicate) return;
   const stillCurrent = () => (typeof isCurrent !== 'function' || isCurrent()) && (!flight || detailState.isCurrent(flight));
   const bodyLoadDeadline = createBodyLoadDeadline(flight?.controller?.signal || signal, bodyLoadDeadlineMs);
+  const loadToken = {};
+  mail.bodyLoadToken = loadToken;
   mail.bodyLoading = true;
   mail.bodyLoadState = normalizeText(mail.body || mail.preview) ? 'partial' : 'loading';
   let exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
@@ -375,13 +377,6 @@ async function loadBody({
         if (mail.bodyLoaded && !needsLiveCampaignEnrichment) return;
         if (exactBodyAvailable) {
           mail.bodyLoading = false;
-          if (
-            stillCurrent() &&
-            typeof getActiveMail === 'function' &&
-            String(getActiveMail()) === String(id)
-          ) {
-            openMail(id, { skipBodyFetch: true, skipReadPersist: true });
-          }
         }
       }
     } catch (error) {
@@ -445,25 +440,27 @@ async function loadBody({
       finalState = 'failed';
     }
   } finally {
+    const currentAtFinish = stillCurrent();
     bodyLoadDeadline.cleanup();
-    mail.bodyLoading = false;
-    if (mail.bodyLoaded) finalState = 'ready';
-    detailState?.finish?.(flight, finalState);
-    if (retryableFailure && detailState?.scheduleRetry?.(flight, () => {
-      mail.bodyLoadError = '';
-      void loadBody({ id, requestId, getMail, account, folder, normalizeBodyImages, normalizeOptOutUrl, getActiveMail, openMail, isCurrent, signal, bodyFetchTimeoutMs, bodyFetchRetryDelayMs, bodyLoadDeadlineMs });
-    })) {
-      mail.bodyLoadState = 'retryScheduled';
-      mail.bodyLoadError = '';
-    } else {
-      mail.bodyLoadState = finalState;
+    if (mail.bodyLoadToken === loadToken) {
+      mail.bodyLoading = false;
+      delete mail.bodyLoadToken;
     }
-    if (
-      stillCurrent() &&
-      typeof getActiveMail === 'function' &&
-      String(getActiveMail()) === String(id)
-    ) {
-      openMail(id, { skipBodyFetch: true, skipReadPersist: true });
+    if (currentAtFinish && mail.bodyLoaded) finalState = 'ready';
+    detailState?.finish?.(flight, finalState);
+    if (currentAtFinish) {
+      if (retryableFailure && detailState?.scheduleRetry?.(flight, () => {
+        mail.bodyLoadError = '';
+        void loadBody({ id, requestId, getMail, account, folder, normalizeBodyImages, normalizeOptOutUrl, getActiveMail, openMail, isCurrent, signal, bodyFetchTimeoutMs, bodyFetchRetryDelayMs, bodyLoadDeadlineMs });
+      })) {
+        mail.bodyLoadState = 'retryScheduled';
+        mail.bodyLoadError = '';
+      } else {
+        mail.bodyLoadState = finalState;
+      }
+      if (typeof getActiveMail === 'function' && String(getActiveMail()) === String(id)) {
+        openMail(id, { skipBodyFetch: true, skipReadPersist: true });
+      }
     }
   }
 }
@@ -572,7 +569,7 @@ async function loadThreadBodies({
 }) {
   const stillCurrent = () => typeof isCurrent !== 'function' || isCurrent();
   if (!stillCurrent()) return false;
-  if (!mail || mail.threadBodiesLoading) return false;
+  if (!mail) return false;
   const messages = Array.isArray(targetMessages)
     ? targetMessages
     : Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
@@ -596,18 +593,14 @@ async function loadThreadBodies({
 
   const request = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   const bodyLoadDeadline = createBodyLoadDeadline(signal, bodyLoadDeadlineMs);
+  const loadToken = {};
+  mail.threadBodiesLoadToken = loadToken;
   mail.threadBodiesLoading = true;
   targets.forEach((message) => {
+    message.threadBodyLoadToken = loadToken;
     message.bodyLoadError = '';
     message.bodyLoading = needsThreadBodyHydration(message);
   });
-  if (
-    typeof openMail === 'function' &&
-    typeof getActiveMail === 'function' &&
-    String(getActiveMail()) === String(mail.id)
-  ) {
-    openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
-  }
   let updated = false;
   try {
     const targetByIdentity = new Map(
@@ -655,15 +648,8 @@ async function loadThreadBodies({
 
     if (!stillCurrent()) return false;
     targets.forEach((message) => {
-      message.bodyLoading = needsThreadBodyHydration(message);
+      if (message.threadBodyLoadToken === loadToken) message.bodyLoading = needsThreadBodyHydration(message);
     });
-    if (
-      typeof openMail === 'function' &&
-      typeof getActiveMail === 'function' &&
-      String(getActiveMail()) === String(mail.id)
-    ) {
-      openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
-    }
 
     const detailTargets = targets.filter((message) => (
       needsThreadBodyHydration(message) ||
@@ -715,8 +701,10 @@ async function loadThreadBodies({
               : '';
           }
         } finally {
-          message.bodyLoading = false;
-          message.imageLoading = false;
+          if (message.threadBodyLoadToken === loadToken) {
+            message.bodyLoading = false;
+            message.imageLoading = false;
+          }
         }
       }));
     }
@@ -732,9 +720,15 @@ async function loadThreadBodies({
   } finally {
     bodyLoadDeadline.cleanup();
     targets.forEach((message) => {
+      if (message.threadBodyLoadToken !== loadToken) return;
       message.bodyLoading = false;
+      message.imageLoading = false;
+      delete message.threadBodyLoadToken;
     });
-    mail.threadBodiesLoading = false;
+    if (mail.threadBodiesLoadToken === loadToken) {
+      mail.threadBodiesLoading = false;
+      delete mail.threadBodiesLoadToken;
+    }
     if (
       stillCurrent() &&
       typeof openMail === 'function' &&
@@ -754,7 +748,6 @@ function retryBody({ id, getMail, loadMessageBody, openMail }) {
   mail.bodyLoading = false;
   mail.bodyLoaded = false;
   void loadMessageBody(mail.id);
-  openMail?.(mail.id, { skipBodyFetch: true, skipReadPersist: true });
   return true;
 }
 
@@ -767,10 +760,20 @@ function bindImageRecovery({ getActiveMail, getMail, loadMessageBody, openMail }
   document.addEventListener('error', (event) => {
     const image = event.target;
     if (!image || !image.matches || !image.matches('[data-mailbox-inline-image]')) return;
+    const detail = image.closest?.('.mail-detail');
+    if (!detail || detail !== document.getElementById?.('mail-detail')) return;
+    const pendingId = String(detail.dataset?.mailboxPendingId || '');
+    const committedId = String(detail?.dataset?.mailboxCommittedId || '');
+    if (!committedId || committedId !== String(getActiveMail() || '')) return;
+    if (detail.dataset) detail.dataset.mailboxDomDirty = 'true';
+    if (pendingId) return;
     const figure = image.closest && image.closest('.detail-mail-image');
-    if (figure) figure.hidden = true;
-    const mail = getMail(getActiveMail());
+    figure?.classList?.add?.('is-image-error');
+    if (image.style) image.style.visibility = 'hidden';
+    const mail = getMail(committedId);
     if (!mail || mail.bodyLoading || mail.imageRecoveryAttempted) return;
+    const source = String(image.getAttribute?.('src') || image.currentSrc || image.src || '').trim();
+    window.SoftoraMailboxImages?.invalidate?.(source);
     mail.imageRecoveryAttempted = true;
     mail.bodyLoaded = false;
     mail.bodyImagesTruncated = true;

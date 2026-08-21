@@ -185,9 +185,14 @@
     const dataUrl = String(image && image.dataUrl || '').trim();
     const isSafeImageSource = global.SoftoraMailboxCampaignInbox?.isSafeImageSource;
     if (typeof isSafeImageSource !== 'function' || !isSafeImageSource(dataUrl)) return '';
+    const prepared = cache.get(dataUrl);
+    if (prepared?.status === 'failed') return '';
     const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
     const escape = typeof escapeHtml === 'function' ? escapeHtml : (value) => String(value || '');
-    return `<figure class="detail-mail-image"><img src="${escape(dataUrl)}" alt="${escape(alt)}" loading="eager" decoding="async" fetchpriority="high" data-mailbox-inline-image></figure>`;
+    const dimensions = prepared?.status === 'ready' && prepared.width > 0 && prepared.height > 0
+      ? ` width="${prepared.width}" height="${prepared.height}"`
+      : '';
+    return `<figure class="detail-mail-image"><img src="${escape(dataUrl)}" alt="${escape(alt)}"${dimensions} loading="eager" decoding="async" fetchpriority="high" data-mailbox-inline-image></figure>`;
   }
 
   function prepareOwnQuote(images, baseState, renderImage) {
@@ -251,51 +256,144 @@
 
   function pruneCache() {
     while (cache.size > MAX_CACHED_IMAGES) {
-      const oldest = cache.keys().next().value;
+      const oldest = Array.from(cache.entries()).find(([, entry]) => (
+        entry?.status !== 'pending' && !(Number(entry?.retainCount) > 0)
+      ))?.[0];
       if (!oldest) break;
       cache.delete(oldest);
     }
   }
 
-  function loadSource(source) {
+  function loadSource(source, { retain = false } = {}) {
     const cached = cache.get(source);
-    if (cached) return cached.settled ? null : cached.promise;
+    if (cached) {
+      if (retain) cached.retainCount = Math.max(0, Number(cached.retainCount) || 0) + 1;
+      return { entry: cached, promise: cached.status === 'pending' ? cached.promise : null };
+    }
     if (typeof global.Image !== 'function') return null;
 
-    const entry = { finishing: false, settled: false, promise: null };
+    const entry = {
+      finishing: false,
+      loaded: false,
+      status: 'pending',
+      width: 0,
+      height: 0,
+      retainCount: retain ? 1 : 0,
+      promise: null,
+    };
     entry.promise = new Promise((resolve) => {
       const image = new global.Image();
       let timer = null;
-      const finish = async () => {
-        if (entry.finishing || entry.settled) return;
-        entry.finishing = true;
+      const settle = (ready) => {
+        if (entry.status !== 'pending') return;
         if (timer) global.clearTimeout(timer);
+        image.onload = null;
+        image.onerror = null;
+        entry.finishing = false;
+        entry.width = ready ? Number(image.naturalWidth) || entry.width || 0 : 0;
+        entry.height = ready ? Number(image.naturalHeight) || entry.height || 0 : 0;
+        entry.status = ready && entry.width > 0 && entry.height > 0 ? 'ready' : 'failed';
+        resolve({ source, status: entry.status, width: entry.width, height: entry.height });
+      };
+      const finish = async (loaded) => {
+        if (entry.finishing || entry.status !== 'pending') return;
+        const ready = loaded === true && image.naturalWidth > 0 && image.naturalHeight > 0;
+        if (!ready) {
+          settle(false);
+          return;
+        }
+        entry.finishing = true;
+        entry.loaded = true;
+        entry.width = Number(image.naturalWidth) || 0;
+        entry.height = Number(image.naturalHeight) || 0;
         try {
-          if (image.complete && image.naturalWidth > 0 && typeof image.decode === 'function') {
+          if (typeof image.decode === 'function') {
             await image.decode();
           }
         } catch (_) {
           // Het load-event bewijst al dat de bytes beschikbaar zijn; decode kan per browser alsnog weigeren.
         }
-        entry.settled = true;
-        resolve();
+        settle(true);
       };
-      image.onload = finish;
-      image.onerror = finish;
+      image.onload = () => void finish(true);
+      image.onerror = () => settle(false);
       image.decoding = 'async';
       image.fetchPriority = 'high';
+      timer = global.setTimeout(() => settle(entry.loaded), LOAD_TIMEOUT_MS);
       image.src = source;
-      timer = global.setTimeout(finish, LOAD_TIMEOUT_MS);
-      if (image.complete) void finish();
+      if (image.complete) void finish(image.naturalWidth > 0 && image.naturalHeight > 0);
     });
     cache.set(source, entry);
     pruneCache();
-    return entry.promise;
+    return { entry, promise: entry.promise };
+  }
+
+  function acquire(images, { retryFailed = false } = {}) {
+    const sources = getSources(images);
+    if (!sources.length) return null;
+    const retained = [];
+    const pending = [];
+    const missing = [];
+
+    sources.forEach((source) => {
+      const entry = cache.get(source);
+      if (entry?.status === 'failed' && retryFailed) {
+        cache.delete(source);
+        missing.push(source);
+        return;
+      }
+      if (!entry) {
+        missing.push(source);
+        return;
+      }
+      entry.retainCount = Math.max(0, Number(entry.retainCount) || 0) + 1;
+      retained.push(entry);
+      if (entry.status === 'pending' && entry.promise) pending.push(entry.promise);
+    });
+
+    missing.forEach((source) => {
+      const loaded = loadSource(source, { retain: true });
+      if (!loaded?.entry) return;
+      retained.push(loaded.entry);
+      if (loaded.promise) pending.push(loaded.promise);
+    });
+
+    if (!retained.length) return null;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      retained.forEach((entry) => {
+        entry.retainCount = Math.max(0, (Number(entry.retainCount) || 0) - 1);
+      });
+      pruneCache();
+    };
+    return { pending, release };
   }
 
   function prepare(images) {
-    const pending = getSources(images).map(loadSource).filter(Boolean);
-    return pending.length ? Promise.allSettled(pending) : null;
+    const acquired = acquire(images);
+    if (!acquired) return null;
+    const { pending, release } = acquired;
+    if (!pending.length) {
+      release();
+      return null;
+    }
+    return Promise.allSettled(pending).finally(release);
+  }
+
+  function prepareForCommit(images) {
+    const acquired = acquire(images, { retryFailed: true });
+    if (!acquired) return null;
+    return Promise.allSettled(acquired.pending).then(() => ({ release: acquired.release }));
+  }
+
+  function invalidate(source) {
+    const key = String(source || '').trim();
+    const entry = cache.get(key);
+    if (!entry || entry.status === 'pending') return false;
+    cache.delete(key);
+    return true;
   }
 
   function prewarm(messages, maxMessages = 2) {
@@ -334,6 +432,7 @@
     merge,
     normalize,
     prepare,
+    prepareForCommit,
     prepareOwnQuote,
     prewarm,
     renderInlineImage,
@@ -342,6 +441,7 @@
     renderUnused,
     sectionHasPlaceholder,
     stage,
+    invalidate,
   };
   global.SoftoraMailboxImages = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

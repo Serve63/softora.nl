@@ -35,6 +35,28 @@ test('mailbox detail state dedupliceert dezelfde target single-flight', () => {
   assert.equal(state.snapshot().inFlight, 0);
 });
 
+test('mailbox detail state vervangt een geaborteerde same-target flight direct', () => {
+  const state = createMailboxDetailState();
+  const owner = new AbortController();
+  state.select('imap:same');
+  const stale = state.begin('imap:same', { signal: owner.signal });
+  owner.abort();
+
+  const replacement = state.begin('imap:same');
+  assert.equal(replacement.duplicate, false);
+  assert.notEqual(replacement.controller, stale.controller);
+  assert.ok(replacement.generation > stale.generation);
+  assert.equal(state.isCurrent(stale), false);
+  assert.equal(state.isCurrent(replacement), true);
+  assert.equal(state.snapshot().inFlight, 1);
+
+  state.finish(stale, 'failed');
+  assert.equal(state.snapshot().inFlight, 1);
+  assert.equal(state.snapshot().state, 'loading');
+  state.finish(replacement, 'ready');
+  assert.equal(state.snapshot().state, 'ready');
+});
+
 test('mailbox detail state plant begrensde automatische retries zonder dubbele timer', () => {
   const callbacks = [];
   const originalSetTimeout = global.setTimeout;

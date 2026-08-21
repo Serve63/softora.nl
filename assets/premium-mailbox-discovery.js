@@ -4,6 +4,7 @@
   const SEARCH_DEBOUNCE_MS = 280;
   const SEARCH_MIN_LENGTH = 2;
   const MAX_HIDE_CONTACT_MESSAGES = 100;
+  const CONTACT_TIMELINE_TIMEOUT_MS = 15_000;
   const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
   function normalizeEmail(value) {
@@ -162,6 +163,7 @@
     const input = documentRef?.getElementById?.('mailbox-search-input');
     const status = documentRef?.getElementById?.('mailbox-search-status');
     const moreButton = documentRef?.getElementById?.('mailbox-search-more');
+    const timelineTimeoutMs = Math.max(10, Number(options.timelineTimeoutMs) || CONTACT_TIMELINE_TIMEOUT_MS);
     let debounceTimer = 0;
     let searchController = null;
     let timelineController = null;
@@ -297,9 +299,11 @@
         const list = options.getListElement?.();
         if (list) list.scrollTop = saved.listScrollTop;
         if (saved.activeMail) {
-          options.openMail?.(saved.activeMail, { skipContactTimeline: true, skipReadPersist: true });
-          const detailBody = documentRef?.querySelector?.('#mail-detail .detail-body');
-          if (detailBody) detailBody.scrollTop = saved.detailScrollTop;
+          const detailReady = options.openMail?.(saved.activeMail, { skipContactTimeline: true, skipReadPersist: true });
+          void Promise.resolve(detailReady).then(() => {
+            const detailBody = documentRef?.querySelector?.('#mail-detail .detail-body');
+            if (detailBody) detailBody.scrollTop = saved.detailScrollTop;
+          });
         }
       } else {
         snapshot = null;
@@ -307,17 +311,22 @@
       return true;
     }
 
-    async function loadContactTimeline(mail, { append = false, force = false } = {}) {
+    async function loadContactTimeline(mail, { append = false, force = false, deferRender = false, signal } = {}) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
-      if (mail.contactTimelineLoading && !append && !force) return false;
       if (mail.contactTimelineLoaded && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
       const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
       if (!contactEmail) return false;
       const generation = ++timelineGeneration;
       timelineController?.abort?.();
-      timelineController = typeof AbortController === 'function' ? new AbortController() : null;
+      const requestController = typeof AbortController === 'function' ? new AbortController() : null;
+      timelineController = requestController;
+      const abortFromParent = () => requestController?.abort?.();
+      signal?.addEventListener?.('abort', abortFromParent, { once: true });
+      if (signal?.aborted) abortFromParent();
       mail.contactTimelineLoading = true;
       mail.contactTimelineRequestGeneration = generation;
+      let timeoutId = 0;
+      let timedOut = false;
       try {
         const timelineOwner = mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || 'both';
         const timelineAccounts = options.getAccountEmails?.();
@@ -327,10 +336,24 @@
           limit: '50',
         });
         if (append && mail.contactTimelineNextCursor) params.set('cursor', mail.contactTimelineNextCursor);
-        const response = await fetchImpl(`/api/mailbox/contact-timeline?${params}`, {
+        const request = fetchImpl(`/api/mailbox/contact-timeline?${params}`, {
           credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
-          ...(timelineController ? { signal: timelineController.signal } : {}),
+          ...(requestController ? { signal: requestController.signal } : signal ? { signal } : {}),
         });
+        const response = typeof global.setTimeout === 'function'
+          ? await Promise.race([
+            request,
+            new Promise((_, reject) => {
+              timeoutId = global.setTimeout(() => {
+                timedOut = true;
+                requestController?.abort?.();
+                const timeoutError = new Error('Contacthistorie laden duurde te lang.');
+                timeoutError.name = 'AbortError';
+                reject(timeoutError);
+              }, timelineTimeoutMs);
+            }),
+          ])
+          : await request;
         const data = await response.json().catch(() => ({}));
         if (generation !== timelineGeneration || options.getActiveMail?.() !== mail.id) return false;
         if (!response.ok || data?.ok !== true) throw new Error(data?.error || 'Contacthistorie laden mislukt.');
@@ -346,17 +369,25 @@
         mail.contactTimelineNeedsRefresh = false;
         mail.contactTimelineError = '';
         mail.contactTimelineNextCursor = String(data.nextCursor || '');
-        options.openMail?.(mail.id, {
-          skipBodyFetch: true,
-          skipContactTimeline: true,
-          skipReadPersist: true,
-        });
+        if (!deferRender) {
+          options.openMail?.(mail.id, {
+            skipBodyFetch: true,
+            skipContactTimeline: true,
+            skipReadPersist: true,
+          });
+        }
         return true;
       } catch (error) {
+        if (timedOut) {
+          mail.contactTimelineError = 'Contacthistorie wordt bij de volgende poging opnieuw geladen.';
+          return false;
+        }
         if (error?.name === 'AbortError' || generation !== timelineGeneration) return false;
         mail.contactTimelineError = 'Contacthistorie wordt bij de volgende poging opnieuw geladen.';
         return false;
       } finally {
+        if (timeoutId) global.clearTimeout?.(timeoutId);
+        signal?.removeEventListener?.('abort', abortFromParent);
         if (mail.contactTimelineRequestGeneration === generation) mail.contactTimelineLoading = false;
       }
     }
