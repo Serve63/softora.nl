@@ -13,8 +13,6 @@
     "test:smoke": "node --test test/smoke/*.test.js",
     "test:postgres:mailbox-locks": "node --test test/postgres/mailbox-campaign-lock-order.postgres.test.js",
     "test:mailbox-postgres-locks": "node test/postgres/run-mailbox-postgres-locks.js",
-    "test:postgres:mailbox-uid-generations": "node --test test/postgres/mailbox-uid-generation-v2.postgres.test.js",
-    "test:mailbox-postgres-uid-generations": "node test/postgres/run-mailbox-uid-generation-v2.js",
     "test:postgres:mailbox-uid-protocol-gate": "node --test test/postgres/mailbox-uid-protocol-gate.postgres.test.js",
     "test:mailbox-postgres-uid-protocol-gate": "node test/postgres/run-mailbox-uid-protocol-gate.js",
     "test:e2e:website-video": "node --test test/e2e/company-website-video.e2e.test.js",

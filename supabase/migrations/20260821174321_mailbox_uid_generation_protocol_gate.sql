@@ -350,4 +350,5 @@ grant execute on function public.softora_begin_mailbox_uid_generation_v2_drain(i
 grant execute on function public.softora_claim_mailbox_sync_lock(
   text, text, text, text, integer, boolean, text
 ) to service_role;
+notify pgrst, 'reload schema';
 -- mailbox-uid-generation-protocol-gate:end

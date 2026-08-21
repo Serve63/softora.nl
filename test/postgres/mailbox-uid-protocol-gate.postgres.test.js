@@ -2,9 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const databaseUrl = String(process.env.MAILBOX_POSTGRES_TEST_URL || '').trim();
 const destructiveAllowed = process.env.MAILBOX_POSTGRES_TEST_ALLOW_DESTRUCTIVE === '1';
+const postgresContainerId = String(process.env.MAILBOX_POSTGRES_TEST_CONTAINER_ID || '').trim();
 
 if (!databaseUrl) {
   test('echte PostgreSQL UID-protocolgatetests vereisen MAILBOX_POSTGRES_TEST_URL', {
@@ -25,42 +27,38 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260821174321_mailbox_uid_generation_protocol_gate.sql'
   ), 'utf8');
-  const dataOpsSchema = fs.readFileSync(path.resolve(
-    __dirname,
-    '../../supabase/data-ops-schema.sql'
-  ), 'utf8');
-  const v2Migration = fs.readFileSync(path.resolve(
-    __dirname,
-    '../../supabase/migrations/20260821174844_mailbox_uid_generation_epoch_v2.sql'
-  ), 'utf8');
   const clients = new Set();
 
-  function extractMarkedBlock(source, startMarker, endMarker) {
-    const start = source.indexOf(startMarker);
-    const end = source.indexOf(endMarker, start);
-    if (start < 0 || end <= start) {
-      throw new Error(`SQL-markerblok ontbreekt: ${startMarker}`);
+  function applyTrackedSql(sql) {
+    const databaseName = decodeURIComponent(parsedUrl.pathname.slice(1));
+    const username = decodeURIComponent(parsedUrl.username || 'postgres');
+    const password = decodeURIComponent(parsedUrl.password || '');
+    let command = 'psql';
+    let args = [
+      '-v', 'ON_ERROR_STOP=1', '-h', parsedUrl.hostname,
+      '-p', parsedUrl.port || '5432', '-U', username, '-d', databaseName,
+    ];
+    if (postgresContainerId) {
+      if (!/^[a-f0-9]{12,64}$/i.test(postgresContainerId)) {
+        throw new Error('Ongeldig PostgreSQL-servicecontainer-id voor UID-protocolgatetest.');
+      }
+      command = 'docker';
+      args = [
+        'exec', '-i', '-e', `PGPASSWORD=${password}`, postgresContainerId,
+        'psql', '-v', 'ON_ERROR_STOP=1', '-U', username, '-d', databaseName,
+      ];
     }
-    return source.slice(start, end + endMarker.length);
+    const result = spawnSync(command, args, {
+      input: sql,
+      encoding: 'utf8',
+      env: { ...process.env, PGPASSWORD: password },
+      maxBuffer: 1024 * 1024,
+    });
+    if (result.error || result.status !== 0) {
+      const detail = String(result.stderr || result.error?.message || 'onbekende fout').trim();
+      throw new Error(`Kon getrackte UID-protocolmigratie niet toepassen: ${detail}`);
+    }
   }
-
-  const bootstrapSentinelSql = extractMarkedBlock(
-    dataOpsSchema,
-    '-- mailbox-uid-generation-bootstrap-sentinel:start',
-    '-- mailbox-uid-generation-bootstrap-sentinel:end'
-  );
-  const bootstrapDrainSql = extractMarkedBlock(
-    dataOpsSchema,
-    '-- mailbox-uid-generation-bootstrap-drain:start',
-    '-- mailbox-uid-generation-bootstrap-drain:end'
-  );
-  const preflightEndMarker = '$uid_protocol_preflight$;';
-  const preflightEnd = v2Migration.indexOf(preflightEndMarker);
-  if (preflightEnd < 0) throw new Error('UID-v2 preflightblok ontbreekt.');
-  const uidProtocolPreflightSql = v2Migration.slice(
-    0,
-    preflightEnd + preflightEndMarker.length
-  );
 
   async function connect() {
     const client = new Client({ connectionString: databaseUrl });
@@ -138,75 +136,6 @@ if (!databaseUrl) {
     }
   }
 
-  async function resetBootstrapProtocolBase(client, { fresh }) {
-    await client.query(`
-      drop schema public cascade;
-      create schema public;
-      grant usage on schema public to public, anon, authenticated, service_role;
-    `);
-    if (fresh) await client.query(bootstrapSentinelSql);
-    await client.query(`
-      create table public.softora_mailbox_sync_state (
-        sync_key text primary key,
-        account_email text not null,
-        folder text not null,
-        status text not null default 'idle' check (status in ('idle','syncing','ok','error')),
-        last_synced_at timestamptz,
-        sync_started_at timestamptz,
-        lock_token text,
-        lock_expires_at timestamptz,
-        last_uid bigint,
-        message_count integer not null default 0,
-        last_error text,
-        created_at timestamptz not null default pg_catalog.clock_timestamp(),
-        updated_at timestamptz not null default pg_catalog.clock_timestamp()
-      );
-      create table public.softora_mailbox_messages (
-        message_key text primary key
-      );
-      create table public.softora_mailbox_campaign_mutations (
-        mutation_id text primary key
-      );
-      create table public.softora_mailbox_campaign_consistency (
-        scope text primary key check (scope='campaign'),
-        content_version bigint not null default 0,
-        created_at timestamptz not null default pg_catalog.clock_timestamp(),
-        updated_at timestamptz not null default pg_catalog.clock_timestamp()
-      );
-      insert into public.softora_mailbox_campaign_consistency(scope) values('campaign');
-      grant select,insert,update,delete on public.softora_mailbox_sync_state to service_role;
-      grant select,insert,update,delete on public.softora_mailbox_messages to service_role;
-      grant select,insert,update,delete on public.softora_mailbox_campaign_mutations to service_role;
-      grant select,insert,update on public.softora_mailbox_campaign_consistency to service_role;
-
-      create or replace function public.softora_claim_mailbox_sync_lock(
-        p_sync_key text,
-        p_account_email text,
-        p_folder text,
-        p_lock_token text,
-        p_lock_ttl_seconds integer default 90,
-        p_force boolean default false
-      )
-      returns table (
-        acquired boolean,
-        locked boolean,
-        claimed_lock_token text,
-        lock_expires_at timestamptz
-      )
-      language sql
-      security invoker
-      set search_path=''
-      as $old_function$
-        select false,false,null::text,null::timestamptz;
-      $old_function$;
-      grant execute on function public.softora_claim_mailbox_sync_lock(
-        text,text,text,text,integer,boolean
-      ) to service_role;
-    `);
-    if (!fresh) await client.query(bootstrapSentinelSql);
-    await client.query(migration);
-  }
-
   test.before(async () => {
     const client = await connect();
     await client.query(`
@@ -277,7 +206,7 @@ if (!databaseUrl) {
         text,text,text,text,integer,boolean
       ) to service_role;
     `);
-    await client.query(migration);
+    applyTrackedSql(migration);
   });
 
   test.after(async () => {
@@ -286,6 +215,16 @@ if (!databaseUrl) {
 
   test('oude zes-argumentencaller en expliciete dual legacy-caller werken in legacy', async () => {
     const client = await connect();
+    const protocol = (await client.query(`
+      select uid_generation_protocol as protocol,
+        uid_generation_drain_started_at as drain_started_at,
+        uid_generation_drain_ready_at as drain_ready_at
+      from public.softora_mailbox_campaign_consistency
+      where scope='campaign'
+    `)).rows[0];
+    assert.deepEqual(protocol, {
+      protocol: 'legacy', drain_started_at: null, drain_ready_at: null,
+    });
     const oldClaim = await claim(client, {
       accountEmail: 'old@softora.nl', token: 'old-legacy-token', oldCaller: true,
     });
@@ -423,84 +362,4 @@ if (!databaseUrl) {
     `)).rows[0].old_overload_removed, true);
   });
 
-  test('verse data-ops UID-bootstrap doorloopt aantoonbaar de verstreken drain', async () => {
-    const client = await connect();
-    await resetBootstrapProtocolBase(client, { fresh: true });
-    await client.query(bootstrapDrainSql);
-    const protocol = (await client.query(`
-      select uid_generation_protocol,
-        uid_generation_drain_started_at is not null as drain_started,
-        uid_generation_drain_ready_at is not null as drain_recorded,
-        uid_generation_drain_ready_at <= pg_catalog.clock_timestamp() as drain_elapsed,
-        coalesce(pg_catalog.current_setting(
-          'softora.mailbox_uid_fresh_bootstrap', true
-        ), '') as fresh_sentinel
-      from public.softora_mailbox_campaign_consistency
-      where scope='campaign'
-    `)).rows[0];
-    assert.deepEqual(protocol, {
-      uid_generation_protocol: 'draining',
-      drain_started: true,
-      drain_recorded: true,
-      drain_elapsed: true,
-      fresh_sentinel: '',
-    });
-    await client.query(uidProtocolPreflightSql);
-  });
-
-  test('verse UID-bootstrap weigert onverwacht gevulde mailboxstate', async () => {
-    const client = await connect();
-    await resetBootstrapProtocolBase(client, { fresh: true });
-    await client.query(`
-      insert into public.softora_mailbox_messages(message_key)
-      values('unexpected-message')
-    `);
-    await assert.rejects(
-      client.query(bootstrapDrainSql),
-      /MAILBOX_UID_FRESH_BOOTSTRAP_NOT_EMPTY/
-    );
-    await client.query(`
-      select pg_catalog.set_config('softora.mailbox_uid_fresh_bootstrap','',false)
-    `);
-  });
-
-  test('bestaande legacy data-ops herstart kan de verplichte drain nooit omzeilen', async () => {
-    const client = await connect();
-    await resetBootstrapProtocolBase(client, { fresh: false });
-    await client.query(bootstrapDrainSql);
-    assert.deepEqual((await client.query(`
-      select uid_generation_protocol,
-        coalesce(pg_catalog.current_setting(
-          'softora.mailbox_uid_fresh_bootstrap', true
-        ), '') as fresh_sentinel
-      from public.softora_mailbox_campaign_consistency
-      where scope='campaign'
-    `)).rows[0], {
-      uid_generation_protocol: 'legacy',
-      fresh_sentinel: '',
-    });
-    await assert.rejects(
-      client.query(uidProtocolPreflightSql),
-      /MAILBOX_UID_PROTOCOL_DRAIN_REQUIRED/
-    );
-  });
-
-  test('bestaande gevulde legacy data-ops herstart blijft eveneens fail-closed', async () => {
-    const client = await connect();
-    await resetBootstrapProtocolBase(client, { fresh: false });
-    await client.query(`
-      insert into public.softora_mailbox_campaign_mutations(mutation_id)
-      values('existing-mutation')
-    `);
-    await client.query(bootstrapDrainSql);
-    assert.equal((await client.query(`
-      select uid_generation_protocol
-      from public.softora_mailbox_campaign_consistency
-      where scope='campaign'
-    `)).rows[0].uid_generation_protocol, 'legacy');
-    await assert.rejects(
-      client.query(uidProtocolPreflightSql),
-      /MAILBOX_UID_PROTOCOL_DRAIN_REQUIRED/
-    );
-  });
 }

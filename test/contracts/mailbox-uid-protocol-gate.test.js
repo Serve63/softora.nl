@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 const {
   createMailboxSyncProtocolLockStore,
 } = require('../../server/services/mailbox-sync-protocol-lock');
@@ -66,46 +65,17 @@ function acquired(args) {
   };
 }
 
-test('data-ops bootstrap spiegelt de protocolgate byte-exact voor v2', () => {
-  const bootstrapSentinelStart = '-- mailbox-uid-generation-bootstrap-sentinel:start';
-  const bootstrapSentinelEnd = '-- mailbox-uid-generation-bootstrap-sentinel:end';
+test('data-ops bootstrap spiegelt alleen de legacy-compatibele protocolgate byte-exact', () => {
   const startMarker = '-- mailbox-uid-generation-protocol-gate:start';
   const endMarker = '-- mailbox-uid-generation-protocol-gate:end';
-  const bootstrapDrainStart = '-- mailbox-uid-generation-bootstrap-drain:start';
-  const bootstrapDrainEnd = '-- mailbox-uid-generation-bootstrap-drain:end';
-  const sentinelStart = schema.indexOf(bootstrapSentinelStart);
-  const sentinelEnd = schema.indexOf(bootstrapSentinelEnd, sentinelStart);
   const start = schema.indexOf(startMarker);
   const end = schema.indexOf(endMarker, start);
-  const drainStart = schema.indexOf(bootstrapDrainStart, end);
-  const drainEnd = schema.indexOf(bootstrapDrainEnd, drainStart);
-  const epochStart = schema.indexOf('-- mailbox-uid-generation-epoch-v2:start');
-  assert.ok(sentinelStart >= 0 && sentinelEnd > sentinelStart && sentinelEnd < start);
-  const bootstrapSentinel = schema.slice(
-    sentinelStart,
-    sentinelEnd + bootstrapSentinelEnd.length
-  );
-  assert.match(bootstrapSentinel, /to_regclass\('public\.softora_mailbox_campaign_consistency'\) is null/);
-  assert.match(bootstrapSentinel, /to_regclass\('public\.softora_mailbox_sync_state'\) is null/);
-  assert.match(bootstrapSentinel, /to_regclass\('public\.softora_mailbox_messages'\) is null/);
-  assert.match(bootstrapSentinel, /to_regclass\('public\.softora_mailbox_campaign_mutations'\) is null/);
   assert.ok(start >= 0 && end > start);
-  assert.equal(schema.slice(start, end + endMarker.length + 1), migration);
-  assert.ok(end < drainStart && drainStart < drainEnd && drainEnd < epochStart);
-  const bootstrapDrain = schema.slice(drainStart, drainEnd + bootstrapDrainEnd.length);
-  assert.match(bootstrapDrain, /uid_generation_protocol = 'draining'/);
-  assert.match(bootstrapDrain, /uid_generation_drain_started_at = v_now - interval '3 minutes'/);
-  assert.match(bootstrapDrain, /uid_generation_drain_ready_at = v_now/);
-  assert.match(bootstrapDrain, /uid_generation_protocol = 'legacy'/);
-  assert.match(bootstrapDrain, /current_setting\([\s\S]*softora\.mailbox_uid_fresh_bootstrap/);
-  assert.match(bootstrapDrain, /exists \(select 1 from public\.softora_mailbox_sync_state\)/);
-  assert.match(bootstrapDrain, /exists \(select 1 from public\.softora_mailbox_messages\)/);
-  assert.match(bootstrapDrain, /exists \(select 1 from public\.softora_mailbox_campaign_mutations\)/);
-  assert.match(bootstrapDrain, /count\(\*\) from public\.softora_mailbox_campaign_consistency/);
-  assert.match(bootstrapDrain, /consistency\.content_version = 0/);
-  assert.match(bootstrapDrain, /MAILBOX_UID_FRESH_BOOTSTRAP_NOT_EMPTY/);
-  assert.match(bootstrapDrain, /'softora\.mailbox_uid_fresh_bootstrap', '', false/);
-  assert.doesNotMatch(migration, /mailbox-uid-generation-bootstrap-drain/);
+  assert.equal(schema.slice(start), migration);
+  assert.match(migration, /notify pgrst, 'reload schema';/);
+  assert.doesNotMatch(schema, /mailbox-uid-generation-bootstrap-(?:sentinel|drain)/);
+  assert.doesNotMatch(schema, /mailbox-uid-generation-epoch-v2/);
+  assert.doesNotMatch(schema.slice(start), /set uid_generation_protocol = 'v2'/);
 });
 
 test('gate is forward-only, scoped and keeps a three-minute drain floor', () => {
@@ -250,12 +220,6 @@ test('unknown protocol and protocol-read failure never fall back to legacy', asy
   assert.equal(unavailableResult.ok, false);
   assert.match(unavailableResult.error.message, /schema cache unavailable/);
   assert.equal(unavailable.calls.length, 1);
-});
-
-test('mailbox index exposes legacy and protocol-aware lock adapters separately', () => {
-  const store = createMailboxIndexStore();
-  assert.equal(typeof store.acquireSyncLock, 'function');
-  assert.equal(typeof store.acquireSyncLockForProtocol, 'function');
 });
 
 test('dedicated PostgreSQL runner is local-only, disposable and covers both caller generations', () => {
