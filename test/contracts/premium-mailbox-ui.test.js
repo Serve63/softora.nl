@@ -6311,78 +6311,84 @@ test('stale stille A-refresh kan de laadlaag van een nieuwere B-selectie niet wi
   assert.equal(detail.classList.contains('is-detail-pending'), false);
 });
 
-test('stille same-ID refresh start opnieuw voor een actuele token en message-identiteit', async () => {
-  const classes = new Set();
-  const attributes = new Map();
-  const loaderActivations = [];
-  const detail = {
-    dataset: {},
-    innerHTML: '',
-    classList: {
-      add(...names) {
-        if (names.includes('is-detail-pending')) loaderActivations.push('class');
-        names.forEach((name) => classes.add(name));
+test('stille same-ID refresh bindt tokenvervanging en objectvervanging elk zelfstandig', async () => {
+  async function runScenario({ label, replaceToken, replaceObject }) {
+    const classes = new Set();
+    const attributes = new Map();
+    const loaderActivations = [];
+    const detail = {
+      dataset: {},
+      innerHTML: '',
+      classList: {
+        add(...names) {
+          if (names.includes('is-detail-pending')) loaderActivations.push('class');
+          names.forEach((name) => classes.add(name));
+        },
+        remove(...names) { names.forEach((name) => classes.delete(name)); },
+        contains(name) { return classes.has(name); },
       },
-      remove(...names) { names.forEach((name) => classes.delete(name)); },
-      contains(name) { return classes.has(name); },
-    },
-    setAttribute(name, value) {
-      if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') {
-        loaderActivations.push(name);
-      }
-      attributes.set(name, String(value));
-    },
-    removeAttribute(name) { attributes.delete(name); },
-    querySelector() { return null; },
-  };
-  let activeId = '';
-  let token = { generation: 1, signal: new AbortController().signal };
-  let mail = { id: 'serve:inbox:same-id-replacement', body: 'Oude zichtbare inhoud.' };
-  const controller = detailStabilityModule.createController({
-    getMail: (id) => String(id) === mail.id ? mail : null,
-    ensureToken: () => token,
-    isTokenCurrent: (candidate) => candidate === token,
-    getScope: () => ({ folder: 'inbox', account: 'serve@softora.nl' }),
-    getActiveMail: () => activeId,
-    setActiveMail: (id) => { activeId = id; },
-    select() {},
-    renderList() {},
-    getDetailElement: () => detail,
-    renderHtml: (current) => `<p>${current.body}</p>`,
-    prepare: (current) => current.preparation,
-  });
+      setAttribute(name, value) {
+        if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') {
+          loaderActivations.push(name);
+        }
+        attributes.set(name, String(value));
+      },
+      removeAttribute(name) { attributes.delete(name); },
+      querySelector() { return null; },
+    };
+    let activeId = '';
+    let token = { generation: 1, signal: new AbortController().signal };
+    let mail = { id: `serve:inbox:same-id-${label}`, body: 'Oude zichtbare inhoud.' };
+    const controller = detailStabilityModule.createController({
+      getMail: (id) => String(id) === mail.id ? mail : null,
+      ensureToken: () => token,
+      isTokenCurrent: (candidate) => candidate === token,
+      getScope: () => ({ folder: 'inbox', account: 'serve@softora.nl' }),
+      getActiveMail: () => activeId,
+      setActiveMail: (id) => { activeId = id; },
+      select() {},
+      renderList() {},
+      getDetailElement: () => detail,
+      renderHtml: (current) => `<p>${current.body}</p>`,
+      prepare: (current) => current.preparation,
+    });
 
-  assert.equal((await controller.open(mail.id, {
-    skipContactTimeline: true,
-  })).committed, true);
-  assert.equal(detail.innerHTML, '<p>Oude zichtbare inhoud.</p>');
-  loaderActivations.length = 0;
+    assert.equal((await controller.open(mail.id, { skipContactTimeline: true })).committed, true, label);
+    loaderActivations.length = 0;
+    let releaseStalePreparation;
+    mail.preparation = new Promise((resolve) => { releaseStalePreparation = resolve; });
+    const staleRun = controller.open(mail.id, {
+      preserveVisibleDetail: true,
+      skipContactTimeline: true,
+    });
+    assert.deepEqual(loaderActivations, [], label);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(controller.snapshot().pending, true, label);
 
-  let releaseStalePreparation;
-  mail.preparation = new Promise((resolve) => { releaseStalePreparation = resolve; });
-  const staleRun = controller.open(mail.id, {
-    preserveVisibleDetail: true,
-    skipContactTimeline: true,
-  });
-  assert.deepEqual(loaderActivations, []);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(controller.snapshot().pending, true);
+    if (replaceToken) token = { generation: 2, signal: new AbortController().signal };
+    if (replaceObject) {
+      mail = { id: mail.id, body: 'Actuele inhoud na refresh.', preparation: Promise.resolve() };
+    } else {
+      mail.body = 'Actuele inhoud na refresh.';
+      mail.preparation = Promise.resolve();
+    }
+    const currentRun = controller.open(mail.id, {
+      preserveVisibleDetail: true,
+      skipContactTimeline: true,
+    });
+    assert.deepEqual(loaderActivations, [], label);
+    assert.equal((await currentRun).committed, true, label);
+    assert.equal(detail.innerHTML, '<p>Actuele inhoud na refresh.</p>', label);
+    assert.equal(detail.classList.contains('is-detail-pending'), false, label);
 
-  token = { generation: 2, signal: new AbortController().signal };
-  mail = { id: mail.id, body: 'Actuele inhoud na refresh.', preparation: Promise.resolve() };
-  const currentRun = controller.open(mail.id, {
-    preserveVisibleDetail: true,
-    skipContactTimeline: true,
-  });
-  assert.deepEqual(loaderActivations, []);
-  assert.equal((await currentRun).committed, true);
-  assert.equal(detail.innerHTML, '<p>Actuele inhoud na refresh.</p>');
-  assert.equal(detail.classList.contains('is-detail-pending'), false);
+    releaseStalePreparation();
+    assert.equal((await staleRun).stale, true, label);
+    assert.equal(detail.innerHTML, '<p>Actuele inhoud na refresh.</p>', label);
+    assert.deepEqual(loaderActivations, [], label);
+  }
 
-  releaseStalePreparation();
-  assert.equal((await staleRun).stale, true);
-  assert.equal(detail.innerHTML, '<p>Actuele inhoud na refresh.</p>');
-  assert.deepEqual(loaderActivations, []);
+  await runScenario({ label: 'new-token-same-object', replaceToken: true, replaceObject: false });
+  await runScenario({ label: 'same-token-new-object', replaceToken: false, replaceObject: true });
 });
 
 test('premium mailbox herstelt bewust gemuteerde detail-DOM ook bij identieke HTML', async () => {
@@ -7512,6 +7518,174 @@ test('focus en visibilitychange verversen dezelfde zichtbare mail zonder enige l
 
   assert.equal(loadOptionsSeen.length, 2);
   assert.ok(loadOptionsSeen.every((options) => options.showLoader === false));
+  assert.deepEqual(loaderActivations, []);
+  assert.equal(detail.innerHTML, htmlBefore);
+  assert.equal(detail.innerHTMLWrites, writesBefore);
+  assert.equal(detail.offsetHeight, heightBefore);
+  assert.equal(mailbox.getActiveMail(), current.id);
+  assert.equal(detail.dataset.mailboxCommittedId, current.id);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+  assert.notEqual(detail.getAttribute('aria-busy'), 'true');
+  refreshController.destroy();
+});
+
+test('focus en visibilitychange houden outreach stabiel door beide providerbatches', async () => {
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const current = mailbox.normalizeMailboxApiMessage({
+    id: 'contact:serve:lifecycle-outreach',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    owner: 'serve',
+    canonicalOwner: 'serve',
+    externalContactEmail: 'stabiel@example.nl',
+    from: 'Stabiele outreachreactie',
+    email: 'stabiel@example.nl',
+    subject: 'Zelfde outreachgesprek blijft staan',
+    body: 'Deze outreachinhoud is al volledig zichtbaar.',
+    bodyLoaded: true,
+    receivedAt: '2026-08-21T13:00:00.000Z',
+  });
+  let messages = [current];
+  mailbox.setMails(messages);
+  await mailbox.openMail(current.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipContactTimeline: true,
+    imagesPrepared: true,
+  });
+
+  const detail = mailbox.getElement('mail-detail');
+  const loaderActivations = [];
+  const originalAdd = detail.classList.add.bind(detail.classList);
+  const originalSetAttribute = detail.setAttribute.bind(detail);
+  detail.classList.add = (...names) => {
+    if (names.includes('is-detail-pending')) loaderActivations.push('class');
+    originalAdd(...names);
+  };
+  detail.setAttribute = (name, value) => {
+    if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') {
+      loaderActivations.push(name);
+    }
+    originalSetAttribute(name, value);
+  };
+  Object.defineProperty(detail, 'offsetHeight', { configurable: true, value: 877 });
+  const htmlBefore = detail.innerHTML;
+  const writesBefore = detail.innerHTMLWrites;
+  const heightBefore = detail.offsetHeight;
+  const campaignLoads = [];
+  const ownerView = ownerSessionModule.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load(folder, normalizeMessage, _fetch, options) {
+        campaignLoads.push({ folder, owner: options.owner });
+        return {
+          fromBootstrap: false,
+          fromCache: false,
+          messages: [{ ...messages[0] }].map(normalizeMessage),
+          sync: {},
+        };
+      },
+      filterMessages: (value) => value,
+    },
+    normalizeMessage: (message) => mailbox.normalizeMailboxApiMessage(message),
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; mailbox.setMails(value); },
+    getActiveMail: mailbox.getActiveMail,
+    setActiveMail() {},
+    renderList() {},
+    openMail(id, openOptions) {
+      return mailbox.openMail(id, {
+        ...openOptions,
+        skipBodyFetch: true,
+        skipThreadBodyFetch: true,
+        skipContactTimeline: true,
+        imagesPrepared: true,
+      });
+    },
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const documentRef = {
+    visibilityState: 'visible',
+    addEventListener(type, handler) { documentListeners.set(type, handler); },
+    removeEventListener(type) { documentListeners.delete(type); },
+    getElementById() { return null; },
+  };
+  const windowRef = {
+    addEventListener(type, handler) { windowListeners.set(type, handler); },
+    removeEventListener(type) { windowListeners.delete(type); },
+  };
+  let nextTimerId = 0;
+  const timers = new Map();
+  const loadOptionsSeen = [];
+  const providerUrls = [];
+  const refreshController = refreshModule.create({
+    autoStart: false,
+    document: documentRef,
+    window: windowRef,
+    button: { disabled: false, classList: { toggle() {} }, setAttribute() {}, addEventListener() {} },
+    ageLabel: { textContent: '', setAttribute() {} },
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async (url) => {
+      providerUrls.push(String(url));
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    },
+    loadMessages: async (loadOptions) => {
+      loadOptionsSeen.push(loadOptions);
+      return ownerView.load(loadOptions);
+    },
+    setTimeout(handler, delay) {
+      const id = ++nextTimerId;
+      timers.set(id, { delay, handler });
+      return id;
+    },
+    clearTimeout(id) { timers.delete(id); },
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+
+  async function triggerLifecycle(handler) {
+    const expectedLoads = loadOptionsSeen.length + 2;
+    const expectedRequests = providerUrls.length + 2;
+    handler();
+    const scheduled = Array.from(timers.entries()).find(([, timer]) => timer.delay === 0);
+    assert.ok(scheduled, 'outreach-lifecycle moet een directe achtergrondcontrole plannen');
+    timers.delete(scheduled[0]);
+    scheduled[1].handler();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (
+        loadOptionsSeen.length === expectedLoads &&
+        providerUrls.length === expectedRequests &&
+        refreshController.snapshot().inFlight === 0
+      ) break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(loadOptionsSeen.length, expectedLoads);
+    assert.equal(providerUrls.length, expectedRequests);
+    assert.equal(refreshController.snapshot().inFlight, 0);
+  }
+
+  refreshController.start();
+  await triggerLifecycle(windowListeners.get('focus'));
+  documentRef.visibilityState = 'hidden';
+  documentListeners.get('visibilitychange')();
+  documentRef.visibilityState = 'visible';
+  await triggerLifecycle(documentListeners.get('visibilitychange'));
+
+  assert.deepEqual(providerUrls, [
+    '/api/mailbox/sync', '/api/mailbox/instantly/sync',
+    '/api/mailbox/sync', '/api/mailbox/instantly/sync',
+  ]);
+  assert.equal(campaignLoads.length, 4);
+  assert.ok(campaignLoads.every((load) => load.folder === 'outreach' && load.owner === 'serve'));
+  assert.ok(loadOptionsSeen.every((options) => options.showLoader === false && options.openLatest === false));
   assert.deepEqual(loaderActivations, []);
   assert.equal(detail.innerHTML, htmlBefore);
   assert.equal(detail.innerHTMLWrites, writesBefore);
