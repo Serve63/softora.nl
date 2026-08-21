@@ -154,10 +154,16 @@ function loadMailboxImagesModuleForTest(options = {}) {
       isSafeImageSource: (value) => Boolean(String(value || '').trim()),
     },
   };
-  const context = { window };
-  vm.createContext(context);
-  vm.runInContext(readImagesScript(), context);
-  return window.SoftoraMailboxImages;
+  const previousWindow = global.window;
+  delete require.cache[require.resolve(imagesScriptPath)];
+  global.window = window;
+  try {
+    return require(imagesScriptPath);
+  } finally {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+    delete require.cache[require.resolve(imagesScriptPath)];
+  }
 }
 
 test('mailbox gebruikt de juiste browsertitel', () => {
