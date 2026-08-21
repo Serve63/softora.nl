@@ -107,8 +107,7 @@ function createMailboxSyncProtocolLockStore({
     });
   }
 
-  async function acquireSyncLockForProtocol(options = {}) {
-    const syncKey = buildSyncKey(options.accountEmail, options.folder || 'inbox');
+  async function getUidGenerationProtocol() {
     const protocolResult = await runDurableWrite(
       'get-uid-generation-protocol',
       (client) => client.rpc('softora_get_mailbox_uid_generation_protocol', {})
@@ -116,9 +115,6 @@ function createMailboxSyncProtocolLockStore({
     if (!protocolResult.ok) {
       return {
         ok: false,
-        locked: false,
-        syncKey,
-        protocolMode: '',
         error: protocolResult.error,
       };
     }
@@ -126,10 +122,22 @@ function createMailboxSyncProtocolLockStore({
     if (!protocolState) {
       return {
         ok: false,
+        error: createMailboxUidProtocolError(),
+      };
+    }
+    return { ok: true, ...protocolState };
+  }
+
+  async function acquireSyncLockForProtocol(options = {}) {
+    const syncKey = buildSyncKey(options.accountEmail, options.folder || 'inbox');
+    const protocolState = await getUidGenerationProtocol();
+    if (!protocolState.ok) {
+      return {
+        ok: false,
         locked: false,
         syncKey,
         protocolMode: '',
-        error: createMailboxUidProtocolError(),
+        error: protocolState.error,
       };
     }
     if (protocolState.protocol === MAILBOX_UID_PROTOCOL_DRAINING) {
@@ -159,6 +167,7 @@ function createMailboxSyncProtocolLockStore({
   return {
     acquireSyncLock,
     acquireSyncLockForProtocol,
+    getUidGenerationProtocol,
   };
 }
 

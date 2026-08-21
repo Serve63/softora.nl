@@ -37,7 +37,8 @@ function createMailboxQuotedSentCandidateLookup(options = {}) {
             .eq('folder', 'sent')
             .ilike('subject', `%${target.canonicalSubject}%`)
             .ilike('recipients_text', `%${target.recipientEmail}%`)
-            .is('deleted_at', null);
+            .is('deleted_at', null)
+            .is('generation_superseded_at', null);
           if (target.beforeAt) query = query.lte('date', target.beforeAt);
           return query
             .order('date', { ascending: false })

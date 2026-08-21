@@ -649,6 +649,11 @@ test('mailbox index store vindt de oudste campagne-uid zonder verwijderde histor
             calls.push(['ilike', column, value]);
             return query;
           },
+          is(column, value) {
+            filters[column] = value;
+            calls.push(['is', column, value]);
+            return query;
+          },
           order(column, options) {
             calls.push(['order', column, options]);
             return query;
@@ -674,6 +679,10 @@ test('mailbox index store vindt de oudste campagne-uid zonder verwijderde histor
 
   assert.equal(uid, 19);
   assert.equal(calls.some((call) => call[0] === 'is' && call[1] === 'deleted_at'), false);
+  assert.equal(
+    calls.some((call) => call[0] === 'is' && call[1] === 'generation_superseded_at'),
+    true
+  );
   assert.deepEqual(
     calls.filter((call) => call[0] === 'ilike'),
     [
@@ -730,6 +739,7 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
     ['is', 'deleted_at', null],
+    ['is', 'generation_superseded_at', null],
     ['eq', 'uid', 42],
   ]);
 });
@@ -771,6 +781,7 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
     ['is', 'deleted_at', null],
+    ['is', 'generation_superseded_at', null],
     ['eq', 'uid', 42],
     ['select', 'message_key,reply_dismissed_at'],
   ]);
@@ -1357,6 +1368,9 @@ test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id 
         },
         is(column, value) {
           calls.push(['is', column, value]);
+          return query;
+        },
+        then(resolve, reject) {
           return Promise.resolve({
             data: [{
               message_key: 'serve@softora.nl|sent|62',
@@ -1373,7 +1387,7 @@ test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id 
               payload: { originalCampaignOutbound: true },
             }],
             error: null,
-          });
+          }).then(resolve, reject);
         },
       };
       return query;
@@ -1402,6 +1416,10 @@ test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id 
     ['in', 'message_id', ['<bizzylizzy-parent@softora.nl>']],
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'sent']);
+  assert.deepEqual(calls.filter((call) => call[0] === 'is'), [
+    ['is', 'deleted_at', null],
+    ['is', 'generation_superseded_at', null],
+  ]);
 });
 
 test('mailbox index store haalt alleen exacte Sent-descendants binnen hetzelfde account op', async () => {

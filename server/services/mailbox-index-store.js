@@ -10,7 +10,14 @@ const {
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
 const { createMailboxIndexTargetedLookups } = require('../repositories/mailbox-index-targeted-lookups');
 const { createMailboxIndexVisibilityStore } = require('./mailbox-index-visibility-store');
-
+const {
+  buildMailboxMessageKey,
+  normalizeMailboxGenerationId,
+  normalizeMailboxUidValidity,
+} = require('./mailbox-uid-validity');
+const { createMailboxUidGenerationIndex } = require('./mailbox-uid-generation-index');
+const { createMailboxLegacySyncFinalizer } = require('./mailbox-sync-legacy-finalizer');
+const { createMailboxSyncProtocolLockStore } = require('./mailbox-sync-protocol-lock');
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
   syncState: 'softora_mailbox_sync_state',
@@ -160,15 +167,26 @@ function createMailboxIndexStore(deps = {}) {
     }
   }
 
-  async function runDurableWrite(label, operation) {
-    const execute = () => run(label, operation, {
-      bypassFailureCooldown: true,
-      clientOptions: {
-        timeoutMs: DURABLE_WRITE_CLIENT_TIMEOUT_MS,
-        ignoreFailureCooldown: true, suppressFailureCooldown: true,
-      },
-      queryTimeoutMs: DURABLE_WRITE_QUERY_TIMEOUT_MS,
-    });
+  async function runDurableWrite(label, operation, { deadlineAtMs = null } = {}) {
+    const execute = () => {
+      const absoluteDeadlineAtMs = Number(deadlineAtMs);
+      const queryTimeoutMs = Number.isFinite(absoluteDeadlineAtMs) && absoluteDeadlineAtMs > 0
+        ? Math.max(0, Math.min(DURABLE_WRITE_QUERY_TIMEOUT_MS, absoluteDeadlineAtMs - now().getTime()))
+        : DURABLE_WRITE_QUERY_TIMEOUT_MS;
+      if (queryTimeoutMs < 250) {
+        const error = new Error(`Mailbox durable write ${label} deadline bereikt.`);
+        error.code = 'MAILBOX_DURABLE_WRITE_DEADLINE_EXHAUSTED';
+        return Promise.resolve({ ok: false, unavailable: false, data: null, error });
+      }
+      return run(label, operation, {
+        bypassFailureCooldown: true,
+        clientOptions: {
+          timeoutMs: DURABLE_WRITE_CLIENT_TIMEOUT_MS,
+          ignoreFailureCooldown: true, suppressFailureCooldown: true,
+        },
+        queryTimeoutMs,
+      });
+    };
     const first = await execute();
     return first.ok || !isSoftIndexError(first.error) ? first : execute();
   }
@@ -240,8 +258,13 @@ function createMailboxIndexStore(deps = {}) {
     }));
   }
 
-  function buildMessageKey(accountEmail, folder, uid) {
-    return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}|${Number(uid) || 0}`;
+  function buildMessageKey(accountEmail, folder, uid, generationId = null) {
+    return buildMailboxMessageKey({
+      accountEmail: normalizeEmail(accountEmail),
+      folder: normalizeFolder(folder),
+      uid,
+      generationId,
+    });
   }
 
   function buildProviderMessageKey(provider, providerId) {
@@ -256,16 +279,20 @@ function createMailboxIndexStore(deps = {}) {
     return Math.max(1, digest.readUInt32BE(0) & 0x7fffffff);
   }
 
-  function buildMessageRow(message, accountEmail, folder, index = 0) {
+  function buildMessageRow(message, accountEmail, folder, index = 0, options = {}) {
     const normalizedFolder = normalizeFolder(folder || message?.folder);
     const uid = parseUidFromMessage(message);
+    const uidValidity = normalizeMailboxUidValidity(options.uidValidity);
+    const generationId = normalizeMailboxGenerationId(options.generationId);
     const dateIso = parseDateIso(message && message.date);
     const body = trimBodyForStorage(message, index);
     return {
-      message_key: buildMessageKey(accountEmail, normalizedFolder, uid),
+      message_key: buildMessageKey(accountEmail, normalizedFolder, uid, generationId),
       account_email: normalizeEmail(accountEmail),
       folder: normalizedFolder,
       uid,
+      ...(uidValidity ? { uid_validity: uidValidity } : {}),
+      ...(generationId ? { uid_generation_id: generationId } : {}),
       provider_id: normalizeString(message && message.id) || `${normalizedFolder}:${uid}`,
       message_id: normalizeString(message && message.messageId),
       in_reply_to: normalizeString(message && message.inReplyTo),
@@ -621,6 +648,7 @@ function createMailboxIndexStore(deps = {}) {
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizeFolder(folder))
         .is('deleted_at', null)
+        .is('generation_superseded_at', null)
         .order('date', { ascending: false })
         .limit(safeLimit)
     );
@@ -644,6 +672,7 @@ function createMailboxIndexStore(deps = {}) {
         .in('account_email', normalizedAccounts)
         .eq('folder', normalizeFolder(folder))
         .is('deleted_at', null)
+        .is('generation_superseded_at', null)
         .order('date', { ascending: false })
         .limit(safeLimit)
     );
@@ -673,6 +702,7 @@ function createMailboxIndexStore(deps = {}) {
           .in('account_email', normalizedAccounts)
           .eq('folder', normalizedFolder)
           .is('deleted_at', null)
+          .is('generation_superseded_at', null)
           .order('date', { ascending: false })
           .order('message_key', { ascending: false })
           .range(offset, offset + pageSize - 1)
@@ -717,6 +747,7 @@ function createMailboxIndexStore(deps = {}) {
               .eq('folder', normalizedFolder)
               .ilike('subject', `%${term}%`)
               .is('deleted_at', null)
+              .is('generation_superseded_at', null)
               .order('date', { ascending: false })
               .order('message_key', { ascending: false })
               .range(offset, offset + pageSize - 1)
@@ -763,6 +794,7 @@ function createMailboxIndexStore(deps = {}) {
           .eq('folder', normalizedFolder)
           .in('message_id', batch)
           .is('deleted_at', null)
+          .is('generation_superseded_at', null)
       );
       if (!result.ok) return null;
       (Array.isArray(result.data) ? result.data : []).forEach((row) => {
@@ -797,6 +829,7 @@ function createMailboxIndexStore(deps = {}) {
             .eq('account_email', normalizedAccount)
             .eq('folder', normalizedFolder)
             .is('deleted_at', null)
+            .is('generation_superseded_at', null)
             .order('uid', { ascending: false });
           if (normalizeString(since)) query = query.gte('date', normalizeString(since));
           return query.range(offset, offset + pageSize - 1);
@@ -922,6 +955,7 @@ function createMailboxIndexStore(deps = {}) {
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizedFolder)
         .is('deleted_at', null)
+        .is('generation_superseded_at', null)
         .limit(1);
       if (Number.isFinite(uid) && uid > 0) return base.eq('uid', uid).maybeSingle();
       return base.eq('provider_id', normalizeString(id)).maybeSingle();
@@ -943,6 +977,7 @@ function createMailboxIndexStore(deps = {}) {
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizedFolder)
         .is('deleted_at', null)
+        .is('generation_superseded_at', null)
         .limit(1);
       if (Number.isFinite(uid) && uid > 0) return base.eq('uid', uid).maybeSingle();
       return base.eq('provider_id', normalizeString(id)).maybeSingle();
@@ -993,14 +1028,25 @@ function createMailboxIndexStore(deps = {}) {
       .filter(Boolean);
   }
 
-  async function upsertMessages({ accountEmail, folder = 'inbox', messages = [] }) {
-    const rows = deduplicateRowsByKey((Array.isArray(messages) ? messages : []).map((message, index) => buildMessageRow(message, accountEmail, folder, index)).filter((row) => row.uid > 0), 'message_key');
+  async function upsertMessages({
+    accountEmail,
+    folder = 'inbox',
+    messages = [],
+    deadlineAtMs = null,
+  }) {
+    const rows = deduplicateRowsByKey(
+      (Array.isArray(messages) ? messages : [])
+        .map((message, index) => buildMessageRow(message, accountEmail, folder, index))
+        .filter((row) => row.uid > 0),
+      'message_key'
+    );
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
     const result = await runDurableWrite('upsert-messages', (client) =>
       client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
         onConflict: 'message_key',
         defaultToNull: false,
-      })
+      }),
+      { deadlineAtMs }
     );
     if (!result.ok) return result;
     return { ...result, upserted: rows.length };
@@ -1020,55 +1066,22 @@ function createMailboxIndexStore(deps = {}) {
     return result.data || null;
   }
 
-  async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS }) {
-    const syncKey = buildSyncKey(accountEmail, folder);
-    const lockToken = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-    const result = await runDurableWrite('acquire-sync-lock', (client) =>
-      client.rpc('softora_claim_mailbox_sync_lock', {
-        p_sync_key: syncKey,
-        p_account_email: normalizeEmail(accountEmail),
-        p_folder: normalizeFolder(folder),
-        p_lock_token: lockToken,
-        p_lock_ttl_seconds: Math.ceil(Math.max(10_000, Number(lockTtlMs) || SYNC_LOCK_TTL_MS) / 1000),
-        p_force: Boolean(force),
-      })
-    );
-    if (!result.ok) return { ok: false, locked: false, syncKey, error: result.error };
-    const claim = Array.isArray(result.data) ? result.data[0] : result.data;
-    if (!claim || claim.acquired !== true) {
-      const lockExpiresAt = normalizeString(claim && claim.lock_expires_at);
-      return { ok: false, locked: Boolean(claim && claim.locked), syncKey,
-        contention: lockExpiresAt ? 'active_lock' : 'capacity',
-        ...(lockExpiresAt ? { lockExpiresAt } : {}),
-      };
-    }
-    return { ok: true, locked: false, syncKey,
-      lockToken: normalizeString(claim.claimed_lock_token) || lockToken,
-    };
-  }
+  const {
+    acquireSyncLock,
+    acquireSyncLockForProtocol,
+    getUidGenerationProtocol,
+  } = createMailboxSyncProtocolLockStore({
+    runDurableWrite,
+    buildSyncKey,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeString,
+    syncLockTtlMs: SYNC_LOCK_TTL_MS,
+  });
 
-  async function finishSync({ accountEmail, folder = 'inbox', lockToken = '', messageCount = 0, lastUid = 0, error = '' }) {
-    const syncKey = buildSyncKey(accountEmail, folder);
-    const failed = Boolean(normalizeString(error));
-    const patch = {
-      status: failed ? 'error' : 'ok',
-      last_error: failed ? truncateText(normalizeString(error), 1000) : null,
-      lock_token: null,
-      lock_expires_at: null,
-      updated_at: isoNow(),
-    };
-    if (!failed) Object.assign(patch, {
-      message_count: Math.max(0, Number(messageCount) || 0), last_uid: Math.max(0, Number(lastUid) || 0), last_synced_at: isoNow(),
-    });
-    return runDurableWrite(
-      'finish-sync',
-      (client) => client
-        .from(MAILBOX_INDEX_TABLES.syncState)
-        .update(patch)
-        .eq('sync_key', syncKey)
-        .eq('lock_token', normalizeString(lockToken))
-    );
-  }
+  const finishSync = createMailboxLegacySyncFinalizer({
+    runDurableWrite, buildSyncKey, normalizeString, truncateText, isoNow,
+  });
 
   function isSyncStateStale(state, maxAgeMs) {
     const syncedAt = Date.parse(normalizeString(state && state.last_synced_at));
@@ -1101,6 +1114,17 @@ function createMailboxIndexStore(deps = {}) {
   const visibilityStore = createMailboxIndexVisibilityStore({
     runDurableWrite, normalizeEmail, normalizeFolder, normalizeString,
   });
+  const uidGenerationIndex = createMailboxUidGenerationIndex({
+    runDurableWrite,
+    buildSyncKey,
+    buildMessageRow,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeString,
+    now,
+    messagesTable: MAILBOX_INDEX_TABLES.messages,
+    pageSize: MAILBOX_INDEX_PAGE_SIZE,
+  });
 
   const { applyStateMutation, getStateMutationStatus, markMessageRead, markMessageReplyDismissed } = createMailboxStateMutationStore({
     run,
@@ -1120,6 +1144,7 @@ function createMailboxIndexStore(deps = {}) {
     BODY_RETENTION_NEWEST_COUNT,
     MAILBOX_INDEX_TABLES,
     acquireSyncLock,
+    acquireSyncLockForProtocol,
     buildMessageKey,
     buildMessageRow,
     buildProviderMessageKey,
@@ -1130,6 +1155,7 @@ function createMailboxIndexStore(deps = {}) {
     getMessageForReplyProof,
     getProviderMessage,
     getSyncState,
+    getUidGenerationProtocol,
     hydrateMessageBodies,
     isAvailable,
     isSyncStateStale,
@@ -1152,6 +1178,7 @@ function createMailboxIndexStore(deps = {}) {
     stableProviderUid,
     upsertMessages,
     upsertProviderMessages,
+    ...uidGenerationIndex,
     ...targetedLookups,
     ...visibilityStore,
   };
