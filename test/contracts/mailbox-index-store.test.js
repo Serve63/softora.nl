@@ -7,6 +7,47 @@ const {
   MAILBOX_INDEX_PAGE_SIZE,
   createMailboxIndexStore,
 } = require('../../server/services/mailbox-index-store');
+const {
+  createMailboxMessageReferenceLookup,
+} = require('../../server/repositories/mailbox-message-reference-lookup');
+
+test('gerichte message-reference lookup gebruikt priority-read wanneer daarom wordt gevraagd', async () => {
+  const calls = [];
+  const query = {
+    select() { return query; },
+    eq() { return query; },
+    or() { return query; },
+    is() { return query; },
+    order() { return query; },
+    range() { return Promise.resolve({ data: [], error: null }); },
+  };
+  const client = { from() { return query; } };
+  const execute = (kind) => async (_label, operation) => {
+    calls.push(kind);
+    const result = await operation(client);
+    return { ok: true, data: result.data };
+  };
+  const lookup = createMailboxMessageReferenceLookup({
+    run: execute('normal'),
+    runPriorityRead: execute('priority'),
+    tableName: 'softora_mailbox_messages',
+    metadataColumns: 'message_key',
+    normalizeString: (value) => String(value || '').trim(),
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    normalizeMessageRow: (row) => row,
+  });
+
+  const result = await lookup({
+    accountEmails: ['serve@softora.nl'],
+    folder: 'sent',
+    messageIds: ['<reply@example.nl>'],
+    priorityRead: true,
+  });
+
+  assert.deepEqual(result, []);
+  assert.deepEqual(calls, ['priority']);
+});
 
 function createMailboxIndexClient() {
   const stateRows = new Map();

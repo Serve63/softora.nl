@@ -1936,6 +1936,7 @@ test('campaign reply service laadt een latere Sent-descendant buiten de globale 
       listMessagesReferencingMessageIdsForAccounts: async (options) => {
         descendantLookups.push(options);
         assert.deepEqual(options.accountEmails, ['serve@softora.nl']);
+        assert.equal(options.priorityRead, true);
         return options.messageIds.some((messageId) => String(messageId).includes('brigit-reply@example.nl'))
           ? [laterOutbound]
           : [];

@@ -1074,6 +1074,7 @@ function createMailboxIndexStore(deps = {}) {
 
   const listMessagesReferencingMessageIdsForAccounts = createMailboxMessageReferenceLookup({
     run,
+    runPriorityRead,
     tableName: MAILBOX_INDEX_TABLES.messages,
     metadataColumns: MAILBOX_MESSAGE_METADATA_COLUMNS,
     normalizeString,
