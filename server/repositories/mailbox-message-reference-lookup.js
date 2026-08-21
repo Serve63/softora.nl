@@ -5,6 +5,7 @@ const MAILBOX_MESSAGE_REFERENCE_LOOKUP_MAX_IDS = 2000;
 function createMailboxMessageReferenceLookup(deps = {}) {
   const {
     run,
+    runPriorityRead,
     tableName,
     metadataColumns,
     normalizeString,
@@ -49,6 +50,7 @@ function createMailboxMessageReferenceLookup(deps = {}) {
     accountEmails = [],
     folder = 'sent',
     messageIds = [],
+    priorityRead = false,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -58,6 +60,7 @@ function createMailboxMessageReferenceLookup(deps = {}) {
     ).slice(0, MAILBOX_MESSAGE_REFERENCE_LOOKUP_MAX_IDS);
     if (!normalizedAccounts.length || !normalizedMessageIds.length) return [];
     const normalizedFolder = normalizeFolder(folder);
+    const read = priorityRead && typeof runPriorityRead === 'function' ? runPriorityRead : run;
     const wantedIds = new Set(normalizedMessageIds);
     const rowsByKey = new Map();
 
@@ -77,7 +80,7 @@ function createMailboxMessageReferenceLookup(deps = {}) {
         const candidateFilter = buildCandidateFilter(batch);
         if (!candidateFilter) continue;
         for (let pageOffset = 0; ; pageOffset += MAILBOX_MESSAGE_REFERENCE_LOOKUP_PAGE_SIZE) {
-          const result = await run(
+          const result = await read(
             `list-messages-referencing-message-id:${normalizedFolder}:${accountEmail}:${batchOffset}:${pageOffset}`,
             (client) => client
               .from(tableName)

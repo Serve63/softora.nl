@@ -242,7 +242,7 @@ async function listExactSentDescendants({
       const result = await mailboxIndexStore.listMessagesReferencingMessageIdsForAccounts({
         accountEmails: [accountEmail],
         folder: 'sent',
-        messageIds,
+        messageIds, priorityRead: true,
       });
       if (!Array.isArray(result)) {
         const error = new Error('Gerichte Sent-threadcontrole kon niet worden gelezen.');
