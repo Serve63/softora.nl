@@ -487,6 +487,7 @@ function createMailboxIndexStore(deps = {}) {
     accountEmails = [],
     limit = 500,
     includeBody = true,
+    priorityRead = false,
   } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
     const normalizedAccounts = Array.from(
@@ -497,7 +498,8 @@ function createMailboxIndexStore(deps = {}) {
     const columns = includeBody
       ? '*'
       : MAILBOX_MESSAGE_METADATA_COLUMNS;
-    const result = await run(`list-provider-messages:${normalizedProvider}`, (client) =>
+    const read = priorityRead ? runPriorityRead : run;
+    const result = await read(`list-provider-messages:${normalizedProvider}`, (client) =>
       client
         .from(MAILBOX_INDEX_TABLES.messages)
         .select(columns)
@@ -739,6 +741,7 @@ function createMailboxIndexStore(deps = {}) {
     accountEmails = [],
     folder = 'sent',
     messageIds = [],
+    priorityRead = false,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -748,10 +751,11 @@ function createMailboxIndexStore(deps = {}) {
     ).slice(0, 2000);
     if (!normalizedAccounts.length || !normalizedMessageIds.length) return [];
     const normalizedFolder = normalizeFolder(folder);
+    const read = priorityRead ? runPriorityRead : run;
     const rowsByKey = new Map();
     for (let offset = 0; offset < normalizedMessageIds.length; offset += MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE) {
       const batch = normalizedMessageIds.slice(offset, offset + MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE);
-      const result = await run(`list-messages-by-message-id:${normalizedFolder}:${offset}`, (client) =>
+      const result = await read(`list-messages-by-message-id:${normalizedFolder}:${offset}`, (client) =>
         client
           .from(MAILBOX_INDEX_TABLES.messages)
           .select(MAILBOX_MESSAGE_METADATA_COLUMNS)

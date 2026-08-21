@@ -1028,7 +1028,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
           accountEmails: campaignMailboxAccounts,
           folder: 'sent',
-          messageIds: parentMessageIds,
+          messageIds: parentMessageIds, priorityRead: true,
         }).catch(() => [])
       : [];
     const targetedSentDescendantsResult = await listExactSentDescendants({
