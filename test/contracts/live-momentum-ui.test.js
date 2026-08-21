@@ -15,7 +15,7 @@ const endGameCardFiles = [
   'leuke-vriendin.png', 'lijpe-instagram-feed.png', 'maatpak.png', 'nieuwe-fiets.png', 'nieuwe-whoop.png', 'oktober-2024.png',
   'persoonlijke-handtekening.png', 'professionele-fotoshoot.png', 'prp-behandeling.png',
   'range-rover-sport.png', 'rolex-datejust.png', 'ruben-zet-toto.png', 'rubens-company.png',
-  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'serves-gezondheidsdossier.png', 'silence-controle.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
+  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'sertraline-vrij.png', 'serves-gezondheidsdossier.png', 'silence-controle.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
   'tanden-rechtzetten.png', 'tandenbleek-voorraad.png', 'transfermarkt.png',
   'vakantiehuis-kopen.png', 'vijf-kilo-spiermassa.png', 'vip-box-psv.png', 'vip-box-willem-2.png',
   'vitalora-draaiend.png', 'wereldkaart-bezochte-landen.png', 'world-watcher.png'
@@ -50,7 +50,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260820a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260821a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260814b" defer><\/script>/);
@@ -482,7 +482,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
     "Ruben's wereldkaart", 'Professionele fotoshoot', 'Persoonlijke handtekening',
-    'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028', 'Silence controle',
+    'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
+    'Sertraline vrij', 'Gratis opleiding via gemeente', 'Silence controle',
     'Lijpe Instagram feed', '3 posts · 6 slides', 'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
     'Huis van €1 miljoen+ kopen', '2028...', '2035...', 'Oktober 2024…'
@@ -660,7 +661,40 @@ test('de zeven kantooruitbreidingen zijn unieke missies met een eigen visuele la
   });
 });
 
-test('Silence controle is een unieke missie 63 met geïsoleerde duurzame state', () => {
+test('de nieuwe medicatie- en opleidingstegels migreren zonder bestaande voortgang te wijzigen', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const expected = [
+    { id: 'sertraline-vrij', title: 'Sertraline vrij' },
+    { id: 'gratis-opleiding-via-gemeente', title: 'Gratis opleiding via gemeente', imageId: 'jurisalem-af' }
+  ];
+  const ids = expected.map((card) => card.id);
+  const silenceIndex = catalog.findIndex((card) => card.id === 'silence-controle');
+
+  assert.deepEqual(catalog.filter((card) => ids.includes(card.id)), expected);
+  assert.deepEqual(catalog.slice(silenceIndex - ids.length, silenceIndex).map((card) => card.id), ids);
+
+  const oldPersistedOrder = catalog
+    .filter((card) => !ids.includes(card.id))
+    .map((card) => card.id);
+  const normalized = JSON.parse(JSON.stringify(api.normalizeState({
+    'serves-gezondheidsdossier': { completed: true, deleted: false },
+    'silence-controle': { completed: false, deleted: true },
+    __order: oldPersistedOrder
+  })));
+
+  assert.deepEqual(normalized['serves-gezondheidsdossier'], { completed: true, deleted: false });
+  assert.deepEqual(normalized['silence-controle'], { completed: false, deleted: true });
+  assert.deepEqual(normalized.__order.filter((id) => oldPersistedOrder.includes(id)), oldPersistedOrder);
+  assert.deepEqual(normalized.__order.filter((id) => ids.includes(id)), ids);
+  ids.forEach((id) => {
+    assert.deepEqual(normalized[id], { completed: false, deleted: false });
+    assert.equal(normalized.__order.filter((orderedId) => orderedId === id).length, 1);
+    assert.ok(normalized.__order.indexOf(id) < normalized.__order.indexOf('checkpoint-2028'));
+  });
+});
+
+test('Silence controle is een unieke missie 65 met geïsoleerde duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
@@ -677,7 +711,7 @@ test('Silence controle is een unieke missie 63 met geïsoleerde duurzame state',
     missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
     imageId: 'silence-controle'
   }]);
-  assert.equal(missionNumber, 63);
+  assert.equal(missionNumber, 65);
   assert.equal(cardIndex, checkpointIndex - 1);
 
   const oldPersistedOrder = catalog
