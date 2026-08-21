@@ -139,7 +139,7 @@ test('ai tools coordinator validates website preview input and returns generated
   assert.equal(activities[0].reason, 'dashboard_activity_website_preview_generated');
 });
 
-test('ai tools coordinator forwards database preview generation controls to the image generator', async () => {
+test('ai tools coordinator forwards database controls without leaking outreach identity to the image generator', async () => {
   let capturedScan = null;
   const { coordinator } = createFixture({
     generateWebsitePreviewImageWithAi: async (scan) => {
@@ -175,11 +175,9 @@ test('ai tools coordinator forwards database preview generation controls to the 
   assert.equal(capturedScan.imageSize, '2160x3840');
   assert.equal(capturedScan.disableReferenceImages, true);
   assert.equal(capturedScan.referenceImageMode, 'prompt-only');
-  assert.deepEqual(capturedScan.softoraOutreachProfile, {
-    name: 'Servé Creusen',
-    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
-    source: '',
-  });
+  assert.equal(capturedScan.softoraOutreachProfile, undefined);
+  assert.equal(capturedScan.outreachProfile, undefined);
+  assert.equal(capturedScan.senderProfile, undefined);
 });
 
 test('ai tools coordinator gives V2 screenshot providers followed by direct website visuals', async () => {
@@ -334,11 +332,9 @@ test('ai tools coordinator lets premium database previews generate with gpt-imag
   assert.equal(generatedScans.length, 1);
   assert.equal(generatedScans[0].host, 'growingbyknowing.nl');
   assert.match(generatedScans[0].bodyTextSample, /Growingbyknowing/);
-  assert.deepEqual(generatedScans[0].softoraOutreachProfile, {
-    name: 'Servé Creusen',
-    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
-    source: '',
-  });
+  assert.equal(generatedScans[0].softoraOutreachProfile, undefined);
+  assert.equal(generatedScans[0].outreachProfile, undefined);
+  assert.equal(generatedScans[0].senderProfile, undefined);
 });
 
 test('ai tools coordinator validates dossier input and falls back safely on OpenAI errors', async () => {

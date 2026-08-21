@@ -124,31 +124,9 @@ function createAiToolsCoordinator(deps = {}) {
       && normalizeString(body.action).toLowerCase() === 'webdesign';
   }
 
-  function normalizeSoftoraOutreachProfile(value = {}) {
-    const raw = value && typeof value === 'object' ? value : {};
-    const name = truncateText(
-      normalizeString(raw.name || raw.senderName || raw.displayName || raw.fullName || ''),
-      100
-    );
-    const roleLabel = truncateText(
-      normalizeString(raw.roleLabel || raw.role || raw.title || raw.eyebrow || ''),
-      140
-    );
-    const source = truncateText(normalizeString(raw.source || ''), 100);
-    if (!name && !roleLabel) return null;
-    return {
-      name,
-      roleLabel,
-      source,
-    };
-  }
-
   function buildDatabasePreviewFallbackScan(inputUrl, body = {}) {
     const company = truncateText(normalizeString(body.company || body.companyName || ''), 120);
     const domain = truncateText(normalizeString(body.domain || ''), 120);
-    const softoraOutreachProfile = normalizeSoftoraOutreachProfile(
-      body.softoraOutreachProfile || body.senderProfile || body.outreachProfile
-    );
     let host = domain;
     try {
       const parsed = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(inputUrl) ? inputUrl : `https://${inputUrl}`);
@@ -177,7 +155,6 @@ function createAiToolsCoordinator(deps = {}) {
         imageCount: 0,
         bodyTextSample: `Websiteconcept voor ${displayName}. Domein: ${host || domain || inputUrl}.`,
         fetchSource: 'premium-database-fallback',
-        ...(softoraOutreachProfile ? { softoraOutreachProfile } : {}),
       },
       scanFallback: true,
     };
@@ -187,9 +164,6 @@ function createAiToolsCoordinator(deps = {}) {
     const body = options.body && typeof options.body === 'object' ? options.body : {};
     const referenceImageMode = normalizeString(options.referenceImageMode || '').toLowerCase();
     const usesHomepageScreenshot = referenceImageMode === HOMEPAGE_SCREENSHOT_REFERENCE_MODE;
-    const softoraOutreachProfile = normalizeSoftoraOutreachProfile(
-      body.softoraOutreachProfile || body.senderProfile || body.outreachProfile
-    );
     let fetched;
     try {
       fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
@@ -217,7 +191,6 @@ function createAiToolsCoordinator(deps = {}) {
             homepageScreenshotReferenceUrlCount: homepageScreenshotUrls.length,
           }
         : {}),
-      ...(softoraOutreachProfile ? { softoraOutreachProfile } : {}),
     };
     const generated = await generateWebsitePreviewImageWithAi(generationScan);
 
