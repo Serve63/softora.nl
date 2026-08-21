@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 const {
   createMailboxSyncProtocolLockStore,
 } = require('../../server/services/mailbox-sync-protocol-lock');
@@ -249,6 +250,12 @@ test('unknown protocol and protocol-read failure never fall back to legacy', asy
   assert.equal(unavailableResult.ok, false);
   assert.match(unavailableResult.error.message, /schema cache unavailable/);
   assert.equal(unavailable.calls.length, 1);
+});
+
+test('mailbox index exposes legacy and protocol-aware lock adapters separately', () => {
+  const store = createMailboxIndexStore();
+  assert.equal(typeof store.acquireSyncLock, 'function');
+  assert.equal(typeof store.acquireSyncLockForProtocol, 'function');
 });
 
 test('dedicated PostgreSQL runner is local-only, disposable and covers both caller generations', () => {
