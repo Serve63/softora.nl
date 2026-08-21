@@ -22,6 +22,8 @@ const SNAPSHOT_STORAGE_MAX_ROWS = MAX_OFFSET;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 950000;
 const SNAPSHOT_FORMAT_VERSION = 2;
+const SNAPSHOT_CUSTOMER_PAGE_SIZE = 250;
+const SNAPSHOT_CUSTOMER_PAGE_TIMEOUT_MS = 12_000;
 const {
   isMailReadySnapshotBootstrapCoherent,
   isMailReadySnapshotCoherent,
@@ -513,6 +515,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
       return dataOpsStore.listCustomerSnapshotRows({
         maxRows: 25000,
+        pageSize: SNAPSHOT_CUSTOMER_PAGE_SIZE,
+        timeoutMs: SNAPSHOT_CUSTOMER_PAGE_TIMEOUT_MS,
         bypassReadCache: true,
         suppressTransientReadFailureLog: true,
       });

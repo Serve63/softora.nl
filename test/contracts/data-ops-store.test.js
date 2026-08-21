@@ -1031,6 +1031,48 @@ test('data ops customer deletes invalidate the compact mail-ready source cache',
   assert.equal(snapshotReads, 2);
 });
 
+test('data ops customer snapshot honors bounded page size and timeout overrides', async () => {
+  const customerRows = Array.from({ length: 600 }, (_, index) => ({
+    customer_id: `lead-${index + 1}`,
+    company: `Bedrijf ${index + 1}`,
+    payload: {},
+    updated_at: '2026-08-21T12:00:00.000Z',
+  }));
+  const ranges = [];
+  const clientOptions = [];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      const query = {
+        select() { return query; },
+        is() { return query; },
+        order() { return query; },
+        range(from, to) {
+          ranges.push([from, to]);
+          return Promise.resolve({ data: customerRows.slice(from, to + 1), error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient(options) {
+      clientOptions.push(options);
+      return client;
+    },
+    dataOpsReadQueryTimeoutMs: 6000,
+    logger: { error() {}, warn() {} },
+  });
+
+  const rows = await store.listCustomerSnapshotRows({ pageSize: 250, timeoutMs: 12000 });
+
+  assert.equal(rows.length, 600);
+  assert.deepEqual(ranges, [[0, 249], [250, 499], [500, 749]]);
+  assert.equal(clientOptions.length, 3);
+  assert.equal(clientOptions.every((options) => options.timeoutMs === 12000), true);
+});
+
 test('data ops photo deletes invalidate the mail-ready asset flag cache and quarantined assets stay unavailable', async () => {
   let photoRows = [
     { customer_id: 'lead-413', storage_path: 'customers/lead-413/photo.png', legacy_meta: {}, updated_at: '2026-07-16T12:00:00.000Z' },
