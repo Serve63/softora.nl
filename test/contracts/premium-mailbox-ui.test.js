@@ -203,6 +203,19 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readDetailStabilityScript(), /function create\(\)/);
 });
 
+test('bewaarde contactgegevens lopen zonder een geneste kaart mee in het mailbericht', () => {
+  const page = readPage();
+  const contactStyle = page.match(/\.detail-mail-contact-card\s*\{([^}]*)\}/);
+
+  assert.ok(contactStyle, 'contactstijl ontbreekt');
+  assert.match(contactStyle[1], /padding:\s*0;/);
+  assert.match(contactStyle[1], /border:\s*0;/);
+  assert.match(contactStyle[1], /border-radius:\s*0;/);
+  assert.match(contactStyle[1], /background:\s*transparent;/);
+  assert.match(contactStyle[1], /box-shadow:\s*none;/);
+  assert.doesNotMatch(contactStyle[1], /border:\s*1px|rgba\(255,255,255/);
+});
+
 test('campaign inbox laadt de canonieke quoteparser ook zelfstandig via CommonJS', () => {
   assert.equal(commonJsCanonicalQuoteBody, 'Nieuw menselijk antwoord.');
 });
