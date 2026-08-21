@@ -34,7 +34,11 @@
       const key = String(target || '');
       if (key !== selectedTarget) select(key);
       const existing = flights.get(key);
-      if (existing) return { ...existing, duplicate: true };
+      if (existing && !existing.controller.signal.aborted) return { ...existing, duplicate: true };
+      if (existing) {
+        flights.delete(key);
+        generation += 1;
+      }
       const flight = {
         target: key,
         generation,
