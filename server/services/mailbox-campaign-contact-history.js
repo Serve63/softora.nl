@@ -29,17 +29,20 @@ async function loadMailboxCampaignContactHistory({
           folder: 'sent',
           subjectTerms: campaignSubjectTerms,
           limit: sentLimit,
+          priorityRead: true,
         })
       : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
         ? mailboxIndexStore.listAllMessagesForAccounts({
             accountEmails: campaignMailboxAccounts,
             folder: 'sent',
             limit: sentLimit,
-        })
+            priorityRead: true,
+          })
         : mailboxIndexStore.listMessagesForAccounts({
             accountEmails: campaignMailboxAccounts,
             folder: 'sent',
             limit: sentLimit,
+            priorityRead: true,
           })
   );
   if (!Array.isArray(seedSentMessagesResult)) {
@@ -66,6 +69,7 @@ async function loadMailboxCampaignContactHistory({
         folder,
         senderEmails: campaignParticipantEmails,
         limit: incomingLimit,
+        priorityRead: true,
       })
     ));
     if (batches.some((batch) => !Array.isArray(batch))) {
@@ -83,6 +87,7 @@ async function loadMailboxCampaignContactHistory({
       folder: 'sent',
       recipientEmails: campaignParticipantEmails,
       limit: sentLimit,
+      priorityRead: true,
     });
     if (!Array.isArray(targetedSentMessages)) {
       const error = new Error('Mailbox-index voor campagne-uitgaande contactberichten kon niet worden gelezen.');

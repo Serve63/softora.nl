@@ -1,6 +1,5 @@
 'use strict';
 
-const RECIPIENT_LOOKUP_CONCURRENCY = 25;
 const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
 function selectCampaignSeedMessages({ batches = [], limit = 500, normalizeString = String } = {}) {
@@ -37,21 +36,6 @@ function selectCampaignSeedMessages({ batches = [], limit = 500, normalizeString
   return selected;
 }
 
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const values = Array(items.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(Math.max(1, Number(concurrency) || 1), items.length);
-  const worker = async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      values[index] = await mapper(items[index], index);
-    }
-  };
-  await Promise.all(Array.from({ length: workerCount }, worker));
-  return values;
-}
-
 function rowContainsRecipientEmail(row, recipientEmails, normalizeString) {
   const addresses = normalizeString(row && row.recipients_text).toLowerCase().match(EMAIL_PATTERN) || [];
   return addresses.some((address) => recipientEmails.has(address));
@@ -59,6 +43,7 @@ function rowContainsRecipientEmail(row, recipientEmails, normalizeString) {
 
 function createMailboxIndexTargetedLookups({
   run,
+  runPriorityRead,
   tableName,
   metadataColumns,
   normalizeEmail,
@@ -72,6 +57,7 @@ function createMailboxIndexTargetedLookups({
     folder = 'inbox',
     senderEmails = [],
     limit = 1000,
+    priorityRead = false,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -81,7 +67,8 @@ function createMailboxIndexTargetedLookups({
     ).slice(0, 400);
     if (!normalizedAccounts.length || !normalizedSenders.length) return [];
     const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 1000)));
-    const result = await run('list-messages-by-sender-emails', (client) =>
+    const read = priorityRead && typeof runPriorityRead === 'function' ? runPriorityRead : run;
+    const result = await read('list-messages-by-sender-emails', (client) =>
       client
         .from(tableName)
         .select(metadataColumns)
@@ -102,6 +89,7 @@ function createMailboxIndexTargetedLookups({
     folder = 'sent',
     recipientEmails = [],
     limit = 1000,
+    priorityRead = false,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -111,32 +99,22 @@ function createMailboxIndexTargetedLookups({
     ).slice(0, 400);
     if (!normalizedAccounts.length || !normalizedRecipients.length) return [];
     const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 1000)));
-    const rowsByKey = new Map();
-    // Keep the proven single-recipient PostgREST predicate: the combined OR
-    // form looks equivalent but has returned no rows in production for valid
-    // historical Sent records. Run that lookup in a bounded pool so older
-    // history is still reached without recreating the former sequential
-    // serverless timeout. The local email extraction is the exact verifier for
-    // candidate rows and avoids substring false positives.
-    const batches = await mapWithConcurrency(
-      normalizedRecipients,
-      RECIPIENT_LOOKUP_CONCURRENCY,
-      (recipientEmail, index) => run(`list-messages-by-recipient-email:${index}`, (client) =>
-        client
-          .from(tableName)
-          .select(metadataColumns)
-          .in('account_email', normalizedAccounts)
-          .eq('folder', normalizeFolder(folder))
-          .ilike('recipients_text', `%${recipientEmail}%`)
-          .is('deleted_at', null)
-          .order('date', { ascending: false })
-          .order('message_key', { ascending: false })
-          .limit(safeLimit)
-      )
+    const read = priorityRead && typeof runPriorityRead === 'function' ? runPriorityRead : run;
+    // Query every recipient in one indexed database call. Keep the local
+    // parser as the final exact verifier so an RPC candidate can never turn a
+    // partial/sub-string address match into a campaign-history match.
+    const result = await read('list-messages-by-recipient-emails', (client) =>
+      client.rpc('softora_list_mailbox_messages_by_recipients', {
+        p_account_emails: normalizedAccounts,
+        p_folder: normalizeFolder(folder),
+        p_recipient_emails: normalizedRecipients,
+        p_limit: safeLimit,
+      })
     );
-    if (batches.some((result) => !result.ok)) return null;
+    if (!result.ok) return null;
+    const rowsByKey = new Map();
     const recipientNeedles = new Set(normalizedRecipients.map((email) => email.toLowerCase()));
-    batches.flatMap((result) => Array.isArray(result.data) ? result.data : [])
+    (Array.isArray(result.data) ? result.data : [])
       .filter((row) => rowContainsRecipientEmail(row, recipientNeedles, normalizeString))
       .forEach((row) => {
         const key = normalizeString(row && row.message_key);

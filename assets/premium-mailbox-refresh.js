@@ -191,14 +191,15 @@
         signal?.addEventListener?.('abort', abortFromParent, { once: true });
         let timeoutId = 0;
         let timedOut = false;
+        let timeoutError = null;
         try {
           const timeoutPromise = new Promise((_resolve, reject) => {
             timeoutId = scheduleTimeout(() => {
               timedOut = true;
+              timeoutError = new Error('Mailboxcontrole duurde te lang.');
+              timeoutError.retryable = true;
+              reject(timeoutError);
               controller?.abort?.();
-              const error = new Error('Mailboxcontrole duurde te lang.');
-              error.retryable = true;
-              reject(error);
             }, REFRESH_REQUEST_TIMEOUT_MS);
           });
           const response = await Promise.race([
@@ -217,8 +218,9 @@
         } catch (error) {
           if (signal?.aborted) throw createAbortError();
           if (!timedOut && error?.name === 'AbortError') throw error;
-          lastError = error;
-          if (!error?.retryable || attempt === REFRESH_MAX_ATTEMPTS - 1) throw error;
+          const requestError = timedOut && timeoutError ? timeoutError : error;
+          lastError = requestError;
+          if (!requestError?.retryable || attempt === REFRESH_MAX_ATTEMPTS - 1) throw requestError;
         } finally {
           if (timeoutId) cancelTimeout?.(timeoutId);
           signal?.removeEventListener?.('abort', abortFromParent);
@@ -306,6 +308,7 @@
         try {
           const settled = [];
           let listUpdated = false;
+          let listRefreshFailed = false;
           for (const batch of buildRefreshRequestBatches(scope, signal)) {
             const batchSettled = await Promise.allSettled(batch.map((startRequest) => startRequest()));
             settled.push(...batchSettled);
@@ -323,16 +326,20 @@
               preserveOnError: true,
             });
             if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
-            if (batchListUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
+            if (batchListUpdated === false) {
+              listRefreshFailed = true;
+              continue;
+            }
             listUpdated = true;
+            listRefreshFailed = false;
           }
           const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
           const rejected = settled.filter((entry) => entry.status === 'rejected');
           const partialPayload = fulfilled.some((entry) => entry?.data?.ok === false);
           if (!fulfilled.length) throw rejected[0]?.reason || new Error('Mailbox vernieuwen mislukt');
-          if (listUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
+          if (listUpdated === false && !listRefreshFailed) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
 
-          const complete = !rejected.length && !partialPayload;
+          const complete = !rejected.length && !partialPayload && !listRefreshFailed;
           if (complete) {
             state.lastSuccessfulAt = getNow();
             state.status = 'ok';

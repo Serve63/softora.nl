@@ -626,13 +626,16 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row));
   }
 
-  async function listMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = 1000 }) {
+  async function listMessagesForAccounts({
+    accountEmails = [], folder = 'inbox', limit = 1000, priorityRead = false,
+  }) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
     );
     if (!normalizedAccounts.length) return [];
     const safeLimit = Math.max(1, Math.min(2000, Number(limit) || 1000));
-    const result = await run('list-messages-for-accounts', (client) =>
+    const read = priorityRead ? runPriorityRead : run;
+    const result = await read('list-messages-for-accounts', (client) =>
       client
         .from(MAILBOX_INDEX_TABLES.messages)
         .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
@@ -646,7 +649,9 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row));
   }
 
-  async function listAllMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = null }) {
+  async function listAllMessagesForAccounts({
+    accountEmails = [], folder = 'inbox', limit = null, priorityRead = false,
+  }) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
     );
@@ -658,7 +663,8 @@ function createMailboxIndexStore(deps = {}) {
     const rows = [];
     for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
       const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
-      const result = await run(`list-all-messages-for-accounts:${normalizedFolder}:${offset}`, (client) =>
+      const read = priorityRead ? runPriorityRead : run;
+      const result = await read(`list-all-messages-for-accounts:${normalizedFolder}:${offset}`, (client) =>
         client
           .from(MAILBOX_INDEX_TABLES.messages)
           .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
@@ -682,6 +688,7 @@ function createMailboxIndexStore(deps = {}) {
     folder = 'inbox',
     subjectTerms = [],
     limit = 1000,
+    priorityRead = false,
   } = {}) {
     const normalizedAccounts = Array.from(
       new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
@@ -697,7 +704,8 @@ function createMailboxIndexStore(deps = {}) {
     for (const term of terms) {
       for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
         const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
-        const result = await run(
+        const read = priorityRead ? runPriorityRead : run;
+        const result = await read(
           `list-matching-messages-for-accounts:${normalizedFolder}:${offset}`,
           (client) =>
             client
@@ -1011,7 +1019,7 @@ function createMailboxIndexStore(deps = {}) {
   async function acquireSyncLock({ accountEmail, folder = 'inbox', force = false, lockTtlMs = SYNC_LOCK_TTL_MS }) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const lockToken = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-    const result = await run('acquire-sync-lock', (client) =>
+    const result = await runDurableWrite('acquire-sync-lock', (client) =>
       client.rpc('softora_claim_mailbox_sync_lock', {
         p_sync_key: syncKey,
         p_account_email: normalizeEmail(accountEmail),
@@ -1076,6 +1084,7 @@ function createMailboxIndexStore(deps = {}) {
   const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
   const targetedLookups = createMailboxIndexTargetedLookups({
     run,
+    runPriorityRead,
     tableName: MAILBOX_INDEX_TABLES.messages,
     metadataColumns: MAILBOX_MESSAGE_METADATA_COLUMNS,
     normalizeEmail,

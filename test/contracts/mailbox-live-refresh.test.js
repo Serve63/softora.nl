@@ -580,6 +580,55 @@ test('temporary provider failures retry once and then update the list in place',
   controller.destroy();
 });
 
+test('provider-success met bewaarde oude lijst blijft gedeeltelijk in plaats van verbindingsfout', async () => {
+  const ageLabel = {
+    textContent: '', attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  let loadCalls = 0;
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    getFolder: () => 'inbox',
+    getAccount: () => 'serve@softora.nl',
+    fetch: async () => successfulResponse(),
+    loadMessages: async () => { loadCalls += 1; return false; },
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  assert.equal(await controller.refresh(), false);
+  assert.equal(loadCalls, 1);
+  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
+  assert.equal(ageLabel.attributes['aria-label'], 'Niet alle mailboxproviders konden worden bijgewerkt voor serve@softora.nl.');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'partial' });
+  controller.destroy();
+});
+
+test('latere geslaagde outreach-lijstrefresh herstelt een eerdere tijdelijke cachefallback', async () => {
+  const ageLabel = { textContent: '', setAttribute() {} };
+  let loadCalls = 0;
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async () => successfulResponse(),
+    loadMessages: async () => {
+      loadCalls += 1;
+      return loadCalls === 2;
+    },
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  assert.equal(await controller.refresh(), true);
+  assert.equal(loadCalls, 2);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
+  controller.destroy();
+});
+
 test('outreach refresh toont IMAP-mail voordat de Instantly-provider start', async () => {
   const events = [];
   let finishImap;
@@ -762,6 +811,7 @@ test('eerste background failure toont expliciet herstel zonder eerdere succesvol
     setAttribute(name, value) { this.attributes[name] = value; },
     addEventListener() {},
   };
+  let loadCalls = 0;
   const controller = refreshModule.create({
     autoStart: false,
     ageLabel,
@@ -773,6 +823,7 @@ test('eerste background failure toont expliciet herstel zonder eerdere succesvol
       status: 400,
       json: async () => ({ error: 'provider niet bereikbaar' }),
     }),
+    loadMessages: async () => { loadCalls += 1; return true; },
     setTimeout: () => 1,
     clearTimeout() {},
   });
@@ -786,6 +837,7 @@ test('eerste background failure toont expliciet herstel zonder eerdere succesvol
   assert.equal(button.attributes['aria-label'], 'Verbindingsfout voor serve@softora.nl; mailbox opnieuw controleren');
   assert.equal(button.disabled, false);
   assert.equal(button.attributes['aria-busy'], 'false');
+  assert.equal(loadCalls, 0);
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'recovering' });
   controller.destroy();
 });
@@ -894,8 +946,9 @@ test('uitgestelde mailboxboot toont direct controleren en houdt automatisch hers
   controller.destroy();
 });
 
-test('handmatige provider-timeout ruimt foreground token en spinner direct in finally op', async () => {
+test('dubbele provider-timeout retryt exact eenmaal en ruimt foreground state op', async () => {
   const timeoutHandlers = [];
+  let attempts = 0;
   const ageLabel = { textContent: '', setAttribute() {} };
   const button = {
     disabled: false,
@@ -909,6 +962,7 @@ test('handmatige provider-timeout ruimt foreground token en spinner direct in fi
     getFolder: () => 'inbox',
     getAccount: () => 'martijn@softora.nl',
     fetch: (_url, init) => new Promise((_resolve, reject) => {
+      attempts += 1;
       init.signal.addEventListener('abort', () => {
         const error = new Error('aborted');
         error.name = 'AbortError';
@@ -920,6 +974,7 @@ test('handmatige provider-timeout ruimt foreground token en spinner direct in fi
       return timeoutHandlers.length || 1;
     },
     clearTimeout() {},
+    wait: async () => {},
   });
 
   const pending = controller.refresh({ manual: true });
@@ -928,10 +983,54 @@ test('handmatige provider-timeout ruimt foreground token en spinner direct in fi
   assert.equal(button.disabled, true);
   assert.equal(timeoutHandlers.length, 1);
   timeoutHandlers[0]();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(attempts, 2);
+  assert.equal(timeoutHandlers.length, 2);
+  timeoutHandlers[1]();
   assert.equal(await pending, false);
   assert.equal(button.disabled, false);
   assert.equal(ageLabel.textContent, 'Verbindingsfout · opnieuw proberen');
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'recovering' });
+  controller.destroy();
+});
+
+test('eerste provider-timeout kan bij de tweede poging volledig herstellen', async () => {
+  const timeoutHandlers = [];
+  const ageLabel = { textContent: '', setAttribute() {} };
+  let attempts = 0;
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    getFolder: () => 'inbox',
+    getAccount: () => 'serve@softora.nl',
+    fetch: (_url, init) => {
+      attempts += 1;
+      if (attempts === 2) return Promise.resolve(successfulResponse());
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      });
+    },
+    loadMessages: async () => true,
+    setTimeout(handler, delay) {
+      if (delay === refreshModule.REFRESH_REQUEST_TIMEOUT_MS) timeoutHandlers.push(handler);
+      return timeoutHandlers.length || 1;
+    },
+    clearTimeout() {},
+    wait: async () => {},
+  });
+
+  const pending = controller.refresh();
+  await Promise.resolve();
+  assert.equal(timeoutHandlers.length, 1);
+  timeoutHandlers[0]();
+  assert.equal(await pending, true);
+  assert.equal(attempts, 2);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
   controller.destroy();
 });
 
