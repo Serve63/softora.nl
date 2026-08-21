@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const {
-  createMailboxSyncService,
+  createMailboxSyncService: createRawMailboxSyncService,
   INCREMENTAL_LOCK_RETRY_ATTEMPTS,
   MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
   REGULAR_CRON_LOCK_RETRY_ATTEMPTS,
@@ -14,6 +14,9 @@ const {
 const {
   syncInstantlyMailboxResponse,
 } = require('../../server/services/mailbox-instantly-integration');
+const {
+  createMailboxSyncLegacyStore,
+} = require('../testlib/mailbox-sync-legacy');
 
 const SERVE_ACCOUNTS = [
   'serve@softora.nl',
@@ -48,6 +51,13 @@ function responseRecorder() {
 
 function successfulResponse(body = { ok: true }) {
   return { ok: true, status: 200, json: async () => body };
+}
+
+function createMailboxSyncService(options = {}) {
+  return createRawMailboxSyncService({
+    ...options,
+    mailboxIndexStore: createMailboxSyncLegacyStore(options.mailboxIndexStore),
+  });
 }
 
 test('fast campaign refresh selects only the exact owner accounts and never a legacy mailbox', () => {

@@ -34,6 +34,7 @@ async function searchThreadReplyUids({
   logger = console,
   accountEmail = '',
   folder = '',
+  strict = false,
 } = {}) {
   const referenceIds = includeThreadReferenceSearch
     ? normalizeMessageIdList(threadReferenceIds)
@@ -72,6 +73,7 @@ async function searchThreadReplyUids({
         `batch-${offset / THREAD_REFERENCE_SEARCH_BATCH_SIZE + 1}`,
         error?.message || error
       );
+      if (strict) throw error;
     }
   }
   for (let offset = 0; offset < recipientTerms.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
@@ -100,6 +102,7 @@ async function searchThreadReplyUids({
         `batch-${offset / THREAD_REFERENCE_SEARCH_BATCH_SIZE + 1}`,
         error?.message || error
       );
+      if (strict) throw error;
     }
   }
   return normalizeUidList(replyUids);
@@ -162,7 +165,31 @@ async function resolveMailboxSyncUids({
   accountEmail = '',
   folder = '',
   prioritizeTargetedUids = false,
+  targetedOnly = false,
+  targetedAfterUid = 0,
+  targetedThroughUid = 0,
 } = {}) {
+  if (targetedOnly) {
+    if (!threadReferenceIds.length) return [];
+    const indexedUidSet = new Set(normalizeUidList(indexedUids));
+    const afterUid = Math.max(0, Number(targetedAfterUid) || 0);
+    const throughUid = Math.max(0, Number(targetedThroughUid) || 0);
+    const targetedUids = await searchThreadReplyUids({
+      client,
+      threadReferenceIds,
+      threadRecipientTerms: [],
+      includeThreadReferenceSearch: true,
+      logger,
+      accountEmail,
+      folder,
+      strict: true,
+    });
+    return targetedUids
+      .filter((uid) => (
+        uid > afterUid && (!throughUid || uid <= throughUid) && !indexedUidSet.has(uid)
+      ))
+      .slice(0, Math.max(1, Number(limit) || 1));
+  }
   const allUids = normalizeUidList(await client.search({ all: true }, { uid: true }));
   if (!campaignHistory) {
     const cursor = Math.max(0, Number(lastSyncedUid) || 0);
