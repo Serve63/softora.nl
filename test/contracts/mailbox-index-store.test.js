@@ -2306,6 +2306,112 @@ test('mailbox index store durably persists fetched messages despite another inde
   ]);
 });
 
+test('mailbox index store bewaart providerberichten duurzaam ondanks een open read-circuit', async () => {
+  let syncReadCalls = 0;
+  let upsertCalls = 0;
+  const requestedClientOptions = [];
+  const persistedRows = [];
+  const transientError = new Error('Supabase client timeout na 8000ms');
+  transientError.name = 'AbortError';
+  const providerMessage = {
+    providerMessageId: 'provider-live-1',
+    providerThreadId: 'thread-live-1',
+    providerAccountEmail: 'serve-sender@example.com',
+    providerOwner: 'serve',
+    accountEmail: 'serve-sender@example.com',
+    folder: 'inbox',
+    direction: 'received',
+    from: 'Prospect',
+    email: 'prospect@example.org',
+    to: 'serve-sender@example.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Dank voor het ontwerp.',
+    date: '2026-08-21T14:00:00.000Z',
+  };
+  const client = {
+    from(table) {
+      if (table === 'softora_mailbox_sync_state') {
+        return {
+          select() {
+            return {
+              eq() { return this; },
+              limit() { return this; },
+              maybeSingle() {
+                syncReadCalls += 1;
+                return new Promise(() => {});
+              },
+            };
+          },
+        };
+      }
+      return {
+        async upsert(rows, options) {
+          upsertCalls += 1;
+          persistedRows.push({ rows, options });
+          if (upsertCalls === 1) return { data: null, error: transientError };
+          return { data: rows, error: null };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options);
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  await store.getSyncState({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
+  const result = await store.upsertProviderMessages({
+    provider: 'instantly',
+    messages: [providerMessage],
+  });
+
+  assert.equal(syncReadCalls, 1);
+  assert.equal(upsertCalls, 2);
+  assert.equal(result.ok, true);
+  assert.equal(result.upserted, 1);
+  assert.equal(persistedRows[1].rows[0].account_email, 'serve-sender@example.com');
+  assert.equal(persistedRows[1].rows[0].folder, 'instantly');
+  assert.equal(persistedRows[1].rows[0].payload.providerOwner, 'serve');
+  assert.deepEqual(persistedRows[1].options, {
+    onConflict: 'message_key',
+    defaultToNull: false,
+  });
+  assert.deepEqual(requestedClientOptions.slice(-2), [{
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }, {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
+
+  let failedUpsertCalls = 0;
+  const alwaysFailingStore = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from: () => ({
+        async upsert() {
+          failedUpsertCalls += 1;
+          return { data: null, error: transientError };
+        },
+      }),
+    }),
+    logger: { error() {}, info() {} },
+  });
+  const failedResult = await alwaysFailingStore.upsertProviderMessages({
+    provider: 'instantly', messages: [providerMessage],
+  });
+  assert.equal(failedUpsertCalls, 2);
+  assert.equal(failedResult.ok, false);
+});
+
 test('mailbox index store finalizes a fenced sync even while the read/write circuit is open', async () => {
   let finishCalls = 0;
   const requestedClientOptions = [];

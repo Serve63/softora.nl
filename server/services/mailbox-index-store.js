@@ -472,7 +472,7 @@ function createMailboxIndexStore(deps = {}) {
       .map((message) => buildProviderMessageRow({ ...message, provider: normalizedProvider }))
       .filter(Boolean);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
-    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) =>
+    const result = await runDurableWrite(`upsert-provider-messages:${normalizedProvider}`, (client) =>
       client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
         onConflict: 'message_key',
         defaultToNull: false,

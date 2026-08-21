@@ -1269,6 +1269,78 @@ test('sync queries only the selected owner accounts and drops unmapped or confli
   assert.equal(query.get('limit'), '100');
 });
 
+test('Instantly sync blijft fail-closed wanneer duurzame provideropslag is uitgeput', async () => {
+  const rawMessages = [
+    incoming(),
+    incoming({
+      id: 'martijn-incoming-store-failure',
+      eaccount: 'martijn-sender@example.com',
+      campaign_id: 'campaign-martijn',
+      thread_id: 'thread-martijn',
+      to_address_email_list: ['martijn-sender@example.com'],
+    }),
+    incoming({
+      id: 'conflicting-campaign-owner-store-failure',
+      campaign_id: 'campaign-martijn',
+    }),
+    incoming({
+      id: 'unmapped-account-store-failure',
+      eaccount: 'other@example.com',
+      to_address_email_list: ['other@example.com'],
+    }),
+  ];
+  const store = createStore();
+  const providerUpserts = [];
+  let continuationWrites = 0;
+  store.upsertProviderMessages = async (input) => {
+    providerUpserts.push(input);
+    return {
+      ok: false,
+      error: new Error('Duurzame provideropslag faalde na twee pogingen.'),
+    };
+  };
+  const { service } = buildService({
+    store,
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => { continuationWrites += 1; },
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: { items: rawMessages },
+    }),
+  });
+
+  let syncResult;
+  await assert.rejects(
+    async () => { syncResult = await service.syncOwner('serve'); },
+    (error) => {
+      assert.equal(error.code, 'INSTANTLY_MAILBOX_STORE_FAILED');
+      assert.equal(error.status, 503);
+      return true;
+    }
+  );
+
+  assert.equal(syncResult, undefined);
+  assert.equal(providerUpserts.length, 1);
+  assert.equal(providerUpserts[0].provider, 'instantly');
+  assert.deepEqual(
+    providerUpserts[0].messages.map((message) => message.providerMessageId),
+    ['incoming-serve-1']
+  );
+  assert.equal(providerUpserts[0].messages[0].providerOwner, 'serve');
+  assert.equal(providerUpserts[0].messages[0].providerAccountEmail, 'serve-sender@example.com');
+  assert.equal(providerUpserts[0].messages[0].providerThreadId, 'thread-serve');
+  assert.equal(providerUpserts[0].messages[0].providerCampaignId, 'campaign-serve');
+  const syncState = await store.getSyncState({
+    accountEmail: 'instantly-serve@softora.internal',
+    folder: 'instantly',
+  });
+  assert.equal(syncState.last_synced_at, null);
+  assert.equal(syncState.message_count, 0);
+  assert.equal(syncState.last_error, 'Instantly-berichten konden niet duurzaam worden opgeslagen.');
+  assert.equal(continuationWrites, 0);
+  assert.deepEqual(store.rows, []);
+});
+
 test('sync rehydrates a visible older thread only when its exact provider HTML is still unknown', async () => {
   const store = createStore();
   const { service, requests } = buildService({
