@@ -63,6 +63,8 @@
     { id: 'vip-box-willem-2-2028', title: 'VIP-box Willem II', timeframe: 2028, imageId: 'vip-box-willem-2' },
     { id: 'instagram-post-2027', title: 'Jaarlijkse Instagram-post 2027', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
+    { id: 'sertraline-vrij', title: 'Sertraline vrij' },
+    { id: 'gratis-opleiding-via-gemeente', title: 'Gratis opleiding via gemeente', imageId: 'jurisalem-af' },
     {
       id: 'silence-controle',
       title: 'Silence controle',
