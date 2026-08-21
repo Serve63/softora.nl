@@ -94,6 +94,99 @@ test('campaign contact history prioriteert onderwerp-matches boven recente ruis 
   assert.equal(recipientLookups[0].includes('info@praktijkkaroena.nl'), true);
 });
 
+test('campaign contact history markeert sent-seed en gerichte sender/recipientreads als priority-read', async () => {
+  const calls = [];
+  await loadMailboxCampaignContactHistory({
+    mailboxIndexStore: {
+      listMatchingMessagesForAccounts: async (options) => {
+        calls.push(['seed', options]);
+        return [];
+      },
+      listMessagesBySenderEmailsForAccounts: async (options) => {
+        calls.push(['sender', options]);
+        return [];
+      },
+      listMessagesByRecipientEmailsForAccounts: async (options) => {
+        calls.push(['recipient', options]);
+        return [];
+      },
+    },
+    campaignMailboxAccounts: ['serve@softora.nl'],
+    messages: [{
+      id: 'inbox:priority',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      email: 'contact@example.nl',
+      date: '2026-08-21T10:00:00.000Z',
+    }],
+    campaignSubjectTerms: ['Kleine vraag over jullie website'],
+    incomingFolders: ['coldmail', 'inbox'],
+    incomingLimit: 250,
+    sentLimit: 2000,
+    participantPriorityMessages: [],
+    dedupeCampaignMessages: (messages) => messages,
+    collectCampaignThreadParticipantEmails,
+  });
+
+  assert.deepEqual(calls.map(([kind, options]) => [kind, options.folder]), [
+    ['seed', 'sent'],
+    ['sender', 'coldmail'],
+    ['sender', 'inbox'],
+    ['recipient', 'sent'],
+  ]);
+  calls.forEach(([_kind, options]) => {
+    assert.equal(options.priorityRead, true);
+    assert.deepEqual(options.accountEmails, ['serve@softora.nl']);
+  });
+  assert.equal(calls.find(([kind]) => kind === 'seed')[1].limit, 2000);
+  assert.equal(calls.find(([kind]) => kind === 'recipient')[1].limit, 2000);
+  calls.filter(([kind]) => kind === 'sender').forEach(([_kind, options]) => {
+    assert.equal(options.limit, 250);
+    assert.deepEqual(options.senderEmails, ['contact@example.nl']);
+  });
+});
+
+test('campaign reply indexscans gebruiken priority-read zonder owner/folder/limiet te wijzigen', async () => {
+  const calls = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async (options) => {
+        calls.push(['recent', options]);
+        return [];
+      },
+      listMatchingMessagesForAccounts: async (options) => {
+        calls.push(['matching', options]);
+        return [];
+      },
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const result = await service.listRepliesWithSnapshot({ limit: 100, owner: 'serve' });
+
+  assert.deepEqual(result, { messages: [], snapshotMessages: [] });
+  assert.deepEqual(
+    calls.filter(([kind]) => kind === 'recent').map(([_kind, options]) => options.folder),
+    CAMPAIGN_INCOMING_FOLDERS
+  );
+  assert.deepEqual(
+    calls.filter(([kind]) => kind === 'matching').map(([_kind, options]) => options.folder),
+    [...CAMPAIGN_INCOMING_FOLDERS, 'sent']
+  );
+  calls.forEach(([kind, options]) => {
+    assert.equal(options.priorityRead, true);
+    assert.ok(options.accountEmails.every((email) => email.startsWith('serve') || email === 'servec321@gmail.com'));
+    assert.equal(
+      options.limit,
+      kind === 'recent'
+        ? CAMPAIGN_MESSAGE_SCAN_LIMIT
+        : options.folder === 'sent'
+          ? CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT
+          : CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT
+    );
+  });
+});
+
 test('campaign mailbox applies the selected owner before limiting older conversations', async () => {
   const serveAccounts = [
     'serve@softora.nl',

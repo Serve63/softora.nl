@@ -912,6 +912,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       options: {
         accountEmails: campaignMailboxAccounts,
         limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+        priorityRead: true,
       },
     });
     const matchingMessages = typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
@@ -922,6 +923,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
             accountEmails: campaignMailboxAccounts,
             subjectTerms: CAMPAIGN_SUBJECT_TERMS,
             limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+            priorityRead: true,
           },
         })
       : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
@@ -931,6 +933,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
             options: {
               accountEmails: campaignMailboxAccounts,
               limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+              priorityRead: true,
             },
           })
         : [];
