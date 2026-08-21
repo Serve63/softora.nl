@@ -53,7 +53,10 @@ function createMailboxStateMutationStore(deps = {}) {
     const result = await run('mark-message-read', (client) => {
       const query = client.from(tableName)
         .update({ unread: false, softora_read_at: readAt, updated_at: readAt })
-        .eq('account_email', target.accountEmail).eq('folder', target.folder).is('deleted_at', null);
+        .eq('account_email', target.accountEmail)
+        .eq('folder', target.folder)
+        .is('deleted_at', null)
+        .is('generation_superseded_at', null);
       return target.uid > 0 ? query.eq('uid', target.uid) : query.eq('provider_id', target.id);
     });
     return { ...result, readAt: result.ok ? readAt : '' };
@@ -65,7 +68,10 @@ function createMailboxStateMutationStore(deps = {}) {
     const result = await run('mark-message-reply-dismissed', (client) => {
       const query = client.from(tableName)
         .update({ unread: false, softora_read_at: dismissedAt, reply_dismissed_at: dismissedAt, updated_at: dismissedAt })
-        .eq('account_email', target.accountEmail).eq('folder', target.folder).is('deleted_at', null);
+        .eq('account_email', target.accountEmail)
+        .eq('folder', target.folder)
+        .is('deleted_at', null)
+        .is('generation_superseded_at', null);
       return (target.uid > 0 ? query.eq('uid', target.uid) : query.eq('provider_id', target.id))
         .select('message_key,reply_dismissed_at');
     });
@@ -84,6 +90,7 @@ function createMailboxStateMutationStore(deps = {}) {
         .eq('account_email', target.accountEmail)
         .eq('folder', target.folder)
         .is('deleted_at', null)
+        .is('generation_superseded_at', null)
         .limit(1);
       return target.uid > 0 ? query.eq('uid', target.uid) : query.eq('provider_id', target.id);
     }, {

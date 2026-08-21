@@ -112,6 +112,7 @@ function createMailboxUidGenerationIndex({
     commitSyncPass,
     commitTargetedSyncPass,
     failSync: syncFinalizer.failSync,
+    skipSync: syncFinalizer.skipSync,
     listLegacyUidIdentities,
     ...uidValidityStore,
   };

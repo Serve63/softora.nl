@@ -89,6 +89,7 @@ function createMailboxMessageReferenceLookup(deps = {}) {
               .eq('folder', normalizedFolder)
               .or(candidateFilter)
               .is('deleted_at', null)
+              .is('generation_superseded_at', null)
               .order('date', { ascending: false })
               .order('message_key', { ascending: false })
               .range(pageOffset, pageOffset + MAILBOX_MESSAGE_REFERENCE_LOOKUP_PAGE_SIZE - 1)

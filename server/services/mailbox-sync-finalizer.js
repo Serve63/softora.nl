@@ -170,6 +170,48 @@ function createMailboxSyncFinalizer({ runDurableWrite, buildSyncKey, normalizeSt
     });
   }
 
+  async function skipSync({
+    accountEmail,
+    folder = 'inbox',
+    lockToken = '',
+    commitId = '',
+    reason = 'folder_missing',
+    deadlineAtMs = null,
+  } = {}) {
+    const normalizedLockToken = normalizeString(lockToken);
+    const normalizedCommitId = normalizeMailboxGenerationId(commitId);
+    const normalizedReason = normalizeString(reason);
+    if (!normalizedLockToken || !normalizedCommitId || normalizedReason !== 'folder_missing') {
+      return {
+        ok: false,
+        skipped: false,
+        error: createMailboxSyncProtocolError('Ongeldige mailbox-sync skipmutatie.'),
+      };
+    }
+    const result = await runDurableWrite(
+      'skip-mailbox-sync-v2',
+      (client) => client.rpc('softora_skip_mailbox_sync_v2', {
+        p_sync_key: buildSyncKey(accountEmail, folder),
+        p_lock_token: normalizedLockToken,
+        p_commit_id: normalizedCommitId,
+        p_reason: normalizedReason,
+      }),
+      { deadlineAtMs }
+    );
+    if (!result.ok) return { ...result, skipped: false };
+    const skipped = getResultRow(result.data);
+    if (!skipped || skipped.lock_lost === true || skipped.skipped !== true) {
+      return {
+        ok: false,
+        skipped: false,
+        lockLost: skipped && skipped.lock_lost === true,
+        replayed: skipped && skipped.replayed === true,
+        error: createMailboxSyncLeaseError(),
+      };
+    }
+    return { ok: true, skipped: true, lockLost: false, replayed: skipped.replayed === true };
+  }
+
   async function failSync({
     accountEmail,
     folder = 'inbox',
@@ -208,7 +250,7 @@ function createMailboxSyncFinalizer({ runDurableWrite, buildSyncKey, normalizeSt
     return { ok: true, applied: true, lockLost: false, replayed: failed.replayed === true };
   }
 
-  return { commitSyncPass, commitTargetedSyncPass, failSync };
+  return { commitSyncPass, commitTargetedSyncPass, failSync, skipSync };
 }
 
 module.exports = {

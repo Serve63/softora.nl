@@ -76,6 +76,7 @@ function createMailboxIndexTargetedLookups({
         .eq('folder', normalizeFolder(folder))
         .in('sender_email', normalizedSenders)
         .is('deleted_at', null)
+        .is('generation_superseded_at', null)
         .order('date', { ascending: false })
         .order('message_key', { ascending: false })
         .limit(safeLimit)
@@ -168,6 +169,7 @@ function createMailboxIndexTargetedLookups({
           .eq('account_email', normalizeEmail(accountEmail))
           .eq('folder', normalizedFolder)
           .ilike('subject', `%${term}%`)
+          .is('generation_superseded_at', null)
           .order('uid', { ascending: true })
           .limit(1)
       );
