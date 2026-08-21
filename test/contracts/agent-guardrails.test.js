@@ -73,16 +73,35 @@ test('websitevideo tooling blijft lokaal en expliciet startbaar', () => {
 test('protected package metadata houdt de echte lokale mailbox-Postgrespoort vast', () => {
   const packageJson = JSON.parse(readRepoFile('package.json'));
   const runner = readRepoFile('test/postgres/run-mailbox-postgres-locks.js');
+  const uidGenerationRunner = readRepoFile('test/postgres/run-mailbox-uid-generation-v2.js');
+  const uidProtocolRunner = readRepoFile('test/postgres/run-mailbox-uid-protocol-gate.js');
   const postgresTest = readRepoFile('test/postgres/mailbox-campaign-lock-order.postgres.test.js');
+  const uidGenerationTest = readRepoFile('test/postgres/mailbox-uid-generation-v2.postgres.test.js');
+  const uidProtocolTest = readRepoFile('test/postgres/mailbox-uid-protocol-gate.postgres.test.js');
   assert.equal(packageJson.scripts['test:mailbox-postgres-locks'],
     'node test/postgres/run-mailbox-postgres-locks.js');
+  assert.equal(packageJson.scripts['test:mailbox-postgres-uid-generations'],
+    'node test/postgres/run-mailbox-uid-generation-v2.js');
+  assert.equal(packageJson.scripts['test:mailbox-postgres-uid-protocol-gate'],
+    'node test/postgres/run-mailbox-uid-protocol-gate.js');
   assert.equal(packageJson.devDependencies.pg, '8.23.0');
   assert.match(runner, /MAILBOX_POSTGRES_ADMIN_URL/);
   assert.match(runner, /localHosts/);
   assert.match(runner, /create database/);
   assert.match(runner, /drop database if exists/);
+  assert.match(uidGenerationRunner, /MAILBOX_POSTGRES_ADMIN_URL/);
+  assert.match(uidGenerationRunner, /localHosts/);
+  assert.match(uidGenerationRunner, /create database/);
+  assert.match(uidGenerationRunner, /drop database if exists/);
+  assert.match(uidProtocolRunner, /MAILBOX_POSTGRES_ADMIN_URL/);
+  assert.match(uidProtocolRunner, /localHosts/);
+  assert.match(uidProtocolRunner, /create database/);
+  assert.match(uidProtocolRunner, /drop database if exists/);
   assert.match(postgresTest, /20260810012150_mailbox_send_provider_outcome_state\.sql/);
   assert.match(postgresTest, /provenance_service_truncate/);
+  assert.match(uidGenerationTest, /20260821174844_mailbox_uid_generation_epoch_v2\.sql/);
+  assert.match(uidGenerationTest, /softora_mailbox_\(\?:uid_generation\|lock\)_test/);
+  assert.match(uidProtocolTest, /softora_mailbox_\(\?:uid_protocol\|lock\)_test/);
 });
 
 test('mailbox PostgreSQL-verificatie blijft dev-only en exact reproduceerbaar', () => {
@@ -582,6 +601,14 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
     packageJson.scripts['test:postgres:mailbox-locks'],
     'node --test test/postgres/mailbox-campaign-lock-order.postgres.test.js'
   );
+  assert.equal(
+    packageJson.scripts['test:postgres:mailbox-uid-generations'],
+    'node --test test/postgres/mailbox-uid-generation-v2.postgres.test.js'
+  );
+  assert.equal(
+    packageJson.scripts['test:postgres:mailbox-uid-protocol-gate'],
+    'node --test test/postgres/mailbox-uid-protocol-gate.postgres.test.js'
+  );
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
   assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
   assert.equal(packageJson.scripts['check:live-production-version:wait'], 'node scripts/wait-live-production-version.js');
@@ -628,6 +655,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(verifyCriticalSource, /\['run', 'check:deps'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(verifyCriticalSource, /\['run', 'test:postgres:mailbox-locks'\]/);
+  assert.match(verifyCriticalSource, /\['run', 'test:postgres:mailbox-uid-generations'\]/);
+  assert.match(verifyCriticalSource, /\['run', 'test:postgres:mailbox-uid-protocol-gate'\]/);
   assert.match(publicDataSource, /MAX_EMBEDDED_JSON_BYTES/);
   assert.match(publicDataSource, /BLOCKED_DATA_EXTENSIONS/);
   assert.match(publicDataSource, /git', \['ls-files', '-z'\]/);
