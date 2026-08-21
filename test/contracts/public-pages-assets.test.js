@@ -2,12 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const sharp = require('sharp');
 
 const { getStaticAssetCacheControl } = require('../../server/routes/public-pages');
 
 const REPO_ROOT = path.join(__dirname, '../..');
 const SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png';
-const GOOGLE_SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png?v=20260821a';
+const GOOGLE_SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png?v=20260821b';
 const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260616a';
 const HOME_SCREEN_ICON_HREF = '/assets/softora-touch-icon.png?v=20260615a';
 const STRUCTURED_DATA_LOGO_URL = 'https://www.softora.nl/assets/softora-touch-icon.png';
@@ -35,7 +36,7 @@ test('public asset cache still allows immutable caching for hashed assets and me
   );
 });
 
-test('html pages use the filled square search favicon, browser favicon, and home-screen icon sitewide', () => {
+test('html pages use the size-corrected square search favicon, browser favicon, and home-screen icon sitewide', () => {
   const searchFaviconPath = path.join(REPO_ROOT, 'assets/softora-search-favicon.png');
   const faviconPath = path.join(REPO_ROOT, 'assets/softora-favicon-round.png');
   const homeScreenIconPath = path.join(REPO_ROOT, 'assets/softora-touch-icon.png');
@@ -58,8 +59,8 @@ test('html pages use the filled square search favicon, browser favicon, and home
   assert.equal(searchFaviconSignature, '89504e470d0a1a0a');
   assert.equal(searchFaviconWidth, 512);
   assert.equal(searchFaviconHeight, 512);
-  assert.equal(searchFaviconColorType, 2, 'search favicon should be RGB without transparent corners');
-  assert.deepEqual(searchFavicon, favicon, 'Google Search favicon should exactly match the browser favicon');
+  assert.equal(searchFaviconColorType, 6, 'search favicon should be RGBA with transparent padding');
+  assert.notDeepEqual(searchFavicon, favicon, 'Google Search favicon should compensate for its larger display slot');
   assert.equal(pngSignature, '89504e470d0a1a0a');
   assert.equal(homeScreenIconSignature, '89504e470d0a1a0a');
   assert.equal(homeScreenIconWidth, 512);
@@ -99,6 +100,54 @@ test('html pages use the filled square search favicon, browser favicon, and home
 
   assert.ok(pagesWithFavicons.includes('premium-website.html'));
   assert.ok(pagesWithFavicons.length >= 40, 'expected sitewide favicon coverage');
+});
+
+test('Google search favicon renders the complete tab icon at 16px inside its 28px slot', async () => {
+  const searchFaviconPath = path.join(REPO_ROOT, 'assets/softora-search-favicon.png');
+  const browserFaviconPath = path.join(REPO_ROOT, 'assets/softora-favicon-round.png');
+  const embeddedSize = 292;
+  const inset = 110;
+
+  const searchImage = sharp(searchFaviconPath);
+  const { data: searchPixels, info } = await searchImage
+    .clone()
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let minX = info.width;
+  let minY = info.height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      const alpha = searchPixels[(y * info.width + x) * info.channels + 3];
+      if (alpha === 0) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  assert.deepEqual(
+    { minX, minY, width: maxX - minX + 1, height: maxY - minY + 1 },
+    { minX: inset, minY: inset, width: embeddedSize, height: embeddedSize },
+    'visible square should occupy 16/28 of the Google favicon canvas'
+  );
+
+  const expectedTabIcon = await sharp(browserFaviconPath)
+    .resize(embeddedSize, embeddedSize, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+  const embeddedSearchIcon = await searchImage
+    .extract({ left: inset, top: inset, width: embeddedSize, height: embeddedSize })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+
+  assert.deepEqual(embeddedSearchIcon, expectedTabIcon, 'embedded Google icon should exactly match the scaled tab icon');
 });
 
 test('public SEO structured data logo points to an existing Softora asset', () => {
