@@ -1031,8 +1031,16 @@ test('data ops customer deletes invalidate the compact mail-ready source cache',
   assert.equal(snapshotReads, 2);
 });
 
-test('data ops photo deletes invalidate the mail-ready asset flag cache', async () => {
-  let photoRows = [{ customer_id: 'lead-413', storage_path: 'customers/lead-413/photo.png', legacy_meta: {}, updated_at: '2026-07-16T12:00:00.000Z' }];
+test('data ops photo deletes invalidate the mail-ready asset flag cache and quarantined assets stay unavailable', async () => {
+  let photoRows = [
+    { customer_id: 'lead-413', storage_path: 'customers/lead-413/photo.png', legacy_meta: {}, updated_at: '2026-07-16T12:00:00.000Z' },
+    {
+      customer_id: 'lead-quarantined',
+      storage_path: 'customers/lead-quarantined/photo.png',
+      legacy_meta: { incidentQuarantine: { active: true, incident: 'webdesign-outreach-identity-leak-20260821' } },
+      updated_at: '2026-08-17T12:00:00.000Z',
+    },
+  ];
   let flagReads = 0;
   const client = {
     from(table) {
@@ -1870,7 +1878,7 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
   assert.match(upserts[0].row.legacy_meta.mockup.qualityCheckedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
-test('data ops store signs design photo URLs in storage batches', async () => {
+test('data ops store signs design photo URLs in storage batches and omits quarantined assets', async () => {
   const rows = Array.from({ length: 18 }, (_item, index) => ({
     customer_id: `customer-${index + 1}`,
     identity_key: `company ${index + 1}|contact|310000000${index}`,
@@ -1879,6 +1887,9 @@ test('data ops store signs design photo URLs in storage batches', async () => {
     mime_type: 'image/png',
     file_name: `webdesign-${index + 1}.png`,
     legacy_meta: {
+      ...(index === 0 ? {
+        incidentQuarantine: { active: true, incident: 'webdesign-outreach-identity-leak-20260821' },
+      } : {}),
       mockup: {
         storageBucket: 'softora-design-photos',
         storagePath: `customers/customer-${index + 1}/mockup.jpg`,
@@ -1946,10 +1957,12 @@ test('data ops store signs design photo URLs in storage batches', async () => {
 
   const entries = await store.listDesignPhotosWithSignedUrls({ expiresInSeconds: 120 });
 
-  assert.equal(entries.length, rows.length);
-  assert.equal(signedPaths.length, rows.length * 2);
+  assert.equal(entries.length, rows.length - 1);
+  assert.equal(signedPaths.length, (rows.length - 1) * 2);
   assert.equal(bulkCalls, 1);
   assert.equal(singleCalls, 0);
+  assert.equal(entries.some((entry) => entry.customerId === 'customer-1'), false);
+  assert.deepEqual(entries.incidentQuarantinedCustomerIds, ['customer-1']);
   assert.equal(entries.every((entry) => entry.websitePhotoUrl.startsWith('https://')), true);
   assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
 });

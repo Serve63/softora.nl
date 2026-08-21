@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto');
 const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
+const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant, WEBDESIGN_VARIANT_V1, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
 
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
 const DEVICE_MOCKUP_FILE_VERSION = 'v8';
@@ -27,15 +28,7 @@ const WEBDESIGN_TRANSIENT_STORAGE_ERROR_MESSAGE =
   'De webdesignfoto kon tijdelijk niet veilig worden opgeslagen. De lead is vrijgegeven; probeer opnieuw.';
 const WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE =
   'Webdesign maken is mislukt. De lead is vrijgegeven; probeer opnieuw.';
-const WEBDESIGN_VARIANT_V1 = 'v1-prompt-only';
-const WEBDESIGN_VARIANT_V2 = 'v2-visual-dna';
 let cachedSharp = null;
-
-function normalizeWebdesignVariant(value) {
-  return String(value || '').trim().toLowerCase() === WEBDESIGN_VARIANT_V2
-    ? WEBDESIGN_VARIANT_V2
-    : WEBDESIGN_VARIANT_V1;
-}
 
 function loadSharpModule() {
   if (cachedSharp) return cachedSharp;
@@ -1128,6 +1121,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
             legacyMeta: {
               id: customer.id,
               identityKey,
+              ...buildWebdesignGenerationProvenance(job),
               websitePhotoName,
               websiteMockupName,
               mockupRenderer: DEVICE_MOCKUP_RENDERER,
@@ -1194,6 +1188,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       [customer.id]: {
         id: customer.id,
         identityKey,
+        ...buildWebdesignGenerationProvenance(job),
         photoKey: photoDataKey,
         chunkCount: chunks.length,
         mockupPhotoKey: mockupPhotoDataKey,

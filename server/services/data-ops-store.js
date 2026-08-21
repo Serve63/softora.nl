@@ -12,6 +12,7 @@ const { chooseStrongerContactStatus, getContactStatusPriority, normalizeContactS
 const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 const { createDataOpsCustomerLookups } = require('./data-ops-customer-lookups');
 const { createMailboxHistoricalOutboundRepository } = require('../repositories/mailbox-historical-outbound');
+const { filterDesignPhotoRowsForServing } = require('./design-photo-generation-policy');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
@@ -1559,7 +1560,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     { timeoutMs: dataOpsReadQueryTimeoutMs });
     if (!result.ok) return null;
     const client = getClient();
-    const rows = result.data || [];
+    const rows = filterDesignPhotoRowsForServing(result.data || []);
     const entries = [];
     let cursor = 0;
     const workerCount = Math.min(8, Math.max(1, rows.length));
@@ -1599,7 +1600,7 @@ function createSoftoraDataOpsStore(deps = {}) {
 
     await Promise.all(Array.from({ length: workerCount }, downloadNext));
     Object.defineProperty(entries, 'hadStructuredRows', {
-      value: rows.length > 0,
+      value: (result.data || []).length > 0,
       enumerable: false,
     });
     return entries;
@@ -1711,7 +1712,8 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
     if (!structuredRows) return null;
     const client = getClient(buildQueryOptions);
-    const rows = structuredRows
+    const serveableRows = filterDesignPhotoRowsForServing(structuredRows);
+    const rows = serveableRows
       .filter((row) => customerIds.length
         ? customerIdSet.has(normalizeString(row && row.customer_id).toLowerCase())
         : designPhotoRowMatchesIdentifiers(row, identifiers))
@@ -1916,6 +1918,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       value: customerIds.length > 0,
       enumerable: false,
     });
+    Object.defineProperty(entries, 'incidentQuarantinedCustomerIds', { value: serveableRows.incidentQuarantinedCustomerIds, enumerable: false });
     return entries;
   }
 
@@ -1934,25 +1937,22 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
       if (!result.ok) return null;
-      return (result.data || []).map((row) => {
-        const legacyMeta = row && row.legacy_meta && typeof row.legacy_meta === 'object'
-          ? row.legacy_meta
-          : {};
-        const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object'
-          ? legacyMeta.mockup
-          : {};
-        return {
-          customerId: normalizeString(row && row.customer_id),
-          identityKey: normalizeString(row && row.identity_key),
-          hasPhoto: Boolean(normalizeString(row && row.storage_path)),
-          hasMockup: Boolean(
-            normalizeString(mockupMeta.storagePath) ||
-              normalizeString(legacyMeta.websiteMockupStoragePath) ||
-              normalizeString(legacyMeta.websiteMockupPath)
-          ),
-          updatedAt: normalizeString(row && row.updated_at),
-        };
-      });
+      return filterDesignPhotoRowsForServing(result.data || [])
+        .map((row) => {
+          const legacyMeta = row && row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
+          const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : {};
+          return {
+            customerId: normalizeString(row && row.customer_id),
+            identityKey: normalizeString(row && row.identity_key),
+            hasPhoto: Boolean(normalizeString(row && row.storage_path)),
+            hasMockup: Boolean(
+              normalizeString(mockupMeta.storagePath) ||
+                normalizeString(legacyMeta.websiteMockupStoragePath) ||
+                normalizeString(legacyMeta.websiteMockupPath)
+            ),
+            updatedAt: normalizeString(row && row.updated_at),
+          };
+        });
     }, {
       bypassReadCache: options.bypassReadCache,
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,

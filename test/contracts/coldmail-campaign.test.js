@@ -9374,6 +9374,52 @@ test('coldmail preview for webdesign action fills from ready row-level website-d
   assert.equal(result.failedItems[0].id, 'missing-1');
 });
 
+test('coldmail webdesign selection cannot revive a quarantined structured asset from stale row URLs or photo state', async () => {
+  const requestedCustomerIds = [];
+  const quarantinedRows = [];
+  Object.defineProperty(quarantinedRows, 'incidentQuarantinedCustomerIds', {
+    value: ['quarantined-1'],
+    enumerable: false,
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'quarantined-1',
+        bedrijf: 'Quarantaine Design BV',
+        email: 'quarantaine@example.test',
+        status: 'prospect',
+        mail: true,
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    ],
+    photoMap: {
+      'quarantined-1': {
+        id: 'quarantined-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    dataOpsStore: {
+      async listDesignPhotosWithSignedUrls(options) {
+        requestedCustomerIds.push(...(options.customerIds || []));
+        return quarantinedRows;
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 1,
+    service: "Website's",
+    specialAction: 'webdesign',
+  });
+
+  assert.deepEqual(requestedCustomerIds, ['quarantined-1']);
+  assert.equal(result.selected, 0);
+  assert.equal(result.failedItems.length, 1);
+  assert.match(result.failedItems[0].error, /Nog geen website-design klaar/i);
+});
+
 test('coldmail preview matches stored webdesigns with normalized company identities', async () => {
   const { service } = createService({
     rows: [
