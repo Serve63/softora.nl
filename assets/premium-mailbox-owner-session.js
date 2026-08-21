@@ -214,20 +214,26 @@
       });
     }
 
+    function openMessage(id, loadOptions = {}, openOptions = {}) {
+      const nextOptions = { ...openOptions };
+      if (loadOptions.showLoader === false) nextOptions.preserveVisibleDetail = true;
+      return options.openMail?.(id, nextOptions);
+    }
+
     function keepConversationOpen(messages, previousActiveId, loadOptions = {}) {
       if (loadOptions.openLatest !== false) return;
       const activeMessage = (Array.isArray(messages) ? messages : []).find(
         (message) => String(message && message.id) === String(previousActiveId || '')
       );
       const nextMessage = activeMessage || (Array.isArray(messages) ? messages[0] : null);
-      if (nextMessage) options.openMail?.(nextMessage.id);
+      if (nextMessage) openMessage(nextMessage.id, loadOptions);
       else {
         options.setActiveMail?.(null);
         options.resetDetail?.();
       }
     }
 
-    async function hydrateOutreachContexts(candidate) {
+    async function hydrateOutreachContexts(candidate, loadOptions = {}) {
       const index = options.index;
       if (!index || typeof index.hydrateOutreachContexts !== 'function') return;
       await index.hydrateOutreachContexts({
@@ -237,7 +243,9 @@
         },
         renderList: (...args) => { if (canApply(candidate)) options.renderList?.(...args); },
         getActiveMail: options.getActiveMail,
-        openMail: (...args) => { if (canApply(candidate)) options.openMail?.(...args); },
+        openMail: (id, openOptions) => {
+          if (canApply(candidate)) openMessage(id, loadOptions, openOptions);
+        },
         toast: options.toast,
       });
     }
@@ -322,7 +330,7 @@
         options.prewarm?.(messages);
         options.renderList?.({ openLatest: loadOptions.openLatest !== false });
         keepConversationOpen(messages, options.getActiveMail?.(), loadOptions);
-        void hydrateOutreachContexts(candidate).catch(() => {});
+        void hydrateOutreachContexts(candidate, loadOptions).catch(() => {});
         options.setStatus?.(sync?.warming ? 'Mailbox wordt bijgewerkt…' : '');
         if (sync?.refreshRecommended && !loadOptions.skipBackgroundSync) {
           void options.syncInBackground?.();
@@ -342,7 +350,9 @@
           const activeMessage = currentMessages.find(
             (message) => String(message && message.id) === String(activeId || '')
           );
-          if (activeMessage) options.openMail?.(activeMessage.id, { skipReadPersist: true });
+          if (activeMessage) {
+            openMessage(activeMessage.id, loadOptions, { skipReadPersist: true });
+          }
           else keepConversationOpen(currentMessages, activeId, { openLatest: false });
           options.setStatus?.('');
           setBusy(false);
