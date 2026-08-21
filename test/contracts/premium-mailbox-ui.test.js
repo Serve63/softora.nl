@@ -171,7 +171,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260820c/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260820a/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260820b/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
@@ -192,8 +192,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260821a/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260820c') < page.indexOf('premium-mailbox-signature.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260820a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260820c') < page.indexOf('premium-mailbox-signature.js?v=20260821a'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260821a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260820b'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260821a'));
@@ -7792,7 +7792,9 @@ test('JT Performance signature wordt in hoofdmail en inkomende thread een veilig
     assert.match(html, />Telefoon</);
     assert.match(html, /href="tel:\+3197010269099"/);
     assert.match(html, />Adres</);
-    assert.match(html, /Nieuwe Baan 1<br>5076 SV Haaren<br>Nederland/);
+    const contactBlock = html.match(/<address class="detail-mail-contact-card"[\s\S]*?<\/address>/)?.[0] || '';
+    assert.match(contactBlock, /Nieuwe Baan 1, 5076 SV Haaren, Nederland/);
+    assert.doesNotMatch(contactBlock, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
     assert.doesNotMatch(html, /Best regards|Jeroen Sterke|JT-performance|Chamber|17122606|Tax Number|NL001751168B24/);
   }
   assert.doesNotMatch(rootHtml, /jt-performance\.nl|service@jt-performance\.nl/);

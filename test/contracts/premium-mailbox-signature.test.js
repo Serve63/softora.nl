@@ -37,7 +37,8 @@ test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend tele
   const html = signature.renderContactCard(parsed.contact);
   assert.match(html, /class="detail-mail-contact-card"/);
   assert.match(html, /href="tel:\+3197010269099"/);
-  assert.match(html, /Nieuwe Baan 1<br>5076 SV Haaren<br>Nederland/);
+  assert.match(html, /Nieuwe Baan 1, 5076 SV Haaren, Nederland/);
+  assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
   assert.doesNotMatch(html, /JT-performance|jt-performance\.nl|Chamber|17122606|Tax Number|NL001751168B24/);
 });
 
@@ -121,6 +122,7 @@ test('mailbox rendert een telefoon-only signature zonder lege adresrij', () => {
   assert.equal(parsed.contact.phoneHref, 'tel:0612345678');
   assert.match(html, />Telefoon</);
   assert.doesNotMatch(html, />Adres</);
+  assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*</i);
 });
 
 test('mailbox rendert een adres-only signature zonder lege telefoonrij', () => {
@@ -141,7 +143,9 @@ test('mailbox rendert een adres-only signature zonder lege telefoonrij', () => {
   assert.equal(parsed.matched, true);
   assert.deepEqual(parsed.contact.addressLines, ['Markt 8', '5211 AA Den Bosch', 'Nederland']);
   assert.match(html, />Adres</);
+  assert.match(html, /Markt 8, 5211 AA Den Bosch, Nederland/);
   assert.doesNotMatch(html, />Telefoon</);
+  assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
 });
 
 test('mailbox ondersteunt alle afgesproken telefoonlabels', () => {
@@ -178,6 +182,9 @@ test('mailbox ondersteunt alle afgesproken adreslabels inline en op de volgende 
     ].join('\n'));
     assert.equal(parsed.matched, true, street);
     assert.deepEqual(parsed.contact.addressLines, ['Lindelaan 3', '1000 AA Amsterdam', 'Nederland'], street);
+    const html = signature.renderContactCard(parsed.contact);
+    assert.match(html, /Lindelaan 3, 1000 AA Amsterdam, Nederland/, street);
+    assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i, street);
   }
 });
 
