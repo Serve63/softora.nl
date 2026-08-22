@@ -209,7 +209,7 @@ test('page smoke: linked kennisbank articles do not 404', async () => {
     },
     {
       path: '/kennisbank/wat-is-een-ai-telefonist',
-      title: /Wat is een AI telefonist\?/,
+      title: /Wat is een AI telefonist en wat kan die verantwoord doen\?/,
     },
   ];
 
