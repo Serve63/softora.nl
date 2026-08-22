@@ -101,11 +101,13 @@ function parseMailboxJsonObject(value) {
     return null;
   }
 }
-async function readMailboxPinPreferences() {
+async function readMailboxPinPreferences(preloadedPayload) {
   try {
     const client = window.SoftoraUiStateClient;
     if (!client || typeof client.get !== 'function') return Object.create(null);
-    const payload = await client.get(MAILBOX_PIN_SCOPE);
+    const payload = preloadedPayload || (typeof client.peek === 'function'
+      ? client.peek(MAILBOX_PIN_SCOPE)
+      : await client.get(MAILBOX_PIN_SCOPE));
     const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object' ? payload.values : {};
     const parsed = parseMailboxJsonObject(values[MAILBOX_PIN_KEY]) || {};
     return Object.entries(parsed).reduce((next, [identity, email]) => {
@@ -136,6 +138,8 @@ async function writePinnedMailboxAccount(email) {
   }
 }
 async function initializeMailboxAccountPreference() {
+  let bootstrappedPreferences = null;
+  try { bootstrappedPreferences = window.SoftoraUiStateClient?.peek?.(MAILBOX_PIN_SCOPE) || null; } catch (_) {}
   try {
     const bootstrappedSession = window.SoftoraMailboxCampaignInbox?.getPageBootstrapSession?.();
     let session = bootstrappedSession;
@@ -148,7 +152,7 @@ async function initializeMailboxAccountPreference() {
   } catch (_) {
     mailboxAccountPreferenceIdentity = 'anonymous'; await window.SoftoraMailboxCampaignInbox.initializeOwnerPreference({}, window.SoftoraUiStateClient, mailboxAccountPreferenceIdentity);
   }
-  mailboxPinPreferences = await readMailboxPinPreferences();
+  mailboxPinPreferences = await readMailboxPinPreferences(bootstrappedPreferences);
   pinnedMailboxAccount = normalizeMailboxEmail(mailboxPinPreferences[mailboxAccountPreferenceIdentity] || '');
 }
 const MAILBOX_TRACKING_HOST_PATTERNS = [
@@ -434,19 +438,18 @@ function normalizeMailboxBodyImages(images) {
   return window.SoftoraMailboxImages?.normalize?.(images) || [];
 }
 function isMailboxRootIncoming(mail) { return Boolean(mail) && !(mail.copyContext && mail.copyContext.evidenceKnown === true) && !window.SoftoraMailboxDisplay.isSentMessage(mail, { account: mail.accountEmail }); }
-function renderMailboxRootIncomingMeta(mail, senderLabel) {
+function renderMailboxRootIncomingMeta(mail) {
   if (!isMailboxRootIncoming(mail)) return '';
   const timestamp = [mail && mail.date, mail && mail.time]
     .map((value) => String(value || '').trim())
     .filter(Boolean)
     .join(', ');
-  const sender = String(senderLabel || '').trim();
-  if (!timestamp && !sender) return '';
-  const ariaLabel = [
-    timestamp ? `Ontvangen ${timestamp}` : '',
-    sender ? `van ${sender}` : '',
-  ].filter(Boolean).join(' ');
-  return `<div class="detail-message-meta"${ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : ''}>${timestamp ? `<span class="detail-message-time">${escapeHtml(timestamp)}</span>` : ''}${sender ? `<span class="detail-message-sender">${escapeHtml(sender)}</span>` : ''}</div>`;
+  const routing = window.SoftoraMailboxCampaignInbox?.renderMessageRouting?.(mail, escapeHtml) || '';
+  if (!timestamp && !routing) return '';
+  const meta = timestamp
+    ? `<div class="detail-message-meta" aria-label="${escapeHtml(`Ontvangen ${timestamp}`)}"><span class="detail-message-time">${escapeHtml(timestamp)}</span></div>`
+    : '';
+  return `${meta}${routing}`;
 }
 function renderMailboxConversationAction(action, mailId, options = {}) {
   const id = String(mailId || '').trim();
@@ -831,8 +834,8 @@ async function loadMailboxMessages(options = {}) {
   return mailboxOwnerView.load(loadOptions);
 }
 function resetMailboxViewForScopeChange() { mailboxDiscoveryController?.resetForScopeChange?.(); mailboxOwnerView.reset(); }
-function switchCampaignMailboxOwner(value) {
-  const owner = mailboxOwnerView.switchOwner(value); mailboxRefreshController?.scopeChanged?.(); return owner;
+function switchCampaignMailboxOwner(value, options = {}) {
+  const owner = mailboxOwnerView.switchOwner(value, options); mailboxRefreshController?.scopeChanged?.(); return owner;
 }
 async function applyMailboxAccount(email, options = {}) {
   const normalizedEmail = normalizeMailboxEmail(email);
@@ -929,7 +932,10 @@ function renderMailboxDetailHtml(m) {
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions); const contactDossier = window.SoftoraMailboxDiscovery.getContactDossier(m, { activeFolder, accountEmails: getMailboxAccounts(), campaignInbox: window.SoftoraMailboxCampaignInbox, fallbackTitle: window.SoftoraMailboxDisplay.formatDetailSubject(m.subject) }); const contactDossierMode = contactDossier.active; const detailTitle = contactDossier.title;
   const detailBody = m.safeBodyPreviewOnly ? (m.preview || '') : (m.body || m.preview || '');
-  const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
+  const rootIncomingMeta = renderMailboxRootIncomingMeta(m);
+  const rootHeaderRouting = isMailboxRootIncoming(m)
+    ? ''
+    : window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml);
   const readState = window.SoftoraMailboxUiState.getReadState(m, window.SoftoraMailboxCampaignInbox);
   return `
     <div class="detail-body">
@@ -953,7 +959,7 @@ function renderMailboxDetailHtml(m) {
             </div>
           </div>
           ${window.SoftoraMailboxDiscovery?.renderTimelineSummary?.(m, escapeHtml) || ''}
-          ${window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml)}${contactDossier.newMessageAction ? renderMailboxConversationAction(contactDossier.newMessageAction, m.id, { placement: 'contact-header' }) : ''}
+          ${rootHeaderRouting}${contactDossier.newMessageAction ? renderMailboxConversationAction(contactDossier.newMessageAction, m.id, { placement: 'contact-header' }) : ''}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
         <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: true, contactDossierMode }))}</div>
@@ -1097,7 +1103,7 @@ if (mailboxAccountMenu) {
     const ownerButton = event.target.closest('[data-mailbox-owner], [data-mailbox-pin-owner]');
     if (ownerButton) {
       const pinOwner = ownerButton.dataset.mailboxPinOwner;
-      const selectedOwner = switchCampaignMailboxOwner(pinOwner || ownerButton.dataset.mailboxOwner);
+      const selectedOwner = switchCampaignMailboxOwner(pinOwner || ownerButton.dataset.mailboxOwner, { persist: !pinOwner });
       if (pinOwner) {
         event.preventDefault();
         event.stopPropagation();

@@ -46,6 +46,9 @@
   const REPLY_MONTH_PATTERN = /\b(?:jan(?:uari|uary)?|feb(?:ruari|ruary)?|mrt|maa?rt|mar(?:ch)?|apr(?:il)?|mei|may|jun(?:i|e)?|jul(?:i|y)?|aug(?:ustus)?|sep(?:tember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\b/i;
   const REPLY_WEEKDAY_PATTERN = /\b(?:ma|di|wo|do|vr|za|zo|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\.?\b/i;
   const REPLY_NUMERIC_DATE_PATTERN = /(?:\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?\b|\b\d{1,2}:\d{2}\b)/;
+  const WRAPPED_GMAIL_YEAR_PATTERN = /\b(?:19|20)\d{2}\b/;
+  const WRAPPED_GMAIL_TIME_PATTERN = /\b\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?\b/i;
+  const WRAPPED_GMAIL_NUMERIC_DATE_PATTERN = /(?:\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b)/;
 
   function hasReplyDateEvidence(value, language) {
     const core = String(value || '').trim();
@@ -343,6 +346,45 @@
     return lines.join('\n').trim();
   }
 
+  function getProvenWrappedGmailHeaderStart(lines, segment) {
+    // Keep this out of the general reply-header parser: neighbouring authored
+    // lines may resemble a wrapped header. The caller uses this wider range
+    // only after the quoted payload has one existing, proven outbound match.
+    if (!segment || segment.marker !== 'quote-prefix' || !Number.isInteger(segment.start)) {
+      return segment && Number.isInteger(segment.start) ? segment.start : 0;
+    }
+    const source = Array.isArray(lines) ? lines : [];
+    const originalStart = segment.start;
+    if (!isQuotePrefixedLine(source[originalStart])) return originalStart;
+
+    let wroteIndex = originalStart - 1;
+    let skippedBlankLines = 0;
+    while (wroteIndex >= 0 && !cleanHeaderLine(source[wroteIndex])) {
+      skippedBlankLines += 1;
+      if (skippedBlankLines > 1) return originalStart;
+      wroteIndex -= 1;
+    }
+    const introIndex = wroteIndex - 1;
+    if (introIndex < 0) return originalStart;
+    if (isQuotePrefixedLine(source[introIndex]) || isQuotePrefixedLine(source[wroteIndex])) {
+      return originalStart;
+    }
+
+    const intro = cleanHeaderLine(source[introIndex]);
+    const wrote = cleanHeaderLine(source[wroteIndex]);
+    if (!/^on\s+/i.test(intro) || !/^wrote\s*:\s*$/i.test(wrote)) return originalStart;
+    if (!WRAPPED_GMAIL_YEAR_PATTERN.test(intro) || !WRAPPED_GMAIL_TIME_PATTERN.test(intro)) {
+      return originalStart;
+    }
+    if (!REPLY_MONTH_PATTERN.test(intro) && !WRAPPED_GMAIL_NUMERIC_DATE_PATTERN.test(intro)) {
+      return originalStart;
+    }
+
+    const parsedHeader = parseReplyHeaderLine(`${intro} ${wrote}`);
+    if (!parsedHeader || parsedHeader.remainder) return originalStart;
+    return introIndex;
+  }
+
   function normalizeMatchText(value) {
     return normalizeLines(value)
       .map((line) => String(line || '')
@@ -448,7 +490,8 @@
         if (Number.isFinite(incomingTimestamp)) {
           const candidateTimestamp = getMessageTimestamp(message);
           if (!candidateTimestamp && !exactDirectParent) return false;
-          if (candidateTimestamp && candidateTimestamp > incomingTimestamp + maxClockSkewMs) return false;
+          const allowedClockSkewMs = exactDirectParent ? maxClockSkewMs : 0;
+          if (candidateTimestamp && candidateTimestamp > incomingTimestamp + allowedClockSkewMs) return false;
         }
         const bodyText = normalizeMatchText(message && (message.body || message.text || ''));
         const authoredText = normalizeMatchText(getAuthoredPrefix(
@@ -498,7 +541,8 @@
     parsed.segments.forEach((segment) => {
       const match = findExactProvenOutbound(stripQuotedEnvelope(segment.text), outboundMessages, options);
       if (!match) return;
-      removed.push(segment);
+      const expandedStart = getProvenWrappedGmailHeaderStart(parsed.lines, segment);
+      removed.push(expandedStart < segment.start ? { ...segment, start: expandedStart } : segment);
       matchedMessages.push(match);
     });
     if (!removed.length) return { body: String(value || '').trim(), removed: [], matchedMessages: [] };

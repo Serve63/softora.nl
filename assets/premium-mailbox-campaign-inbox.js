@@ -185,9 +185,9 @@
     preferenceIdentity = String(identity || '').trim().toLowerCase() || 'anonymous';
     const saved = ownerPreference
       ? await ownerPreference.initialize(uiStateClient, preferenceIdentity)
-      : { pinnedOwner: '', selectedOwner: '' };
+      : { pinnedOwner: '', selectedOwner: '', currentOwner: '' };
     pinnedOwner = saved.pinnedOwner;
-    setOwner(pinnedOwner || saved.selectedOwner || defaultOwner);
+    activeOwner = normalizeOwner(saved.currentOwner || pinnedOwner || saved.selectedOwner || defaultOwner);
     return { defaultOwner, pinnedOwner, activeOwner };
   }
 
@@ -196,7 +196,7 @@
       return { owner: activeOwner, label: getOwnerLabel(), saved: false };
     }
     pinnedOwner = normalizeOwner(value);
-    setOwner(pinnedOwner);
+    activeOwner = pinnedOwner;
     const saved = ownerPreference ? await ownerPreference.pin(pinnedOwner, uiStateClient) : false;
     return { owner: pinnedOwner, label: getOwnerLabel(pinnedOwner), saved };
   }
@@ -209,9 +209,9 @@
     return activeOwner;
   }
 
-  function setOwner(value) {
+  function setOwner(value, options = {}) {
     activeOwner = normalizeOwner(value);
-    ownerPreference?.persist?.(activeOwner);
+    if (options.persist !== false) ownerPreference?.persist?.(activeOwner);
     return activeOwner;
   }
 

@@ -389,8 +389,8 @@
       return token;
     }
 
-    function switchOwner(value) {
-      const owner = options.campaignInbox.setOwner(value);
+    function switchOwner(value, switchOptions = {}) {
+      const owner = options.campaignInbox.setOwner(value, switchOptions);
       reset();
       options.closeMenu?.();
       options.updateAccountUi?.();
