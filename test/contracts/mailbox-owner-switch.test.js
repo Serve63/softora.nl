@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const ownerSession = require('../../assets/premium-mailbox-owner-session.js');
+const ownerPreferenceApi = require('../../assets/premium-mailbox-owner-preference.js');
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox.js');
 const {
   getMailboxMessageOwner,
@@ -13,6 +14,20 @@ function response(payload) {
     ok: true,
     json: async () => payload,
   };
+}
+
+function createUrlState(initialUrl = 'https://www.softora.nl/premium-mailbox') {
+  const location = new URL(initialUrl);
+  const replacements = [];
+  const history = {
+    state: null,
+    replaceState(state, _title, nextUrl) {
+      this.state = state;
+      replacements.push(nextUrl === undefined ? null : String(nextUrl));
+      if (nextUrl !== undefined) location.href = new URL(String(nextUrl), location.href).href;
+    },
+  };
+  return { history, location, replacements };
 }
 
 test('mailbox owner session annuleert een oude request en accepteert alleen de nieuwste scope', () => {
@@ -115,23 +130,351 @@ test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC
   assert.equal(reconciled[0].threadMessages[2].bodyLoaded, true);
 });
 
-test('gekozen campagne-eigenaar blijft na een refresh dezelfde servervoorkeur houden', async () => {
+test('gekozen campagne-eigenaar schrijft de servervoorkeur met keepalive', async () => {
   const writes = [];
   const client = {
     async get() { return { values: {} }; },
-    async set(scope, payload) { writes.push({ scope, payload }); },
+    async set(scope, payload, options) { writes.push({ scope, payload, options }); },
   };
   await campaignInbox.initializeOwnerPreference(
     { authenticated: true, email: 'serve@softora.nl' },
     client,
     'serve@softora.nl'
   );
+
   assert.equal(campaignInbox.setOwner('both'), 'both');
   await new Promise((resolve) => setImmediate(resolve));
-  const selectionWrite = writes.find((entry) => entry.payload?.patch?.['softora_mailbox_active_owner_v1_serve@softora.nl'] === 'both');
-  assert.ok(selectionWrite);
+
+  assert.deepEqual(writes, [{
+    scope: 'premium_mailbox_preferences',
+    payload: {
+      patch: { 'softora_mailbox_active_owner_v1_serve@softora.nl': 'both' },
+      source: 'premium-mailbox',
+      actor: 'serve@softora.nl',
+    },
+    options: { keepalive: true },
+  }]);
   assert.equal(campaignInbox.getOwner(), 'both');
-  campaignInbox.setOwner('serve');
+});
+
+test('op een verse pagina blijft de pin de initiële default boven een oude serverselectie', async () => {
+  const writes = [];
+  let liveReads = 0;
+  const client = {
+    peek(scope) {
+      assert.equal(scope, 'premium_mailbox_preferences');
+      return {
+        values: {
+          softora_mailbox_pinned_owner_v1_usr_serve: 'serve',
+          softora_mailbox_active_owner_v1_usr_serve: 'martijn',
+        },
+      };
+    },
+    async get() {
+      liveReads += 1;
+      return new Promise(() => {});
+    },
+    async set(scope, payload, options) { writes.push({ scope, payload, options }); },
+  };
+
+  const state = await campaignInbox.initializeOwnerPreference(
+    { authenticated: true, email: 'serve@softora.nl' },
+    client,
+    'usr_serve'
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(state, {
+    defaultOwner: 'serve',
+    pinnedOwner: 'serve',
+    activeOwner: 'serve',
+  });
+  assert.equal(liveReads, 0);
+  assert.deepEqual(writes, []);
+});
+
+test('de identiteitsgebonden tabkeuze wint bij refresh van de pin en herstelt de serverselectie', async () => {
+  const urlState = createUrlState();
+  urlState.history.state = {
+    softoraMailboxOwnerViewV1: { identity: 'usr_serve', owner: 'martijn' },
+  };
+  const previousLocation = global.location;
+  const previousHistory = global.history;
+  global.location = urlState.location;
+  global.history = urlState.history;
+  const writes = [];
+  let liveReads = 0;
+
+  try {
+    const state = await campaignInbox.initializeOwnerPreference(
+      { authenticated: true, email: 'serve@softora.nl' },
+      {
+        peek() {
+          return {
+            values: {
+              softora_mailbox_pinned_owner_v1_usr_serve: 'serve',
+              softora_mailbox_active_owner_v1_usr_serve: 'serve',
+            },
+          };
+        },
+        async get() { liveReads += 1; return new Promise(() => {}); },
+        async set(scope, payload, options) { writes.push({ scope, payload, options }); return { ok: true }; },
+      },
+      'usr_serve'
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(state, {
+      defaultOwner: 'serve',
+      pinnedOwner: 'serve',
+      activeOwner: 'martijn',
+    });
+    assert.equal(liveReads, 0);
+    assert.equal(writes.length, 1);
+    assert.deepEqual(writes[0].payload.patch, {
+      softora_mailbox_active_owner_v1_usr_serve: 'martijn',
+    });
+    assert.deepEqual(writes[0].options, { keepalive: true });
+  } finally {
+    if (previousLocation === undefined) delete global.location;
+    else global.location = previousLocation;
+    if (previousHistory === undefined) delete global.history;
+    else global.history = previousHistory;
+  }
+});
+
+test('vastgepinde eigenaar blijft de initiële fallback als geen tabkeuze bestaat', async () => {
+  const state = await campaignInbox.initializeOwnerPreference(
+    { authenticated: true, email: 'martijn@softora.nl' },
+    {
+      async get() {
+        return { values: { softora_mailbox_pinned_owner_v1_usr_martijn: 'serve' } };
+      },
+      async set() { throw new Error('initialisatie mag nooit schrijven'); },
+    },
+    'usr_martijn'
+  );
+
+  assert.deepEqual(state, {
+    defaultOwner: 'martijn',
+    pinnedOwner: 'serve',
+    activeOwner: 'serve',
+  });
+});
+
+test('voorkeurinitialisatie gebruikt een aanwezige bootstrap direct en start geen blokkerende liveread', async () => {
+  let liveReads = 0;
+  const preference = ownerPreferenceApi.create();
+  const saved = await preference.initialize({
+    peek() {
+      return {
+        values: {
+          softora_mailbox_pinned_owner_v1_usr_serve: 'serve',
+          softora_mailbox_active_owner_v1_usr_serve: 'martijn',
+        },
+      };
+    },
+    async get() { liveReads += 1; return new Promise(() => {}); },
+    async set() { throw new Error('initialisatie mag nooit schrijven'); },
+  }, 'usr_serve');
+
+  assert.deepEqual(saved, { pinnedOwner: 'serve', selectedOwner: 'martijn', currentOwner: '' });
+  assert.equal(liveReads, 0);
+});
+
+test('voorkeurinitialisatie met productie-peek wacht bij ontbrekende bootstrap nooit op de live timeout', async () => {
+  let liveReads = 0;
+  const preference = ownerPreferenceApi.create();
+  const saved = await preference.initialize({
+    peek() { return null; },
+    async get() { liveReads += 1; return new Promise(() => {}); },
+    async set() { return { ok: true }; },
+  }, 'usr_serve');
+
+  assert.deepEqual(saved, { pinnedOwner: '', selectedOwner: '', currentOwner: '' });
+  assert.equal(liveReads, 0);
+});
+
+test('vertraagde eigenaarwrite blijft aan het oorspronkelijke gebruikersaccount gebonden', async () => {
+  const urlState = createUrlState();
+  const writes = [];
+  const client = {
+    async get() { return { values: {} }; },
+    async set(scope, payload, options) { writes.push({ scope, payload, options }); },
+  };
+  const preference = ownerPreferenceApi.create(urlState);
+
+  await preference.initialize(client, 'usr_serve');
+  const serveWrite = preference.persist('martijn');
+  urlState.location.href = 'https://www.softora.nl/premium-mailbox';
+  await preference.initialize(client, 'usr_martijn');
+  await serveWrite;
+
+  assert.deepEqual(writes, [{
+    scope: 'premium_mailbox_preferences',
+    payload: {
+      patch: { softora_mailbox_active_owner_v1_usr_serve: 'martijn' },
+      source: 'premium-mailbox',
+      actor: 'usr_serve',
+    },
+    options: { keepalive: true },
+  }]);
+});
+
+test('identiteitsgebonden tab-viewstate geeft read-your-write terwijl de oude paginawrite nog niet is gecommit', async () => {
+  const urlState = createUrlState();
+  const serverValues = {
+    softora_mailbox_pinned_owner_v1_usr_serve: 'serve',
+    softora_mailbox_active_owner_v1_usr_serve: 'serve',
+  };
+  let releaseOldWrite;
+  const oldWriteGate = new Promise((resolve) => { releaseOldWrite = resolve; });
+  const oldPage = ownerPreferenceApi.create(urlState);
+  const oldClient = {
+    peek: () => ({ values: { ...serverValues } }),
+    async get() { throw new Error('bootstrap is aanwezig'); },
+    async set(_scope, payload) {
+      await oldWriteGate;
+      Object.assign(serverValues, payload.patch);
+      return { ok: true };
+    },
+  };
+  await oldPage.initialize(oldClient, 'usr_serve');
+  const oldWrite = oldPage.persist('martijn');
+  assert.deepEqual(urlState.history.state, {
+    softoraMailboxOwnerViewV1: { identity: 'usr_serve', owner: 'martijn' },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  let newPageLiveReads = 0;
+  const repairWrites = [];
+  const newPage = ownerPreferenceApi.create(urlState);
+  const duringHardRefresh = await newPage.initialize({
+    peek: () => ({ values: { ...serverValues } }),
+    async get() { newPageLiveReads += 1; return new Promise(() => {}); },
+    async set(_scope, payload, options) {
+      repairWrites.push({ payload, options });
+      Object.assign(serverValues, payload.patch);
+      return { ok: true };
+    },
+  }, 'usr_serve');
+
+  assert.deepEqual(duringHardRefresh, {
+    pinnedOwner: 'serve',
+    selectedOwner: 'serve',
+    currentOwner: 'martijn',
+  });
+  assert.equal(newPageLiveReads, 0);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(repairWrites.length, 1);
+  assert.deepEqual(repairWrites[0].payload.patch, {
+    softora_mailbox_active_owner_v1_usr_serve: 'martijn',
+  });
+  assert.deepEqual(repairWrites[0].options, { keepalive: true });
+
+  releaseOldWrite();
+  await oldWrite;
+});
+
+test('mislukte ownerwrite blijft via de tabgeschiedenis actief en wordt bij refresh hersteld', async () => {
+  const urlState = createUrlState('https://www.softora.nl/premium-mailbox?message=abc#detail');
+  const staleValues = { softora_mailbox_active_owner_v1_usr_serve: 'serve' };
+  const firstPage = ownerPreferenceApi.create(urlState);
+  await firstPage.initialize({
+    peek: () => ({ values: staleValues }),
+    async get() { throw new Error('bootstrap is aanwezig'); },
+    async set() { throw new Error('offline'); },
+  }, 'usr_serve');
+
+  await assert.rejects(firstPage.persist('martijn'), /offline/);
+  assert.equal(urlState.location.search, '?message=abc');
+  assert.equal(urlState.location.hash, '#detail');
+  assert.deepEqual(urlState.history.state, {
+    softoraMailboxOwnerViewV1: { identity: 'usr_serve', owner: 'martijn' },
+  });
+
+  const retries = [];
+  const nextPage = ownerPreferenceApi.create(urlState);
+  const restored = await nextPage.initialize({
+    peek: () => ({ values: staleValues }),
+    async get() { throw new Error('bootstrap is aanwezig'); },
+    async set(_scope, payload, options) { retries.push({ payload, options }); return { ok: true }; },
+  }, 'usr_serve');
+
+  assert.equal(restored.currentOwner, 'martijn');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(retries.length, 1);
+  assert.equal(retries[0].payload.patch.softora_mailbox_active_owner_v1_usr_serve, 'martijn');
+  assert.deepEqual(retries[0].options, { keepalive: true });
+});
+
+test('tab-viewstate van Servé wordt na accountwissel niet voor Martijn gelezen of opgeslagen', async () => {
+  const urlState = createUrlState('https://www.softora.nl/premium-mailbox?message=abc#detail');
+  const writes = [];
+  const preference = ownerPreferenceApi.create(urlState);
+  const client = {
+    peek() {
+      return {
+        values: {
+          softora_mailbox_pinned_owner_v1_usr_serve: 'serve',
+          softora_mailbox_active_owner_v1_usr_serve: 'serve',
+          softora_mailbox_pinned_owner_v1_usr_martijn: 'serve',
+          softora_mailbox_active_owner_v1_usr_martijn: 'serve',
+        },
+      };
+    },
+    async get() { throw new Error('bootstrap is aanwezig'); },
+    async set(scope, payload, options) { writes.push({ scope, payload, options }); return { ok: true }; },
+  };
+
+  await preference.initialize(client, 'usr_serve');
+  await preference.persist('martijn');
+  writes.length = 0;
+
+  const afterAccountSwitch = await preference.initialize(client, 'usr_martijn');
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(afterAccountSwitch, {
+    pinnedOwner: 'serve',
+    selectedOwner: 'serve',
+    currentOwner: '',
+  });
+  assert.deepEqual(writes, []);
+  assert.equal(urlState.location.search, '?message=abc');
+  assert.equal(urlState.location.hash, '#detail');
+  assert.deepEqual(urlState.history.state, {
+    softoraMailboxOwnerViewV1: { identity: 'usr_serve', owner: 'martijn' },
+  });
+});
+
+test('ownerpin schrijft pin en selectie in exact één atomische keepalive-request', async () => {
+  const urlState = createUrlState('https://www.softora.nl/premium-mailbox?q=senioren#mail');
+  const writes = [];
+  const preference = ownerPreferenceApi.create(urlState);
+  await preference.initialize({
+    peek: () => ({ values: {} }),
+    async get() { throw new Error('bootstrap is aanwezig'); },
+    async set(scope, payload, options) { writes.push({ scope, payload, options }); return { ok: true }; },
+  }, 'usr_serve');
+
+  assert.equal(await preference.pin('martijn'), true);
+  assert.equal(urlState.location.search, '?q=senioren');
+  assert.equal(urlState.location.hash, '#mail');
+  assert.deepEqual(urlState.history.state, {
+    softoraMailboxOwnerViewV1: { identity: 'usr_serve', owner: 'martijn' },
+  });
+  assert.deepEqual(writes, [{
+    scope: 'premium_mailbox_preferences',
+    payload: {
+      patch: {
+        softora_mailbox_active_owner_v1_usr_serve: 'martijn',
+        softora_mailbox_pinned_owner_v1_usr_serve: 'martijn',
+      },
+      source: 'premium-mailbox',
+      actor: 'usr_serve',
+    },
+    options: { keepalive: true },
+  }]);
 });
 
 test('bootstrapverversing hervat exact het actieve gesprek en ruimt een verdwenen nepthread op', async () => {
