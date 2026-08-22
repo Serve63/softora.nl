@@ -526,7 +526,10 @@ function renderMailBody(value, images, options) {
     const copyLabel = window.SoftoraMailboxCampaignInbox?.getOwnerByAccount?.(copyContext.sourceAccountEmail)
       ? 'Jouw bericht'
       : 'Eerdere mail';
-    renderedSections.push(`<section class="detail-mail-section detail-mail-section-sent"><div class="detail-mail-section-label">${copyLabel}</div>${copyMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(copyMeta)}</div>` : ''}`);
+    const copyRouting = contactDossierMode
+      ? window.SoftoraMailboxCampaignInbox?.renderMessageRouting?.(options && options.mail, escapeHtml) || ''
+      : '';
+    renderedSections.push(`<section class="detail-mail-section detail-mail-section-sent"><div class="detail-mail-section-label">${copyLabel}</div>${copyMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(copyMeta)}</div>` : ''}${copyRouting}`);
   }
   let injectedImages = false, injectedAttachments = false, insertedReplyAction = false, insertedOlderThreadMessages = false, insertedRootIncomingMeta = false;
   let rootIncomingOpen = rootIncoming;
@@ -933,7 +936,7 @@ function renderMailboxDetailHtml(m) {
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions); const contactDossier = window.SoftoraMailboxDiscovery.getContactDossier(m, { activeFolder, accountEmails: getMailboxAccounts(), campaignInbox: window.SoftoraMailboxCampaignInbox, fallbackTitle: window.SoftoraMailboxDisplay.formatDetailSubject(m.subject) }); const contactDossierMode = contactDossier.active; const detailTitle = contactDossier.title;
   const detailBody = m.safeBodyPreviewOnly ? (m.preview || '') : (m.body || m.preview || '');
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m);
-  const rootHeaderRouting = isMailboxRootIncoming(m)
+  const rootHeaderRouting = isMailboxRootIncoming(m) || contactDossierMode
     ? ''
     : window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml);
   const readState = window.SoftoraMailboxUiState.getReadState(m, window.SoftoraMailboxCampaignInbox);

@@ -141,7 +141,7 @@
     const more = mail.contactTimelineNextCursor
       ? `<button type="button" data-mailbox-action="load-more-contact-timeline" data-mailbox-id="${escapeHtml(mail.id)}">Oudere berichten laden</button>`
       : '';
-    return `<div class="mail-contact-summary" role="status"><strong>Contactdossier</strong><span>${escapeHtml(`${messages} berichten · ${threads} onderwerpen${contact ? ` · ${contact}` : ''}`)}</span>${more}</div>`;
+    return `<div class="mail-contact-summary" role="status"><strong>Contactdossier:</strong><span>${escapeHtml(`${messages} berichten · ${threads} onderwerpen${contact ? ` · ${contact}` : ''}`)}</span>${more}</div>`;
   }
 
   function renderRootSentCardStart(mail, options = {}) {
@@ -154,7 +154,8 @@
       .filter(Boolean)
       .join(' · ');
     const escapeHtml = typeof options.escapeHtml === 'function' ? options.escapeHtml : String;
-    return `<section class="detail-mail-section detail-mail-section-sent" data-mailbox-message-direction="sent" data-mailbox-root-message="true"><div class="detail-mail-section-label">Jouw bericht</div>${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}`;
+    const routing = campaignInbox?.renderMessageRouting?.(mail, escapeHtml) || '';
+    return `<section class="detail-mail-section detail-mail-section-sent" data-mailbox-message-direction="sent" data-mailbox-root-message="true"><div class="detail-mail-section-label">Jouw bericht</div>${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}${routing}`;
   }
 
   function create(options = {}) {
