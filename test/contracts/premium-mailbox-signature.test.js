@@ -36,6 +36,9 @@ test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend tele
 
   const html = signature.renderContactCard(parsed.contact);
   assert.match(html, /class="detail-mail-contact-card"/);
+  assert.equal((html.match(/class="detail-mail-contact-item"/g) || []).length, 2);
+  assert.match(html, /<dt>Telefoon:<\/dt>/);
+  assert.match(html, /<dt>Adres:<\/dt>/);
   assert.match(html, /href="tel:\+3197010269099"/);
   assert.match(html, /Nieuwe Baan 1, 5076 SV Haaren, Nederland/);
   assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
@@ -120,9 +123,9 @@ test('mailbox rendert een telefoon-only signature zonder lege adresrij', () => {
   assert.equal(parsed.matched, true);
   assert.deepEqual(parsed.bodyLines, ['Prima.']);
   assert.equal(parsed.contact.phoneHref, 'tel:0612345678');
-  assert.match(html, /class="detail-mail-contact-item detail-mail-contact-item-phone"/);
-  assert.match(html, />Telefoon</);
-  assert.doesNotMatch(html, />Adres</);
+  assert.match(html, /class="detail-mail-contact-item"/);
+  assert.match(html, />Telefoon:<\/dt>/);
+  assert.doesNotMatch(html, />Adres:<\/dt>/);
   assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*</i);
 });
 
@@ -143,10 +146,10 @@ test('mailbox rendert een adres-only signature zonder lege telefoonrij', () => {
 
   assert.equal(parsed.matched, true);
   assert.deepEqual(parsed.contact.addressLines, ['Markt 8', '5211 AA Den Bosch', 'Nederland']);
-  assert.doesNotMatch(html, /detail-mail-contact-item-phone/);
-  assert.match(html, />Adres</);
+  assert.match(html, /class="detail-mail-contact-item"/);
+  assert.match(html, />Adres:<\/dt>/);
   assert.match(html, /Markt 8, 5211 AA Den Bosch, Nederland/);
-  assert.doesNotMatch(html, />Telefoon</);
+  assert.doesNotMatch(html, />Telefoon:<\/dt>/);
   assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
 });
 

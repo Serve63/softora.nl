@@ -202,10 +202,10 @@
       const phoneValue = phoneHref
         ? `<a class="detail-mail-contact-link" href="${escapeValue(phoneHref)}">${escapeValue(phone)}</a>`
         : `<span class="detail-mail-contact-value">${escapeValue(phone)}</span>`;
-      items.push(`<div class="detail-mail-contact-item detail-mail-contact-item-phone"><dt>Telefoon</dt><dd>${phoneValue}</dd></div>`);
+      items.push(`<div class="detail-mail-contact-item"><dt>Telefoon:</dt><dd>${phoneValue}</dd></div>`);
     }
     if (addressLines.length) {
-      items.push(`<div class="detail-mail-contact-item"><dt>Adres</dt><dd class="detail-mail-contact-value">${addressLines.map(escapeValue).join(', ')}</dd></div>`);
+      items.push(`<div class="detail-mail-contact-item"><dt>Adres:</dt><dd class="detail-mail-contact-value">${addressLines.map(escapeValue).join(', ')}</dd></div>`);
     }
     return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening"><dl class="detail-mail-contact-grid">${items.join('')}</dl></address>`;
   }
