@@ -534,56 +534,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-een-ai-telefonist',
-    title: 'Wat is een AI telefonist?',
-    description:
-      'Heldere uitleg van AI telefonie, wanneer het nuttig is en hoe je voorkomt dat gesprekken onpersoonlijk worden.',
-    category: 'AI telefonie',
-    intent: 'Uitleg',
-    publishedAt: '2026-05-20',
-    updatedAt: '2026-05-20',
-    readTime: '5 min',
-    summary:
-      'Een AI telefonist neemt gesprekken aan, stelt vaste vragen, vat informatie samen en zet vervolgacties klaar.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Een digitale eerste lijn',
-        paragraphs: Object.freeze([
-          'Een AI telefonist is software die telefoongesprekken kan voeren op basis van vooraf ingerichte doelen. Denk aan opnemen, vragen stellen, informatie verzamelen, een afspraak voorbereiden of een samenvatting naar het team sturen.',
-          'Het doel is niet om persoonlijk contact te vervangen, maar om bereikbaarheid en opvolging betrouwbaarder te maken.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Wanneer AI telefonie waarde toevoegt',
-        paragraphs: Object.freeze([
-          'AI telefonie is vooral interessant als je vaak dezelfde vragen krijgt, leads snel wilt kwalificeren of buiten werktijd bereikbaar wilt blijven. Ook voor drukke teams kan het helpen om gesprekken alvast te structureren.',
-          'De beste toepassingen hebben duidelijke grenzen: wanneer mag de AI helpen en wanneer moet een medewerker terugbellen?',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Koppeling met je proces',
-        paragraphs: Object.freeze([
-          'De echte waarde ontstaat na het gesprek. Een goede AI telefonist maakt een samenvatting, herkent vervolgacties en kan informatie doorzetten naar CRM, agenda of mailbox.',
-          'Zonder die opvolging blijft het een los telefoonsysteem. Met goede koppelingen wordt het onderdeel van je commerciële proces.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
-      Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
-      Object.freeze({ label: 'Wanneer is een chatbot zinvol?', href: '/blog/chatbot-laten-maken-wanneer-zinvol' }),
-      Object.freeze({
-        label: 'AI telefonist voor afspraakintake',
-        href: '/blog/ai-telefonist-voor-afspraakintake',
-        availableFrom: '2026-05-29',
-      }),
-      Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'vergelijkingen',
     slug: 'website-laten-maken-vs-zelf-maken',
     title: 'Website laten maken of zelf maken: wat is slimmer?',
@@ -2972,16 +2922,35 @@ function filterSeoContentRelatedLinks(linksRaw, nowMs) {
   return Object.freeze(links.filter((link) => isSeoContentRelatedLinkAvailable(link, nowMs)));
 }
 
+function filterSeoContentSectionLinks(sectionsRaw, nowMs) {
+  const sections = Array.isArray(sectionsRaw) ? sectionsRaw : [];
+  return Object.freeze(sections.map((section) => {
+    if (!section || typeof section !== 'object' || !Array.isArray(section.paragraphs)) return section;
+    let changed = false;
+    const paragraphs = section.paragraphs.map((paragraph) => {
+      if (!paragraph || typeof paragraph !== 'object' || Array.isArray(paragraph) || !Array.isArray(paragraph.links)) {
+        return paragraph;
+      }
+      const links = filterSeoContentRelatedLinks(paragraph.links, nowMs);
+      if (links.length === paragraph.links.length) return paragraph;
+      changed = true;
+      return Object.freeze({ ...paragraph, links });
+    });
+    if (!changed) return section;
+    return Object.freeze({ ...section, paragraphs: Object.freeze(paragraphs) });
+  }));
+}
+
 function enrichSeoContentItem(item, { nowMs = Date.now() } = {}) {
   if (!item) return item;
   const usesNativeQuality = Number(item.qualityVersion) >= 2;
-  const sections = Object.freeze(usesNativeQuality
+  const sections = filterSeoContentSectionLinks(usesNativeQuality
     ? [...(item.sections || [])]
     : [
         ...(item.sections || []),
         ...buildSeoContentDepthSections(item),
         ...buildSeoContentPerformanceSections(item),
-      ]);
+      ], nowMs);
   const faq = item.faq
     ? Object.freeze([...(item.faq || [])])
     : (usesNativeQuality ? Object.freeze([]) : buildSeoContentFaq(item));

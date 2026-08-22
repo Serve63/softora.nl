@@ -1330,6 +1330,44 @@ test('AI-telefonist kostengids maakt belvolume, scope en menselijke controle ver
   ]);
 });
 
+test('AI-telefonist definitiegids maakt techniek, taakgrens en menselijk herstel toetsbaar', () => {
+  const now = new Date('2026-08-22T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'wat-is-een-ai-telefonist', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const costHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonist-kosten-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-05-20');
+  assert.equal(item.updatedAt, '2026-08-22');
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.growthEventAt, '2026-08-22');
+  assert.equal(item.targetMoneyPage, '/ai-telefonist');
+  assert.ok(item.informationGain.includes('zesveldige gesprekskaart'));
+  assert.ok(item.sections.length >= 10);
+  assert.equal(item.sources.length, 6);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-ai-telefonist">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"datePublished":"2026-05-20"/);
+  assert.match(html, /"dateModified":"2026-08-22"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Vul vóór een demo een zesveldige gesprekskaart in/);
+  assert.match(html, /href="\/ai-telefonist">AI telefonist laten maken<\/a>/);
+  assert.match(html, /href="\/kennisbank\/ai-telefonist-crm-koppeling">AI telefonie koppelen aan CRM of agenda<\/a>/);
+  assert.match(html, /href="\/blog\/ai-telefonie-menselijke-overdracht">gids over menselijke overdracht<\/a>/);
+  assert.match(costHtml, /href="\/kennisbank\/wat-is-een-ai-telefonist">wat een AI telefonist precies is<\/a>/);
+  assert.doesNotMatch(html, /altijd bereikbaar|foutloze gesprekken|volledig autonoom|garandeert afspraken|AVG-proof/i);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/wat-is-een-ai-telefonist');
+  assert.equal(sitemapEntry.images.length, 1);
+  assert.equal(sitemapEntry.images[0].loc, '/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg');
+});
+
 test('AI-telefonist CRM-gids maakt events, duplicatecontrole en herstel toetsbaar', () => {
   const now = new Date('2026-08-18T12:00:00.000Z');
   const item = getSeoContentItem('kennisbank', 'ai-telefonist-crm-koppeling', { now });
