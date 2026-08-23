@@ -139,6 +139,10 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
     sitemap,
     /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>\s*<lastmod>2026-07-23<\/lastmod>/
   );
+  assert.match(
+    sitemap,
+    /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>\s*<lastmod>2026-08-23<\/lastmod>/
+  );
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/over-softora<\/loc>/);
@@ -448,6 +452,7 @@ const CORE_INTERNAL_LINK_EXPECTATIONS = [
       '/crm-systeem-op-maat',
       '/blog/ai-automatisering-mkb-waar-beginnen',
       '/kennisbank/wat-is-een-ai-telefonist',
+      '/blog/ai-telefonie-menselijke-overdracht',
     ],
   },
 ];
@@ -468,6 +473,22 @@ for (const page of CORE_INTERNAL_LINK_EXPECTATIONS) {
     assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
   });
 }
+
+test('AI-telefonistpagina registreert de interne-linkactie als andere groei-actie', () => {
+  const entry = INDEXABLE_PUBLIC_SEO_PAGES.find((page) => page.path === '/ai-telefonist');
+  const source = fs.readFileSync(path.join(root, 'ai-telefonist.html'), 'utf8');
+  const html = applyPublicSeoHeadDefaults(source, 'ai-telefonist.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.equal(entry.growthEventKind, 'other_growth_action');
+  assert.equal(entry.lastmod, '2026-08-23');
+  assert.match(html, /"dateModified":"2026-08-23"/);
+  assert.match(
+    html,
+    /Lees hoe je <a href="\/blog\/ai-telefonie-menselijke-overdracht">menselijke overdracht bij AI telefonie<\/a>/
+  );
+});
 
 test('ai automation page owns its internal links inside the page content', () => {
   const source = fs.readFileSync(path.join(root, 'ai-automatisering.html'), 'utf8');
