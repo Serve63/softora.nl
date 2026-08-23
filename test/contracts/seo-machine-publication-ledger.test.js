@@ -40,7 +40,7 @@ function createFetchFixture() {
       { contentType: 'application/json' }
     )],
     ['https://www.softora.nl/sitemap.xml', response(
-      '<urlset><url><loc>https://www.softora.nl/blog/good</loc></url><url><loc>https://www.softora.nl/blog/noindex</loc></url><url><loc>https://www.softora.nl/blog/refreshed</loc></url></urlset>',
+      '<urlset><url><loc>https://www.softora.nl/blog/good</loc></url><url><loc>https://www.softora.nl/blog/noindex</loc></url><url><loc>https://www.softora.nl/blog/refreshed</loc></url><url><loc>https://www.softora.nl/ai-telefonist</loc></url></urlset>',
       { contentType: 'application/xml' }
     )],
     ['https://www.softora.nl/blog/good', response(htmlPage({
@@ -56,6 +56,11 @@ function createFetchFixture() {
       path: '/blog/refreshed',
       publishedAt: '2026-06-01',
       modifiedAt: '2026-07-14',
+    }))],
+    ['https://www.softora.nl/ai-telefonist', response(htmlPage({
+      path: '/ai-telefonist',
+      publishedAt: '',
+      modifiedAt: '2026-07-17',
     }))],
   ]);
   return async (url) => {
@@ -86,6 +91,7 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
       ['/bedrijfssoftware-op-maat', '2026-08-06', 'substantial_refresh'],
       ['/crm-systeem-op-maat', '2026-07-04', 'substantial_refresh'],
       ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
+      ['/ai-telefonist', '2026-08-23', 'other_growth_action'],
     ]
   );
 });
@@ -206,21 +212,34 @@ test('live publication ledger counts only verified public indexable URLs', async
         status: 'live',
         title: 'Refreshed',
       },
+      {
+        collection: 'service',
+        cluster: 'ai-contact',
+        path: '/ai-telefonist',
+        publishedAt: '',
+        eventAt: '2026-07-17',
+        publicationKind: 'other_growth_action',
+        status: 'live',
+        title: 'AI telefonist',
+      },
     ],
   });
 
   assert.equal(ledger.status, 'p0');
   assert.match(ledger.errors.join('\n'), /noindex.*indexable/i);
-  assert.equal(ledger.windows['7'].declared, 3);
-  assert.equal(ledger.windows['7'].qualifying, 2);
+  assert.equal(ledger.windows['7'].declared, 4);
+  assert.equal(ledger.windows['7'].qualifying, 3);
   assert.equal(ledger.windows['7'].newUrls, 1);
   assert.equal(ledger.windows['7'].substantialRefreshes, 1);
-  assert.equal(ledger.windows['7'].otherGrowthActions, 0);
-  assert.equal(ledger.windows['7'].deficit, 3);
-  assert.equal(ledger.windows['7'].items[0].qualifies, true);
-  assert.equal(ledger.windows['7'].items[1].checks.indexable, false);
-  assert.equal(ledger.windows['7'].items[2].publicationKind, 'substantial_refresh');
-  assert.equal(ledger.windows['7'].items[2].dateModified, '2026-07-14');
+  assert.equal(ledger.windows['7'].otherGrowthActions, 1);
+  assert.equal(ledger.windows['7'].deficit, 2);
+  const byPath = new Map(ledger.windows['7'].items.map((item) => [item.path, item]));
+  assert.equal(byPath.get('/blog/good').qualifies, true);
+  assert.equal(byPath.get('/blog/noindex').checks.indexable, false);
+  assert.equal(byPath.get('/blog/refreshed').publicationKind, 'substantial_refresh');
+  assert.equal(byPath.get('/blog/refreshed').dateModified, '2026-07-14');
+  assert.equal(byPath.get('/ai-telefonist').publicationKind, 'other_growth_action');
+  assert.equal(byPath.get('/ai-telefonist').dateModified, '2026-07-17');
 });
 
 test('cadence gate returns red exit code two when content is required', () => {

@@ -171,9 +171,9 @@ function buildPublicationAudit({
   const eventAt = resolvePublicationEventAt(item);
   const datePublished = extractDatePublished(html);
   const dateModified = extractDateModified(html);
-  const eventDate = publicationKind === PUBLICATION_KINDS.SUBSTANTIAL_REFRESH
-    ? dateModified
-    : datePublished;
+  const eventDate = publicationKind === PUBLICATION_KINDS.NEW_URL
+    ? datePublished
+    : dateModified;
   const publishedDateSource = eventDate === eventAt
     ? 'structured-data'
     : (hasVisiblePublishedDate(html, eventAt) ? 'visible' : 'missing');

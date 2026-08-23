@@ -156,6 +156,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'AI telefonist laten maken voor het MKB',
     description:
       'Laat een AI telefonist maken door Softora voor intake, bereikbaarheid, leadkwalificatie, afspraakverzoeken en CRM-opvolging met menselijke controle.',
+    lastmod: '2026-08-23',
+    growthEventKind: 'other_growth_action',
+    growthCluster: 'ai-contact',
     kind: 'service',
     serviceName: 'AI telefonist',
     relatedLinks: [
@@ -165,6 +168,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/crm-systeem-op-maat',
       '/kennisbank/wat-is-een-ai-telefonist',
       '/blog/ai-automatisering-mkb-waar-beginnen',
+      '/blog/ai-telefonie-menselijke-overdracht',
     ],
   },
   {
