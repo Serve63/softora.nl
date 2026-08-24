@@ -1,6 +1,7 @@
 'use strict';
 
 const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+const CAMPAIGN_SEED_QUERY_CONCURRENCY = 2;
 
 function selectCampaignSeedMessages({ batches = [], limit = 500, normalizeString = String } = {}) {
   const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 500)));
@@ -132,20 +133,29 @@ function createMailboxIndexTargetedLookups({
     folders = ['inbox', 'sent'],
     subjectTerms = [],
     limit = 500,
+    priorityRead = false,
   } = {}) {
     const normalizedFolders = Array.from(
       new Set((Array.isArray(folders) ? folders : []).map(normalizeFolder).filter(Boolean))
     );
     if (!normalizeEmail(accountEmail) || !normalizedFolders.length || !subjectTerms.length) return [];
-    const batches = await Promise.all(normalizedFolders.flatMap((folder) =>
-      subjectTerms.map((subjectTerm) => listMatchingMessagesForAccounts({
+    const queries = normalizedFolders.flatMap((folder) =>
+      subjectTerms.map((subjectTerm) => () => listMatchingMessagesForAccounts({
         accountEmails: [accountEmail],
         folder,
         subjectTerms: [subjectTerm],
         limit,
+        priorityRead,
       }))
-    ));
-    if (batches.some((batch) => !Array.isArray(batch))) return null;
+    );
+    const batches = [];
+    for (let offset = 0; offset < queries.length; offset += CAMPAIGN_SEED_QUERY_CONCURRENCY) {
+      const batchGroup = await Promise.all(
+        queries.slice(offset, offset + CAMPAIGN_SEED_QUERY_CONCURRENCY).map((query) => query())
+      );
+      if (batchGroup.some((batch) => !Array.isArray(batch))) return null;
+      batches.push(...batchGroup);
+    }
     return selectCampaignSeedMessages({ batches, limit, normalizeString });
   }
 
@@ -153,6 +163,7 @@ function createMailboxIndexTargetedLookups({
     accountEmail,
     folder = 'inbox',
     subjectTerms = [],
+    priorityRead = false,
   } = {}) {
     const terms = Array.from(
       new Set((Array.isArray(subjectTerms) ? subjectTerms : []).map(normalizeString).filter(Boolean))
@@ -160,9 +171,10 @@ function createMailboxIndexTargetedLookups({
     if (!terms.length) return 0;
 
     let oldestUid = 0;
+    const read = priorityRead && typeof runPriorityRead === 'function' ? runPriorityRead : run;
     for (const term of terms) {
       const normalizedFolder = normalizeFolder(folder);
-      const result = await run(`get-oldest-matching-message-uid:${normalizedFolder}`, (client) =>
+      const result = await read(`get-oldest-matching-message-uid:${normalizedFolder}`, (client) =>
         client
           .from(tableName)
           .select('uid')

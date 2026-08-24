@@ -4736,6 +4736,7 @@ test('campaign mailbox sync combines newest mail with missing historical convers
       },
       listMessageUidsForAccount: async (options) => {
         assert.equal(options.limit, CAMPAIGN_SYNC_UID_SCAN_LIMIT);
+        assert.equal(options.priorityRead, true);
         return [119, 120];
       },
       upsertMessages: async ({ messages }) => {
@@ -4766,6 +4767,7 @@ test('campaign mailbox sync combines newest mail with missing historical convers
     accountEmail: 'serve290@gmail.com',
     folder: 'sent',
     subjectTerms: ['Kleine vraag over jullie website', 'Nieuw webdesign'],
+    priorityRead: true,
   });
   assert.equal(upsertedUids.length, CAMPAIGN_SYNC_FETCH_LIMIT);
   assert.deepEqual(upsertedUids, [118, 117, 90, 89]);

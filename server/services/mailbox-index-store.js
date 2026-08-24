@@ -812,15 +812,17 @@ function createMailboxIndexStore(deps = {}) {
     folder = 'inbox',
     since = '',
     limit = 5000,
+    priorityRead = false,
   } = {}) {
     const normalizedAccount = normalizeEmail(accountEmail);
     if (!normalizedAccount) return [];
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = Math.max(1, Math.min(10_000, Math.floor(Number(limit) || 5000)));
     const rows = [];
+    const read = priorityRead ? runPriorityRead : run;
     for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
       const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
-      const result = await run(
+      const result = await read(
         `list-message-uids-for-account:${normalizedFolder}:${offset}`,
         (client) => {
           let query = client

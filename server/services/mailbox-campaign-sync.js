@@ -450,6 +450,7 @@ function createMailboxSyncService({
               folders: CAMPAIGN_HISTORY_SEED_FOLDERS,
               subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
               limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+              priorityRead: true,
             });
             if (!Array.isArray(indexedCampaignMessages)) {
               const error = new Error('Mailbox-index voor campagnecontacten kon niet worden gelezen.');
@@ -464,6 +465,7 @@ function createMailboxSyncService({
                 incomingFolders: CAMPAIGN_HISTORY_SEED_FOLDERS.filter((seedFolder) => seedFolder !== 'sent'),
                 collectCampaignThreadReferenceIds,
                 collectMissingCampaignThreadReferenceIds,
+                priorityRead: true,
               });
             }
             effectiveCampaignSeedCache.set(cacheKey, indexedCampaignMessages);
@@ -563,6 +565,7 @@ function createMailboxSyncService({
               accountEmail: account.email,
               folder: normalizedFolder,
               subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
+              priorityRead: true,
             })
           : 0;
       let threadReferenceIds = [];
@@ -601,6 +604,7 @@ function createMailboxSyncService({
             folder: normalizedFolder,
             since: CAMPAIGN_HISTORY_SINCE.toISOString(),
             limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+            priorityRead: true,
           })) || [];
         }
         if (typeof mailboxIndexStore.listCampaignSeedMessagesForAccount === 'function') {
@@ -613,6 +617,7 @@ function createMailboxSyncService({
               folders: CAMPAIGN_HISTORY_SEED_FOLDERS,
               subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
               limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+              priorityRead: true,
             });
             if (!Array.isArray(indexedCampaignMessages)) {
               const error = new Error('Mailbox-index voor campagnecontacten kon niet worden gelezen.');
@@ -627,6 +632,7 @@ function createMailboxSyncService({
                 incomingFolders: CAMPAIGN_HISTORY_SEED_FOLDERS.filter((folder) => folder !== 'sent'),
                 collectCampaignThreadReferenceIds,
                 collectMissingCampaignThreadReferenceIds,
+                priorityRead: true,
               });
             }
             cache.set(cacheKey, indexedCampaignMessages);
@@ -656,6 +662,7 @@ function createMailboxSyncService({
               folder: 'inbox',
               subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
               limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+              priorityRead: true,
             })) || [];
           threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
           threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
@@ -669,12 +676,14 @@ function createMailboxSyncService({
               accountEmails: [account.email],
               folder: 'inbox',
               limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+              priorityRead: true,
             })) || [];
           const indexedSentMessages =
             (await mailboxIndexStore.listAllMessagesForAccounts({
               accountEmails: [account.email],
               folder: 'sent',
               limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+              priorityRead: true,
             })) || [];
           if (!indexedUids.length) {
             indexedUids = indexedSentMessages
@@ -701,6 +710,7 @@ function createMailboxSyncService({
               accountEmails: [account.email],
               folder: normalizedFolder,
               limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+              priorityRead: true,
             })) || [];
           indexedUids = indexedMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
         }

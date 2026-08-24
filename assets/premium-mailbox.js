@@ -838,6 +838,7 @@ async function loadMailboxMessages(options = {}) {
 }
 function resetMailboxViewForScopeChange() { mailboxDiscoveryController?.resetForScopeChange?.(); mailboxOwnerView.reset(); }
 function switchCampaignMailboxOwner(value, options = {}) {
+  mailboxDiscoveryController?.resetForScopeChange?.();
   const owner = mailboxOwnerView.switchOwner(value, options); mailboxRefreshController?.scopeChanged?.(); return owner;
 }
 async function applyMailboxAccount(email, options = {}) {

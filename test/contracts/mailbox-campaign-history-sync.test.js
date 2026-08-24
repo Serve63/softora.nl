@@ -82,8 +82,49 @@ test('campaign history seed leest iedere map en onderwerpstroom als eigen begren
     ['sent', ['Kleine vraag']],
     ['sent', ['Nieuw webdesign']],
   ]);
+  assert.equal(calls.every((call) => call.priorityRead === false), true);
   assert.equal(selected.length, 4);
   assert.ok(selected.some((message) => message.id === 'inbox:Nieuw webdesign'));
+
+  calls.length = 0;
+  await lookups.listCampaignSeedMessagesForAccount({
+    accountEmail: 'martijnven123@gmail.com',
+    folders: ['inbox', 'sent'],
+    subjectTerms: ['Kleine vraag', 'Nieuw webdesign'],
+    limit: 4,
+    priorityRead: true,
+  });
+  assert.equal(calls.length, 4);
+  assert.equal(calls.every((call) => call.priorityRead === true), true);
+});
+
+test('campaign history seed begrenst priority-reads tot twee gelijktijdige queries per account', async () => {
+  let activeReads = 0;
+  let maxActiveReads = 0;
+  const lookups = createMailboxIndexTargetedLookups({
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    listMatchingMessagesForAccounts: async (options) => {
+      assert.equal(options.priorityRead, true);
+      activeReads += 1;
+      maxActiveReads = Math.max(maxActiveReads, activeReads);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeReads -= 1;
+      return [];
+    },
+  });
+
+  const selected = await lookups.listCampaignSeedMessagesForAccount({
+    accountEmail: 'martijnven123@gmail.com',
+    folders: ['inbox', 'coldmail', 'allmail', 'sent'],
+    subjectTerms: ['Kleine vraag', 'Nieuw webdesign'],
+    limit: 50,
+    priorityRead: true,
+  });
+
+  assert.deepEqual(selected, []);
+  assert.equal(maxActiveReads, 2);
 });
 
 test('campaign history sync derives sent-recipient searches from normalized indexed messages', () => {
@@ -191,11 +232,14 @@ test('campaign sync expands changed-subject Sent chains before selecting missing
     seedMessages: [root],
     collectCampaignThreadReferenceIds,
     collectMissingCampaignThreadReferenceIds,
+    priorityRead: true,
   });
 
   assert.equal(referenceLookups.length, 2);
   assert.equal(referenceLookups[0].messageIds.includes('<campaign-original@example.test>'), true);
+  assert.equal(referenceLookups.every((lookup) => lookup.priorityRead === true), true);
   assert.deepEqual(exactLookups.map((lookup) => lookup.folder), ['inbox', 'coldmail', 'allmail']);
+  assert.equal(exactLookups.every((lookup) => lookup.priorityRead === true), true);
   assert.equal(exactLookups.every((lookup) => (
     lookup.messageIds.includes('<known-allmail@example.test>') &&
     lookup.messageIds.includes('<missing-inbound@example.test>')
@@ -209,6 +253,35 @@ test('campaign sync expands changed-subject Sent chains before selecting missing
     '<campaign-original@example.test>',
     '<missing-inbound@example.test>',
   ]);
+});
+
+test('campaign sync blijft fail-closed wanneer de Sent-priority-read na retry ontbreekt', async () => {
+  const seed = {
+    id: 'inbox:root',
+    folder: 'inbox',
+    accountEmail: 'serve290@gmail.com',
+    messageId: '<campaign-root@example.test>',
+  };
+
+  await assert.rejects(
+    expandCampaignSyncSeeds({
+      mailboxIndexStore: {
+        listMessagesReferencingMessageIdsForAccounts: async (options) => {
+          assert.equal(options.priorityRead, true);
+          return null;
+        },
+      },
+      accountEmail: seed.accountEmail,
+      seedMessages: [seed],
+      collectCampaignThreadReferenceIds,
+      collectMissingCampaignThreadReferenceIds,
+      priorityRead: true,
+    }),
+    (error) => (
+      error?.status === 503 &&
+      error?.message === 'Gerichte Sent-threadindex kon niet worden gelezen.'
+    )
+  );
 });
 
 test('campaign history sync reserves capacity for newest and older campaign mail', () => {

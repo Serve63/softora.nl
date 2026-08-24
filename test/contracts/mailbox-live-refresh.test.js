@@ -219,13 +219,17 @@ test('mailbox cron waits for sent capacity before starting lower-priority work',
 
 test('incremental IMAP refresh skips expensive history scans but retains exact UID dedupe', async () => {
   const fetches = [];
+  const uidReadOptions = [];
   let historyCalls = 0;
   const selected = account('serve@softora.nl');
   const service = createMailboxSyncService({
     mailboxIndexStore: {
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
       finishSync: async () => ({ ok: true }),
-      listMessageUidsForAccount: async () => [91, 92],
+      listMessageUidsForAccount: async (options) => {
+        uidReadOptions.push(options);
+        return [91, 92];
+      },
       listMatchingMessagesForAccounts: async () => { historyCalls += 1; return []; },
       listAllMessagesForAccounts: async () => { historyCalls += 1; return []; },
       getOldestMatchingMessageUid: async () => { historyCalls += 1; return 0; },
@@ -252,6 +256,7 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
 
   assert.equal(result.ok, true);
   assert.equal(historyCalls, 0);
+  assert.equal(uidReadOptions[0].priorityRead, true);
   assert.deepEqual(fetches[0].indexedUids, [91, 92]);
   assert.equal(fetches[0].campaignHistory, false);
   assert.equal(result.results[0].historyBackfill, false);
@@ -260,28 +265,32 @@ test('incremental IMAP refresh skips expensive history scans but retains exact U
 
 test('incremental campaign refresh carries known contact participants and headers into IMAP search', async () => {
   const fetches = [];
+  const campaignSeedReadOptions = [];
   const selected = account('martijn@softora.nl');
   const service = createMailboxSyncService({
     mailboxIndexStore: {
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
       finishSync: async () => ({ ok: true }),
       listMessageUidsForAccount: async () => [90, 91],
-      listCampaignSeedMessagesForAccount: async () => [{
-        folder: 'inbox',
-        accountEmail: selected.email,
-        email: 'info@praktijkkaroena.nl',
-        subject: 'Re: Nieuw webdesign',
-        messageId: '<karoena-inbound@example.nl>',
-      }, {
-        folder: 'sent',
-        accountEmail: selected.email,
-        email: selected.email,
-        to: 'info@praktijkkaroena.nl',
-        subject: 'Nieuw webdesign',
-        messageId: '<karoena-outbound@example.nl>',
-        inReplyTo: '<karoena-missing@example.nl>',
-        references: '<karoena-inbound@example.nl> <karoena-missing@example.nl>',
-      }],
+      listCampaignSeedMessagesForAccount: async (options) => {
+        campaignSeedReadOptions.push(options);
+        return [{
+          folder: 'inbox',
+          accountEmail: selected.email,
+          email: 'info@praktijkkaroena.nl',
+          subject: 'Re: Nieuw webdesign',
+          messageId: '<karoena-inbound@example.nl>',
+        }, {
+          folder: 'sent',
+          accountEmail: selected.email,
+          email: selected.email,
+          to: 'info@praktijkkaroena.nl',
+          subject: 'Nieuw webdesign',
+          messageId: '<karoena-outbound@example.nl>',
+          inReplyTo: '<karoena-missing@example.nl>',
+          references: '<karoena-inbound@example.nl> <karoena-missing@example.nl>',
+        }];
+      },
       upsertMessages: async () => ({ ok: true, upserted: 0 }),
     },
     assertReadableAccount: () => selected,
@@ -304,6 +313,7 @@ test('incremental campaign refresh carries known contact participants and header
   });
 
   assert.equal(fetches.length, 1);
+  assert.equal(campaignSeedReadOptions[0].priorityRead, true);
   assert.equal(fetches[0].campaignHistory, false);
   assert.deepEqual(fetches[0].threadRecipientTerms, [
     'info@praktijkkaroena.nl',
@@ -313,6 +323,113 @@ test('incremental campaign refresh carries known contact participants and header
     '<karoena-missing@example.nl>',
   ]);
   assert.equal(fetches[0].includeThreadReferenceSearch, true);
+});
+
+test('incremental campaign refresh blijft fail-closed als priority-seeds ontbreken', async () => {
+  const selected = account('serve@softora.nl');
+  const seedReads = [];
+  const finalizerErrors = [];
+  let fetches = 0;
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock' }),
+      finishSync: async (options) => {
+        finalizerErrors.push(options.error);
+        return { ok: true };
+      },
+      listMessageUidsForAccount: async () => [],
+      listCampaignSeedMessagesForAccount: async (options) => {
+        seedReads.push(options);
+        return null;
+      },
+    },
+    assertReadableAccount: () => selected,
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => {
+      fetches += 1;
+      return [];
+    },
+    getSafeLimit: (value) => Number(value) || 50,
+    getAccounts: () => [selected],
+    normalizeEmail: (value) => String(value || '').toLowerCase(),
+    normalizeFolder: (value) => String(value || '').toLowerCase(),
+    logger: { error() {} },
+  });
+
+  const result = await service.syncMailbox({
+    accountEmail: selected.email,
+    folders: ['inbox'],
+    campaignOnly: true,
+    incrementalOnly: true,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(seedReads[0].priorityRead, true);
+  assert.equal(result.results[0].error, 'Mailbox-index voor campagnecontacten kon niet worden gelezen.');
+  assert.deepEqual(finalizerErrors, ['Mailbox-index voor campagnecontacten kon niet worden gelezen.']);
+  assert.equal(fetches, 0);
+});
+
+test('complete campaign sync gebruikt priority-read voor beide veilige legacy fallbacks', async () => {
+  const selected = account('serve@softora.nl');
+  for (const fallback of ['matching', 'all']) {
+    const oldestReads = [];
+    const uidReads = [];
+    const fallbackReads = [];
+    const mailboxIndexStore = {
+      acquireSyncLock: async () => ({ ok: true, lockToken: `lock-${fallback}` }),
+      finishSync: async () => ({ ok: true }),
+      getOldestMatchingMessageUid: async (options) => {
+        oldestReads.push(options);
+        return 17;
+      },
+      listMessageUidsForAccount: async (options) => {
+        uidReads.push(options);
+        return [18, 19];
+      },
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+      ...(fallback === 'matching'
+        ? {
+            listMatchingMessagesForAccounts: async (options) => {
+              fallbackReads.push(options);
+              return [];
+            },
+          }
+        : {
+            listAllMessagesForAccounts: async (options) => {
+              fallbackReads.push(options);
+              return [];
+            },
+          }),
+    };
+    const service = createMailboxSyncService({
+      mailboxIndexStore,
+      assertReadableAccount: () => selected,
+      canUseMailboxIndex: () => true,
+      fetchMessagesFromImap: async () => [],
+      getSafeLimit: (value) => Number(value) || 50,
+      getAccounts: () => [selected],
+      normalizeEmail: (value) => String(value || '').toLowerCase(),
+      normalizeFolder: (value) => String(value || '').toLowerCase(),
+      logger: { error() {} },
+    });
+
+    const result = await service.syncMailboxFolder({
+      accountEmail: selected.email,
+      folder: 'sent',
+      campaignOnly: true,
+      incrementalOnly: false,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(oldestReads[0].priorityRead, true);
+    assert.equal(uidReads[0].priorityRead, true);
+    assert.equal(fallbackReads.every((options) => options.priorityRead === true), true);
+    assert.deepEqual(
+      fallbackReads.map((options) => options.folder),
+      fallback === 'matching' ? ['inbox'] : ['inbox', 'sent']
+    );
+  }
 });
 
 test('incremental campaign refresh bounds participant fallback before IMAP', async () => {

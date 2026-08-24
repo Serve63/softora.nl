@@ -30,6 +30,7 @@ async function expandCampaignSyncSeeds({
   incomingFolders = ['inbox', 'coldmail', 'allmail'],
   collectCampaignThreadReferenceIds,
   collectMissingCampaignThreadReferenceIds,
+  priorityRead = false,
 } = {}) {
   let messages = mergeMessages(seedMessages);
   if (
@@ -61,6 +62,7 @@ async function expandCampaignSyncSeeds({
         accountEmails: [accountEmail],
         folder: 'sent',
         messageIds: references,
+        priorityRead,
       });
       if (!Array.isArray(linkedSent)) {
         const error = new Error('Gerichte Sent-threadindex kon niet worden gelezen.');
@@ -82,6 +84,7 @@ async function expandCampaignSyncSeeds({
       accountEmails: [accountEmail],
       folder,
       messageIds: unresolvedIds,
+      priorityRead,
     })
   ));
   if (indexedIncoming.some((batch) => !Array.isArray(batch))) {
