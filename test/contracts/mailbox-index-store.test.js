@@ -2146,6 +2146,104 @@ test('campaign priority-read omzeilt alleen op verzoek de cooldown en probeert �
   }]);
 });
 
+test('campaign UID-read herstelt na een open circuit en één timeout zonder dedupe te verliezen', async () => {
+  let uidReadCalls = 0;
+  const requestedClientOptions = [];
+  const transientError = new Error('Supabase client timeout na 8000ms');
+  transientError.name = 'AbortError';
+  const client = {
+    from(table) {
+      if (table === 'softora_mailbox_sync_state') {
+        return {
+          select() {
+            return {
+              eq() { return this; },
+              limit() { return this; },
+              maybeSingle() { return new Promise(() => {}); },
+            };
+          },
+        };
+      }
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        is() { return query; },
+        order() { return query; },
+        gte() { return query; },
+        async range() {
+          uidReadCalls += 1;
+          if (uidReadCalls === 1) return { data: null, error: transientError };
+          return { data: [{ uid: 42 }, { uid: 42 }, { uid: 41 }], error: null };
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedClientOptions.push(options || {});
+      return client;
+    },
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: { error() {}, info() {} },
+  });
+
+  assert.equal(await store.getSyncState({ accountEmail: 'serve@softora.nl', folder: 'inbox' }), null);
+  const uids = await store.listMessageUidsForAccount({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    since: '2026-05-01T00:00:00.000Z',
+    limit: 500,
+    priorityRead: true,
+  });
+
+  assert.deepEqual(uids, [42, 41]);
+  assert.equal(uidReadCalls, 2);
+  assert.deepEqual(requestedClientOptions.slice(-2), [{
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }, {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
+});
+
+test('gerichte Sent-priority-read stopt na twee soft failures', async () => {
+  let readCalls = 0;
+  const transientError = new Error('Supabase client timeout na 8000ms');
+  transientError.name = 'AbortError';
+  const query = {
+    select() { return query; },
+    eq() { return query; },
+    or() { return query; },
+    is() { return query; },
+    order() { return query; },
+    async range() {
+      readCalls += 1;
+      return { data: null, error: transientError };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => query }),
+    logger: { error() {}, info() {} },
+  });
+
+  const result = await store.listMessagesReferencingMessageIdsForAccounts({
+    accountEmails: ['serve@softora.nl'],
+    folder: 'sent',
+    messageIds: ['<campaign-root@example.nl>'],
+    priorityRead: true,
+  });
+
+  assert.equal(result, null);
+  assert.equal(readCalls, 2);
+});
+
 test('gerichte campaign-indexreads gebruiken priority-read alleen op expliciet verzoek', async () => {
   const requestedClientOptions = [];
   const emptyResult = { data: [], error: null };
@@ -2154,8 +2252,11 @@ test('gerichte campaign-indexreads gebruiken priority-read alleen op expliciet v
     in() { return query; },
     eq() { return query; },
     is() { return query; },
+    ilike() { return query; },
+    gte() { return query; },
     order() { return query; },
     limit() { return Promise.resolve(emptyResult); },
+    range() { return Promise.resolve(emptyResult); },
     then(resolve, reject) { return Promise.resolve(emptyResult).then(resolve, reject); },
   };
   const store = createMailboxIndexStore({
@@ -2179,13 +2280,30 @@ test('gerichte campaign-indexreads gebruiken priority-read alleen op expliciet v
   await store.listProviderMessages({
     provider: 'instantly', accountEmails: ['serve-sender@example.com'], priorityRead: true,
   });
+  await store.listMessageUidsForAccount({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', limit: 1,
+  });
+  await store.listMessageUidsForAccount({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', limit: 1, priorityRead: true,
+  });
+  await store.getOldestMatchingMessageUid({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', subjectTerms: ['Kleine vraag'],
+  });
+  await store.getOldestMatchingMessageUid({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', subjectTerms: ['Kleine vraag'], priorityRead: true,
+  });
 
   const priorityOptions = {
     timeoutMs: 8000,
     ignoreFailureCooldown: true,
     suppressFailureCooldown: true,
   };
-  assert.deepEqual(requestedClientOptions, [{}, priorityOptions, {}, priorityOptions]);
+  assert.deepEqual(requestedClientOptions, [
+    {}, priorityOptions,
+    {}, priorityOptions,
+    {}, priorityOptions,
+    {}, priorityOptions,
+  ]);
 });
 
 test('sync-lockclaim gebruikt duurzame timeouts, omzeilt cooldown en retryt één soft failure', async () => {
