@@ -27,6 +27,7 @@ const {
   MAILBOX_UID_TARGET_REFERENCE_LIMIT,
   normalizeMailboxGenerationId,
   normalizeMailboxTargetReferences,
+  normalizeMailboxTargetUidManifest,
   normalizeMailboxUidValidity,
 } = require('./mailbox-uid-validity');
 
@@ -112,7 +113,7 @@ function normalizeMailboxSyncPass(fetched) {
   }
   if (targetedSparse) {
     if (
-      !targetReferenceIds.length || targetReferenceIds.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT ||
+      targetReferenceIds.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT ||
       targetUidManifest.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT ||
       targetUidManifest.some((uid, index) => (
         !Number.isSafeInteger(uid) || uid <= 0 || uid > scanUpperUid ||
@@ -184,10 +185,9 @@ function collectAnchoredCampaignThreadReferenceIds(messages = []) {
       byNormalizedReference.set(normalized, reference);
     }
   });
-  return Array.from(byNormalizedReference.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
+  return normalizeMailboxTargetReferences(Array.from(byNormalizedReference.keys()))
     .slice(0, MAILBOX_UID_TARGET_REFERENCE_LIMIT)
-    .map(([, reference]) => reference);
+    .map((normalized) => byNormalizedReference.get(normalized));
 }
 
 function collectAnchoredMissingCampaignThreadReferenceIds(messages = []) {
@@ -471,24 +471,6 @@ function createMailboxSyncService({
             effectiveCampaignSeedCache.set(cacheKey, indexedCampaignMessages);
           }
         }
-        const preflightThreadReferenceIds = incrementalOnly
-          ? collectAnchoredMissingCampaignThreadReferenceIds(indexedCampaignMessages)
-          : collectAnchoredCampaignThreadReferenceIds(indexedCampaignMessages);
-        if (!preflightThreadReferenceIds.length) {
-          return {
-            ok: true,
-            account: account.email,
-            folder: normalizedFolder,
-            synced: 0,
-            upserted: 0,
-            historyBackfill: Boolean(campaignOnly && !incrementalOnly),
-            historyBeforeUid: 0,
-            targetedThreadReferences: 0,
-            targetedThreadRecipients: collectCampaignThreadRecipientTerms(indexedCampaignMessages).length,
-            incrementalOnly: Boolean(incrementalOnly),
-            uidProtocol: MAILBOX_UID_PROTOCOL_V2,
-          };
-        }
       }
     }
     let lock = await mailboxIndexStore.acquireSyncLockForProtocol({
@@ -548,6 +530,15 @@ function createMailboxSyncService({
     let syncDeadlineAtMs = 0;
     try {
       if (useUidGenerationV2) assertMailboxSyncV2Store(mailboxIndexStore);
+      if (
+        useUidGenerationV2 && recoverGmailAllMail &&
+        (
+          typeof mailboxIndexStore?.checkpointTargetUidManifest !== 'function' ||
+          typeof mailboxIndexStore?.invalidateTargetUidManifest !== 'function'
+        )
+      ) {
+        throw createMailboxSyncV2UnavailableError();
+      }
       if (useUidGenerationV2) {
         syncDeadlineAtMs = getMailboxSyncLeaseDeadlineAtMs({
           leaseExpiresAt: lock.lockExpiresAt,
@@ -800,6 +791,44 @@ function createMailboxSyncService({
           selectionTargets: recoverGmailAllMail ? selectionTargetReferenceIds : [],
           deadlineAtMs: syncDeadlineAtMs,
         }),
+        ...(recoverGmailAllMail ? {
+          checkpointTargetUidManifest: ({
+            generationId,
+            uidValidity,
+            expectedScannedThroughUid,
+            scannedThroughUid,
+            foundUids,
+            scanComplete,
+          }) => mailboxIndexStore.checkpointTargetUidManifest({
+            accountEmail: account.email,
+            folder: normalizedFolder,
+            lockToken: lock.lockToken,
+            checkpointId: createMailboxSyncMutationId(),
+            generationId,
+            uidValidity,
+            expectedScannedThroughUid,
+            scannedThroughUid,
+            foundUids,
+            scanComplete,
+            deadlineAtMs: syncDeadlineAtMs,
+          }),
+          invalidateTargetUidManifest: ({
+            generationId,
+            uidValidity,
+            expectedStagedCount,
+            missingUids,
+          }) => mailboxIndexStore.invalidateTargetUidManifest({
+            accountEmail: account.email,
+            folder: normalizedFolder,
+            lockToken: lock.lockToken,
+            invalidationId: createMailboxSyncMutationId(),
+            generationId,
+            uidValidity,
+            expectedStagedCount,
+            missingUids,
+            deadlineAtMs: syncDeadlineAtMs,
+          }),
+        } : {}),
         listLegacyUidIdentities: () => mailboxIndexStore.listLegacyUidIdentities({
           accountEmail: account.email,
           folder: normalizedFolder,
@@ -842,6 +871,97 @@ function createMailboxSyncService({
           incrementalOnly: Boolean(incrementalOnly),
           skipped: true,
           reason: 'folder_missing',
+          uidProtocol: MAILBOX_UID_PROTOCOL_V2,
+        };
+      }
+      if (fetched?.manifestCheckpoint && typeof fetched.manifestCheckpoint === 'object') {
+        const checkpoint = fetched.manifestCheckpoint;
+        const generationId = normalizeMailboxGenerationId(checkpoint.generationId);
+        const uidValidity = normalizeMailboxUidValidity(checkpoint.uidValidity);
+        const scanUpperUid = Number(checkpoint.scanUpperUid);
+        const scannedThroughUid = Number(checkpoint.targetManifestScannedThroughUid);
+        const targetUidManifest = normalizeMailboxTargetUidManifest(checkpoint.targetUidManifest);
+        if (
+          !recoverGmailAllMail || !generationId || !uidValidity ||
+          !Number.isSafeInteger(scanUpperUid) || scanUpperUid < 1 ||
+          !Number.isSafeInteger(scannedThroughUid) || scannedThroughUid < 0 ||
+          scannedThroughUid >= scanUpperUid ||
+          !targetUidManifest || targetUidManifest.some((uid) => uid > scannedThroughUid) ||
+          checkpoint.targetManifestComplete !== false || checkpoint.lockReleased !== true ||
+          !Array.isArray(fetched.messages) || fetched.messages.length !== 0 || fetched.syncPass !== null
+        ) {
+          throw createMailboxSyncV2ProtocolError(
+            'Gerichte All Mail-manifestcheckpoint bevat geen geldige duurzame voortgang.'
+          );
+        }
+        return {
+          ok: true,
+          account: account.email,
+          folder: normalizedFolder,
+          synced: 0,
+          upserted: 0,
+          historyBackfill: Boolean(campaignOnly && !incrementalOnly),
+          historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
+          targetedThreadReferences: threadReferenceIds.length,
+          targetedThreadRecipients: threadRecipientTerms.length,
+          incrementalOnly: Boolean(incrementalOnly),
+          uidGeneration: generationId,
+          uidValidity,
+          rebuildPending: true,
+          activated: false,
+          resetDetected: checkpoint.resetDetected === true,
+          manifestCheckpointed: true,
+          manifestCheckpointReplayed: checkpoint.replayed === true,
+          targetManifestScannedThroughUid: scannedThroughUid,
+          targetUidManifestCount: targetUidManifest.length,
+          uidProtocol: MAILBOX_UID_PROTOCOL_V2,
+        };
+      }
+      if (fetched?.manifestInvalidation && typeof fetched.manifestInvalidation === 'object') {
+        const invalidation = fetched.manifestInvalidation;
+        const generationId = normalizeMailboxGenerationId(invalidation.generationId);
+        const uidValidity = normalizeMailboxUidValidity(invalidation.uidValidity);
+        const missingUids = normalizeMailboxTargetUidManifest(invalidation.missingUids);
+        const generationRole = String(invalidation.generationRole || '').trim().toLowerCase();
+        if (
+          !recoverGmailAllMail || !generationId || !uidValidity ||
+          !['pending', 'active'].includes(generationRole) ||
+          !missingUids || !missingUids.length ||
+          missingUids.length !== invalidation.missingUids.length ||
+          invalidation.missingUids.some((uid, index) => Number(uid) !== missingUids[index]) ||
+          invalidation.pendingAbandoned !== (generationRole === 'pending') ||
+          typeof invalidation.activeManifestInvalidated !== 'boolean' ||
+          (generationRole === 'active' && invalidation.activeManifestInvalidated !== true) ||
+          invalidation.lockReleased !== true || typeof invalidation.replayed !== 'boolean' ||
+          !Array.isArray(fetched.messages) || fetched.messages.length !== 0 || fetched.syncPass !== null
+        ) {
+          throw createMailboxSyncV2ProtocolError(
+            'Gerichte All Mail-manifestinvalidatie bevat geen geldig atomisch herstelbewijs.'
+          );
+        }
+        return {
+          ok: true,
+          account: account.email,
+          folder: normalizedFolder,
+          synced: 0,
+          upserted: 0,
+          historyBackfill: Boolean(campaignOnly && !incrementalOnly),
+          historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
+          targetedThreadReferences: threadReferenceIds.length,
+          targetedThreadRecipients: threadRecipientTerms.length,
+          incrementalOnly: Boolean(incrementalOnly),
+          uidGeneration: generationId,
+          uidValidity,
+          rebuildPending: false,
+          rebuildRequired: true,
+          activated: false,
+          resetDetected: invalidation.resetDetected === true,
+          targetManifestInvalidated: true,
+          manifestInvalidationReplayed: invalidation.replayed,
+          invalidatedGenerationRole: generationRole,
+          pendingAbandoned: invalidation.pendingAbandoned,
+          activeManifestInvalidated: invalidation.activeManifestInvalidated,
+          missingManifestUidCount: missingUids.length,
           uidProtocol: MAILBOX_UID_PROTOCOL_V2,
         };
       }
@@ -1006,6 +1126,7 @@ module.exports = {
   INCREMENTAL_LOCK_RETRY_DELAY_MS,
   REGULAR_CRON_LOCK_RETRY_ATTEMPTS,
   MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
+  collectAnchoredCampaignThreadReferenceIds,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   collectMissingCampaignThreadReferenceIds,

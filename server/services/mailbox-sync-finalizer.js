@@ -95,8 +95,6 @@ function createMailboxSyncFinalizer({ runDurableWrite, buildSyncKey, normalizeSt
       !targetReferencesValid || !normalizedTargetUidManifest ||
       (normalizedSelectionPolicy === MAILBOX_UID_SELECTION_POLICY &&
         (normalizedTargetReferenceIds.length || normalizedTargetUidManifest.length)) ||
-      (normalizedSelectionPolicy === MAILBOX_UID_TARGETED_SELECTION_POLICY &&
-        !normalizedTargetReferenceIds.length) ||
       !Number.isSafeInteger(safeScannedFromUid) || !Number.isSafeInteger(safeScannedThroughUid)
     ) {
       return { ok: false, committed: false, error: createMailboxSyncProtocolError('Ongeldige atomische mailbox-syncpass.') };
