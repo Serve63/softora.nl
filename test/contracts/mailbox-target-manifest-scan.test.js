@@ -109,6 +109,7 @@ test('gerichte manifestscan matcht uitsluitend exacte tokens uit de drie toegest
 test('gerichte manifestscan begrenst headerfetch en hervat na de laatste bewezen kandidaat-UID', async () => {
   const candidateUids = Array.from({ length: 75 }, (_value, index) => index + 101);
   const selectedUids = candidateUids.slice(0, MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP);
+  const matchingUid = selectedUids[Math.floor(selectedUids.length / 2)];
   const client = createClient({
     candidateUids,
     messages: selectedUids.map((uid) => ({
@@ -121,19 +122,27 @@ test('gerichte manifestscan begrenst headerfetch en hervat na de laatste bewezen
     client,
     fromUid: 100,
     scanUpperUid: 10_000,
-    targetReferenceIds: ['message-125@example.test'],
+    targetReferenceIds: [`message-${matchingUid}@example.test`],
   });
 
   assert.deepEqual(result, {
-    foundUids: [125],
+    foundUids: [matchingUid],
     scannedThroughUid: selectedUids[selectedUids.length - 1],
     scanComplete: false,
   });
   assert.deepEqual(client.calls.fetch[0].uids, selectedUids);
 });
 
-test('gerichte manifestscan bewaakt de 49/50/51-capgrens zonder UID-gap of overlap', async (t) => {
-  for (const candidateCount of [49, 50, 51]) {
+test('gerichte manifestscan houdt de productieheaderbatch onder de live IMAP-timeoutgrens', () => {
+  assert.equal(MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP, 20);
+});
+
+test('gerichte manifestscan bewaakt de capgrens zonder UID-gap of overlap', async (t) => {
+  for (const candidateCount of [
+    MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP - 1,
+    MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP,
+    MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP + 1,
+  ]) {
     await t.test(`${candidateCount} kandidaten`, async () => {
       const candidateUids = Array.from({ length: candidateCount }, (_value, index) => index + 101);
       const selectedUids = candidateUids.slice(0, MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP);
@@ -165,8 +174,11 @@ test('gerichte manifestscan bewaakt de 49/50/51-capgrens zonder UID-gap of overl
         headers: MAILBOX_TARGET_MANIFEST_HEADERS,
       });
       assert.equal(Object.hasOwn(client.calls.fetch[0].query, 'internalDate'), false);
-      if (candidateCount === 51) {
-        assert.equal(result.scannedThroughUid + 1, candidateUids[50]);
+      if (candidateCount === MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP + 1) {
+        assert.equal(
+          result.scannedThroughUid + 1,
+          candidateUids[MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP]
+        );
       }
     });
   }
