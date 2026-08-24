@@ -9,6 +9,8 @@
     'met hartelijke groeten',
     'hartelijke groet',
     'hartelijke groeten',
+    'muzikale groet',
+    'muzikale groeten',
     'groet',
     'groeten',
     'mvg',

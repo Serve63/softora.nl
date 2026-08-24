@@ -12,6 +12,7 @@ const steps = [
   ['run', 'test:smoke'],
   ['run', 'test:postgres:mailbox-locks'],
   ['run', 'test:postgres:mailbox-uid-protocol-gate'],
+  ['run', 'test:postgres:mailbox-uid-generation-v2'],
   ['run', 'check:secrets'],
 ];
 

@@ -102,6 +102,66 @@ test('mailbox herkent CRLF en non-breaking spaces in een gecombineerde handteken
   assert.deepEqual(parsed.contact.addressLines, ['Dorpsstraat 4', '1234 AB Utrecht', 'Nederland']);
 });
 
+test('mailbox verwijdert een muzikale standaardhandtekening en bewaart uitsluitend het telefoonnummer', () => {
+  const authoredLines = [
+    'Hallo Serve,',
+    '',
+    'Thanks voor je mailtje. Het idee ziet er leuk uit, stuur de online preview maar, ben wel benieuwd.',
+    'Wat zouden alle voordelen zijn tov mijn huidige website?',
+    '',
+    'De huidige website heb ik nooit helemaal afgemaakt. Wel vind ik het belangrijk dat ik zelf alles kan aanpassen,',
+    'onderhouden en de SEO kan regelen zoals nu in Wordpress.',
+  ];
+  const standardSignature = [
+    '',
+    'Muzikale groet,',
+    '',
+    'Niels van Kollenburg',
+    '',
+    'T. 06 - 29 03 73 59',
+    'E. info@nielsvankollenburg.nl',
+    'W. nielsvankollenburg.nl',
+    '',
+    'Klik hier voor meer info',
+  ];
+  const parsed = signature.parseIncoming([...authoredLines, ...standardSignature].join('\n'));
+
+  assert.equal(parsed.matched, true);
+  assert.deepEqual(parsed.bodyLines, authoredLines);
+  assert.deepEqual(parsed.contact, {
+    phone: '06 - 29 03 73 59',
+    phoneHref: 'tel:0629037359',
+    addressLines: [],
+  });
+
+  const html = signature.renderContactCard(parsed.contact);
+  assert.equal((html.match(/class="detail-mail-contact-item"/g) || []).length, 1);
+  assert.match(html, /<dt>Telefoon:<\/dt>/);
+  assert.match(html, /href="tel:0629037359">06 - 29 03 73 59<\/a>/);
+  assert.doesNotMatch(html, /Adres:|Niels van Kollenburg|info@nielsvankollenburg\.nl|nielsvankollenburg\.nl|Klik hier/i);
+});
+
+test('mailbox herkent ook Muzikale groeten als zelfstandige signoff zonder zinnen fout te markeren', () => {
+  const plural = signature.parseIncoming([
+    'Dank voor je bericht.',
+    '',
+    'Muzikale groeten!',
+    'Naam',
+    'T 06 12 34 56 78',
+    'E. naam@example.nl',
+  ].join('\n'));
+  const naturalSentence = signature.parseIncoming('Muzikale groeten zijn een leuke afsluiting.\nDit is inhoudelijke tekst.');
+
+  assert.equal(plural.matched, true);
+  assert.deepEqual(plural.bodyLines, ['Dank voor je bericht.']);
+  assert.equal(plural.contact.phone, '06 12 34 56 78');
+  assert.equal(naturalSentence.matched, false);
+  assert.deepEqual(naturalSentence.bodyLines, [
+    'Muzikale groeten zijn een leuke afsluiting.',
+    'Dit is inhoudelijke tekst.',
+  ]);
+});
+
 test('contactkaart escaped HTML en maakt van een onveilige telefoonwaarde geen link', () => {
   const html = signature.renderContactCard({
     phone: '0612345<img src=x onerror=alert(1)>',
