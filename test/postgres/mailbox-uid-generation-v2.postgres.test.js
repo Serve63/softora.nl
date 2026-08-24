@@ -47,12 +47,6 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260824224810_optimize_mailbox_final_activation_lineage.sql'
   ), 'utf8');
-  const finalActivationLineageOldImpact = finalActivationLineageMigration.match(
-    /\$old\$(  if v_old_account <> '' and v_old_account = v_new_account then[\s\S]*?  end if;)\$old\$/
-  )?.[1];
-  if (!finalActivationLineageOldImpact) {
-    throw new Error('Finale lineage-migratie mist het bevroren rij-impactfragment.');
-  }
   const sendProvenanceFoundation = fs.readFileSync(path.resolve(
     __dirname,
     '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
@@ -1209,7 +1203,28 @@ begin
           end if;
         end if;
 
-${finalActivationLineageOldImpact}
+  if v_old_account <> '' and v_old_account = v_new_account then
+    perform public.softora_refresh_mailbox_campaign_lineage_impacts(
+      v_old_account,
+      v_message_key,
+      array[v_old_message_id, v_new_message_id]
+    );
+  else
+    if v_old_account <> '' then
+      perform public.softora_refresh_mailbox_campaign_lineage_impacts(
+        v_old_account,
+        v_message_key,
+        array[v_old_message_id]
+      );
+    end if;
+    if v_new_account <> '' then
+      perform public.softora_refresh_mailbox_campaign_lineage_impacts(
+        v_new_account,
+        v_message_key,
+        array[v_new_message_id]
+      );
+    end if;
+  end if;
         if tg_op='DELETE' then return old; end if;
         return new;
       end;
