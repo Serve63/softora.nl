@@ -1135,9 +1135,9 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(row.naam || row.contact || row.contactName || row.clientName) || getRowCompany(row);
   }
 
+  const dutchProvinceSuffix =
+    '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
   function cleanPlaceLabel(value) {
-    const dutchProvinceSuffix =
-      '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
     return normalizeString(value)
       .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
       .replace(new RegExp(`\\s*\\(${dutchProvinceSuffix}\\)\\s*$`, 'i'), '')
@@ -1147,12 +1147,13 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/\s+/g, ' ')
       .trim();
   }
-
+  function isDutchProvinceLabel(value) {
+    return new RegExp(`^${dutchProvinceSuffix}$`, 'i').test(normalizeString(value));
+  }
   function looksLikeStreetAddress(value) {
     const text = normalizeString(value).toLowerCase();
     return /\d/.test(text) && /(straat|weg|laan|plein|pad|dijk|hof|kade|markt|singel|steeg|gracht|boulevard|baan|akker|plantsoen|park)\b/.test(text);
   }
-
   function formatKnownPlaceKey(value) {
     return normalizeString(value)
       .split(/\s+/)
@@ -1160,7 +1161,6 @@ function createColdmailCampaignService(deps = {}) {
       .join(' ')
       .replace(/^S Hertogenbosch$/, "'s-Hertogenbosch");
   }
-
   function findKnownPlaceLabel(value) {
     const haystack = normalizePlaceKey(value);
     if (!haystack) return '';
@@ -1169,25 +1169,23 @@ function createColdmailCampaignService(deps = {}) {
       .find((key) => haystack.includes(normalizePlaceKey(key)));
     return placeKey ? formatKnownPlaceKey(placeKey) : '';
   }
-
   function extractPlaceFromAddress(value) {
     const text = normalizeString(value)
       .replace(/\s+/g, ' ')
       .replace(/\s*,\s*/g, ', ')
       .trim();
     if (!text) return '';
-
     const postalMatch = text.match(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b\s+([A-Za-zÀ-ÿ'’.\- ]{2,})$/);
     if (postalMatch) return cleanPlaceLabel(postalMatch[1]);
-
     const parts = text.split(/[,\n;|]/).map(cleanPlaceLabel).filter(Boolean);
     for (let index = parts.length - 1; index >= 0; index -= 1) {
       const candidate = parts[index];
       if (!candidate || looksLikeStreetAddress(candidate)) continue;
       if (/^\d+$/.test(candidate)) continue;
+      const hasEarlierPlace = parts.slice(0, index).some((part) => part && !looksLikeStreetAddress(part) && !/^\d+$/.test(part));
+      if (hasEarlierPlace && isDutchProvinceLabel(candidate)) continue;
       return candidate;
     }
-
     return looksLikeStreetAddress(text) ? findKnownPlaceLabel(text) : cleanPlaceLabel(text);
   }
 
