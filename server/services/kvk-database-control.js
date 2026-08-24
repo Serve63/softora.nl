@@ -253,12 +253,13 @@ function createKvkDatabaseControlService(deps = {}) {
 
       if (worker.queuePending === true) {
         const progressAt = Date.parse(worker.workerProgressAt || '');
-        const progressMissingTooLong = !Number.isFinite(progressAt)
-          && Number.isFinite(requestedAt)
-          && currentTime - requestedAt > workerProgressStaleAfterMs;
-        const progressExpired = Number.isFinite(progressAt)
-          && currentTime - progressAt > workerProgressStaleAfterMs;
-        if (progressMissingTooLong || progressExpired) {
+        const progressReferenceAt = Number.isFinite(progressAt)
+          && (!Number.isFinite(requestedAt) || progressAt >= requestedAt)
+          ? progressAt
+          : requestedAt;
+        const progressExpired = Number.isFinite(progressReferenceAt)
+          && currentTime - progressReferenceAt > workerProgressStaleAfterMs;
+        if (progressExpired) {
           return {
             reason: `${label} is gestopt: te lang geen opgeslagen databasevoortgang.`,
             wasFailure: true,
