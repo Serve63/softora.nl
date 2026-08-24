@@ -33,8 +33,11 @@ test('kvk database shell keeps the premium sidebar around the scraper', () => {
   assert.match(shellSource, /html, body \{ height: 100%; margin: 0; overflow: hidden;/);
   assert.match(shellSource, /\.kvk-database-shell \{ display: flex; height: 100vh; \}/);
   assert.match(shellSource, /<main class="main-content kvk-database-shell__content"/);
+  assert.match(shellSource, /\.kvk-database-shell__content \{[\s\S]*display: flex;[\s\S]*flex-direction: column;/);
+  assert.match(shellSource, /\.kvk-database-shell__frame \{[\s\S]*flex: 1 1 auto;[\s\S]*height: 100%;[\s\S]*min-height: 0;/);
   assert.match(shellSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.match(shellSource, /title="Softora Database Bedrijven Scraper"/);
+  assert.doesNotMatch(shellSource, /settings-module-route-header|data-settings-module-back-host/);
 });
 
 test('shared premium sidebar script also initializes on the clean kvk database route', () => {
@@ -136,7 +139,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260809e/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260824a/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
@@ -389,6 +392,7 @@ test('kvk database shows every Searcher result and only material Controller corr
 
 test('kvk database hides the page scrollbar without disabling scrolling', () => {
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
+  const planningStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-planning.css'), 'utf8');
 
   assert.match(styleSource, /html\{[^}]*scrollbar-width:none;[^}]*-ms-overflow-style:none/);
   assert.match(styleSource, /body\{[^}]*scrollbar-width:none;[^}]*-ms-overflow-style:none/);
@@ -396,6 +400,9 @@ test('kvk database hides the page scrollbar without disabling scrolling', () => 
   assert.match(styleSource, /::\-webkit-scrollbar\{display:none;width:0;height:0\}/);
   assert.doesNotMatch(styleSource, /html\{[^}]*overflow:hidden/);
   assert.doesNotMatch(styleSource, /body\{[^}]*overflow:hidden/);
+  assert.doesNotMatch(planningStyleSource, /html\s*,\s*body\s*\{[^}]*scrollbar-width:\s*thin/);
+  assert.doesNotMatch(planningStyleSource, /(?:html|body)::\-webkit-scrollbar/);
+  assert.match(planningStyleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
 });
 
 test('kvk database page loads its protected live snapshot with an empty embedded bootstrap', () => {
