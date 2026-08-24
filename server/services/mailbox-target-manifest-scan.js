@@ -9,7 +9,10 @@ const {
 } = require('./mailbox-uid-validity');
 
 const MAILBOX_TARGET_MANIFEST_UID_SEARCH_WINDOW = 5_000;
-const MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP = 50;
+// Dense Gmail All Mail windows can take well over the 70-second IMAP deadline
+// when 50 header records are requested at once. Keep enough deadline headroom
+// for the header fetch and the durable checkpoint that follows it.
+const MAILBOX_TARGET_MANIFEST_HEADER_FETCH_CAP = 20;
 const MAILBOX_TARGET_MANIFEST_HEADERS = Object.freeze([
   'Message-ID',
   'In-Reply-To',
