@@ -30,7 +30,7 @@ function createCoordinatorFixture(options = {}) {
     deriveCustomersFromOrders: (orders) => orders.map((order) => ({ id: `order-${order.id}` })),
     mergeCustomersWithResponsible: (customers) => customers,
     customerListsDiffer: (customers) => JSON.stringify(customers) !== JSON.stringify(state.klanten),
-    renderTable() {}, renderPage() {}, setRetryHidden() {},
+    renderTable: options.renderTable || (() => {}), renderPage() {}, setRetryHidden() {},
     setStatusMessage: (...args) => statuses.push(args),
     setCustomerLoadFailure: (hasVisibleCustomers) => {
       state.loadState = 'error';
@@ -151,6 +151,30 @@ test('klantenloader dedupliceert gelijktijdige retries', async () => {
   assert.equal(customerReads, 1);
 });
 
+test('klantenloader toont de laadstatus ook terwijl bootstraprijen zichtbaar zijn', async () => {
+  let releaseCanonicalRead;
+  const renderStates = [];
+  const fixture = createCoordinatorFixture({
+    customers: [{ id: 'bestaand-1' }],
+    fetchCanonicalCustomers: () => new Promise((resolve) => { releaseCanonicalRead = resolve; }),
+    renderTable: () => renderStates.push(fixture.state.loadState),
+    fetchUiState: async (scope) => ({
+      values: scope === 'customers'
+        ? { 'customer-key': JSON.stringify([{ id: 'bestaand-1', databaseStatus: 'klant' }]) }
+        : { 'order-key': '[]' },
+    }),
+  });
+
+  const pending = fixture.coordinator.run();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fixture.state.loadState, 'loading');
+  assert.deepEqual(renderStates, ['loading']);
+  releaseCanonicalRead([{ id: 'bestaand-1' }]);
+  await pending;
+  assert.equal(fixture.state.loadState, 'ready');
+  assert.deepEqual(renderStates, ['loading', 'ready']);
+});
+
 test('klantenloader laat de formele klantentabel winnen van een lege legacy UI-state', async () => {
   const fixture = createCoordinatorFixture({
     fetchCanonicalCustomers: async () => [{ id: 'formeel-1' }, { id: 'formeel-2' }],
@@ -189,5 +213,8 @@ test('klantenpagina heeft retry, single-flight en blokkeert writes zonder volled
   assert.match(source, /if \(!state\.fullCustomerRowsLoaded\)/);
   assert.match(loadSource, /setCustomerLoadFailure\(true\)/);
   assert.match(source, /nodes\.empty\.hidden = !customerLoadState\.shouldShowEmpty/);
+  assert.match(source, /id="customerLoadingOverlay"[\s\S]*Klantgegevens laden…/);
+  assert.match(source, /document\.getElementById\("customerLoadingOverlay"\)\.hidden = !isLoading;/);
+  assert.match(loadSource, /state\.loadState = 'loading';/);
   assert.doesNotMatch(source, /if \(!hadBootstrapCustomers\) \{ const shouldRerender = customerListsDiffer\(\[\]\)/);
 });

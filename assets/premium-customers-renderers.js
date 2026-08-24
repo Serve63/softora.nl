@@ -123,7 +123,7 @@
         appendText(cell, "span", "active-text " + (cellConfig[2] ? "is-yes" : "is-no"), cellConfig[1]);
         row.appendChild(cell);
       });
-      const dateCell = createCell("Betaaldatum", "muted-cell");
+      const dateCell = createCell("Betaaldatum", "muted-cell cell-date");
       dateCell.textContent = helpers.formatDate(customer.datum);
       row.appendChild(dateCell);
       const actionsCell = createCell("Acties", "cell-actions");
