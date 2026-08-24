@@ -224,6 +224,40 @@ test('fresh heartbeats cannot keep control on without persisted progress', async
   assert.match(report.payload.control.automaticStopReason, /geen opgeslagen databasevoortgang/);
 });
 
+test('an explicit restart gets a fresh progress grace period after stale persisted progress', async () => {
+  const { service, setNow } = createInMemoryService({
+    workerStaleAfterMs: 60 * 60_000,
+  });
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'running',
+        workerProgressAt: '2026-07-26T19:00:00.000Z',
+        queuePending: true,
+      },
+    },
+    createJsonResponse()
+  );
+
+  const restarted = createJsonResponse();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    restarted
+  );
+
+  assert.equal(restarted.payload.control.enabled, true);
+  assert.equal(restarted.payload.control.automaticStopReason, '');
+
+  setNow('2026-07-26T21:00:00.001Z');
+  const expired = createJsonResponse();
+  await service.sendGetControlResponse({}, expired);
+
+  assert.equal(expired.payload.control.enabled, false);
+  assert.match(expired.payload.control.automaticStopReason, /geen opgeslagen databasevoortgang/);
+});
+
 test('an explicit worker error immediately and durably switches control off', async () => {
   const { service, getStoredRow } = createInMemoryService();
   await service.sendCommandControlResponse(
