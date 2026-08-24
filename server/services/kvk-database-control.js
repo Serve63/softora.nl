@@ -146,8 +146,12 @@ function createKvkDatabaseControlService(deps = {}) {
       };
     }
     const progressAt = Date.parse(worker.workerProgressAt || '');
-    const progressAgeMs = Number.isFinite(progressAt)
-      ? Math.max(0, now().getTime() - progressAt)
+    const progressReferenceAt = Number.isFinite(progressAt)
+      && (!Number.isFinite(requestedAt) || progressAt >= requestedAt)
+      ? progressAt
+      : requestedAt;
+    const progressAgeMs = Number.isFinite(progressReferenceAt)
+      ? Math.max(0, now().getTime() - progressReferenceAt)
       : 0;
     if (
       worker.queuePending === true &&

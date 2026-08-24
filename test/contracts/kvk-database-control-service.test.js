@@ -249,6 +249,7 @@ test('an explicit restart gets a fresh progress grace period after stale persist
 
   assert.equal(restarted.payload.control.enabled, true);
   assert.equal(restarted.payload.control.automaticStopReason, '');
+  assert.equal(restarted.payload.control.workers.vuller.workerState, 'running');
 
   setNow('2026-07-26T21:00:00.001Z');
   const expired = createJsonResponse();
