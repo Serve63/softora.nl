@@ -89,7 +89,7 @@ if (!databaseUrl) {
     const password = decodeURIComponent(parsedUrl.password || '');
     let command = 'psql';
     let args = [
-      '-v', 'ON_ERROR_STOP=1', '-h', parsedUrl.hostname,
+      '--single-transaction', '-v', 'ON_ERROR_STOP=1', '-h', parsedUrl.hostname,
       '-p', parsedUrl.port || '5432', '-U', username, '-d', databaseName,
     ];
     if (postgresContainerId) {
@@ -99,7 +99,8 @@ if (!databaseUrl) {
       command = 'docker';
       args = [
         'exec', '-i', '-e', `PGPASSWORD=${password}`, postgresContainerId,
-        'psql', '-v', 'ON_ERROR_STOP=1', '-U', username, '-d', databaseName,
+        'psql', '--single-transaction', '-v', 'ON_ERROR_STOP=1',
+        '-U', username, '-d', databaseName,
       ];
     }
     const result = spawnSync(command, args, {
