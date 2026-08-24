@@ -1,5 +1,8 @@
 const DEFAULT_MAILBOX_IMAP_OPERATION_TIMEOUT_MS = 70_000;
 const {
+  scanMailboxTargetUidManifestWindow,
+} = require('./mailbox-target-manifest-scan');
+const {
   MAILBOX_UID_TARGETED_SELECTION_POLICY,
   MAILBOX_UID_TARGET_REFERENCE_LIMIT,
   normalizeMailboxTargetReference,
@@ -46,6 +49,42 @@ function normalizeMailboxUidList(values) {
       .map(Number)
       .filter((uid) => Number.isSafeInteger(uid) && uid > 0)
   )).sort((left, right) => left - right);
+}
+
+function inspectSelectedMailboxUidCoverage({ selectedUids = [], messages = [] } = {}) {
+  if (!Array.isArray(selectedUids) || !Array.isArray(messages)) {
+    return { valid: false, returnedUids: [], missingUids: [] };
+  }
+  const expectedUids = normalizeMailboxUidList(selectedUids);
+  if (
+    expectedUids.length !== selectedUids.length ||
+    selectedUids.some((uid, index) => (
+      typeof uid !== 'number' || uid !== expectedUids[index]
+    ))
+  ) {
+    return { valid: false, returnedUids: [], missingUids: [] };
+  }
+  const expectedUidSet = new Set(expectedUids);
+  const returnedUids = [];
+  const returnedUidSet = new Set();
+  for (const message of messages) {
+    const uid = message && message.uid;
+    if (
+      typeof uid !== 'number' || !Number.isSafeInteger(uid) || uid <= 0 ||
+      !expectedUidSet.has(uid) ||
+      returnedUidSet.has(uid)
+    ) {
+      return { valid: false, returnedUids: [], missingUids: [] };
+    }
+    returnedUidSet.add(uid);
+    returnedUids.push(uid);
+  }
+  returnedUids.sort((left, right) => left - right);
+  return {
+    valid: true,
+    returnedUids,
+    missingUids: expectedUids.filter((uid) => !returnedUidSet.has(uid)),
+  };
 }
 
 function normalizeMailboxMessageId(value) {
@@ -213,6 +252,8 @@ function createMailboxImapFetcher({
     prepareUidGeneration = null,
     listLegacyUidIdentities = null,
     confirmUidBaseline = null,
+    checkpointTargetUidManifest = null,
+    invalidateTargetUidManifest = null,
     returnSyncPass = false,
     ...historySyncOptions
   }) {
@@ -316,31 +357,130 @@ function createMailboxImapFetcher({
                 error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
                 throw error;
               }
-              targetReferenceIds = prepared.mode === 'rebuild'
-                ? prepared.selectionTargets
-                : historySyncOptions.threadReferenceIds;
-              const targetedUids = await resolveMailboxSyncUids({
-                client,
-                limit: MAILBOX_UID_TARGET_REFERENCE_LIMIT + 1,
-                campaignHistory: false,
-                oldestIndexedCampaignUid: 0,
-                ...historySyncOptions,
-                threadReferenceIds: targetReferenceIds,
-                threadRecipientTerms: [],
-                targetedOnly: true,
-                targetedAfterUid: 0,
-                targetedThroughUid: prepared.scanUpperUid,
-                indexedUids: prepared.mode === 'steady' ? historySyncOptions.indexedUids : [],
-                logger,
-                accountEmail: account.email,
-                folder: normalizedFolder,
-              });
-              if (targetedUids.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT) {
+              targetReferenceIds = prepared.selectionTargets;
+              const preparedManifest = normalizeMailboxUidList(prepared.targetUidManifest);
+              const preparedManifestCursor = Number(prepared.targetManifestScannedThroughUid);
+              const emptyManifestNeedsCheckpoint = prepared.mode === 'rebuild' &&
+                prepared.scanUpperUid === 0 && preparedManifestCursor === 0 &&
+                preparedManifest.length === 0 && prepared.targetManifestComplete === false;
+              if (
+                !Array.isArray(prepared.targetUidManifest) ||
+                preparedManifest.length !== prepared.targetUidManifest.length ||
+                preparedManifest.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT ||
+                prepared.targetUidManifest.some((uid, index) => Number(uid) !== preparedManifest[index]) ||
+                preparedManifest.some((uid) => uid > prepared.scanUpperUid) ||
+                !Number.isSafeInteger(preparedManifestCursor) || preparedManifestCursor < 0 ||
+                preparedManifestCursor > prepared.scanUpperUid ||
+                typeof prepared.targetManifestComplete !== 'boolean' ||
+                (!emptyManifestNeedsCheckpoint &&
+                  prepared.targetManifestComplete !== (preparedManifestCursor === prepared.scanUpperUid)) ||
+                preparedManifest.some((uid) => uid > preparedManifestCursor)
+              ) {
+                const error = new Error('Gerichte All Mail-selectie bevat geen geldig duurzaam UID-manifest.');
+                error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                throw error;
+              }
+              targetUidManifest = preparedManifest;
+              if (!prepared.targetManifestComplete) {
+                if (prepared.mode !== 'rebuild' || typeof checkpointTargetUidManifest !== 'function') {
+                  const error = new Error('Gerichte All Mail-rebuild mist de vereiste manifestcheckpoint.');
+                  error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                  throw error;
+                }
+                const manifestWindow = targetReferenceIds.length
+                  ? await scanMailboxTargetUidManifestWindow({
+                      client,
+                      fromUid: preparedManifestCursor + 1,
+                      scanUpperUid: prepared.scanUpperUid,
+                      targetReferenceIds,
+                    })
+                  : {
+                      foundUids: [],
+                      scannedThroughUid: prepared.scanUpperUid,
+                      scanComplete: true,
+                    };
+                const foundUids = normalizeMailboxUidList(manifestWindow?.foundUids);
+                const manifestScannedThroughUid = Number(manifestWindow?.scannedThroughUid);
+                const emptyManifestCompleted = preparedManifestCursor === 0 &&
+                  prepared.scanUpperUid === 0 && manifestScannedThroughUid === 0 &&
+                  manifestWindow?.scanComplete === true && foundUids.length === 0;
+                if (
+                  !Array.isArray(manifestWindow?.foundUids) ||
+                  foundUids.length !== manifestWindow.foundUids.length ||
+                  manifestWindow.foundUids.some((uid, index) => Number(uid) !== foundUids[index]) ||
+                  !Number.isSafeInteger(manifestScannedThroughUid) ||
+                  (manifestScannedThroughUid <= preparedManifestCursor && !emptyManifestCompleted) ||
+                  manifestScannedThroughUid > prepared.scanUpperUid ||
+                  typeof manifestWindow.scanComplete !== 'boolean' ||
+                  manifestWindow.scanComplete !== (manifestScannedThroughUid === prepared.scanUpperUid) ||
+                  foundUids.some((uid) => (
+                    uid <= preparedManifestCursor || uid > manifestScannedThroughUid
+                  ))
+                ) {
+                  const error = new Error('Gerichte All Mail-headerscan gaf een ongeldig UID-window terug.');
+                  error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                  throw error;
+                }
+                const expectedCheckpointManifest = normalizeMailboxUidList([
+                  ...targetUidManifest,
+                  ...foundUids,
+                ]);
+                if (expectedCheckpointManifest.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT) {
+                  const error = new Error('Gerichte All Mail-selectie overschrijdt de veilige manifestlimiet.');
+                  error.code = 'MAILBOX_UID_TARGET_MANIFEST_LIMIT';
+                  throw error;
+                }
+                const checkpoint = await checkpointTargetUidManifest({
+                  generationId: prepared.targetGenerationId,
+                  uidValidity: observedUidValidity,
+                  expectedScannedThroughUid: preparedManifestCursor,
+                  scannedThroughUid: manifestScannedThroughUid,
+                  foundUids,
+                  scanComplete: manifestWindow.scanComplete,
+                });
+                const checkpointManifest = normalizeMailboxUidList(checkpoint?.targetUidManifest);
+                if (
+                  !checkpoint?.ok || checkpoint.checkpointed !== true || checkpoint.lockLost === true ||
+                  Number(checkpoint.targetManifestScannedThroughUid) !== manifestScannedThroughUid ||
+                  checkpoint.targetManifestComplete !== manifestWindow.scanComplete ||
+                  checkpoint.lockReleased !== !manifestWindow.scanComplete ||
+                  !Array.isArray(checkpoint.targetUidManifest) ||
+                  checkpointManifest.length !== expectedCheckpointManifest.length ||
+                  checkpointManifest.some((uid, index) => (
+                    uid !== expectedCheckpointManifest[index] ||
+                    Number(checkpoint.targetUidManifest[index]) !== uid
+                  ))
+                ) {
+                  const error = checkpoint?.error || new Error(
+                    'Gerichte All Mail-manifestcheckpoint gaf een ongeldig antwoord.'
+                  );
+                  if (!error.code) error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                  throw error;
+                }
+                targetUidManifest = checkpointManifest;
+                if (!manifestWindow.scanComplete) {
+                  return {
+                    messages: [],
+                    syncPass: null,
+                    manifestCheckpoint: {
+                      generationId: prepared.targetGenerationId,
+                      uidValidity: observedUidValidity,
+                      resetDetected: prepared.resetDetected === true,
+                      scanUpperUid: prepared.scanUpperUid,
+                      targetManifestScannedThroughUid: manifestScannedThroughUid,
+                      targetUidManifest,
+                      targetManifestComplete: false,
+                      lockReleased: true,
+                      replayed: checkpoint.replayed === true,
+                    },
+                  };
+                }
+              }
+              if (targetUidManifest.length > MAILBOX_UID_TARGET_REFERENCE_LIMIT) {
                 const error = new Error('Gerichte All Mail-selectie overschrijdt de veilige manifestlimiet.');
                 error.code = 'MAILBOX_UID_TARGET_MANIFEST_LIMIT';
                 throw error;
               }
-              targetUidManifest = targetedUids;
               if (prepared.mode === 'rebuild') {
                 const stagedCount = Math.max(0, Number(prepared.scannedThroughUid) || 0);
                 if (stagedCount > targetUidManifest.length) {
@@ -417,7 +557,67 @@ function createMailboxImapFetcher({
                 toClientMessage,
               });
             }
-            if (prepared?.mode === 'rebuild') {
+            if (prepared && targetedOnly && selectedUids.length) {
+              const coverage = inspectSelectedMailboxUidCoverage({ selectedUids, messages });
+              if (!coverage.valid) {
+                const error = new Error(
+                  'Gerichte All Mail-bodyfetch bevat ongeldige, onverwachte of dubbele UID-records.'
+                );
+                error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                throw error;
+              }
+              if (coverage.missingUids.length) {
+                if (typeof invalidateTargetUidManifest !== 'function') {
+                  const error = new Error(
+                    'Gerichte All Mail-bodyfetch mist manifestinvalidatie voor verdwenen UID-records.'
+                  );
+                  error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                  throw error;
+                }
+                const generationRole = prepared.mode === 'steady' ? 'active' : 'pending';
+                const expectedStagedCount = generationRole === 'pending'
+                  ? Number(prepared.scannedThroughUid)
+                  : 0;
+                const invalidation = await invalidateTargetUidManifest({
+                  generationId: prepared.targetGenerationId,
+                  uidValidity: observedUidValidity,
+                  expectedStagedCount,
+                  missingUids: coverage.missingUids,
+                });
+                const shouldInvalidateActive = generationRole === 'active' ||
+                  Boolean(prepared.activeGenerationId);
+                if (
+                  !invalidation?.ok || invalidation.invalidated !== true ||
+                  invalidation.lockLost === true || invalidation.generationRole !== generationRole ||
+                  invalidation.pendingAbandoned !== (generationRole === 'pending') ||
+                  typeof invalidation.activeManifestInvalidated !== 'boolean' ||
+                  invalidation.activeManifestInvalidated !== shouldInvalidateActive ||
+                  invalidation.lockReleased !== true || typeof invalidation.replayed !== 'boolean'
+                ) {
+                  const error = invalidation?.error || new Error(
+                    'Gerichte All Mail-manifestinvalidatie gaf een ongeldig antwoord.'
+                  );
+                  if (!error.code) error.code = 'MAILBOX_UID_GENERATION_PROTOCOL_INVALID';
+                  throw error;
+                }
+                return {
+                  messages: [],
+                  syncPass: null,
+                  manifestInvalidation: {
+                    generationId: prepared.targetGenerationId,
+                    uidValidity: observedUidValidity,
+                    resetDetected: prepared.resetDetected === true,
+                    generationRole,
+                    pendingAbandoned: invalidation.pendingAbandoned,
+                    activeManifestInvalidated: invalidation.activeManifestInvalidated,
+                    lockReleased: true,
+                    replayed: invalidation.replayed,
+                    missingUids: coverage.missingUids,
+                  },
+                };
+              }
+            }
+            if (prepared && (prepared.mode === 'rebuild' || targetedOnly)) {
               messages.sort((left, right) => (Number(left?.uid) || 0) - (Number(right?.uid) || 0));
             }
             return {
@@ -490,6 +690,7 @@ module.exports = {
   createMailboxImapOperationTimeoutError,
   fetchSelectedMailboxMessages,
   getMailboxImapOperationTimeoutMs,
+  inspectSelectedMailboxUidCoverage,
   normalizeMailboxMessageId,
   runMailboxImapOperationWithDeadline,
   selectMailboxUidWindow,

@@ -35,6 +35,14 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260824180221_fix_mailbox_uid_target_binary_order.sql'
   ), 'utf8');
+  const anchorOptimizationMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260824190410_optimize_mailbox_target_anchor_validation.sql'
+  ), 'utf8');
+  const targetManifestCheckpointMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260824193645_checkpoint_mailbox_uid_target_manifest.sql'
+  ), 'utf8');
   const sendProvenanceFoundation = fs.readFileSync(path.resolve(
     __dirname,
     '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
@@ -63,6 +71,7 @@ if (!databaseUrl) {
     provenanceFenceEnd + provenanceFenceEndMarker.length
   );
   const clients = new Set();
+  const martijnCompatibilityGeneration = '4eeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
   async function applyTrackedSql(client, sql) {
     const databaseName = decodeURIComponent(parsedUrl.pathname.slice(1));
@@ -176,7 +185,7 @@ if (!databaseUrl) {
     selectionTargets = []
   ) {
     return (await client.query(`
-      select * from public.softora_prepare_mailbox_uid_generation_v2(
+      select * from public.softora_prepare_mailbox_uid_generation_v3(
         $1,$2,$3::bigint,$4::bigint,$5,$6::jsonb
       )
     `, [
@@ -201,6 +210,114 @@ if (!databaseUrl) {
       JSON.stringify(targetReferenceIds), JSON.stringify(targetUidManifest),
       JSON.stringify(rows), fromUid, throughUid, complete, messageCount, lastUid,
     ])).rows[0];
+  }
+
+  async function checkpointTargetManifest(client, {
+    syncKey, token, checkpointId, generationId, uidValidity,
+    expectedScannedThroughUid, scannedThroughUid, foundUids, scanComplete,
+  }) {
+    return (await client.query(`
+      select * from public.softora_checkpoint_mailbox_uid_target_manifest_v2(
+        $1,$2,$3,$4::uuid,$5::bigint,$6::bigint,$7::bigint,$8::jsonb,$9::boolean
+      )
+    `, [
+      syncKey, token, checkpointId, generationId, uidValidity,
+      expectedScannedThroughUid, scannedThroughUid,
+      JSON.stringify(foundUids), scanComplete,
+    ])).rows[0];
+  }
+
+  async function invalidateTargetManifest(client, {
+    syncKey, token, invalidationId, generationId, uidValidity,
+    expectedStagedCount, missingUids,
+  }) {
+    return (await client.query(`
+      select * from public.softora_invalidate_mailbox_uid_target_manifest_v2(
+        $1,$2,$3,$4::uuid,$5::bigint,$6::integer,$7::jsonb
+      )
+    `, [
+      syncKey, token, invalidationId, generationId, uidValidity,
+      expectedStagedCount, JSON.stringify(missingUids),
+    ])).rows[0];
+  }
+
+  async function rejectsInSavepoint(client, operation, expected) {
+    await client.query('savepoint expected_failure');
+    try {
+      await assert.rejects(operation(), expected);
+    } finally {
+      await client.query('rollback to savepoint expected_failure');
+      await client.query('release savepoint expected_failure');
+    }
+  }
+
+  async function createTargetedAllMailActiveFixture(client, {
+    mutationPrefix,
+    syncKey = 'servecreusen@softora.nl|allmail',
+    accountEmail = 'servecreusen@softora.nl',
+    targetReference = 'legacy-visible@test',
+    uidValidity = 700,
+    scanUpperUid = 4,
+    targetUidManifest = [4],
+  }) {
+    await client.query(`
+      insert into public.softora_mailbox_sync_state(
+        sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+      ) values($1,$2,'allmail','idle',0,0,null)
+    `, [syncKey, accountEmail]);
+    const token = `${mutationPrefix}-lease`;
+    await lease(client, syncKey, token);
+    const prepared = await prepare(
+      client,
+      syncKey,
+      token,
+      uidValidity,
+      scanUpperUid + 1,
+      'targeted-sparse-v2',
+      [targetReference]
+    );
+    const checkpoint = await checkpointTargetManifest(client, {
+      syncKey,
+      token,
+      checkpointId: `${mutationPrefix}-checkpoint`,
+      generationId: prepared.target_generation_id,
+      uidValidity,
+      expectedScannedThroughUid: 0,
+      scannedThroughUid: scanUpperUid,
+      foundUids: targetUidManifest,
+      scanComplete: true,
+    });
+    assert.equal(checkpoint.checkpointed, true);
+    const committed = await commit(client, {
+      syncKey,
+      token,
+      commitId: `${mutationPrefix}-commit`,
+      generationId: prepared.target_generation_id,
+      uidValidity,
+      selectionPolicy: 'targeted-sparse-v2',
+      targetReferenceIds: [targetReference],
+      targetUidManifest,
+      rows: targetUidManifest.map((uid) => messageRow(uid, `${mutationPrefix}-${uid}`, {
+        account_email: accountEmail,
+        folder: 'allmail',
+        in_reply_to: targetReference,
+      })),
+      fromUid: 1,
+      throughUid: targetUidManifest.length,
+      complete: true,
+      messageCount: targetUidManifest.length,
+      lastUid: 0,
+    });
+    assert.equal(committed.activated, true);
+    return {
+      accountEmail,
+      generationId: prepared.target_generation_id,
+      scanUpperUid,
+      syncKey,
+      targetReference,
+      targetUidManifest,
+      uidValidity,
+    };
   }
 
   async function skipSync(client, {
@@ -861,21 +978,959 @@ begin
           'legacy:2','legacy-hidden@test',null,'Legacy hidden',now(),false,false,
           '{"source":"imap-sync"}',null);
       update public.softora_mailbox_messages
+      set in_reply_to='martijn-parent@test',
+          references_text='<martijn-chain-a@test>, <martijn-chain-b@test>'
+      where provider_id='martijn-anchor';
+      insert into public.softora_mailbox_messages(
+        message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,
+        references_text,subject,date,unread,starred,payload
+      )
+      select
+        'anchor-perf:' || seed::text,
+        'martijn@softora.nl',
+        'coldmail',
+        10000 + seed,
+        'anchor-perf:' || seed::text,
+        'anchor-perf-' || seed::text || '@test',
+        'anchor-parent-' || seed::text || '@test',
+        '<anchor-chain-' || seed::text || '@test>',
+        'Anchor performance seed',
+        now(),
+        false,
+        false,
+        '{"source":"imap-sync"}'::jsonb
+      from pg_catalog.generate_series(1, 900) as seed;
+      update public.softora_mailbox_messages
       set softora_read_at=clock_timestamp(),reply_dismissed_at=clock_timestamp()
       where provider_id in ('legacy:1','serve-allmail:reply');
       update public.softora_mailbox_messages
       set deleted_at=clock_timestamp() where provider_id='legacy:2';
     `);
+    // The lineage trigger was introduced after the original UID-generation
+    // migration. Keep the local fixture in that historical order so the
+    // earlier provenance backfills cannot create pre-migration lineage rows
+    // whose two cascading keys would violate the immediate shape check.
+    await client.query(`
+      alter table public.softora_mailbox_messages
+        disable trigger softora_refresh_mailbox_message_lineage
+    `);
     await applyTrackedSql(client, sendProvenanceFoundation);
     await applyTrackedSql(client, providerOutcomeMigration);
+    await client.query(`
+      truncate table public.softora_mailbox_campaign_lineage_members,
+        public.softora_mailbox_campaign_lineage_roots
+    `);
     await applyTrackedSql(client, migration);
+    await client.query(`
+      alter table public.softora_mailbox_messages
+        enable trigger softora_refresh_mailbox_message_lineage
+    `);
+    await client.query(`
+      insert into public.softora_mailbox_campaign_lineage_roots(message_key)
+      select message.message_key
+      from public.softora_mailbox_messages as message
+      where public.softora_is_campaign_mailbox_message(
+        message.account_email, message.folder, message.payload
+      )
+      on conflict(message_key) do nothing;
+
+      insert into public.softora_mailbox_campaign_lineage_members(
+        message_key,root_message_key,parent_message_key,lineage_depth
+      )
+      select message.message_key,message.message_key,null,0
+      from public.softora_mailbox_messages as message
+      where public.softora_is_campaign_mailbox_message(
+        message.account_email, message.folder, message.payload
+      )
+      on conflict(message_key) do nothing
+    `);
     await applyTrackedSql(client, sendProvenanceVisibilityFenceMigration);
     await applyTrackedSql(client, perKeyRepairMigration);
     await applyTrackedSql(client, targetOrderRepairMigration);
+    await applyTrackedSql(client, anchorOptimizationMigration);
+    await client.query(
+      "select pg_catalog.set_config('softora.mailbox_uid_generation_v2_transition','1',false)"
+    );
+    await client.query(`
+      with selected_targets as (
+        select public.softora_normalize_mailbox_message_id(message.message_id)
+          as reference_id
+        from public.softora_mailbox_messages as message
+        where message.account_email='martijn@softora.nl'
+          and message.folder='coldmail'
+          and message.provider_id like 'anchor-perf:%'
+        order by message.uid
+        limit 370
+      ), target_set as (
+        select pg_catalog.jsonb_agg(
+          selected.reference_id
+          order by pg_catalog.convert_to(selected.reference_id, 'UTF8')
+        ) as selection_targets
+        from selected_targets as selected
+      )
+      insert into public.softora_mailbox_uid_generations(
+        generation_id,sync_key,account_email,folder,uid_validity,
+        selection_policy,selection_targets,selection_targets_digest,
+        selection_uid_manifest,status,scan_upper_uid,scanned_through_uid,
+        scan_complete,updated_at
+      )
+      select $1::uuid,'martijn@softora.nl|allmail','martijn@softora.nl',
+        'allmail',910,'targeted-sparse-v2',target_set.selection_targets,
+        pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+          target_set.selection_targets::text, 'UTF8'
+        ), 'sha256'), 'hex'),null,'staging',43869,0,false,
+        pg_catalog.clock_timestamp()
+      from target_set;
+    `, [martijnCompatibilityGeneration]);
+    await client.query(`
+      update public.softora_mailbox_sync_state
+      set pending_uid_generation_id=$1::uuid,updated_at=pg_catalog.clock_timestamp()
+      where sync_key='martijn@softora.nl|allmail'
+    `, [martijnCompatibilityGeneration]);
+    await applyTrackedSql(client, targetManifestCheckpointMigration);
   });
 
   test.after(async () => {
     await Promise.all(Array.from(clients, (client) => client.end().catch(() => null)));
+  });
+
+  test('checkpointmigratie hervat Martijns bestaande lege 370-target pending generatie exact', async () => {
+    const client = await connect();
+    const before = (await client.query(`
+      select generation.generation_id,generation.status,generation.uid_validity,
+        generation.scan_upper_uid,generation.scanned_through_uid,
+        generation.selection_manifest_scanned_through_uid,
+        generation.selection_manifest_partial_uids,
+        generation.selection_uid_manifest,
+        pg_catalog.jsonb_array_length(generation.selection_targets)::integer
+          as target_count,
+        state.pending_uid_generation_id
+      from public.softora_mailbox_uid_generations as generation
+      join public.softora_mailbox_sync_state as state using(sync_key)
+      where generation.generation_id=$1::uuid
+    `, [martijnCompatibilityGeneration])).rows[0];
+    assert.deepEqual(before, {
+      generation_id: martijnCompatibilityGeneration,
+      status: 'staging',
+      uid_validity: '910',
+      scan_upper_uid: '43869',
+      scanned_through_uid: '0',
+      selection_manifest_scanned_through_uid: '0',
+      selection_manifest_partial_uids: [],
+      selection_uid_manifest: null,
+      target_count: 370,
+      pending_uid_generation_id: martijnCompatibilityGeneration,
+    });
+
+    await client.query('begin');
+    try {
+      const targets = (await client.query(`
+        select selection_targets
+        from public.softora_mailbox_uid_generations
+        where generation_id=$1::uuid
+      `, [martijnCompatibilityGeneration])).rows[0].selection_targets;
+      await lease(client, 'martijn@softora.nl|allmail', 'compatibility-resume-lease');
+      const resumed = await prepare(
+        client, 'martijn@softora.nl|allmail', 'compatibility-resume-lease',
+        910, 43870, 'targeted-sparse-v2', targets
+      );
+      assert.equal(resumed.prepared, true);
+      assert.equal(resumed.resumed, true);
+      assert.equal(resumed.mode, 'rebuild');
+      assert.equal(resumed.target_generation_id, martijnCompatibilityGeneration);
+      assert.equal(resumed.scan_upper_uid, '43869');
+      assert.equal(resumed.selection_manifest_scanned_through_uid, '0');
+      assert.deepEqual(resumed.target_uid_manifest, []);
+      assert.equal(resumed.target_manifest_complete, false);
+
+      const resumedFromEmptyCurrentTargets = await prepare(
+        client, 'martijn@softora.nl|allmail', 'compatibility-resume-lease',
+        910, 43870, 'targeted-sparse-v2', []
+      );
+      assert.equal(resumedFromEmptyCurrentTargets.resumed, true);
+      assert.equal(
+        resumedFromEmptyCurrentTargets.target_generation_id,
+        martijnCompatibilityGeneration
+      );
+      assert.deepEqual(
+        resumedFromEmptyCurrentTargets.selection_targets,
+        targets
+      );
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('v2 prepare-wrapper blijft exact de oude 13-koloms returnshape houden', async () => {
+    const client = await connect();
+    await client.query('begin');
+    try {
+      await lease(
+        client,
+        'martijn@softora.nl|allmail',
+        'compatibility-v2-wrapper-lease'
+      );
+      const row = (await client.query(`
+        select * from public.softora_prepare_mailbox_uid_generation_v2(
+          'martijn@softora.nl|allmail',
+          'compatibility-v2-wrapper-lease',910,43870,
+          'targeted-sparse-v2','[]'::jsonb
+        )
+      `)).rows[0];
+      assert.deepEqual(Object.keys(row), [
+        'prepared', 'lock_lost', 'mode', 'reset_detected', 'resumed',
+        'active_generation_id', 'target_generation_id',
+        'current_uid_validity', 'observed_uid_validity', 'scan_upper_uid',
+        'scanned_through_uid', 'lease_expires_at', 'selection_targets',
+      ]);
+      assert.equal(row.prepared, true);
+      assert.equal(row.target_generation_id, martijnCompatibilityGeneration);
+      assert.equal(row.selection_targets.length, 370);
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('oude v2-runtime kan een seeded steady-delta volledig SEARCHen en committen', async () => {
+    const client = await connect();
+    const syncKey = 'servecreusen@softora.nl|allmail';
+    const accountEmail = 'servecreusen@softora.nl';
+    const targetReference = 'legacy-visible@test';
+    const token = 'compatibility-v2-seeded-delta-lease';
+    await client.query('begin');
+    try {
+      await client.query(`
+        insert into public.softora_mailbox_sync_state(
+          sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+        ) values($1,$2,'allmail','idle',0,0,null)
+      `, [syncKey, accountEmail]);
+      await lease(client, syncKey, 'compatibility-v3-active-seed-lease');
+      const initialPrepared = await prepare(
+        client,
+        syncKey,
+        'compatibility-v3-active-seed-lease',
+        700,
+        5,
+        'targeted-sparse-v2',
+        [targetReference]
+      );
+      const initialCheckpoint = await checkpointTargetManifest(client, {
+        syncKey,
+        token: 'compatibility-v3-active-seed-lease',
+        checkpointId: 'compatibility-v3-active-seed-checkpoint',
+        generationId: initialPrepared.target_generation_id,
+        uidValidity: 700,
+        expectedScannedThroughUid: 0,
+        scannedThroughUid: 4,
+        foundUids: [4],
+        scanComplete: true,
+      });
+      assert.equal(initialCheckpoint.checkpointed, true);
+      const initialCommit = await commit(client, {
+        syncKey,
+        token: 'compatibility-v3-active-seed-lease',
+        commitId: 'compatibility-v3-active-seed-commit',
+        generationId: initialPrepared.target_generation_id,
+        uidValidity: 700,
+        selectionPolicy: 'targeted-sparse-v2',
+        targetReferenceIds: [targetReference],
+        targetUidManifest: [4],
+        rows: [messageRow(4, 'compatibility-v3-active-seed', {
+          account_email: accountEmail,
+          folder: 'allmail',
+          in_reply_to: targetReference,
+        })],
+        fromUid: 1,
+        throughUid: 1,
+        complete: true,
+        messageCount: 1,
+        lastUid: 0,
+      });
+      assert.equal(initialCommit.activated, true);
+
+      const active = (await client.query(`
+        select state.uid_validity,generation.scan_upper_uid,
+          generation.selection_targets,generation.selection_uid_manifest
+        from public.softora_mailbox_sync_state as state
+        join public.softora_mailbox_uid_generations as generation
+          on generation.generation_id=state.active_uid_generation_id
+        where state.sync_key=$1 and generation.status='active'
+          and generation.selection_policy='targeted-sparse-v2'
+      `, [syncKey])).rows[0];
+      assert.ok(active);
+      assert.ok(active.selection_targets.length > 0);
+      assert.ok(active.selection_uid_manifest.length > 0);
+      const uidValidity = Number(active.uid_validity);
+      const newScanUpperUid = Number(active.scan_upper_uid) + 2;
+      const targetUidManifest = [
+        ...active.selection_uid_manifest.map(Number),
+        newScanUpperUid,
+      ];
+
+      await lease(client, syncKey, token);
+      const prepared = (await client.query(`
+        select * from public.softora_prepare_mailbox_uid_generation_v2(
+          $1,$2,$3::bigint,$4::bigint,'targeted-sparse-v2',$5::jsonb
+        )
+      `, [
+        syncKey, token, uidValidity, newScanUpperUid + 1,
+        JSON.stringify(active.selection_targets),
+      ])).rows[0];
+      assert.equal(prepared.prepared, true);
+      assert.equal(prepared.mode, 'rebuild');
+      assert.deepEqual(prepared.selection_targets, active.selection_targets);
+
+      const pending = (await client.query(`
+        select selection_manifest_scanned_through_uid,
+          selection_manifest_partial_uids,selection_uid_manifest,
+          scanned_through_uid,scan_upper_uid
+        from public.softora_mailbox_uid_generations
+        where generation_id=$1::uuid
+      `, [prepared.target_generation_id])).rows[0];
+      assert.deepEqual(pending, {
+        selection_manifest_scanned_through_uid: '0',
+        selection_manifest_partial_uids: [],
+        selection_uid_manifest: null,
+        scanned_through_uid: '0',
+        scan_upper_uid: String(newScanUpperUid),
+      });
+
+      const committed = await commit(client, {
+        syncKey,
+        token,
+        commitId: 'compatibility-v2-seeded-delta-commit',
+        generationId: prepared.target_generation_id,
+        uidValidity,
+        selectionPolicy: 'targeted-sparse-v2',
+        targetReferenceIds: active.selection_targets,
+        targetUidManifest,
+        rows: targetUidManifest.map((uid) => messageRow(
+          uid,
+          `compatibility-v2-seeded-delta-${uid}`,
+          {
+            account_email: accountEmail,
+            folder: 'allmail',
+            in_reply_to: targetReference,
+          }
+        )),
+        fromUid: 1,
+        throughUid: targetUidManifest.length,
+        complete: true,
+        messageCount: targetUidManifest.length,
+        lastUid: 0,
+      });
+      assert.equal(committed.committed, true);
+      assert.equal(committed.activated, true);
+      assert.deepEqual((await client.query(`
+        select selection_manifest_scanned_through_uid,
+          selection_manifest_partial_uids,selection_uid_manifest,scan_complete
+        from public.softora_mailbox_uid_generations
+        where generation_id=$1::uuid
+      `, [prepared.target_generation_id])).rows[0], {
+        selection_manifest_scanned_through_uid: String(newScanUpperUid),
+        selection_manifest_partial_uids: targetUidManifest,
+        selection_uid_manifest: targetUidManifest,
+        scan_complete: true,
+      });
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('pending expunge na partial staging is fenced, idempotent en bewaart active zichtbaarheid', async () => {
+    const client = await connect();
+    await client.query('begin');
+    try {
+      const fixture = await createTargetedAllMailActiveFixture(client, {
+        mutationPrefix: 'pending-expunge-active',
+      });
+      const token = 'pending-expunge-rebuild-lease';
+      await lease(client, fixture.syncKey, token);
+      const prepared = await prepare(
+        client,
+        fixture.syncKey,
+        token,
+        fixture.uidValidity,
+        9,
+        'targeted-sparse-v2',
+        [fixture.targetReference]
+      );
+      assert.equal(prepared.mode, 'rebuild');
+      assert.equal(prepared.selection_manifest_scanned_through_uid, '4');
+      assert.deepEqual(prepared.target_uid_manifest, [4]);
+      const checkpoint = await checkpointTargetManifest(client, {
+        syncKey: fixture.syncKey,
+        token,
+        checkpointId: 'pending-expunge-final-checkpoint',
+        generationId: prepared.target_generation_id,
+        uidValidity: fixture.uidValidity,
+        expectedScannedThroughUid: 4,
+        scannedThroughUid: 8,
+        foundUids: [7],
+        scanComplete: true,
+      });
+      assert.deepEqual(checkpoint.target_uid_manifest, [4, 7]);
+      const staged = await commit(client, {
+        syncKey: fixture.syncKey,
+        token,
+        commitId: 'pending-expunge-partial-commit',
+        generationId: prepared.target_generation_id,
+        uidValidity: fixture.uidValidity,
+        selectionPolicy: 'targeted-sparse-v2',
+        targetReferenceIds: [fixture.targetReference],
+        targetUidManifest: [4, 7],
+        rows: [messageRow(4, 'pending-expunge-partial', {
+          account_email: fixture.accountEmail,
+          folder: 'allmail',
+          in_reply_to: fixture.targetReference,
+        })],
+        fromUid: 1,
+        throughUid: 1,
+        complete: false,
+        messageCount: 1,
+        lastUid: 0,
+      });
+      assert.equal(staged.rebuild_pending, true);
+
+      await lease(client, fixture.syncKey, 'pending-expunge-invalidation-lease');
+      const invalidationInput = {
+        syncKey: fixture.syncKey,
+        token: 'pending-expunge-invalidation-lease',
+        invalidationId: 'pending-expunge-invalidation',
+        generationId: prepared.target_generation_id,
+        uidValidity: fixture.uidValidity,
+        expectedStagedCount: 1,
+        missingUids: [7],
+      };
+      const invalidated = await invalidateTargetManifest(client, invalidationInput);
+      assert.deepEqual(invalidated, {
+        invalidated: true,
+        lock_lost: false,
+        replayed: false,
+        generation_role: 'pending',
+        pending_abandoned: true,
+        active_manifest_invalidated: true,
+        lock_released: true,
+      });
+      assert.deepEqual((await client.query(`
+        select state.status,state.active_uid_generation_id,
+          state.pending_uid_generation_id,generation.status as pending_status,
+          (select count(*)::integer
+           from public.softora_mailbox_uid_generation_staging as staged
+           where staged.generation_id=$2::uuid) as staged_count,
+          (select count(*)::integer
+           from public.softora_mailbox_messages as message
+           where message.uid_generation_id=$3::uuid
+             and message.generation_superseded_at is null
+             and message.deleted_at is null) as active_visible
+        from public.softora_mailbox_sync_state as state
+        join public.softora_mailbox_uid_generations as generation
+          on generation.generation_id=$2::uuid
+        where state.sync_key=$1
+      `, [
+        fixture.syncKey,
+        prepared.target_generation_id,
+        fixture.generationId,
+      ])).rows[0], {
+        status: 'idle',
+        active_uid_generation_id: fixture.generationId,
+        pending_uid_generation_id: null,
+        pending_status: 'abandoned',
+        staged_count: 0,
+        active_visible: 1,
+      });
+
+      const replayed = await invalidateTargetManifest(client, invalidationInput);
+      assert.equal(replayed.invalidated, true);
+      assert.equal(replayed.replayed, true);
+      await rejectsInSavepoint(
+        client,
+        () => invalidateTargetManifest(client, {
+          ...invalidationInput,
+          missingUids: [4],
+        }),
+        /MAILBOX_UID_GENERATION_REPLAY_MISMATCH/
+      );
+      const wrongLease = await invalidateTargetManifest(client, {
+        ...invalidationInput,
+        token: 'wrong-pending-expunge-lease',
+        invalidationId: 'pending-expunge-wrong-lease',
+      });
+      assert.equal(wrongLease.invalidated, false);
+      assert.equal(wrongLease.lock_lost, true);
+
+      await lease(client, fixture.syncKey, 'pending-expunge-conflict-lease');
+      await rejectsInSavepoint(
+        client,
+        () => invalidateTargetManifest(client, {
+          ...invalidationInput,
+          token: 'pending-expunge-conflict-lease',
+          invalidationId: 'pending-expunge-wrong-generation',
+          generationId: '99999999-9999-4999-8999-999999999999',
+        }),
+        /MAILBOX_UID_TARGET_MANIFEST_INVALIDATION_CONFLICT/
+      );
+      await rejectsInSavepoint(
+        client,
+        () => invalidateTargetManifest(client, {
+          ...invalidationInput,
+          token: 'pending-expunge-conflict-lease',
+          invalidationId: 'pending-expunge-wrong-validity',
+          generationId: fixture.generationId,
+          uidValidity: fixture.uidValidity + 1,
+          expectedStagedCount: 0,
+          missingUids: [4],
+        }),
+        /MAILBOX_UID_TARGET_MANIFEST_INVALIDATION_CONFLICT/
+      );
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('active steady expunge houdt inhoud zichtbaar en forceert een nieuwe frozen generatie', async () => {
+    const client = await connect();
+    await client.query('begin');
+    try {
+      const fixture = await createTargetedAllMailActiveFixture(client, {
+        mutationPrefix: 'active-expunge-seed',
+      });
+      await lease(client, fixture.syncKey, 'active-expunge-invalidation-lease');
+      const invalidationInput = {
+        syncKey: fixture.syncKey,
+        token: 'active-expunge-invalidation-lease',
+        invalidationId: 'active-expunge-invalidation',
+        generationId: fixture.generationId,
+        uidValidity: fixture.uidValidity,
+        expectedStagedCount: 0,
+        missingUids: [4],
+      };
+      const invalidated = await invalidateTargetManifest(client, invalidationInput);
+      assert.deepEqual(invalidated, {
+        invalidated: true,
+        lock_lost: false,
+        replayed: false,
+        generation_role: 'active',
+        pending_abandoned: false,
+        active_manifest_invalidated: true,
+        lock_released: true,
+      });
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_messages
+        where uid_generation_id=$1::uuid
+          and generation_superseded_at is null and deleted_at is null
+      `, [fixture.generationId])).rows[0].count, 1);
+      const replayed = await invalidateTargetManifest(client, invalidationInput);
+      assert.equal(replayed.replayed, true);
+
+      await lease(client, fixture.syncKey, 'active-expunge-rebuild-lease');
+      const rebuilt = await prepare(
+        client,
+        fixture.syncKey,
+        'active-expunge-rebuild-lease',
+        fixture.uidValidity,
+        fixture.scanUpperUid + 1,
+        'targeted-sparse-v2',
+        [fixture.targetReference]
+      );
+      assert.equal(rebuilt.mode, 'rebuild');
+      assert.notEqual(rebuilt.target_generation_id, fixture.generationId);
+      assert.equal(rebuilt.selection_manifest_scanned_through_uid, '0');
+      assert.deepEqual(rebuilt.target_uid_manifest, []);
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('verdwenen anchor na prepare verandert het frozen commitbewijs niet', async () => {
+    const client = await connect();
+    const syncKey = 'servecreusen@softora.nl|allmail';
+    const targetReference = 'legacy-visible@test';
+    await client.query('begin');
+    try {
+      await client.query(`
+        insert into public.softora_mailbox_sync_state(
+          sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+        ) values($1,'servecreusen@softora.nl','allmail','idle',0,0,null)
+      `, [syncKey]);
+      await lease(client, syncKey, 'anchor-disappears-lease');
+      const prepared = await prepare(
+        client,
+        syncKey,
+        'anchor-disappears-lease',
+        700,
+        5,
+        'targeted-sparse-v2',
+        [targetReference]
+      );
+      const checkpoint = await checkpointTargetManifest(client, {
+        syncKey,
+        token: 'anchor-disappears-lease',
+        checkpointId: 'anchor-disappears-checkpoint',
+        generationId: prepared.target_generation_id,
+        uidValidity: 700,
+        expectedScannedThroughUid: 0,
+        scannedThroughUid: 4,
+        foundUids: [4],
+        scanComplete: true,
+      });
+      assert.equal(checkpoint.checkpointed, true);
+      await client.query(`
+        update public.softora_mailbox_messages
+        set deleted_at=pg_catalog.clock_timestamp()
+        where account_email='servecreusen@softora.nl'
+          and provider_id='legacy:1'
+      `);
+      assert.equal((await client.query(`
+        select public.softora_mailbox_target_references_are_anchored(
+          'servecreusen@softora.nl',$1::jsonb
+        ) as anchored
+      `, [JSON.stringify([targetReference])])).rows[0].anchored, false);
+
+      const committed = await commit(client, {
+        syncKey,
+        token: 'anchor-disappears-lease',
+        commitId: 'anchor-disappears-commit',
+        generationId: prepared.target_generation_id,
+        uidValidity: 700,
+        selectionPolicy: 'targeted-sparse-v2',
+        targetReferenceIds: [targetReference],
+        targetUidManifest: [4],
+        rows: [messageRow(4, 'anchor-disappears', {
+          account_email: 'servecreusen@softora.nl',
+          folder: 'allmail',
+          in_reply_to: targetReference,
+        })],
+        fromUid: 1,
+        throughUid: 1,
+        complete: true,
+        messageCount: 1,
+        lastUid: 0,
+      });
+      assert.equal(committed.committed, true);
+      assert.equal(committed.activated, true);
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('targetmanifest checkpoint doorloopt partial, resume, final, replay en drift fail-closed', async () => {
+    const client = await connect();
+    const syncKey = 'serve@softora.nl|allmail';
+    const targetReferenceIds = ['seed-a@test'];
+    await client.query('begin');
+    try {
+      await client.query(`
+        insert into public.softora_mailbox_messages(
+          message_key,account_email,folder,uid,provider_id,message_id,
+          subject,date,unread,starred,payload
+        ) values(
+          'serve-checkpoint-anchor','serve@softora.nl','coldmail',99001,
+          'serve-checkpoint-anchor','seed-b@test','Checkpoint anchor',
+          pg_catalog.clock_timestamp(),false,false,'{"source":"imap-sync"}'::jsonb
+        )
+      `);
+      await lease(client, syncKey, 'checkpoint-partial-lease');
+      const prepared = await prepare(
+        client, syncKey, 'checkpoint-partial-lease', 900, 21,
+        'targeted-sparse-v2', targetReferenceIds
+      );
+      assert.equal(prepared.mode, 'rebuild');
+      assert.equal(prepared.selection_manifest_scanned_through_uid, '0');
+      assert.deepEqual(prepared.target_uid_manifest, []);
+      assert.equal(prepared.target_manifest_complete, false);
+
+      await rejectsInSavepoint(client, () => checkpointTargetManifest(client, {
+        syncKey, token: 'checkpoint-partial-lease', checkpointId: 'checkpoint-unsorted',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 0, scannedThroughUid: 10,
+        foundUids: [7, 3], scanComplete: false,
+      }), /MAILBOX_UID_TARGET_MANIFEST_CHECKPOINT_INVALID/);
+      await rejectsInSavepoint(client, () => checkpointTargetManifest(client, {
+        syncKey, token: 'checkpoint-partial-lease', checkpointId: 'checkpoint-duplicate',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 0, scannedThroughUid: 10,
+        foundUids: [3, 3], scanComplete: false,
+      }), /MAILBOX_UID_TARGET_MANIFEST_CHECKPOINT_INVALID/);
+      await rejectsInSavepoint(client, () => checkpointTargetManifest(client, {
+        syncKey, token: 'checkpoint-partial-lease', checkpointId: 'checkpoint-outside-window',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 0, scannedThroughUid: 10,
+        foundUids: [11], scanComplete: false,
+      }), /MAILBOX_UID_TARGET_MANIFEST_UID_OUT_OF_WINDOW/);
+      await rejectsInSavepoint(client, () => checkpointTargetManifest(client, {
+        syncKey, token: 'checkpoint-partial-lease', checkpointId: 'checkpoint-false-complete',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 0, scannedThroughUid: 10,
+        foundUids: [3], scanComplete: true,
+      }), /MAILBOX_UID_TARGET_MANIFEST_CHECKPOINT_CONFLICT/);
+
+      const partialInput = {
+        syncKey, token: 'checkpoint-partial-lease', checkpointId: 'checkpoint-partial',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 0, scannedThroughUid: 10,
+        foundUids: [3, 7], scanComplete: false,
+      };
+      const partial = await checkpointTargetManifest(client, partialInput);
+      assert.deepEqual(partial, {
+        checkpointed: true,
+        lock_lost: false,
+        replayed: false,
+        scanned_through_uid: '10',
+        target_uid_manifest: [3, 7],
+        scan_complete: false,
+        lock_released: true,
+      });
+      assert.deepEqual((await client.query(`
+        select state.status,state.lock_token,state.pending_uid_generation_id,
+          generation.selection_manifest_scanned_through_uid,
+          generation.selection_manifest_partial_uids,
+          generation.selection_uid_manifest
+        from public.softora_mailbox_sync_state as state
+        join public.softora_mailbox_uid_generations as generation
+          on generation.generation_id=state.pending_uid_generation_id
+        where state.sync_key=$1
+      `, [syncKey])).rows[0], {
+        status: 'idle',
+        lock_token: null,
+        pending_uid_generation_id: prepared.target_generation_id,
+        selection_manifest_scanned_through_uid: '10',
+        selection_manifest_partial_uids: [3, 7],
+        selection_uid_manifest: null,
+      });
+
+      const partialReplay = await checkpointTargetManifest(client, partialInput);
+      assert.equal(partialReplay.checkpointed, true);
+      assert.equal(partialReplay.replayed, true);
+      assert.equal(partialReplay.lock_released, true);
+      await rejectsInSavepoint(client, () => checkpointTargetManifest(client, {
+        ...partialInput, foundUids: [3, 8],
+      }), /MAILBOX_UID_GENERATION_REPLAY_MISMATCH/);
+      await rejectsInSavepoint(client, () => client.query(`
+        update public.softora_mailbox_uid_generations
+        set selection_uid_manifest='[3,7]'::jsonb
+        where generation_id=$1::uuid
+      `, [prepared.target_generation_id]),
+      /MAILBOX_UID_TARGET_MANIFEST_CHECKPOINT_REQUIRED/);
+
+      await lease(client, syncKey, 'checkpoint-final-lease');
+      const resumed = await prepare(
+        client, syncKey, 'checkpoint-final-lease', 900, 21,
+        'targeted-sparse-v2', targetReferenceIds
+      );
+      assert.equal(resumed.resumed, true);
+      assert.equal(resumed.target_generation_id, prepared.target_generation_id);
+      assert.equal(resumed.selection_manifest_scanned_through_uid, '10');
+      assert.deepEqual(resumed.target_uid_manifest, [3, 7]);
+      assert.equal(resumed.target_manifest_complete, false);
+
+      const finalInput = {
+        syncKey, token: 'checkpoint-final-lease', checkpointId: 'checkpoint-final',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 10, scannedThroughUid: 20,
+        foundUids: [12, 18], scanComplete: true,
+      };
+      const final = await checkpointTargetManifest(client, finalInput);
+      assert.deepEqual(final, {
+        checkpointed: true,
+        lock_lost: false,
+        replayed: false,
+        scanned_through_uid: '20',
+        target_uid_manifest: [3, 7, 12, 18],
+        scan_complete: true,
+        lock_released: false,
+      });
+      assert.deepEqual((await client.query(`
+        select state.status,state.lock_token,
+          generation.selection_manifest_scanned_through_uid,
+          generation.selection_manifest_partial_uids,
+          generation.selection_uid_manifest
+        from public.softora_mailbox_sync_state as state
+        join public.softora_mailbox_uid_generations as generation
+          on generation.generation_id=state.pending_uid_generation_id
+        where state.sync_key=$1
+      `, [syncKey])).rows[0], {
+        status: 'syncing',
+        lock_token: 'checkpoint-final-lease',
+        selection_manifest_scanned_through_uid: '20',
+        selection_manifest_partial_uids: [3, 7, 12, 18],
+        selection_uid_manifest: [3, 7, 12, 18],
+      });
+      await rejectsInSavepoint(client, () => checkpointTargetManifest(client, {
+        ...finalInput, checkpointId: 'checkpoint-stale-cursor',
+        expectedScannedThroughUid: 10,
+      }), /MAILBOX_UID_TARGET_MANIFEST_CHECKPOINT_CONFLICT/);
+
+      const activated = await commit(client, {
+        syncKey, token: 'checkpoint-final-lease', commitId: 'checkpoint-activate',
+        generationId: prepared.target_generation_id, uidValidity: 900,
+        selectionPolicy: 'targeted-sparse-v2', targetReferenceIds,
+        targetUidManifest: [3, 7, 12, 18],
+        rows: [3, 7, 12, 18].map((uid) => messageRow(uid, `checkpoint-${uid}`, {
+          account_email: 'serve@softora.nl', folder: 'allmail',
+          in_reply_to: 'seed-a@test',
+        })),
+        fromUid: 1, throughUid: 4, complete: true,
+        messageCount: 4, lastUid: 0,
+      });
+      assert.equal(activated.activated, true);
+      const finalReplay = await checkpointTargetManifest(client, finalInput);
+      assert.equal(finalReplay.replayed, true);
+      assert.deepEqual(finalReplay.target_uid_manifest, [3, 7, 12, 18]);
+
+      await lease(client, syncKey, 'checkpoint-upper-drift-lease');
+      const upperDrift = await prepare(
+        client, syncKey, 'checkpoint-upper-drift-lease', 900, 26,
+        'targeted-sparse-v2', targetReferenceIds
+      );
+      assert.equal(upperDrift.mode, 'rebuild');
+      assert.notEqual(upperDrift.target_generation_id, prepared.target_generation_id);
+      assert.equal(upperDrift.scan_upper_uid, '25');
+      assert.equal(upperDrift.selection_manifest_scanned_through_uid, '20');
+      assert.deepEqual(upperDrift.target_uid_manifest, [3, 7, 12, 18]);
+      assert.equal(upperDrift.target_manifest_complete, false);
+
+      const frozenTargetResume = await prepare(
+        client, syncKey, 'checkpoint-upper-drift-lease', 900, 26,
+        'targeted-sparse-v2', ['seed-b@test']
+      );
+      assert.equal(frozenTargetResume.mode, 'rebuild');
+      assert.equal(frozenTargetResume.resumed, true);
+      assert.equal(frozenTargetResume.target_generation_id, upperDrift.target_generation_id);
+      assert.equal(frozenTargetResume.scan_upper_uid, '25');
+      assert.deepEqual(frozenTargetResume.selection_targets, targetReferenceIds);
+      assert.equal(frozenTargetResume.selection_manifest_scanned_through_uid, '20');
+      assert.deepEqual(frozenTargetResume.target_uid_manifest, [3, 7, 12, 18]);
+
+      const upperFinal = await checkpointTargetManifest(client, {
+        syncKey, token: 'checkpoint-upper-drift-lease',
+        checkpointId: 'checkpoint-upper-final',
+        generationId: upperDrift.target_generation_id, uidValidity: 900,
+        expectedScannedThroughUid: 20, scannedThroughUid: 25,
+        foundUids: [], scanComplete: true,
+      });
+      assert.deepEqual(upperFinal.target_uid_manifest, [3, 7, 12, 18]);
+      assert.equal(upperFinal.scan_complete, true);
+      const upperActivated = await commit(client, {
+        syncKey, token: 'checkpoint-upper-drift-lease',
+        commitId: 'checkpoint-upper-activate',
+        generationId: upperDrift.target_generation_id, uidValidity: 900,
+        selectionPolicy: 'targeted-sparse-v2', targetReferenceIds,
+        targetUidManifest: [3, 7, 12, 18],
+        rows: [3, 7, 12, 18].map((uid) => messageRow(uid, `checkpoint-upper-${uid}`, {
+          account_email: 'serve@softora.nl', folder: 'allmail',
+          in_reply_to: 'seed-a@test',
+        })),
+        fromUid: 1, throughUid: 4, complete: true,
+        messageCount: 4, lastUid: 0,
+      });
+      assert.equal(upperActivated.activated, true);
+
+      await lease(client, syncKey, 'checkpoint-target-drift-lease');
+      const nextTargetGeneration = await prepare(
+        client, syncKey, 'checkpoint-target-drift-lease', 900, 26,
+        'targeted-sparse-v2', ['seed-b@test']
+      );
+      assert.equal(nextTargetGeneration.mode, 'rebuild');
+      assert.notEqual(nextTargetGeneration.target_generation_id, upperDrift.target_generation_id);
+      assert.deepEqual(nextTargetGeneration.selection_targets, ['seed-b@test']);
+      assert.equal(nextTargetGeneration.selection_manifest_scanned_through_uid, '0');
+      assert.deepEqual(nextTargetGeneration.target_uid_manifest, []);
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  test('lege targeted selectie checkpoint en activeert zonder SEARCH- of warninglus', async () => {
+    const client = await connect();
+    const syncKey = 'serve@softora.nl|allmail';
+    await client.query('begin');
+    try {
+      await lease(client, syncKey, 'empty-target-prepare-lease');
+      const prepared = await prepare(
+        client, syncKey, 'empty-target-prepare-lease', 902, 1,
+        'targeted-sparse-v2', []
+      );
+      assert.equal(prepared.mode, 'rebuild');
+      assert.deepEqual(prepared.selection_targets, []);
+      assert.deepEqual(prepared.target_uid_manifest, []);
+      assert.equal(prepared.target_manifest_complete, false);
+
+      const checkpointed = await checkpointTargetManifest(client, {
+        syncKey,
+        token: 'empty-target-prepare-lease',
+        checkpointId: 'empty-target-checkpoint',
+        generationId: prepared.target_generation_id,
+        uidValidity: 902,
+        expectedScannedThroughUid: 0,
+        scannedThroughUid: 0,
+        foundUids: [],
+        scanComplete: true,
+      });
+      assert.equal(checkpointed.checkpointed, true);
+      assert.equal(checkpointed.scan_complete, true);
+      assert.deepEqual(checkpointed.target_uid_manifest, []);
+
+      const activated = await commit(client, {
+        syncKey,
+        token: 'empty-target-prepare-lease',
+        commitId: 'empty-target-activate',
+        generationId: prepared.target_generation_id,
+        uidValidity: 902,
+        selectionPolicy: 'targeted-sparse-v2',
+        targetReferenceIds: [],
+        targetUidManifest: [],
+        rows: [],
+        fromUid: 1,
+        throughUid: 0,
+        complete: true,
+        messageCount: 0,
+        lastUid: 0,
+      });
+      assert.equal(activated.activated, true);
+      assert.equal(activated.rebuild_pending, false);
+      assert.deepEqual((await client.query(`
+        select active_uid_generation_id,pending_uid_generation_id,
+          message_count,status,lock_token
+        from public.softora_mailbox_sync_state where sync_key=$1
+      `, [syncKey])).rows[0], {
+        active_uid_generation_id: prepared.target_generation_id,
+        pending_uid_generation_id: null,
+        message_count: 0,
+        status: 'ok',
+        lock_token: null,
+      });
+
+      await lease(client, syncKey, 'empty-target-steady-lease');
+      const steady = await prepare(
+        client, syncKey, 'empty-target-steady-lease', 902, 1,
+        'targeted-sparse-v2', []
+      );
+      assert.equal(steady.mode, 'steady');
+      assert.equal(steady.target_manifest_complete, true);
+      assert.deepEqual(steady.target_uid_manifest, []);
+      const steadyCommit = await commit(client, {
+        syncKey,
+        token: 'empty-target-steady-lease',
+        commitId: 'empty-target-steady',
+        generationId: steady.target_generation_id,
+        uidValidity: 902,
+        selectionPolicy: 'targeted-sparse-v2',
+        targetReferenceIds: [],
+        targetUidManifest: [],
+        rows: [],
+        fromUid: 0,
+        throughUid: 0,
+        complete: true,
+        messageCount: 0,
+        lastUid: 0,
+      });
+      assert.equal(steadyCommit.activated, false);
+      assert.equal(steadyCommit.rebuild_pending, false);
+    } finally {
+      await client.query('rollback');
+    }
   });
 
   test('per-key reparatie behoudt lineage en stelt alleen de shape-regel uit', async () => {
@@ -1087,6 +2142,72 @@ begin
     `, [syncKey])).rows[0], {
       uid_validity: '911', message_count: 2, status: 'ok', lock_token: null,
     });
+  });
+
+  test('set-based ankervalidatie dekt alle headers en blijft ruim binnen de RPC-grens', async () => {
+    const client = await connect();
+    const semantic = (await client.query(`
+      select
+        public.softora_mailbox_target_references_are_anchored(
+          'martijn@softora.nl', '["martijn-anchor@test"]'::jsonb
+        ) as message_id,
+        public.softora_mailbox_target_references_are_anchored(
+          'martijn@softora.nl', '["martijn-parent@test"]'::jsonb
+        ) as in_reply_to,
+        public.softora_mailbox_target_references_are_anchored(
+          'martijn@softora.nl', '["martijn-chain-a@test","martijn-chain-b@test"]'::jsonb
+        ) as references_text,
+        public.softora_mailbox_target_references_are_anchored(
+          'martijn@softora.nl', '["<martijn-chain-a@test>"]'::jsonb
+        ) as decorated_references_text,
+        public.softora_mailbox_target_references_are_anchored(
+          'martijn@softora.nl', '["missing-anchor@test"]'::jsonb
+        ) as missing,
+        public.softora_mailbox_target_references_are_anchored(
+          'serve@softora.nl', '["martijn-anchor@test"]'::jsonb
+        ) as cross_account,
+        public.softora_mailbox_target_references_are_anchored(
+          'martijn@softora.nl', '{"not":"an-array"}'::jsonb
+        ) as invalid_shape
+    `)).rows[0];
+    assert.deepEqual(semantic, {
+      message_id: true,
+      in_reply_to: true,
+      references_text: true,
+      decorated_references_text: true,
+      missing: false,
+      cross_account: false,
+      invalid_shape: false,
+    });
+
+    await client.query("set statement_timeout='3s'");
+    try {
+      const result = (await client.query(`
+        with selected as (
+          select public.softora_normalize_mailbox_message_id(message_id)
+            as reference_id
+          from public.softora_mailbox_messages
+          where account_email='martijn@softora.nl'
+            and folder='coldmail'
+            and provider_id like 'anchor-perf:%'
+          order by uid
+          limit 300
+        ), targets as (
+          select pg_catalog.jsonb_agg(
+            reference_id order by pg_catalog.convert_to(reference_id, 'UTF8')
+          ) as value
+          from selected
+        )
+        select pg_catalog.jsonb_array_length(targets.value)::integer as target_count,
+          public.softora_mailbox_target_references_are_anchored(
+            'martijn@softora.nl', targets.value
+          ) as anchored
+        from targets
+      `)).rows[0];
+      assert.deepEqual(result, { target_count: 300, anchored: true });
+    } finally {
+      await client.query("set statement_timeout='10s'");
+    }
   });
 
   test('All Mail reset accepteert alleen accountgeankerde sparse targets en bewaart state', async () => {
@@ -2407,13 +3528,14 @@ begin
       order by procedure.proname
     `, [[
       'softora_prepare_mailbox_uid_generation_v2',
+      'softora_checkpoint_mailbox_uid_target_manifest_v2',
       'softora_confirm_mailbox_uid_baseline_v2',
       'softora_commit_mailbox_sync_pass_v2',
       'softora_skip_mailbox_sync_v2',
       'softora_fail_mailbox_sync_v2',
       'softora_apply_mailbox_state_mutation',
     ]])).rows;
-    assert.equal(rpcAcl.length, 6);
+    assert.equal(rpcAcl.length, 7);
     assert.ok(rpcAcl.every((row) => (
       !row.prosecdef
       && !row.anon_execute

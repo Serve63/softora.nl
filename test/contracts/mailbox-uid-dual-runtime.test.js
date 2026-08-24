@@ -55,6 +55,29 @@ function createSyncPass(messages = [], overrides = {}) {
   };
 }
 
+function createTargetedPrepared(overrides = {}) {
+  return {
+    ok: true,
+    prepared: true,
+    mode: 'rebuild',
+    resetDetected: true,
+    resumed: false,
+    activeGenerationId: GENERATION_A,
+    targetGenerationId: GENERATION_B,
+    currentUidValidity: 700,
+    observedUidValidity: 701,
+    scanUpperUid: 6_001,
+    scannedThroughUid: 0,
+    leaseExpiresAt: futureLeaseExpiry(),
+    selectionPolicy: MAILBOX_UID_TARGETED_SELECTION_POLICY,
+    selectionTargets: ['root@example.test'],
+    targetManifestScannedThroughUid: 0,
+    targetUidManifest: [],
+    targetManifestComplete: false,
+    ...overrides,
+  };
+}
+
 function createRawSyncService({ store, fetcher, accountEmail = 'serve@softora.nl' }) {
   const selected = {
     email: accountEmail,
@@ -82,6 +105,7 @@ test('echte index-store wiret dual runtime zonder legacy rij-identiteit te wijzi
     'acquireSyncLockForProtocol',
     'getUidGenerationProtocol',
     'prepareUidGeneration',
+    'checkpointTargetUidManifest',
     'confirmUidBaseline',
     'listLegacyUidIdentities',
     'commitSyncPass',
@@ -375,6 +399,8 @@ test('Gmail All Mail volgt claim-v2 wanneer de eerdere preflight nog legacy las'
         calls.push('prepare-v2');
         return { ok: true, prepared: true };
       },
+      checkpointTargetUidManifest: async () => { throw new Error('manifestcheckpoint niet verwacht'); },
+      invalidateTargetUidManifest: async () => { throw new Error('manifestinvalidatie niet verwacht'); },
       confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
       listLegacyUidIdentities: async () => [],
       commitSyncPass: async () => { throw new Error('algemene commit niet verwacht'); },
@@ -567,6 +593,7 @@ test('v2 gebruikt prepare en atomische commit en sluit een mislukking met v2-fai
       calls.push(['prepare', options]);
       return { ok: true, prepared: true };
     },
+    checkpointTargetUidManifest: async () => { throw new Error('manifestcheckpoint niet verwacht'); },
     confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
     listLegacyUidIdentities: async () => [],
     commitSyncPass: async (options) => {
@@ -671,6 +698,7 @@ test('ontbrekende optionele map gebruikt een atomische v2-skip en geen failure',
       lockExpiresAt: futureLeaseExpiry(),
     }),
     prepareUidGeneration: async () => { throw new Error('prepare gebruikt'); },
+    checkpointTargetUidManifest: async () => { throw new Error('manifestcheckpoint gebruikt'); },
     confirmUidBaseline: async () => { throw new Error('baseline gebruikt'); },
     listLegacyUidIdentities: async () => { throw new Error('legacy-identiteiten gebruikt'); },
     commitSyncPass: async () => { throw new Error('commit gebruikt'); },
@@ -709,6 +737,7 @@ test('v2 commit houdt gelijke UIDs bij Servé en Martijn in afzonderlijke accoun
         lockExpiresAt: futureLeaseExpiry(),
       }),
       prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+      checkpointTargetUidManifest: async () => { throw new Error('manifestcheckpoint gebruikt'); },
       confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
       listLegacyUidIdentities: async () => [],
       commitSyncPass: async (options) => {
@@ -910,6 +939,8 @@ test('gerichte Gmail All Mail-selectie is uitsluitend onder protocol v2 actief',
     listMessageUidsForAccount: async () => [],
     listCampaignSeedMessagesForAccount: async () => seedMessages,
     prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+    checkpointTargetUidManifest: async () => { throw new Error('manifestcheckpoint niet verwacht'); },
+    invalidateTargetUidManifest: async () => { throw new Error('manifestinvalidatie niet verwacht'); },
     confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
     listLegacyUidIdentities: async () => [],
     commitSyncPass: async () => { throw new Error('algemene commit niet verwacht'); },
@@ -976,6 +1007,220 @@ test('gerichte Gmail All Mail-selectie is uitsluitend onder protocol v2 actief',
     incrementalOnly: true,
   });
   assert.equal(Object.hasOwn(legacyFetchOptions[0], 'targetedOnly'), false);
+});
+
+test('gerichte All Mail-rebuild checkpoint UID-windows duurzaam en gebruikt daarna het bevroren manifest', async () => {
+  const checkpointCalls = [];
+  const selectedWindows = [];
+  let prepareCall = 0;
+  const headersByUid = new Map([
+    [100, 'Message-ID: <ROOT@example.test>\r\n'],
+    [2_500, 'Message-ID: <other@example.test>\r\n'],
+    [5_500, 'In-Reply-To: <other@example.test>\r\n'],
+    [6_001, 'References: <other@example.test>\r\n <root@example.test>\r\n'],
+  ]);
+  const fetcher = createMailboxImapFetcher({
+    buildMailboxBodyImages: () => [],
+    createClient: () => ({
+      mailbox: { uidValidity: 701n, uidNext: 6_002 },
+      usable: true,
+      async connect() {},
+      async getMailboxLock() { return { release() {} }; },
+      async search(query) {
+        if (query.uid === '1:5000') return [100, 2_500];
+        if (query.uid === '5001:6001') return [5_500, 6_001];
+        throw new Error(`onverwachte SEARCH ${query.uid}`);
+      },
+      async *fetch(uids) {
+        for (const uid of uids) yield {
+          uid,
+          internalDate: new Date('2026-08-24T12:00:00.000Z'),
+          headers: Buffer.from(headersByUid.get(uid)),
+        };
+      },
+      async logout() { this.usable = false; },
+    }),
+    fetchSelectedMessages: async ({ selectedUids }) => {
+      selectedWindows.push([...selectedUids]);
+      return selectedUids.map((uid) => ({ uid, id: `allmail:${uid}` }));
+    },
+    getSafeLimit: () => 8,
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    parseMailSource: async () => ({}),
+    resolveMailboxName: async () => '[Gmail]/All Mail',
+    resolveMailboxSyncUids: async () => { throw new Error('legacy targeted SEARCH gebruikt'); },
+    runWithDeadline: async ({ operation }) => operation(),
+    sanitizeMailboxDisplayText: (value) => value,
+    toClientMessage: (value) => value,
+  });
+  const run = () => fetcher({
+    account: { email: 'martijnven123@gmail.com' },
+    folder: CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
+    targetedOnly: true,
+    prepareUidGeneration: async () => {
+      prepareCall += 1;
+      return createTargetedPrepared(prepareCall === 1 ? {} : {
+        resumed: true,
+        targetManifestScannedThroughUid: 5_000,
+        targetUidManifest: [100],
+      });
+    },
+    checkpointTargetUidManifest: async (options) => {
+      checkpointCalls.push(options);
+      const complete = options.scannedThroughUid === 6_001;
+      return {
+        ok: true, checkpointed: true, lockLost: false, replayed: false,
+        targetManifestScannedThroughUid: options.scannedThroughUid,
+        targetUidManifest: complete ? [100, 6_001] : [100],
+        targetManifestComplete: complete,
+        lockReleased: !complete,
+      };
+    },
+    returnSyncPass: true,
+  });
+
+  const first = await run();
+  assert.equal(first.manifestCheckpoint.targetManifestScannedThroughUid, 5_000);
+  assert.deepEqual(first.manifestCheckpoint.targetUidManifest, [100]);
+  const second = await run();
+  assert.deepEqual(checkpointCalls.map((call) => [
+    call.expectedScannedThroughUid, call.scannedThroughUid, call.foundUids,
+  ]), [[0, 5_000, [100]], [5_000, 6_001, [6_001]]]);
+  assert.deepEqual(selectedWindows, [[100, 6_001]]);
+  assert.deepEqual(second.messages.map((message) => message.uid), [100, 6_001]);
+  assert.equal(second.syncPass.scanComplete, true);
+});
+
+test('gerichte steady All Mail gebruikt uitsluitend het opgeslagen manifest en nooit legacy SEARCH', async () => {
+  let legacySearches = 0;
+  let selectedUids = [];
+  const client = {
+    mailbox: { uidValidity: 701n, uidNext: 8 }, usable: true,
+    async connect() {}, async getMailboxLock() { return { release() {} }; },
+    async search() { legacySearches += 1; throw new Error('SEARCH niet toegestaan'); },
+    async logout() { this.usable = false; },
+  };
+  const fetcher = createMailboxImapFetcher({
+    buildMailboxBodyImages: () => [], createClient: () => client,
+    fetchSelectedMessages: async (options) => {
+      selectedUids = options.selectedUids;
+      return selectedUids.map((uid) => ({ uid, id: `allmail:${uid}` }));
+    },
+    getSafeLimit: () => 8, normalizeFolder: (value) => String(value).toLowerCase(),
+    normalizeString: String, parseMailSource: async () => ({}),
+    resolveMailboxName: async () => '[Gmail]/All Mail',
+    resolveMailboxSyncUids: async () => { legacySearches += 1; throw new Error('resolver niet toegestaan'); },
+    runWithDeadline: async ({ operation }) => operation(),
+    sanitizeMailboxDisplayText: String, toClientMessage: (value) => value,
+  });
+  const fetched = await fetcher({
+    account: { email: 'martijnven123@gmail.com' }, folder: 'allmail', targetedOnly: true,
+    prepareUidGeneration: async () => createTargetedPrepared({
+      mode: 'steady', resetDetected: false, activeGenerationId: GENERATION_A,
+      targetGenerationId: GENERATION_A, scanUpperUid: 7,
+      targetManifestScannedThroughUid: 7, targetUidManifest: [7], targetManifestComplete: true,
+    }),
+    checkpointTargetUidManifest: async () => { throw new Error('checkpoint niet toegestaan'); },
+    returnSyncPass: true,
+  });
+  assert.equal(legacySearches, 0);
+  assert.deepEqual(selectedUids, [7]);
+  assert.deepEqual(fetched.syncPass.targetUidManifest, [7]);
+});
+
+test('manifestcheckpoint behandelt een verloren response idempotent en timeout fail-closed', async () => {
+  const seeds = [{
+    folder: 'inbox', messageId: '<known@example.test>', email: 'klant@example.test',
+  }, {
+    folder: 'sent', messageId: '<sent@example.test>', inReplyTo: '<missing@example.test>',
+    email: 'martijnven123@gmail.com', to: 'klant@example.test',
+  }];
+  const run = async ({
+    accountEmail = 'martijnven123@gmail.com',
+    timeout = false,
+    malformed = false,
+  } = {}) => {
+    const effects = { commits: 0, failures: 0, checkpoint: null };
+    const store = {
+      getUidGenerationProtocol: async () => ({ ok: true, protocol: 'legacy' }),
+      acquireSyncLockForProtocol: async () => ({
+        ok: true,
+        protocolMode: 'v2',
+        lockToken: `checkpoint-lock:${accountEmail}`,
+        lockExpiresAt: futureLeaseExpiry(),
+      }),
+      listMessageUidsForAccount: async () => [],
+      listCampaignSeedMessagesForAccount: async () => seeds,
+      prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+      checkpointTargetUidManifest: async (options) => {
+        effects.checkpoint = options;
+        if (timeout) {
+          const error = new Error('checkpoint timeout');
+          error.code = 'MAILBOX_IMAP_OPERATION_TIMEOUT';
+          throw error;
+        }
+        return {
+          ok: true, checkpointed: true, replayed: true, lockLost: false,
+          targetManifestScannedThroughUid: 5_000, targetUidManifest: [7],
+          targetManifestComplete: false, lockReleased: true,
+        };
+      },
+      invalidateTargetUidManifest: async () => { throw new Error('manifestinvalidatie niet verwacht'); },
+      confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
+      listLegacyUidIdentities: async () => [], skipSync: async () => ({ ok: true, skipped: true }),
+      commitSyncPass: async () => { effects.commits += 1; },
+      commitTargetedSyncPass: async () => { effects.commits += 1; },
+      failSync: async () => { effects.failures += 1; return { ok: true, applied: true }; },
+    };
+    const service = createRawSyncService({
+      store, accountEmail,
+      fetcher: async (options) => {
+        const checkpoint = await options.checkpointTargetUidManifest({
+          generationId: GENERATION_B, uidValidity: 701, expectedScannedThroughUid: 0,
+          scannedThroughUid: 5_000, foundUids: [7], scanComplete: false,
+        });
+        if (malformed) return { messages: [], syncPass: null, manifestCheckpoint: {} };
+        return {
+          messages: [], syncPass: null,
+          manifestCheckpoint: {
+            generationId: GENERATION_B, uidValidity: 701, resetDetected: true,
+            scanUpperUid: 6_001,
+            targetManifestScannedThroughUid: 5_000, targetUidManifest: [7],
+            targetManifestComplete: false, lockReleased: true, replayed: checkpoint.replayed,
+          },
+        };
+      },
+    });
+    const promise = service.syncMailboxFolder({
+      accountEmail, folder: 'allmail',
+      campaignOnly: true, incrementalOnly: true,
+    });
+    return { effects, promise };
+  };
+
+  const replay = await run();
+  const replayResult = await replay.promise;
+  assert.equal(replayResult.manifestCheckpointReplayed, true);
+  assert.match(replay.effects.checkpoint.checkpointId, /^[0-9a-f-]{36}$/);
+  assert.equal(replay.effects.checkpoint.accountEmail, 'martijnven123@gmail.com');
+  assert.equal(replay.effects.checkpoint.lockToken, 'checkpoint-lock:martijnven123@gmail.com');
+  assert.deepEqual([replay.effects.commits, replay.effects.failures], [0, 0]);
+  const serveReplay = await run({ accountEmail: 'serve290@gmail.com' });
+  await serveReplay.promise;
+  assert.equal(serveReplay.effects.checkpoint.accountEmail, 'serve290@gmail.com');
+  assert.equal(serveReplay.effects.checkpoint.lockToken, 'checkpoint-lock:serve290@gmail.com');
+  assert.notEqual(
+    serveReplay.effects.checkpoint.checkpointId,
+    replay.effects.checkpoint.checkpointId
+  );
+  assert.deepEqual([serveReplay.effects.commits, serveReplay.effects.failures], [0, 0]);
+  const timedOut = await run({ timeout: true });
+  await assert.rejects(timedOut.promise, { code: 'MAILBOX_IMAP_OPERATION_TIMEOUT' });
+  assert.deepEqual([timedOut.effects.commits, timedOut.effects.failures], [0, 1]);
+  const malformed = await run({ malformed: true });
+  await assert.rejects(malformed.promise, { code: 'MAILBOX_SYNC_V2_PROTOCOL_INVALID' });
+  assert.deepEqual([malformed.effects.commits, malformed.effects.failures], [0, 1]);
 });
 
 test('verstreken lease-deadline start geen IMAP-operatie meer', async () => {
