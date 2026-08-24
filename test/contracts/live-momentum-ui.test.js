@@ -53,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260821a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260814b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260824a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260729a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-focus-mode\.js\?v=20260813a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
@@ -331,6 +331,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /function getCurrentPeriodDay\(date = new Date\(\)\)/);
   assert.match(js, /let TODAY = getCurrentPeriodDay\(\);/);
   assert.match(js, /window\.setInterval\(refreshToday, TODAY_REFRESH_MS\);/);
+  assert.match(js, /const statusCells = getStatusCells\(\), headers = grid\.querySelectorAll\('\.habit-day'\);/);
+  assert.match(js, /if \(task === 0\) headers\[index\]\.classList\.toggle\('is-today', day === TODAY\);/);
+  assert.match(js, /TODAY = currentPeriodDay;\s*refreshCellData\(\);\s*updateChart\(\);/);
   assert.doesNotMatch(js, /isMobileToday/);
   assert.match(js, /const missed = tracked && !checked && day > 0 && day <= TODAY;/);
   assert.match(js, /cell\.setAttribute\('aria-disabled', String\(day > TODAY\)\);/);
