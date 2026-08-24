@@ -43,6 +43,16 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260824193645_checkpoint_mailbox_uid_target_manifest.sql'
   ), 'utf8');
+  const finalActivationLineageMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260824224810_optimize_mailbox_final_activation_lineage.sql'
+  ), 'utf8');
+  const finalActivationLineageOldImpact = finalActivationLineageMigration.match(
+    /\$old\$(  if v_old_account <> '' and v_old_account = v_new_account then[\s\S]*?  end if;)\$old\$/
+  )?.[1];
+  if (!finalActivationLineageOldImpact) {
+    throw new Error('Finale lineage-migratie mist het bevroren rij-impactfragment.');
+  }
   const sendProvenanceFoundation = fs.readFileSync(path.resolve(
     __dirname,
     '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
@@ -328,6 +338,54 @@ if (!databaseUrl) {
     `, [syncKey, token, commitId, reason])).rows[0];
   }
 
+  function lineageSnapshotRows(accountEmail, prefix, count) {
+    const rootMessageId = `${prefix}-root@test.softora.nl`;
+    return Array.from({ length: count }, (_, index) => {
+      const uid = index + 1;
+      return messageRow(uid, `${prefix}-${uid}`, {
+        account_email: accountEmail,
+        recipients_text: accountEmail,
+        message_id: uid === 1
+          ? rootMessageId
+          : `${prefix}-child-${uid}@test.softora.nl`,
+        in_reply_to: uid === 1 ? null : rootMessageId,
+      });
+    });
+  }
+
+  async function resetLineageMetrics(client) {
+    await client.query(`
+      update public.softora_mailbox_lineage_test_metrics set call_count=0
+    `);
+  }
+
+  async function lineageMetrics(client) {
+    return Object.fromEntries((await client.query(`
+      select operation,call_count
+      from public.softora_mailbox_lineage_test_metrics order by operation
+    `)).rows.map((row) => [row.operation, row.call_count]));
+  }
+
+  async function activateSnapshot(client, {
+    syncKey, token, commitId, uidValidity, rows,
+  }) {
+    await lease(client, syncKey, token);
+    const prepared = await prepare(
+      client, syncKey, token, uidValidity, rows.length + 1
+    );
+    assert.equal(prepared.prepared, true);
+    assert.equal(prepared.mode, 'rebuild');
+    const committed = await commit(client, {
+      syncKey, token, commitId,
+      generationId: prepared.target_generation_id,
+      uidValidity, rows,
+      fromUid: 1, throughUid: rows.length, complete: true,
+      messageCount: rows.length, lastUid: rows.length,
+    });
+    assert.equal(committed.activated, true);
+    return { committed, prepared };
+  }
+
   test.before(async () => {
     const client = await connect();
     await client.query(`
@@ -410,15 +468,30 @@ if (!databaseUrl) {
         message_key text primary key
           references public.softora_mailbox_messages(message_key)
           on update cascade on delete cascade,
+        account_email text not null,
+        message_id text not null,
         created_at timestamptz not null default clock_timestamp()
+      );
+      create table public.softora_mailbox_message_lineage_edges (
+        child_message_key text not null
+          references public.softora_mailbox_messages(message_key)
+          on update cascade on delete cascade,
+        account_email text not null,
+        child_message_id text,
+        parent_message_id text not null,
+        created_at timestamptz not null default clock_timestamp(),
+        primary key(child_message_key,parent_message_id)
       );
       create table public.softora_mailbox_campaign_lineage_members (
         message_key text primary key
           references public.softora_mailbox_messages(message_key)
           on update cascade on delete cascade,
+        account_email text not null,
+        message_id text,
         root_message_key text not null
           references public.softora_mailbox_messages(message_key)
           on update cascade on delete cascade,
+        root_message_id text not null,
         parent_message_key text
           references public.softora_mailbox_campaign_lineage_members(message_key)
           on update cascade on delete cascade deferrable initially deferred,
@@ -430,6 +503,26 @@ if (!databaseUrl) {
           or (lineage_depth > 0 and parent_message_key is not null)
         )
       );
+      create table public.softora_mailbox_campaign_lineage_discoveries (
+        account_email text not null,
+        message_key text not null
+          references public.softora_mailbox_messages(message_key)
+          on update cascade on delete cascade,
+        root_message_key text not null
+          references public.softora_mailbox_messages(message_key)
+          on update cascade on delete cascade,
+        active boolean not null default true,
+        first_discovered_at timestamptz not null default clock_timestamp(),
+        last_connected_at timestamptz not null default clock_timestamp(),
+        last_disconnected_at timestamptz,
+        primary key(account_email,message_key,root_message_key)
+      );
+      create table public.softora_mailbox_lineage_test_metrics (
+        operation text primary key,
+        call_count integer not null default 0
+      );
+      insert into public.softora_mailbox_lineage_test_metrics(operation)
+      values('impact'),('rebuild');
       create table public.softora_mailbox_message_tombstones (
         account_email text not null,
         normalized_message_id text not null,
@@ -789,9 +882,8 @@ if (!databaseUrl) {
         p_account_email text,p_folder text,p_payload jsonb
       ) returns boolean language sql immutable security invoker set search_path=''
       as $function$
-        select lower(btrim(coalesce(p_account_email,''))) = any(array[
-          'serve@softora.nl','servecreusen@softora.nl','martijn@softora.nl'
-        ]::text[]) and lower(btrim(coalesce(p_folder,''))) in ('inbox','sent','coldmail');
+        select lower(btrim(coalesce(p_account_email,''))) like '%@softora.nl'
+          and lower(btrim(coalesce(p_folder,''))) in ('inbox','sent','coldmail');
       $function$;
       create or replace function public.softora_track_mailbox_campaign_message_change()
       returns trigger
@@ -880,34 +972,249 @@ begin
       after truncate on public.softora_mailbox_messages
       for each statement execute function public.softora_track_mailbox_campaign_message_change();
 
+      create or replace function public.softora_rebuild_mailbox_campaign_lineage(
+        p_account_email text,
+        p_start_keys text[],
+        p_full_rebuild boolean,
+        p_previous_roots jsonb
+      )
+      returns void
+      language plpgsql
+      volatile
+      security invoker
+      set search_path = ''
+      as $function$
+      begin
+        update public.softora_mailbox_lineage_test_metrics
+        set call_count=call_count+1 where operation='rebuild';
+
+        insert into public.softora_mailbox_campaign_lineage_members(
+          message_key,account_email,message_id,root_message_key,root_message_id,
+          parent_message_key,lineage_depth
+        )
+        select root.message_key,root.account_email,root.message_id,
+          root.message_key,root.message_id,null,0
+        from public.softora_mailbox_campaign_lineage_roots as root
+        join public.softora_mailbox_messages as message
+          on message.message_key=root.message_key
+        where root.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+          and message.deleted_at is null
+          and message.generation_superseded_at is null
+          and (
+            p_full_rebuild
+            or root.message_key=any(coalesce(p_start_keys,'{}'::text[]))
+          )
+        on conflict(message_key) do update set
+          account_email=excluded.account_email,
+          message_id=excluded.message_id,
+          root_message_key=excluded.root_message_key,
+          root_message_id=excluded.root_message_id,
+          parent_message_key=null,
+          lineage_depth=0;
+
+        with recursive descendants as (
+          select member.message_key,member.account_email,member.message_id,
+            member.root_message_key,member.root_message_id,
+            member.parent_message_key,member.lineage_depth,
+            array[member.message_key]::text[] as visited
+          from public.softora_mailbox_campaign_lineage_members as member
+          where member.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+            and member.lineage_depth=0
+          union all
+          select child.message_key,child.account_email,
+            public.softora_normalize_mailbox_message_id(child.message_id),
+            descendants.root_message_key,descendants.root_message_id,
+            descendants.message_key,descendants.lineage_depth+1,
+            descendants.visited||child.message_key
+          from descendants
+          join public.softora_mailbox_message_lineage_edges as edge
+            on edge.account_email=descendants.account_email
+            and edge.parent_message_id=descendants.message_id
+          join public.softora_mailbox_messages as child
+            on child.message_key=edge.child_message_key
+            and child.account_email=descendants.account_email
+            and child.deleted_at is null
+            and child.generation_superseded_at is null
+          where not child.message_key=any(descendants.visited)
+            and (
+              p_full_rebuild
+              or child.message_key=any(coalesce(p_start_keys,'{}'::text[]))
+            )
+            and not exists (
+              select 1 from public.softora_mailbox_campaign_lineage_roots as child_root
+              where child_root.message_key=child.message_key
+            )
+        ), resolved as (
+          select distinct on (descendants.message_key)
+            descendants.message_key,descendants.account_email,descendants.message_id,
+            descendants.root_message_key,descendants.root_message_id,
+            descendants.parent_message_key,descendants.lineage_depth
+          from descendants
+          where descendants.lineage_depth>0
+          order by descendants.message_key,descendants.lineage_depth,
+            descendants.root_message_key
+        )
+        insert into public.softora_mailbox_campaign_lineage_members(
+          message_key,account_email,message_id,root_message_key,root_message_id,
+          parent_message_key,lineage_depth
+        )
+        select resolved.message_key,resolved.account_email,resolved.message_id,
+          resolved.root_message_key,resolved.root_message_id,
+          resolved.parent_message_key,resolved.lineage_depth
+        from resolved
+        on conflict(message_key) do update set
+          account_email=excluded.account_email,
+          message_id=excluded.message_id,
+          root_message_key=excluded.root_message_key,
+          root_message_id=excluded.root_message_id,
+          parent_message_key=excluded.parent_message_key,
+          lineage_depth=excluded.lineage_depth;
+
+        insert into public.softora_mailbox_campaign_lineage_discoveries(
+          account_email,message_key,root_message_key,active,
+          first_discovered_at,last_connected_at,last_disconnected_at
+        )
+        select member.account_email,member.message_key,member.root_message_key,true,
+          pg_catalog.clock_timestamp(),pg_catalog.clock_timestamp(),null
+        from public.softora_mailbox_campaign_lineage_members as member
+        where member.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+          and (
+            p_full_rebuild
+            or member.message_key=any(coalesce(p_start_keys,'{}'::text[]))
+          )
+        on conflict(account_email,message_key,root_message_key) do update set
+          active=true,last_connected_at=excluded.last_connected_at,
+          last_disconnected_at=null;
+      end;
+      $function$;
+
+      create or replace function public.softora_refresh_mailbox_campaign_lineage_impacts(
+        p_account_email text,
+        p_message_key text,
+        p_message_ids text[]
+      )
+      returns void
+      language plpgsql
+      volatile
+      security invoker
+      set search_path = ''
+      as $function$
+      declare
+        v_keys text[];
+        v_previous_roots jsonb;
+      begin
+        update public.softora_mailbox_lineage_test_metrics
+        set call_count=call_count+1 where operation='impact';
+
+        with recursive direct_keys as (
+          select p_message_key as message_key
+          union
+          select message.message_key
+          from public.softora_mailbox_messages as message
+          where message.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+            and public.softora_normalize_mailbox_message_id(message.message_id)
+              = any(coalesce(p_message_ids,'{}'::text[]))
+          union
+          select edge.child_message_key
+          from public.softora_mailbox_message_lineage_edges as edge
+          where edge.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+            and edge.parent_message_id=any(coalesce(p_message_ids,'{}'::text[]))
+          union
+          select root.message_key
+          from public.softora_mailbox_campaign_lineage_roots as root
+          where root.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+            and root.message_id=any(coalesce(p_message_ids,'{}'::text[]))
+        ), impacted as (
+          select direct.message_key from direct_keys as direct
+          union
+          select child.message_key
+          from impacted
+          join public.softora_mailbox_campaign_lineage_members as child
+            on child.parent_message_key=impacted.message_key
+        )
+        select coalesce(pg_catalog.array_agg(distinct impacted.message_key),'{}'::text[])
+        into v_keys from impacted;
+
+        select coalesce(pg_catalog.jsonb_object_agg(
+          member.message_key,member.root_message_key
+        ),'{}'::jsonb) into v_previous_roots
+        from public.softora_mailbox_campaign_lineage_members as member
+        where member.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+          and member.message_key=any(v_keys);
+
+        delete from public.softora_mailbox_campaign_lineage_members as member
+        where member.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+          and member.message_key=any(v_keys);
+        perform public.softora_rebuild_mailbox_campaign_lineage(
+          p_account_email,v_keys,false,v_previous_roots
+        );
+        update public.softora_mailbox_campaign_lineage_discoveries as discovery
+        set active=false,last_disconnected_at=pg_catalog.clock_timestamp()
+        where discovery.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+          and discovery.message_key=any(v_keys)
+          and discovery.active
+          and not exists (
+            select 1 from public.softora_mailbox_campaign_lineage_members as member
+            where member.message_key=discovery.message_key
+              and member.root_message_key=discovery.root_message_key
+          );
+      end;
+      $function$;
+
       create or replace function public.softora_refresh_mailbox_message_lineage()
       returns trigger language plpgsql volatile security invoker set search_path=''
       as $function$
+      declare
+        v_message_key text := case when tg_op='DELETE' then old.message_key else new.message_key end;
+        v_old_account text := case when tg_op='INSERT' then '' else
+          pg_catalog.lower(pg_catalog.btrim(coalesce(old.account_email,''))) end;
+        v_new_account text := case when tg_op='DELETE' then '' else
+          pg_catalog.lower(pg_catalog.btrim(coalesce(new.account_email,''))) end;
+        v_old_message_id text := case when tg_op='INSERT' then null else
+          public.softora_normalize_mailbox_message_id(old.message_id) end;
+        v_new_message_id text := case when tg_op='DELETE' then null else
+          public.softora_normalize_mailbox_message_id(new.message_id) end;
+        v_parent_message_id text;
       begin
-        if tg_op = 'UPDATE' and old.message_key is distinct from new.message_key then
-          return new;
+        if tg_op <> 'INSERT' then
+          delete from public.softora_mailbox_message_lineage_edges
+          where child_message_key=old.message_key;
+          delete from public.softora_mailbox_campaign_lineage_roots
+          where message_key=old.message_key;
         end if;
-        if tg_op = 'INSERT' and new.uid_validity is not null and exists (
-          select 1 from public.softora_mailbox_campaign_consistency
-          where scope = 'campaign' and uid_generation_protocol = 'draining'
-        ) then
-          return new;
+
+        if tg_op <> 'DELETE'
+          and new.deleted_at is null
+          and new.generation_superseded_at is null
+          and public.softora_is_campaign_mailbox_message(
+            new.account_email,new.folder,new.payload
+          ) then
+          v_parent_message_id := public.softora_normalize_mailbox_message_id(
+            new.in_reply_to
+          );
+          if v_parent_message_id is null then
+            insert into public.softora_mailbox_campaign_lineage_roots(
+              message_key,account_email,message_id
+            ) values(new.message_key,v_new_account,v_new_message_id)
+            on conflict(message_key) do update set
+              account_email=excluded.account_email,message_id=excluded.message_id;
+          else
+            insert into public.softora_mailbox_message_lineage_edges(
+              child_message_key,account_email,child_message_id,parent_message_id
+            ) values(new.message_key,v_new_account,v_new_message_id,v_parent_message_id)
+            on conflict(child_message_key,parent_message_id) do update set
+              account_email=excluded.account_email,
+              child_message_id=excluded.child_message_id;
+          end if;
         end if;
-        if public.softora_is_campaign_mailbox_message(
-          new.account_email, new.folder, new.payload
-        ) then
-          insert into public.softora_mailbox_campaign_lineage_roots(message_key)
-          values(new.message_key) on conflict(message_key) do nothing;
-          insert into public.softora_mailbox_campaign_lineage_members(
-            message_key,root_message_key,parent_message_key,lineage_depth
-          ) values(new.message_key,new.message_key,null,0)
-          on conflict(message_key) do nothing;
-        end if;
+
+${finalActivationLineageOldImpact}
+        if tg_op='DELETE' then return old; end if;
         return new;
       end;
       $function$;
       create trigger softora_refresh_mailbox_message_lineage
-      after insert or update on public.softora_mailbox_messages
+      after insert or update or delete on public.softora_mailbox_messages
       for each row execute function public.softora_refresh_mailbox_message_lineage();
       create or replace function public.softora_preserve_mailbox_read_state()
       returns trigger language plpgsql security invoker set search_path=''
@@ -1017,7 +1324,9 @@ begin
     await applyTrackedSql(client, sendProvenanceFoundation);
     await applyTrackedSql(client, providerOutcomeMigration);
     await client.query(`
-      truncate table public.softora_mailbox_campaign_lineage_members,
+      truncate table public.softora_mailbox_campaign_lineage_discoveries,
+        public.softora_mailbox_campaign_lineage_members,
+        public.softora_mailbox_message_lineage_edges,
         public.softora_mailbox_campaign_lineage_roots
     `);
     await applyTrackedSql(client, migration);
@@ -1026,23 +1335,46 @@ begin
         enable trigger softora_refresh_mailbox_message_lineage
     `);
     await client.query(`
-      insert into public.softora_mailbox_campaign_lineage_roots(message_key)
-      select message.message_key
+      insert into public.softora_mailbox_campaign_lineage_roots(
+        message_key,account_email,message_id
+      )
+      select message.message_key,message.account_email,
+        public.softora_normalize_mailbox_message_id(message.message_id)
       from public.softora_mailbox_messages as message
       where public.softora_is_campaign_mailbox_message(
         message.account_email, message.folder, message.payload
       )
+        and message.deleted_at is null
+        and message.generation_superseded_at is null
+        and public.softora_normalize_mailbox_message_id(message.message_id) is not null
+        and public.softora_normalize_mailbox_message_id(message.in_reply_to) is null
       on conflict(message_key) do nothing;
 
-      insert into public.softora_mailbox_campaign_lineage_members(
-        message_key,root_message_key,parent_message_key,lineage_depth
+      insert into public.softora_mailbox_message_lineage_edges(
+        child_message_key,account_email,child_message_id,parent_message_id
       )
-      select message.message_key,message.message_key,null,0
+      select message.message_key,message.account_email,
+        public.softora_normalize_mailbox_message_id(message.message_id),
+        public.softora_normalize_mailbox_message_id(message.in_reply_to)
       from public.softora_mailbox_messages as message
       where public.softora_is_campaign_mailbox_message(
         message.account_email, message.folder, message.payload
       )
-      on conflict(message_key) do nothing
+        and message.deleted_at is null
+        and message.generation_superseded_at is null
+        and public.softora_normalize_mailbox_message_id(message.in_reply_to) is not null
+      on conflict(child_message_key,parent_message_id) do nothing;
+
+      select public.softora_rebuild_mailbox_campaign_lineage(
+        account.account_email,'{}'::text[],true,'{}'::jsonb
+      )
+      from (
+        select distinct message.account_email
+        from public.softora_mailbox_messages as message
+        where public.softora_is_campaign_mailbox_message(
+          message.account_email,message.folder,message.payload
+        )
+      ) as account
     `);
     await applyTrackedSql(client, sendProvenanceVisibilityFenceMigration);
     await applyTrackedSql(client, perKeyRepairMigration);
@@ -1088,11 +1420,518 @@ begin
       where sync_key='martijn@softora.nl|allmail'
     `, [martijnCompatibilityGeneration]);
     await applyTrackedSql(client, targetManifestCheckpointMigration);
+    await applyTrackedSql(client, finalActivationLineageMigration);
+    await client.query(`
+      update public.softora_mailbox_lineage_test_metrics set call_count=0
+    `);
   });
 
   test.after(async () => {
     await Promise.all(Array.from(clients, (client) => client.end().catch(() => null)));
   });
+
+  test('legacy NULL-generation activeert atomair met rollback, replay en volledige lineage', async () => {
+    const client = await connect();
+    const accountEmail = 'legacy-activation@softora.nl';
+    const syncKey = `${accountEmail}|inbox`;
+    const legacyRootKey = `${syncKey}|1`;
+    const legacyChildKey = `${syncKey}|2`;
+    const staleGenerationId = '5eeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const staleMessageKey = `${syncKey}|gen:${staleGenerationId}|3`;
+    const rows = lineageSnapshotRows(accountEmail, 'legacy-activation-new', 2);
+    rows[0].message_id = 'legacy-activation-root@test.softora.nl';
+    rows[1].message_id = 'legacy-activation-child@test.softora.nl';
+    rows[1].in_reply_to = rows[0].message_id;
+    let rejectionInstalled = false;
+    await client.query('begin');
+    try {
+      // Seed messages before their sync-state exists: this is the exact legacy
+      // NULL-generation shape that a final staged activation must retire.
+      await client.query(`
+        insert into public.softora_mailbox_messages(
+          message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,
+          recipients_text,subject,date,payload,uid_validity
+        ) values
+          ($1,$3,'inbox',1,'legacy-activation:1',$4,null,$3,'Legacy root',
+            clock_timestamp(),'{}'::jsonb,null),
+          ($2,$3,'inbox',2,'legacy-activation:2',$5,$4,$3,'Legacy child',
+            clock_timestamp(),'{}'::jsonb,null)
+      `, [
+        legacyRootKey, legacyChildKey, accountEmail,
+        'legacy-activation-root@test.softora.nl',
+        'legacy-activation-child@test.softora.nl',
+      ]);
+      await client.query(`
+        insert into public.softora_mailbox_sync_state(
+          sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+        ) values($1,$2,'inbox','idle',2,2,null)
+      `, [syncKey, accountEmail]);
+      await client.query(`
+        insert into public.softora_mailbox_uid_generations(
+          generation_id,sync_key,account_email,folder,uid_validity,
+          selection_policy,status,scan_upper_uid,scanned_through_uid,
+          scan_complete,snapshot_message_count,activated_at,superseded_at
+        ) values(
+          $1::uuid,$2,$3,'inbox',699,'staged-rebuild-v2','superseded',
+          3,3,true,1,clock_timestamp()-interval '2 minutes',
+          clock_timestamp()-interval '1 minute'
+        )
+      `, [staleGenerationId, syncKey, accountEmail]);
+      await client.query(`
+        alter table public.softora_mailbox_messages
+          disable trigger softora_mailbox_messages_coerce_uid_generation
+      `);
+      await client.query(`
+        insert into public.softora_mailbox_messages(
+          message_key,account_email,folder,uid,uid_validity,uid_generation_id,
+          provider_id,message_id,recipients_text,subject,date,payload
+        ) values(
+          $2,$3,'inbox',3,699,$1::uuid,'legacy-activation:stale',
+          'legacy-activation-stale@test.softora.nl',$3,'Stale generation',
+          clock_timestamp(),'{}'::jsonb
+        )
+      `, [staleGenerationId, staleMessageKey, accountEmail]);
+      await client.query(`
+        alter table public.softora_mailbox_messages
+          enable trigger softora_mailbox_messages_coerce_uid_generation
+      `);
+      assert.deepEqual((await client.query(`
+        select message_key,root_message_key,lineage_depth
+        from public.softora_mailbox_campaign_lineage_members
+        where account_email=$1 order by lineage_depth,message_key
+      `, [accountEmail])).rows, [
+        { message_key: legacyRootKey, root_message_key: legacyRootKey, lineage_depth: 0 },
+        { message_key: staleMessageKey, root_message_key: staleMessageKey, lineage_depth: 0 },
+        { message_key: legacyChildKey, root_message_key: legacyRootKey, lineage_depth: 1 },
+      ]);
+
+      const token = 'legacy-activation-token';
+      await lease(client, syncKey, token);
+      const prepared = await prepare(client, syncKey, token, 701, 3);
+      assert.equal(prepared.mode, 'rebuild');
+      assert.equal(prepared.active_generation_id, null);
+      const args = {
+        syncKey, token, commitId: 'legacy-null-final-activation',
+        generationId: prepared.target_generation_id, uidValidity: 701, rows,
+        fromUid: 1, throughUid: 2, complete: true, messageCount: 2, lastUid: 2,
+      };
+
+      await client.query(`
+        create or replace function public.test_reject_final_lineage_activation()
+        returns trigger language plpgsql set search_path=''
+        as $function$
+        begin
+          if old.active_uid_generation_id is distinct from new.active_uid_generation_id then
+            raise exception using errcode='55000',message='TEST_FINAL_ACTIVATION_ROLLBACK';
+          end if;
+          return new;
+        end;
+        $function$;
+        create trigger test_reject_final_lineage_activation
+        before update of active_uid_generation_id on public.softora_mailbox_sync_state
+        for each row execute function public.test_reject_final_lineage_activation();
+      `);
+      rejectionInstalled = true;
+      await resetLineageMetrics(client);
+      await rejectsInSavepoint(
+        client,
+        () => commit(client, args),
+        /TEST_FINAL_ACTIVATION_ROLLBACK/
+      );
+      assert.deepEqual(await lineageMetrics(client), { impact: 0, rebuild: 0 });
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_messages
+        where account_email=$1 and generation_superseded_at is null
+          and uid_generation_id is null
+      `, [accountEmail])).rows[0].count, 2);
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_campaign_lineage_members
+        where message_key=any($1::text[])
+      `, [[legacyRootKey, legacyChildKey, staleMessageKey]])).rows[0].count, 3);
+
+      await client.query(`
+        drop trigger test_reject_final_lineage_activation
+          on public.softora_mailbox_sync_state;
+        drop function public.test_reject_final_lineage_activation();
+      `);
+      rejectionInstalled = false;
+      await resetLineageMetrics(client);
+      const activated = await commit(client, args);
+      assert.equal(activated.activated, true);
+      assert.deepEqual(await lineageMetrics(client), { impact: 1, rebuild: 2 });
+      assert.equal((await client.query(`
+        select pg_catalog.current_setting(
+          'softora.mailbox_lineage_batch_activation_v2',true
+        ) as batch_scope
+      `)).rows[0].batch_scope, '');
+
+      const newRootKey = `${syncKey}|gen:${prepared.target_generation_id}|1`;
+      const newChildKey = `${syncKey}|gen:${prepared.target_generation_id}|2`;
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_campaign_lineage_roots
+        where message_key=any($1::text[])
+      `, [[legacyRootKey, legacyChildKey, staleMessageKey]])).rows[0].count, 0);
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_message_lineage_edges
+        where child_message_key=any($1::text[])
+      `, [[legacyRootKey, legacyChildKey, staleMessageKey]])).rows[0].count, 0);
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_campaign_lineage_members
+        where message_key=any($1::text[])
+      `, [[legacyRootKey, legacyChildKey, staleMessageKey]])).rows[0].count, 0);
+      assert.deepEqual((await client.query(`
+        select generation_superseded_at is not null as superseded,
+          deleted_at is not null as deleted
+        from public.softora_mailbox_messages where message_key=$1
+      `, [staleMessageKey])).rows[0], { superseded: true, deleted: true });
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_campaign_lineage_discoveries
+        where message_key=$1 and active
+      `, [staleMessageKey])).rows[0].count, 0);
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_campaign_lineage_discoveries as discovery
+        where discovery.message_key=any($1::text[])
+          and discovery.active
+          and not exists (
+            select 1
+            from public.softora_mailbox_campaign_lineage_members as member
+            where member.message_key=discovery.message_key
+              and member.root_message_key=discovery.root_message_key
+          )
+      `, [[legacyRootKey, legacyChildKey, staleMessageKey]])).rows[0].count, 0);
+      assert.deepEqual((await client.query(`
+        select message_key,root_message_key,parent_message_key,lineage_depth
+        from public.softora_mailbox_campaign_lineage_members
+        where account_email=$1 order by lineage_depth,message_key
+      `, [accountEmail])).rows, [
+        {
+          message_key: newRootKey,
+          root_message_key: newRootKey,
+          parent_message_key: null,
+          lineage_depth: 0,
+        },
+        {
+          message_key: newChildKey,
+          root_message_key: newRootKey,
+          parent_message_key: newRootKey,
+          lineage_depth: 1,
+        },
+      ]);
+      assert.equal((await client.query(`
+        select count(*)::integer as count
+        from public.softora_mailbox_campaign_lineage_discoveries
+        where account_email=$1 and active
+      `, [accountEmail])).rows[0].count, 2);
+
+      const replayed = await commit(client, args);
+      assert.equal(replayed.replayed, true);
+      assert.deepEqual(await lineageMetrics(client), { impact: 1, rebuild: 2 });
+
+      await lease(client, syncKey, 'legacy-steady-token');
+      const steady = await prepare(client, syncKey, 'legacy-steady-token', 701, 3);
+      assert.equal(steady.mode, 'steady');
+      await resetLineageMetrics(client);
+      const steadyResult = await commit(client, {
+        syncKey, token: 'legacy-steady-token', commitId: 'legacy-steady-row-impact',
+        generationId: steady.target_generation_id, uidValidity: 701,
+        rows: [{ ...rows[1], starred: true }],
+        fromUid: 3, throughUid: 2, complete: true, messageCount: 2, lastUid: 2,
+      });
+      assert.equal(steadyResult.activated, false);
+      assert.ok((await lineageMetrics(client)).impact >= 1);
+
+      await resetLineageMetrics(client);
+      await client.query(`
+        update public.softora_mailbox_messages
+        set subject='Direct lineage row-impact'
+        where message_key=$1
+      `, [newChildKey]);
+      assert.ok((await lineageMetrics(client)).impact >= 1);
+    } finally {
+      if (rejectionInstalled) {
+        await client.query(`
+          drop trigger if exists test_reject_final_lineage_activation
+            on public.softora_mailbox_sync_state;
+          drop function if exists public.test_reject_final_lineage_activation();
+        `).catch(() => null);
+      }
+      await client.query('rollback');
+    }
+  });
+
+  test('verkeerde en DELETE batchscope falen dicht zonder lineage- of berichtdrift', async () => {
+    const client = await connect();
+    await client.query('begin');
+    try {
+      const messageSnapshot = async (messageKey) => (await client.query(`
+        select message_key,account_email,folder,uid_generation_id,
+          generation_superseded_at,subject
+        from public.softora_mailbox_messages
+        where message_key=$1
+      `, [messageKey])).rows[0];
+      const lineageSnapshot = async (accountEmail) => ({
+        roots: (await client.query(`
+          select message_key,account_email,message_id,created_at
+          from public.softora_mailbox_campaign_lineage_roots
+          where account_email=$1 order by message_key
+        `, [accountEmail])).rows,
+        edges: (await client.query(`
+          select child_message_key,account_email,child_message_id,parent_message_id,
+            created_at
+          from public.softora_mailbox_message_lineage_edges
+          where account_email=$1 order by child_message_key,parent_message_id
+        `, [accountEmail])).rows,
+        members: (await client.query(`
+          select message_key,account_email,message_id,root_message_key,
+            root_message_id,parent_message_key,lineage_depth,created_at
+          from public.softora_mailbox_campaign_lineage_members
+          where account_email=$1 order by message_key
+        `, [accountEmail])).rows,
+        discoveries: (await client.query(`
+          select account_email,message_key,root_message_key,active,
+            first_discovered_at,last_connected_at,last_disconnected_at
+          from public.softora_mailbox_campaign_lineage_discoveries
+          where account_email=$1 order by message_key,root_message_key
+        `, [accountEmail])).rows,
+      });
+      const state = (await client.query(`
+        select sync_key,account_email,folder,active_uid_generation_id
+        from public.softora_mailbox_sync_state
+        where sync_key='serve@softora.nl|inbox'
+      `)).rows[0];
+      const message = (await client.query(`
+        select message_key,subject
+        from public.softora_mailbox_messages
+        where account_email=$1 and folder=$2
+          and generation_superseded_at is null
+        order by uid limit 1
+      `, [state.account_email, state.folder])).rows[0];
+      const messageBefore = await messageSnapshot(message.message_key);
+      const artifactsBefore = await lineageSnapshot(state.account_email);
+      await client.query(`
+        select pg_catalog.set_config('softora.mailbox_sync_per_key_v2','1',true),
+          pg_catalog.set_config('softora.mailbox_uid_generation_v2_transition','1',true),
+          pg_catalog.set_config(
+            'softora.mailbox_lineage_batch_activation_v2',$1,true
+          )
+      `, [JSON.stringify({
+        syncKey: 'martijn@softora.nl|inbox',
+        accountEmail: 'martijn@softora.nl',
+        folder: 'inbox',
+        oldGenerationId: null,
+        newGenerationId: state.active_uid_generation_id,
+      })]);
+      await rejectsInSavepoint(
+        client,
+        () => client.query(`
+          update public.softora_mailbox_messages set subject='scope must reject'
+          where message_key=$1
+        `, [message.message_key]),
+        /MAILBOX_LINEAGE_ACTIVATION_ROW_SCOPE_MISMATCH/
+      );
+      assert.deepEqual(await messageSnapshot(message.message_key), messageBefore);
+      assert.deepEqual(await lineageSnapshot(state.account_email), artifactsBefore);
+
+      await client.query(`
+        select pg_catalog.set_config(
+          'softora.mailbox_lineage_batch_activation_v2',$1,true
+        )
+      `, [JSON.stringify({
+        syncKey: state.sync_key,
+        accountEmail: state.account_email,
+        folder: state.folder,
+        oldGenerationId: state.active_uid_generation_id,
+        newGenerationId: '99999999-9999-4999-8999-999999999999',
+      })]);
+      await rejectsInSavepoint(
+        client,
+        () => client.query(`
+          update public.softora_mailbox_messages
+          set subject='wrong generation must reject'
+          where message_key=$1
+        `, [message.message_key]),
+        /MAILBOX_LINEAGE_ACTIVATION_ROW_SCOPE_MISMATCH/
+      );
+      assert.deepEqual(await messageSnapshot(message.message_key), messageBefore);
+      assert.deepEqual(await lineageSnapshot(state.account_email), artifactsBefore);
+
+      const nullGenerationState = (await client.query(`
+        select sync_key,account_email,folder
+        from public.softora_mailbox_sync_state
+        where sync_key='servecreusen@softora.nl|inbox'
+      `)).rows[0];
+      const nullGenerationMessage = (await client.query(`
+        select message_key
+        from public.softora_mailbox_messages
+        where account_email=$1 and folder=$2
+          and uid_generation_id is null
+          and generation_superseded_at is null
+          and deleted_at is null
+        order by uid limit 1
+      `, [
+        nullGenerationState.account_email,
+        nullGenerationState.folder,
+      ])).rows[0];
+      assert.ok(nullGenerationMessage, 'NULL-generation testbericht ontbreekt');
+      const nullMessageBefore = await messageSnapshot(nullGenerationMessage.message_key);
+      const nullArtifactsBefore = await lineageSnapshot(
+        nullGenerationState.account_email
+      );
+      await client.query(`
+        select pg_catalog.set_config(
+          'softora.mailbox_lineage_batch_activation_v2',$1,true
+        )
+      `, [JSON.stringify({
+        syncKey: nullGenerationState.sync_key,
+        accountEmail: nullGenerationState.account_email,
+        folder: nullGenerationState.folder,
+        oldGenerationId: null,
+        newGenerationId: state.active_uid_generation_id,
+      })]);
+      await rejectsInSavepoint(
+        client,
+        () => client.query(`
+          update public.softora_mailbox_messages
+          set subject='NULL generation must reject'
+          where message_key=$1
+        `, [nullGenerationMessage.message_key]),
+        /MAILBOX_LINEAGE_ACTIVATION_ROW_SCOPE_MISMATCH/
+      );
+      assert.deepEqual(
+        await messageSnapshot(nullGenerationMessage.message_key),
+        nullMessageBefore
+      );
+      assert.deepEqual(
+        await lineageSnapshot(nullGenerationState.account_email),
+        nullArtifactsBefore
+      );
+
+      await client.query(`
+        select pg_catalog.set_config(
+          'softora.mailbox_lineage_batch_activation_v2',$1,true
+        )
+      `, [JSON.stringify({
+        syncKey: state.sync_key,
+        accountEmail: state.account_email,
+        folder: state.folder,
+        oldGenerationId: state.active_uid_generation_id,
+        newGenerationId: state.active_uid_generation_id,
+      })]);
+      await rejectsInSavepoint(
+        client,
+        () => client.query(`
+          delete from public.softora_mailbox_messages where message_key=$1
+        `, [message.message_key]),
+        /MAILBOX_LINEAGE_ACTIVATION_ROW_OPERATION_INVALID/
+      );
+      assert.deepEqual(await messageSnapshot(message.message_key), messageBefore);
+      assert.deepEqual(await lineageSnapshot(state.account_email), artifactsBefore);
+    } finally {
+      await client.query('rollback');
+    }
+  });
+
+  for (const messageCount of [300, 750]) {
+    test(`${messageCount}-rij finale lineage-activatie blijft binnen 8s en retireert schoon`, async () => {
+      const client = await connect();
+      const accountEmail = `lineage-scale-${messageCount}@softora.nl`;
+      const syncKey = `${accountEmail}|inbox`;
+      const firstRows = lineageSnapshotRows(accountEmail, `scale-${messageCount}-old`, messageCount);
+      const nextRows = lineageSnapshotRows(accountEmail, `scale-${messageCount}-new`, messageCount);
+      await client.query('begin');
+      try {
+        await client.query(`
+          insert into public.softora_mailbox_sync_state(
+            sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+          ) values($1,$2,'inbox','idle',0,0,null)
+        `, [syncKey, accountEmail]);
+        const first = await activateSnapshot(client, {
+          syncKey,
+          token: `scale-${messageCount}-first-token`,
+          commitId: `scale-${messageCount}-first-commit`,
+          uidValidity: 800 + messageCount,
+          rows: firstRows,
+        });
+        const oldGenerationId = first.prepared.target_generation_id;
+        await lease(client, syncKey, `scale-${messageCount}-final-token`);
+        const prepared = await prepare(
+          client, syncKey, `scale-${messageCount}-final-token`,
+          801 + messageCount, messageCount + 1
+        );
+        assert.equal(prepared.mode, 'rebuild');
+        await resetLineageMetrics(client);
+        await client.query("set local statement_timeout='8s'");
+        const startedAt = Date.now();
+        const activated = await commit(client, {
+          syncKey,
+          token: `scale-${messageCount}-final-token`,
+          commitId: `scale-${messageCount}-final-commit`,
+          generationId: prepared.target_generation_id,
+          uidValidity: 801 + messageCount,
+          rows: nextRows,
+          fromUid: 1,
+          throughUid: messageCount,
+          complete: true,
+          messageCount,
+          lastUid: messageCount,
+        });
+        const elapsedMs = Date.now() - startedAt;
+        assert.equal(activated.activated, true);
+        assert.ok(elapsedMs < 8_000, `${messageCount} rijen duurden ${elapsedMs} ms`);
+        assert.deepEqual(await lineageMetrics(client), { impact: 0, rebuild: 1 });
+        assert.deepEqual((await client.query(`
+          select
+            (select count(*)::integer
+              from public.softora_mailbox_campaign_lineage_roots
+              where account_email=$1) as roots,
+            (select count(*)::integer
+              from public.softora_mailbox_message_lineage_edges
+              where account_email=$1) as edges,
+            (select count(*)::integer
+              from public.softora_mailbox_campaign_lineage_members
+              where account_email=$1) as members,
+            (select count(*)::integer
+              from public.softora_mailbox_campaign_lineage_discoveries
+              where account_email=$1 and active) as active_discoveries
+        `, [accountEmail])).rows[0], {
+          roots: 1,
+          edges: messageCount - 1,
+          members: messageCount,
+          active_discoveries: messageCount,
+        });
+        assert.equal((await client.query(`
+          select count(*)::integer as count
+          from public.softora_mailbox_messages as message
+          where message.uid_generation_id=$1::uuid
+            and message.generation_superseded_at is not null
+            and not message.deleted_at is null
+        `, [oldGenerationId])).rows[0].count, messageCount);
+        assert.equal((await client.query(`
+          select count(*)::integer as count
+          from public.softora_mailbox_messages as message
+          where message.uid_generation_id=$1::uuid
+            and (
+              exists(select 1 from public.softora_mailbox_campaign_lineage_roots as root
+                where root.message_key=message.message_key)
+              or exists(select 1 from public.softora_mailbox_message_lineage_edges as edge
+                where edge.child_message_key=message.message_key)
+              or exists(select 1 from public.softora_mailbox_campaign_lineage_members as member
+                where member.message_key=message.message_key)
+            )
+        `, [oldGenerationId])).rows[0].count, 0);
+      } finally {
+        await client.query("set local statement_timeout='10s'").catch(() => null);
+        await client.query('rollback');
+      }
+    });
+  }
 
   test('checkpointmigratie hervat Martijns bestaande lege 370-target pending generatie exact', async () => {
     const client = await connect();
@@ -2503,8 +3342,9 @@ begin
     `)).rows[0].message_key;
     await assert.rejects(client.query(`
       insert into public.softora_mailbox_campaign_lineage_members(
-        message_key,root_message_key,parent_message_key,lineage_depth
-      ) values($1,$2,null,0)
+        message_key,account_email,message_id,root_message_key,root_message_id,
+        parent_message_key,lineage_depth
+      ) values($1,'external@test','external-invalid@test',$2,'wrong-root@test',null,0)
     `, ['external@test|archive|99', validRoot]),
     /softora_mailbox_campaign_lineage_members_shape_check/);
     assert.equal((await client.query(`
