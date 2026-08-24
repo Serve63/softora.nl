@@ -1,0 +1,27 @@
+.customer-table-region {
+    position: relative;
+    min-height: 9rem;
+}
+
+.customer-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    min-height: 9rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: wait;
+}
+
+.customer-loading-overlay[hidden] {
+    display: none;
+}
+
+.cell-date {
+    white-space: nowrap;
+}

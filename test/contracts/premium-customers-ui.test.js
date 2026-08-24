@@ -11,7 +11,7 @@ test('premium customers page bootstraps customer rows before async sync runs', (
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
   assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-customers-load-state\.js\?v=20260817b/);
+  assert.match(pageSource, /assets\/premium-customers-load-state\.js\?v=20260824a/);
   assert.match(pageSource, /customerLoadState\.fetchCanonicalCustomers\(window\.fetch\.bind\(window\)\)/);
   assert.match(pageSource, /<option value="website">Website<\/option>/);
   assert.match(pageSource, /function readCustomersBootstrapPayload\(\)/);
@@ -31,8 +31,10 @@ test('premium customers page bootstraps customer rows before async sync runs', (
 test('premium customers page supports toegewezen aan in table, modal and order import', () => {
   const pagePath = path.join(__dirname, '../../premium-klanten.html');
   const rendererPath = path.join(__dirname, '../../assets/premium-customers-renderers.js');
+  const tableStateStylesPath = path.join(__dirname, '../../assets/premium-customers-table-state.css');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const tableStateStyles = fs.readFileSync(tableStateStylesPath, 'utf8');
 
   assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
   assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
@@ -59,9 +61,13 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.doesNotMatch(pageSource, /leaderboard-card/);
   assert.doesNotMatch(pageSource, /leaderboardList/);
   assert.doesNotMatch(pageSource, /function updateLeaderboard\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260824a"><\/script>/);
   assert.match(pageSource, /window\.SoftoraCustomersRenderers\.renderRows\(nodes\.body, filtered, \{/);
   assert.doesNotMatch(rendererSource, /renderLeaderboard/);
+  assert.match(rendererSource, /createCell\("Betaaldatum", "muted-cell cell-date"\)/);
+  assert.match(pageSource, /assets\/premium-customers-table-state\.css\?v=20260824a/);
+  assert.match(tableStateStyles, /\.cell-date \{\s*white-space: nowrap;/);
+  assert.match(pageSource, /thead th:nth-child\(9\) \{ width: 11%; \}/);
   assert.match(rendererSource, /function createCell\(label, className\) \{/);
   assert.match(rendererSource, /function renderRows\(target, customers, helpers\) \{/);
   assert.match(pageSource, /nodes\.body\.replaceChildren\(\);/);

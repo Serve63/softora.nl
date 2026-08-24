@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-customers-table-state.css?v=20260824a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -570,8 +570,8 @@
         thead th:nth-child(6) { width: 7%; }
         thead th:nth-child(7) { width: 12%; white-space: normal; line-height: 1.25; }
         thead th:nth-child(8) { width: 6%; }
-        thead th:nth-child(9) { width: 7%; }
-        thead th:nth-child(10) { width: 10%; }
+        thead th:nth-child(9) { width: 11%; }
+        thead th:nth-child(10) { width: 6%; }
         thead th:nth-child(11) { width: 6%; }
 
         thead th:nth-child(7),
@@ -1072,7 +1072,7 @@
                         <button class="status-retry" id="retryCustomersButton" type="button" hidden>Opnieuw proberen</button>
                     </div>
 
-                    <div class="table-wrap">
+                    <div class="table-wrap customer-table-region" id="customerTableRegion" aria-busy="true">
                         <table>
                             <thead>
                                 <tr>
@@ -1089,7 +1089,7 @@
                                 </tr>
                             </thead>
                             <tbody id="customersBody"></tbody>
-                        </table>
+                        </table><div class="customer-loading-overlay" id="customerLoadingOverlay" role="status" aria-live="polite">Klantgegevens laden…</div>
                     </div>
 
                     <div class="empty-state" id="emptyState" hidden>Geen klanten gevonden.</div>
@@ -1193,9 +1193,9 @@
     </div>
 
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
-    <script src="assets/premium-customers-renderers.js?v=20260427a"></script>
+    <script src="assets/premium-customers-renderers.js?v=20260824a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
-    <script src="assets/premium-customers-load-state.js?v=20260817b"></script>
+    <script src="assets/premium-customers-load-state.js?v=20260824a"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
@@ -1827,9 +1827,9 @@
         }
 
         function renderTable() {
-            const filtered = getFilteredCustomers();
+            const filtered = getFilteredCustomers(), isLoading = state.loadState === "loading";
 
-            nodes.empty.hidden = !customerLoadState.shouldShowEmpty(state.loadState, filtered.length);
+            document.getElementById("customerTableRegion").setAttribute("aria-busy", String(isLoading)); document.getElementById("customerLoadingOverlay").hidden = !isLoading; nodes.empty.hidden = !customerLoadState.shouldShowEmpty(state.loadState, filtered.length);
             nodes.body.replaceChildren();
 
             if (!filtered.length) {

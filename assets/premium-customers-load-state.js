@@ -74,7 +74,7 @@
       let remoteCustomers = [];
       let orders = [];
 
-      state.loadState = hadBootstrapCustomers ? 'ready' : 'loading';
+      state.loadState = 'loading';
       deps.setRetryHidden(true);
       deps.renderTable();
       if (!hadBootstrapCustomers) deps.setStatusMessage('Klantenbestand laden...', 'info');
@@ -133,6 +133,7 @@
         state.klanten = enrichedCustomers;
         state.loadState = canonicalReadSucceeded ? 'ready' : 'error';
         if (shouldRerender || !hadBootstrapCustomers) deps.renderPage();
+        else deps.renderTable();
         if (canonicalReadSucceeded) deps.setStatusMessage('');
         else deps.setCustomerLoadFailure(true);
         return loadOutcome;
