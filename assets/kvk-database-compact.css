@@ -9,6 +9,12 @@
     overflow: hidden;
   }
 
+  html[data-softora-sidebar-content-frame="1"]:root,
+  html[data-softora-sidebar-content-frame="1"]:root body {
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
   .app-shell {
     display: grid;
     grid-template-rows: 30px 42px 82px minmax(0, 1fr) 184px;
