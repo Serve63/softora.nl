@@ -4,6 +4,26 @@ const { createMailboxAttachmentService } = require('./mailbox-attachment-service
 const { sendMailboxMessage } = require('./mailbox-instantly-integration');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
+const TEMPORARY_MAILBOX_SEND_MESSAGE =
+  'De veilige verzendcontrole heeft tijdelijk geen verbinding. Je mail is niet verzonden en je concept blijft staan; probeer het opnieuw.';
+
+function isTemporaryMailboxSendInfrastructureError(error) {
+  const code = String(error?.code || '').trim().toUpperCase();
+  const text = String(
+    error?.message || error?.details || error?.hint || error?.name || error || ''
+  ).trim();
+  if ([
+    'MAILBOX_REPLY_TARGET_UNAVAILABLE',
+    'MAILBOX_SEND_PROVENANCE_UNAVAILABLE',
+    'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED',
+    'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED',
+    'SUPABASE_REST_COOLDOWN',
+    '57014',
+  ].includes(code)) return true;
+  return /(?:supabase|postgrest|mailbox index).*(?:abort|timeout|timed out|cooldown|504|503|fetch|network|temporar)/i.test(text)
+    || /(?:abort|timeout|timed out|cooldown|504|503|fetch failed|network|temporar).*(?:supabase|postgrest|mailbox index)/i.test(text);
+}
+
 function createMailboxComposeRuntime(dependencies = {}) {
   const {
     composeSendDependencies,
@@ -84,6 +104,15 @@ function createMailboxComposeRuntime(dependencies = {}) {
       return res.status(200).json({ ok: true, result });
     } catch (error) {
       logger.error('[Mailbox][Send]', error?.message || error);
+      if (isTemporaryMailboxSendInfrastructureError(error)) {
+        return res.status(503).json({
+          ok: false,
+          code: 'MAILBOX_SEND_TEMPORARY',
+          error: 'Mail niet verzonden',
+          detail: TEMPORARY_MAILBOX_SEND_MESSAGE,
+          retryable: true,
+        });
+      }
       return res.status(error.status || 500).json({
         ok: false,
         code: normalizeString(error?.code) || 'MAILBOX_SEND_FAILED',
@@ -245,4 +274,8 @@ function createMailboxComposeRuntime(dependencies = {}) {
   };
 }
 
-module.exports = { createMailboxComposeRuntime };
+module.exports = {
+  TEMPORARY_MAILBOX_SEND_MESSAGE,
+  createMailboxComposeRuntime,
+  isTemporaryMailboxSendInfrastructureError,
+};

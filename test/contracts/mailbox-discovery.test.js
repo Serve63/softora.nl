@@ -42,6 +42,18 @@ const contactDossierMigrationPath = path.resolve(
   __dirname,
   '../../supabase/migrations/20260820171023_mailbox_contact_search_and_logical_tombstones.sql'
 );
+const atomicVisibilityMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260820174711_mailbox_contact_atomic_visibility.sql'
+);
+const acceptedTimelineMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260824120230_mailbox_contact_timeline_send_provenance.sql'
+);
+const campaignProvenanceMigrationPath = path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260824122203_mailbox_discovery_campaign_provenance.sql'
+);
 
 function createElement() {
   const listeners = {};
@@ -492,12 +504,52 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
       created_at timestamptz, updated_at timestamptz
     );
     create table public.softora_mailbox_send_provenance (
-      intent_id text primary key, account_email text, recipient_email text,
-      provider text, status text, accepted_at timestamptz
+      intent_id text primary key, idempotency_key text unique, owner text,
+      account_email text, recipient_email text, mode text,
+      conversation_id text, reply_target_message_id text, references_text text,
+      provider text, provider_thread_id text, provider_message_id text,
+      sent_message_id text, sender_name text, subject text, body_text text,
+      cc_text text, bcc_text text, status text, accepted_at timestamptz
     );
     create table public.softora_mailbox_campaign_consistency (
-      scope text primary key, content_version bigint not null default 0
+      scope text primary key, content_version bigint not null default 0,
+      updated_at timestamptz not null default now()
     );
+    create or replace function public.softora_lock_mailbox_campaign_consistency_before_write()
+    returns trigger language plpgsql volatile security invoker set search_path = '' as $$
+    begin
+      insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+      values ('campaign', 0) on conflict (scope) do nothing;
+      perform 1 from public.softora_mailbox_campaign_consistency
+      where scope = 'campaign' for update;
+      return null;
+    end;
+    $$;
+    create table public.softora_mailbox_campaign_lineage_roots (
+      message_key text primary key, account_email text not null
+    );
+    create table public.softora_mailbox_campaign_lineage_members (
+      message_key text primary key, account_email text not null,
+      is_proven_automated boolean not null default false
+    );
+    create function public.softora_has_proven_automated_reply(p_payload jsonb)
+    returns boolean language sql immutable security invoker set search_path = '' as $$
+      select (
+        lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'automatedReplyEvidenceKnown', ''))) = 'true'
+        and lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'automatedReplyEvidence', ''))) = 'true'
+        and nullif(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'automatedReplyEvidenceSource', '')), '') is not null
+      ) or (
+        nullif(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'autoSubmitted', '')), '') is not null
+        and lower(btrim(coalesce(p_payload, '{}'::jsonb)->>'autoSubmitted')) <> 'no'
+      ) or lower(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'precedence', ''))) in (
+        'auto_reply', 'auto-reply', 'bulk', 'junk', 'list'
+      ) or (
+        nullif(btrim(coalesce(coalesce(p_payload, '{}'::jsonb)->>'autoResponseSuppress', '')), '') is not null
+        and lower(btrim(coalesce(p_payload, '{}'::jsonb)->>'autoResponseSuppress')) not in (
+          '0', 'false', 'no', 'none', 'off'
+        )
+      );
+    $$;
     insert into public.softora_mailbox_campaign_consistency (scope, content_version)
     values ('campaign', 0);
   `);
@@ -542,6 +594,9 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
         '', null,'2026-08-19T10:04:00Z');
   `);
   await database.exec(fs.readFileSync(contactDossierMigrationPath, 'utf8'));
+  await database.exec(fs.readFileSync(atomicVisibilityMigrationPath, 'utf8'));
+  await database.exec(fs.readFileSync(acceptedTimelineMigrationPath, 'utf8'));
+  await database.exec(fs.readFileSync(campaignProvenanceMigrationPath, 'utf8'));
 
   const preMigrationDeleteState = await database.query(`
     select message_key, deleted_at
@@ -661,19 +716,255 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
     );
   `);
 
+  await database.exec(`
+    insert into public.softora_mailbox_campaign_lineage_members (
+      message_key, account_email, is_proven_automated
+    ) values
+      ('tessa-back-a-in','martijn@softora.nl',false),
+      ('tessa-back-a-out','martijn@softora.nl',false),
+      ('tessa-back-a-later','martijn@softora.nl',false),
+      ('tessa-back-b-in','martijn@softora.nl',false),
+      ('tessa-back-b-out','martijn@softora.nl',false),
+      ('tessa-back-c-in','martijn@softora.nl',false),
+      ('tessa-back-c-out','martijn@softora.nl',false),
+      ('tessa-dongen','martijn@softora.nl',false),
+      ('tessa-mensink','martijn@softora.nl',false),
+      ('tessa-back-serve','serve@softora.nl',false),
+      ('old-in','martijn@softora.nl',false),
+      ('old-out','martijn@softora.nl',false);
+
+    insert into public.softora_mailbox_messages (
+      message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,
+      sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,
+      body_truncated,has_body,unread,starred,payload
+    ) values
+      ('peter-root-one','martijn@softora.nl','sent',301,'sent:301','<peter-root-one@test>','','',
+        'Martijn','martijn@softora.nl','peter.root.one@example.nl','Campagne een','Peter root een','Eerste bewezen outbound','2026-08-18T08:00:00Z','2026-08-18T08:00:00Z',false,true,false,false,'{}'),
+      ('peter-root-two','martijn@softora.nl','sent',302,'sent:302','<peter-root-two@test>','','',
+        'Martijn','martijn@softora.nl','peter.root.two@example.nl','Campagne twee','Peter root twee','Tweede bewezen outbound','2026-08-18T08:01:00Z','2026-08-18T08:01:00Z',false,true,false,false,'{}'),
+      ('peter-root-three','martijn@softora.nl','sent',303,'sent:303','<peter-root-three@test>','','',
+        'Martijn','martijn@softora.nl','peter.root.three@example.nl','Campagne drie','Peter root drie','Derde bewezen outbound','2026-08-18T08:02:00Z','2026-08-18T08:02:00Z',false,true,false,false,'{"originalCampaignOutbound":true}'),
+      ('peter-brouwers','martijn@softora.nl','inbox',304,'inbox:304','<peter-brouwers@test>','','',
+        'Peter Brouwers','peter.brouwers@example.nl','martijn@softora.nl','RE: Kleine vraag over jullie website','Menselijke reactie','Dit is een echte reactie','2026-08-18T09:00:00Z','2026-08-18T09:00:00Z',false,true,false,false,'{}'),
+      ('peter-bridge-reply','martijn@softora.nl','inbox',315,'inbox:315','<peter-bridge-reply@test>','<peter-bridge-root@test>','<peter-bridge-root@test>',
+        'Peter Brug','peter.bridge@example.nl','martijn@softora.nl','Volledig gewijzigde titel','Brugreactie','Inbound reply via exact outbound Message-ID','2026-08-18T09:00:30Z','2026-08-18T09:00:30Z',false,true,false,false,'{}'),
+      ('peter-afspraak','martijn@softora.nl','inbox',305,'inbox:305','<peter-afspraak@test>','','',
+        'Peter Los Bericht','peter.losbericht@example.nl','martijn@softora.nl','Gesprek 17/8','Gewone mail','Geen campagnebewijs','2026-08-18T09:01:00Z','2026-08-18T09:01:00Z',false,true,false,false,'{}'),
+      ('peter-strato-bounce','martijn@softora.nl','inbox',306,'inbox:306','<peter-strato@test>','<peter-root-one@test>','<peter-root-one@test>',
+        'STRATO Mailserver','mailer-daemon@strato.nl','martijn@softora.nl, peter.bounce@example.nl','Re: Kleine vraag over jullie website','Delivery failed','Bezorging mislukt','2026-08-18T09:02:00Z','2026-08-18T09:02:00Z',false,true,false,false,'{"autoSubmitted":"auto-generated"}'),
+      ('peter-linkedin','martijn@softora.nl','inbox',307,'inbox:307','<peter-linkedin@test>','','',
+        'LinkedIn','messages-noreply@linkedin.com','martijn@softora.nl, peter.linkedin@example.nl','Re: Kleine vraag over jullie website','LinkedIn melding','Netwerkupdate','2026-08-18T09:03:00Z','2026-08-18T09:03:00Z',false,true,false,false,'{}'),
+      ('changed-root','martijn@softora.nl','sent',308,'sent:308','<changed-root@test>','','',
+        'Martijn','martijn@softora.nl','changed.contact@example.nl','Campagne ander onderwerp','Start','Campagne outbound','2026-08-18T10:00:00Z','2026-08-18T10:00:00Z',false,true,false,false,'{}'),
+      ('changed-lineage-reply','martijn@softora.nl','inbox',309,'inbox:309','<changed-reply@test>','<changed-root@test>','<changed-root@test>',
+        'Gewijzigde reactie','changed.contact@example.nl','martijn@softora.nl','Volledig ander onderwerp','Hernoemdzoekwoord','hernoemdzoekwoord blijft via exacte lineage zichtbaar','2026-08-18T10:01:00Z','2026-08-18T10:01:00Z',false,true,false,false,'{}'),
+      ('autoflag-reply','martijn@softora.nl','inbox',310,'inbox:310','<autoflag@test>','<peter-root-one@test>','<peter-root-one@test>',
+        'Autoflag Persoon','autoflag@example.nl','martijn@softora.nl','Re: Kleine vraag over jullie website','Automatisch','Automatische inhoud','2026-08-18T10:02:00Z','2026-08-18T10:02:00Z',false,true,false,false,'{"autoSubmitted":"auto-replied"}'),
+      ('instantlycase-valid','martijn@softora.nl','instantly',311,'instantly:311','<instantly-valid@test>','','',
+        'Instantlycase Geldig','instantlycase.valid@example.nl','martijn@softora.nl','Ander onderwerp','Geldig','Providerbewijs','2026-08-18T10:03:00Z','2026-08-18T10:03:00Z',false,true,false,false,
+        '{"provider":"instantly","providerThreadId":"thread-valid","providerCampaignId":"campaign-valid","providerAccountEmail":"martijn@softora.nl","providerOwner":"martijn","direction":"received"}'),
+      ('instantlycase-invalid','martijn@softora.nl','instantly',312,'instantly:312','<instantly-invalid@test>','','',
+        'Instantlycase Ongeldig','instantlycase.invalid@example.nl','martijn@softora.nl','Ander onderwerp','Ongeldig','Geen campagne-id','2026-08-18T10:04:00Z','2026-08-18T10:04:00Z',false,true,false,false,
+        '{"provider":"instantly","providerThreadId":"thread-invalid","providerAccountEmail":"martijn@softora.nl","providerOwner":"martijn","direction":"received"}'),
+      ('ownerscope-martijn','martijn@softora.nl','inbox',313,'inbox:313','<ownerscope-martijn@test>','','',
+        'Ownerscope Martijn','ownerscope.martijn@example.nl','martijn@softora.nl','Re: Kleine vraag over jullie website','Eigenaar','Martijn dossier','2026-08-18T10:05:00Z','2026-08-18T10:05:00Z',false,true,false,false,'{}'),
+      ('ownerscope-serve','serve@softora.nl','inbox',314,'inbox:314','<ownerscope-serve@test>','','',
+        'Ownerscope Serve','ownerscope.serve@example.nl','serve@softora.nl','Re: Kleine vraag over jullie website','Eigenaar','Serve dossier','2026-08-18T10:06:00Z','2026-08-18T10:06:00Z',false,true,false,false,'{}');
+
+    insert into public.softora_mailbox_campaign_lineage_roots (message_key, account_email)
+    values
+      ('peter-root-one','martijn@softora.nl'),
+      ('peter-root-two','martijn@softora.nl'),
+      ('peter-root-three','martijn@softora.nl'),
+      ('changed-root','martijn@softora.nl');
+    insert into public.softora_mailbox_campaign_lineage_members (
+      message_key, account_email, is_proven_automated
+    ) values
+      ('changed-lineage-reply','martijn@softora.nl',false),
+      ('peter-strato-bounce','martijn@softora.nl',true),
+      ('ownerscope-martijn','martijn@softora.nl',false),
+      ('ownerscope-serve','serve@softora.nl',false);
+
+    insert into public.softora_outbound_recipient_guards (
+      guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,
+      status,source,permanent
+    ) values
+      ('fixture:peter-root-one','email','peter.root.one@example.nl','softora','coldmail','martijn@softora.nl','peter.root.one@example.nl','sent','fixture',true),
+      ('fixture:peter-root-two','email','peter.root.two@example.nl','softora','coldmail','martijn@softora.nl','peter.root.two@example.nl','sent','fixture',true),
+      ('fixture:peter-root-three','email','peter.root.three@example.nl','softora','coldmail','martijn@softora.nl','peter.root.three@example.nl','sent','fixture',true),
+      ('fixture:peter-brouwers','email','peter.brouwers@example.nl','softora','coldmail','martijn@softora.nl','peter.brouwers@example.nl','sent','fixture',true),
+      ('fixture:peter-afspraak','email','peter.losbericht@example.nl','softora','coldmail','martijn@softora.nl','peter.losbericht@example.nl','sent','fixture',true),
+      ('fixture:peter-bounce','email','peter.bounce@example.nl','softora','coldmail','martijn@softora.nl','peter.bounce@example.nl','sent','fixture',true),
+      ('fixture:peter-linkedin','email','peter.linkedin@example.nl','softora','coldmail','martijn@softora.nl','peter.linkedin@example.nl','sent','fixture',true),
+      ('fixture:changed','email','changed.contact@example.nl','softora','coldmail','martijn@softora.nl','changed.contact@example.nl','sent','fixture',true),
+      ('fixture:autoflag','email','autoflag@example.nl','softora','coldmail','martijn@softora.nl','autoflag@example.nl','sent','fixture',true),
+      ('fixture:instantly-valid','email','instantlycase.valid@example.nl','instantly','instantly','martijn@softora.nl','instantlycase.valid@example.nl','sent','fixture',true),
+      ('fixture:instantly-invalid','email','instantlycase.invalid@example.nl','instantly','instantly','martijn@softora.nl','instantlycase.invalid@example.nl','sent','fixture',true),
+      ('fixture:ownerscope-martijn','email','ownerscope.martijn@example.nl','softora','coldmail','martijn@softora.nl','ownerscope.martijn@example.nl','sent','fixture',true),
+      ('fixture:ownerscope-serve','email','ownerscope.serve@example.nl','softora','coldmail','serve@softora.nl','ownerscope.serve@example.nl','sent','fixture',true);
+
+    insert into public.softora_outbound_recipient_guards (
+      guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,
+      status,source,permanent,payload
+    ) values (
+      'fixture:peter-bridge','email','peter.bridge@example.nl','softora','coldmail',
+      'martijn@softora.nl','peter.bridge@example.nl','sent','fixture',true,
+      '{"events":[{"messageId":"<peter-bridge-root@test>"}]}'
+    );
+
+    insert into public.softora_mailbox_send_provenance (
+      intent_id,idempotency_key,owner,account_email,recipient_email,mode,
+      provider,sent_message_id,sender_name,subject,body_text,status,accepted_at
+    ) values (
+      'search-fallback','search-fallback','martijn','martijn@softora.nl',
+      'provenance.contact@example.nl','reply','smtp','<search-fallback@test>',
+      'Martijn van de Ven','Volledig ander onderwerp','provenancezoekwoord voor Sent-sync',
+      'accepted','2026-08-18T11:00:00Z'
+    );
+  `);
+
+  const peterResults = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'peter', 20, 0
+    )
+  `);
+  assert.equal(peterResults.rows.length, 5);
+  assert.ok(peterResults.rows.every((row) => Number(row.total_count) === 5));
+  assert.deepEqual(
+    peterResults.rows.map((row) => row.external_contact_email).sort(),
+    [
+      'peter.bridge@example.nl',
+      'peter.root.one@example.nl',
+      'peter.root.three@example.nl',
+      'peter.root.two@example.nl',
+      'psonnemans@ziggo.nl',
+    ]
+  );
+  assert.ok(peterResults.rows.every((row) => row.canonical_owner === 'martijn'));
+  assert.ok(!peterResults.rows.some((row) => row.message_key === 'peter-brouwers'));
+
+  const fallbackSearch = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'provenancezoekwoord', 20, 0
+    )
+  `);
+  assert.deepEqual(fallbackSearch.rows.map((row) => row.message_key), [
+    'accepted-send|search-fallback',
+  ]);
+  assert.equal(fallbackSearch.rows[0].payload.timelineSource, 'send-provenance');
+
+  await database.exec(`
+    insert into public.softora_mailbox_messages (
+      message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,
+      sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,
+      body_truncated,has_body,unread,starred,payload
+    ) values (
+      'search-fallback-imap','martijn@softora.nl','sent',316,'sent:316',
+      '<SEARCH-FALLBACK@test>','','','Martijn van de Ven','martijn@softora.nl',
+      'provenance.contact@example.nl','Volledig ander onderwerp','provenancezoekwoord',
+      'provenancezoekwoord uit echte IMAP Sent','2026-08-18T11:00:00Z',
+      '2026-08-18T11:00:00Z',false,true,false,false,'{}'
+    );
+  `);
+  const indexedFallbackSearch = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'provenancezoekwoord', 20, 0
+    )
+  `);
+  assert.deepEqual(indexedFallbackSearch.rows.map((row) => row.message_key), [
+    'search-fallback-imap',
+  ]);
+
+  const peterFirstPage = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'peter', 2, 0
+    )
+  `);
+  const peterSecondPage = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'peter', 2, 2
+    )
+  `);
+  const peterThirdPage = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'peter', 2, 4
+    )
+  `);
+  assert.equal(peterFirstPage.rows.length, 2);
+  assert.equal(peterSecondPage.rows.length, 2);
+  assert.equal(peterThirdPage.rows.length, 1);
+  assert.ok([...peterFirstPage.rows, ...peterSecondPage.rows, ...peterThirdPage.rows]
+    .every((row) => Number(row.total_count) === 5));
+  assert.equal(new Set([
+    ...peterFirstPage.rows,
+    ...peterSecondPage.rows,
+    ...peterThirdPage.rows,
+  ].map((row) => row.external_contact_email)).size, 5);
+
+  const renamedLineage = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'hernoemdzoekwoord', 20, 0
+    )
+  `);
+  assert.deepEqual(renamedLineage.rows.map((row) => row.message_key), ['changed-lineage-reply']);
+  assert.equal(renamedLineage.rows[0].subject, 'Volledig ander onderwerp');
+
+  const automated = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'autoflag', 20, 0
+    )
+  `);
+  assert.equal(automated.rows.length, 0);
+
+  const instantly = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'instantlycase', 20, 0
+    )
+  `);
+  assert.deepEqual(instantly.rows.map((row) => row.message_key), ['instantlycase-valid']);
+
+  const ownerScopes = [];
+  for (const owner of ['martijn', 'serve']) {
+    const account = owner === 'martijn' ? 'martijn@softora.nl' : 'serve@softora.nl';
+    const result = await database.query(`
+      select * from public.softora_search_mailbox_contact_dossiers(
+        $1::jsonb, 'ownerscope', 20, 0
+      )
+    `, [JSON.stringify({ [owner]: [account] })]);
+    assert.equal(result.rows.length, 1);
+    assert.equal(result.rows[0].canonical_owner, owner);
+    ownerScopes.push(result.rows[0].external_contact_email);
+  }
+  assert.deepEqual(ownerScopes.sort(), [
+    'ownerscope.martijn@example.nl',
+    'ownerscope.serve@example.nl',
+  ]);
+  const bothOwners = await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"],"serve":["serve@softora.nl"]}'::jsonb,
+      'ownerscope', 20, 0
+    )
+  `);
+  assert.equal(bothOwners.rows.length, 2);
+  assert.deepEqual(
+    bothOwners.rows.map((row) => row.canonical_owner).sort(),
+    ['martijn', 'serve']
+  );
+
   const martijnTimeline = await database.query(
     "select * from public.softora_mailbox_contact_timeline(array['martijn@softora.nl'],'psonnemans@ziggo.nl',50,0)"
   );
-  assert.equal(martijnTimeline.rows.length, 4);
-  assert.equal(Number(martijnTimeline.rows[0].total_count), 4);
-  assert.equal(new Set(martijnTimeline.rows.map((row) => row.technical_thread_key)).size, 2);
+  assert.equal(martijnTimeline.rows.length, 2);
+  assert.equal(Number(martijnTimeline.rows[0].total_count), 2);
+  assert.equal(new Set(martijnTimeline.rows.map((row) => row.technical_thread_key)).size, 1);
   assert.ok(martijnTimeline.rows.every((row) => row.external_contact_email === 'psonnemans@ziggo.nl'));
   assert.ok(martijnTimeline.rows.every((row) => row.sender_email !== 'ander@ziggo.nl'));
 
   const bothTimeline = await database.query(
     "select * from public.softora_mailbox_contact_timeline(array['martijn@softora.nl','serve@softora.nl'],'psonnemans@ziggo.nl',50,0)"
   );
-  assert.equal(bothTimeline.rows.length, 5);
+  assert.equal(bothTimeline.rows.length, 2);
+  assert.ok(!martijnTimeline.rows.some((row) => /afspraak/i.test(row.subject)));
   const search = await database.query(
     "select * from public.softora_search_mailbox_messages(array['martijn@softora.nl'],'afspraak',20,0)"
   );
@@ -850,6 +1141,8 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   const narrowPlanSource = fs.readFileSync(outreachNarrowPlanMigrationPath, 'utf8');
   const scoreOnceSource = fs.readFileSync(outreachScoreOnceMigrationPath, 'utf8');
   const contactDossierSource = fs.readFileSync(contactDossierMigrationPath, 'utf8');
+  const acceptedTimelineSource = fs.readFileSync(acceptedTimelineMigrationPath, 'utf8');
+  const campaignProvenanceSource = fs.readFileSync(campaignProvenanceMigrationPath, 'utf8');
   assert.match(source, /using gin[\s\S]*extensions\.gin_trgm_ops/);
   assert.match(source, /body_text/);
   assert.match(source, /generation_superseded_at is null/);
@@ -910,4 +1203,24 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   assert.match(contactDossierSource, /softora_set_mailbox_message_visibility[\s\S]*softora_mailbox_campaign_consistency[\s\S]*for update;[\s\S]*select m\.\*[\s\S]*limit 1;[\s\S]*pg_advisory_xact_lock[\s\S]*select m\.\*[\s\S]*for update;/);
   assert.match(contactDossierSource, /where pg_catalog\.lower\(pg_catalog\.btrim\(m\.account_email\)\) = v_account_email[\s\S]*softora_normalize_mailbox_message_id\(m\.message_id\) = v_message_id/);
   assert.doesNotMatch(contactDossierSource, /grant execute[\s\S]*to authenticated/);
+  assert.match(campaignProvenanceSource, /softora_mailbox_message_has_campaign_proof/);
+  assert.match(campaignProvenanceSource, /provenance_candidates as materialized/);
+  assert.match(campaignProvenanceSource, /timelineSource', 'send-provenance'/);
+  assert.match(campaignProvenanceSource, /row_number\(\) over[\s\S]*source_rank/);
+  assert.doesNotMatch(campaignProvenanceSource, /kleine vraag over jullie website|nieuw webdesign/);
+  assert.match(acceptedTimelineSource, /softora_has_proven_automated_reply\(params\.payload\)/);
+  assert.match(acceptedTimelineSource, /softora_mailbox_campaign_lineage_roots root/);
+  assert.match(acceptedTimelineSource, /softora_mailbox_campaign_lineage_members member/);
+  assert.match(acceptedTimelineSource, /originalCampaignOutbound/);
+  assert.match(acceptedTimelineSource, /providerCampaignId/);
+  assert.match(acceptedTimelineSource, /mailer-daemon\|postmaster/);
+  assert.match(acceptedTimelineSource, /linkedin\[\.\]com/);
+  assert.match(acceptedTimelineSource, /strato\[\.\]\(nl\|de\|com\)/);
+  assert.match(acceptedTimelineSource, /physical_candidates as materialized[\s\S]*softora_mailbox_message_has_campaign_proof/);
+  assert.match(campaignProvenanceSource, /contact_matches\.\*, pg_catalog\.count\(\*\) over \(\) as result_count/);
+  assert.match(campaignProvenanceSource, /least\(40/);
+  assert.match(campaignProvenanceSource, /least\(5000/);
+  assert.match(campaignProvenanceSource, /revoke all on function public\.softora_search_mailbox_contact_dossiers[\s\S]*from public, anon, authenticated/);
+  assert.match(campaignProvenanceSource, /grant execute on function public\.softora_search_mailbox_contact_dossiers[\s\S]*to service_role/);
+  assert.doesNotMatch(campaignProvenanceSource, /grant execute[\s\S]*to authenticated/);
 });

@@ -2334,6 +2334,46 @@ test('campaign reply service faalt gesloten wanneer gerichte contacthistorie nie
   );
 });
 
+test('campaign reply service verbergt accepted sends niet als een provenance-read tijdelijk faalt', async () => {
+  const provenanceError = Object.assign(new Error('accepted provenance tijdelijk niet leesbaar'), {
+    code: 'ETIMEDOUT',
+    status: 503,
+  });
+  const incoming = {
+    id: 'inbox:accepted-read-failure',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'lead@example.nl',
+    to: 'serve@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Menselijke reactie',
+    body: 'Menselijke reactie',
+    date: '2026-08-24T13:00:00.000Z',
+    messageId: '<accepted-read-failure@example.nl>',
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [incoming] : [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'accepted-read-failure', bedrijf: 'Lead', email: 'lead@example.nl',
+        campaignType: 'webdesign', lastColdmailProvider: 'softora',
+      }],
+    },
+    mailboxSendProvenanceStore: {
+      listAcceptedMessages: async () => { throw provenanceError; },
+    },
+  });
+
+  await assert.rejects(
+    service.listReplies({ limit: 100, owner: 'serve' }),
+    (error) => error === provenanceError
+  );
+});
+
 test('campaign reply service hydrateert alleen de zichtbare conversatieroots en niet alle threadbodies', async () => {
   const hydratedIds = [];
   const replies = Array.from({ length: 140 }, (_item, index) => ({

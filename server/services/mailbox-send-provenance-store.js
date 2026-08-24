@@ -1,5 +1,8 @@
 const crypto = require('crypto');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
+const MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS = 8_000;
+const MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS = 2;
+const MAILBOX_SEND_RESERVATION_LEASE_MS = 30_000;
 
 function createCanonicalMailboxHash(parts = []) {
   const source = parts.map((value) => {
@@ -67,6 +70,17 @@ function isAmbiguousMailboxProviderError(error) {
     || status >= 500;
 }
 
+function isTransientMailboxProvenanceError(error) {
+  const code = String(error?.code || '').trim().toUpperCase();
+  const status = Number(error?.status || error?.statusCode || 0);
+  const text = String(
+    error?.message || error?.details || error?.hint || error?.name || error || ''
+  ).trim();
+  return status === 408 || status === 429 || status >= 500
+    || ['57014', 'SUPABASE_REST_COOLDOWN'].includes(code)
+    || /abort|timeout|timed out|cooldown|fetch failed|network|econnreset|etimedout|connection terminated|temporar/i.test(text);
+}
+
 function createMailboxReconcileRequiredError(cause) {
   const error = new Error('De provideruitkomst is niet eenduidig bevestigd; controleer de verzendstatus vóór opnieuw proberen.');
   error.status = 409;
@@ -82,17 +96,50 @@ function createMailboxSendProvenanceStore(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     logger = console,
     now = () => new Date(),
+    criticalClientTimeoutMs = MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
+    criticalMaxAttempts = MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS,
+    retryDelayMs = 50,
+    sleep = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
+    createTransitionToken = () => crypto.randomUUID(),
+    reservationLeaseMs = MAILBOX_SEND_RESERVATION_LEASE_MS,
   } = deps;
   const normalizeEmail = (value) => normalizeString(value).toLowerCase();
   const getClient = () => (isSupabaseConfigured() ? getSupabaseClient() : null);
 
-  function requiredClient() {
-    const client = getClient();
+  const getCriticalClient = () => (isSupabaseConfigured() ? getSupabaseClient({
+    timeoutMs: Math.max(1_000, Math.min(60_000, Number(criticalClientTimeoutMs) || MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS)),
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }) : null);
+
+  function requiredCriticalClient() {
+    const client = getCriticalClient();
     if (client) return client;
     const error = new Error('Duurzame mailbox-threadregistratie is niet beschikbaar; verzending is veilig gestopt.');
     error.status = 503;
     error.code = 'MAILBOX_SEND_PROVENANCE_UNAVAILABLE';
     throw error;
+  }
+
+  async function runCriticalQuery(operation, options = {}) {
+    const configuredAttempts = Math.max(1, Math.min(2, Number(criticalMaxAttempts) || 1));
+    const maxAttempts = options.maxAttempts === undefined
+      ? configuredAttempts
+      : Math.max(1, Math.min(configuredAttempts, Number(options.maxAttempts) || 1));
+    let lastError = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        const result = await operation(requiredCriticalClient());
+        if (result?.error) throw result.error;
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (!isTransientMailboxProvenanceError(error) || attempt >= maxAttempts - 1) throw error;
+        const delayMs = Math.max(0, Math.min(250, Number(retryDelayMs) || 0));
+        if (delayMs) await sleep(delayMs);
+      }
+    }
+    throw lastError;
   }
 
   function normalizeRow(row = {}) {
@@ -116,6 +163,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
       sentReconcileRequired: row.sent_reconcile_required === true,
       acceptedAt: normalizeString(row.accepted_at), createdAt: normalizeString(row.created_at),
       updatedAt: normalizeString(row.updated_at),
+      transitionToken: normalizeString(row.transition_token),
     };
   }
 
@@ -142,7 +190,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
       cc_text: normalizeString(input.cc) || null, bcc_text: normalizeString(input.bcc) || null,
       status: 'prepared', dispatch_state: 'reserved', dispatch_started_at: null,
       dispatch_lease_expires_at: null, reconcile_required: false, sent_reconcile_required: false,
-      error_text: null, updated_at: now().toISOString(),
+      error_text: null, transition_token: null, updated_at: now().toISOString(),
     };
   }
 
@@ -172,32 +220,89 @@ function createMailboxSendProvenanceStore(deps = {}) {
   }
 
   async function findByIdempotencyKey(idempotencyKey) {
-    const result = await requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
-      .eq('idempotency_key', normalizeString(idempotencyKey)).maybeSingle();
-    if (result.error) throw result.error;
+    const result = await runCriticalQuery((client) => client
+      .from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
+      .eq('idempotency_key', normalizeString(idempotencyKey)).maybeSingle());
+    return result.data ? normalizeRow(result.data) : null;
+  }
+
+  async function findByIntentId(intentId) {
+    const result = await runCriticalQuery((client) => client
+      .from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
+      .eq('intent_id', normalizeString(intentId)).maybeSingle());
     return result.data ? normalizeRow(result.data) : null;
   }
 
   async function findByColumn(column, value, statuses = []) {
-    let query = requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
-      .eq(column, normalizeString(value));
-    if (statuses.length) query = query.in('status', statuses);
-    const result = await query.maybeSingle();
-    if (result.error) throw result.error;
+    const result = await runCriticalQuery((client) => {
+      let query = client.from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
+        .eq(column, normalizeString(value));
+      if (statuses.length) query = query.in('status', statuses);
+      return query.maybeSingle();
+    });
     return result.data ? normalizeRow(result.data) : null;
+  }
+
+  function isExpiredStartedDispatch(intent) {
+    const leaseExpiresAtMs = Date.parse(normalizeString(intent?.dispatchLeaseExpiresAt));
+    return intent?.status === 'prepared' && intent?.dispatchState === 'started'
+      && Number.isFinite(leaseExpiresAtMs) && leaseExpiresAtMs <= now().getTime();
+  }
+
+  function getReservationLeaseMs() {
+    return Math.max(5_000, Math.min(120_000, Number(reservationLeaseMs) || MAILBOX_SEND_RESERVATION_LEASE_MS));
+  }
+
+  function isExpiredReservedDispatch(intent) {
+    if (intent?.status !== 'prepared' || intent?.dispatchState !== 'reserved') return false;
+    const explicitLeaseMs = Date.parse(normalizeString(intent.dispatchLeaseExpiresAt));
+    if (Number.isFinite(explicitLeaseMs)) return explicitLeaseMs <= now().getTime();
+    const legacyBaseMs = Date.parse(normalizeString(intent.updatedAt || intent.createdAt));
+    return Number.isFinite(legacyBaseMs) && legacyBaseMs + getReservationLeaseMs() <= now().getTime();
+  }
+
+  function matchesReservationPayload(intent, row, { exactIntent = false } = {}) {
+    if (!intent) return false;
+    const expected = normalizeRow(row);
+    const fields = [
+      'idempotencyKey', 'sendIdentityKey', 'sendScopeKey', 'payloadFingerprint', 'attachmentsFingerprint',
+      'owner', 'accountEmail', 'recipientEmail', 'mode', 'conversationId', 'replyTargetMessageId',
+      'references', 'provider', 'providerThreadId', 'senderName', 'subject', 'body', 'cc', 'bcc',
+    ];
+    if (exactIntent) fields.push('intentId', 'messageId');
+    return fields.every((field) => intent[field] === expected[field]);
+  }
+
+  function exactReservedCasFilters(intent) {
+    const equals = {};
+    const nulls = [];
+    if (normalizeString(intent.transitionToken)) equals.transition_token = intent.transitionToken;
+    else nulls.push('transition_token');
+    if (normalizeString(intent.dispatchLeaseExpiresAt)) equals.dispatch_lease_expires_at = intent.dispatchLeaseExpiresAt;
+    else nulls.push('dispatch_lease_expires_at');
+    if (normalizeString(intent.updatedAt)) equals.updated_at = intent.updatedAt;
+    return { statuses: ['prepared'], dispatchState: 'reserved', equals, nulls };
+  }
+
+  async function reconcileExpiredStartedDispatch(intent) {
+    if (!isExpiredStartedDispatch(intent)) return intent;
+    const error = new Error('De dispatchlease is verlopen; de provideruitkomst moet eerst worden gereconcilieerd.');
+    error.code = 'MAILBOX_SEND_DISPATCH_LEASE_EXPIRED';
+    return markUnknown(intent.intentId, error, {
+      sentReconcileRequired: true, expectedDispatchLeaseExpiresAt: intent.dispatchLeaseExpiresAt,
+    });
   }
 
   async function findReservationConflict(row) {
     const byIdempotency = await findByIdempotencyKey(row.idempotency_key);
-    if (byIdempotency) return byIdempotency;
+    if (byIdempotency) return reconcileExpiredStartedDispatch(byIdempotency);
     const byIdentity = await findByColumn(
-      'send_identity_key',
-      row.send_identity_key,
-      ['prepared', 'unknown', 'accepted']
+      'send_identity_key', row.send_identity_key, ['prepared', 'unknown', 'accepted']
     );
-    if (byIdentity) return byIdentity;
+    if (byIdentity) return reconcileExpiredStartedDispatch(byIdentity);
     return row.mode === 'new-message'
       ? findByColumn('send_scope_key', row.send_scope_key, ['prepared', 'unknown'])
+        .then(reconcileExpiredStartedDispatch)
       : null;
   }
 
@@ -216,29 +321,204 @@ function createMailboxSendProvenanceStore(deps = {}) {
   async function reserve(input = {}) {
     const row = buildPreparedRow(input);
     assertPreparedRow(row);
-    const result = await requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).insert(row).select('*').single();
-    if (!result.error && result.data) return { created: true, intent: normalizeRow(result.data) };
-    if (normalizeString(result.error && result.error.code) === '23505') {
-      const existing = await findReservationConflict(row);
-      if (existing) return { created: false, intent: existing };
+    const reservationToken = normalizeString(createTransitionToken());
+    if (!reservationToken) {
+      const error = new Error('Threadregistratie kon niet worden voorbereid.');
+      error.status = 503;
+      error.code = 'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED';
+      throw error;
     }
-    const error = result.error || new Error('Threadregistratie kon niet worden voorbereid.');
+    row.transition_token = reservationToken;
+    const reservedAt = now();
+    row.updated_at = reservedAt.toISOString();
+    row.dispatch_lease_expires_at = new Date(reservedAt.getTime() + getReservationLeaseMs()).toISOString();
+
+    function isExactCommittedReservation(intent) {
+      return intent?.status === 'prepared' && intent?.dispatchState === 'reserved'
+        && intent?.transitionToken === reservationToken
+        && sameTimestamp(intent?.dispatchLeaseExpiresAt, row.dispatch_lease_expires_at)
+        && matchesReservationPayload(intent, row, { exactIntent: true });
+    }
+
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = await runCriticalQuery((client) => client.from(MAILBOX_SEND_PROVENANCE_TABLE)
+          .insert(row).select('*').single(), { maxAttempts: 1 });
+        if (result.data) return { created: true, intent: normalizeRow(result.data) };
+        lastError = new Error('Threadregistratie kon niet worden voorbereid.');
+      } catch (queryError) {
+        lastError = queryError;
+      }
+
+      let byIntent = null, existing = null;
+      try {
+        byIntent = await findByIntentId(row.intent_id);
+        if (isExactCommittedReservation(byIntent)) return { created: true, intent: byIntent };
+        existing = byIntent ? await reconcileExpiredStartedDispatch(byIntent) : await findReservationConflict(row);
+      } catch (readError) {
+        const error = createUpdateError(lastError, 'voorbereid');
+        error.recoveryError = readError;
+        throw error;
+      }
+      if (existing && isExpiredReservedDispatch(existing)) {
+        const recovered = await recoverExpiredReserved(existing, row, reservationToken);
+        if (recovered.created === true) return { created: true, intent: recovered.intent };
+        if (recovered.released === true && attempt === 0) continue;
+        if (recovered.intent) return { created: false, intent: recovered.intent };
+      }
+      if (existing) return { created: false, intent: existing };
+      if (attempt === 0 && isTransientMailboxProvenanceError(lastError)) {
+        const delayMs = Math.max(0, Math.min(250, Number(retryDelayMs) || 0));
+        if (delayMs) await sleep(delayMs);
+        continue;
+      }
+      const error = lastError || new Error('Threadregistratie kon niet worden voorbereid.');
+      error.status = Number(error.status) || 503;
+      error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED';
+      throw error;
+    }
+    const error = lastError || new Error('Threadregistratie kon niet worden voorbereid.');
     error.status = Number(error.status) || 503;
     error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED';
     throw error;
   }
 
-  async function updateIntent(intentId, values, label, filters = {}) {
-    let query = requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE)
-      .update({ ...values, updated_at: now().toISOString() }).eq('intent_id', normalizeString(intentId));
-    if (Array.isArray(filters.statuses) && filters.statuses.length) query = query.in('status', filters.statuses);
-    if (filters.dispatchState) query = query.eq('dispatch_state', filters.dispatchState);
-    const result = await query.select('*').single();
-    if (!result.error && result.data) return normalizeRow(result.data);
-    const error = result.error || new Error(`Threadregistratie kon niet als ${label} worden opgeslagen.`);
+  function sameTimestamp(left, right) {
+    if (!normalizeString(left) && !normalizeString(right)) return true;
+    const leftMs = Date.parse(normalizeString(left));
+    const rightMs = Date.parse(normalizeString(right));
+    return Number.isFinite(leftMs) && Number.isFinite(rightMs) && leftMs === rightMs;
+  }
+
+  function transitionFieldMatches(intent, column, expected) {
+    if (column === 'intent_id') return intent?.intentId === normalizeString(expected);
+    if (column === 'status') return intent?.status === normalizeString(expected).toLowerCase();
+    if (column === 'dispatch_state') return intent?.dispatchState === normalizeString(expected).toLowerCase();
+    if (column === 'dispatch_started_at') return sameTimestamp(intent?.dispatchStartedAt, expected);
+    if (column === 'dispatch_lease_expires_at') return sameTimestamp(intent?.dispatchLeaseExpiresAt, expected);
+    if (column === 'reconcile_required') return intent?.reconcileRequired === (expected === true);
+    if (column === 'sent_reconcile_required') return intent?.sentReconcileRequired === (expected === true);
+    if (column === 'provider_message_id') return intent?.providerMessageId === normalizeString(expected);
+    if (column === 'provider_thread_id') return intent?.providerThreadId === normalizeString(expected);
+    if (column === 'sent_message_id') return intent?.messageId === normalizeString(expected);
+    if (column === 'accepted_at') return sameTimestamp(intent?.acceptedAt, expected);
+    if (column === 'error_text') return intent?.error === normalizeString(expected);
+    if (column === 'transition_token') return intent?.transitionToken === normalizeString(expected);
+    if (column === 'updated_at') return sameTimestamp(intent?.updatedAt, expected);
+    return false;
+  }
+
+  function matchesTransition(intent, values, transitionToken) {
+    return Boolean(intent) && intent.transitionToken === transitionToken
+      && Object.entries(values).every(([column, expected]) => transitionFieldMatches(intent, column, expected));
+  }
+
+  function matchesTransitionFilters(intent, filters = {}) {
+    if (!intent) return false;
+    if (Array.isArray(filters.statuses) && filters.statuses.length && !filters.statuses.includes(intent.status)) return false;
+    if (filters.dispatchState && intent.dispatchState !== filters.dispatchState) return false;
+    if ((filters.nulls || []).some((column) => !transitionFieldMatches(intent, column, null))) return false;
+    return Object.entries(filters.equals || {})
+      .every(([column, expected]) => transitionFieldMatches(intent, column, expected));
+  }
+
+  function createUpdateError(queryError, label) {
+    const error = queryError instanceof Error
+      ? queryError
+      : Object.assign(new Error(normalizeString(queryError?.message)
+          || `Threadregistratie kon niet als ${label} worden opgeslagen.`), queryError || {});
     error.status = Number(error.status) || 503;
     error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED';
-    throw error;
+    return error;
+  }
+
+  async function updateIntent(intentId, values, label, filters = {}, options = {}) {
+    const normalizedIntentId = normalizeString(intentId);
+    const transitionToken = normalizeString(options.transitionToken || createTransitionToken());
+    if (!transitionToken) throw createUpdateError(null, label);
+    const patch = { ...values, transition_token: transitionToken, updated_at: now().toISOString() };
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = await runCriticalQuery((client) => {
+          let query = client.from(MAILBOX_SEND_PROVENANCE_TABLE)
+            .update(patch).eq('intent_id', normalizedIntentId);
+          if (Array.isArray(filters.statuses) && filters.statuses.length) query = query.in('status', filters.statuses);
+          if (filters.dispatchState) query = query.eq('dispatch_state', filters.dispatchState);
+          Object.entries(filters.equals || {}).forEach(([column, expected]) => { query = query.eq(column, expected); });
+          (filters.nulls || []).forEach((column) => { query = query.is(column, null); });
+          return query.select('*').single();
+        }, { maxAttempts: 1 });
+        if (result.data) return normalizeRow(result.data);
+        lastError = new Error(`Threadregistratie kon niet als ${label} worden opgeslagen.`);
+      } catch (queryError) {
+        lastError = queryError;
+      }
+
+      let current = null;
+      try {
+        const readbackIntentId = normalizeString(options.readbackIntentId) || normalizedIntentId;
+        current = await findByIntentId(readbackIntentId);
+        if (!current && readbackIntentId !== normalizedIntentId) current = await findByIntentId(normalizedIntentId);
+      } catch (readError) {
+        const error = createUpdateError(lastError, label);
+        error.recoveryError = readError;
+        throw error;
+      }
+      if (matchesTransition(current, values, transitionToken)) return current;
+      if (typeof options.isAlreadyApplied === 'function' && options.isAlreadyApplied(current)) return current;
+      if (attempt === 0 && isTransientMailboxProvenanceError(lastError)
+        && matchesTransitionFilters(current, filters)) {
+        const delayMs = Math.max(0, Math.min(250, Number(retryDelayMs) || 0));
+        if (delayMs) await sleep(delayMs);
+        continue;
+      }
+      throw createUpdateError(lastError, label);
+    }
+    throw createUpdateError(lastError, label);
+  }
+
+  async function renewExpiredReserved(existing, row, reservationToken) {
+    if (existing.idempotencyKey !== normalizeString(row.idempotency_key)
+      || !matchesReservationPayload(existing, row)) return { created: false, intent: existing };
+    try {
+      const renewed = await updateIntent(existing.intentId, {
+        intent_id: row.intent_id,
+        sent_message_id: row.sent_message_id,
+        status: 'prepared', dispatch_state: 'reserved',
+        dispatch_started_at: null,
+        dispatch_lease_expires_at: row.dispatch_lease_expires_at,
+        reconcile_required: false, sent_reconcile_required: false,
+        error_text: null,
+      }, 'opnieuw gereserveerd', exactReservedCasFilters(existing), {
+        transitionToken: reservationToken, readbackIntentId: row.intent_id,
+      });
+      const created = renewed.transitionToken === reservationToken
+        && renewed.intentId === normalizeString(row.intent_id);
+      return { created, intent: renewed };
+    } catch (error) {
+      const current = await findByIdempotencyKey(row.idempotency_key).catch(() => null);
+      if (current) return { created: false, intent: current };
+      throw error;
+    }
+  }
+
+  async function releaseExpiredReserved(existing) {
+    const released = await updateIntent(existing.intentId, {
+      status: 'failed', dispatch_state: 'finished', dispatch_lease_expires_at: null,
+      error_text: 'De pre-dispatchreservering verliep voordat de provider werd gestart.',
+    }, 'veilig vrijgegeven', exactReservedCasFilters(existing), {
+      isAlreadyApplied: (intent) => intent?.status === 'failed' && intent?.dispatchState === 'finished',
+    });
+    return { released: released?.status === 'failed', intent: released };
+  }
+
+  async function recoverExpiredReserved(existing, row, reservationToken) {
+    if (!isExpiredReservedDispatch(existing)) return { created: false, intent: existing };
+    if (existing.idempotencyKey === normalizeString(row.idempotency_key))
+      return renewExpiredReserved(existing, row, reservationToken);
+    return releaseExpiredReserved(existing);
   }
 
   const startDispatch = (intentId, leaseMs = 120_000) => {
@@ -249,23 +529,50 @@ function createMailboxSendProvenanceStore(deps = {}) {
     }, 'gestart', { statuses: ['prepared'], dispatchState: 'reserved' });
   };
 
-  const accept = (intentId, values = {}) => updateIntent(intentId, {
-    status: 'accepted', sent_message_id: normalizeString(values.messageId) || null,
-    provider_message_id: normalizeString(values.providerMessageId) || null,
-    provider_thread_id: normalizeString(values.providerThreadId) || null,
-    accepted_at: normalizeString(values.acceptedAt) || now().toISOString(), error_text: null,
-    dispatch_state: 'finished', dispatch_lease_expires_at: null,
-    reconcile_required: false, sent_reconcile_required: false,
-  }, 'verzonden', { statuses: ['prepared', 'unknown'] });
+  const accept = (intentId, values = {}) => {
+    const messageId = normalizeString(values.messageId);
+    const providerMessageId = normalizeString(values.providerMessageId);
+    const providerThreadId = normalizeString(values.providerThreadId);
+    return updateIntent(intentId, {
+      status: 'accepted', sent_message_id: messageId || null,
+      provider_message_id: providerMessageId || null,
+      provider_thread_id: providerThreadId || null,
+      accepted_at: normalizeString(values.acceptedAt) || now().toISOString(), error_text: null,
+      dispatch_state: 'finished', dispatch_lease_expires_at: null,
+      reconcile_required: false, sent_reconcile_required: false,
+    }, 'verzonden', { statuses: ['prepared', 'unknown'] }, {
+      isAlreadyApplied: (intent) => intent?.status === 'accepted' && intent?.dispatchState === 'finished'
+        && (!messageId || intent.messageId === messageId)
+        && (!providerMessageId || intent.providerMessageId === providerMessageId)
+        && (!providerThreadId || intent.providerThreadId === providerThreadId),
+    });
+  };
 
-  const markUnknown = (intentId, errorValue, values = {}) => updateIntent(intentId, {
-    status: 'unknown', dispatch_state: 'started', dispatch_lease_expires_at: null,
-    reconcile_required: true, sent_reconcile_required: values.sentReconcileRequired === true,
-    provider_message_id: normalizeString(values.providerMessageId) || null,
-    sent_message_id: normalizeString(values.messageId) || null,
-    error_text: normalizeString(errorValue && (errorValue.message || errorValue)).slice(0, 1000)
-      || 'Providerresultaat vereist reconciliatie',
-  }, 'onzeker', { statuses: ['prepared'] });
+  const markUnknown = (intentId, errorValue, values = {}) => {
+    const providerMessageId = normalizeString(values.providerMessageId);
+    const messageId = normalizeString(values.messageId);
+    const sentReconcileRequired = values.sentReconcileRequired === true;
+    const expectedDispatchLeaseExpiresAt = normalizeString(values.expectedDispatchLeaseExpiresAt);
+    const filters = { statuses: ['prepared'] };
+    if (expectedDispatchLeaseExpiresAt) Object.assign(filters, {
+      dispatchState: 'started', equals: { dispatch_lease_expires_at: expectedDispatchLeaseExpiresAt },
+    });
+    return updateIntent(intentId, {
+      status: 'unknown', dispatch_state: 'started', dispatch_lease_expires_at: null,
+      reconcile_required: true, sent_reconcile_required: sentReconcileRequired,
+      provider_message_id: providerMessageId || null,
+      sent_message_id: messageId || null,
+      error_text: normalizeString(errorValue && (errorValue.message || errorValue)).slice(0, 1000)
+        || 'Providerresultaat vereist reconciliatie',
+    }, 'onzeker', filters, {
+      isAlreadyApplied: (intent) => (intent?.status === 'unknown' && intent?.dispatchState === 'started'
+        && intent?.reconcileRequired === true && intent?.sentReconcileRequired === sentReconcileRequired
+        && (!providerMessageId || intent.providerMessageId === providerMessageId)
+        && (!messageId || intent.messageId === messageId))
+        || (Boolean(expectedDispatchLeaseExpiresAt) && intent?.status === 'accepted'
+          && intent?.dispatchState === 'finished'),
+    });
+  };
 
   async function fail(intentId, errorValue) {
     try {
@@ -273,7 +580,9 @@ function createMailboxSendProvenanceStore(deps = {}) {
         status: 'failed',
         dispatch_state: 'finished', dispatch_lease_expires_at: null,
         error_text: normalizeString(errorValue && (errorValue.message || errorValue)).slice(0, 1000) || 'Verzending mislukt',
-      }, 'mislukt', { statuses: ['prepared'] });
+      }, 'mislukt', { statuses: ['prepared'] }, {
+        isAlreadyApplied: (intent) => intent?.status === 'failed' && intent?.dispatchState === 'finished',
+      });
     } catch (error) {
       logger.error('[MailboxSendProvenance][Fail]', error?.message || error);
       return null;
@@ -282,16 +591,17 @@ function createMailboxSendProvenanceStore(deps = {}) {
 
   async function listAcceptedMessages({ accountEmails = [], limit = 500 } = {}) {
     const emails = Array.from(new Set(accountEmails.map(normalizeEmail).filter(Boolean)));
-    const client = getClient();
-    if (!emails.length || !client) return [];
-    const result = await client.from(MAILBOX_SEND_PROVENANCE_TABLE).select('*').in('account_email', emails)
-      .eq('status', 'accepted').order('accepted_at', { ascending: false })
-      .limit(Math.max(1, Math.min(2000, Number(limit) || 500)));
-    if (result.error) {
-      logger.error('[MailboxSendProvenance][List]', result.error?.message || result.error);
-      return [];
+    if (!emails.length || !isSupabaseConfigured()) return [];
+    try {
+      const result = await runCriticalQuery((client) => client
+        .from(MAILBOX_SEND_PROVENANCE_TABLE).select('*').in('account_email', emails)
+        .eq('status', 'accepted').order('accepted_at', { ascending: false })
+        .limit(Math.max(1, Math.min(2000, Number(limit) || 500))));
+      return (Array.isArray(result.data) ? result.data : []).map(normalizeRow);
+    } catch (error) {
+      logger.error('[MailboxSendProvenance][List]', error?.message || error);
+      throw error;
     }
-    return (Array.isArray(result.data) ? result.data : []).map(normalizeRow);
   }
 
   return {
@@ -310,6 +620,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
 
 module.exports = {
   MAILBOX_SEND_PROVENANCE_TABLE,
+  MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
   createMailboxSendIdentityKey,
@@ -317,4 +628,5 @@ module.exports = {
   createMailboxSendScopeKey,
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
+  isTransientMailboxProvenanceError,
 };

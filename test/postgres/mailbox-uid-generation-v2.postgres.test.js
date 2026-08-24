@@ -27,9 +27,40 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260821202054_mailbox_uid_generation_epoch_v2.sql'
   ), 'utf8');
+  const perKeyRepairMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260824120423_mailbox_sync_per_key_finalizer_repair.sql'
+  ), 'utf8');
+  const sendProvenanceFoundation = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
+  ), 'utf8');
+  const providerOutcomeMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260810012150_mailbox_send_provider_outcome_state.sql'
+  ), 'utf8');
+  const sendProvenanceTimelineMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260824120230_mailbox_contact_timeline_send_provenance.sql'
+  ), 'utf8');
+  const provenanceFenceStart = sendProvenanceTimelineMigration.indexOf(
+    '-- mailbox-send-provenance-visibility-fence:start'
+  );
+  const provenanceFenceEndMarker = '-- mailbox-send-provenance-visibility-fence:end';
+  const provenanceFenceEnd = sendProvenanceTimelineMigration.indexOf(
+    provenanceFenceEndMarker,
+    provenanceFenceStart
+  );
+  if (provenanceFenceStart < 0 || provenanceFenceEnd <= provenanceFenceStart) {
+    throw new Error('Getrackte provenance-visibilityfence mist het verwachte bereik.');
+  }
+  const sendProvenanceVisibilityFenceMigration = sendProvenanceTimelineMigration.slice(
+    provenanceFenceStart,
+    provenanceFenceEnd + provenanceFenceEndMarker.length
+  );
   const clients = new Set();
 
-  function applyTrackedSql(sql) {
+  async function applyTrackedSql(client, sql) {
     const databaseName = decodeURIComponent(parsedUrl.pathname.slice(1));
     const username = decodeURIComponent(parsedUrl.username || 'postgres');
     const password = decodeURIComponent(parsedUrl.password || '');
@@ -54,6 +85,24 @@ if (!databaseUrl) {
       env: { ...process.env, PGPASSWORD: password },
       maxBuffer: 1024 * 1024,
     });
+    if (result.error?.code === 'ENOENT' && !postgresContainerId) {
+      // Keep tracked migration contents as a bound value; never concatenate them into a client query.
+      await client.query(`
+        create or replace function pg_temp.softora_apply_tracked_test_sql(p_sql text)
+        returns void
+        language plpgsql
+        as $function$
+        begin
+          execute p_sql;
+        end;
+        $function$;
+      `);
+      await client.query(
+        'select pg_temp.softora_apply_tracked_test_sql($1::text)',
+        [sql]
+      );
+      return;
+    }
     if (result.error || result.status !== 0) {
       const detail = String(result.stderr || result.error?.message || 'onbekende fout').trim();
       throw new Error(`Kon getrackte UID-generation-migratie niet toepassen: ${detail}`);
@@ -66,6 +115,19 @@ if (!databaseUrl) {
     await client.query("set statement_timeout='10s'; set lock_timeout='7s';");
     clients.add(client);
     return client;
+  }
+
+  async function waitForBackendWait(client, pid, expectedWaitEvent, timeoutMs = 3_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const activity = (await client.query(`
+        select wait_event_type,wait_event
+        from pg_catalog.pg_stat_activity where pid=$1
+      `, [pid])).rows[0];
+      if (activity?.wait_event === expectedWaitEvent) return activity;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return null;
   }
 
   function messageRow(uid, suffix, overrides = {}) {
@@ -223,6 +285,37 @@ if (!databaseUrl) {
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       );
+      create table public.softora_mailbox_campaign_lineage_roots (
+        message_key text primary key
+          references public.softora_mailbox_messages(message_key)
+          on update cascade on delete cascade,
+        created_at timestamptz not null default clock_timestamp()
+      );
+      create table public.softora_mailbox_campaign_lineage_members (
+        message_key text primary key
+          references public.softora_mailbox_messages(message_key)
+          on update cascade on delete cascade,
+        root_message_key text not null
+          references public.softora_mailbox_messages(message_key)
+          on update cascade on delete cascade,
+        parent_message_key text
+          references public.softora_mailbox_campaign_lineage_members(message_key)
+          on update cascade on delete cascade deferrable initially deferred,
+        lineage_depth integer not null,
+        created_at timestamptz not null default clock_timestamp(),
+        constraint softora_mailbox_campaign_lineage_members_check check (
+          (lineage_depth = 0 and parent_message_key is null
+            and root_message_key = message_key)
+          or (lineage_depth > 0 and parent_message_key is not null)
+        )
+      );
+      create table public.softora_mailbox_message_tombstones (
+        account_email text not null,
+        normalized_message_id text not null,
+        deleted_at timestamptz not null default clock_timestamp(),
+        updated_at timestamptz not null default clock_timestamp(),
+        primary key(account_email,normalized_message_id)
+      );
       insert into public.softora_mailbox_campaign_consistency(
         scope,uid_generation_protocol,uid_generation_protocol_changed_at,
         uid_generation_drain_started_at,uid_generation_drain_ready_at
@@ -230,6 +323,134 @@ if (!databaseUrl) {
         'campaign','draining',clock_timestamp()-interval '10 minutes',
         clock_timestamp()-interval '10 minutes',clock_timestamp()-interval '5 minutes'
       );
+
+      create or replace function public.softora_lock_mailbox_sync_capacity()
+      returns trigger language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+        perform pg_catalog.pg_advisory_xact_lock(824031, 3);
+        return null;
+      end;
+      $function$;
+      create trigger softora_mailbox_sync_capacity_lock
+      before insert or update or delete on public.softora_mailbox_sync_state
+      for each statement execute function public.softora_lock_mailbox_sync_capacity();
+
+      create or replace function public.softora_claim_mailbox_sync_lock(
+        p_sync_key text,
+        p_account_email text,
+        p_folder text,
+        p_lock_token text,
+        p_lock_ttl_seconds integer default 90,
+        p_force boolean default false,
+        p_protocol text default 'legacy'
+      )
+      returns table (
+        acquired boolean,
+        locked boolean,
+        claimed_lock_token text,
+        lock_expires_at timestamptz
+      )
+      language plpgsql
+      volatile
+      security invoker
+      set search_path = ''
+      as $function$
+      declare
+        v_sync_key text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_sync_key, '')));
+        v_account_email text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_account_email, '')));
+        v_folder text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_folder, '')));
+        v_lock_token text := pg_catalog.btrim(coalesce(p_lock_token, ''));
+        v_protocol text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_protocol, '')));
+        v_consistency public.softora_mailbox_campaign_consistency%rowtype;
+        v_current public.softora_mailbox_sync_state%rowtype;
+        v_active_count integer := 0;
+        v_blocked_until timestamptz;
+      begin
+        if v_sync_key = '' or pg_catalog.char_length(v_sync_key) > 600
+          or v_account_email = '' or pg_catalog.char_length(v_account_email) > 320
+          or v_folder = '' or pg_catalog.char_length(v_folder) > 200
+          or v_lock_token = '' or pg_catalog.char_length(v_lock_token) > 200
+          or position('|' in v_account_email) > 0
+          or position('|' in v_folder) > 0
+          or v_sync_key is distinct from (v_account_email || '|' || v_folder)
+          or v_protocol not in ('legacy', 'v2') then
+          raise exception using errcode = '22023',
+            message = 'MAILBOX_SYNC_LOCK_IDENTITY_INVALID';
+        end if;
+
+        perform pg_catalog.pg_advisory_xact_lock(824031, 3);
+        select consistency.* into strict v_consistency
+        from public.softora_mailbox_campaign_consistency as consistency
+  where consistency.scope = 'campaign'
+  for update;
+
+        if v_consistency.uid_generation_protocol = 'draining'
+          or v_consistency.uid_generation_protocol is distinct from v_protocol then
+          v_blocked_until := greatest(
+            coalesce(v_consistency.uid_generation_drain_ready_at,
+              pg_catalog.clock_timestamp()),
+            pg_catalog.clock_timestamp() + interval '30 seconds'
+          );
+          return query select false, true, null::text, v_blocked_until;
+          return;
+        end if;
+
+        select current_sync.* into v_current
+        from public.softora_mailbox_sync_state as current_sync
+        where current_sync.sync_key = v_sync_key
+        for update;
+
+        if found
+          and v_current.status = 'syncing'
+          and nullif(pg_catalog.btrim(v_current.lock_token), '') is not null
+          and v_current.lock_expires_at > pg_catalog.clock_timestamp() then
+          if pg_catalog.btrim(v_current.lock_token) = v_lock_token then
+            return query select true, false, v_lock_token, v_current.lock_expires_at;
+          else
+            return query select false, true, null::text, v_current.lock_expires_at;
+          end if;
+          return;
+        end if;
+
+        select pg_catalog.count(*)::integer into v_active_count
+        from public.softora_mailbox_sync_state as active_sync
+        where active_sync.status = 'syncing'
+          and nullif(pg_catalog.btrim(active_sync.lock_token), '') is not null
+          and active_sync.lock_expires_at > pg_catalog.clock_timestamp()
+          and active_sync.sync_key <> v_sync_key;
+        if v_active_count >= 3 then
+          return query select false, true, null::text, null::timestamptz;
+          return;
+        end if;
+
+        insert into public.softora_mailbox_sync_state as stored_sync (
+          sync_key, account_email, folder, status, sync_started_at,
+          lock_token, lock_expires_at, last_error, updated_at
+        ) values (
+          v_sync_key, v_account_email, v_folder, 'syncing', pg_catalog.clock_timestamp(),
+          v_lock_token,
+          pg_catalog.clock_timestamp() + pg_catalog.make_interval(
+            secs => greatest(10, least(
+              300, coalesce(p_lock_ttl_seconds, 90)
+            ))
+          ),
+          null, pg_catalog.clock_timestamp()
+        )
+        on conflict (sync_key) do update set
+          account_email = excluded.account_email,
+          folder = excluded.folder,
+          status = excluded.status,
+          sync_started_at = excluded.sync_started_at,
+          lock_token = excluded.lock_token,
+          lock_expires_at = excluded.lock_expires_at,
+          last_error = null,
+          updated_at = excluded.updated_at
+        returning stored_sync.* into v_current;
+
+        return query select true, false, v_lock_token, v_current.lock_expires_at;
+      end;
+      $function$;
 
       create or replace function public.softora_lock_mailbox_campaign_consistency_before_write()
       returns trigger language plpgsql volatile security invoker set search_path=''
@@ -274,6 +495,175 @@ if (!databaseUrl) {
         select nullif(lower(regexp_replace(btrim(coalesce(p_value,'')),
           '^[<>,[:space:]]+|[<>,[:space:]]+$','','g')),'');
       $function$;
+      create or replace function public.softora_mailbox_message_participants(
+        p_sender_email text,p_recipients_text text,p_payload jsonb
+      ) returns text[] language sql immutable security invoker set search_path=''
+      as $function$
+        select array_remove(array[
+          nullif(pg_catalog.lower(pg_catalog.btrim(coalesce(p_sender_email,''))),''),
+          nullif(pg_catalog.lower(pg_catalog.btrim(coalesce(p_recipients_text,''))),'' )
+        ],null);
+      $function$;
+      create or replace function public.softora_inherit_mailbox_message_tombstone()
+      returns trigger language plpgsql volatile security invoker set search_path=''
+      as $function$
+      declare
+        v_deleted_at timestamptz;
+        v_message_id text := public.softora_normalize_mailbox_message_id(new.message_id);
+      begin
+        if v_message_id is null then return new; end if;
+        select tombstone.deleted_at into v_deleted_at
+        from public.softora_mailbox_message_tombstones as tombstone
+        where tombstone.account_email=pg_catalog.lower(pg_catalog.btrim(new.account_email))
+          and tombstone.normalized_message_id=v_message_id;
+        if found then new.deleted_at:=v_deleted_at; end if;
+        return new;
+      end;
+      $function$;
+      create trigger softora_mailbox_messages_inherit_logical_tombstone
+      before insert or update of account_email,message_id,deleted_at
+      on public.softora_mailbox_messages for each row
+      execute function public.softora_inherit_mailbox_message_tombstone();
+
+      create or replace function public.softora_set_mailbox_message_visibility(
+        p_account_email text,p_folder text,p_uid bigint,p_provider_id text,p_hidden boolean
+      ) returns table(
+        message_key text,account_email text,folder text,uid bigint,
+        provider_id text,message_id text
+      ) language plpgsql volatile security invoker set search_path=''
+      as $function$
+      declare
+        v_anchor public.softora_mailbox_messages%rowtype;
+        v_message_id text;
+        v_changed_at timestamptz:=pg_catalog.clock_timestamp();
+      begin
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0)
+  on conflict (scope) do nothing;
+        perform 1 from public.softora_mailbox_campaign_consistency
+        where scope='campaign' for update;
+        select m.* into v_anchor from public.softora_mailbox_messages as m
+        where m.account_email=pg_catalog.lower(pg_catalog.btrim(p_account_email))
+          and m.folder=pg_catalog.lower(pg_catalog.btrim(p_folder))
+          and m.uid=p_uid and m.provider_id=p_provider_id
+          and m.generation_superseded_at is null
+        limit 1 for update;
+        if not found then return; end if;
+        v_message_id:=public.softora_normalize_mailbox_message_id(v_anchor.message_id);
+        if v_message_id is not null and p_hidden then
+          insert into public.softora_mailbox_message_tombstones(
+            account_email,normalized_message_id,deleted_at,updated_at
+          ) values(v_anchor.account_email,v_message_id,v_changed_at,v_changed_at)
+          on conflict on constraint softora_mailbox_message_tombstones_pkey do update
+          set deleted_at=excluded.deleted_at,updated_at=excluded.updated_at;
+        elsif v_message_id is not null then
+          delete from public.softora_mailbox_message_tombstones as tombstone
+          where tombstone.account_email=v_anchor.account_email
+            and tombstone.normalized_message_id=v_message_id;
+        end if;
+        return query update public.softora_mailbox_messages as m
+        set deleted_at=case when p_hidden then v_changed_at else null end,
+            updated_at=v_changed_at
+        where m.account_email=v_anchor.account_email
+          and m.generation_superseded_at is null
+          and (v_message_id is null and m.message_key=v_anchor.message_key
+            or v_message_id is not null
+              and public.softora_normalize_mailbox_message_id(m.message_id)=v_message_id)
+        returning m.message_key,m.account_email,m.folder,m.uid,m.provider_id,m.message_id;
+      end;
+      $function$;
+
+      create or replace function public.softora_set_mailbox_contact_visibility(
+        p_owner_accounts text[],p_contact_email text,p_anchor_account_email text,
+        p_anchor_folder text,p_anchor_uid bigint,p_anchor_provider_id text,
+        p_expected_message_count integer,p_hidden boolean
+      ) returns table(
+        message_key text,account_email text,folder text,uid bigint,
+        provider_id text,message_id text
+      ) language plpgsql volatile security invoker set search_path=''
+      as $function$
+      declare
+        v_owner_accounts text[]:=p_owner_accounts;
+        v_contact_email text:=pg_catalog.lower(pg_catalog.btrim(p_contact_email));
+        v_message_ids text[];
+        v_changed_at timestamptz:=pg_catalog.clock_timestamp();
+      begin
+  insert into public.softora_mailbox_campaign_consistency (scope, content_version)
+  values ('campaign', 0)
+  on conflict (scope) do nothing;
+        perform 1 from public.softora_mailbox_campaign_consistency
+        where scope='campaign' for update;
+        select pg_catalog.array_agg(distinct public.softora_normalize_mailbox_message_id(m.message_id))
+        into v_message_ids
+        from public.softora_mailbox_messages as m
+        where m.account_email=any(v_owner_accounts)
+          and m.generation_superseded_at is null
+          and v_contact_email=any(public.softora_mailbox_message_participants(
+            m.sender_email,m.recipients_text,m.payload
+          ));
+        if coalesce(pg_catalog.cardinality(v_message_ids),0)=0 then return; end if;
+        perform 1 from public.softora_mailbox_messages as m
+        where m.account_email=any(v_owner_accounts)
+          and m.generation_superseded_at is null
+          and v_contact_email=any(public.softora_mailbox_message_participants(
+            m.sender_email,m.recipients_text,m.payload
+          )) for update;
+        if p_hidden then
+          insert into public.softora_mailbox_message_tombstones(
+            account_email,normalized_message_id,deleted_at,updated_at
+          ) select owner_account,normalized_message_id,v_changed_at,v_changed_at
+          from pg_catalog.unnest(v_owner_accounts) as owner(owner_account)
+          cross join pg_catalog.unnest(v_message_ids) as ids(normalized_message_id)
+          on conflict on constraint softora_mailbox_message_tombstones_pkey do update
+          set deleted_at=excluded.deleted_at,updated_at=excluded.updated_at;
+        else
+          delete from public.softora_mailbox_message_tombstones as tombstone
+          where tombstone.account_email=any(v_owner_accounts)
+            and tombstone.normalized_message_id=any(v_message_ids);
+        end if;
+        return query update public.softora_mailbox_messages as m
+        set deleted_at=case when p_hidden then v_changed_at else null end,
+            updated_at=v_changed_at
+        where m.account_email=any(v_owner_accounts)
+          and m.generation_superseded_at is null
+          and v_contact_email=any(public.softora_mailbox_message_participants(
+            m.sender_email,m.recipients_text,m.payload
+          ))
+        returning m.message_key,m.account_email,m.folder,m.uid,m.provider_id,m.message_id;
+      end;
+      $function$;
+
+      create or replace function public.softora_apply_mailbox_uid_validity(
+        p_account_email text,p_folder text,p_uid_validity bigint,p_lock_token text
+      ) returns table(
+        previous_uid_validity bigint,current_uid_validity bigint,
+        reset_detected boolean,adopted_legacy boolean,superseded_count integer
+      ) language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+  perform pg_advisory_xact_lock(824031, 3);
+        perform 1 from public.softora_mailbox_campaign_consistency
+        where scope='campaign' for update;
+        return query select null::bigint,p_uid_validity,false,false,0;
+      end;
+      $function$;
+
+      create or replace function public.softora_commit_mailbox_campaign_messages(
+        p_mutation_id uuid,p_request_key text,p_rows jsonb,p_result jsonb default '{}'::jsonb
+      ) returns table(
+        mutation_id uuid,mutation_status text,started_content_version bigint,
+        completed_content_version bigint,current_content_version bigint,
+        upserted_count integer,replayed boolean
+      ) language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+  perform pg_advisory_xact_lock(824031, 3);
+        perform 1 from public.softora_mailbox_campaign_consistency
+        where scope='campaign' for update;
+        return query select p_mutation_id,'completed'::text,0::bigint,0::bigint,
+          0::bigint,0,false;
+      end;
+      $function$;
       create or replace function public.softora_is_campaign_mailbox_message(
         p_account_email text,p_folder text,p_payload jsonb
       ) returns boolean language sql immutable security invoker set search_path=''
@@ -282,6 +672,122 @@ if (!databaseUrl) {
           'serve@softora.nl','servecreusen@softora.nl','martijn@softora.nl'
         ]::text[]) and lower(btrim(coalesce(p_folder,''))) in ('inbox','sent','coldmail');
       $function$;
+      create or replace function public.softora_track_mailbox_campaign_message_change()
+      returns trigger
+      language plpgsql
+      volatile
+      security invoker
+      set search_path = ''
+      as $function$
+      declare
+        v_affects_campaign boolean := false;
+begin
+  if coalesce(current_setting('softora.mailbox_campaign_version_bumped', true), '') = '1' then
+          return null;
+        elsif tg_op = 'TRUNCATE' then
+          v_affects_campaign := true;
+        elsif tg_op = 'INSERT' then
+          select exists (
+            select 1 from softora_mailbox_campaign_new_rows as new_row
+            where public.softora_is_campaign_mailbox_message(
+              new_row.account_email, new_row.folder, new_row.payload
+            )
+          ) into v_affects_campaign;
+        elsif tg_op = 'DELETE' then
+          select exists (
+            select 1 from softora_mailbox_campaign_old_rows as old_row
+            where public.softora_is_campaign_mailbox_message(
+              old_row.account_email, old_row.folder, old_row.payload
+            )
+          ) into v_affects_campaign;
+        else
+          select exists (
+            select 1
+            from softora_mailbox_campaign_old_rows as old_row
+            full join softora_mailbox_campaign_new_rows as new_row
+              on new_row.message_key = old_row.message_key
+            where (
+              public.softora_is_campaign_mailbox_message(
+                old_row.account_email, old_row.folder, old_row.payload
+              ) or public.softora_is_campaign_mailbox_message(
+                new_row.account_email, new_row.folder, new_row.payload
+              )
+            ) and row(
+              old_row.message_key, old_row.account_email, old_row.folder, old_row.uid,
+              old_row.provider_id, old_row.message_id, old_row.in_reply_to, old_row.references_text,
+              old_row.sender_name, old_row.sender_email, old_row.recipients_text, old_row.subject,
+              old_row.preview, old_row.body_text, old_row.body_truncated, old_row.has_body,
+              old_row.date, old_row.internal_date, old_row.unread, old_row.softora_read_at,
+              old_row.starred, old_row.reply_dismissed_at, old_row.payload, old_row.deleted_at
+            ) is distinct from row(
+              new_row.message_key, new_row.account_email, new_row.folder, new_row.uid,
+              new_row.provider_id, new_row.message_id, new_row.in_reply_to, new_row.references_text,
+              new_row.sender_name, new_row.sender_email, new_row.recipients_text, new_row.subject,
+              new_row.preview, new_row.body_text, new_row.body_truncated, new_row.has_body,
+              new_row.date, new_row.internal_date, new_row.unread, new_row.softora_read_at,
+              new_row.starred, new_row.reply_dismissed_at, new_row.payload, new_row.deleted_at
+            )
+          ) into v_affects_campaign;
+        end if;
+
+        if v_affects_campaign then
+          perform set_config('softora.mailbox_campaign_version_bumped', '1', true);
+          insert into public.softora_mailbox_campaign_consistency (
+            scope, content_version, created_at, updated_at
+          ) values ('campaign', 1, clock_timestamp(), clock_timestamp())
+          on conflict (scope) do update set
+            content_version = public.softora_mailbox_campaign_consistency.content_version + 1,
+            updated_at = clock_timestamp();
+        end if;
+        return null;
+      end;
+      $function$;
+      create trigger softora_track_mailbox_campaign_message_insert
+      after insert on public.softora_mailbox_messages
+      referencing new table as softora_mailbox_campaign_new_rows
+      for each statement execute function public.softora_track_mailbox_campaign_message_change();
+      create trigger softora_track_mailbox_campaign_message_update
+      after update on public.softora_mailbox_messages
+      referencing old table as softora_mailbox_campaign_old_rows
+        new table as softora_mailbox_campaign_new_rows
+      for each statement execute function public.softora_track_mailbox_campaign_message_change();
+      create trigger softora_track_mailbox_campaign_message_delete
+      after delete on public.softora_mailbox_messages
+      referencing old table as softora_mailbox_campaign_old_rows
+      for each statement execute function public.softora_track_mailbox_campaign_message_change();
+      create trigger softora_track_mailbox_campaign_message_truncate
+      after truncate on public.softora_mailbox_messages
+      for each statement execute function public.softora_track_mailbox_campaign_message_change();
+
+      create or replace function public.softora_refresh_mailbox_message_lineage()
+      returns trigger language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+        if tg_op = 'UPDATE' and old.message_key is distinct from new.message_key then
+          return new;
+        end if;
+        if tg_op = 'INSERT' and new.uid_validity is not null and exists (
+          select 1 from public.softora_mailbox_campaign_consistency
+          where scope = 'campaign' and uid_generation_protocol = 'draining'
+        ) then
+          return new;
+        end if;
+        if public.softora_is_campaign_mailbox_message(
+          new.account_email, new.folder, new.payload
+        ) then
+          insert into public.softora_mailbox_campaign_lineage_roots(message_key)
+          values(new.message_key) on conflict(message_key) do nothing;
+          insert into public.softora_mailbox_campaign_lineage_members(
+            message_key,root_message_key,parent_message_key,lineage_depth
+          ) values(new.message_key,new.message_key,null,0)
+          on conflict(message_key) do nothing;
+        end if;
+        return new;
+      end;
+      $function$;
+      create trigger softora_refresh_mailbox_message_lineage
+      after insert or update on public.softora_mailbox_messages
+      for each row execute function public.softora_refresh_mailbox_message_lineage();
       create or replace function public.softora_preserve_mailbox_read_state()
       returns trigger language plpgsql security invoker set search_path=''
       as $function$
@@ -350,11 +856,160 @@ if (!databaseUrl) {
       update public.softora_mailbox_messages
       set deleted_at=clock_timestamp() where provider_id='legacy:2';
     `);
-    applyTrackedSql(migration);
+    await applyTrackedSql(client, sendProvenanceFoundation);
+    await applyTrackedSql(client, providerOutcomeMigration);
+    await applyTrackedSql(client, migration);
+    await applyTrackedSql(client, sendProvenanceVisibilityFenceMigration);
+    await applyTrackedSql(client, perKeyRepairMigration);
   });
 
   test.after(async () => {
     await Promise.all(Array.from(clients, (client) => client.end().catch(() => null)));
+  });
+
+  test('per-key reparatie behoudt lineage en stelt alleen de shape-regel uit', async () => {
+    const client = await connect();
+    const triggerState = (await client.query(`
+      select tgname,tgenabled
+      from pg_catalog.pg_trigger
+      where tgrelid='public.softora_mailbox_messages'::pg_catalog.regclass
+        and tgname='softora_refresh_mailbox_message_lineage'
+        and not tgisinternal
+    `)).rows[0];
+    assert.deepEqual(triggerState, {
+      tgname: 'softora_refresh_mailbox_message_lineage', tgenabled: 'O',
+    });
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from pg_catalog.pg_constraint
+      where conrelid='public.softora_mailbox_campaign_lineage_members'::pg_catalog.regclass
+        and conname='softora_mailbox_campaign_lineage_members_check'
+    `)).rows[0].count, 0);
+    const deferred = (await client.query(`
+      select tgdeferrable,tginitdeferred,tgenabled
+      from pg_catalog.pg_trigger
+      where tgrelid='public.softora_mailbox_campaign_lineage_members'::pg_catalog.regclass
+        and tgname='softora_mailbox_campaign_lineage_member_shape_deferred'
+        and not tgisinternal
+    `)).rows[0];
+    assert.deepEqual(deferred, {
+      tgdeferrable: true, tginitdeferred: true, tgenabled: 'O',
+    });
+    const capacity = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_lock_mailbox_sync_capacity()'::pg_catalog.regprocedure
+      ) as definition
+    `)).rows[0].definition;
+    assert.match(capacity, /mailbox_sync_per_key_v2/);
+    assert.match(capacity, /pg_advisory_xact_lock\(824031, 3\)/);
+  });
+
+  test('actieve sync blokkeert alleen accepted-zichtbaarheid en nooit sendvoorbereiding of herstel', async () => {
+    const syncClient = await connect();
+    const writerClient = await connect();
+    const observerClient = await connect();
+    const writerPid = (await writerClient.query('select pg_backend_pid() as pid')).rows[0].pid;
+    let syncOpen = false;
+    let acceptedPromise = null;
+    const insertPrepared = (intentId, marker) => writerClient.query(`
+      insert into public.softora_mailbox_send_provenance (
+        intent_id,idempotency_key,owner,account_email,recipient_email,mode,
+        conversation_id,provider,subject,body_text,status,send_identity_key,
+        send_scope_key,payload_fingerprint,dispatch_state
+      ) values ($1,$1,'serve','serve@softora.nl',$2,'new-message',$1,'smtp',
+        'Kleine vraag','Exact bericht','prepared',$3,$4,$5,'reserved')
+    `, [
+      intentId,
+      `${marker}@provenance-fence.example`,
+      `new-message:${marker.repeat(64)}`,
+      `smtp-new-message-scope:${marker.repeat(64)}`,
+      marker.repeat(64),
+    ]);
+
+    try {
+      await syncClient.query('begin');
+      syncOpen = true;
+      await syncClient.query(
+        "select public.softora_lock_mailbox_sync_key_v2('active-sync@softora.nl|sent')"
+      );
+      await writerClient.query("set lock_timeout='250ms'");
+
+      await insertPrepared('coldmail:provenance-fence-accepted', 'a');
+      await writerClient.query(`
+        update public.softora_mailbox_send_provenance
+        set dispatch_state='started',dispatch_started_at=clock_timestamp()
+        where intent_id='coldmail:provenance-fence-accepted'
+      `);
+      await insertPrepared('coldmail:provenance-fence-failed', 'b');
+      await writerClient.query(`
+        update public.softora_mailbox_send_provenance
+        set status='failed',dispatch_state='finished',error_text='provider weigerde'
+        where intent_id='coldmail:provenance-fence-failed'
+      `);
+      await insertPrepared('coldmail:provenance-fence-unknown', 'c');
+      await writerClient.query(`
+        update public.softora_mailbox_send_provenance
+        set status='unknown',dispatch_state='started',sent_reconcile_required=true
+        where intent_id='coldmail:provenance-fence-unknown'
+      `);
+
+      const versionBefore = Number((await observerClient.query(`
+        select content_version from public.softora_mailbox_campaign_consistency
+        where scope='campaign'
+      `)).rows[0].content_version);
+      await assert.rejects(writerClient.query(`
+        update public.softora_mailbox_send_provenance
+        set status='accepted',dispatch_state='finished',
+          sent_message_id='<provenance-fence@test.softora.nl>',
+          accepted_at=clock_timestamp()
+        where intent_id='coldmail:provenance-fence-accepted'
+      `), (error) => error?.code === '55P03');
+      await writerClient.query(`
+        update public.softora_mailbox_send_provenance
+        set status='unknown',sent_message_id='<provenance-fence@test.softora.nl>',
+          sent_reconcile_required=true,error_text='duurzame herstelmarkering bevestigd'
+        where intent_id='coldmail:provenance-fence-accepted'
+      `);
+
+      await writerClient.query("set lock_timeout='7s'");
+      acceptedPromise = writerClient.query(`
+        update public.softora_mailbox_send_provenance
+        set status='accepted',dispatch_state='finished',
+          sent_message_id='<provenance-fence@test.softora.nl>',
+          accepted_at=clock_timestamp()
+        where intent_id='coldmail:provenance-fence-accepted'
+      `);
+      void acceptedPromise.catch(() => null);
+      assert.ok(
+        await waitForBackendWait(observerClient, writerPid, 'advisory'),
+        'accepted provenance wachtte niet op de actieve syncfence'
+      );
+      assert.equal(Number((await observerClient.query(`
+        select content_version from public.softora_mailbox_campaign_consistency
+        where scope='campaign'
+      `)).rows[0].content_version), versionBefore);
+
+      await syncClient.query('commit');
+      syncOpen = false;
+      assert.equal((await acceptedPromise).rowCount, 1);
+      acceptedPromise = null;
+      assert.deepEqual((await observerClient.query(`
+        select status,dispatch_state,sent_message_id
+        from public.softora_mailbox_send_provenance
+        where intent_id='coldmail:provenance-fence-accepted'
+      `)).rows[0], {
+        status: 'accepted',
+        dispatch_state: 'finished',
+        sent_message_id: '<provenance-fence@test.softora.nl>',
+      });
+      assert.equal(Number((await observerClient.query(`
+        select content_version from public.softora_mailbox_campaign_consistency
+        where scope='campaign'
+      `)).rows[0].content_version), versionBefore + 1);
+    } finally {
+      if (syncOpen) await syncClient.query('rollback').catch(() => null);
+      if (acceptedPromise) await acceptedPromise.catch(() => null);
+    }
   });
 
   test('backfill geeft bekende states UUID-generaties en laat NULL-legacy ongemoeid', async () => {
@@ -597,6 +1252,21 @@ if (!databaseUrl) {
       { provider_id: 'legacy:2', adopted: false, superseded: true,
         unread: false, starred: false, read: false, dismissed: false },
     ]);
+    const adoptedMessageKey = `${syncKey}|gen:${prepared.target_generation_id}|1`;
+    assert.deepEqual((await client.query(`
+      select message_key,root_message_key,parent_message_key,lineage_depth
+      from public.softora_mailbox_campaign_lineage_members
+      where message_key=$1
+    `, [adoptedMessageKey])).rows[0], {
+      message_key: adoptedMessageKey,
+      root_message_key: adoptedMessageKey,
+      parent_message_key: null,
+      lineage_depth: 0,
+    });
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_campaign_lineage_roots where message_key=$1
+    `, [adoptedMessageKey])).rows[0].count, 1);
     const replay = (await client.query(`
       select * from public.softora_confirm_mailbox_uid_baseline_v2(
         $1,$2,$3::uuid,700,$4::jsonb
@@ -632,6 +1302,42 @@ if (!databaseUrl) {
       { uid: '1', provider_id: 'legacy:1', read: true, dismissed: true },
       { uid: '2', provider_id: 'imap:extra-server-row:2', read: false, dismissed: false },
     ]);
+    const newMessageKey = `servecreusen@softora.nl|inbox|gen:${prepared.target_generation_id}|2`;
+    assert.deepEqual((await client.query(`
+      select message_key,root_message_key,parent_message_key,lineage_depth
+      from public.softora_mailbox_campaign_lineage_members
+      where message_key=$1
+    `, [newMessageKey])).rows[0], {
+      message_key: newMessageKey,
+      root_message_key: newMessageKey,
+      parent_message_key: null,
+      lineage_depth: 0,
+    });
+  });
+
+  test('uitgestelde lineage-shape-regel weigert een ongeldige eindtoestand bij commit', async () => {
+    const client = await connect();
+    await client.query(`
+      insert into public.softora_mailbox_messages(
+        message_key,account_email,folder,uid,provider_id,date,payload
+      ) values('external@test|archive|99','external@test','archive',99,
+        'external-invalid-lineage',clock_timestamp(),'{}'::jsonb)
+    `);
+    const validRoot = (await client.query(`
+      select message_key from public.softora_mailbox_campaign_lineage_members
+      where lineage_depth=0 order by message_key limit 1
+    `)).rows[0].message_key;
+    await assert.rejects(client.query(`
+      insert into public.softora_mailbox_campaign_lineage_members(
+        message_key,root_message_key,parent_message_key,lineage_depth
+      ) values($1,$2,null,0)
+    `, ['external@test|archive|99', validRoot]),
+    /softora_mailbox_campaign_lineage_members_shape_check/);
+    assert.equal((await client.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_campaign_lineage_members
+      where message_key='external@test|archive|99'
+    `)).rows[0].count, 0);
   });
 
   test('lege NULL-baseline activeert exact één lege UUID-generatie', async () => {
@@ -915,6 +1621,253 @@ if (!databaseUrl) {
         drop trigger if exists test_pause_after_uid_generation_insert
           on public.softora_mailbox_messages;
         drop function if exists public.test_pause_after_uid_generation_insert();
+      `);
+    }
+  });
+
+  test('contact- en berichtzichtbaarheid sluiten UID-activatie wederzijds uit zonder hide/restore-miss', async () => {
+    const syncClient = await connect();
+    const visibilityClient = await connect();
+    const observerClient = await connect();
+    const sharedFenceClient = await connect();
+    const syncKey = 'servecreusen@softora.nl|coldmail';
+    const accountEmail = 'servecreusen@softora.nl';
+    const folder = 'coldmail';
+    const contactEmail = 'visibility-race@example.org';
+    const providerId = 'visibility-race-provider';
+    const messageId = 'visibility-race@test.softora.nl';
+    let syncPromise = null;
+    let visibilityPromise = null;
+    let sharedFenceOpen = false;
+
+    const raceRow = (suffix) => messageRow(1, suffix, {
+      provider_id: providerId,
+      message_id: messageId,
+      sender_email: contactEmail,
+      recipients_text: accountEmail,
+      subject: 'Re: Kleine vraag over jullie website',
+    });
+    const activeMessage = async () => (await observerClient.query(`
+      select message_key,uid,provider_id,uid_generation_id,deleted_at
+      from public.softora_mailbox_messages
+      where account_email=$1 and folder=$2 and uid=1
+        and generation_superseded_at is null
+    `, [accountEmail, folder])).rows[0];
+    const tombstoneCount = async () => Number((await observerClient.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email=$1
+        and normalized_message_id=public.softora_normalize_mailbox_message_id($2)
+    `, [accountEmail, messageId])).rows[0].count);
+
+    await syncClient.query(`
+      insert into public.softora_mailbox_sync_state(
+        sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+      ) values($1,$2,$3,'idle',0,0,null)
+    `, [syncKey, accountEmail, folder]);
+    await lease(syncClient, syncKey, 'visibility-baseline-token');
+    const baseline = await prepare(
+      syncClient, syncKey, 'visibility-baseline-token', 500, 1
+    );
+    const confirmed = (await syncClient.query(`
+      select * from public.softora_confirm_mailbox_uid_baseline_v2(
+        $1,$2,$3::uuid,500,'[]'::jsonb
+      )
+    `, [syncKey, 'visibility-baseline-token', baseline.target_generation_id])).rows[0];
+    assert.equal(confirmed.confirmed, true);
+
+    await lease(syncClient, syncKey, 'visibility-initial-token');
+    const initial = await prepare(
+      syncClient, syncKey, 'visibility-initial-token', 500, 2
+    );
+    const initialCommit = await commit(syncClient, {
+      syncKey,
+      token: 'visibility-initial-token',
+      commitId: 'visibility-initial-commit',
+      generationId: initial.target_generation_id,
+      uidValidity: 500,
+      rows: [raceRow('visibility-initial')],
+      fromUid: 1,
+      throughUid: 1,
+      complete: true,
+      messageCount: 1,
+      lastUid: 1,
+    });
+    assert.equal(initialCommit.committed, true);
+
+    await lease(syncClient, syncKey, 'visibility-hide-token');
+    const hideGeneration = await prepare(
+      syncClient, syncKey, 'visibility-hide-token', 501, 2
+    );
+    const syncPid = (await syncClient.query(
+      'select pg_backend_pid() as pid'
+    )).rows[0].pid;
+    const visibilityPid = (await visibilityClient.query(
+      'select pg_backend_pid() as pid'
+    )).rows[0].pid;
+
+    await syncClient.query(`
+      create or replace function public.test_pause_visibility_uid_insert()
+      returns trigger language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+        perform pg_catalog.pg_sleep(1.5);
+        return null;
+      end;
+      $function$;
+      create trigger test_pause_visibility_uid_insert
+      after insert on public.softora_mailbox_messages for each statement
+      execute function public.test_pause_visibility_uid_insert();
+    `);
+
+    try {
+      syncPromise = commit(syncClient, {
+        syncKey,
+        token: 'visibility-hide-token',
+        commitId: 'visibility-hide-commit',
+        generationId: hideGeneration.target_generation_id,
+        uidValidity: 501,
+        rows: [raceRow('visibility-hide-generation')],
+        fromUid: 1,
+        throughUid: 1,
+        complete: true,
+        messageCount: 1,
+        lastUid: 1,
+      });
+      assert.ok(
+        await waitForBackendWait(observerClient, syncPid, 'PgSleep'),
+        'UID-activatie bereikte het hide-racevenster niet'
+      );
+
+      let hideSettled = false;
+      visibilityPromise = visibilityClient.query(`
+        select * from public.softora_set_mailbox_contact_visibility(
+          array[$1]::text[],$2,$1,$3,1,$4,1,true
+        )
+      `, [accountEmail, contactEmail, folder, providerId]).then((result) => result.rows)
+        .finally(() => { hideSettled = true; });
+      const hideWait = await waitForBackendWait(observerClient, visibilityPid, 'advisory');
+      assert.ok(hideWait, 'contact-hide wachtte niet op de gedeelde UID-fence');
+      assert.equal(hideSettled, false);
+
+      const [activated, hiddenRows] = await Promise.all([syncPromise, visibilityPromise]);
+      assert.equal(activated.activated, true);
+      assert.equal(hiddenRows.length, 1);
+      assert.equal((await activeMessage()).uid_generation_id, hideGeneration.target_generation_id);
+      assert.ok((await activeMessage()).deleted_at);
+      assert.equal(await tombstoneCount(), 1);
+
+      await syncClient.query(`
+        drop trigger if exists test_pause_visibility_uid_insert
+          on public.softora_mailbox_messages;
+        drop function if exists public.test_pause_visibility_uid_insert();
+      `);
+      syncPromise = null;
+      visibilityPromise = null;
+
+      await lease(syncClient, syncKey, 'visibility-restore-token');
+      const restoreGeneration = await prepare(
+        syncClient, syncKey, 'visibility-restore-token', 502, 2
+      );
+      await visibilityClient.query(`
+        create or replace function public.test_pause_visibility_tombstone_delete()
+        returns trigger language plpgsql volatile security invoker set search_path=''
+        as $function$
+        begin
+          perform pg_catalog.pg_sleep(1.5);
+          return old;
+        end;
+        $function$;
+        create trigger test_pause_visibility_tombstone_delete
+        before delete on public.softora_mailbox_message_tombstones for each statement
+        execute function public.test_pause_visibility_tombstone_delete();
+      `);
+
+      let restoreSettled = false;
+      visibilityPromise = visibilityClient.query(`
+        select * from public.softora_set_mailbox_contact_visibility(
+          array[$1]::text[],$2,$1,$3,1,$4,0,false
+        )
+      `, [accountEmail, contactEmail, folder, providerId]).then((result) => result.rows)
+        .finally(() => { restoreSettled = true; });
+      assert.ok(
+        await waitForBackendWait(observerClient, visibilityPid, 'PgSleep'),
+        'contact-restore bereikte het commit-racevenster niet'
+      );
+
+      let restoreCommitSettled = false;
+      syncPromise = commit(syncClient, {
+        syncKey,
+        token: 'visibility-restore-token',
+        commitId: 'visibility-restore-commit',
+        generationId: restoreGeneration.target_generation_id,
+        uidValidity: 502,
+        rows: [raceRow('visibility-restore-generation')],
+        fromUid: 1,
+        throughUid: 1,
+        complete: true,
+        messageCount: 1,
+        lastUid: 1,
+      }).finally(() => { restoreCommitSettled = true; });
+      const commitWait = await waitForBackendWait(observerClient, syncPid, 'advisory');
+      assert.ok(commitWait, 'UID-commit wachtte niet op de exclusieve restore-fence');
+      assert.equal(restoreCommitSettled, false);
+      assert.equal(restoreSettled, false);
+
+      const [restoredRows, restoredCommit] = await Promise.all([
+        visibilityPromise, syncPromise,
+      ]);
+      assert.equal(restoredRows.length, 1);
+      assert.equal(restoredCommit.activated, true);
+      const restoredActive = await activeMessage();
+      assert.equal(restoredActive.uid_generation_id, restoreGeneration.target_generation_id);
+      assert.equal(restoredActive.deleted_at, null);
+      assert.equal(await tombstoneCount(), 0);
+
+      await visibilityClient.query(`
+        drop trigger if exists test_pause_visibility_tombstone_delete
+          on public.softora_mailbox_message_tombstones;
+        drop function if exists public.test_pause_visibility_tombstone_delete();
+      `);
+      syncPromise = null;
+      visibilityPromise = null;
+
+      for (const hidden of [true, false]) {
+        await sharedFenceClient.query('begin');
+        sharedFenceOpen = true;
+        await sharedFenceClient.query(
+          'select public.softora_lock_mailbox_visibility_shared_v2()'
+        );
+        let messageVisibilitySettled = false;
+        visibilityPromise = visibilityClient.query(`
+          select * from public.softora_set_mailbox_message_visibility(
+            $1,$2,1,$3,$4
+          )
+        `, [accountEmail, folder, providerId, hidden]).then((result) => result.rows)
+          .finally(() => { messageVisibilitySettled = true; });
+        const messageWait = await waitForBackendWait(
+          observerClient, visibilityPid, 'advisory'
+        );
+        assert.ok(messageWait, `bericht-${hidden ? 'hide' : 'restore'} wachtte niet op shared fence`);
+        assert.equal(messageVisibilitySettled, false);
+        await sharedFenceClient.query('commit');
+        sharedFenceOpen = false;
+        const changedRows = await visibilityPromise;
+        visibilityPromise = null;
+        assert.equal(changedRows.length, 1);
+        assert.equal(Boolean((await activeMessage()).deleted_at), hidden);
+        assert.equal(await tombstoneCount(), hidden ? 1 : 0);
+      }
+    } finally {
+      if (sharedFenceOpen) await sharedFenceClient.query('rollback').catch(() => null);
+      await Promise.allSettled([syncPromise, visibilityPromise].filter(Boolean));
+      await observerClient.query(`
+        drop trigger if exists test_pause_visibility_uid_insert
+          on public.softora_mailbox_messages;
+        drop trigger if exists test_pause_visibility_tombstone_delete
+          on public.softora_mailbox_message_tombstones;
+        drop function if exists public.test_pause_visibility_uid_insert();
+        drop function if exists public.test_pause_visibility_tombstone_delete();
       `);
     }
   });

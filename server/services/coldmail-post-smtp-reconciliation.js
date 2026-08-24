@@ -101,6 +101,7 @@ function buildGuardPayload(evidence, reconciled, at) {
     specialAction: text(evidence && evidence.specialAction),
     actor: text(evidence && evidence.actor),
     messageId: text(evidence && evidence.messageId),
+    sendIntentId: text(evidence && evidence.sendIntentId),
     providerId: text(evidence && evidence.providerId),
     recipientEmail: email(evidence && evidence.recipientEmail),
     senderEmail: email(evidence && evidence.senderEmail),
@@ -123,6 +124,8 @@ function createColdmailPostSmtpReconciliation(deps = {}) {
     outboundRecipientGuardStore,
     dataOpsStore,
     getSenderEmails = () => [],
+    finalizeProvenance = async () => true,
+    loadAcceptedProvenance = async () => null,
     finalizeEvidence = async () => true,
     now = () => new Date(),
     logger = console,
@@ -159,6 +162,7 @@ function createColdmailPostSmtpReconciliation(deps = {}) {
       sentAt: text(evidence.sentAt) || now().toISOString(),
       postSmtpEvidence: text(evidence.postSmtpEvidence) || 'smtp-accepted',
     };
+    await finalizeProvenance(normalized);
     await setGuardState(normalized, false);
     await finalizeEvidence(normalized);
     await setGuardState(normalized, true);
@@ -189,9 +193,28 @@ function createColdmailPostSmtpReconciliation(deps = {}) {
     const maxRows = Math.max(1, Math.min(250, Number(options.maxRows) || 100));
     const groups = await loadPendingGroups(maxRows);
     if (!groups.length) return { ok: true, checked: 0, reconciled: 0, unresolved: 0, errors: [] };
+    const acceptedProvenanceByReservation = new Map();
+    await Promise.all(groups.map(async (group) => {
+      const reservationId = text(group && group.reservation_id);
+      if (!reservationId) return;
+      try {
+        const evidence = await loadAcceptedProvenance({
+          reservationId,
+          senderEmail: email(group && group.sender_email),
+          recipientEmail: email(group && group.recipient_email),
+        });
+        if (evidence) acceptedProvenanceByReservation.set(reservationId, evidence);
+      } catch (error) {
+        logger.warn('[Coldmail][accepted-provenance-read]', {
+          reservationId,
+          error: text(error && error.message),
+        });
+      }
+    }));
     const needsMailboxEvidence = groups.some((group) => {
       const payload = getPendingPayload(group);
-      return text(group && group.status).toLowerCase() !== 'sent' || !payload.messageId;
+      return !acceptedProvenanceByReservation.has(text(group && group.reservation_id)) &&
+        (text(group && group.status).toLowerCase() !== 'sent' || !payload.messageId);
     });
     const accountEmails = Array.from(new Set(getSenderEmails().map(email).filter(Boolean)));
     const messages = needsMailboxEvidence && dataOpsStore && typeof dataOpsStore.listMailboxMessages === 'function'
@@ -210,7 +233,10 @@ function createColdmailPostSmtpReconciliation(deps = {}) {
     for (const group of groups) {
       try {
         const payload = getPendingPayload(group);
-        let evidence = text(group && group.status).toLowerCase() === 'sent' && payload.messageId
+        const reservationId = text(group && group.reservation_id);
+        let evidence = acceptedProvenanceByReservation.has(reservationId)
+          ? { ...payload, ...acceptedProvenanceByReservation.get(reservationId), reservationId }
+          : text(group && group.status).toLowerCase() === 'sent' && payload.messageId
           ? { ...payload, reservationId: text(group.reservation_id) }
           : null;
         if (!evidence) {

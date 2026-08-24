@@ -3,6 +3,7 @@ const {
 } = require('./server-app-runtime-composition-options');
 const { createColdmailCampaignService } = require('./coldmail-campaign');
 const { createInstantlyOutreachService } = require('./instantly-outreach');
+const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
 const { createOutboundRecipientGuardStore } = require('./outbound-recipient-guard-store');
 
 const DEFAULT_DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
@@ -413,6 +414,11 @@ function buildServerAppFeatureWiringRuntimeContext({
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
           outboundRecipientGuardStore,
+          mailboxSendProvenanceStore: createMailboxSendProvenanceStore({
+            isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+            getSupabaseClient: platformRuntime.getSupabaseClient,
+            normalizeString: shared.normalizeString,
+          }),
           dataOpsStore: uiSeoRuntime.dataOpsStore,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,

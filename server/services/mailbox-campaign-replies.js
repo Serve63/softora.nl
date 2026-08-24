@@ -154,7 +154,7 @@ function getMessageTimestamp(message) {
 }
 
 function getConversationTimestamp(message) {
-  return parseMessageDate(message && message.activityAt) || getMessageTimestamp(message);
+  return Math.max(...['latestInboundAt', 'latestOutboundAt', 'activityAt'].map((key) => parseMessageDate(message && message[key])), getMessageTimestamp(message));
 }
 
 function messageReferencesId(message, messageId) {
@@ -1044,7 +1044,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ? await mailboxSendProvenanceStore.listAcceptedMessages({
           accountEmails: campaignMailboxAccounts,
           limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-        }).catch(() => [])
+        })
       : [];
     const sentMessages = dedupeCampaignMessages([
       ...allSeedSentMessages,
