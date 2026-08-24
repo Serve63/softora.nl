@@ -320,6 +320,117 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
+test('runtime ops coordinator upserts compact customer mutations without reading or rewriting the full dataset', async () => {
+  const bridgeWrites = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      throw new Error('full customer read should not run for one customer upsert');
+    },
+    setUiStateValues: async () => {
+      throw new Error('legacy ui-state write should not run for one customer upsert');
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      setUiStateValues: async (scope, values, meta) => {
+        bridgeWrites.push({ scope, values, meta });
+        return {
+          values,
+          source: 'supabase:data_ops',
+          updatedAt: '2026-08-24T14:30:00.000Z',
+        };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        patch: {
+          softora_customers_premium_v1: JSON.stringify([{ id: 'klant-413', bedrijf: 'Administratieportaal' }]),
+        },
+        mode: 'upsert',
+        upsertOnly: true,
+        source: 'premium-klanten',
+        actor: 'Premium klanten database',
+      },
+    },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.source, 'supabase:data_ops');
+  assert.deepEqual(bridgeWrites, [{
+    scope: 'premium_customers_database',
+    values: {
+      softora_customers_premium_v1: '[{"id":"klant-413","bedrijf":"Administratieportaal"}]',
+    },
+    meta: {
+      source: 'premium-klanten',
+      actor: 'Premium klanten database',
+      upsertOnly: true,
+    },
+  }]);
+});
+
+test('runtime ops coordinator rejects malformed customer upserts before data ops storage', async () => {
+  const bridgeWrites = [];
+  const { coordinator } = createFixture({
+    dataOpsUiStateBridge: {
+      canHandleScope: () => true,
+      setUiStateValues: async (...args) => {
+        bridgeWrites.push(args);
+        return null;
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    { body: { patch: { softora_customers_premium_v1: '[]' }, mode: 'upsert' } },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'CUSTOMER_UPSERT_PAYLOAD_INVALID');
+  assert.equal(bridgeWrites.length, 0);
+});
+
+test('runtime ops coordinator fails closed when a compact customer upsert is not confirmed', async () => {
+  const legacyWrites = [];
+  const { coordinator } = createFixture({
+    setUiStateValues: async (...args) => {
+      legacyWrites.push(args);
+      return { values: {} };
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: () => true,
+      setUiStateValues: async () => null,
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        patch: {
+          softora_customers_premium_v1: JSON.stringify([{ id: 'klant-fail-closed' }]),
+        },
+        mode: 'upsert',
+      },
+    },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.code, 'CUSTOMER_UPSERT_FAILED');
+  assert.equal(legacyWrites.length, 0);
+});
+
 test('runtime ops coordinator saves data ops patches when ui-state pre-read is unavailable', async () => {
   const bridgeWrites = [];
   const legacyWrites = [];

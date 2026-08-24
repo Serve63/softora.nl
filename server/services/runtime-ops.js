@@ -12,6 +12,9 @@ const PREMIUM_WORD_HTML_KEY = 'softora_premium_word_html_v1';
 const PREMIUM_WORD_BACKUPS_KEY = 'softora_premium_word_html_backups_v1';
 const PREMIUM_WORD_BACKUP_LIMIT = 8;
 const PREMIUM_WORD_BACKUPS_MAX_LENGTH = 180000;
+const PREMIUM_CUSTOMERS_SCOPE = 'premium_customers_database';
+const PREMIUM_CUSTOMERS_KEY = 'softora_customers_premium_v1';
+const PREMIUM_CUSTOMERS_UPSERT_LIMIT = 100;
 const SPORTSCHOOL_LOGBOOK_SCOPE = 'sportschool_logboek';
 const SPORTSCHOOL_LOGBOOK_KEY = 'sportschool_logboek_v1';
 const SPORTSCHOOL_LOGBOOK_MAX_LENGTH = 180000;
@@ -728,9 +731,49 @@ function createRuntimeOpsCoordinator(deps = {}) {
       normalizeString(body.mode || '').toLowerCase() === 'replace';
     const source = normalizeString(body.source || 'frontend');
     const actor = normalizeString(body.actor || '');
+    const customerUpsertRequested =
+      scope === PREMIUM_CUSTOMERS_SCOPE &&
+      (body.upsertOnly === true || normalizeString(body.mode || '').toLowerCase() === 'upsert');
     let valuesToSave;
     let currentState = null;
     let currentValues = {};
+
+    if (customerUpsertRequested) {
+      const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
+      const patchKeys = Object.keys(patchValues);
+      let customerRows = null;
+      try {
+        customerRows = JSON.parse(String(patchValues[PREMIUM_CUSTOMERS_KEY] || ''));
+      } catch (_error) {
+        customerRows = null;
+      }
+      if (
+        patchKeys.length !== 1 ||
+        patchKeys[0] !== PREMIUM_CUSTOMERS_KEY ||
+        !Array.isArray(customerRows) ||
+        customerRows.length < 1 ||
+        customerRows.length > PREMIUM_CUSTOMERS_UPSERT_LIMIT
+      ) {
+        return res.status(400).json({
+          ok: false,
+          code: 'CUSTOMER_UPSERT_PAYLOAD_INVALID',
+          error: 'Gerichte klantopslag bevat geen geldige klantmutatie.',
+        });
+      }
+      const mirroredState = await mirrorUiStateValuesToDataOps(scope, patchValues, {
+        source,
+        actor,
+        upsertOnly: true,
+      });
+      if (!mirroredState) {
+        return res.status(503).json({
+          ok: false,
+          code: 'CUSTOMER_UPSERT_FAILED',
+          error: 'Klant kon niet veilig in de formele Supabase-tabel worden opgeslagen.',
+        });
+      }
+      return sendUiStateSetSuccessResponse(res, scope, mirroredState, patchValues);
+    }
 
     if (replaceRequested) {
       if (scope === PREMIUM_WORD_SCOPE) {

@@ -146,3 +146,22 @@ test('premium customers page preserves the shared database lifecycle status', ()
   assert.match(loadStateSource, /remoteRows = deps\.parseCustomerStorageRows\(/);
   assert.match(loadStateSource, /if \(loadOutcome === 'canonical'\) \{/);
 });
+
+test('premium customers page saves one customer through a compact structured upsert', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-klanten.html'), 'utf8');
+  const storeSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-customers-store.js'), 'utf8');
+  const saveCustomerStart = pageSource.indexOf('async function saveCustomer(event)');
+  const deleteCustomerStart = pageSource.indexOf('async function deleteCustomer(customerId)');
+  const saveCustomerSource = pageSource.slice(saveCustomerStart, deleteCustomerStart);
+
+  assert.match(pageSource, /assets\/premium-customers-store\.js\?v=20260824a/);
+  assert.match(pageSource, /SoftoraPremiumCustomersStore\.createCustomerPersistence/);
+  assert.match(storeSource, /async function persistCustomerUpsert\(customer\)/);
+  assert.match(storeSource, /\[config\.key\]: JSON\.stringify\(\[normalizedCustomer\]\)/);
+  assert.match(storeSource, /mode: "upsert",\s*upsertOnly: true,/);
+  assert.ok(saveCustomerStart >= 0);
+  assert.ok(deleteCustomerStart > saveCustomerStart);
+  assert.match(saveCustomerSource, /const result = await customerPersistence\.persistCustomerUpsert\(nextCustomer\);/);
+  assert.doesNotMatch(saveCustomerSource, /persistCustomerList/);
+  assert.match(saveCustomerSource, /if \(result\.ok\) \{\s*state\.klanten = sortCustomers\(nextCustomers\);/);
+});
