@@ -459,10 +459,11 @@
     }
   }
   function refreshCellData() {
-    const statusCells = getStatusCells();
+    const statusCells = getStatusCells(), headers = grid.querySelectorAll('.habit-day');
     statusCells.forEach((cell, index) => {
       const day = DAYS[index % TOTAL_DAYS];
       const task = Math.floor(index / TOTAL_DAYS);
+      if (task === 0) headers[index].classList.toggle('is-today', day === TODAY);
       cell.dataset.cellIndex = String(index);
       cell.dataset.day = String(day);
       cell.dataset.task = String(task);
@@ -799,7 +800,6 @@
       header.className = 'habit-day';
       header.setAttribute('role', 'columnheader');
       header.classList.toggle('is-muted', day < PERIOD.startDay);
-      header.classList.toggle('is-today', day === TODAY);
       header.innerHTML = `<span>${PERIOD.shortLabel}</span><b>${day}</b>`;
       fragment.append(header);
     });
