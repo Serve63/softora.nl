@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
+const MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS = 8_000;
+const MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS = 2;
 
 function createCanonicalMailboxHash(parts = []) {
   const source = parts.map((value) => {
@@ -67,6 +69,17 @@ function isAmbiguousMailboxProviderError(error) {
     || status >= 500;
 }
 
+function isTransientMailboxProvenanceError(error) {
+  const code = String(error?.code || '').trim().toUpperCase();
+  const status = Number(error?.status || error?.statusCode || 0);
+  const text = String(
+    error?.message || error?.details || error?.hint || error?.name || error || ''
+  ).trim();
+  return status === 408 || status === 429 || status >= 500
+    || ['57014', 'SUPABASE_REST_COOLDOWN'].includes(code)
+    || /abort|timeout|timed out|cooldown|fetch failed|network|econnreset|etimedout|connection terminated|temporar/i.test(text);
+}
+
 function createMailboxReconcileRequiredError(cause) {
   const error = new Error('De provideruitkomst is niet eenduidig bevestigd; controleer de verzendstatus vóór opnieuw proberen.');
   error.status = 409;
@@ -82,17 +95,45 @@ function createMailboxSendProvenanceStore(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     logger = console,
     now = () => new Date(),
+    criticalClientTimeoutMs = MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
+    criticalMaxAttempts = MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS,
+    retryDelayMs = 50,
+    sleep = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
   } = deps;
   const normalizeEmail = (value) => normalizeString(value).toLowerCase();
   const getClient = () => (isSupabaseConfigured() ? getSupabaseClient() : null);
 
-  function requiredClient() {
-    const client = getClient();
+  const getCriticalClient = () => (isSupabaseConfigured() ? getSupabaseClient({
+    timeoutMs: Math.max(1_000, Math.min(60_000, Number(criticalClientTimeoutMs) || MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS)),
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }) : null);
+
+  function requiredCriticalClient() {
+    const client = getCriticalClient();
     if (client) return client;
     const error = new Error('Duurzame mailbox-threadregistratie is niet beschikbaar; verzending is veilig gestopt.');
     error.status = 503;
     error.code = 'MAILBOX_SEND_PROVENANCE_UNAVAILABLE';
     throw error;
+  }
+
+  async function runCriticalQuery(operation) {
+    const maxAttempts = Math.max(1, Math.min(2, Number(criticalMaxAttempts) || 1));
+    let lastError = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        const result = await operation(requiredCriticalClient());
+        if (result?.error) throw result.error;
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (!isTransientMailboxProvenanceError(error) || attempt >= maxAttempts - 1) throw error;
+        const delayMs = Math.max(0, Math.min(250, Number(retryDelayMs) || 0));
+        if (delayMs) await sleep(delayMs);
+      }
+    }
+    throw lastError;
   }
 
   function normalizeRow(row = {}) {
@@ -172,18 +213,19 @@ function createMailboxSendProvenanceStore(deps = {}) {
   }
 
   async function findByIdempotencyKey(idempotencyKey) {
-    const result = await requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
-      .eq('idempotency_key', normalizeString(idempotencyKey)).maybeSingle();
-    if (result.error) throw result.error;
+    const result = await runCriticalQuery((client) => client
+      .from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
+      .eq('idempotency_key', normalizeString(idempotencyKey)).maybeSingle());
     return result.data ? normalizeRow(result.data) : null;
   }
 
   async function findByColumn(column, value, statuses = []) {
-    let query = requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
-      .eq(column, normalizeString(value));
-    if (statuses.length) query = query.in('status', statuses);
-    const result = await query.maybeSingle();
-    if (result.error) throw result.error;
+    const result = await runCriticalQuery((client) => {
+      let query = client.from(MAILBOX_SEND_PROVENANCE_TABLE).select('*')
+        .eq(column, normalizeString(value));
+      if (statuses.length) query = query.in('status', statuses);
+      return query.maybeSingle();
+    });
     return result.data ? normalizeRow(result.data) : null;
   }
 
@@ -216,26 +258,44 @@ function createMailboxSendProvenanceStore(deps = {}) {
   async function reserve(input = {}) {
     const row = buildPreparedRow(input);
     assertPreparedRow(row);
-    const result = await requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE).insert(row).select('*').single();
-    if (!result.error && result.data) return { created: true, intent: normalizeRow(result.data) };
-    if (normalizeString(result.error && result.error.code) === '23505') {
-      const existing = await findReservationConflict(row);
-      if (existing) return { created: false, intent: existing };
+    try {
+      const result = await runCriticalQuery((client) => client
+        .from(MAILBOX_SEND_PROVENANCE_TABLE).insert(row).select('*').single());
+      if (result.data) return { created: true, intent: normalizeRow(result.data) };
+    } catch (queryError) {
+      if (normalizeString(queryError && queryError.code) === '23505') {
+        const existing = await findReservationConflict(row);
+        if (existing) return { created: false, intent: existing };
+      }
+      const error = queryError || new Error('Threadregistratie kon niet worden voorbereid.');
+      error.status = Number(error.status) || 503;
+      error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED';
+      throw error;
     }
-    const error = result.error || new Error('Threadregistratie kon niet worden voorbereid.');
+    const error = new Error('Threadregistratie kon niet worden voorbereid.');
     error.status = Number(error.status) || 503;
     error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED';
     throw error;
   }
 
   async function updateIntent(intentId, values, label, filters = {}) {
-    let query = requiredClient().from(MAILBOX_SEND_PROVENANCE_TABLE)
-      .update({ ...values, updated_at: now().toISOString() }).eq('intent_id', normalizeString(intentId));
-    if (Array.isArray(filters.statuses) && filters.statuses.length) query = query.in('status', filters.statuses);
-    if (filters.dispatchState) query = query.eq('dispatch_state', filters.dispatchState);
-    const result = await query.select('*').single();
-    if (!result.error && result.data) return normalizeRow(result.data);
-    const error = result.error || new Error(`Threadregistratie kon niet als ${label} worden opgeslagen.`);
+    let result;
+    try {
+      result = await runCriticalQuery((client) => {
+        let query = client.from(MAILBOX_SEND_PROVENANCE_TABLE)
+          .update({ ...values, updated_at: now().toISOString() }).eq('intent_id', normalizeString(intentId));
+        if (Array.isArray(filters.statuses) && filters.statuses.length) query = query.in('status', filters.statuses);
+        if (filters.dispatchState) query = query.eq('dispatch_state', filters.dispatchState);
+        return query.select('*').single();
+      });
+    } catch (queryError) {
+      const error = queryError || new Error(`Threadregistratie kon niet als ${label} worden opgeslagen.`);
+      error.status = Number(error.status) || 503;
+      error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED';
+      throw error;
+    }
+    if (result.data) return normalizeRow(result.data);
+    const error = new Error(`Threadregistratie kon niet als ${label} worden opgeslagen.`);
     error.status = Number(error.status) || 503;
     error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED';
     throw error;
@@ -310,6 +370,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
 
 module.exports = {
   MAILBOX_SEND_PROVENANCE_TABLE,
+  MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
   createMailboxSendIdentityKey,
@@ -317,4 +378,5 @@ module.exports = {
   createMailboxSendScopeKey,
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
+  isTransientMailboxProvenanceError,
 };

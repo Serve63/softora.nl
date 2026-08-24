@@ -308,6 +308,18 @@ function createMailboxComposeSend(deps = {}) {
       throw error;
     }
     const sentAt = now();
+    const sentCopyPromise = Promise.resolve().then(() => appendSentMessage({
+      account,
+      createImapClient,
+      nodemailer,
+      mail,
+      messageId: normalizeString(info?.messageId || ''),
+      sentAt,
+      logger,
+    })).catch((error) => {
+      logger.warn('[MailboxSentCopy][append-after-smtp]', error?.message || error);
+      return false;
+    });
     let acceptedProvenance;
     try {
       if (webdesignParts) {
@@ -328,17 +340,10 @@ function createMailboxComposeSend(deps = {}) {
           sentReconcileRequired: true,
         }).catch((markError) => logger.error('[MailboxSendProvenance][Unknown]', markError?.message || markError));
       }
+      await sentCopyPromise;
       throw createMailboxReconcileRequiredError(error);
     }
-    const sentCopySaved = await appendSentMessage({
-      account,
-      createImapClient,
-      nodemailer,
-      mail,
-      messageId: normalizeString(info?.messageId || ''),
-      sentAt,
-      logger,
-    });
+    const sentCopySaved = await sentCopyPromise;
     await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
       logger.warn('[MailboxAttachment][CleanupAfterAcceptedSend]', error?.message || error);
     });

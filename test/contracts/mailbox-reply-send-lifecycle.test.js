@@ -4,7 +4,10 @@ const assert = require('node:assert/strict');
 require('../../assets/premium-mailbox-reply-identity');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
 const { createMailboxComposeThreadContext } = require('../../server/services/mailbox-compose-thread-context');
-const { createMailboxComposeRuntime } = require('../../server/services/mailbox-compose-runtime');
+const {
+  TEMPORARY_MAILBOX_SEND_MESSAGE,
+  createMailboxComposeRuntime,
+} = require('../../server/services/mailbox-compose-runtime');
 const { createMailboxSendProvenanceStore } = require('../../server/services/mailbox-send-provenance-store');
 const { sendMailboxMessage } = require('../../server/services/mailbox-instantly-integration');
 
@@ -400,4 +403,43 @@ test('provider success followed by DB finalize failure records reconcile-require
     providerMessageId: 'outbound-1',
     sentReconcileRequired: true,
   });
+});
+
+test('mailbox send response hides raw Supabase cooldown details behind a safe retryable message', async () => {
+  const runtime = createMailboxComposeRuntime({
+    composeSendDependencies: {},
+    getAccount: () => null,
+    instantlyMailboxService: null,
+    mailboxComposeThreadContext: {
+      async resolve() {
+        const error = new Error(
+          'Supabase REST tijdelijk overgeslagen na timeout/504 (23s cooldown). Supabase client timeout na 1500ms.'
+        );
+        error.code = 'SUPABASE_REST_COOLDOWN';
+        error.status = 503;
+        throw error;
+      },
+    },
+    mailboxSendProvenanceStore: null,
+    normalizeEmail,
+    normalizeString,
+    logger: { error() {} },
+  });
+  const response = responseRecorder();
+
+  await runtime.sendMessageResponse({ body: {
+    account: 'serve@softora.nl', to: 'prospect@example.nl', subject: 'Re: Website',
+    body: 'Dit concept moet blijven staan.', mode: 'reply', idempotencyKey: 'browser:safe-error',
+  } }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.deepEqual(response.body, {
+    ok: false,
+    code: 'MAILBOX_SEND_TEMPORARY',
+    error: 'Mail niet verzonden',
+    detail: TEMPORARY_MAILBOX_SEND_MESSAGE,
+    retryable: true,
+  });
+  assert.match(response.body.detail, /niet verzonden.*concept blijft staan.*probeer het opnieuw/i);
+  assert.doesNotMatch(JSON.stringify(response.body), /Supabase|REST|504|cooldown|1500ms|23s/i);
 });

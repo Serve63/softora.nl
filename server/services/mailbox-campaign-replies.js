@@ -154,7 +154,7 @@ function getMessageTimestamp(message) {
 }
 
 function getConversationTimestamp(message) {
-  return parseMessageDate(message && message.activityAt) || getMessageTimestamp(message);
+  return Math.max(...['latestInboundAt', 'latestOutboundAt', 'activityAt'].map((key) => parseMessageDate(message && message[key])), getMessageTimestamp(message));
 }
 
 function messageReferencesId(message, messageId) {

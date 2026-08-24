@@ -13,7 +13,7 @@ const {
 const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const autopilotResilience = require('./coldmail-autopilot-resilience');
-const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-reconciliation');
+const { createColdmailSendDurability } = require('./coldmail-send-provenance');
 const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation'); const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
@@ -213,7 +213,7 @@ function createColdmailCampaignService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     outboundRecipientGuardStore = null,
-    dataOpsStore = null,
+    dataOpsStore = null, mailboxSendProvenanceStore = null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     leadDbScope = DEFAULT_LEAD_DB_SCOPE,
@@ -309,11 +309,11 @@ function createColdmailCampaignService(deps = {}) {
     normalizeString,
     truncateText,
   });
-  const postSmtpReconciliation = createColdmailPostSmtpReconciliation({
-    outboundRecipientGuardStore, dataOpsStore, now, logger, getSenderEmails: () => getConfiguredSenderEmails(),
-    finalizeEvidence: (evidence) => finalizeAcceptedColdmailEvidence(evidence),
+  const coldmailSendDurability = createColdmailSendDurability({
+    store: mailboxSendProvenanceStore, outboundRecipientGuardStore, dataOpsStore, now, logger,
+    getSenderEmails: () => getConfiguredSenderEmails(), runPersistenceStep: runColdmailPostSmtpPersistenceStep,
+    finalizeEvidence: finalizeAcceptedColdmailEvidence,
   });
-
   function normalizeEmailAddress(value) {
     const raw = normalizeString(value)
       .toLowerCase()
@@ -5506,7 +5506,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function reconcileColdmailPostSmtp(input = {}) {
-    const result = await postSmtpReconciliation.reconcilePending({ maxRows: input.maxRows });
+    const result = await coldmailSendDurability.reconcilePending({ maxRows: input.maxRows });
     if (result.reconciled > 0) coldmailLiveStatsCache = null;
     return result;
   }
@@ -8723,28 +8723,19 @@ function createColdmailCampaignService(deps = {}) {
           failed.push(outboundReservation.conflict);
           continue;
         }
-        let info;
-        let accepted = [];
-        let rejected = [];
-        try {
-          info = await transporter.sendMail(mail);
-          accepted = Array.isArray(info && info.accepted)
-            ? info.accepted.map(normalizeEmailAddress).filter(Boolean)
-            : [];
-          rejected = Array.isArray(info && info.rejected)
-            ? info.rejected.map(normalizeEmailAddress).filter(Boolean)
-            : [];
-          if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
-            throw new Error('SMTP accepteerde de ontvanger niet.');
-          }
-        } catch (error) {
-          await releaseSupabaseOutboundRecipientReservation(outboundReservation, { to });
-          await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
-          throw error;
-        }
-        if (!isTestRecipientRow(row, to)) {
-          await confirmSupabaseColdmailSenderCooldown(senderCooldownReservation, senderEmail, input, actor);
-        }
+        const delivery = await coldmailSendDurability.dispatch({
+          provenanceInput: shouldReserveGuards ? {
+            reservationId: outboundReservation && outboundReservation.reservationId,
+            accountEmail: senderEmail, recipientEmail: to, subject, body: text,
+            bcc: auditBcc, attachments,
+          } : null,
+          recipientEmail: to, normalizeEmailAddress, sendProvider: () => transporter.sendMail(mail),
+          onSafeFailure: () => Promise.all([
+            releaseSupabaseOutboundRecipientReservation(outboundReservation, { to }),
+            releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to }),
+          ]),
+        });
+        const { accepted, info, intent: sendProvenanceIntent, rejected } = delivery;
         const sentItem = {
           id: item.id,
           bedrijf: getRowCompany(row),
@@ -8757,29 +8748,34 @@ function createColdmailCampaignService(deps = {}) {
           sentAt: now().toISOString(),
           sentCopySaved: false,
         };
-        const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
-        sentItem.sentCopySaved = sentCopySaved;
+        const sentCopyPromise = saveSentCopy(senderEmail, mail, info, smtpAccount).catch((error) => {
+          logger.error('[Coldmail][SentCopy]', error && error.message ? error.message : error);
+          return false;
+        });
         if (!isTestRecipientRow(row, to)) {
-          await postSmtpReconciliation.persistAcceptedSend({
-              reservationId: outboundReservation && outboundReservation.reservationId,
-              customerId: item.id,
-              bedrijf: sentItem.bedrijf,
-              senderEmail,
-              recipientEmail: to,
-              subject,
-              expectedSubject: subject,
-              reference,
-              durationDays: input.durationDays,
-              specialAction: effectiveSpecialAction,
-              actor,
-              messageId: sentItem.messageId,
-              sentAt: sentItem.sentAt,
-              trackingId: sentItem.trackingId,
-              postSmtpEvidence: 'smtp-accepted',
-              customerRow: row,
-            });
+          const acceptedEvidence = {
+            reservationId: outboundReservation && outboundReservation.reservationId,
+            customerId: item.id,
+            bedrijf: sentItem.bedrijf,
+            senderEmail,
+            recipientEmail: to,
+            subject,
+            expectedSubject: subject,
+            reference,
+            durationDays: input.durationDays,
+            specialAction: effectiveSpecialAction,
+            actor,
+            messageId: sentItem.messageId,
+            sentAt: sentItem.sentAt,
+            trackingId: sentItem.trackingId,
+            postSmtpEvidence: 'smtp-accepted',
+            customerRow: row,
+          };
+          await coldmailSendDurability.persistAccepted(sendProvenanceIntent, acceptedEvidence, sentCopyPromise);
           persistedSentRowIds.add(item.id);
+          await confirmSupabaseColdmailSenderCooldown(senderCooldownReservation, senderEmail, input, actor);
         }
+        sentItem.sentCopySaved = await sentCopyPromise;
         sent.push(sentItem);
       } catch (error) {
         failed.push({
@@ -8800,6 +8796,8 @@ function createColdmailCampaignService(deps = {}) {
           ? 'central_outbound_guard_preflight_failed'
           : postSmtpPersistenceFailed
           ? 'post_smtp_persistence_failed'
+          : errorCode === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+          ? 'provider_send_reconcile_required'
           : getSmtpSafetyStopReason(error);
         if (safetyReason) {
           safetyPause = await recordColdmailSafetyPause({

@@ -40,9 +40,19 @@ function createMailboxDiscoveryRepository(deps = {}) {
   }
 
   function normalizeDiscoveryRow(row = {}) {
-    const message = normalizeMessageRow(row);
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const isAcceptedSendFallback = String(payload.timelineSource || '').trim() === 'send-provenance';
+    const message = normalizeMessageRow(isAcceptedSendFallback ? {
+      ...row,
+      body_text: String(payload.timelineBodyText || ''),
+    } : row, { includeBody: isAcceptedSendFallback });
     return {
       ...message,
+      ...(isAcceptedSendFallback ? {
+        bodyLoaded: true,
+        localAcceptedSend: true,
+        timelineSynthetic: true,
+      } : {}),
       messageKey: String(row.message_key || ''),
       technicalThreadKey: String(row.technical_thread_key || ''),
       externalContactEmail: String(row.external_contact_email || '').trim().toLowerCase(),

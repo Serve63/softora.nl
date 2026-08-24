@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   createMailboxSendProvenanceStore,
 } = require('../../server/services/mailbox-send-provenance-store');
+const { createSupabaseStateStore } = require('../../server/services/supabase-state');
 
 function createFakeSupabase() {
   const rows = [];
@@ -105,6 +106,114 @@ test('mailbox send provenance survives acceptance and prevents an idempotent res
   });
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].conversationId, 'conversation:blue');
+});
+
+test('mailbox send provenance bypasses an active shared circuit and retries one isolated timeout', async () => {
+  let backgroundCalls = 0;
+  let criticalCalls = 0;
+  const createdClients = [];
+  const createClient = (_url, _key, options = {}) => {
+    const timedFetch = options.global.fetch;
+    const client = {
+      timedFetch,
+      from() {
+        let inserted = null;
+        const query = {
+          insert(row) { inserted = { ...row }; return query; },
+          select() { return query; },
+          async single() {
+            try {
+              await timedFetch('https://example.supabase.co/rest/v1/softora_mailbox_send_provenance', {
+                method: 'POST',
+              });
+              return { data: inserted, error: null };
+            } catch (error) {
+              return { data: null, error };
+            }
+          },
+        };
+        return query;
+      },
+    };
+    createdClients.push(client);
+    return client;
+  };
+  const stateStore = createSupabaseStateStore({
+    supabaseUrl: 'https://example.supabase.co',
+    supabaseServiceRoleKey: 'service-role-key',
+    supabaseStateTable: 'runtime_state',
+    supabaseStateKey: 'runtime_state_main',
+    createClient,
+    fetchImpl: async (url) => {
+      if (String(url).includes('/background-sync')) {
+        backgroundCalls += 1;
+        const error = new Error('Supabase client timeout na 1500ms');
+        error.name = 'AbortError';
+        throw error;
+      }
+      criticalCalls += 1;
+      if (criticalCalls === 1) {
+        const error = new Error('Supabase client timeout na 8000ms');
+        error.name = 'AbortError';
+        throw error;
+      }
+      return { ok: true, status: 201, text: async () => '[]' };
+    },
+  });
+  const backgroundClient = stateStore.getSupabaseClient();
+  await assert.rejects(
+    backgroundClient.timedFetch('https://example.supabase.co/background-sync'),
+    /1500ms/
+  );
+  await assert.rejects(
+    backgroundClient.timedFetch('https://example.supabase.co/background-sync'),
+    /tijdelijk overgeslagen/
+  );
+
+  const provenanceStore = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: stateStore.getSupabaseClient,
+    retryDelayMs: 0,
+  });
+  const result = await provenanceStore.reserve({
+    intentId: 'send:circuit-isolated', idempotencyKey: 'browser:circuit-isolated', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'prospect@example.nl', mode: 'reply',
+    conversationId: 'conversation:circuit-isolated', replyTargetMessageId: '<incoming@example.nl>',
+    references: '<incoming@example.nl>', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Re: Website', body: 'Dankjewel voor je reactie.',
+  });
+
+  assert.equal(result.created, true);
+  assert.equal(result.intent.status, 'prepared');
+  assert.equal(backgroundCalls, 1, 'het gedeelde circuit hoort de tweede achtergrondcall over te slaan');
+  assert.equal(criticalCalls, 2, 'de kritieke provenancecall hoort exact één soft retry te doen');
+  assert.equal(createdClients.length, 2, 'default- en kritieke clientpolicy horen gescheiden te zijn');
+});
+
+test('mailbox send provenance requests the bounded isolated client policy for every send guard query', async () => {
+  const requestedPolicies = [];
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      requestedPolicies.push(options || {});
+      return client;
+    },
+    retryDelayMs: 0,
+  });
+
+  await store.reserve({
+    intentId: 'send:policy', idempotencyKey: 'browser:policy', owner: 'martijn',
+    accountEmail: 'martijn@softora.nl', recipientEmail: 'prospect@example.nl', mode: 'new-message',
+    conversationId: 'draft:prospect', provider: 'smtp', senderName: 'Martijn van de Ven',
+    subject: 'Kleine vraag', body: 'Goedendag',
+  });
+
+  assert.deepEqual(requestedPolicies, [{
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
 });
 
 test('mailbox send provenance fails closed when durable storage is unavailable', async () => {
