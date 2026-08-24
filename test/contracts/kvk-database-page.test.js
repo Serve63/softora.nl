@@ -525,12 +525,12 @@ test('kvk framed content uses the same solid background as the surrounding page'
   const directorySource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-company-directory.html'), 'utf8');
   const frameStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-frame.css'), 'utf8');
 
-  assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260809a/);
-  assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260809a/);
+  assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260824a/);
+  assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260824a/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813b/);
   assert.match(
     frameStyleSource,
-    /html\[data-softora-sidebar-content-frame="1"\][\s\S]*background:\s*#f4f1ed !important;/
+    /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{\s*background:\s*#f4f1ed !important;/
   );
 });
 
