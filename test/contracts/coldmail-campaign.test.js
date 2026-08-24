@@ -5728,6 +5728,32 @@ test('coldmail campaign removes Dutch province suffixes from city variables', as
   assert.doesNotMatch(sentMessages[1].text, /\(NBr\.\)|\bNBr\b|\bNB\b/);
 });
 
+test('coldmail campaign selects the municipality before a trailing Dutch province', async () => {
+  const { service, sentMessages } = createService({
+    rows: [{
+      id: 'kvk-86351907',
+      bedrijf: 'Resin Art JR',
+      naam: 'Resin Art JR',
+      email: 'info@resinartjr.nl',
+      stad: 'Tongeren, Boxtel, Noord-Brabant',
+      status: 'prospect',
+      mail: true,
+    }],
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.match(sentMessages[0].text, /📍 Boxtel/);
+  assert.doesNotMatch(sentMessages[0].text, /📍 Noord-Brabant|📍 Tongeren/);
+});
+
 test('coldmail campaign replaces website variable from database website aliases', async () => {
   const { service, sentMessages } = createService({
     rows: [

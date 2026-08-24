@@ -2009,6 +2009,67 @@ test('data ops store signs design photo URLs in storage batches and omits quaran
   assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
 });
 
+test('data ops store can sign one targeted quarantined asset for a proven sent public preview', async () => {
+  const row = {
+    customer_id: 'customer-sent-preview',
+    identity_key: 'sent preview|contact|3100000000',
+    storage_bucket: 'softora-design-photos',
+    storage_path: 'customers/customer-sent-preview/webdesign.png',
+    mime_type: 'image/png',
+    file_name: 'sent-preview.png',
+    legacy_meta: {
+      incidentQuarantine: { active: true, incident: 'webdesign-outreach-identity-leak-20260821' },
+      mockup: {
+        storageBucket: 'softora-design-photos',
+        storagePath: 'customers/customer-sent-preview/mockup.jpg',
+        fileName: 'sent-preview-mockup.jpg',
+      },
+    },
+    updated_at: '2026-08-21T12:00:00.000Z',
+  };
+  const query = {
+    select() { return query; },
+    is() { return query; },
+    in() { return query; },
+    order() { return query; },
+    limit() { return Promise.resolve({ data: [row], error: null }); },
+  };
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return query;
+    },
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrls(paths) {
+            return {
+              data: paths.map((path) => ({ path, signedUrl: `https://storage.example.test/${bucket}/${path}` })),
+              error: null,
+            };
+          },
+        };
+      },
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    customerIds: ['customer-sent-preview'],
+    includeIncidentQuarantined: true,
+    expiresInSeconds: 120,
+  });
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].customerId, 'customer-sent-preview');
+  assert.match(entries[0].websitePhotoUrl, /^https:\/\/storage\.example\.test\//);
+  assert.match(entries[0].websiteMockupUrl, /^https:\/\/storage\.example\.test\//);
+});
+
 test('data ops store scans up to 1500 design photo rows for full coldmail stock visibility', async () => {
   const rows = Array.from({ length: 1200 }, (_item, index) => {
     const number = index + 1;

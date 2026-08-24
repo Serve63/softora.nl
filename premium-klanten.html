@@ -1195,6 +1195,7 @@
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script src="assets/premium-customers-renderers.js?v=20260824a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script>
+    <script src="assets/premium-customers-store.js?v=20260824a"></script>
     <script src="assets/premium-customers-load-state.js?v=20260824a"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1248,6 +1249,7 @@
             editId: null,
             messageTimer: null
         };
+        const customerPersistence = window.SoftoraPremiumCustomersStore.createCustomerPersistence({ scope: CUSTOMER_DB_SCOPE, key: CUSTOMER_DB_KEY, normalizeCustomer, normalizeString, isCustomerLifecycleRecord, fetchUiStateSetWithFallback, getSharedCustomerRows: () => state.sharedCustomerRows, setSharedCustomerRows: (rows) => { state.sharedCustomerRows = rows; } });
 
         const nodes = {
             body: document.getElementById("customersBody"),
@@ -2012,19 +2014,17 @@
                 })
                 : state.klanten.concat(nextCustomer);
 
-            state.klanten = sortCustomers(nextCustomers);
-            renderPage();
-            closeModal();
-
-            const result = await persistCustomerList(state.klanten);
+            const result = await customerPersistence.persistCustomerUpsert(nextCustomer);
             if (result.ok) {
+                state.klanten = sortCustomers(nextCustomers);
+                renderPage();
+                closeModal();
                 setStatusMessage(isEditing ? "Klant bijgewerkt." : "Klant toegevoegd.", "success", true);
                 return;
             }
 
-            setStatusMessage(
-                "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
-                "error"
+            setModalError(
+                "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout")
             );
         }
 

@@ -190,6 +190,16 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
 });
 
+test('premium klanten opslagasset blijft buiten de statische sidebar', () => {
+  const source = readRepoFile('premium-klanten.html');
+  const asideEnd = source.indexOf('</aside>');
+  const storeAssetIndex = source.indexOf('assets/premium-customers-store.js?v=20260824a');
+
+  assert.ok(asideEnd > 0, 'klantenpagina hoort de statische sidebar te behouden');
+  assert.ok(storeAssetIndex > asideEnd, 'klantenopslaglogica hoort buiten de sidebar-shell te laden');
+  assert.match(source, /class="sidebar-link magnetic active" data-sidebar-key="customers"/);
+});
+
 test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => {
   const source = readRepoFile('premium-gezondheidsdossier.html');
   const asideEnd = source.indexOf('</aside>');
