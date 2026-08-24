@@ -1712,7 +1712,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
     if (!structuredRows) return null;
     const client = getClient(buildQueryOptions);
-    const serveableRows = filterDesignPhotoRowsForServing(structuredRows);
+    const serveableRows = options.includeIncidentQuarantined === true && hasTargetedLookup ? structuredRows : filterDesignPhotoRowsForServing(structuredRows);
     const rows = serveableRows
       .filter((row) => customerIds.length
         ? customerIdSet.has(normalizeString(row && row.customer_id).toLowerCase())

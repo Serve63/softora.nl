@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { OUTBOUND_SENDER_PROFILE_KEYS } = require('./outbound-sender-identity');
+const { listSentQuarantinedPreviewEntries } = require('./public-webdesign-preview-quarantine');
 
 const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
@@ -1518,14 +1519,11 @@ function createPublicWebdesignPreviewService(options = {}) {
   }
 
   async function resolveStructuredPreview(id, options = {}) {
-    if (
-      !dataOpsStore ||
+    if (!dataOpsStore ||
       typeof dataOpsStore.listCustomers !== 'function' ||
-      typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function'
-    ) {
-      return null;
-    }
+      typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') return null;
     const diagnostics = options.diagnostics || null;
+    const allowSentQuarantined = Boolean(options.allowSentQuarantined);
 
     const directPhotoEntries = await retryPublicPreviewRead(() => dataOpsStore.listDesignPhotosWithSignedUrls({
       ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
@@ -1536,51 +1534,36 @@ function createPublicWebdesignPreviewService(options = {}) {
     const directPhotoMap = buildPhotoMapFromStructuredEntries(directPhotoEntries);
     const includeProfileContext = Boolean(options.includeProfileContext);
     const loadOutboundContexts = async (identifiers) => {
-      if (
-        !includeProfileContext ||
+      if ((!includeProfileContext && !allowSentQuarantined) ||
         !dataOpsStore ||
-        typeof dataOpsStore.listOutboundRecipientGuardsForPreview !== 'function'
-      ) {
-        return [];
-      }
+        typeof dataOpsStore.listOutboundRecipientGuardsForPreview !== 'function') return [];
       const loaded = await retryPublicPreviewRead(
         () => dataOpsStore.listOutboundRecipientGuardsForPreview({
           ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
           identifiers,
           maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
         }),
-        STRUCTURED_PREVIEW_READ_ATTEMPTS,
-        diagnostics,
-        'outbound-context'
+        STRUCTURED_PREVIEW_READ_ATTEMPTS, diagnostics, 'outbound-context'
       );
       return Array.isArray(loaded) ? loaded : [];
     };
     const directRecords = getPreviewRecordList(directPhotoMap);
     let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], []);
-    if (preview && !includeProfileContext) {
-      return preview;
-    }
+    if (preview && !includeProfileContext) return preview;
 
     async function loadCustomersForPreview(source) {
       const loadedCustomers = await retryPublicPreviewRead(
         () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
-        STRUCTURED_PREVIEW_READ_ATTEMPTS,
-        diagnostics,
-        source
+        STRUCTURED_PREVIEW_READ_ATTEMPTS, diagnostics, source
       );
       return Array.isArray(loadedCustomers) ? loadedCustomers : [];
     }
 
     async function enrichDirectPreview() {
       const customers = await loadCustomersForPreview('customers-direct');
-      const matchedCustomers = directRecords
-        .map((record) => findCustomerForPreviewRecord(customers, id, record))
-        .filter(Boolean);
+      const matchedCustomers = directRecords.map((record) => findCustomerForPreviewRecord(customers, id, record)).filter(Boolean);
       const candidateCustomers = findCustomerCandidates(customers, id);
-      const profileCustomers = Array.from(new Set([
-        ...matchedCustomers,
-        ...candidateCustomers,
-      ].filter(Boolean)));
+      const profileCustomers = Array.from(new Set([...matchedCustomers, ...candidateCustomers].filter(Boolean)));
       const customerPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, []) || preview;
       if (
         customerPreview &&
@@ -1591,9 +1574,7 @@ function createPublicWebdesignPreviewService(options = {}) {
         return customerPreview;
       }
 
-      const profileCustomer = profileCustomers.find((customer) =>
-        hasConfirmedPublicPreviewSenderProfileSignal([customer])
-      );
+      const profileCustomer = profileCustomers.find((customer) => hasConfirmedPublicPreviewSenderProfileSignal([customer]));
       if (profileCustomer) {
         const profileRecord =
           directRecords.find((record) => findCustomerForPreviewRecord([profileCustomer], id, record)) ||
@@ -1608,14 +1589,10 @@ function createPublicWebdesignPreviewService(options = {}) {
           profileCustomer,
           null
         );
-        if (profilePreview && hasExplicitPublicPreviewProfile(profilePreview)) {
-          return profilePreview;
-        }
+        if (profilePreview && hasExplicitPublicPreviewProfile(profilePreview)) return profilePreview;
       }
 
-      const outboundContexts = await loadOutboundContexts(
-        collectPublicPreviewContextIdentifiers(id, directRecords, profileCustomers)
-      );
+      const outboundContexts = await loadOutboundContexts(collectPublicPreviewContextIdentifiers(id, directRecords, profileCustomers));
       const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
       return enrichedPreview || customerPreview || preview || null;
     }
@@ -1631,6 +1608,24 @@ function createPublicWebdesignPreviewService(options = {}) {
     let outboundContexts = await loadOutboundContexts(
       collectPublicPreviewContextIdentifiers(id, directRecords, [])
     );
+    if (allowSentQuarantined) {
+      const sentQuarantinedEntries = await retryPublicPreviewRead(
+        () => listSentQuarantinedPreviewEntries({
+          customerId: id,
+          outboundContexts,
+          dataOpsStore,
+          readOptions: PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
+          expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
+          maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
+        }),
+        STRUCTURED_PREVIEW_READ_ATTEMPTS,
+        diagnostics,
+        'design-photos-sent-quarantine'
+      );
+      const sentQuarantinedMap = buildPhotoMapFromStructuredEntries(sentQuarantinedEntries);
+      preview = resolvePreviewFromMaps(id, {}, sentQuarantinedMap, [], outboundContexts);
+      if (preview) return preview;
+    }
     const customers = await loadCustomersForPreview('customers-candidates');
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
@@ -1665,7 +1660,11 @@ function createPublicWebdesignPreviewService(options = {}) {
     const cachedPreview = getPublicPreviewCacheEntry(publicPreviewResolutionCache, cacheKey);
     if (cachedPreview) return cachedPreview;
     const diagnostics = options.diagnostics || null;
-    const structuredPreview = await resolveStructuredPreview(id, { includeProfileContext, diagnostics });
+    const structuredPreview = await resolveStructuredPreview(id, {
+      includeProfileContext,
+      allowSentQuarantined: Boolean(options.allowSentQuarantined),
+      diagnostics,
+    });
     if (structuredPreview) {
       if (structuredPreview.profileContextPending) {
         return structuredPreview;
@@ -1719,7 +1718,7 @@ function createPublicWebdesignPreviewService(options = {}) {
         query.customerId ||
         query.id,
       req && req.params && (req.params.companySlug || req.params.customerId),
-    ], { diagnostics });
+    ], { diagnostics, allowSentQuarantined: true });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) {
@@ -1746,7 +1745,7 @@ function createPublicWebdesignPreviewService(options = {}) {
     const resolvedPreview = await resolveFirstPreview([
       queryIdentifier,
       routeIdentifier,
-    ], { includeProfileContext: true, diagnostics });
+    ], { includeProfileContext: true, diagnostics, allowSentQuarantined: true });
     const preview = applyPublicPreviewProfileOverride(resolvedPreview, profileOverride);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -1781,7 +1780,7 @@ function createPublicWebdesignPreviewService(options = {}) {
     const preview = await resolveFirstPreview([
       queryIdentifier,
       routeIdentifier,
-    ], { diagnostics });
+    ], { diagnostics, allowSentQuarantined: true });
     if (!preview) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
       if (hasPublicPreviewTransientReadFailure(diagnostics)) {

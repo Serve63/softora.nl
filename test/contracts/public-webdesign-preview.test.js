@@ -1705,6 +1705,89 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
   }
 });
 
+test('public webdesign preview restores a quarantined asset only after permanent sent proof', async () => {
+  const photoReads = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        throw new Error('customer snapshot should not be needed for exact sent proof');
+      },
+      async listDesignPhotosWithSignedUrls(options) {
+        photoReads.push(options);
+        if (!options.includeIncidentQuarantined) return [];
+        return [{
+          customerId: 'kvk-77250257',
+          fileName: 'karin-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/karin-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/karin-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        return [{
+          guard_key: 'id:kvk-77250257',
+          sender_email: 'servecreusen@softora.nl',
+          recipient_id: 'kvk-77250257',
+          recipient_email: 'karin@karinvandelaar.nl',
+          recipient_company: 'Karin van de Laar Fotografie & CRM-advies',
+          status: 'sent',
+          permanent: true,
+          updated_at: '2026-08-18T14:26:02.000Z',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'karin-van-de-laar-fotografie-crm-advies' },
+    query: { cid: 'kvk-77250257', sender: 'serve' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.ok(photoReads.some((options) => options.includeIncidentQuarantined === true));
+  assert.match(response.body, /Karin van de Laar Fotografie &amp; CRM-advies/);
+  assert.match(response.body, /\/webdesign\/kvk-77250257\/asset\/webdesign\?w=840/);
+  assert.doesNotMatch(response.body, /Preview wordt geladen|Deze preview is niet beschikbaar/);
+});
+
+test('public webdesign preview keeps quarantined assets blocked for reserved-only guards', async () => {
+  const photoReads = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls(options) {
+        photoReads.push(options);
+        return [];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        return [{
+          sender_email: 'servecreusen@softora.nl',
+          recipient_id: 'kvk-not-sent',
+          status: 'reserved',
+          permanent: true,
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'nog-niet-verzonden' },
+    query: { cid: 'kvk-not-sent', sender: 'serve' },
+  }, response);
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(photoReads.some((options) => options.includeIncidentQuarantined === true), false);
+});
+
 test('public webdesign preview is wired into feature routes', () => {
   const featureRoutes = fs.readFileSync(
     path.join(__dirname, '../../server/services/feature-routes-runtime.js'),
