@@ -438,6 +438,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-profile-render-key/);
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
   assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
+  assert.match(prefillSource, /function normalizePremiumSidebarStructure\(\) \{/);
+  assert.match(prefillSource, /FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS[\s\S]*"coldmailing"[\s\S]*"agenda"[\s\S]*"websitegenerator"[\s\S]*"bookkeeping"/);
+  assert.match(prefillSource, /ensureFirstPaintSidebarLink\(sidebar, overview, getFirstPaintSidebarLink\("lead_radar"\), \["database"\]\);/);
+  assert.match(prefillSource, /ensureFirstPaintSidebarLink\(sidebar, management, getFirstPaintSidebarLink\("summarize"\), \["seo", "qr_code", "packages"\]\);/);
+  assert.match(prefillSource, /normalizePremiumSidebarStructure\(\);\s*prefillPremiumSidebarActiveState\(\);/);
+  assert.match(prefillSource, /data-sidebar-structure-prefilled/);
   assert.match(prefillSource, /link\.classList\.toggle\("active", key === activeKey\);/);
   assert.match(prefillSource, /NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1"/);
   assert.match(prefillSource, /function readCookieValue\(name\) \{/);
@@ -453,6 +459,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
   assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818b'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260824a'/);
+  assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);

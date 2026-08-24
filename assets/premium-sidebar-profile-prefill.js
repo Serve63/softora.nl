@@ -71,6 +71,96 @@
         return "dashboard";
     }
 
+    var FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS = [
+        "analytics",
+        "coldmailing",
+        "health_dossier",
+        "agenda",
+        "websitegenerator",
+        "bookkeeping",
+        "pdfs",
+        "live_momentum",
+        "websitegenerator_library"
+    ];
+
+    function getFirstPaintSidebarLink(key) {
+        var sharedLinks = window.SoftoraPremiumSidebarLinks;
+        if (key === "lead_radar") {
+            if (sharedLinks && typeof sharedLinks.getLeadRadarSidebarLink === "function") {
+                return sharedLinks.getLeadRadarSidebarLink();
+            }
+            return {
+                key: "lead_radar",
+                href: "/lead-radar",
+                label: "Lead Radar",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m16 16 4.25 4.25M11 7.5v3.75l2.5 1.5"></path></svg>'
+            };
+        }
+        if (sharedLinks && typeof sharedLinks.getSummarizeSidebarLink === "function") {
+            return sharedLinks.getSummarizeSidebarLink();
+        }
+        return {
+            key: "summarize",
+            href: "/premium-samenvatten",
+            label: "Samenvatten",
+            icon: '<svg class="sidebar-link-summarize-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg>'
+        };
+    }
+
+    function findFirstPaintSidebarSection(sidebar, label) {
+        var normalizedLabel = String(label || "").trim().toLowerCase();
+        return Array.prototype.find.call(sidebar.querySelectorAll(".sidebar-section"), function (section) {
+            var sectionLabel = section.querySelector(".sidebar-section-label");
+            return String((sectionLabel && sectionLabel.textContent) || "").trim().toLowerCase() === normalizedLabel;
+        }) || null;
+    }
+
+    function ensureFirstPaintSidebarLink(sidebar, section, link, insertBeforeKeys) {
+        if (!sidebar || !section || !link) return;
+        var anchor = sidebar.querySelector('[data-sidebar-key="' + link.key + '"]');
+        if (!anchor) {
+            anchor = document.createElement("a");
+        }
+        anchor.className = "sidebar-link magnetic";
+        anchor.setAttribute("href", link.href);
+        anchor.setAttribute("data-sidebar-key", link.key);
+        anchor.removeAttribute("aria-disabled");
+        anchor.removeAttribute("tabindex");
+        anchor.removeAttribute("role");
+        anchor.removeAttribute("data-sidebar-href");
+        anchor.removeAttribute("data-sidebar-nav-init");
+        anchor.innerHTML = link.icon;
+        var label = document.createElement("span");
+        label.className = "sidebar-link-text";
+        label.textContent = link.label;
+        anchor.appendChild(label);
+        var before = null;
+        for (var i = 0; i < insertBeforeKeys.length; i += 1) {
+            before = section.querySelector('[data-sidebar-key="' + insertBeforeKeys[i] + '"]');
+            if (before && before !== anchor) break;
+            before = null;
+        }
+        section.insertBefore(anchor, before);
+    }
+
+    function normalizePremiumSidebarStructure() {
+        var sidebar = document.querySelector(".sidebar[data-static-sidebar='1']");
+        if (!sidebar) return;
+        FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS.forEach(function (key) {
+            sidebar.querySelectorAll('[data-sidebar-key="' + key + '"]').forEach(function (link) {
+                link.remove();
+            });
+        });
+        sidebar.querySelectorAll('a[href="/winnen"], a[href="/live-momentum"], a[href="/live-momentum.html"], a[href^="/premium-analytics"]').forEach(function (link) {
+            link.remove();
+        });
+        var overview = findFirstPaintSidebarSection(sidebar, "overzicht");
+        var management = findFirstPaintSidebarSection(sidebar, "beheer");
+        ensureFirstPaintSidebarLink(sidebar, overview, getFirstPaintSidebarLink("lead_radar"), ["database"]);
+        ensureFirstPaintSidebarLink(sidebar, management, getFirstPaintSidebarLink("summarize"), ["seo", "qr_code", "packages"]);
+        sidebar.setAttribute("data-sidebar-structure-prefilled", "1");
+    }
+
     function prefillPremiumSidebarActiveState() {
         var sidebar = document.querySelector(".sidebar[data-static-sidebar='1']");
         if (!sidebar) return;
@@ -268,6 +358,7 @@
     }
 
     try {
+        normalizePremiumSidebarStructure();
         prefillPremiumSidebarActiveState();
         prefillPremiumSidebarScrollState();
 
