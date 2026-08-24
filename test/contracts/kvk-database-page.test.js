@@ -405,6 +405,20 @@ test('kvk database hides the page scrollbar without disabling scrolling', () => 
   assert.match(planningStyleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
 });
 
+test('kvk database keeps the wide desktop dashboard inside one viewport', () => {
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
+
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260824a/);
+  assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
+  assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
+  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 82px minmax\(0, 1fr\) 184px;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
+  assert.match(compactStyleSource, /\.latest-treated-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*margin:\s*0/);
+  assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
+  assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*184px;[^}]*min-height:\s*0/);
+  assert.match(compactStyleSource, /\.planning-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
+});
+
 test('kvk database page loads its protected live snapshot with an empty embedded bootstrap', () => {
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
 
