@@ -1044,7 +1044,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ? await mailboxSendProvenanceStore.listAcceptedMessages({
           accountEmails: campaignMailboxAccounts,
           limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-        }).catch(() => [])
+        })
       : [];
     const sentMessages = dedupeCampaignMessages([
       ...allSeedSentMessages,

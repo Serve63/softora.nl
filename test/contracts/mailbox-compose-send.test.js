@@ -172,7 +172,11 @@ test('mailbox compose stays fail-closed before SMTP when the isolated provenance
     },
   }), (error) => error.code === '57014' && error.status === 503);
 
-  assert.equal(provenanceCalls, 2, 'kritieke opslag krijgt maximaal één retry');
+  assert.equal(
+    provenanceCalls,
+    1,
+    'zonder geslaagde read-back mag de reserveringsmutatie niet blind worden herhaald'
+  );
   assert.equal(smtpCalls, 0, 'SMTP mag nooit starten zonder duurzame prepared provenance');
 });
 

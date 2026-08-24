@@ -86,7 +86,21 @@ if (!databaseUrl) {
       maxBuffer: 1024 * 1024,
     });
     if (result.error?.code === 'ENOENT' && !postgresContainerId) {
-      await client.query(sql);
+      // Keep tracked migration contents as a bound value; never concatenate them into a client query.
+      await client.query(`
+        create or replace function pg_temp.softora_apply_tracked_test_sql(p_sql text)
+        returns void
+        language plpgsql
+        as $function$
+        begin
+          execute p_sql;
+        end;
+        $function$;
+      `);
+      await client.query(
+        'select pg_temp.softora_apply_tracked_test_sql($1::text)',
+        [sql]
+      );
       return;
     }
     if (result.error || result.status !== 0) {

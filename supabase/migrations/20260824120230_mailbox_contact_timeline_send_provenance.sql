@@ -2,6 +2,9 @@
 -- catching up. A real mailbox row always wins once the same Message-ID arrives.
 -- mailbox-send-provenance-visibility-fence:start
 
+alter table public.softora_mailbox_send_provenance
+  add column if not exists transition_token uuid;
+
 create index if not exists softora_mailbox_send_provenance_contact_timeline_idx
   on public.softora_mailbox_send_provenance (
     account_email,
