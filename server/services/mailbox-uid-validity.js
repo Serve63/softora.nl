@@ -45,12 +45,16 @@ function normalizeMailboxTargetReference(value) {
     : '';
 }
 
+function compareMailboxTargetReferenceBytes(left, right) {
+  return Buffer.compare(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8'));
+}
+
 function normalizeMailboxTargetReferences(values) {
   return Array.from(new Set(
     (Array.isArray(values) ? values : [])
       .map(normalizeMailboxTargetReference)
       .filter(Boolean)
-  )).sort();
+  )).sort(compareMailboxTargetReferenceBytes);
 }
 
 function normalizeMailboxLeaseExpiry(value) {

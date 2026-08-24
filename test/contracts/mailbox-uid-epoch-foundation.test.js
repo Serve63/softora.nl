@@ -84,6 +84,18 @@ test('gelijke UIDVALIDITY-epochs blijven door UUID-generaties duurzaam verschill
     normalizeMailboxTargetReferences([' <B@Test.nl> ', 'a@test.nl', 'b@test.nl']),
     ['a@test.nl', 'b@test.nl']
   );
+  assert.deepEqual(
+    normalizeMailboxTargetReferences(['_target@test.nl', '-target@test.nl']),
+    ['-target@test.nl', '_target@test.nl']
+  );
+  assert.deepEqual(
+    normalizeMailboxTargetReferences(['x==v8@test.nl', 'x=6b@test.nl']),
+    ['x=6b@test.nl', 'x==v8@test.nl']
+  );
+  assert.deepEqual(
+    normalizeMailboxTargetReferences(['\u{10000}@test.nl', '\uE000@test.nl']),
+    ['\uE000@test.nl', '\u{10000}@test.nl']
+  );
 });
 
 test('legacy lockpayload blijft ongewijzigd en dual runtime claimt expliciet v2', async () => {

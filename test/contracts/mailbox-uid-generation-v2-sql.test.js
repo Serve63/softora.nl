@@ -10,6 +10,10 @@ const migrationPath = path.join(
   'supabase/migrations/20260821202054_mailbox_uid_generation_epoch_v2.sql'
 );
 const migration = fs.readFileSync(migrationPath, 'utf8');
+const targetOrderRepairMigration = fs.readFileSync(path.join(
+  repoRoot,
+  'supabase/migrations/20260824180221_fix_mailbox_uid_target_binary_order.sql'
+), 'utf8');
 const schema = fs.readFileSync(path.join(repoRoot, 'supabase/data-ops-schema.sql'), 'utf8');
 
 function functionSql(name) {
@@ -34,7 +38,11 @@ test('herstelde live UIDVALIDITY-migraties zijn byte-exact', () => {
 
 test('data-ops bootstrap spiegelt de volledige v2-eindstaat exact', () => {
   const marker = '-- mailbox-uid-generation-epoch-v2:start';
-  assert.equal(schema.slice(schema.indexOf(marker)), migration);
+  const repairedBootstrap = migration.replaceAll(
+    "order by target.value #>> '{}'",
+    "order by pg_catalog.convert_to(target.value #>> '{}', 'UTF8')"
+  );
+  assert.equal(schema.slice(schema.indexOf(marker)), repairedBootstrap);
 });
 
 test('UUID generation-control maakt A-B-A mogelijk zonder UIDVALIDITY-identiteit', () => {
@@ -69,6 +77,44 @@ test('prepare, baseline, commit, skip en fail hebben het vaste runtimecontract',
   assert.match(migration, /softora_skip_mailbox_sync_v2\(\s*p_sync_key text,\s*p_lock_token text,\s*p_commit_id text,\s*p_reason text/s);
   assert.match(migration, /softora_fail_mailbox_sync_v2\(\s*p_sync_key text,\s*p_lock_token text,\s*p_commit_id text,\s*p_error text/s);
   assert.match(functionSql('softora_prepare_mailbox_uid_generation_v2'), /p_selection_policy not in \('staged-rebuild-v2', 'targeted-sparse-v2'\)/);
+});
+
+test('All Mail targetvolgorde is expliciet UTF-8-binair en niet database-locale-afhankelijk', () => {
+  assert.match(
+    targetOrderRepairMigration,
+    /softora_prepare_mailbox_uid_generation_v2\(text,text,bigint,bigint,text,jsonb\)/
+  );
+  assert.match(
+    targetOrderRepairMigration,
+    /softora_commit_mailbox_sync_pass_v2\(text,text,text,uuid,bigint,text,jsonb,jsonb,jsonb,bigint,bigint,boolean,integer,bigint\)/
+  );
+  assert.match(
+    targetOrderRepairMigration,
+    /\$old\$order by target\.value #>> '\{\}'\$old\$/
+  );
+  assert.equal(
+    targetOrderRepairMigration.match(
+      /order by pg_catalog\.convert_to\(target\.value #>> '\{\}', 'UTF8'\)/g
+    )?.length,
+    2
+  );
+  assert.match(targetOrderRepairMigration, /pg_catalog\.pg_get_functiondef\(v_oid\)/);
+  assert.doesNotMatch(
+    targetOrderRepairMigration,
+    /create or replace function public\.softora_(?:prepare_mailbox_uid_generation_v2|commit_mailbox_sync_pass_v2)/
+  );
+  assert.match(targetOrderRepairMigration, /MAILBOX_UID_TARGET_ORDER_PATCH_DRIFT/);
+  assert.equal(
+    targetOrderRepairMigration.match(/from public, anon, authenticated/g)?.length,
+    2
+  );
+  assert.equal(targetOrderRepairMigration.match(/to service_role/g)?.length, 2);
+  assert.equal(
+    schema.match(
+      /order by pg_catalog\.convert_to\(target\.value #>> '\{\}', 'UTF8'\)/g
+    )?.length,
+    2
+  );
 });
 
 test('migratie schakelt alleen na een lege drain atomisch van draining naar v2', () => {

@@ -31,6 +31,10 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260824120423_mailbox_sync_per_key_finalizer_repair.sql'
   ), 'utf8');
+  const targetOrderRepairMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260824180221_fix_mailbox_uid_target_binary_order.sql'
+  ), 'utf8');
   const sendProvenanceFoundation = fs.readFileSync(path.resolve(
     __dirname,
     '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
@@ -844,6 +848,12 @@ begin
         ('martijn@softora.nl|allmail|uv:910|4','martijn@softora.nl','allmail',4,
           'martijn-allmail:reply','martijn-reply@test','martijn-anchor@test',
           'Martijn reply',now(),false,true,'{"source":"imap-sync"}',910),
+        ('martijn@softora.nl|coldmail|11','martijn@softora.nl','coldmail',11,
+          'martijn-binary-anchor:1','x=6b@test.nl',null,'Binary anchor 1',now(),
+          false,false,'{"source":"imap-sync"}',null),
+        ('martijn@softora.nl|coldmail|12','martijn@softora.nl','coldmail',12,
+          'martijn-binary-anchor:2','x==v8@test.nl',null,'Binary anchor 2',now(),
+          false,false,'{"source":"imap-sync"}',null),
         ('servecreusen@softora.nl|inbox|1','servecreusen@softora.nl','inbox',1,
           'legacy:1','legacy-visible@test',null,'Legacy visible',now(),false,true,
           '{"source":"imap-sync"}',null),
@@ -861,6 +871,7 @@ begin
     await applyTrackedSql(client, migration);
     await applyTrackedSql(client, sendProvenanceVisibilityFenceMigration);
     await applyTrackedSql(client, perKeyRepairMigration);
+    await applyTrackedSql(client, targetOrderRepairMigration);
   });
 
   test.after(async () => {
@@ -1034,6 +1045,48 @@ begin
       select count(*)::integer as count from public.softora_mailbox_uid_generations
       where sync_key='martijn@softora.nl|inbox' and status='active'
     `)).rows[0].count, 1);
+  });
+
+  test('prepare en commit voltooien met UTF-8-binaire targets onder een geldige lease', async () => {
+    const client = await connect();
+    const syncKey = 'martijn@softora.nl|allmail';
+    const token = 'binary-order-valid-lease';
+    const targetReferenceIds = ['x=6b@test.nl', 'x==v8@test.nl'];
+    await lease(client, syncKey, token);
+    const prepared = await prepare(
+      client, syncKey, token, 911, 7,
+      'targeted-sparse-v2', targetReferenceIds
+    );
+    assert.equal(prepared.prepared, true);
+    assert.equal(prepared.mode, 'rebuild');
+    assert.deepEqual(prepared.selection_targets, targetReferenceIds);
+
+    const committed = await commit(client, {
+      syncKey, token, commitId: 'binary-order-valid-commit',
+      generationId: prepared.target_generation_id, uidValidity: 911,
+      selectionPolicy: 'targeted-sparse-v2', targetReferenceIds,
+      targetUidManifest: [5, 6],
+      rows: [
+        messageRow(5, 'binary-order-1', {
+          account_email: 'martijn@softora.nl', folder: 'allmail',
+          in_reply_to: targetReferenceIds[0],
+        }),
+        messageRow(6, 'binary-order-2', {
+          account_email: 'martijn@softora.nl', folder: 'allmail',
+          in_reply_to: targetReferenceIds[1],
+        }),
+      ],
+      fromUid: 1, throughUid: 2, complete: true,
+      messageCount: 2, lastUid: 0,
+    });
+    assert.equal(committed.committed, true);
+    assert.equal(committed.activated, true);
+    assert.deepEqual((await client.query(`
+      select uid_validity,message_count,status,lock_token
+      from public.softora_mailbox_sync_state where sync_key=$1
+    `, [syncKey])).rows[0], {
+      uid_validity: '911', message_count: 2, status: 'ok', lock_token: null,
+    });
   });
 
   test('All Mail reset accepteert alleen accountgeankerde sparse targets en bewaart state', async () => {

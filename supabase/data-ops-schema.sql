@@ -4389,7 +4389,7 @@ begin
     )
     or p_selection_targets is distinct from (
       select coalesce(pg_catalog.jsonb_agg(target.value #>> '{}'
-        order by target.value #>> '{}'), '[]'::jsonb)
+        order by pg_catalog.convert_to(target.value #>> '{}', 'UTF8')), '[]'::jsonb)
       from pg_catalog.jsonb_array_elements(p_selection_targets) as target(value)
     )
     or (p_selection_policy = 'staged-rebuild-v2'
@@ -4622,7 +4622,7 @@ begin
     from pg_catalog.jsonb_array_elements(p_target_reference_ids) as target(value)
   ) or p_target_reference_ids is distinct from (
     select coalesce(pg_catalog.jsonb_agg(target.value #>> '{}'
-      order by target.value #>> '{}'), '[]'::jsonb)
+      order by pg_catalog.convert_to(target.value #>> '{}', 'UTF8')), '[]'::jsonb)
     from pg_catalog.jsonb_array_elements(p_target_reference_ids) as target(value)
   ) then
     raise exception using errcode = '22023',
