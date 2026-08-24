@@ -197,5 +197,9 @@ test('echte PostgreSQL-test dekt activatie, schaal, replay, rollback en fail-clo
   assert.match(postgresTest, /NULL generation must reject/);
   assert.match(postgresTest, /active[\s\S]*root_message_key/);
   assert.match(postgresTest, /MAILBOX_LINEAGE_ACTIVATION_ROW_SCOPE_MISMATCH/);
-  assert.match(postgresTest, /'--single-transaction'/);
+  assert.equal(
+    (postgresTest.match(/'--single-transaction'/g) || []).length,
+    2,
+    'zowel lokale psql als docker-psql moet één atomaire migratietransactie gebruiken'
+  );
 });
