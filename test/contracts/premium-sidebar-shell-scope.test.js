@@ -438,6 +438,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-profile-render-key/);
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
   assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
+  assert.match(prefillSource, /function normalizePremiumSidebarStructure\(\) \{/);
+  assert.match(prefillSource, /FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS[\s\S]*"coldmailing"[\s\S]*"agenda"[\s\S]*"websitegenerator"[\s\S]*"bookkeeping"/);
+  assert.match(prefillSource, /ensureFirstPaintSidebarLink\(sidebar, overview, getFirstPaintSidebarLink\("lead_radar"\), \["database"\]\);/);
+  assert.match(prefillSource, /ensureFirstPaintSidebarLink\(sidebar, management, getFirstPaintSidebarLink\("summarize"\), \["seo", "qr_code", "packages"\]\);/);
+  assert.match(prefillSource, /normalizePremiumSidebarStructure\(\);\s*prefillPremiumSidebarActiveState\(\);/);
+  assert.match(prefillSource, /data-sidebar-structure-prefilled/);
   assert.match(prefillSource, /link\.classList\.toggle\("active", key === activeKey\);/);
   assert.match(prefillSource, /NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1"/);
   assert.match(prefillSource, /function readCookieValue\(name\) \{/);
@@ -453,6 +459,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
   assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818b'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260824a'/);
+  assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
@@ -515,6 +523,8 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /class="main-content kvk-database-shell__content"/);
   assert.match(pageSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  assert.doesNotMatch(pageSource, /settings-module-route-header|data-settings-module-back-host/);
+  assert.match(dashboardSource, /<main class="app-shell">\s*<span data-settings-module-back-host><\/span>\s*<header class="page-header">/);
   assert.equal((pageSource.match(/background:\s*#f4f1ed/g) || []).length, 3);
   assert.doesNotMatch(pageSource, /background:\s*#f8f7f4/);
   assert.match(themeSource, /pathname === "\/kvk-database"/);

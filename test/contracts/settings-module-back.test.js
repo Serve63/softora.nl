@@ -21,6 +21,7 @@ test('de Extra-catalogus is de centrale route-inventory voor Instellingen-module
   assert.equal(routes.RETURN_HREF, '/premium-instellingen#extra');
   assert.equal(routes.findByPath('/live-momentum.html')?.href, '/winnen');
   assert.equal(routes.findByPath('/live-momentum-access')?.href, '/winnen');
+  assert.equal(routes.findByPath('/premium-kvk-database')?.href, '/kvk-database');
   assert.equal(routes.findByPath('/premium-personeel-dashboard'), null);
 
   const settings = read('premium-instellingen.html');
@@ -36,9 +37,10 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
   routes.getLinkedModules().forEach((module) => {
     module.files.forEach((file) => {
       const source = read(file);
+      const routesVersion = file === 'premium-kvk-database.html' ? '20260824c' : '20260818b';
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
       assert.match(source, /settings-module-back\.css\?v=20260818a/, file);
-      assert.match(source, /settings-module-routes\.js\?v=20260818b/, file);
+      assert.match(source, new RegExp(`settings-module-routes\\.js\\?v=${routesVersion}`), file);
       assert.match(source, /settings-module-back\.js\?v=20260814b/, file);
       assert.equal((source.match(/class="settings-module-back"/g) || []).length, 0, file);
     });
@@ -84,12 +86,14 @@ test('Instellingen-link staat in de titelkolom en nooit in de rechter actiegroep
   const health = read('premium-gezondheidsdossier.html');
   const revenue = read('premium-omzetwerk.html');
   const locked = read('live-momentum-access.html');
+  const database = read('premium-kvk-database.html');
 
   assert.match(winning, /<div>\s*<span data-settings-module-back-host><\/span>\s*<h1 id="momentum-title">/);
   assert.doesNotMatch(winning, /momentum-head-actions[\s\S]{0,120}data-settings-module-back-host/);
   assert.match(health, /<div>\s*<span data-settings-module-back-host><\/span>\s*<p class="health-eyebrow">/);
   assert.match(revenue, /<div class="hero-copy">\s*<span data-settings-module-back-host><\/span>\s*<p class="eyebrow">/);
   assert.match(locked, /<header class="momentum-access-header">\s*<span data-settings-module-back-host><\/span>\s*<span class="momentum-access-brand">/);
+  assert.match(database, /<main class="app-shell">\s*<span data-settings-module-back-host><\/span>\s*<header class="page-header">/);
 });
 
 test('locked en unlocked Winnen blijven één veilige gedeelde uitweg houden', () => {

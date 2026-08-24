@@ -1,25 +1,8 @@
-html,
-body {
-  scrollbar-width: thin;
-  scrollbar-color: #b85a82 #f0ebe7;
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  display: block;
-  width: 9px;
-  height: 9px;
-}
-
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track,
 .planning-panel .location-list::-webkit-scrollbar-track {
   background: #f0ebe7;
   border-radius: 999px;
 }
 
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb,
 .planning-panel .location-list::-webkit-scrollbar-thumb {
   background: #b85a82;
   border: 2px solid #f0ebe7;

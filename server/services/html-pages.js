@@ -15,6 +15,7 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a';
 const PREMIUM_PERSONNEL_THEME_VERSION = '20260818b';
+const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260824a';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
 const PREMIUM_SIDEBAR_LINKS_VERSION = '20260818a';
@@ -808,10 +809,7 @@ function createHtmlPageCoordinator(options = {}) {
         shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html
       );
       if (isProtectedPremiumPage) {
-        rendered = rendered.replace(
-          /assets\/personnel-theme\.js\?v=[^"'\s>]+/g,
-          `assets/personnel-theme.js?v=${PREMIUM_PERSONNEL_THEME_VERSION}`
-        );
+        rendered = rendered.replace(/assets\/personnel-theme\.js\?v=[^"'\s>]+/g, `assets/personnel-theme.js?v=${PREMIUM_PERSONNEL_THEME_VERSION}`).replace(/assets\/premium-sidebar-profile-prefill\.js\?v=[^"'\s>]+/g, `assets/premium-sidebar-profile-prefill.js?v=${PREMIUM_SIDEBAR_PREFILL_VERSION}`);
       }
       try {
         const shouldLoadBootstrapData =
