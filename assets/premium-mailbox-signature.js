@@ -25,7 +25,8 @@
     'cheers',
   ]);
   const FIELD_PATTERNS = [
-    { key: 'phone', pattern: /^(?:[-*•]\s*)?(?:phone|tel(?:efoon)?|mobiel|mobile|t)\.?\s*(?::\s*|\s+)(.*)$/i },
+    { key: 'phone', label: 'phone', pattern: /^(?:[-*•]\s*)?(?:phone|tel(?:efoon)?|mobiel|mobile|t)\.?\s*(?::\s*|\s+)(.*)$/i },
+    { key: 'phone', label: 'm', requiresPhoneLikeValue: true, pattern: /^(?:[-*•]\s*)?m\.?\s*(?::\s*|\s+)(.*)$/i },
     { key: 'street', pattern: /^(?:[-*•]\s*)?(?:street|straat|address|adres)\s*:\s*(.*)$/i },
     { key: 'postcode', pattern: /^(?:[-*•]\s*)?(?:postcode|zip(?:\s+code)?|postal\s+code)\s*:\s*(.*)$/i },
     { key: 'city', pattern: /^(?:[-*•]\s*)?(?:city|plaats|stad)\s*:\s*(.*)$/i },
@@ -59,6 +60,9 @@
     const parts = line.split(/\s*(?:\/|\|)\s*/).filter(Boolean);
     return Boolean(parts.length && parts.every((part) => SIGNOFF_PHRASES.has(normalizeSignoffPart(part))));
   }
+  function isStrongSignatureSeparator(value) {
+    return normalizeWhitespace(value) === '--';
+  }
   function getQuotedThreadApi() {
     if (global && global.SoftoraMailboxQuotedThread) return global.SoftoraMailboxQuotedThread;
     if (commonJsQuotedThread !== undefined) return commonJsQuotedThread;
@@ -72,19 +76,36 @@
     }
     return commonJsQuotedThread;
   }
-  function findDirectBodyEnd(body, lines) {
+  function findQuotedSegments(body) {
     const quotedThread = getQuotedThreadApi();
     if (quotedThread && typeof quotedThread.findQuotedSegments === 'function') {
       try {
-        const segments = quotedThread.findQuotedSegments(body).segments || [];
-        const starts = segments
-          .map((segment) => Number(segment && segment.start))
-          .filter((start) => Number.isInteger(start) && start >= 0);
-        if (starts.length) return Math.min(...starts);
+        return (quotedThread.findQuotedSegments(body).segments || [])
+          .map((segment) => ({
+            start: Number(segment && segment.start),
+            end: Number(segment && segment.end),
+            marker: String(segment && segment.marker || ''),
+            headerFields: segment && segment.headerFields && typeof segment.headerFields === 'object'
+              ? segment.headerFields
+              : {},
+          }))
+          .filter((segment) => (
+            Number.isInteger(segment.start) &&
+            Number.isInteger(segment.end) &&
+            segment.start >= 0 &&
+            segment.end > segment.start
+          ));
       } catch (_) {
         // Fail open below when a host supplies an incompatible quote parser.
       }
     }
+    return [];
+  }
+
+  function findDirectBodyEnd(body, lines, quotedSegments) {
+    const starts = (Array.isArray(quotedSegments) ? quotedSegments : findQuotedSegments(body))
+      .map((segment) => segment.start);
+    if (starts.length) return Math.min(...starts);
     const fallbackIndex = lines.findIndex((line) => (
       /^\s*>/.test(String(line || '')) ||
       /^(?:-{2,}|_{2,})\s*(?:original message|oorspronkelijk(?:e)? bericht|forwarded message|doorgestuurd bericht)/i.test(normalizeWhitespace(line))
@@ -92,11 +113,98 @@
     return fallbackIndex >= 0 ? fallbackIndex : lines.length;
   }
 
+  function normalizeIdentityText(value) {
+    return normalizeWhitespace(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function extractEmails(value) {
+    return (String(value == null ? '' : value).match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [])
+      .map((email) => email.toLowerCase());
+  }
+
+  function buildSenderEvidence(messageContext) {
+    const context = messageContext && typeof messageContext === 'object' && !Array.isArray(messageContext)
+      ? messageContext
+      : {};
+    const emailValues = [context.email, context.fromEmail, context.senderEmail, context.from];
+    const emails = Array.from(new Set(emailValues.flatMap(extractEmails)));
+    const names = Array.from(new Set([context.from, context.fromName, context.senderName]
+      .map((value) => String(value == null ? '' : value)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, ' '))
+      .map(normalizeIdentityText)
+      .filter((name) => name.split(' ').filter((part) => part.length >= 2).length >= 2)));
+    return { emails, names };
+  }
+
+  function valueMatchesSenderEvidence(value, senderEvidence) {
+    const valueEmails = extractEmails(value);
+    if (senderEvidence.emails.some((email) => valueEmails.includes(email))) return true;
+    const normalized = ` ${normalizeIdentityText(value)} `;
+    return senderEvidence.names.some((name) => normalized.includes(` ${name} `));
+  }
+
+  function linesMatchSenderEvidence(lines, senderEvidence) {
+    return valueMatchesSenderEvidence((Array.isArray(lines) ? lines : []).join('\n'), senderEvidence);
+  }
+
+  function isIgnorableFooterSenderHeader(segment, signatureStart, lines, senderEvidence) {
+    if (!segment || segment.marker !== 'sender-header' || segment.start <= signatureStart) return false;
+    if (!normalizeWhitespace(lines[segment.start - 1])) return false;
+    const fromValues = Array.isArray(segment.headerFields && segment.headerFields.from)
+      ? segment.headerFields.from
+      : [];
+    if (!fromValues.some((value) => valueMatchesSenderEvidence(value, senderEvidence))) return false;
+    return linesMatchSenderEvidence(lines.slice(signatureStart + 1, segment.start), senderEvidence);
+  }
+
+  function findPostQuoteSignatureStart(lines, quotedSegments, messageContext) {
+    const segments = (Array.isArray(quotedSegments) ? quotedSegments : [])
+      .slice()
+      .sort((left, right) => left.start - right.start || left.end - right.end);
+    const senderEvidence = buildSenderEvidence(messageContext);
+    if (!segments.length || (!senderEvidence.emails.length && !senderEvidence.names.length)) return -1;
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      if (!isStrongSignatureSeparator(lines[index])) continue;
+      if (!linesMatchSenderEvidence(lines.slice(index + 1), senderEvidence)) continue;
+      const hasCompletedQuote = segments.some((segment) => segment.start < index && segment.end <= index);
+      if (!hasCompletedQuote) continue;
+      const hasLaterOrCoveringQuote = segments.some((segment) => (
+        segment.end > index &&
+        !isIgnorableFooterSenderHeader(segment, index, lines, senderEvidence)
+      ));
+      if (!hasLaterOrCoveringQuote) return index;
+    }
+    return -1;
+  }
+
+  function hasPostQuoteSignatureSeparator(lines, directBodyEnd) {
+    const source = Array.isArray(lines) ? lines : [];
+    if (!Number.isInteger(directBodyEnd) || directBodyEnd >= source.length) return false;
+    return source.some((line, index) => (
+      index > directBodyEnd &&
+      isStrongSignatureSeparator(line) &&
+      source.slice(index + 1).some((footerLine) => normalizeWhitespace(footerLine))
+    ));
+  }
+
   function matchField(value) {
     const line = normalizeWhitespace(value);
     for (const field of FIELD_PATTERNS) {
       const match = field.pattern.exec(line);
-      if (match) return { key: field.key, value: String(match[1] || '') };
+      if (match) {
+        return {
+          key: field.key,
+          label: field.label || field.key,
+          requiresPhoneLikeValue: field.requiresPhoneLikeValue === true,
+          value: String(match[1] || ''),
+        };
+      }
     }
     return null;
   }
@@ -131,16 +239,32 @@
     if (!lines.some((line) => line.toLocaleLowerCase('nl-NL') === key)) lines.push(cleaned);
   }
 
+  function extractCompactDutchAddress(signatureLines) {
+    const pattern = /^([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ.'’\- ]{1,80}\s+\d{1,5}[A-Za-z]?(?:[-/]\d{1,5}[A-Za-z]?)?)\s*\|\s*(\d{4})\s*([A-Za-z]{2})\s+([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ.'’\- ]{1,80})$/;
+    for (let index = 1; index < signatureLines.length; index += 1) {
+      const match = pattern.exec(normalizeWhitespace(signatureLines[index]));
+      if (!match) continue;
+      return {
+        street: cleanFieldValue(match[1]),
+        postcodeCity: `${match[2]} ${match[3].toUpperCase()} ${cleanFieldValue(match[4])}`,
+      };
+    }
+    return { street: '', postcodeCity: '' };
+  }
+
   function extractContact(signatureLines) {
     const values = { phone: '', street: '', postcode: '', city: '', country: '' };
     for (let index = 1; index < signatureLines.length; index += 1) {
       const field = matchField(signatureLines[index]);
       if (!field || values[field.key]) continue;
-      values[field.key] = readFieldValue(signatureLines, index, field.value);
+      const fieldValue = readFieldValue(signatureLines, index, field.value);
+      if (field.key === 'phone' && field.requiresPhoneLikeValue && !buildPhoneHref(fieldValue)) continue;
+      values[field.key] = fieldValue;
     }
+    const compactAddress = extractCompactDutchAddress(signatureLines);
     const addressLines = [];
-    appendUnique(addressLines, values.street);
-    appendUnique(addressLines, [values.postcode, values.city].filter(Boolean).join(' '));
+    appendUnique(addressLines, values.street || compactAddress.street);
+    appendUnique(addressLines, [values.postcode, values.city].filter(Boolean).join(' ') || compactAddress.postcodeCity);
     appendUnique(addressLines, values.country);
     return {
       phone: cleanFieldValue(values.phone),
@@ -156,12 +280,23 @@
     return result;
   }
 
-  function parseIncoming(body) {
+  function parseIncoming(body, messageContext) {
     const normalizedBody = normalizeBody(body);
     const lines = normalizedBody ? normalizedBody.split('\n') : [];
-    const directBodyEnd = findDirectBodyEnd(normalizedBody, lines);
+    const quotedSegments = findQuotedSegments(normalizedBody);
+    const directBodyEnd = findDirectBodyEnd(normalizedBody, lines, quotedSegments);
     let signatureStart = -1;
-    for (let index = directBodyEnd - 1; index >= 0; index -= 1) {
+    let signatureEnd = directBodyEnd;
+    let postQuoteSignature = false;
+    const postQuoteSignatureStart = findPostQuoteSignatureStart(lines, quotedSegments, messageContext);
+    if (postQuoteSignatureStart >= 0) {
+      signatureStart = postQuoteSignatureStart;
+      signatureEnd = lines.length;
+      postQuoteSignature = true;
+    } else if (hasPostQuoteSignatureSeparator(lines, directBodyEnd)) {
+      return { bodyLines: lines, contact: emptyContact(), matched: false };
+    }
+    for (let index = directBodyEnd - 1; signatureStart < 0 && index >= 0; index -= 1) {
       if (isStandaloneSignoff(lines[index])) {
         signatureStart = index;
         break;
@@ -170,12 +305,14 @@
     if (signatureStart < 0) {
       return { bodyLines: lines, contact: emptyContact(), matched: false };
     }
-    const signatureLines = lines.slice(signatureStart, directBodyEnd);
+    const signatureLines = lines.slice(signatureStart, signatureEnd);
     return {
-      bodyLines: trimOuterBlankLines([
-        ...lines.slice(0, signatureStart),
-        ...lines.slice(directBodyEnd),
-      ]),
+      bodyLines: trimOuterBlankLines(postQuoteSignature
+        ? lines.slice(0, signatureStart)
+        : [
+            ...lines.slice(0, signatureStart),
+            ...lines.slice(directBodyEnd),
+          ]),
       contact: extractContact(signatureLines),
       matched: true,
     };

@@ -69,6 +69,10 @@ function createElement() {
   };
 }
 
+function normalizeOwnerForTest(accountEmail) {
+  return String(accountEmail || '').toLowerCase().startsWith('martijn') ? 'martijn' : 'serve';
+}
+
 test('mailbox discovery beperkt owner-scope server-side en valideert query en cursor', async () => {
   const calls = [];
   const service = createMailboxDiscoveryService({
@@ -172,16 +176,24 @@ test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart techn
   const root = {
     id: 'martijn@softora.nl|inbox:55',
     messageId: '<old-2@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    folder: 'inbox',
     email: 'psonnemans@ziggo.nl',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'psonnemans@ziggo.nl',
     conversationId: 'conversation:stale-root',
   };
   const rows = [
-    { id: root.id, messageId: root.messageId, technicalThreadKey: 'imap:martijn:old', messageKey: 'old-2', conversationId: 'conversation:exact-root' },
-    { id: 'new-in', messageId: '<new-1@example.test>', technicalThreadKey: 'imap:martijn:new', subject: 'afspraak 17/8' },
-    { id: 'new-out', messageId: '<new-2@example.test>', technicalThreadKey: 'imap:martijn:new', subject: 'Re: afspraak 17/8' },
-    { id: 'mirror', messageId: '<new-2@example.test>', technicalThreadKey: 'imap:martijn:new', subject: 'Re: afspraak 17/8' },
+    { ...root, technicalThreadKey: 'imap:martijn:old', messageKey: 'old-2', conversationId: 'conversation:exact-root' },
+    { id: 'new-in', messageId: '<new-1@example.test>', accountEmail: 'martijn@softora.nl', folder: 'inbox', email: 'psonnemans@ziggo.nl', to: 'martijn@softora.nl', technicalThreadKey: 'imap:martijn:new', subject: 'afspraak 17/8' },
+    { id: 'new-out', messageId: '<new-2@example.test>', accountEmail: 'martijn@softora.nl', folder: 'sent', email: 'martijn@softora.nl', to: 'psonnemans@ziggo.nl', technicalThreadKey: 'imap:martijn:new', subject: 'Re: afspraak 17/8' },
+    { id: 'mirror', messageId: '<new-2@example.test>', accountEmail: 'martijn@softora.nl', folder: 'sent', email: 'martijn@softora.nl', to: 'psonnemans@ziggo.nl', technicalThreadKey: 'imap:martijn:new', subject: 'Re: afspraak 17/8' },
   ];
-  discoveryUi.mergeContactTimeline(root, rows, 'psonnemans@ziggo.nl', 3);
+  discoveryUi.mergeContactTimeline(root, rows, 'psonnemans@ziggo.nl', 3, {
+    accountEmails: ['martijn@softora.nl'],
+    canonicalOwner: 'martijn',
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+  });
   assert.equal(root.threadMessages.length, 2);
   assert.equal(root.contactTimelineTotal, 3);
   assert.equal(root.contactTimelineThreadCount, 2);
@@ -224,11 +236,425 @@ test('contacttijdlijn laat alleen hetzelfde externe adres binnen exact dezelfde 
 
   discoveryUi.mergeContactTimeline(root, rows, 'secretariaat@seniorenhaaren.nl', 4, {
     accountEmails: ['martijn@softora.nl', 'martijnvandeven@softora.nl'],
+    canonicalOwner: 'martijn',
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
   });
 
   assert.deepEqual(root.threadMessages.map((message) => message.id), ['inbox:correct']);
   assert.equal(root.contactTimelineRejectedCount, 2);
   assert.equal(root.contactTimelineTotal, 2);
+});
+
+test('contacttijdlijn bewaart alleen een exact RFC-gelinkte alias binnen dezelfde eigenaar', () => {
+  const root = {
+    id: 'inbox:lia-reply',
+    messageId: '<lia-reply@example.test>',
+    inReplyTo: '<lia-sent-parent@example.test>',
+    references: '<lia-sent-parent@example.test>',
+    technicalThreadKey: 'imap:martijn:<lia-sent-parent@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    folder: 'inbox',
+    email: 'lia@huidig.example',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'lia@huidig.example',
+    threadMessages: [{
+      id: 'sent:lia-parent',
+      messageId: '<lia-sent-parent@example.test>',
+      technicalThreadKey: 'imap:martijn:<lia-sent-parent@example.test>',
+      accountEmail: 'martijn@softora.nl',
+      folder: 'sent',
+      email: 'martijn@softora.nl',
+      to: 'lia@oude-alias.example',
+      externalContactEmail: 'lia@oude-alias.example',
+    }, {
+      id: 'sent:unrelated-prior',
+      messageId: '<unrelated-prior@example.test>',
+      technicalThreadKey: 'imap:martijn:<unrelated-prior@example.test>',
+      accountEmail: 'martijn@softora.nl',
+      folder: 'sent',
+      email: 'martijn@softora.nl',
+      to: 'ander@example.test',
+      externalContactEmail: 'ander@example.test',
+    }],
+  };
+  const rows = [{ ...root, threadMessages: undefined }, {
+    id: 'inbox:current-contact',
+    messageId: '<current-contact@example.test>',
+    technicalThreadKey: 'imap:martijn:<current-contact@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    folder: 'inbox',
+    email: 'lia@huidig.example',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'lia@huidig.example',
+  }, {
+    id: 'inbox:unrelated-response',
+    messageId: '<unrelated-response@example.test>',
+    technicalThreadKey: 'imap:martijn:<unrelated-response@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    folder: 'inbox',
+    email: 'ander@example.test',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'ander@example.test',
+  }, {
+    id: 'inbox:sibling-contact',
+    messageId: '<sibling-contact@example.test>',
+    inReplyTo: '<lia-sent-parent@example.test>',
+    references: '<lia-sent-parent@example.test>',
+    technicalThreadKey: root.technicalThreadKey,
+    accountEmail: 'martijn@softora.nl',
+    folder: 'inbox',
+    email: 'sibling@example.test',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'sibling@example.test',
+  }, {
+    id: 'inbox:spoofed-owner',
+    messageId: '<spoofed-owner@example.test>',
+    technicalThreadKey: 'imap:martijn:<spoofed-owner@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    canonicalOwner: 'serve',
+    folder: 'inbox',
+    email: 'lia@huidig.example',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'lia@huidig.example',
+  }, {
+    id: 'sent:cross-account-parent',
+    messageId: '<lia-sent-parent@example.test>',
+    technicalThreadKey: root.technicalThreadKey,
+    accountEmail: 'martijnvandeven@softora.nl',
+    folder: 'sent',
+    email: 'martijnvandeven@softora.nl',
+    to: 'lia@oude-alias.example',
+    externalContactEmail: 'lia@oude-alias.example',
+  }, {
+    id: 'inbox:foreign-owner',
+    messageId: '<foreign-owner@example.test>',
+    technicalThreadKey: root.technicalThreadKey,
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    email: 'lia@oude-alias.example',
+    to: 'serve@softora.nl',
+    externalContactEmail: 'lia@oude-alias.example',
+  }, {
+    id: 'inbox:foreign-root-id',
+    messageId: root.messageId,
+    technicalThreadKey: root.technicalThreadKey,
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    email: 'lia@huidig.example',
+    to: 'serve@softora.nl',
+    externalContactEmail: 'lia@huidig.example',
+  }];
+
+  discoveryUi.mergeContactTimeline(root, rows, 'lia@huidig.example', 8, {
+    accountEmails: ['martijn@softora.nl', 'martijnvandeven@softora.nl', 'serve@softora.nl'],
+    canonicalOwner: 'martijn',
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+  });
+
+  assert.deepEqual(
+    root.threadMessages.map((message) => message.id).sort(),
+    ['inbox:current-contact', 'sent:lia-parent']
+  );
+  assert.equal(root.contactTimelineRejectedCount, 6);
+  assert.equal(root.contactTimelineTotal, 3);
+  assert.equal(root.contactTimelineThreadCount, 2);
+});
+
+test('contacttijdlijn faalt gesloten zonder ownerresolver of zonder expliciete accountscope', () => {
+  const createRoot = () => ({
+    id: 'inbox:scope-root', messageId: '<scope-root@example.test>',
+    accountEmail: 'martijn@softora.nl', folder: 'inbox',
+    email: 'lia@example.test', to: 'martijn@softora.nl', externalContactEmail: 'lia@example.test',
+  });
+  const row = {
+    id: 'inbox:scope-row', messageId: '<scope-row@example.test>',
+    accountEmail: 'martijn@softora.nl', folder: 'inbox',
+    email: 'lia@example.test', to: 'martijn@softora.nl', externalContactEmail: 'lia@example.test',
+  };
+  const missingResolver = createRoot();
+  discoveryUi.mergeContactTimeline(missingResolver, [missingResolver, row], 'lia@example.test', 2, {
+    accountEmails: ['martijn@softora.nl'], canonicalOwner: 'martijn',
+  });
+  assert.deepEqual(missingResolver.threadMessages, []);
+  assert.equal(missingResolver.contactTimelineRejectedCount, 2);
+
+  const emptyAccounts = createRoot();
+  discoveryUi.mergeContactTimeline(emptyAccounts, [emptyAccounts, row], 'lia@example.test', 2, {
+    accountEmails: [], canonicalOwner: 'martijn',
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+  });
+  assert.deepEqual(emptyAccounts.threadMessages, []);
+  assert.equal(emptyAccounts.contactTimelineRejectedCount, 2);
+});
+
+test('contacttijdlijn behoudt een exacte alias bij eerste laadpagina en telt append maar eenmaal', async () => {
+  const elements = {
+    'mailbox-search-input': createElement(),
+    'mailbox-search-clear': createElement(),
+    'mailbox-search-status': createElement(),
+    'mailbox-search-more': createElement(),
+  };
+  const root = {
+    id: 'inbox:alias-root',
+    messageId: '<alias-root@example.test>',
+    inReplyTo: '<alias-parent@example.test>',
+    references: '<alias-parent@example.test>',
+    technicalThreadKey: 'imap:martijn:<alias-parent@example.test>',
+    accountEmail: 'martijn@softora.nl',
+    canonicalOwner: 'martijn',
+    folder: 'inbox',
+    email: 'lia@huidig.example',
+    to: 'martijn@softora.nl',
+    externalContactEmail: 'lia@huidig.example',
+    threadMessages: [{
+      id: 'sent:alias-parent',
+      messageId: '<alias-parent@example.test>',
+      technicalThreadKey: 'imap:martijn:<alias-parent@example.test>',
+      accountEmail: 'martijn@softora.nl',
+      canonicalOwner: 'martijn',
+      folder: 'sent',
+      email: 'martijn@softora.nl',
+      to: 'lia@oude-alias.example',
+      externalContactEmail: 'lia@oude-alias.example',
+    }],
+  };
+  const requests = [];
+  const controller = discoveryUi.create({
+    document: { getElementById: (id) => elements[id] || null, querySelector: () => null },
+    async fetch(url) {
+      const request = new URL(url, 'https://softora.test');
+      requests.push(request);
+      return request.searchParams.has('cursor') ? {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          totalCount: 4,
+          nextCursor: null,
+          messages: [{
+            id: 'inbox:older-current', messageId: '<older-current@example.test>',
+            technicalThreadKey: 'imap:martijn:<older-current@example.test>',
+            accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+            email: 'lia@huidig.example', to: 'martijn@softora.nl', externalContactEmail: 'lia@huidig.example',
+          }, {
+            id: 'inbox:unrelated-page', messageId: '<unrelated-page@example.test>',
+            technicalThreadKey: 'imap:martijn:<unrelated-page@example.test>',
+            accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+            email: 'ander@example.test', to: 'martijn@softora.nl', externalContactEmail: 'ander@example.test',
+          }],
+        }),
+      } : {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          totalCount: 4,
+          nextCursor: 'page-2',
+          messages: [{ ...root, threadMessages: undefined }, {
+            id: 'inbox:new-current', messageId: '<new-current@example.test>',
+            technicalThreadKey: 'imap:martijn:<new-current@example.test>',
+            accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+            email: 'lia@huidig.example', to: 'martijn@softora.nl', externalContactEmail: 'lia@huidig.example',
+          }],
+        }),
+      };
+    },
+    getOwner: () => 'both',
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+    getAccountEmails: () => ['martijn@softora.nl'],
+    getActiveMail: () => root.id,
+    normalizeMessage: (message) => ({ ...message }),
+    openMail() {},
+  });
+
+  assert.equal(await controller.loadContactTimeline(root), true);
+  assert.deepEqual(
+    root.threadMessages.map((message) => message.id).sort(),
+    ['inbox:new-current', 'sent:alias-parent']
+  );
+  assert.equal(root.contactTimelineTotal, 4);
+  assert.equal(root.contactTimelineNextCursor, 'page-2');
+
+  assert.equal(await controller.loadMoreContactTimeline(root), true);
+  assert.equal(requests[1].searchParams.get('cursor'), 'page-2');
+  assert.deepEqual(
+    root.threadMessages.map((message) => message.id).sort(),
+    ['inbox:new-current', 'inbox:older-current', 'sent:alias-parent']
+  );
+  assert.equal(root.contactTimelineRejectedCount, 1);
+  assert.equal(root.contactTimelineTotal, 4);
+  assert.equal(root.contactTimelineNextCursor, '');
+});
+
+test('append bewaart een vroege aliasparent pending en bewijst hem pas met een latere directe seed', async () => {
+  const root = {
+    id: 'sent:pending-parent', messageId: '<pending-parent@example.test>',
+    technicalThreadKey: 'imap:martijn:<pending-parent@example.test>',
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'sent',
+    email: 'martijn@softora.nl', to: 'role@example.test', externalContactEmail: 'lia@example.test',
+  };
+  let page = 0;
+  const controller = discoveryUi.create({
+    document: { getElementById: () => null, querySelector: () => null },
+    fetch: async () => {
+      page += 1;
+      return page === 1 ? {
+        ok: true,
+        json: async () => ({ ok: true, messages: [{ ...root }], totalCount: 2, nextCursor: 'page-2' }),
+      } : {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          messages: [{
+            id: 'inbox:later-seed', messageId: '<later-seed@example.test>',
+            inReplyTo: root.messageId, references: root.messageId,
+            technicalThreadKey: root.technicalThreadKey,
+            accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+            email: 'lia@example.test', to: 'martijn@softora.nl', externalContactEmail: 'lia@example.test',
+          }],
+          totalCount: 2,
+          nextCursor: null,
+        }),
+      };
+    },
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+    getAccountEmails: () => ['martijn@softora.nl'],
+    getActiveMail: () => root.id,
+    normalizeMessage: (message) => ({ ...message }),
+    openMail() {},
+  });
+
+  assert.equal(await controller.loadContactTimeline(root), true);
+  assert.deepEqual(root.threadMessages, []);
+  assert.deepEqual(root.contactTimelinePendingMessages.map((message) => message.id), ['sent:pending-parent']);
+  assert.equal(root.contactTimelineRejectedCount, 0);
+  assert.equal(root.contactTimelineTotal, 2);
+
+  assert.equal(await controller.loadMoreContactTimeline(root), true);
+  assert.deepEqual(root.threadMessages.map((message) => message.id), ['inbox:later-seed']);
+  assert.deepEqual(root.contactTimelinePendingMessages, []);
+  assert.equal(root.contactTimelineRejectedCount, 0);
+  assert.equal(root.contactTimelineTotal, 2);
+});
+
+test('uitgestelde detailhydratie ververst de lijststatus zonder een tweede detailcommit', async () => {
+  const root = {
+    id: 'inbox:deferred-timeline', messageId: '<deferred-reply@example.test>',
+    inReplyTo: '<deferred-parent@example.test>', references: '<deferred-parent@example.test>',
+    technicalThreadKey: 'imap:martijn:<deferred-parent@example.test>',
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+    email: 'lia@example.test', to: 'martijn@softora.nl', externalContactEmail: 'lia@example.test',
+  };
+  const parent = {
+    id: 'sent:deferred-parent', messageId: '<deferred-parent@example.test>',
+    technicalThreadKey: root.technicalThreadKey,
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'sent',
+    email: 'martijn@softora.nl', to: 'role@example.test', externalContactEmail: 'role@example.test',
+  };
+  const listRenders = [];
+  const detailCommits = [];
+  const controller = discoveryUi.create({
+    document: { getElementById: () => null, querySelector: () => null },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ ok: true, messages: [root, parent], totalCount: 2, nextCursor: null }),
+    }),
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+    getAccountEmails: () => ['martijn@softora.nl'],
+    getActiveMail: () => root.id,
+    normalizeMessage: (message) => ({ ...message }),
+    renderList: (options) => listRenders.push(options),
+    openMail: (...args) => detailCommits.push(args),
+  });
+
+  assert.equal(await controller.loadContactTimeline(root, { deferRender: true }), true);
+  assert.deepEqual(root.threadMessages.map((message) => message.id), ['sent:deferred-parent']);
+  assert.deepEqual(listRenders, [{ openLatest: false }]);
+  assert.deepEqual(detailCommits, []);
+});
+
+test('volledige hide-tijdlijn accepteert exacte aliaslineage maar blijft fail-closed voor ander contact', async () => {
+  async function prepare(messages, options = {}) {
+    const root = {
+      id: 'inbox:hide-root', messageId: '<hide-root@example.test>',
+      inReplyTo: '<hide-parent@example.test>', references: '<hide-parent@example.test>',
+      technicalThreadKey: 'imap:martijn:<hide-parent@example.test>',
+      accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+      email: 'lia@huidig.example', to: 'martijn@softora.nl', externalContactEmail: 'lia@huidig.example',
+    };
+    const controller = discoveryUi.create({
+      document: { getElementById: () => null, querySelector: () => null },
+      fetch: async () => ({ ok: true, json: async () => ({ ok: true, messages, totalCount: messages.length, nextCursor: null }) }),
+      getOwner: () => 'martijn',
+      ...(options.missingResolver ? {} : {
+        getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
+      }),
+      getAccountEmails: () => options.accounts || ['martijn@softora.nl'],
+      getActiveMail: () => root.id,
+      normalizeMessage: (message) => ({ ...message }),
+      openMail() {},
+    });
+    return { root, result: await controller.prepareCompleteContactTimelineForHide(root) };
+  }
+
+  const validRoot = {
+    id: 'inbox:hide-root', messageId: '<hide-root@example.test>',
+    inReplyTo: '<hide-parent@example.test>', references: '<hide-parent@example.test>',
+    technicalThreadKey: 'imap:martijn:<hide-parent@example.test>',
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+    email: 'lia@huidig.example', to: 'martijn@softora.nl', externalContactEmail: 'lia@huidig.example',
+  };
+  const linkedAlias = {
+    id: 'sent:hide-parent', messageId: '<hide-parent@example.test>',
+    technicalThreadKey: validRoot.technicalThreadKey,
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'sent',
+    email: 'martijn@softora.nl', to: 'lia@oude-alias.example', externalContactEmail: 'lia@oude-alias.example',
+  };
+  const valid = await prepare([validRoot, linkedAlias]);
+  assert.equal(valid.result, true);
+  assert.deepEqual(valid.root.threadMessages.map((message) => message.id), ['sent:hide-parent']);
+
+  const unrelated = {
+    id: 'sent:hide-unrelated', messageId: '<hide-unrelated@example.test>',
+    technicalThreadKey: 'imap:martijn:<hide-unrelated@example.test>',
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'sent',
+    email: 'martijn@softora.nl', to: 'ander@example.test', externalContactEmail: 'ander@example.test',
+  };
+  const invalid = await prepare([validRoot, unrelated]);
+  assert.equal(invalid.result, false);
+  assert.match(invalid.root.contactTimelineError, /onverwacht bericht/i);
+
+  const sibling = {
+    id: 'inbox:hide-sibling', messageId: '<hide-sibling@example.test>',
+    inReplyTo: linkedAlias.messageId, references: linkedAlias.messageId,
+    technicalThreadKey: validRoot.technicalThreadKey,
+    accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
+    email: 'sibling@example.test', to: 'martijn@softora.nl', externalContactEmail: 'sibling@example.test',
+  };
+  assert.equal((await prepare([validRoot, linkedAlias, sibling])).result, false);
+
+  const crossAccountParent = {
+    ...linkedAlias,
+    id: 'sent:hide-cross-account-parent',
+    accountEmail: 'martijnvandeven@softora.nl',
+    email: 'martijnvandeven@softora.nl',
+  };
+  assert.equal((await prepare([validRoot, crossAccountParent], {
+    accounts: ['martijn@softora.nl', 'martijnvandeven@softora.nl'],
+  })).result, false);
+
+  const otherAccountRootCollision = {
+    ...validRoot,
+    id: 'inbox:hide-root-collision',
+    accountEmail: 'martijnvandeven@softora.nl',
+    to: 'martijnvandeven@softora.nl',
+  };
+  assert.equal((await prepare([otherAccountRootCollision, crossAccountParent], {
+    accounts: ['martijn@softora.nl', 'martijnvandeven@softora.nl'],
+  })).result, false);
+
+  const spoofedRoot = { ...validRoot, canonicalOwner: 'serve' };
+  assert.equal((await prepare([spoofedRoot, linkedAlias])).result, false);
+  assert.equal((await prepare([validRoot, linkedAlias], { missingResolver: true })).result, false);
+  assert.equal((await prepare([validRoot, linkedAlias], { accounts: [] })).result, false);
 });
 
 test('contacttijdlijn gebruikt in beide-scope altijd de concrete eigenaar van zoekresultaat of normaal bericht', async () => {
@@ -458,6 +884,7 @@ test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contac
       };
     },
     getOwner: () => 'both',
+    getMessageOwner: (message) => normalizeOwnerForTest(message?.accountEmail),
     getAccountEmails: () => ['owner@example.test'],
     getActiveMail: () => mail.id,
     normalizeMessage: (value) => ({ ...value }),

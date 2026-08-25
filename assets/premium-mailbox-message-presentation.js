@@ -65,7 +65,19 @@
       ) {
         return { body: getSentAuthoredBody(body), contact: emptyContact(), signatureMatched: false };
       }
-      const provenBody = getProvenQuotedOutboundResult(body, mail, message).body;
+      const hasMessageContext = Boolean(message && typeof message === 'object' && !Array.isArray(message));
+      const parsedSignature = hasMessageContext
+        ? signature?.parseIncoming?.(body, message)
+        : null;
+      const signatureMatched = Boolean(
+        parsedSignature &&
+        parsedSignature.matched === true &&
+        Array.isArray(parsedSignature.bodyLines)
+      );
+      const bodyWithoutSignature = signatureMatched
+        ? parsedSignature.bodyLines.join('\n').trim()
+        : body;
+      const provenBody = getProvenQuotedOutboundResult(bodyWithoutSignature, mail, message).body;
       const parsedDisplayBody = presentationOptions.stripDetectedQuotes === true &&
         typeof options.splitQuotedReply === 'function'
         ? options.splitQuotedReply(provenBody)
@@ -76,12 +88,11 @@
       if (!message || typeof message !== 'object' || Array.isArray(message)) {
         return { body: sourceSafeBody, contact: emptyContact(), signatureMatched: false };
       }
-      const parsedSignature = signature?.parseIncoming?.(sourceSafeBody);
-      if (!parsedSignature || parsedSignature.matched !== true || !Array.isArray(parsedSignature.bodyLines)) {
+      if (!signatureMatched) {
         return { body: sourceSafeBody, contact: emptyContact(), signatureMatched: false };
       }
       return {
-        body: parsedSignature.bodyLines.join('\n').trim(),
+        body: sourceSafeBody,
         contact: parsedSignature.contact || emptyContact(),
         signatureMatched: true,
       };
