@@ -1422,6 +1422,77 @@ test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id 
   ]);
 });
 
+test('mailbox index store vraagt canoniek opgeslagen Sent-bewijs via de service-role RPC op', async () => {
+  const rpcCalls = [];
+  const clientPolicies = [];
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      clientPolicies.push(options || {});
+      return {
+        async rpc(name, args) {
+          rpcCalls.push([name, args]);
+          return {
+            data: [
+              { message_id: 'bewust-verwijderd@softora.nl' },
+              { message_id: '<BEWUST-VERWIJDERD@SOFTORA.NL>' },
+              { message_id: 'niet-gevraagd@softora.nl' },
+            ],
+            error: null,
+          };
+        },
+      };
+    },
+    logger: { error() {}, info() {} },
+  });
+
+  const messageIds = await store.listStoredMessageIdsByMessageIdsForAccounts({
+    accountEmails: [' SERVE@SOFTORA.NL ', 'serve@softora.nl'],
+    folder: 'SENT',
+    messageIds: [' <<BEWUST-VERWIJDERD@SOFTORA.NL>>, '],
+    priorityRead: true,
+  });
+
+  assert.deepEqual(messageIds, ['bewust-verwijderd@softora.nl']);
+  assert.deepEqual(rpcCalls, [[
+    'softora_list_stored_mailbox_message_ids',
+    {
+      p_account_emails: ['serve@softora.nl'],
+      p_folder: 'sent',
+      p_message_ids: ['bewust-verwijderd@softora.nl'],
+    },
+  ]]);
+  assert.deepEqual(clientPolicies, [{
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  }]);
+});
+
+test('mailbox opgeslagen-bewijslookup faalt gesloten op te brede of onbeschikbare reads', async () => {
+  let rpcCalls = 0;
+  const configuredStore = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      async rpc() { rpcCalls += 1; return { data: [], error: null }; },
+    }),
+    logger: { error() {}, info() {} },
+  });
+  await assert.rejects(
+    configuredStore.listStoredMessageIdsByMessageIdsForAccounts({
+      accountEmails: ['serve@softora.nl'],
+      messageIds: Array.from({ length: 201 }, (_, index) => `id-${index}@example.nl`),
+    }),
+    (error) => error.code === 'MAILBOX_STORED_MESSAGE_EVIDENCE_INPUT_TOO_LARGE'
+  );
+  assert.equal(rpcCalls, 0);
+
+  const unavailableStore = createMailboxIndexStore({ isSupabaseConfigured: () => false });
+  assert.equal(await unavailableStore.listStoredMessageIdsByMessageIdsForAccounts({
+    accountEmails: ['serve@softora.nl'], messageIds: ['id@example.nl'], priorityRead: true,
+  }), null);
+});
+
 test('mailbox index store haalt alleen exacte Sent-descendants binnen hetzelfde account op', async () => {
   const calls = [];
   const rows = [{

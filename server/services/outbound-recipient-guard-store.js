@@ -1,5 +1,6 @@
 const DEFAULT_TABLE = 'softora_outbound_recipient_guards';
 const DEFAULT_RESERVATION_TTL_MS = 2 * 60 * 60 * 1000;
+const MAX_EXACT_RECIPIENT_EMAIL_FILTERS = 100;
 const HISTORICAL_MAILBOX_LEDGER_GUARD_KEY = 'system:mailbox-outbound-ledger-v1';
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
@@ -319,6 +320,8 @@ function createOutboundRecipientGuardStore(deps = {}) {
   function mergeRecipientGroup(target, row = {}) {
     [
       'recipient_email',
+      'key_type',
+      'key_value',
       'recipient_domain',
       'recipient_company_key',
       'recipient_id',
@@ -346,44 +349,87 @@ function createOutboundRecipientGuardStore(deps = {}) {
   }
 
   async function listRecipientGroupsByStatus(status, options = {}) {
+    const hasRecipientEmailFilter = Object.prototype.hasOwnProperty.call(
+      options,
+      'recipientEmails'
+    );
+    const recipientEmails = Array.from(new Set(
+      (Array.isArray(options.recipientEmails) ? options.recipientEmails : [])
+        .map((value) => normalizeEmailAddress(value, normalizeString))
+        .filter((value) => (
+          value.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+        ))
+    ));
+    if (recipientEmails.length > MAX_EXACT_RECIPIENT_EMAIL_FILTERS) return null;
+    if (hasRecipientEmailFilter && !recipientEmails.length) return [];
     const client = getClient();
-    if (!client) return [];
-    const maxRows = Math.max(1, Math.min(20_000, Number(options.maxRows) || 10_000));
+    if (!client) return hasRecipientEmailFilter ? null : [];
+    const maxRows = hasRecipientEmailFilter
+      ? recipientEmails.length + 1
+      : Math.max(1, Math.min(20_000, Number(options.maxRows) || 10_000));
     const provider = normalizeString(options.provider);
     const channel = normalizeString(options.channel);
-    const keyType = normalizeString(options.keyType);
+    const keyType = hasRecipientEmailFilter ? 'email' : normalizeString(options.keyType);
     const updatedSince = normalizeString(options.updatedSince);
     const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at,last_seen_at';
     const buildQuery = () => {
       let query = client
         .from(table)
-        .select(selectColumns)
+        .select(selectColumns, hasRecipientEmailFilter ? { count: 'exact' } : undefined)
         .eq('status', status)
         .eq('permanent', true);
       if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
       if (channel && query && typeof query.eq === 'function') query = query.eq('channel', channel);
       if (keyType && query && typeof query.eq === 'function') query = query.eq('key_type', keyType);
+      if (hasRecipientEmailFilter) query = query.in('key_value', recipientEmails);
       if (updatedSince && query && typeof query.gte === 'function') query = query.gte('updated_at', updatedSince);
       if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
       return query;
     };
     const rows = [];
+    let exactResultCount = null;
     const pageSize = Math.min(1000, maxRows);
     const firstQuery = buildQuery();
     if (firstQuery && typeof firstQuery.range === 'function') {
       for (let from = 0; from < maxRows; from += pageSize) {
         const to = Math.min(maxRows - 1, from + pageSize - 1);
-        const { data, error } = await buildQuery().range(from, to);
+        const { data, error, count } = await buildQuery().range(from, to);
         if (error) throw error;
+        if (hasRecipientEmailFilter) {
+          const parsedCount = count === null || count === undefined ? Number.NaN : Number(count);
+          if (!Number.isFinite(parsedCount)
+            || (exactResultCount !== null && exactResultCount !== parsedCount)) return null;
+          exactResultCount = parsedCount;
+        }
         const pageRows = Array.isArray(data) ? data : [];
         rows.push(...pageRows);
         if (pageRows.length < pageSize) break;
       }
     } else {
       const query = firstQuery && typeof firstQuery.limit === 'function' ? firstQuery.limit(maxRows) : firstQuery;
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
+      if (hasRecipientEmailFilter) {
+        const parsedCount = count === null || count === undefined ? Number.NaN : Number(count);
+        if (!Number.isFinite(parsedCount)) return null;
+        exactResultCount = parsedCount;
+      }
       rows.push(...(Array.isArray(data) ? data : []));
+    }
+    const exactRowKeys = new Set();
+    if (hasRecipientEmailFilter) {
+      const requestedRecipients = new Set(recipientEmails);
+      if (exactResultCount !== rows.length || rows.length > recipientEmails.length) return null;
+      for (const row of rows) {
+        const keyTypeValue = normalizeString(row && row.key_type).toLowerCase();
+        const keyValue = normalizeEmailAddress(row && row.key_value, normalizeString);
+        const recipientEmail = normalizeEmailAddress(row && row.recipient_email, normalizeString);
+        if (keyTypeValue !== 'email' || !requestedRecipients.has(keyValue)
+          || recipientEmail !== keyValue || exactRowKeys.has(keyValue)
+          || normalizeString(row && row.status).toLowerCase() !== normalizeString(status).toLowerCase()
+          || row.permanent !== true) return null;
+        exactRowKeys.add(keyValue);
+      }
     }
     const groups = new Map();
     rows.slice(0, maxRows).forEach((row) => {
@@ -395,11 +441,16 @@ function createOutboundRecipientGuardStore(deps = {}) {
         normalizeGuardKeyPart(row && row.recipient_id, normalizeString),
         normalizeString(row && (row.last_seen_at || row.updated_at || row.created_at)),
       ].join('|');
-      const groupKey = reservationId || fallbackKey;
+      const exactRecipientKey = hasRecipientEmailFilter
+        ? normalizeEmailAddress(row && row.key_value, normalizeString)
+        : '';
+      const groupKey = exactRecipientKey ? `email:${exactRecipientKey}` : reservationId || fallbackKey;
       if (!groupKey) return;
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {
           reservation_id: reservationId,
+          key_type: '',
+          key_value: '',
           recipient_email: '',
           recipient_domain: '',
           recipient_company_key: '',
@@ -457,6 +508,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
 
 module.exports = {
   HISTORICAL_MAILBOX_LEDGER_GUARD_KEY,
+  MAX_EXACT_RECIPIENT_EMAIL_FILTERS,
   createOutboundRecipientGuardStore,
   getIdentityKeyRows,
   normalizeIdentity,

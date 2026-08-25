@@ -9,6 +9,7 @@ const {
 } = require('../repositories/mailbox-message-reference-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
 const { createMailboxIndexTargetedLookups } = require('../repositories/mailbox-index-targeted-lookups');
+const { createMailboxStoredMessageEvidenceLookup } = require('../repositories/mailbox-stored-message-evidence-lookup');
 const { createMailboxIndexVisibilityStore } = require('./mailbox-index-visibility-store');
 const {
   buildMailboxMessageKey,
@@ -1164,6 +1165,7 @@ function createMailboxIndexStore(deps = {}) {
     listAllMessagesForAccounts,
     listMatchingMessagesForAccounts,
     listMessagesByMessageIdsForAccounts,
+    listStoredMessageIdsByMessageIdsForAccounts: createMailboxStoredMessageEvidenceLookup({ run, runPriorityRead, normalizeEmail, normalizeFolder, normalizeString }),
     listSentCandidatesForQuotedReplies,
     listMessagesReferencingMessageIdsForAccounts,
     listUnthreadedSentCandidatesForConversations,

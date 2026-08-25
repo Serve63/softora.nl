@@ -142,6 +142,154 @@ test('mailbox send provenance survives acceptance and prevents an idempotent res
   assert.equal(accepted[0].conversationId, 'conversation:blue');
 });
 
+test('gerichte accepted-provenance lookup gebruikt één canonieke geaggregeerde RPC en behoudt ambiguïteit', async () => {
+  const rpcCalls = [];
+  const rows = [1, 2].map((number) => ({
+    intent_id: `send:targeted-${number}`,
+    idempotency_key: `browser:targeted-${number}`,
+    owner: 'serve',
+    account_email: 'serve@softora.nl',
+    recipient_email: 'lead@example.nl',
+    mode: 'reply',
+    conversation_id: 'conversation:targeted',
+    reply_target_message_id: '<incoming@example.nl>',
+    references_text: '<root@example.nl> <incoming@example.nl>',
+    provider: 'smtp',
+    provider_thread_id: 'thread-targeted',
+    provider_message_id: `provider-targeted-${number}`,
+    sent_message_id: number === 1 ? '<TARGET@Example.NL>' : 'target@example.nl',
+    canonical_message_id: 'target@example.nl',
+    sender_name: 'Servé Creusen',
+    subject: 'Re: Kleine vraag',
+    body_text: `Exact antwoord ${number}`,
+    cc_text: 'cc@example.nl',
+    bcc_text: 'bcc@example.nl',
+    status: 'accepted',
+    dispatch_state: 'finished',
+    accepted_at: `2026-08-25T00:0${number}:00.000Z`,
+    created_at: '2026-08-25T00:00:00.000Z',
+    updated_at: `2026-08-25T00:0${number}:00.000Z`,
+  }));
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      async rpc(name, args) {
+        rpcCalls.push([name, args]);
+        return {
+          data: {
+            rows,
+            complete: true,
+            overflow: false,
+            returned_count: rows.length,
+            max_rows: 3,
+          },
+          error: null,
+        };
+      },
+    }),
+    logger: { error() {} },
+  });
+
+  const accepted = await store.listAcceptedMessagesByMessageIds({
+    accountEmails: [' SERVE@SOFTORA.NL ', 'serve@softora.nl'],
+    messageIds: [' <<TARGET@EXAMPLE.NL>>, ', '<target@example.nl>'],
+    maxRows: 3,
+  });
+
+  assert.equal(accepted.length, 2, 'dubbele accepted provenance moet zichtbaar blijven als ambiguïteit');
+  assert.deepEqual(accepted.map((row) => row.intentId), ['send:targeted-1', 'send:targeted-2']);
+  assert.equal(accepted[0].messageId, '<TARGET@Example.NL>');
+  assert.equal(accepted[0].canonicalMessageId, 'target@example.nl');
+  assert.equal(accepted[0].body, 'Exact antwoord 1');
+  assert.equal(accepted[0].replyTargetMessageId, '<incoming@example.nl>');
+  assert.deepEqual(rpcCalls, [[
+    'softora_list_accepted_mailbox_send_provenance_by_message_ids',
+    {
+      p_account_emails: ['serve@softora.nl'],
+      p_message_ids: ['target@example.nl'],
+      p_max_rows: 3,
+    },
+  ]]);
+});
+
+test('gerichte accepted-provenance lookup faalt gesloten op overflow, scopeschending en ontbrekende opslag', async () => {
+  const baseRow = {
+    intent_id: 'send:overflow', idempotency_key: 'browser:overflow', owner: 'serve',
+    account_email: 'serve@softora.nl', recipient_email: 'lead@example.nl', mode: 'reply',
+    provider: 'smtp', sent_message_id: '<target@example.nl>',
+    canonical_message_id: 'target@example.nl', subject: 'Re: Vraag', body_text: 'Antwoord',
+    status: 'accepted', dispatch_state: 'finished',
+  };
+  const overflowRows = [1, 2, 3].map((number) => ({
+    ...baseRow, intent_id: `send:overflow-${number}`,
+  }));
+  const overflowStore = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      async rpc() {
+        return { data: {
+          rows: overflowRows, complete: false, overflow: true,
+          returned_count: 3, max_rows: 2,
+        }, error: null };
+      },
+    }),
+    logger: { error() {} },
+  });
+  await assert.rejects(
+    overflowStore.listAcceptedMessagesByMessageIds({
+      accountEmails: ['serve@softora.nl'], messageIds: ['target@example.nl'], maxRows: 2,
+    }),
+    (error) => error.code === 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_OVERFLOW'
+  );
+
+  const scopeStore = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      async rpc() {
+        return { data: {
+          rows: [{ ...baseRow, account_email: 'martijn@softora.nl' }],
+          complete: true, overflow: false, returned_count: 1, max_rows: 2,
+        }, error: null };
+      },
+    }),
+    logger: { error() {} },
+  });
+  await assert.rejects(
+    scopeStore.listAcceptedMessagesByMessageIds({
+      accountEmails: ['serve@softora.nl'], messageIds: ['target@example.nl'], maxRows: 2,
+    }),
+    (error) => error.code === 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_INVALID_RESULT'
+  );
+
+  const unavailableStore = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => false,
+    logger: { error() {} },
+  });
+  await assert.rejects(
+    unavailableStore.listAcceptedMessagesByMessageIds({
+      accountEmails: ['serve@softora.nl'], messageIds: ['target@example.nl'], maxRows: 2,
+    }),
+    (error) => error.code === 'MAILBOX_SEND_PROVENANCE_UNAVAILABLE'
+  );
+});
+
+test('gerichte accepted-provenance lookup weigert te brede input vóór de RPC', async () => {
+  let rpcCalls = 0;
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ async rpc() { rpcCalls += 1; return { data: null, error: null }; } }),
+  });
+  await assert.rejects(
+    store.listAcceptedMessagesByMessageIds({
+      accountEmails: ['serve@softora.nl'],
+      messageIds: Array.from({ length: 201 }, (_, index) => `target-${index}@example.nl`),
+      maxRows: 500,
+    }),
+    (error) => error.code === 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_INPUT_TOO_LARGE'
+  );
+  assert.equal(rpcCalls, 0);
+});
+
 test('mailbox send provenance bypasses an active shared circuit and retries one isolated timeout', async () => {
   let backgroundCalls = 0;
   let criticalCalls = 0;

@@ -542,6 +542,104 @@ test('data ops store reads only customers matching campaign reply sender emails'
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 1000]);
 });
 
+test('data ops unieke customerlookup bewijst volledigheid en weigert emailambiguïteit', async () => {
+  function createClient(rows, count = rows.length) {
+    const calls = [];
+    return {
+      calls,
+      from(table) {
+        const query = {
+          select(columns, options) {
+            calls.push(['select', table, columns, options]);
+            return query;
+          },
+          is(column, value) {
+            calls.push(['is', column, value]);
+            return query;
+          },
+          in(column, values) {
+            calls.push(['in', column, values]);
+            return query;
+          },
+          limit(value) {
+            calls.push(['limit', value]);
+            return Promise.resolve({ data: rows.slice(0, value), count, error: null });
+          },
+        };
+        return query;
+      },
+    };
+  }
+
+  const uniqueClient = createClient([{
+    customer_id: 'customer-unique', company: 'Uniek', email: 'info@uniek.nl',
+    payload: { id: 'customer-unique', email: 'info@uniek.nl', campaignType: 'webdesign' },
+  }]);
+  const uniqueStore = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => uniqueClient,
+    logger: { error() {}, warn() {} },
+  });
+  const unique = await uniqueStore.listUniqueCustomersByEmails({
+    emails: ['INFO@UNIEK.NL', 'ontbreekt@example.nl'],
+    bypassReadCache: true,
+  });
+
+  assert.equal(unique.length, 1);
+  assert.equal(unique[0].id, 'customer-unique');
+  assert.deepEqual(uniqueClient.calls.find((call) => call[0] === 'limit'), ['limit', 3]);
+  assert.deepEqual(uniqueClient.calls.find((call) => call[0] === 'select')[3], { count: 'exact' });
+
+  const ambiguousRows = [
+    { customer_id: 'duplicate-a', email: 'info@uniek.nl', payload: { id: 'duplicate-a', email: 'info@uniek.nl' } },
+    { customer_id: 'duplicate-b', email: 'info@uniek.nl', payload: { id: 'duplicate-b', email: 'info@uniek.nl' } },
+  ];
+  const ambiguousStore = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => createClient(ambiguousRows),
+    logger: { error() {}, warn() {} },
+  });
+  assert.equal(await ambiguousStore.listUniqueCustomersByEmails({
+    emails: ['info@uniek.nl', 'ontbreekt@example.nl'], bypassReadCache: true,
+  }), null, 'twee klanten op één email blijven ambigu, ook als een andere gevraagde email ontbreekt');
+
+  const missingCountStore = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => createClient(ambiguousRows.slice(0, 1), null),
+    logger: { error() {}, warn() {} },
+  });
+  assert.equal(await missingCountStore.listUniqueCustomersByEmails({
+    emails: ['info@uniek.nl'], bypassReadCache: true,
+  }), null, 'zonder exacte count is volledigheid niet bewezen');
+
+  const driftedPayloadStore = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => createClient([{
+      customer_id: 'payload-drift', email: 'info@uniek.nl',
+      payload: { id: 'payload-drift', email: 'ander@example.nl' },
+    }]),
+    logger: { error() {}, warn() {} },
+  });
+  assert.equal(await driftedPayloadStore.listUniqueCustomersByEmails({
+    emails: ['info@uniek.nl'], bypassReadCache: true,
+  }), null, 'payload- en database-email mogen niet naar verschillende dossiers wijzen');
+});
+
+test('data ops unieke customerlookup begrenst de bewijsinput vóór Supabase', async () => {
+  let queries = 0;
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from() { queries += 1; throw new Error('mag niet queryen'); } }),
+    logger: { error() {}, warn() {} },
+  });
+  const result = await store.listUniqueCustomersByEmails({
+    emails: Array.from({ length: 201 }, (_, index) => `contact-${index}@example.nl`),
+    bypassReadCache: true,
+  });
+  assert.equal(result, null);
+  assert.equal(queries, 0);
+});
+
 test('data ops store resolves exact customer ids without scanning the customer snapshot', async () => {
   const calls = [];
   const client = {
