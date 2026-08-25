@@ -127,7 +127,7 @@
       <div class="step-intro"><h3>Kies jouw bekleding</h3><p>Voel straks in de winkel de echte stalen. Hier zie je direct wat materiaal en kleur met de stoel doen.</p></div>
       <div class="choice-section">
         <p class="choice-label">Materiaal</p>
-        <div class="option-grid">
+        <div class="option-grid upholstery-grid">
           ${Object.entries(UPHOLSTERY).map(([id, item]) => radioCard({
             group: 'upholstery', value: id, selected: state.upholstery === id,
             title: item.name, note: item.note, price: item.price,
@@ -163,7 +163,7 @@
       <div class="step-intro"><h3>Maak comfort persoonlijk</h3><p>Kies eerst de bediening en voeg daarna functies toe die jouw dagelijkse comfort verbeteren.</p></div>
       <div class="choice-section">
         <p class="choice-label">Bediening</p>
-        <div class="option-grid">
+        <div class="option-grid mechanism-grid">
           ${Object.entries(MECHANISMS).map(([id, item]) => radioCard({
             group: 'mechanism', value: id, selected: state.mechanism === id,
             title: item.name, note: item.note, price: item.price,

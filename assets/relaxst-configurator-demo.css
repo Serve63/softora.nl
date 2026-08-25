@@ -292,6 +292,51 @@ dialog > p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }
 .dialog-summary { margin: 20px 0; }
 .dialog-primary { width: 100%; margin: 0; }
 
+@media (min-width: 1051px) {
+  .site-header { height: 64px; }
+  .brand { gap: 10px; font-size: 22px; }
+  .brand-mark { width: 27px; height: 27px; }
+  .hero { min-height: 190px; padding-top: 22px; padding-bottom: 24px; }
+  .hero-number { position: absolute; right: 7vw; bottom: 12px; font-size: clamp(140px, 15vw, 240px); }
+  .hero-proof { margin-top: 18px; }
+  .configurator {
+    height: calc(100dvh - 268px);
+    min-height: 620px;
+    max-height: 760px;
+    margin-bottom: 14px;
+  }
+  .product-stage { padding: 20px 28px 18px; }
+  .product-visual { min-height: 0; }
+  #chair-image { width: min(72%, 540px); max-height: 470px; }
+  .material-chip { top: 19%; }
+  .product-caption h2 { font-size: clamp(28px, 3vw, 42px); }
+  .stage-price strong { font-size: 22px; }
+  .selection-tags { margin-top: 10px; }
+  .builder-panel { padding: 24px clamp(26px, 3vw, 44px) 18px; }
+  .builder-heading h2 { font-size: 32px; }
+  .steps { margin: 18px 0; }
+  .step-content { min-height: 0; }
+  .step-intro { margin-bottom: 14px; }
+  .step-intro h3 { font-size: 22px; }
+  .option-card { padding: 11px; }
+  .upholstery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .upholstery-grid .option-card { display: block; }
+  .upholstery-grid .option-card-price { display: block; margin-top: 6px; }
+  .mechanism-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .models .option-card { min-height: 112px; padding: 7px; }
+  .models .option-card img { width: 58px; height: 58px; margin-bottom: 3px; }
+  .choice-section + .choice-section { margin-top: 16px; }
+  .choice-label { margin-bottom: 7px; }
+  .swatch-card { padding: 7px 5px; }
+  .swatch-card span { width: 30px; height: 30px; margin-bottom: 5px; }
+  .feature-card { min-height: 70px; }
+  .summary-row { padding: 10px 13px; }
+  .summary-total { padding: 13px; }
+  .summary-note { margin-top: 9px; }
+  .builder-actions { min-height: 52px; margin-top: 14px; padding-top: 12px; }
+  .button-primary, .button-secondary { min-height: 42px; }
+}
+
 @media (max-width: 1050px) {
   .site-header nav a { display: none; }
   .hero { grid-template-columns: 1fr; }
