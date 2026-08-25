@@ -54,7 +54,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260821b/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260825a/);
   assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260819b/);
   assert.match(bootstrapScriptSource, /remoteBootstrapVersion/);
   assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
@@ -66,7 +66,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260821a/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260821b/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260825a/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -170,8 +170,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.metric-kg\s*\{[\s\S]*?width: 46px;/);
   assert.match(stylesSource, /\.metric-input\s*\{[\s\S]*?width: 100%;[\s\S]*?height: 22px;[\s\S]*?padding: 0;/);
   assert.match(stylesSource, /\.form-history\s*\{/);
-  assert.match(stylesSource, /\.exercise-top\s*\{[\s\S]*?grid-template-rows: 38px 34px;[\s\S]*?row-gap: 2px;/);
-  assert.match(stylesSource, /\.exercise-controls\s*\{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1 \/ span 2;[\s\S]*?justify-items: end;/);
+  assert.match(stylesSource, /\.exercise-top\s*\{[\s\S]*?grid-template-rows: 38px minmax\(34px, auto\);[\s\S]*?row-gap: 2px;/);
+  assert.match(stylesSource, /\.exercise-controls\s*\{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1 \/ span 2;[\s\S]*?align-self: start;[\s\S]*?justify-items: end;/);
   assert.match(stylesSource, /\.form-status:nth-child\(3\)\s*\{[\s\S]*?width: 46px;/);
   assert.doesNotMatch(scriptSource, /title\.textContent = 'Vorm'/);
   assert.doesNotMatch(scriptSource, /form-status-index/);
@@ -185,7 +185,13 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /top\.append\(dragHandle, title, controls, notes\);/);
   assert.match(scriptSource, /card\.append\(top\);/);
   assert.doesNotMatch(scriptSource, /card\.append\(top, notes\);/);
-  assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?grid-column: 1 \/ span 2;[\s\S]*?grid-row: 2;[\s\S]*?font-size: 10px;/);
+  assert.match(scriptSource, /notes = document\.createElement\('textarea'\);/);
+  assert.match(scriptSource, /notes\.rows = 1;/);
+  assert.match(scriptSource, /notes\.setAttribute\('aria-label', `Notities \$\{exercise\.title\}`\);/);
+  assert.match(scriptSource, /function fitNotesField\(field\)[\s\S]*?field\.style\.height = 'auto';[\s\S]*?field\.scrollHeight/);
+  assert.match(scriptSource, /list\.querySelectorAll\('\.exercise-notes'\)\.forEach\(fitNotesField\);/);
+  assert.doesNotMatch(scriptSource, /notes\.type = 'text';/);
+  assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?grid-column: 1 \/ span 2;[\s\S]*?grid-row: 2;[\s\S]*?overflow: hidden;[\s\S]*?resize: none;[\s\S]*?font-size: 10px;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: pre-wrap;/);
   assert.match(stylesSource, /:focus-within/);
   assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
 
