@@ -102,13 +102,6 @@ main { overflow: hidden; }
   letter-spacing: -0.065em;
   white-space: nowrap;
 }
-.hero-intro {
-  max-width: 650px;
-  margin: 26px 0 0;
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1.65;
-}
 .hero-proof { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 24px; }
 .hero-proof span { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
 .hero-proof b { color: var(--peach-deep); font-size: 10px; }
@@ -315,7 +308,6 @@ dialog > p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }
   .concept-pill { padding: 7px 9px; font-size: 9px; }
   .hero { min-height: auto; padding: 48px 21px 38px; }
   .hero h1 { font-size: 44px; white-space: normal; }
-  .hero-intro { font-size: 16px; }
   .hero-proof { display: grid; gap: 10px; }
   .hero-number { right: -10px; bottom: 24px; font-size: 140px; }
   .configurator { width: 100%; margin: 0; border-width: 1px 0; border-radius: 0; box-shadow: none; }
