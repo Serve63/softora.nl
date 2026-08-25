@@ -4,6 +4,7 @@ const { createAgendaMetadataService } = require('./agenda-metadata');
 const { createAgendaTaskHelpers } = require('./agenda-task-helpers');
 const { createConfirmationMailService } = require('./confirmation-mail');
 const { createGoogleCalendarSyncService } = require('./google-calendar-sync');
+const { createOutboundRecipientGuardStore } = require('./outbound-recipient-guard-store');
 
 function createAgendaSupportRuntime(deps = {}) {
   let agendaMetadataService = null;
@@ -48,6 +49,15 @@ function createAgendaSupportRuntime(deps = {}) {
     mailConfig,
     googleCalendarConfig = {},
     resolveAppointmentCallId,
+    isSupabaseConfigured = () => false,
+    getSupabaseClient = () => null,
+    outboundRecipientGuardStore = createOutboundRecipientGuardStore({
+      isSupabaseConfigured,
+      getSupabaseClient,
+      normalizeString,
+      truncateText,
+      logger: console,
+    }),
   } = deps;
 
   const {
@@ -194,6 +204,7 @@ function createAgendaSupportRuntime(deps = {}) {
     setGeneratedAgendaAppointmentAtIndex,
     formatDateTimeLabelNl,
     truncateText,
+    outboundRecipientGuardStore,
   });
 
   const {

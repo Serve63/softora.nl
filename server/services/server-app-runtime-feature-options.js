@@ -37,6 +37,8 @@ function buildAgendaSupportRuntimeOptions({
   appendDashboardActivity,
   mailConfig,
   resolveAppointmentCallId,
+  isSupabaseConfigured,
+  getSupabaseClient,
 }) {
   return {
     normalizeString,
@@ -77,6 +79,8 @@ function buildAgendaSupportRuntimeOptions({
     appendDashboardActivity,
     mailConfig,
     resolveAppointmentCallId,
+    isSupabaseConfigured,
+    getSupabaseClient,
   };
 }
 

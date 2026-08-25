@@ -6,6 +6,9 @@ const {
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
 } = require('./mailbox-send-provenance-store');
+const {
+  assertOutboundRecipientsNotSuppressed,
+} = require('../security/outbound-mail-suppression');
 
 const MAX_COMPOSE_ATTACHMENTS = 5;
 const MAX_COMPOSE_ATTACHMENT_BYTES = 4 * 1024 * 1024;
@@ -31,6 +34,7 @@ function createMailboxComposeSend(deps = {}) {
     nodemailer,
     webdesignEmailTemplateVersion,
     mailboxSendProvenanceStore,
+    outboundRecipientGuardStore,
     mailboxAttachmentService,
     logger = console,
     now = () => new Date(),
@@ -196,6 +200,15 @@ function createMailboxComposeSend(deps = {}) {
       to: normalizedTo,
       subject: cleanSubject,
       text: normalizedText,
+    });
+    await assertOutboundRecipientsNotSuppressed({
+      outboundRecipientGuardStore,
+      identities: [
+        { ...(webdesignParts?.outboundIdentity || {}), recipientEmail: normalizedTo },
+        ...normalizedCc.map((recipientEmail) => ({ recipientEmail })),
+        ...normalizedBcc.map((recipientEmail) => ({ recipientEmail })),
+      ],
+      channel: 'softora-mailbox',
     });
     const mail = {
       from: account.name ? `${account.name} <${account.email}>` : account.email,

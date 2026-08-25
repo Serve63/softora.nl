@@ -100,6 +100,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
         normalizeString,
         threadProvenance,
         mailboxSendProvenanceStore,
+        outboundRecipientGuardStore: composeSendDependencies?.outboundRecipientGuardStore,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
