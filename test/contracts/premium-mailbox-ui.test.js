@@ -413,6 +413,7 @@ test('detailstabiliteit ruimt een stale laadlaag op zonder een nieuwere run te r
 test('contacttijdlijn heeft een harde deadline zodat maildetail altijd kan committen', async () => {
   const mail = {
     id: 'contact:deadline',
+    accountEmail: 'serve@softora.nl',
     externalContactEmail: 'klant@example.nl',
     canonicalOwner: 'serve',
   };
@@ -3085,6 +3086,8 @@ test('mailbox bewaart Moniques eigen tekst en zet telefoon uit de suffix in een 
     mail: {
       id: 'inbox:dierenkliniek',
       folder: 'inbox',
+      from: 'Dierenkliniek ’t Spoor',
+      email: 'info@dierenkliniektspoor.nl',
       accountEmail: 'contact.venvisuals@gmail.com',
       receivedAt: '2026-08-04T15:17:03.000Z',
       threadMessages: [{
@@ -3105,6 +3108,233 @@ test('mailbox bewaart Moniques eigen tekst en zet telefoon uit de suffix in een 
   assert.match(html, /href="tel:0731234567"/);
   assert.doesNotMatch(html, /Op di 4 aug 2026 om 16:37 schreef/);
   assert.equal((html.match(/Afgelopen week kwam ik jullie website dierenkliniektspoor\.nl tegen\./g) || []).length, 1);
+});
+
+test('mailbox rendert Lia haar antwoord en contactgegevens correct met en zonder bewezen Sent-parent', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website stroomvantaal-popup.nl tegen.',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt.',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+  ].join('\n');
+  const incomingBody = [
+    'Dag Martijn,',
+    '',
+    'dank voor je mail, ik reageer later!',
+    '',
+    'groet,',
+    'Lia',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven :',
+    ...sentBody.split('\n').map((line) => `> ${line}`),
+    '',
+    '--',
+    '---',
+    '*LIA HESEMANS redactie & training*',
+    'eindredactie | auteursbegeleiding | schrijftraining',
+    'Haarensteijnstraat 23 | 5076 CM Haaren',
+    'M 06 33688506',
+    'I [www.stroomvantaal-popup.nl](http://www.stroomvantaal-popup.nl)',
+  ].join('\n');
+  const provenSent = {
+    id: 'sent:285',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    messageId: '<lia-parent@softora.nl>',
+    date: '2026-08-25T10:59:00.000Z',
+    body: sentBody,
+  };
+
+  for (const [label, threadMessages, expectedColdmailOccurrences] of [
+    ['zonder Sent-parent', [], 0],
+    ['met Sent-parent', [provenSent], 1],
+  ]) {
+    const html = renderMailboxBodyForTest(incomingBody, [], {
+      replyMailId: 'inbox:162',
+      mail: {
+        id: 'inbox:162',
+        folder: 'inbox',
+        from: 'Lia Hesemans',
+        email: 'lia@example.nl',
+        accountEmail: 'martijn@softora.nl',
+        receivedAt: '2026-08-25T11:10:00.000Z',
+        inReplyTo: '<lia-parent@softora.nl>',
+        body: incomingBody,
+        threadMessages,
+      },
+    });
+
+    assert.match(html, /Dag Martijn,/, label);
+    assert.match(html, /dank voor je mail, ik reageer later!/, label);
+    assert.match(html, /groet,<\/div>\s*<div class="detail-mail-line">Lia<\/div>/, label);
+    assert.doesNotMatch(html, /Op di 25 aug 2026 om 12:59 schreef/, label);
+    assert.doesNotMatch(html, /detail-mail-section-quote/, label);
+    assert.equal(
+      (html.match(/Afgelopen week kwam ik jullie website stroomvantaal-popup\.nl tegen\./g) || []).length,
+      expectedColdmailOccurrences,
+      label
+    );
+    assert.doesNotMatch(html, /LIA HESEMANS|eindredactie|auteursbegeleiding|schrijftraining|www\.stroomvantaal-popup\.nl/, label);
+    assert.equal((html.match(/<dt>Telefoon:<\/dt>/g) || []).length, 1, label);
+    assert.equal((html.match(/<dt>Adres:<\/dt>/g) || []).length, 1, label);
+    assert.match(html, /class="detail-mail-contact-card"/, label);
+    assert.match(html, /class="detail-mail-contact-grid"/, label);
+    assert.match(html, /class="detail-mail-contact-item"/, label);
+    assert.match(html, /href="tel:0633688506">06 33688506<\/a>/, label);
+    assert.match(html, /Haarensteijnstraat 23, 5076 CM Haaren/, label);
+  }
+});
+
+test('mailbox bewaart Lia haar persoonlijke afsluiting en onbewezen post-quote footer atomair', () => {
+  const incomingBody = [
+    'Dag Martijn,',
+    '',
+    'dank voor je mail, ik reageer later!',
+    '',
+    'groet,',
+    'Lia',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Dit is een voldoende duidelijke geciteerde coldmailregel.',
+    '',
+    '--',
+    'LIA HESEMANS redactie & training',
+    'Haarensteijnstraat 23 | 5076 CM Haaren',
+    'M 06 33688506',
+  ].join('\n');
+
+  for (const [label, senderContext] of [
+    ['lege context', {}],
+    ['alleen e-mail zonder footermatch', { email: 'lia@example.nl' }],
+    ['enkelvoudige afzendernaam', { fromName: 'Lia' }],
+  ]) {
+    const presentation = campaignInboxModule.getSourceSafeMessagePresentation(
+      senderContext,
+      senderContext,
+      incomingBody
+    );
+
+    assert.equal(presentation.signatureMatched, false, label);
+    assert.equal(presentation.body, incomingBody, label);
+    assert.deepEqual(presentation.contact, { phone: '', phoneHref: '', addressLines: [] }, label);
+    assert.match(presentation.body, /groet,\nLia/, label);
+    assert.match(presentation.body, /--\nLIA HESEMANS[\s\S]*M 06 33688506/, label);
+  }
+});
+
+test('mailbox vindt een sterke post-quote footer vóór een latere From-regel die op een quoteheader lijkt', () => {
+  const incomingBody = [
+    'Dag Martijn,',
+    '',
+    'dank voor je mail, ik reageer later!',
+    '',
+    'groet,',
+    'Lia',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Dit is een voldoende duidelijke geciteerde coldmailregel.',
+    '',
+    '--',
+    'LIA HESEMANS redactie & training',
+    'From: lia@example.nl',
+    'Haarensteijnstraat 23 | 5076 CM Haaren',
+    'M 06 33688506',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:lia-from-footer',
+    mail: {
+      id: 'inbox:lia-from-footer',
+      folder: 'inbox',
+      from: 'Lia Hesemans',
+      email: 'lia@example.nl',
+      accountEmail: 'martijn@softora.nl',
+      receivedAt: '2026-08-25T11:10:00.000Z',
+      body: incomingBody,
+      threadMessages: [],
+    },
+  });
+
+  assert.match(html, /groet,<\/div>\s*<div class="detail-mail-line">Lia<\/div>/);
+  assert.doesNotMatch(html, /lia@example\.nl|LIA HESEMANS/);
+  assert.equal((html.match(/<dt>Telefoon:<\/dt>/g) || []).length, 1);
+  assert.equal((html.match(/<dt>Adres:<\/dt>/g) || []).length, 1);
+  assert.match(html, /href="tel:0633688506">06 33688506<\/a>/);
+  assert.match(html, /Haarensteijnstraat 23, 5076 CM Haaren/);
+});
+
+test('mailbox maakt van een gedeeltelijk geprefixte quote zonder -- geen contactkaart', () => {
+  const incomingBody = [
+    'Dit is mijn eigen antwoord.',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Dit is de eerste regel van het geciteerde bericht.',
+    'Met vriendelijke groet,',
+    'M. de Vries',
+    'M 06 12345678',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:mixed-quote-signoff',
+    mail: {
+      id: 'inbox:mixed-quote-signoff',
+      folder: 'inbox',
+      accountEmail: 'martijn@softora.nl',
+      receivedAt: '2026-08-25T11:10:00.000Z',
+      body: incomingBody,
+      threadMessages: [],
+    },
+  });
+
+  assert.match(html, /Dit is mijn eigen antwoord\./);
+  assert.doesNotMatch(html, /detail-mail-contact-card|<dt>Telefoon:<\/dt>|href="tel:0612345678"/);
+});
+
+test('mailbox schrijft na bewezen quoteverwijdering een oude Martijn-footer nooit aan Anna toe', () => {
+  const sentBody = 'Dit is een voldoende lange bewezen uitgaande mail van Martijn met een concrete toelichting.';
+  const incomingBody = [
+    'Dank voor je bericht.',
+    '',
+    'Groet,',
+    'Anna',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    `> ${sentBody}`,
+    '',
+    '--',
+    'Martijn van de Ven',
+    'M 06 12345678',
+  ].join('\n');
+  const mail = {
+    id: 'inbox:anna-old-martijn-footer',
+    folder: 'inbox',
+    direction: 'received',
+    from: 'Anna Jansen',
+    email: 'anna@example.nl',
+    accountEmail: 'martijn@softora.nl',
+    receivedAt: '2026-08-25T11:10:00.000Z',
+    inReplyTo: '<anna-parent@softora.nl>',
+    body: incomingBody,
+    threadMessages: [{
+      id: 'sent:anna-parent',
+      folder: 'sent',
+      direction: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      messageId: '<anna-parent@softora.nl>',
+      date: '2026-08-25T10:59:00.000Z',
+      body: sentBody,
+    }],
+  };
+  const presentation = campaignInboxModule.getSourceSafeMessagePresentation(mail, mail);
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: mail.id,
+    mail,
+  });
+
+  assert.deepEqual(presentation.contact, { phone: '', phoneHref: '', addressLines: [] });
+  assert.doesNotMatch(html, /detail-mail-contact-card|<dt>Telefoon:<\/dt>|href="tel:0612345678"/);
+  assert.match(html, /Dank voor je bericht\./);
 });
 
 test('mailbox verwijdert JT inline Gmail-citaat uit grijs en toont de bewezen Servé-mail eenmaal roze', () => {

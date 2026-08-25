@@ -61,26 +61,150 @@
     ].join('|');
   }
 
+  function normalizeRfcMessageId(value) {
+    return String(value || '').trim().toLowerCase().replace(/^<+|>+$/g, '');
+  }
+
+  function getExactMessageReferenceIds(value) {
+    const source = String(value || '').trim();
+    if (!source) return [];
+    const tokens = source.match(/<[^<>]+>/g) || source.split(/[,\s]+/);
+    return Array.from(new Set(tokens.map(normalizeRfcMessageId).filter(Boolean)));
+  }
+
+  function normalizePersonalOwner(value) {
+    const owner = String(value || '').trim().toLowerCase();
+    if (owner === 'serve' || owner === 'servé') return 'serve';
+    return owner === 'martijn' ? 'martijn' : '';
+  }
+
+  function getTimelineAccount(message) {
+    return normalizeEmail(message?.accountEmail || message?.providerAccountEmail);
+  }
+
+  function getTimelineMessageIdentity(message) {
+    const account = getTimelineAccount(message);
+    if (!account) return '';
+    const messageId = normalizeRfcMessageId(message?.messageId);
+    if (messageId) return `${account}|message:${messageId}`;
+    const messageKey = String(message?.messageKey || '').trim();
+    if (messageKey) return `${account}|key:${messageKey}`;
+    const providerId = String(message?.providerMessageId || message?.mailboxId || message?.id || '').trim();
+    return providerId ? `${account}|provider:${providerId}` : '';
+  }
+
+  function getTechnicalThreadKey(message) {
+    return String(message?.technicalThreadKey || '').trim().toLowerCase();
+  }
+
+  function getRoutedContact(message, accountEmails) {
+    return resolveExternalContact(message, accountEmails) || normalizeEmail(message?.externalContactEmail);
+  }
+
+  function isProvenOutbound(message) {
+    const folder = String(message?.folder || message?.storageFolder || '').trim().toLowerCase();
+    const direction = String(message?.direction || '').trim().toLowerCase();
+    return folder === 'sent' || direction === 'sent' ||
+      message?.localAcceptedSend === true || message?.copyContext?.evidenceKnown === true;
+  }
+
+  function createContactTimelineScope(contactEmail, options = {}) {
+    const contact = normalizeEmail(contactEmail);
+    const accounts = Array.from(new Set(
+      (Array.isArray(options.accountEmails) ? options.accountEmails : []).map(normalizeEmail).filter(Boolean)
+    ));
+    const allowedAccounts = new Set(accounts);
+    const canonicalOwner = normalizePersonalOwner(options.canonicalOwner);
+    const ownerResolver = typeof options.getMessageOwner === 'function' ? options.getMessageOwner : null;
+    const valid = Boolean(contact && accounts.length && canonicalOwner && ownerResolver);
+    const getOwner = (message) => {
+      if (!ownerResolver) return '';
+      const resolvedOwner = normalizePersonalOwner(ownerResolver(message));
+      if (!resolvedOwner) return '';
+      const embeddedValue = String(message?.canonicalOwner || '').trim();
+      if (embeddedValue) {
+        const embeddedOwner = normalizePersonalOwner(embeddedValue);
+        if (!embeddedOwner || embeddedOwner !== resolvedOwner) return '';
+      }
+      return resolvedOwner;
+    };
+    const matches = (message) => {
+      const account = getTimelineAccount(message);
+      return valid && Boolean(account) && allowedAccounts.has(account) && getOwner(message) === canonicalOwner;
+    };
+    return { accounts, canonicalOwner, contact, getOwner, matches, valid };
+  }
+
+  function isDirectionalContactAncestor(candidate, seed, scope) {
+    const candidateAccount = getTimelineAccount(candidate);
+    const seedAccount = getTimelineAccount(seed);
+    const candidateThread = getTechnicalThreadKey(candidate);
+    const seedThread = getTechnicalThreadKey(seed);
+    const candidateMessageId = normalizeRfcMessageId(candidate?.messageId);
+    if (!candidateAccount || candidateAccount !== seedAccount || !candidateThread || candidateThread !== seedThread ||
+      !candidateMessageId || !isProvenOutbound(candidate)) return false;
+    const seedReferences = new Set(getExactMessageReferenceIds(
+      [seed?.inReplyTo, seed?.references].filter(Boolean).join(' ')
+    ));
+    return seedReferences.has(candidateMessageId) && scope.matches(candidate);
+  }
+
+  function filterContactTimelineMessages(root, messages, contactEmail, options = {}) {
+    const scope = createContactTimelineScope(contactEmail, options);
+    const incoming = Array.isArray(messages) ? messages : [];
+    const linkedMessages = Array.isArray(options.linkedMessages)
+      ? options.linkedMessages
+      : Array.isArray(root?.threadMessages) ? root.threadMessages : [];
+    const pendingMessages = Array.isArray(options.pendingMessages) ? options.pendingMessages : [];
+    const entries = new Map();
+    let invalidIndex = 0;
+    const addEntries = (items, source) => items.forEach((message) => {
+      const identity = getTimelineMessageIdentity(message);
+      const key = identity || `invalid:${source}:${invalidIndex++}`;
+      const existing = entries.get(key);
+      if (existing) {
+        existing.sources.add(source);
+        if (source === 'incoming') existing.message = message;
+      } else {
+        entries.set(key, { identity, message, sources: new Set([source]) });
+      }
+    });
+    addEntries(incoming, 'incoming');
+    addEntries(pendingMessages, 'pending');
+    addEntries(linkedMessages, 'linked');
+    const directSeeds = [root, ...Array.from(entries.values(), (entry) => entry.message)]
+      .filter((message) => scope.matches(message) && getRoutedContact(message, scope.accounts) === scope.contact);
+    const accepted = [];
+    const pending = [];
+    let rejectedCount = 0;
+    entries.forEach((entry) => {
+      const { identity, message, sources } = entry;
+      const scoped = Boolean(identity) && scope.matches(message);
+      const direct = scoped && getRoutedContact(message, scope.accounts) === scope.contact;
+      const ancestor = scoped && directSeeds.some((seed) => isDirectionalContactAncestor(message, seed, scope));
+      const linkedOnlyDirect = direct && sources.size === 1 && sources.has('linked');
+      if (ancestor || direct && !linkedOnlyDirect) {
+        accepted.push(message);
+        return;
+      }
+      const canBecomeAncestor = scoped && isProvenOutbound(message) &&
+        Boolean(normalizeRfcMessageId(message?.messageId)) && Boolean(getTechnicalThreadKey(message));
+      if (options.hasMore === true && canBecomeAncestor) {
+        pending.push(message);
+        return;
+      }
+      if (sources.has('incoming') || sources.has('pending')) rejectedCount += 1;
+    });
+    return { messages: accepted, pendingMessages: pending, rejectedCount, scopeValid: scope.valid };
+  }
+
   function mergeContactTimeline(root, messages, contactEmail, totalCount, options = {}) {
     const normalizedContact = normalizeEmail(contactEmail);
-    const accountEmails = Array.isArray(options.accountEmails) ? options.accountEmails : [];
-    const allowedAccounts = new Set(accountEmails.map(normalizeEmail).filter(Boolean));
-    const canonicalOwner = String(options.canonicalOwner || '').trim().toLowerCase();
-    let rejectedCount = Math.max(0, Number(options.rejectedCountOffset) || 0);
-    const normalized = (Array.isArray(messages) ? messages : []).filter((message) => {
-      if (!accountEmails.length || getMessageIdentity(message) === getMessageIdentity(root)) return true;
-      const messageAccount = normalizeEmail(message?.accountEmail || message?.providerAccountEmail);
-      const matchesOwner = canonicalOwner && typeof options.getMessageOwner === 'function'
-        ? String(options.getMessageOwner(message) || '').trim().toLowerCase() === canonicalOwner
-        : allowedAccounts.has(messageAccount);
-      const messageContact = normalizeEmail(message?.externalContactEmail) ||
-        resolveExternalContact(message, accountEmails);
-      const matches = matchesOwner && messageContact === normalizedContact;
-      if (!matches) rejectedCount += 1;
-      return matches;
-    });
-    const rootIdentity = getMessageIdentity(root);
-    const matchingRoot = normalized.find((message) => getMessageIdentity(message) === rootIdentity);
+    const filtered = filterContactTimelineMessages(root, messages, contactEmail, options);
+    const rejectedCount = Math.max(0, Number(options.rejectedCountOffset) || 0) + filtered.rejectedCount;
+    const normalized = filtered.messages;
+    const rootIdentity = getTimelineMessageIdentity(root);
+    const matchingRoot = normalized.find((message) => getTimelineMessageIdentity(message) === rootIdentity);
     if (matchingRoot) {
       root.technicalThreadKey = matchingRoot.technicalThreadKey;
       root.messageKey = matchingRoot.messageKey || root.messageKey;
@@ -88,13 +212,14 @@
     }
     const seen = new Set(rootIdentity ? [rootIdentity] : []);
     root.threadMessages = normalized.filter((message) => {
-      const identity = getMessageIdentity(message);
+      const identity = getTimelineMessageIdentity(message);
       if (!identity || seen.has(identity)) return false;
       seen.add(identity);
       return true;
     });
     root.externalContactEmail = normalizedContact;
     root.contactTimelineLoaded = true;
+    root.contactTimelinePendingMessages = filtered.pendingMessages;
     const reportedTotal = Number.isFinite(Number(totalCount)) && Number(totalCount) > 0
       ? Number(totalCount)
       : 1 + root.threadMessages.length;
@@ -319,6 +444,19 @@
       if (mail.contactTimelineLoaded && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
       const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
       if (!contactEmail) return false;
+      const timelineAccounts = Array.from(new Set(
+        (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
+      ));
+      const rootAccount = getTimelineAccount(mail);
+      const timelineOwner = normalizePersonalOwner(options.getMessageOwner?.(mail));
+      const timelineScope = createContactTimelineScope(contactEmail, {
+        accountEmails: timelineAccounts,
+        canonicalOwner: timelineOwner,
+        getMessageOwner: options.getMessageOwner,
+      });
+      if (!rootAccount || !timelineAccounts.includes(rootAccount) || !timelineScope.valid || !timelineScope.matches(mail)) {
+        return false;
+      }
       const generation = ++timelineGeneration;
       timelineController?.abort?.();
       const requestController = typeof AbortController === 'function' ? new AbortController() : null;
@@ -331,8 +469,6 @@
       let timeoutId = 0;
       let timedOut = false;
       try {
-        const timelineOwner = mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || 'both';
-        const timelineAccounts = options.getAccountEmails?.();
         const params = new URLSearchParams({
           contact: contactEmail,
           owner: timelineOwner,
@@ -363,16 +499,22 @@
         const incoming = (Array.isArray(data.messages) ? data.messages : []).map((message) => options.normalizeMessage?.(message) || message);
         const prior = append && mail.contactTimelineLoaded ? [mail, ...(mail.threadMessages || [])] : [];
         const rows = [...prior, ...incoming];
+        const nextCursor = String(data.nextCursor || '');
         mergeContactTimeline(mail, rows, contactEmail, data.totalCount, {
           accountEmails: timelineAccounts,
           canonicalOwner: timelineOwner,
           getMessageOwner: options.getMessageOwner,
+          linkedMessages: append ? [] : mail.threadMessages,
+          pendingMessages: append ? mail.contactTimelinePendingMessages : [],
+          hasMore: Boolean(nextCursor),
           rejectedCountOffset: append ? mail.contactTimelineRejectedCount : 0,
         });
         mail.contactTimelineNeedsRefresh = false;
         mail.contactTimelineError = '';
-        mail.contactTimelineNextCursor = String(data.nextCursor || '');
-        if (!deferRender) {
+        mail.contactTimelineNextCursor = nextCursor;
+        if (deferRender) {
+          options.renderList?.({ openLatest: false });
+        } else {
           options.openMail?.(mail.id, {
             skipBodyFetch: true,
             skipContactTimeline: true,
@@ -398,27 +540,34 @@
     async function prepareCompleteContactTimelineForHide(mail) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
       const frozenId = String(mail.id);
-      const frozenAccounts = Array.from(new Set([
-        ...(options.getAccountEmails?.() || []).map(normalizeEmail),
-        normalizeEmail(mail.accountEmail || mail.providerAccountEmail),
-      ].filter(Boolean))).sort();
+      const frozenAccounts = Array.from(new Set(
+        (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
+      )).sort();
+      const rootAccount = getTimelineAccount(mail);
       const frozenContact = normalizeEmail(mail.externalContactEmail) || resolveExternalContact(mail, frozenAccounts);
-      const frozenOwner = String(
-        mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || ''
-      ).trim().toLowerCase();
-      const rootIdentity = getMessageIdentity(mail);
-      if (!frozenContact || !frozenOwner || !rootIdentity || !frozenAccounts.length) return false;
+      const frozenOwner = normalizePersonalOwner(options.getMessageOwner?.(mail));
+      const frozenScope = createContactTimelineScope(frozenContact, {
+        accountEmails: frozenAccounts,
+        canonicalOwner: frozenOwner,
+        getMessageOwner: options.getMessageOwner,
+      });
+      const rootIdentity = getTimelineMessageIdentity(mail);
+      if (!rootAccount || !frozenAccounts.includes(rootAccount) || !rootIdentity ||
+        !frozenScope.valid || !frozenScope.matches(mail)) return false;
       const scopeIsCurrent = () => {
-        const currentAccounts = Array.from(new Set([
-          ...(options.getAccountEmails?.() || []).map(normalizeEmail),
-          normalizeEmail(mail.accountEmail || mail.providerAccountEmail),
-        ].filter(Boolean))).sort();
+        const currentAccounts = Array.from(new Set(
+          (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
+        )).sort();
         const currentContact = normalizeEmail(mail.externalContactEmail) || resolveExternalContact(mail, currentAccounts);
-        const currentOwner = String(
-          mail.canonicalOwner || mail.owner || options.getMessageOwner?.(mail) || options.getOwner?.() || ''
-        ).trim().toLowerCase();
+        const currentOwner = normalizePersonalOwner(options.getMessageOwner?.(mail));
+        const currentScope = createContactTimelineScope(currentContact, {
+          accountEmails: currentAccounts,
+          canonicalOwner: currentOwner,
+          getMessageOwner: options.getMessageOwner,
+        });
         return String(options.getActiveMail?.() || '') === frozenId &&
-          currentContact === frozenContact && currentOwner === frozenOwner;
+          currentContact === frozenContact && currentOwner === frozenOwner &&
+          currentAccounts.join('|') === frozenAccounts.join('|') && currentScope.matches(mail);
       };
       const generation = ++timelineGeneration;
       timelineController?.abort?.();
@@ -459,15 +608,8 @@
             : [];
           if (!incoming.length) throw new Error('Contacthistorie kon niet volledig worden geladen.');
           incoming.forEach((message) => {
-            const identity = getMessageIdentity(message);
-            const account = normalizeEmail(message?.accountEmail || message?.providerAccountEmail);
-            const owner = String(
-              message?.canonicalOwner || message?.owner || options.getMessageOwner?.(message) || ''
-            ).trim().toLowerCase();
-            const contact = normalizeEmail(message?.externalContactEmail) ||
-              resolveExternalContact(message, [...frozenAccounts, account]);
-            if (!identity || seenIdentities.has(identity) || !account ||
-              owner !== frozenOwner || contact !== frozenContact) {
+            const identity = getTimelineMessageIdentity(message);
+            if (!identity || seenIdentities.has(identity) || !frozenScope.matches(message)) {
               throw new Error('Contacthistorie bevatte een onverwacht bericht en is niet verborgen.');
             }
             seenIdentities.add(identity);
@@ -484,10 +626,27 @@
         if (seenIdentities.size !== expectedTotal || !seenIdentities.has(rootIdentity)) {
           throw new Error('Contacthistorie was niet volledig en is daarom niet verborgen.');
         }
+        // Validate alias lineage only after every page is present, while the
+        // per-page owner/account and uniqueness checks above remain fail-closed.
+        const filtered = filterContactTimelineMessages(mail, messages, frozenContact, {
+          accountEmails: frozenAccounts,
+          canonicalOwner: frozenOwner,
+          getMessageOwner: options.getMessageOwner,
+          linkedMessages: [],
+          pendingMessages: [],
+          hasMore: false,
+        });
+        if (!filtered.scopeValid || filtered.pendingMessages.length ||
+          filtered.rejectedCount || filtered.messages.length !== expectedTotal) {
+          throw new Error('Contacthistorie bevatte een onverwacht bericht en is niet verborgen.');
+        }
         mergeContactTimeline(mail, messages, frozenContact, expectedTotal, {
           accountEmails: frozenAccounts,
           canonicalOwner: frozenOwner,
           getMessageOwner: options.getMessageOwner,
+          linkedMessages: [],
+          pendingMessages: [],
+          hasMore: false,
         });
         const loadedCount = 1 + (Array.isArray(mail.threadMessages) ? mail.threadMessages.length : 0);
         if (!scopeIsCurrent() || loadedCount !== expectedTotal) {

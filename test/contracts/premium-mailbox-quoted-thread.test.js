@@ -155,3 +155,24 @@ test('natuurlijke regeleinden en onbewezen Gmail-achtige varianten worden niet u
   assert.equal(unprefixed.body, unprefixedBody);
   assert.deepEqual(unprefixed.removed, []);
 });
+
+test('quoteparser houdt twee structurele quotes rond een losse -- als twee echte segmenten', () => {
+  const body = [
+    'Dit is Anna haar eigen antwoord.',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Eerste echte quote.',
+    '',
+    '--',
+    'Anna Jansen',
+    'M 06 87654321',
+    '',
+    'On Tue, Aug 25, 2026 at 11:30 AM Piet Jansen wrote:',
+    '> Tweede echte quote.',
+  ].join('\n');
+  const parsed = quotedThread.findQuotedSegments(body);
+
+  assert.deepEqual(parsed.segments.map((segment) => segment.marker), ['reply-header', 'reply-header']);
+  assert.ok(parsed.segments[0].end <= body.split('\n').indexOf('--'));
+  assert.ok(parsed.segments[1].start > body.split('\n').indexOf('--'));
+});

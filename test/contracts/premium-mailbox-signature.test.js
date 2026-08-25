@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const signature = require('../../assets/premium-mailbox-signature.js');
 
 test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend telefoon en adres', () => {
-  const parsed = signature.parseIncoming([
+  const body = [
     'Ziet er zeker gaaf uit!',
     '',
     'Best regards/Met vriendelijke groet.',
@@ -24,7 +24,8 @@ test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend tele
     '17122606',
     'Tax Number',
     'NL001751168B24',
-  ].join('\n'));
+  ].join('\n');
+  const parsed = signature.parseIncoming(body);
 
   assert.equal(parsed.matched, true);
   assert.deepEqual(parsed.bodyLines, ['Ziet er zeker gaaf uit!']);
@@ -80,6 +81,246 @@ test('mailbox haalt geen handtekening uit geciteerde of quoteachtige tekst', () 
     assert.equal(parsed.matched, false);
     assert.deepEqual(parsed.bodyLines, body.split('\n'));
   }
+});
+
+test('mailbox verwijdert Lia haar footer na een Gmail-quote maar bewaart haar persoonlijke afsluiting en de quote', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website stroomvantaal-popup.nl tegen.',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt.',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+  ].join('\n');
+  const quotedLines = [
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven :',
+    ...sentBody.split('\n').map((line) => `> ${line}`),
+  ];
+  const body = [
+    'Dag Martijn,',
+    '',
+    'dank voor je mail, ik reageer later!',
+    '',
+    'groet,',
+    'Lia',
+    '',
+    ...quotedLines,
+    '',
+    '--',
+    '---',
+    '*LIA HESEMANS redactie & training*',
+    'eindredactie | auteursbegeleiding | schrijftraining',
+    'From: lia@example.nl',
+    'Haarensteijnstraat 23 | 5076 CM Haaren',
+    'M. de Vries',
+    'M 06 33688506',
+    'I [www.stroomvantaal-popup.nl](http://www.stroomvantaal-popup.nl)',
+  ].join('\n');
+  const parsed = signature.parseIncoming(body, {
+    from: 'Lia Hesemans',
+    email: 'lia@example.nl',
+  });
+
+  assert.equal(parsed.matched, true);
+  assert.deepEqual(parsed.bodyLines, [
+    'Dag Martijn,',
+    '',
+    'dank voor je mail, ik reageer later!',
+    '',
+    'groet,',
+    'Lia',
+    '',
+    ...quotedLines,
+  ]);
+  assert.deepEqual(parsed.contact, {
+    phone: '06 33688506',
+    phoneHref: 'tel:0633688506',
+    addressLines: ['Haarensteijnstraat 23', '5076 CM Haaren'],
+  });
+  assert.doesNotMatch(parsed.bodyLines.join('\n'), /LIA HESEMANS|eindredactie|lia@example\.nl|M\. de Vries|stroomvantaal-popup\.nl\]\(/);
+
+  const html = signature.renderContactCard(parsed.contact);
+  assert.equal((html.match(/<dt>Telefoon:<\/dt>/g) || []).length, 1);
+  assert.equal((html.match(/<dt>Adres:<\/dt>/g) || []).length, 1);
+  assert.match(html, /href="tel:0633688506">06 33688506<\/a>/);
+  assert.match(html, /Haarensteijnstraat 23, 5076 CM Haaren/);
+
+  const withoutMessageContext = signature.parseIncoming(body);
+  assert.deepEqual(withoutMessageContext.contact, { phone: '', phoneHref: '', addressLines: [] });
+  assert.match(withoutMessageContext.bodyLines.join('\n'), /LIA HESEMANS|M 06 33688506/);
+});
+
+test('mailbox stript zonder bewezen post-quote afzenderidentiteit geen deel van Lia haar antwoord', () => {
+  const body = [
+    'Dag Martijn,',
+    '',
+    'dank voor je mail, ik reageer later!',
+    '',
+    'groet,',
+    'Lia',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Dit is een voldoende duidelijke geciteerde coldmailregel.',
+    '',
+    '--',
+    'LIA HESEMANS redactie & training',
+    'Haarensteijnstraat 23 | 5076 CM Haaren',
+    'M 06 33688506',
+  ].join('\n');
+
+  for (const [label, context] of [
+    ['lege context', {}],
+    ['alleen e-mail zonder footermatch', { email: 'lia@example.nl' }],
+    ['enkelvoudige afzendernaam', { fromName: 'Lia' }],
+  ]) {
+    const parsed = signature.parseIncoming(body, context);
+
+    assert.equal(parsed.matched, false, label);
+    assert.deepEqual(parsed.bodyLines, body.split('\n'), label);
+    assert.deepEqual(parsed.contact, { phone: '', phoneHref: '', addressLines: [] }, label);
+    assert.match(parsed.bodyLines.join('\n'), /groet,\nLia/, label);
+    assert.match(parsed.bodyLines.join('\n'), /--\nLIA HESEMANS[\s\S]*M 06 33688506/, label);
+  }
+});
+
+test('mailbox schrijft een mixed of gedeeltelijk geprefixte quote zonder sterke footerscheider nooit toe aan de huidige afzender', () => {
+  const body = [
+    'Dit is mijn eigen antwoord.',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Dit is de eerste regel van het geciteerde bericht.',
+    'Met vriendelijke groet,',
+    'M. de Vries',
+    'M 06 12345678',
+  ].join('\n');
+  const parsed = signature.parseIncoming(body);
+
+  assert.equal(parsed.matched, false);
+  assert.deepEqual(parsed.bodyLines, body.split('\n'));
+  assert.deepEqual(parsed.contact, { phone: '', phoneHref: '', addressLines: [] });
+});
+
+test('mailbox slaat een ambigue M-naam over en bewaart een latere echte M-telefoonregel', () => {
+  const parsed = signature.parseIncoming([
+    'Dank voor je bericht.',
+    '',
+    '--',
+    'M. de Vries',
+    'M 06 12345678',
+  ].join('\n'));
+
+  assert.equal(parsed.matched, true);
+  assert.deepEqual(parsed.bodyLines, ['Dank voor je bericht.']);
+  assert.deepEqual(parsed.contact, {
+    phone: '06 12345678',
+    phoneHref: 'tel:0612345678',
+    addressLines: [],
+  });
+});
+
+test('mailbox bewaart een expliciete telefoonwaarde met toestel veilig maar zonder kliklink', () => {
+  const parsed = signature.parseIncoming([
+    'Dank voor je bericht.',
+    '',
+    '--',
+    'Klantenservice',
+    'Telefoon: 020 123 45 67 toestel 89',
+  ].join('\n'));
+  const html = signature.renderContactCard(parsed.contact);
+
+  assert.equal(parsed.matched, true);
+  assert.deepEqual(parsed.contact, {
+    phone: '020 123 45 67 toestel 89',
+    phoneHref: '',
+    addressLines: [],
+  });
+  assert.match(html, /<dt>Telefoon:<\/dt><dd><span class="detail-mail-contact-value">020 123 45 67 toestel 89<\/span><\/dd>/);
+  assert.doesNotMatch(html, /href=/);
+});
+
+test('mailbox schrijft een oude Martijn-footer na Anna haar quote nooit aan Anna toe', () => {
+  const body = [
+    'Dank voor je bericht.',
+    '',
+    'Groet,',
+    'Anna',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Dit is de geciteerde mail van Martijn.',
+    '',
+    '--',
+    'Martijn van de Ven',
+    'M 06 12345678',
+  ].join('\n');
+  const parsed = signature.parseIncoming(body, {
+    from: 'Anna Jansen',
+    email: 'anna@example.nl',
+  });
+
+  assert.deepEqual(parsed.contact, { phone: '', phoneHref: '', addressLines: [] });
+  assert.match(parsed.bodyLines.join('\n'), /Martijn van de Ven\nM 06 12345678/);
+});
+
+test('mailbox pakt een -- tussen twee echte quote-segmenten nooit als huidige signature', () => {
+  const body = [
+    'Dit is Anna haar eigen antwoord.',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Eerste echte quote.',
+    '',
+    '--',
+    'Anna Jansen',
+    'M 06 87654321',
+    '',
+    'On Tue, Aug 25, 2026 at 11:30 AM Piet Jansen wrote:',
+    '> Tweede echte quote.',
+  ].join('\n');
+  const parsed = signature.parseIncoming(body, {
+    from: 'Anna Jansen',
+    email: 'anna@example.nl',
+  });
+
+  assert.equal(parsed.matched, false);
+  assert.deepEqual(parsed.contact, { phone: '', phoneHref: '', addressLines: [] });
+  assert.deepEqual(parsed.bodyLines, body.split('\n'));
+});
+
+test('mailbox negeert alleen een aaneengesloten footer-From en nooit een gescheiden tweede sender-headerquote', () => {
+  const body = [
+    'Dit is Anna haar eigen antwoord.',
+    '',
+    'Op di 25 aug 2026 om 12:59 schreef Martijn van de Ven:',
+    '> Eerste echte quote.',
+    '',
+    '--',
+    'Anna Jansen',
+    'M 06 87654321',
+    '',
+    'From: anna@example.nl',
+    '> Tweede echte quote onder een sender-header.',
+  ].join('\n');
+  const parsed = signature.parseIncoming(body, {
+    from: 'Anna Jansen',
+    email: 'anna@example.nl',
+  });
+
+  assert.equal(parsed.matched, false);
+  assert.deepEqual(parsed.contact, { phone: '', phoneHref: '', addressLines: [] });
+  assert.deepEqual(parsed.bodyLines, body.split('\n'));
+});
+
+test('mailbox laat pipe- en postcodeachtige inhoud zonder bewezen signaturemarker volledig intact', () => {
+  const body = [
+    'De notitie gebruikt gewone pipe-tekst: concept | definitief.',
+    'Haarensteijnstraat 23 | 5076 CM Haaren',
+    'M 06 33688506 hoort in deze inhoudelijke opsomming.',
+  ].join('\n');
+  const parsed = signature.parseIncoming(body);
+
+  assert.equal(parsed.matched, false);
+  assert.deepEqual(parsed.bodyLines, body.split('\n'));
+  assert.deepEqual(parsed.contact, { phone: '', phoneHref: '', addressLines: [] });
 });
 
 test('mailbox herkent CRLF en non-breaking spaces in een gecombineerde handtekening', () => {
@@ -214,7 +455,7 @@ test('mailbox rendert een adres-only signature zonder lege telefoonrij', () => {
 });
 
 test('mailbox ondersteunt alle afgesproken telefoonlabels', () => {
-  for (const label of ['Phone', 'Tel', 'Telefoon', 'Mobiel', 'Mobile', 'T']) {
+  for (const label of ['Phone', 'Tel', 'Telefoon', 'Mobiel', 'Mobile', 'T', 'M']) {
     const parsed = signature.parseIncoming(`Antwoord.\n\nMet vriendelijke groet,\nNaam\n${label}: 0612345678`);
     assert.equal(parsed.matched, true, label);
     assert.equal(parsed.contact.phone, '0612345678', label);

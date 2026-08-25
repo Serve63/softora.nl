@@ -19,6 +19,10 @@ const acceptedTimelineMigration = fs.readFileSync(path.resolve(
   __dirname,
   '../../supabase/migrations/20260824120230_mailbox_contact_timeline_send_provenance.sql'
 ), 'utf8');
+const aliasLineageTimelineMigration = fs.readFileSync(path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260825164216_mailbox_contact_timeline_alias_lineage.sql'
+), 'utf8');
 
 async function createTimelineDatabase() {
   const database = new PGlite();
@@ -113,6 +117,9 @@ async function createTimelineDatabase() {
     );
     create table public.softora_mailbox_campaign_lineage_members (
       message_key text primary key, account_email text not null,
+      message_id text, parent_message_key text, root_message_key text,
+      root_message_id text, lineage_depth integer not null default 0,
+      is_incoming boolean not null default false,
       is_proven_automated boolean not null default false
     );
 
@@ -133,19 +140,38 @@ async function createTimelineDatabase() {
       select nullif(pg_catalog.lower(pg_catalog.btrim(pg_catalog.btrim(coalesce(p_value, ''), '<>'))), '');
     $function$;
 
+    create or replace function public.softora_mailbox_participant_emails(p_value text)
+    returns text[] language sql immutable security invoker set search_path = '' as $function$
+      select coalesce(
+        pg_catalog.array_agg(distinct pg_catalog.lower(matches[1])),
+        array[]::text[]
+      )
+      from pg_catalog.regexp_matches(
+        pg_catalog.lower(coalesce(p_value, '')),
+        '([a-z0-9.!#$%&''*+/=?^_\`{|}~-]+@[a-z0-9.-]+[.][a-z]{2,})',
+        'g'
+      ) as matches;
+    $function$;
+
     create or replace function public.softora_mailbox_message_participants(
       p_sender_email text,
       p_recipients_text text,
       p_payload jsonb
     ) returns text[] language sql immutable security invoker set search_path = '' as $function$
-      select array(
-        select distinct participant
-        from pg_catalog.unnest(array[
-          pg_catalog.lower(pg_catalog.btrim(coalesce(p_sender_email, ''))),
-          pg_catalog.lower(pg_catalog.btrim(coalesce(p_recipients_text, '')))
-        ]) participant
-        where participant <> ''
-      );
+      select coalesce(
+        pg_catalog.array_agg(distinct email),
+        array[]::text[]
+      )
+      from pg_catalog.unnest(public.softora_mailbox_participant_emails(pg_catalog.concat_ws(
+        ' ',
+        p_sender_email,
+        p_recipients_text,
+        p_payload->>'toDisplay',
+        p_payload->>'cc',
+        p_payload->>'bcc',
+        p_payload->>'replyTo',
+        p_payload->>'deliveredTo'
+      ))) as participants(email);
     $function$;
 
     create or replace function public.softora_mailbox_technical_thread_key(
@@ -181,9 +207,17 @@ async function createTimelineDatabase() {
       return null;
     end;
     $function$;
+
+    create or replace function public.softora_lock_mailbox_visibility_exclusive()
+    returns void language plpgsql volatile security invoker set search_path = '' as $function$
+    begin
+      return;
+    end;
+    $function$;
   `);
   await database.exec(atomicVisibilityMigration);
   await database.exec(acceptedTimelineMigration);
+  await database.exec(aliasLineageTimelineMigration);
   return database;
 }
 
@@ -366,6 +400,614 @@ test('accepted-sendfallback blijft owner-exact, bodyvast, deduped, pagineerbaar 
       select count(*)::integer as count from public.softora_mailbox_message_tombstones
       where account_email = any($1::text[])
     `, [serveAccounts])).rows[0].count, 0);
+  } finally {
+    await database.close();
+  }
+});
+
+test('contacttijdlijn koppelt een antwoordalias alleen via exact bewezen origin en nooit via een andere multi-To-ontvanger', async () => {
+  const database = await createTimelineDatabase();
+  const accountEmail = 'contact.venvisuals@gmail.com';
+  const roleAddress = 'info@stroomvantaal.nl';
+  const replyAlias = 'liahesemans@xs4all.nl';
+  const coRecipientEmail = 'stakeholder@other.example';
+  const rootMessageId = '<alias-root@gmail.com>';
+  try {
+    await insertPhysical(database, {
+      key: 'alias-root', accountEmail, folder: 'sent', uid: 285,
+      providerId: 'sent:285', messageId: rootMessageId,
+      senderName: 'Martijn van de Ven', senderEmail: accountEmail,
+      recipients: `"Stroom van Taal" <${roleAddress}>, Stakeholder <${coRecipientEmail}>`,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Originele campagne naar het rol-adres.', date: '2026-08-25T10:59:24Z',
+      searchDocument: `${roleAddress} ${coRecipientEmail}`,
+      payload: { source: 'imap-sync', cc: 'aaa-unrelated@example.com' },
+    });
+    await insertPhysical(database, {
+      key: 'alias-inbound', accountEmail, folder: 'inbox', uid: 162,
+      providerId: 'inbox:162', messageId: '<alias-reply@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: accountEmail, subject: 'Re: Kleine vraag over jullie website',
+      body: 'Ik reageer vanaf mijn persoonlijke adres.', date: '2026-08-25T14:44:33Z',
+      searchDocument: replyAlias,
+    });
+    const colleagueEmail = 'colleague@other.example';
+    await insertPhysical(database, {
+      key: 'alias-colleague-reply', accountEmail, folder: 'inbox', uid: 165,
+      providerId: 'inbox:165', messageId: '<alias-colleague@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Colleague', senderEmail: colleagueEmail,
+      recipients: accountEmail, subject: 'Re: Kleine vraag over jullie website',
+      body: 'Menselijke reactie van een ander contact in dezelfde RFC-thread.',
+      date: '2026-08-25T14:45:00Z', searchDocument: colleagueEmail,
+    });
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_roots (
+        message_key, account_email
+      ) values ('alias-root',$1)
+    `, [accountEmail]);
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_members (
+        message_key, account_email, message_id, parent_message_key,
+        root_message_key, root_message_id, lineage_depth, is_incoming,
+        is_proven_automated
+      ) values
+        ('alias-root',$1,'alias-root@gmail.com',null,'alias-root','alias-root@gmail.com',0,false,false),
+        ('alias-inbound',$1,'alias-reply@gmail.com','alias-root','alias-root','alias-root@gmail.com',1,true,false),
+        ('alias-colleague-reply',$1,'alias-colleague@gmail.com','alias-root','alias-root','alias-root@gmail.com',1,true,false)
+    `, [accountEmail]);
+
+    const rootExternalParticipants = await database.query(`
+      select participant
+      from pg_catalog.unnest(public.softora_mailbox_message_participants(
+        $1, $2, $3::jsonb
+      )) participant
+      where participant <> $1
+      order by participant
+    `, [
+      accountEmail,
+      `"Stroom van Taal" <${roleAddress}>, Stakeholder <${coRecipientEmail}>`,
+      JSON.stringify({ source: 'imap-sync', cc: 'aaa-unrelated@example.com' }),
+    ]);
+    assert.deepEqual(rootExternalParticipants.rows.map((row) => row.participant), [
+      'aaa-unrelated@example.com',
+      roleAddress,
+      coRecipientEmail,
+    ]);
+
+    await insertProvenance(database, {
+      intentId: 'alias-root-provenance', owner: 'martijn', accountEmail,
+      recipientEmail: roleAddress, mode: 'new-message', conversationId: 'alias-thread',
+      messageId: rootMessageId, senderName: 'Martijn van de Ven',
+      subject: 'Kleine vraag over jullie website', body: 'Duurzaam bewijs van de oorspronkelijke A-ontvanger.',
+      status: 'accepted', acceptedAt: '2026-08-25T10:59:24Z',
+    });
+    await insertProvenance(database, {
+      intentId: 'alias-accepted-followup', owner: 'martijn', accountEmail,
+      recipientEmail: roleAddress, mode: 'reply', conversationId: 'alias-thread',
+      replyTargetMessageId: rootMessageId, references: rootMessageId,
+      messageId: '<alias-followup@gmail.com>', senderName: 'Martijn van de Ven',
+      subject: 'Re: Kleine vraag over jullie website', body: 'Geaccepteerde follow-up in exact dezelfde thread.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:46:00Z',
+    });
+    await insertProvenance(database, {
+      intentId: 'alias-unrelated-accepted', owner: 'martijn', accountEmail,
+      recipientEmail: roleAddress, mode: 'new-message',
+      messageId: '<alias-unrelated-accepted@gmail.com>', senderName: 'Martijn van de Ven',
+      subject: 'Ander onderwerp', body: 'Geen threadkoppeling.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:47:00Z',
+    });
+    await insertProvenance(database, {
+      intentId: 'alias-co-recipient-followup', owner: 'martijn', accountEmail,
+      recipientEmail: coRecipientEmail, mode: 'reply', conversationId: 'alias-thread',
+      replyTargetMessageId: rootMessageId, references: rootMessageId,
+      messageId: '<alias-co-recipient-followup@gmail.com>', senderName: 'Martijn van de Ven',
+      subject: 'Re: Kleine vraag over jullie website',
+      body: 'Zelfde thread, maar uitsluitend bestemd voor de andere To-ontvanger.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:46:15Z',
+    });
+    await insertProvenance(database, {
+      intentId: 'alias-wrong-owner-followup', owner: 'serve', accountEmail,
+      recipientEmail: roleAddress, mode: 'reply', conversationId: 'alias-thread',
+      replyTargetMessageId: rootMessageId, references: rootMessageId,
+      messageId: '<alias-wrong-owner-followup@gmail.com>', senderName: 'Servé Creusen',
+      subject: 'Re: Kleine vraag over jullie website', body: 'Verkeerde owner in hetzelfde account en thread.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:46:30Z',
+    });
+
+    await insertPhysical(database, {
+      key: 'alias-same-thread-unproven', accountEmail, folder: 'sent', uid: 286,
+      providerId: 'sent:286', messageId: '<alias-unproven@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Martijn van de Ven', senderEmail: accountEmail,
+      recipients: roleAddress, subject: 'Zelfde headers zonder durable lineage',
+      body: 'Niet opnemen zonder campagnelidmaatschap.', date: '2026-08-25T14:43:00Z',
+      searchDocument: roleAddress,
+    });
+    await insertPhysical(database, {
+      key: 'alias-corrupt-member', accountEmail, folder: 'sent', uid: 287,
+      providerId: 'sent:287', messageId: '<alias-corrupt@gmail.com>',
+      senderName: 'Martijn van de Ven', senderEmail: accountEmail,
+      recipients: roleAddress, subject: 'Zelfde rootlabel maar andere technische thread',
+      body: 'Niet opnemen bij een afwijkende thread key.', date: '2026-08-25T14:42:00Z',
+      searchDocument: roleAddress,
+    });
+    await insertPhysical(database, {
+      key: 'alias-automated', accountEmail, folder: 'inbox', uid: 163,
+      providerId: 'inbox:163', messageId: '<alias-auto@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Autoresponder', senderEmail: roleAddress,
+      recipients: accountEmail, subject: 'Automatisch antwoord',
+      body: 'Afwezig.', date: '2026-08-25T14:41:00Z', searchDocument: roleAddress,
+      payload: { source: 'imap-sync', autoSubmitted: 'auto-replied' },
+    });
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_members (
+        message_key, account_email, message_id, parent_message_key,
+        root_message_key, root_message_id, lineage_depth, is_incoming,
+        is_proven_automated
+      ) values
+        ('alias-corrupt-member',$1,'alias-corrupt@gmail.com','alias-root','alias-root','alias-root@gmail.com',1,false,false),
+        ('alias-automated',$1,'alias-auto@gmail.com','alias-root','alias-root','alias-root@gmail.com',1,true,true)
+    `, [accountEmail]);
+
+    await insertPhysical(database, {
+      key: 'alias-ordinary-direct', accountEmail, folder: 'inbox', uid: 164,
+      providerId: 'inbox:164', messageId: '<alias-ordinary@gmail.com>',
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: accountEmail, subject: 'Losse afspraak',
+      body: 'Gewone mail buiten de campagne.', date: '2026-08-25T14:40:00Z',
+      searchDocument: replyAlias,
+    });
+
+    const martijnAccount = 'martijn@softora.nl';
+    await insertPhysical(database, {
+      key: 'other-owner-root', accountEmail: martijnAccount, folder: 'sent', uid: 1,
+      providerId: 'sent:1', messageId: rootMessageId,
+      senderName: 'Martijn van de Ven', senderEmail: martijnAccount,
+      recipients: roleAddress, subject: 'Kleine vraag over jullie website',
+      body: 'Zelfde Message-ID in andere eigenaarsscope.', date: '2026-08-25T10:59:24Z',
+      searchDocument: roleAddress,
+    });
+    await insertPhysical(database, {
+      key: 'other-owner-inbound', accountEmail: martijnAccount, folder: 'inbox', uid: 2,
+      providerId: 'inbox:2', messageId: '<other-owner-reply@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: martijnAccount, subject: 'Re: Kleine vraag over jullie website',
+      body: 'Andere eigenaar blijft apart.', date: '2026-08-25T14:45:00Z',
+      searchDocument: replyAlias,
+    });
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_roots (
+        message_key, account_email
+      ) values ('other-owner-root',$1)
+    `, [martijnAccount]);
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_members (
+        message_key, account_email, message_id, parent_message_key,
+        root_message_key, root_message_id, lineage_depth, is_incoming,
+        is_proven_automated
+      ) values
+        ('other-owner-root',$1,'alias-root@gmail.com',null,'other-owner-root','alias-root@gmail.com',0,false,false),
+        ('other-owner-inbound',$1,'other-owner-reply@gmail.com','other-owner-root','other-owner-root','alias-root@gmail.com',1,true,false);
+    `, [martijnAccount]);
+
+    const timeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(timeline.rows.map((row) => row.message_key), [
+      'accepted-send|alias-accepted-followup',
+      'alias-inbound',
+      'alias-root',
+    ]);
+    assert.ok(timeline.rows.every((row) => row.account_email === accountEmail));
+    assert.ok(timeline.rows.every((row) => row.external_contact_email === replyAlias));
+    assert.ok(timeline.rows.every((row) => Number(row.total_count) === 3));
+    assert.equal(new Set(timeline.rows.map((row) => row.technical_thread_key)).size, 1);
+    assert.ok(!timeline.rows.some((row) => /unproven|corrupt|automated|ordinary|unrelated|other-owner|colleague|co-recipient|wrong-owner/.test(row.message_key)));
+
+    const coRecipientTimeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, coRecipientEmail]);
+    assert.deepEqual(coRecipientTimeline.rows.map((row) => row.message_key), [
+      'accepted-send|alias-co-recipient-followup',
+      'alias-root',
+    ]);
+
+    const colleagueTimeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, colleagueEmail]);
+    assert.deepEqual(colleagueTimeline.rows.map((row) => row.message_key), [
+      'accepted-send|alias-accepted-followup',
+      'alias-colleague-reply',
+      'alias-root',
+    ]);
+    assert.ok(!colleagueTimeline.rows.some((row) => row.message_key === 'alias-inbound'));
+
+    const hidden = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'inbox',162,'inbox:162',3,true
+      )
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(hidden.rows.map((row) => row.message_key).sort(), [
+      'alias-inbound',
+      'alias-root',
+    ]);
+    assert.deepEqual((await database.query(`
+      select message_key
+      from public.softora_mailbox_messages
+      where deleted_at is not null
+      order by message_key
+    `)).rows.map((row) => row.message_key), ['alias-inbound', 'alias-root']);
+    assert.equal((await database.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = $1
+        and normalized_message_id = any(array[
+          'alias-root@gmail.com','alias-reply@gmail.com','alias-followup@gmail.com'
+        ]::text[])
+    `, [accountEmail])).rows[0].count, 3);
+    assert.equal((await database.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = $1
+        and normalized_message_id = 'alias-co-recipient-followup@gmail.com'
+    `, [accountEmail])).rows[0].count, 0);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias])).rows, []);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, colleagueEmail])).rows.map((row) => row.message_key), [
+      'alias-colleague-reply',
+    ]);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, coRecipientEmail])).rows.map((row) => row.message_key), [
+      'accepted-send|alias-co-recipient-followup',
+    ]);
+
+    const restored = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'inbox',162,'inbox:162',0,false
+      )
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(restored.rows.map((row) => row.message_key).sort(), [
+      'alias-inbound',
+      'alias-root',
+    ]);
+    assert.equal((await database.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = $1
+    `, [accountEmail])).rows[0].count, 0);
+    assert.equal((await database.query(`
+      select deleted_at from public.softora_mailbox_messages
+      where message_key = 'alias-colleague-reply'
+    `)).rows[0].deleted_at, null);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias])).rows.map((row) => row.message_key), [
+      'accepted-send|alias-accepted-followup',
+      'alias-inbound',
+      'alias-root',
+    ]);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, coRecipientEmail])).rows.map((row) => row.message_key), [
+      'accepted-send|alias-co-recipient-followup',
+      'alias-root',
+    ]);
+
+    const otherOwnerTimeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [martijnAccount, replyAlias]);
+    assert.deepEqual(otherOwnerTimeline.rows.map((row) => row.message_key), [
+      'other-owner-inbound',
+      'other-owner-root',
+    ]);
+
+    const privileges = await database.query(`
+      select
+        procedure.prosecdef,
+        procedure.provolatile,
+        pg_catalog.has_function_privilege(
+          'anon', 'public.softora_mailbox_contact_timeline(text[],text,integer,integer)', 'execute'
+        ) as anon_execute,
+        pg_catalog.has_function_privilege(
+          'authenticated', 'public.softora_mailbox_contact_timeline(text[],text,integer,integer)', 'execute'
+        ) as authenticated_execute,
+        pg_catalog.has_function_privilege(
+          'service_role', 'public.softora_mailbox_contact_timeline(text[],text,integer,integer)', 'execute'
+        ) as service_execute
+      from pg_catalog.pg_proc procedure
+      where procedure.oid = 'public.softora_mailbox_contact_timeline(text[],text,integer,integer)'::pg_catalog.regprocedure
+    `);
+    assert.equal(privileges.rows[0].prosecdef, false);
+    assert.equal(privileges.rows[0].provolatile, 's');
+    assert.equal(privileges.rows[0].anon_execute, false);
+    assert.equal(privileges.rows[0].authenticated_execute, false);
+    assert.equal(privileges.rows[0].service_execute, true);
+
+    const helperPrivileges = await database.query(`
+      select
+        procedure.oid::pg_catalog.regprocedure::text as signature,
+        procedure.prosecdef,
+        procedure.provolatile,
+        pg_catalog.has_function_privilege('anon', procedure.oid, 'execute') as anon_execute,
+        pg_catalog.has_function_privilege('authenticated', procedure.oid, 'execute') as authenticated_execute,
+        pg_catalog.has_function_privilege('service_role', procedure.oid, 'execute') as service_execute
+      from pg_catalog.pg_proc procedure
+      where procedure.oid = any(array[
+        'public.softora_mailbox_account_owner(text)'::pg_catalog.regprocedure,
+        'public.softora_mailbox_contact_scope(text[],text)'::pg_catalog.regprocedure,
+        'public.softora_set_mailbox_contact_visibility(text[],text,text,text,bigint,text,integer,boolean)'::pg_catalog.regprocedure
+      ]::pg_catalog.oid[])
+      order by signature
+    `);
+    assert.deepEqual(helperPrivileges.rows, [
+      {
+        signature: 'softora_mailbox_account_owner(text)',
+        prosecdef: false,
+        provolatile: 'i',
+        anon_execute: false,
+        authenticated_execute: false,
+        service_execute: true,
+      },
+      {
+        signature: 'softora_mailbox_contact_scope(text[],text)',
+        prosecdef: false,
+        provolatile: 's',
+        anon_execute: false,
+        authenticated_execute: false,
+        service_execute: true,
+      },
+      {
+        signature: 'softora_set_mailbox_contact_visibility(text[],text,text,text,bigint,text,integer,boolean)',
+        prosecdef: false,
+        provolatile: 'v',
+        anon_execute: false,
+        authenticated_execute: false,
+        service_execute: true,
+      },
+    ]);
+
+    const canonicalOwners = await database.query(`
+      select public.softora_mailbox_account_owner(account_email) as owner
+      from pg_catalog.unnest(array[
+        'serve.290+mailbox@googlemail.com',
+        'serve.creusen7@gmail.com',
+        'contact.venvisuals@gmail.com',
+        'contactvenvisuals+mailbox@googlemail.com',
+        'future-account@softora.nl'
+      ]::text[]) accounts(account_email)
+    `);
+    assert.deepEqual(canonicalOwners.rows.map((row) => row.owner), [
+      'serve', 'serve', 'martijn', 'martijn', null,
+    ]);
+  } finally {
+    await database.close();
+  }
+});
+
+test('aliaslineage gebruikt één fail-closed scope voor ancestor-only tijdlijn en zichtbaarheid', () => {
+  assert.doesNotMatch(aliasLineageTimelineMigration, /min\(participant\)/i);
+  assert.equal((aliasLineageTimelineMigration.match(/create or replace function public\.softora_mailbox_contact_timeline/gi) || []).length, 1);
+  assert.match(aliasLineageTimelineMigration, /ancestor_walk[\s\S]*parent_member\.message_key = ancestor\.parent_message_key/i);
+  assert.match(aliasLineageTimelineMigration, /m\.search_document like \('%' \|\| p\.contact_email \|\| '%'\)/i);
+  assert.doesNotMatch(aliasLineageTimelineMigration, /allowed_lineage_contacts/i);
+  assert.match(aliasLineageTimelineMigration, /allowed_alias_origins[\s\S]*alias_match\.origin_contact_email/i);
+  assert.match(aliasLineageTimelineMigration, /softora_mailbox_account_owner\(provenance\.account_email\)[\s\S]*softora_mailbox_account_owner\(provenance\.account_email\)/i);
+  assert.match(aliasLineageTimelineMigration, /softora_mailbox_contact_scope\([\s\S]*v_owner_accounts, v_contact_email[\s\S]*v_physical_message_keys/i);
+});
+
+test('aliasantwoord blijft vóór fysieke Sent-sync zichtbaar via exact account- en ownergebonden accepted provenance', async () => {
+  const database = await createTimelineDatabase();
+  const accountEmail = 'contact.venvisuals@gmail.com';
+  const roleAddress = 'info@stroomvantaal.nl';
+  const replyAlias = 'liahesemans@xs4all.nl';
+  const rootMessageId = '<provenance-only-root@gmail.com>';
+  try {
+    await insertProvenance(database, {
+      intentId: 'provenance-only-root', owner: 'martijn', accountEmail,
+      recipientEmail: roleAddress, mode: 'new-message',
+      messageId: rootMessageId, senderName: 'Martijn van de Ven',
+      subject: 'Kleine vraag over jullie website', body: 'Verzonden root die nog niet via IMAP Sent is geïndexeerd.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:59:00Z',
+    });
+    await insertProvenance(database, {
+      intentId: 'provenance-only-wrong-owner-followup', owner: 'serve', accountEmail,
+      recipientEmail: roleAddress, mode: 'reply',
+      replyTargetMessageId: rootMessageId, references: rootMessageId,
+      messageId: '<provenance-only-wrong-owner-followup@gmail.com>',
+      senderName: 'Servé Creusen', subject: 'Re: Kleine vraag over jullie website',
+      body: 'Zelfde account en thread, maar een botsende owner.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:59:30Z',
+    });
+    await insertPhysical(database, {
+      key: 'provenance-only-alias-inbound', accountEmail, folder: 'inbox', uid: 170,
+      providerId: 'inbox:170', messageId: '<provenance-only-reply@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: accountEmail, subject: 'Re: Kleine vraag over jullie website',
+      body: 'Antwoord vóór de fysieke Sent-sync.', date: '2026-08-25T15:00:00Z',
+      searchDocument: replyAlias,
+    });
+    await insertPhysical(database, {
+      key: 'provenance-only-reference-nearmiss', accountEmail, folder: 'inbox', uid: 171,
+      providerId: 'inbox:171', messageId: '<provenance-only-nearmiss@gmail.com>',
+      inReplyTo: '<different-parent@gmail.com>', references: rootMessageId,
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: accountEmail, subject: 'Re: Kleine vraag over jullie website',
+      body: 'Alleen References is onvoldoende.', date: '2026-08-25T15:01:00Z',
+      searchDocument: replyAlias,
+    });
+    await insertPhysical(database, {
+      key: 'provenance-only-automated', accountEmail, folder: 'inbox', uid: 172,
+      providerId: 'inbox:172', messageId: '<provenance-only-auto@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: accountEmail, subject: 'Automatisch antwoord',
+      body: 'Afwezig.', date: '2026-08-25T15:02:00Z', searchDocument: replyAlias,
+      payload: { source: 'imap-sync', autoSubmitted: 'auto-replied' },
+    });
+
+    const otherAccount = 'serve@softora.nl';
+    await insertProvenance(database, {
+      intentId: 'provenance-only-other-account', owner: 'serve', accountEmail: otherAccount,
+      recipientEmail: roleAddress, mode: 'new-message', messageId: rootMessageId,
+      senderName: 'Servé Creusen', subject: 'Kleine vraag over jullie website',
+      body: 'Zelfde RFC-ID in ander account.', status: 'accepted', acceptedAt: '2026-08-25T14:58:00Z',
+    });
+    await insertPhysical(database, {
+      key: 'provenance-only-other-account-inbound', accountEmail: otherAccount,
+      folder: 'inbox', uid: 1, providerId: 'inbox:1',
+      messageId: '<provenance-only-other-account-reply@gmail.com>',
+      inReplyTo: rootMessageId, references: rootMessageId,
+      senderName: 'Lia Hesemans', senderEmail: replyAlias,
+      recipients: otherAccount, subject: 'Re: Kleine vraag over jullie website',
+      body: 'Ander account blijft buiten scope.', date: '2026-08-25T15:03:00Z',
+      searchDocument: replyAlias,
+    });
+
+    const physicalRoot = await database.query(`
+      select message_key
+      from public.softora_mailbox_messages
+      where account_email = $1
+        and public.softora_normalize_mailbox_message_id(message_id)
+          = public.softora_normalize_mailbox_message_id($2)
+    `, [accountEmail, rootMessageId]);
+    assert.deepEqual(physicalRoot.rows, []);
+
+    const timeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(timeline.rows.map((row) => row.message_key), [
+      'provenance-only-alias-inbound',
+      'accepted-send|provenance-only-root',
+    ]);
+    assert.ok(timeline.rows.every((row) => row.account_email === accountEmail));
+    assert.ok(timeline.rows.every((row) => row.external_contact_email === replyAlias));
+    assert.ok(timeline.rows.every((row) => Number(row.total_count) === 2));
+    assert.equal(new Set(timeline.rows.map((row) => row.technical_thread_key)).size, 1);
+    assert.ok(!timeline.rows.some((row) => /nearmiss|automated|other-account|wrong-owner/.test(row.message_key)));
+
+    const hidden = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'inbox',170,'inbox:170',2,true
+      )
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(hidden.rows.map((row) => row.message_key), [
+      'provenance-only-alias-inbound',
+    ]);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias])).rows, []);
+    assert.equal((await database.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = $1
+        and normalized_message_id = any(array[
+          'provenance-only-reply@gmail.com','provenance-only-root@gmail.com'
+        ]::text[])
+    `, [accountEmail])).rows[0].count, 2);
+    assert.deepEqual((await database.query(`
+      select message_key
+      from public.softora_mailbox_messages
+      where deleted_at is not null
+      order by message_key
+    `)).rows.map((row) => row.message_key), ['provenance-only-alias-inbound']);
+
+    const restored = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'inbox',170,'inbox:170',0,false
+      )
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(restored.rows.map((row) => row.message_key), [
+      'provenance-only-alias-inbound',
+    ]);
+    assert.equal((await database.query(`
+      select count(*)::integer as count
+      from public.softora_mailbox_message_tombstones
+      where account_email = $1
+    `, [accountEmail])).rows[0].count, 0);
+    assert.deepEqual((await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias])).rows.map((row) => row.message_key), [
+      'provenance-only-alias-inbound',
+      'accepted-send|provenance-only-root',
+    ]);
+
+    await insertPhysical(database, {
+      key: 'provenance-only-root-physical', accountEmail, folder: 'sent', uid: 173,
+      providerId: 'sent:173', messageId: rootMessageId,
+      senderName: 'Martijn van de Ven', senderEmail: accountEmail,
+      recipients: roleAddress, subject: 'Kleine vraag over jullie website',
+      body: 'De later gesynchroniseerde fysieke Sent-root.', date: '2026-08-25T14:59:00Z',
+      searchDocument: roleAddress,
+    });
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_roots (
+        message_key, account_email
+      ) values ('provenance-only-root-physical',$1)
+    `, [accountEmail]);
+    await database.query(`
+      insert into public.softora_mailbox_campaign_lineage_members (
+        message_key, account_email, message_id, parent_message_key,
+        root_message_key, root_message_id, lineage_depth, is_incoming,
+        is_proven_automated
+      ) values
+        ('provenance-only-root-physical',$1,'provenance-only-root@gmail.com',null,
+          'provenance-only-root-physical','provenance-only-root@gmail.com',0,false,false),
+        ('provenance-only-alias-inbound',$1,'provenance-only-reply@gmail.com',
+          'provenance-only-root-physical','provenance-only-root-physical',
+          'provenance-only-root@gmail.com',1,true,false)
+    `, [accountEmail]);
+    const transitionedTimeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(transitionedTimeline.rows.map((row) => row.message_key), [
+      'provenance-only-alias-inbound',
+      'provenance-only-root-physical',
+    ]);
+    assert.ok(!transitionedTimeline.rows.some((row) => /wrong-owner/.test(row.message_key)));
+
+    const transitionedHidden = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'inbox',170,'inbox:170',2,true
+      )
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(transitionedHidden.rows.map((row) => row.message_key).sort(), [
+      'provenance-only-alias-inbound',
+      'provenance-only-root-physical',
+    ]);
+    const transitionedRestored = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'inbox',170,'inbox:170',0,false
+      )
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(transitionedRestored.rows.map((row) => row.message_key).sort(), [
+      'provenance-only-alias-inbound',
+      'provenance-only-root-physical',
+    ]);
+
+    await insertProvenance(database, {
+      intentId: 'provenance-only-owner-conflict', owner: 'serve', accountEmail,
+      recipientEmail: roleAddress, mode: 'new-message', messageId: rootMessageId,
+      senderName: 'Servé Creusen', subject: 'Kleine vraag over jullie website',
+      body: 'Onmogelijke ownerbotsing binnen hetzelfde account en Message-ID.',
+      status: 'accepted', acceptedAt: '2026-08-25T14:57:00Z',
+    });
+    const conflictedTimeline = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [accountEmail, replyAlias]);
+    assert.deepEqual(conflictedTimeline.rows.map((row) => row.message_key), [
+      'provenance-only-alias-inbound',
+      'provenance-only-root-physical',
+    ]);
+    assert.ok(!conflictedTimeline.rows.some((row) => /owner-conflict/.test(row.message_key)));
   } finally {
     await database.close();
   }
