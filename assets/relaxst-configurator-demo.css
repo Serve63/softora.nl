@@ -77,11 +77,11 @@ button { color: inherit; }
 
 main { overflow: hidden; }
 .hero {
-  min-height: 380px;
-  padding: 72px clamp(24px, 7vw, 110px) 62px;
+  min-height: 300px;
+  padding: 38px clamp(24px, 7vw, 110px) 40px;
   display: grid;
   grid-template-columns: minmax(0, 780px) 1fr;
-  align-items: end;
+  align-items: center;
   position: relative;
 }
 .hero-copy { position: relative; z-index: 1; }

@@ -10,7 +10,7 @@ const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260825-4"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260825-5"/);
   assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js"/);
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
@@ -37,6 +37,7 @@ test('Relaxst demo includes responsive and accessible interaction states', () =>
   assert.match(css, /@media \(max-width: 700px\)/);
   assert.match(css, /white-space: nowrap/);
   assert.match(css, /white-space: normal/);
+  assert.match(css, /\.hero \{[\s\S]*?min-height: 300px;[\s\S]*?align-items: center;/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /:focus-visible/);
   assert.match(html, /aria-live="polite"/);
