@@ -3525,8 +3525,7 @@ begin
     });
     const keyB = `${syncKey}|gen:${generationB.prepared.target_generation_id}|1`;
 
-    await rejectsInSavepoint(
-      client,
+    await assert.rejects(
       () => client.query(`
         select * from public.softora_apply_mailbox_state_mutation_v2(
           $1,'inbox',1,'',$2,$3,$4,31,false,true
