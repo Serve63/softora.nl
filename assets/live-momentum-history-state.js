@@ -56,6 +56,7 @@
         period: options.periodKey,
         endGameMissionCard: options.getLegacyMissionState(),
         endGameCards: options.getEndGameState(),
+        heldDays: options.getHeldDays?.() || [],
         goals: getGoals().map(serializeGoal),
         retiredGoals: serializeRetiredGoals(),
         updatedAt: new Date().toISOString()

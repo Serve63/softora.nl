@@ -16,7 +16,7 @@ test('Winnen levert een toegankelijke maandgrafiek zonder locked toegang of pagi
   assert.match(html, /data-momentum-history-trigger[^>]*aria-label="Maandgemiddelde openen"[^>]*aria-haspopup="dialog"/);
   assert.match(html, /id="momentum-history-dialog"[^>]*aria-labelledby="momentum-history-title"/);
   assert.match(html, /data-momentum-history-close aria-label="Maandgemiddelde sluiten"/);
-  assert.match(html, /live-momentum-history\.js\?v=20260814a/);
+  assert.match(html, /live-momentum-history\.js\?v=20260825a/);
   assert.match(html, /live-momentum-history-ui\.js\?v=20260814b/);
   assert.match(html, /live-momentum-history\.css\?v=20260814b/);
   assert.doesNotMatch(locked, /momentum-history-trigger|momentum-history-dialog|live-momentum-history/);
