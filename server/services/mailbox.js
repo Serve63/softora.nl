@@ -2091,7 +2091,6 @@ function createMailboxService(deps = {}) {
   const { getMessageReadStatusResponse, markMessageReadResponse } = createMailboxReadMessageResponses({
     getMessageReadStatus, markMessageRead, logger, normalizeString,
   });
-
   const mailboxVisibility = createMailboxVisibilityService({
     getAccount,
     ...getInstantlyVisibilityDeps(instantlyMailboxService),
@@ -2109,6 +2108,7 @@ function createMailboxService(deps = {}) {
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
       confirmMailboxWebdesignOutboundRecipient, appendSentMessage, createImapClient, nodemailer,
       webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+      outboundRecipientGuardStore,
     },
     getAccount, instantlyMailboxService, mailboxComposeThreadContext,
     getSupabaseClient, attachmentSigningSecret: env.PREMIUM_SESSION_SECRET || '', mailboxSendProvenanceStore, mailboxAttachmentService: deps.mailboxAttachmentService, normalizeEmail, normalizeString, logger,

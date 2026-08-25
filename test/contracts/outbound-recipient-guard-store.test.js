@@ -119,6 +119,57 @@ test('outbound recipient guard schema keeps public roles locked out', () => {
   assert.match(schema, /revoke all on table public\.softora_outbound_recipient_guards from anon;/);
   assert.match(schema, /revoke all on table public\.softora_outbound_recipient_guards from authenticated;/);
   assert.match(schema, /grant select, insert, update, delete on public\.softora_outbound_recipient_guards to service_role;/);
+  assert.match(schema, /suppressed boolean not null default false/);
+  assert.match(schema, /suppression_reason text/);
+  assert.match(schema, /suppression_source text/);
+  assert.match(schema, /suppression_actor text/);
+  assert.match(schema, /suppressed_at timestamptz/);
+});
+
+test('outbound recipient suppression lookup matches only permanent suppression rows', async () => {
+  const calls = [];
+  const conflict = {
+    guard_key: 'company:blocked-bv',
+    recipient_company: 'Blocked BV',
+    suppressed: true,
+    permanent: true,
+  };
+  const client = {
+    from(table) {
+      return {
+        select(columns) {
+          const query = {
+            in(column, values) {
+              calls.push({ type: 'in', table, columns, column, values });
+              return query;
+            },
+            eq(column, value) {
+              calls.push({ type: 'eq', column, value });
+              return query;
+            },
+            async limit(count) {
+              calls.push({ type: 'limit', count });
+              return { data: [conflict], error: null };
+            },
+          };
+          return query;
+        },
+      };
+    },
+  };
+
+  const result = await createStore(client).findRecipientSuppressionConflict([
+    { recipientEmail: 'allowed@example.test' },
+    { recipientCompany: 'Blocked BV' },
+  ]);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.conflict.guard_key, 'company:blocked-bv');
+  assert.deepEqual(calls.find((call) => call.type === 'in').values, [
+    'email:allowed@example.test', 'domain:example-test', 'company:blocked-bv',
+  ]);
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'suppressed' && call.value === true), true);
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'permanent' && call.value === true), true);
 });
 
 test('outbound recipient guard store blocks a batch conflict before inserting', async () => {

@@ -107,6 +107,8 @@ function buildAgendaSupportRuntimeCompositionOptions({
       syncCooldownMs: envConfig.GOOGLE_CALENDAR_SYNC_COOLDOWN_MS,
     },
     resolveAppointmentCallId: platformRuntime.resolveAppointmentCallId,
+    isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+    getSupabaseClient: platformRuntime.getSupabaseClient,
   });
 }
 

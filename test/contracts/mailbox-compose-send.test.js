@@ -5,11 +5,16 @@ const { createMailboxComposeSend } = require('../../server/services/mailbox-comp
 const { MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION } = require('../../server/services/mailbox-compose-email-renderer');
 const { createMailboxSendProvenanceStore } = require('../../server/services/mailbox-send-provenance-store');
 
+function createAllowingSuppressionStore() {
+  return { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
+}
+
 test('mailbox compose returns the exact accepted sent message for immediate reconciliation', async () => {
   const sentAt = new Date('2026-08-05T14:05:06.000Z');
   const sentCopies = [];
   const reservations = [];
   const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
     getAccount: () => ({
       email: 'serve@softora.nl',
       name: 'Servé Creusen',
@@ -117,6 +122,63 @@ test('mailbox compose returns the exact accepted sent message for immediate reco
   });
 });
 
+test('mailbox compose blocks suppressed TO, CC or BCC recipients before provenance and SMTP', async () => {
+  let smtpCalls = 0;
+  let provenanceCalls = 0;
+  let checkedIdentities = [];
+  const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict(identities) {
+        checkedIdentities = identities;
+        return {
+          ok: true,
+          conflict: {
+            guard_key: 'domain:blocked-example',
+            recipient_domain: 'blocked-example',
+            suppressed: true,
+            permanent: true,
+          },
+        };
+      },
+    },
+    getAccount: () => ({
+      email: 'serve@softora.nl', smtpConfigured: true, smtpIdentityMatches: true,
+      smtpHost: 'smtp.example.test', smtpPort: 465, smtpSecure: true,
+      smtpUser: 'serve@softora.nl', smtpPass: 'secret',
+    }),
+    isValidEmail: (value) => /^[^@]+@[^@]+\.[^@]+$/.test(String(value || '')),
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, max) => String(value || '').slice(0, max),
+    createTransport: () => ({ sendMail: async () => { smtpCalls += 1; } }),
+    buildMailboxWebdesignSendParts: async () => null,
+    appendSentMessage: async () => true,
+    mailboxSendProvenanceStore: {
+      reserve: async () => { provenanceCalls += 1; return { created: true, intent: {} }; },
+    },
+  });
+
+  await assert.rejects(() => sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'allowed@example.test',
+    cc: 'contact@blocked.example',
+    bcc: 'audit@example.test',
+    subject: 'Mag niet weg',
+    text: 'Concept',
+    threadProvenance: {
+      intentId: 'send:suppressed', idempotencyKey: 'suppressed', owner: 'serve',
+      accountEmail: 'serve@softora.nl', recipientEmail: 'allowed@example.test',
+      mode: 'new-message', conversationId: '', messageId: '<planned@softora.nl>', provider: 'smtp',
+    },
+  }), (error) => error.code === 'OUTBOUND_RECIPIENT_SUPPRESSED' && error.status === 409);
+
+  assert.deepEqual(checkedIdentities.map((identity) => identity.recipientEmail), [
+    'allowed@example.test', 'contact@blocked.example', 'audit@example.test',
+  ]);
+  assert.equal(provenanceCalls, 0);
+  assert.equal(smtpCalls, 0);
+});
+
 test('mailbox compose stays fail-closed before SMTP when the isolated provenance guard remains unavailable', async () => {
   let provenanceCalls = 0;
   let smtpCalls = 0;
@@ -137,6 +199,7 @@ test('mailbox compose stays fail-closed before SMTP when the isolated provenance
     retryDelayMs: 0,
   });
   const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
     getAccount: () => ({
       email: 'serve@softora.nl', name: 'Servé Creusen', smtpConfigured: true,
       smtpIdentityMatches: true, smtpHost: 'smtp.example.test', smtpPort: 465,
@@ -188,6 +251,7 @@ test('mailbox compose starts and completes the Sent copy when provenance finaliz
   const finalizeError = new Error('Supabase accepted update timeout');
   finalizeError.code = '57014';
   const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
     getAccount: () => ({
       email: 'serve@softora.nl', name: 'Servé Creusen', smtpConfigured: true,
       smtpIdentityMatches: true, smtpHost: 'smtp.example.test', smtpPort: 465,

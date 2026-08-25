@@ -109,6 +109,9 @@ function createFixture(overrides = {}) {
         inReplyTo: '<message-1@example.com>',
         references: ['<message-1@example.com>'],
       })),
+    outboundRecipientGuardStore: overrides.outboundRecipientGuardStore || {
+      findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }),
+    },
   });
 
   return {
@@ -185,6 +188,33 @@ test('confirmation mail service exposes missing SMTP and IMAP env hints when con
     'MAIL_IMAP_USER',
     'MAIL_IMAP_PASS',
   ]);
+});
+
+test('confirmation mail blocks a suppressed company before SMTP', async () => {
+  const fixture = createFixture({
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict(identities) {
+        assert.equal(identities[0].recipientEmail, 'contact@blocked.example');
+        assert.equal(identities[0].recipientCompany, 'Blocked Company BV');
+        return {
+          ok: true,
+          conflict: {
+            guard_key: 'company:blocked-company-bv',
+            recipient_company: 'Blocked Company BV',
+            suppressed: true,
+            permanent: true,
+          },
+        };
+      },
+    },
+  });
+
+  await assert.rejects(() => fixture.service.sendConfirmationEmailViaSmtp({
+    appointment: { id: 43, company: 'Blocked Company BV' },
+    recipientEmail: 'contact@blocked.example',
+    draftText: 'Onderwerp: Afspraak\n\nTot snel.',
+  }), (error) => error.code === 'OUTBOUND_RECIPIENT_SUPPRESSED' && error.status === 409);
+  assert.equal(fixture.transportCalls.length, 0);
 });
 
 test('confirmation mail service syncs IMAP confirmation replies and marks matched mail as seen', async () => {

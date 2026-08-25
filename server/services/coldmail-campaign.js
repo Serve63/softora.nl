@@ -19,6 +19,7 @@ const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshne
 const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
 const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard');
+const { assertOutboundRecipientsNotSuppressed } = require('../security/outbound-mail-suppression');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const { markIncidentQuarantinedDesignPhotosAuthoritative, markMissingDesignPhotosAuthoritative } = require('./design-photo-generation-policy');
 const {
@@ -130,13 +131,11 @@ const {
 } = require('../config/coldmail-campaign');
 
 let cachedColdmailPreviewSharp = null;
-
 function loadColdmailPreviewSharpModule() {
   if (cachedColdmailPreviewSharp) return cachedColdmailPreviewSharp;
   cachedColdmailPreviewSharp = require('sharp');
   return cachedColdmailPreviewSharp;
 }
-
 function isExpectedDnsMiss(error) {
   return Boolean(
     error &&
@@ -155,7 +154,6 @@ function isExpectedDnsMiss(error) {
       ].includes(String(error.code || '').toUpperCase())
   );
 }
-
 async function resolveEmailDomainWithDoh(domain) {
   const value = String(domain || '').trim().toLowerCase().replace(/\.+$/g, '');
   if (!value || typeof fetch !== 'function') return false;
@@ -7235,6 +7233,10 @@ function createColdmailCampaignService(deps = {}) {
     const from = getParsedMailFromEmail(parsedMail);
     const messageId = normalizeString(parsedMail && parsedMail.messageId);
     const references = collectMessageReferenceHeader(parsedMail);
+    await assertOutboundRecipientsNotSuppressed({
+      outboundRecipientGuardStore, channel: 'coldmail-auto-reply',
+      identities: [{ recipientEmail: from.address, recipientCompany: getRowCompany(row) }],
+    });
     const mail = {
       from: formatMailFromHeader(senderEmail, delivery.account),
       to: from.address,
@@ -7248,13 +7250,11 @@ function createColdmailCampaignService(deps = {}) {
     await saveSentCopy(senderEmail, mail, info, delivery.account);
     return info;
   }
-
   function buildCustomerPhotoDataKey(row) {
     const id = getExplicitRowId(row);
     if (!id) return '';
     return `softora_database_photo_data_v1_${id.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 80)}`;
   }
-
   function readChunkedCustomerPhoto(values, photoKey, chunkCount = 0) {
     const key = normalizeString(photoKey);
     if (!key) return null;
