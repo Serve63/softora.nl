@@ -489,6 +489,7 @@ const {
   extractEmailAddresses,
   getAccountOwner: (accountEmail) => getOutboundSenderIdentity(accountEmail)?.profileKey || '',
   getCanonicalCampaignSubject,
+  getAccountDisplayName: (accountEmail) => getOutboundSenderIdentity(accountEmail)?.name || '',
   getMailboxMessageDirection,
   getMessageIdentity,
   getMessageReferenceIds,
@@ -877,9 +878,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
   const {
     mailboxIndexStore = null,
     dataOpsStore = null,
-    mailboxSendProvenanceStore = null, mailboxOutreachScope = null,
+    mailboxSendProvenanceStore = null, mailboxOutreachScope = null, outboundRecipientGuardStore = null,
   } = deps;
-
   async function listRepliesWithSnapshot({
     limit = 100,
     owner = '',
@@ -1085,10 +1085,10 @@ function createMailboxCampaignRepliesService(deps = {}) {
     // Fwd/FW prefix (TTV Irene is a real example). The recovery helper hydrates
     // only the conversations that can actually appear in the selected view.
     const quotedRecovery = await recoverQuotedOriginalSentMessages({
-      conversations: conversationsWithHistoricalReplies,
-      selectedAccountEmails: selectedMailboxAccounts,
-      limit: safeLimit,
-      mailboxIndexStore,
+      conversations: conversationsWithHistoricalReplies, selectedAccountEmails: selectedMailboxAccounts,
+      limit: safeLimit, mailboxIndexStore,
+      dataOpsStore, mailboxSendProvenanceStore,
+      outboundRecipientGuardStore, knownSentMessages: sentMessages,
     });
     const conversationsWithQuotedOriginals = quotedRecovery.conversations;
     const hydratedRecoveryByIdentity = quotedRecovery.hydratedByIdentity;
