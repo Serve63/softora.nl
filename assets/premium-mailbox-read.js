@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  const READ_STATE_CHANNEL = 'softora_mailbox_read_state_v2';
+  const READ_STATE_CHANNEL = 'softora_mailbox_read_state_v3';
 
   function normalize(value) {
     return String(value || '').trim().toLowerCase();
@@ -24,13 +24,20 @@
       const account = normalize(options.getAccount?.(mail) || mail.accountEmail);
       const folder = normalize(options.getFolder?.(mail) || mail.storageFolder || mail.folder || 'inbox');
       const owner = normalize(options.getOwner?.(mail) || mail.providerOwner);
-      if (!id || !account) return null;
-      return { owner, account, folder, id };
+      const messageKey = String(mail.messageKey || '').trim();
+      const messageId = String(mail.messageId || '').trim();
+      const provider = normalize(mail.provider || (folder === 'instantly' ? 'instantly' : ''));
+      const providerMessageId = String(mail.providerMessageId || '').trim();
+      if (!id || !account || !messageKey) return null;
+      return { owner, account, folder, id, messageKey, messageId, provider, providerMessageId };
     }
 
     function getIdentityKey(identity) {
       const source = identity && typeof identity === 'object' ? identity : {};
-      return [normalize(source.owner), normalize(source.account), normalize(source.folder), String(source.id || '').trim()].join('|');
+      const owner = normalize(source.owner);
+      const account = normalize(source.account);
+      const messageKey = String(source.messageKey || '').trim();
+      return owner && account && messageKey ? `message-key:${owner}|${account}|${messageKey}` : '';
     }
 
     function getConversationTargets(mail) {
@@ -230,7 +237,8 @@
     async function persist(mail, persistOptions = {}) {
       const requestId = options.getRequestId?.(mail);
       const account = options.getAccount?.(mail);
-      if (!mail || !requestId || !account) {
+      const identity = getIdentity(mail);
+      if (!mail || !requestId || !account || !identity) {
         return { ok: false, error: new Error('Gelezen status mist berichtprovenance') };
       }
       const payload = {
@@ -239,11 +247,14 @@
         id: requestId,
         uid: mail.uid,
         folder: options.getFolder?.(mail) || 'inbox',
+        messageKey: identity.messageKey,
+        messageId: identity.messageId,
+        provider: identity.provider,
+        providerMessageId: identity.providerMessageId,
         unread: persistOptions.unread === true,
         dismissReply: persistOptions.dismissReply === true,
       };
       if (stateOutbox && typeof stateOutbox.enqueue === 'function') {
-        const identity = getIdentity(mail);
         const identities = getConversationTargets(persistOptions.conversation || mail)
           .map(getIdentity)
           .filter(Boolean);

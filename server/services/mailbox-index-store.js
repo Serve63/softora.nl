@@ -354,7 +354,7 @@ function createMailboxIndexStore(deps = {}) {
     const softoraReadAt = normalizeString(row.softora_read_at);
     const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');
     const normalized = {
-      id: normalizeString(row.provider_id) || `${folder}:${uid}`,
+      id: normalizeString(row.provider_id) || `${folder}:${uid}`, messageKey: normalizeString(row.message_key),
       uid,
       folder,
       accountEmail: normalizeEmail(row.account_email),

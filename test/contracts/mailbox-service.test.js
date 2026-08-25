@@ -2669,6 +2669,8 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
       body: {
         account: 'serve@softora.nl',
         id: 'inbox:42',
+        messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
+        messageId: '<message-42@example.test>',
         mutationId: '00000000-0000-4000-8000-000000000042',
         revision: 42001,
       },
@@ -2688,6 +2690,8 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
   assert.equal(calls[0][1].accountEmail, 'serve@softora.nl');
   assert.equal(calls[0][1].folder, 'inbox');
   assert.equal(calls[0][1].uid, 42);
+  assert.equal(calls[0][1].messageKey, 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42');
+  assert.equal(calls[0][1].messageId, '<message-42@example.test>');
   assert.equal(calls[0][1].revision, 42001);
   assert.match(calls[0][1].mutationKey, /^[a-f0-9]{64}$/);
   assert.deepEqual(calls.slice(1), [
@@ -2733,6 +2737,8 @@ test('mailbox service handelt een antwoordherinnering pas na een geslaagde leesa
   await service.markMessageReadResponse({
     body: {
       account: 'serve@softora.nl', id: 'inbox:42', dismissReply: true,
+      messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
+      messageId: '<message-42@example.test>',
       mutationId: '00000000-0000-4000-8000-000000000043', revision: 43001,
     },
   }, res);
@@ -2779,6 +2785,8 @@ test('mailbox service maakt een tijdelijke Supabasefout retryable zonder raw fou
       account: 'serve290@gmail.com',
       id: 'inbox:259',
       uid: 259,
+      messageKey: 'serve290@gmail.com|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|259',
+      messageId: '<message-259@example.test>',
       mutationId: '00000000-0000-4000-8000-000000000259',
       revision: 259001,
       dismissReply: true,
@@ -2832,6 +2840,8 @@ test('mailbox statusresponse bevestigt exact dezelfde idempotente mutatie zonder
   });
   const payload = {
     account: 'serve290@gmail.com', id: 'inbox:259', uid: 259,
+    messageKey: 'serve290@gmail.com|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|259',
+    messageId: '<message-259@example.test>',
     mutationId: '00000000-0000-4000-8000-000000000259', revision: 259001,
     dismissReply: true,
   };
@@ -3284,6 +3294,7 @@ test('mailbox service rejects invalid mark-read message references', async () =>
       body: {
         account: 'serve@softora.nl',
         id: 'not-a-message',
+        messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
       },
     },
     res
@@ -3292,6 +3303,40 @@ test('mailbox service rejects invalid mark-read message references', async () =>
   assert.equal(res.statusCode, 400);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.error, 'Mailboxbericht niet gevonden.');
+});
+
+test('mailbox service weigert een oud UID-only readrecord vóór iedere index- of providerwrite', async () => {
+  let writes = 0;
+  const service = createMailboxService({
+    logger: { error() {} },
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl', name: 'Servé',
+      imapHost: 'imap.example.test', imapUser: 'serve@softora.nl', imapPass: 'secret',
+    }]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      applyStateMutation: async () => {
+        writes += 1;
+        return { ok: true, row: {} };
+      },
+    },
+    createImapClient: () => {
+      writes += 1;
+      return {};
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.markMessageReadResponse({
+    body: { account: 'serve@softora.nl', id: 'inbox:42', uid: 42 },
+  }, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.code, 'MAILBOX_STATE_IDENTITY_REQUIRED');
+  assert.equal(res.body.retryable, false);
+  assert.equal(writes, 0);
 });
 
 test('mailbox service rewrites compose draft through OpenAI with reply context', async () => {

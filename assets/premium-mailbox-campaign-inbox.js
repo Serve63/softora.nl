@@ -6,7 +6,7 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v16';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v17';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -728,11 +728,25 @@
       const sent = isSentMessageByProvenance(message, mail.accountEmail);
       const { body, contactHtml } = messagePresentation.getThreadPresentation(message, mail, { loading, loadError, sent, escapeHtml });
       if (!body && !contactHtml && !loading && !loadError) return '';
-      const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
+      const canonicalTimestamp = [message.receivedAt, message.internalDate]
+        .find((value) => Number.isFinite(Date.parse(String(value || '')))) || (
+          /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/.test(String(message.date || '').trim()) &&
+          Number.isFinite(Date.parse(String(message.date || '')))
+            ? message.date
+            : ''
+        );
+      const when = canonicalTimestamp && typeof formatDate === 'function'
+        ? formatDate(canonicalTimestamp)
+        : null;
+      const useDisplayFallback = (!canonicalTimestamp || !(when && (when.date || when.time))) &&
+        Boolean(message.date || message.time);
       const messageOwner = sent ? getMessageOwner(message) : '';
       const owner = messageOwner ? getOwnerLabel(messageOwner) : '';
       const sentLabel = messageOwner && messageOwner === mailboxOwner ? 'Jouw bericht' : 'Eerdere mail';
-      const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
+      const dateLabel = [
+        useDisplayFallback ? message.date : when && when.date,
+        useDisplayFallback ? message.time : when && when.time,
+      ].filter(Boolean).join(', ');
       const meta = [dateLabel, owner].filter(Boolean).join(' · ');
       const renderedBody = loadError
         ? `<div class="detail-mail-load-error" role="alert"><span>${escapeHtml(loadError)}</span><button type="button" data-mailbox-action="retry-thread-message" data-mailbox-id="${escapeHtml(mail.id)}" data-mailbox-thread-key="${escapeHtml(getActionMessageKey(message))}">Opnieuw proberen</button></div>`

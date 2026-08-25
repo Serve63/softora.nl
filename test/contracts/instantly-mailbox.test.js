@@ -1991,6 +1991,8 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
         providerOwner: 'serve',
         providerAccountEmail: 'serve-sender@example.com',
         providerMessageId: 'incoming-serve-1',
+        messageKey: 'instantly|incoming-serve-1',
+        messageId: '<incoming-serve-1@example.test>',
       };
     },
   };
@@ -2004,6 +2006,7 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
       return {
         ok: true,
         row: {
+          message_key: 'instantly|incoming-serve-1',
           unread: false,
           softora_read_at: '2026-08-05T15:51:00.000Z',
           reply_dismissed_at: null,
@@ -2042,6 +2045,8 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
             provider: 'instantly',
             providerMessageId: 'incoming-serve-1',
             providerOwner: 'serve',
+            messageKey: 'instantly|incoming-serve-1',
+            messageId: '<incoming-serve-1@example.test>',
             unread: true,
             subject: 'Re: Website',
             date: '2026-08-05T15:50:00.000Z',
@@ -2059,6 +2064,8 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
     accountEmail: 'serve-sender@example.com',
     folder: 'instantly',
     id: 'instantly:incoming-serve-1',
+    messageKey: 'instantly|incoming-serve-1',
+    messageId: '<incoming-serve-1@example.test>',
   });
   assert.equal(read.sourceMailboxMutated, false);
   assert.equal(imapCreated, false);

@@ -149,6 +149,7 @@ test('rapid conversation switching sends only the exact latest opened message co
     ...secondLatest,
     id: 'serve@softora.nl|coldmail:19', mailboxId: 'coldmail:19', uid: 19,
     email: 'stale@example.nl', replyTo: '', messageId: '<stale@example.nl>',
+    conversationId: 'conversation:stale-root',
     threadMessages: [secondLatest],
   };
   const current = new Map([[first.id, first], [second.id, second]]);

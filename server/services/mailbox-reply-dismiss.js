@@ -13,13 +13,15 @@ function createMailboxReplyDismissService(deps = {}) {
     logger = console,
   } = deps;
 
-  async function dismiss({ accountEmail, id, folder, uid }) {
+  async function dismiss({ accountEmail, id, folder, uid, messageKey, messageId }) {
     if (!canUseMailboxIndex() || typeof mailboxIndexStore?.markMessageReplyDismissed !== 'function') {
       const error = new Error('Softora-mailboxindex is niet beschikbaar; de antwoordherinnering blijft staan.');
       error.status = 503;
       throw error;
     }
-    const result = await mailboxIndexStore.markMessageReplyDismissed({ accountEmail, id, folder, uid });
+    const result = await mailboxIndexStore.markMessageReplyDismissed({
+      accountEmail, id, folder, uid, messageKey, messageId,
+    });
     if (result?.ok !== true) {
       const error = new Error(result?.error?.message || 'Antwoordherinnering kon niet duurzaam worden afgehandeld.');
       error.status = result?.unavailable ? 503 : 404;
@@ -27,6 +29,7 @@ function createMailboxReplyDismissService(deps = {}) {
       throw error;
     }
     const replyDismissedAt = result.dismissedAt || new Date().toISOString();
+    const resultRow = Array.isArray(result.data) ? result.data[0] : result.data;
     let snapshotUpdated = false;
     if (typeof getUiStateValues === 'function' && typeof setUiStateValues === 'function') {
       try {
@@ -34,7 +37,13 @@ function createMailboxReplyDismissService(deps = {}) {
         const rawValue = current?.values?.[MAILBOX_CAMPAIGN_SNAPSHOT_KEY] || '';
         const snapshotResult = markMailboxCampaignSnapshotReplyDismissed(
           rawValue,
-          { accountEmail, id, folder, uid },
+          {
+            accountEmail,
+            id,
+            folder,
+            uid,
+            messageKey: String(resultRow?.message_key || resultRow?.messageKey || messageKey || '').trim(),
+          },
           { dismissedAt: replyDismissedAt }
         );
         if (snapshotResult.changed) {

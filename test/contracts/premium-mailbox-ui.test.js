@@ -176,17 +176,17 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260824a/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260822a/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260825b/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260814a/);
-  assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260814b/);
-  assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260818a/);
+  assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260825c/);
+  assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260825c/);
   assert.match(page, /assets\/premium-mailbox-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
   assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260822a/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260825b/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260818b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260821a/);
@@ -195,7 +195,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260822a') < page.indexOf('premium-mailbox-signature.js?v=20260825a'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260825a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260822a'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260825b'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260821b'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260821b') < page.indexOf('premium-mailbox-index.js?v=20260821a'));
   assert.match(readSignatureScript(), /renderContactCard/);
@@ -921,6 +921,83 @@ test('historische inkomende en uitgaande kaarten tonen hun eigen bewezen Aan-rou
   assert.doesNotMatch(html, /Niet beschikbaar in bronbericht/);
   assert.equal((html.match(/Aan:<\/span>/g) || []).length, 2);
   assert.equal((html.match(/data-mailbox-routing-kind="direct"/g) || []).length, 3);
+});
+
+test('roze threadkaarten tonen Vandaag en de echte verzendtijd uit canonieke timestamps', () => {
+  const formattedInputs = [];
+  const formattedByTimestamp = new Map([
+    ['2026-08-25T13:01:00.000Z', { date: 'Vandaag', time: '15:01' }],
+    ['2026-08-18T09:23:00.000Z', { date: '18 augustus', time: '11:23' }],
+    ['2026-08-20T12:42:00.000Z', { date: '20 augustus', time: '14:42' }],
+  ]);
+  const html = campaignInboxModule.renderThreadMessages({
+    id: 'inbox:date-root',
+    accountEmail: 'serve@softora.nl',
+    threadMessages: [{
+      id: 'sent:today-normalized',
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-08-25T13:01:00.000Z',
+      date: 'Vandaag',
+      time: '15:01',
+      body: 'Eigen bericht van vandaag.',
+      hasBody: true,
+      bodyLoaded: true,
+    }, {
+      id: 'sent:older-normalized',
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      receivedAt: 'ongeldige-oude-weergave',
+      internalDate: '2026-08-18T09:23:00.000Z',
+      date: '18 augustus',
+      time: '00:00',
+      body: 'Ouder eigen bericht.',
+      hasBody: true,
+      bodyLoaded: true,
+    }, {
+      id: 'sent:raw-iso',
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      date: '2026-08-20T12:42:00.000Z',
+      body: 'Ruwe ISO-fallback.',
+      hasBody: true,
+      bodyLoaded: true,
+    }, {
+      id: 'sent:legacy-display',
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      date: '17 augustus',
+      time: '09:17',
+      body: 'Legacy weergavefallback.',
+      hasBody: true,
+      bodyLoaded: true,
+    }, {
+      id: 'sent:date-only-display',
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      date: '2026-08-16',
+      body: 'Datum zonder bewezen verzendtijd.',
+      hasBody: true,
+      bodyLoaded: true,
+    }],
+  }, String, (value) => {
+    formattedInputs.push(value);
+    return formattedByTimestamp.get(value) || { date: '', time: '' };
+  });
+
+  assert.deepEqual(formattedInputs, [
+    '2026-08-25T13:01:00.000Z',
+    '2026-08-18T09:23:00.000Z',
+    '2026-08-20T12:42:00.000Z',
+  ]);
+  assert.match(html, /Vandaag, 15:01 · Servé Creusen/);
+  assert.match(html, /18 augustus, 11:23 · Servé Creusen/);
+  assert.match(html, /20 augustus, 14:42 · Servé Creusen/);
+  assert.match(html, /17 augustus, 09:17 · Servé Creusen/);
+  assert.match(html, /2026-08-16 · Servé Creusen/);
+  assert.doesNotMatch(html, /2026-08-16, 02:00/);
+  assert.doesNotMatch(html, /18 augustus, 00:00/);
+  assert.equal((html.match(/detail-mail-section-sent/g) || []).length, 5);
 });
 
 test('premium mailbox rendert meerdere opgeslagen Karoena-berichten als losse kaarten', () => {
@@ -3749,7 +3826,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260824a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260822a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260822a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260825b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260821a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -4701,7 +4778,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260818b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260825b/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -5018,6 +5095,8 @@ test('send-ack werkt contacttijdlijn, lijstactiviteit en exact replytarget atomi
   const inbound = {
     id: 'martijn@softora.nl|inbox:58', mailboxId: 'inbox:58', uid: 58,
     folder: 'inbox', accountEmail: 'martijn@softora.nl', owner: 'martijn',
+    messageKey: 'martijn@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|58',
+    messageId: '<inbound-58@example.test>',
     receivedAt: '2026-08-08T10:12:00.000Z', unread: false, replyDismissedAt: '',
   };
   const root = {
@@ -5092,6 +5171,8 @@ test('send-ack werkt contacttijdlijn, lijstactiviteit en exact replytarget atomi
   assert.equal(writes.length, 1);
   assert.equal(writes[0].payload.id, inbound.id);
   assert.equal(writes[0].payload.uid, 58);
+  assert.equal(writes[0].payload.messageKey, inbound.messageKey);
+  assert.equal(writes[0].payload.messageId, inbound.messageId);
   assert.equal(writes[0].payload.dismissReply, true);
 });
 
@@ -5382,6 +5463,10 @@ test('gelezen status blijft direct stabiel bij traag succes, stale cache en pagi
     folder: 'instantly',
     accountEmail: 'servecreusen@websoftora.com',
     owner: 'serve',
+    messageKey: 'instantly|reply-1',
+    messageId: '<reply-1@example.test>',
+    provider: 'instantly',
+    providerMessageId: 'reply-1',
     unread: true,
   };
 
@@ -5415,10 +5500,14 @@ test('afhandelen blijft optimistic op gesprek en reply bij stale poll en vertraa
   let requestCount = 0;
   const latestReply = {
     id: 'inbox:reply-43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|43',
+    messageId: '<reply-43@example.test>',
     date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '',
   };
   const mail = {
     id: 'inbox:conversation-42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
+    messageId: '<conversation-42@example.test>',
     date: '2026-08-04T14:00:00.000Z', unread: false, threadMessages: [latestReply],
   };
   const controller = readModule.create({
@@ -5477,10 +5566,14 @@ test('afhandelen rolt gesprek en reply eenmalig terug bij backendfout', async ()
   const toasts = [];
   const latestReply = {
     id: 'inbox:reply-failed', uid: 51, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|51',
+    messageId: '<reply-failed@example.test>',
     unread: true, replyDismissedAt: '',
   };
   const mail = {
     id: 'inbox:conversation-failed', uid: 50, folder: 'inbox', accountEmail: 'serve@softora.nl', owner: 'serve',
+    messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|50',
+    messageId: '<conversation-failed@example.test>',
     unread: false, threadMessages: [latestReply],
   };
   const controller = readModule.create({
@@ -5550,6 +5643,8 @@ test('mislukte gelezen actie rolt exact terug en biedt een zichtbare retry', asy
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     owner: 'serve',
+    messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
+    messageId: '<read-failed@example.test>',
     unread: true,
     replyDismissedAt: '',
   };
@@ -5588,7 +5683,7 @@ test('gelezen status is eigenaargebonden en synchroniseert bevestigd tussen tabs
     ...baseOptions,
     fetch: async () => ({ ok: true, json: async () => ({ ok: true, result: { unread: false } }) }),
   });
-  const serve = { id: 'instantly:same-id', folder: 'instantly', accountEmail: 'shared@example.nl', owner: 'serve', unread: true };
+  const serve = { id: 'instantly:same-id', folder: 'instantly', accountEmail: 'shared@example.nl', owner: 'serve', messageKey: 'instantly|same-id', messageId: '<same-id@example.test>', provider: 'instantly', providerMessageId: 'same-id', unread: true };
   const martijn = { ...serve, owner: 'martijn', unread: true };
 
   assert.equal((await first.markRead(serve, { render() {} })).ok, true);
@@ -8067,7 +8162,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260822a/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260825b/);
   assert.match(pageSource, /premium-mailbox\.js\?v=20260824a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
@@ -9537,7 +9632,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v16:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v17:usr_serve:serve');
         return {
           ok: true,
           owner: 'serve',

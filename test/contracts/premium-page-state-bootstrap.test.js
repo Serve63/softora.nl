@@ -292,6 +292,7 @@ test('mailbox-bootstrap verzoent verse procescache met duurzame afgehandeld-stat
   let persisted = '';
   const initialMessage = {
     id: 'inbox:66',
+    messageKey: 'martijn@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|66',
     uid: 66,
     folder: 'inbox',
     accountEmail: 'martijn@softora.nl',
@@ -303,6 +304,7 @@ test('mailbox-bootstrap verzoent verse procescache met duurzame afgehandeld-stat
   };
   const newerCachedMessage = {
     id: 'inbox:67',
+    messageKey: 'martijn@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|67',
     uid: 67,
     folder: 'inbox',
     accountEmail: 'martijn@softora.nl',
@@ -348,6 +350,61 @@ test('mailbox-bootstrap verzoent verse procescache met duurzame afgehandeld-stat
   assert.equal(reloaded.mailbox.messages[0].unread, false);
   assert.equal(reloaded.mailbox.messages[0].replyDismissedAt, '2026-08-12T00:22:29.095Z');
   assert.equal(reloaded.mailbox.messages[1].id, 'inbox:67');
+  assert.equal(mailboxReads, 1);
+});
+
+test('mailbox-bootstrap neemt afgehandeld-status niet over naar dezelfde UID uit een nieuwe generatie', async () => {
+  let persisted = '';
+  let mailboxReads = 0;
+  const oldMessage = {
+    id: 'inbox:66-old',
+    messageKey: 'martijn@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|66',
+    messageId: '<old-generation@example.test>',
+    uid: 66,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'old@example.test',
+    unread: false,
+    replyDismissedAt: '2026-08-24T10:05:00.000Z',
+    subject: 'Oud bericht',
+    date: '2026-08-24T10:00:00.000Z',
+  };
+  const freshMessage = {
+    id: 'inbox:66-new',
+    messageKey: 'martijn@softora.nl|inbox|gen:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb|66',
+    messageId: '<new-generation@example.test>',
+    uid: 66,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'fresh@example.test',
+    unread: true,
+    replyDismissedAt: '',
+    subject: 'Nieuw bericht',
+    date: '2026-08-25T10:00:00.000Z',
+  };
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async (scope) => scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+      ? { values: persisted ? { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted } : {}, source: 'supabase' }
+      : { values: {}, source: 'supabase' },
+    mailboxCoordinator: {
+      listCampaignReplies: async () => {
+        mailboxReads += 1;
+        return { ok: true, messages: [freshMessage], sync: { source: 'campaign-replies-index' } };
+      },
+    },
+  });
+
+  const first = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+  assert.equal(first.mailbox.messages[0].replyDismissedAt, '');
+  persisted = serializeMailboxCampaignSnapshot(
+    { ok: true, messages: [oldMessage], sync: { source: 'campaign-replies-index' } },
+    { savedAt: '2026-08-25T10:05:00.000Z' }
+  );
+  const reloaded = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+
+  assert.equal(reloaded.mailbox.messages[0].messageKey, freshMessage.messageKey);
+  assert.equal(reloaded.mailbox.messages[0].unread, true);
+  assert.equal(reloaded.mailbox.messages[0].replyDismissedAt, '');
   assert.equal(mailboxReads, 1);
 });
 

@@ -20,8 +20,8 @@ test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duu
   const renders = [];
   const requests = [];
   const toasts = [];
-  const latestReply = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '' };
-  const mail = { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T14:00:00.000Z', unread: false, replyDismissedAt: '', threadMessages: [latestReply] };
+  const latestReply = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|43', messageId: '<message-43@example.test>', date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '' };
+  const mail = { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42', messageId: '<message-42@example.test>', date: '2026-08-04T14:00:00.000Z', unread: false, replyDismissedAt: '', threadMessages: [latestReply] };
   const controller = mailboxRead.create({
     getAccount: () => 'serve@softora.nl',
     getFolder: () => 'inbox',
@@ -54,6 +54,8 @@ test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duu
     url: '/api/mailbox/messages/read',
     body: {
       account: 'serve@softora.nl', owner: 'serve', id: 'inbox:43', uid: 43,
+      messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|43',
+      messageId: '<message-43@example.test>', provider: '', providerMessageId: '',
       folder: 'inbox', unread: false, dismissReply: true,
     },
   }]);

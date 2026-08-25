@@ -289,7 +289,7 @@
         if (exact === mail) return mail;
         return {
           ...exact,
-          conversationId: String(mail.conversationId || exact.conversationId || '').trim(),
+          conversationId: String(exact.conversationId || mail.conversationId || '').trim(),
           threadMessages: Array.isArray(mail.threadMessages) ? mail.threadMessages : [],
           campaign: exact.campaign || mail.campaign || null,
         };
@@ -298,7 +298,7 @@
       if (action.isRoot) return mail;
       return {
         ...action.message,
-        conversationId: String(mail.conversationId || action.message.conversationId || '').trim(),
+        conversationId: String(action.message.conversationId || mail.conversationId || '').trim(),
         threadMessages: Array.isArray(mail.threadMessages) ? mail.threadMessages : [],
         campaign: action.message.campaign || mail.campaign || null,
       };

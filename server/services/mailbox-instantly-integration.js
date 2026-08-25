@@ -116,6 +116,8 @@ async function markInstantlyMessageRead({
     id: `instantly:${stored.providerMessageId}`,
     folder: 'instantly',
     uid: 0,
+    messageKey: stored.messageKey,
+    messageId: stored.messageId,
   });
   if (result?.ok !== true) {
     const error = new Error('Gelezen status kon niet in Softora worden opgeslagen.');
