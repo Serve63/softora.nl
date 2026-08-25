@@ -1,6 +1,12 @@
 /* Keep the wide desktop dashboard inside the available iframe viewport.
    The activity table and planning list remain independently scrollable on
    shorter screens, while tablet and mobile keep the normal page flow. */
+.database-fill-toggle,
+.stat-card,
+.panel {
+  box-shadow: none;
+}
+
 @media (min-width: 1181px) {
   html,
   body {
