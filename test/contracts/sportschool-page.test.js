@@ -54,7 +54,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260825c/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260825d/);
   assert.match(pageSource, /assets\/sportschool-logboek-bootstrap\.js\?v=20260825a/);
   assert.match(bootstrapScriptSource, /remoteBootstrapVersion/);
   assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
@@ -190,7 +190,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.form-status-button\[data-status="up"\]/);
   assert.match(stylesSource, /\.form-status-button\[data-status="down"\]/);
   assert.match(stylesSource, /\.form-status-button\[data-status="same"\]/);
-  assert.match(stylesSource, /\.form-status-icon\s*\{[\s\S]*?width: 27px;[\s\S]*?height: 27px;/);
+  assert.match(stylesSource, /\.form-status-button\s*\{[\s\S]*?height: 28px;/);
+  assert.match(stylesSource, /\.form-status-icon\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;/);
   assert.match(stylesSource, /\.form-status-icon-shape\s*\{[\s\S]*?stroke-width: 4;/);
   assert.doesNotMatch(stylesSource, /\.exercise-complete/);
   assert.match(stylesSource, /\.completion-action\s*\{[\s\S]*?background: #3d945c;[\s\S]*?pointer-events: none;/);
