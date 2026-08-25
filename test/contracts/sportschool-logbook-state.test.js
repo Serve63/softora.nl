@@ -13,11 +13,11 @@ const {
   setFormSessionStatus,
 } = require('../../assets/sportschool-logboek-state');
 
-test('vormstatus doorloopt per tik rood omlaag, geel gelijk en groen omhoog', () => {
+test('vormstatus doorloopt per tik rood omlaag, geel gelijk, groen omhoog en weer leeg', () => {
   assert.equal(nextFormStatus(''), 'down');
   assert.equal(nextFormStatus('down'), 'same');
   assert.equal(nextFormStatus('same'), 'up');
-  assert.equal(nextFormStatus('up'), 'down');
+  assert.equal(nextFormStatus('up'), '');
 });
 
 test('vormgeschiedenis schuift per trainingsdatum en reserveert rechts een leeg vak voor vandaag', () => {
@@ -44,6 +44,18 @@ test('vormgeschiedenis schuift per trainingsdatum en reserveert rechts een leeg 
     { date: '2026-08-18', status: 'down', isCurrent: false },
     { date: '2026-08-25', status: 'up', isCurrent: true },
   ]);
+
+  const clearedHistory = setFormSessionStatus(nextHistory, '2026-08-25', '');
+  assert.deepEqual(clearedHistory, [
+    { date: '2026-08-11', status: 'same' },
+    { date: '2026-08-18', status: 'down' },
+  ]);
+  assert.deepEqual(buildFormSessionSlots(clearedHistory, '2026-08-25', true), [
+    { date: '2026-08-11', status: 'same', isCurrent: false },
+    { date: '2026-08-18', status: 'down', isCurrent: false },
+    { date: '2026-08-25', status: '', isCurrent: true },
+  ]);
+  assert.deepEqual(setFormSessionStatus(nextHistory, '2026-08-25', 'onbekend'), nextHistory);
 });
 
 test('dezelfde trainingsdatum schuift na herladen niet nogmaals door', () => {
