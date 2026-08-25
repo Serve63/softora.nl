@@ -77,7 +77,7 @@
       const goals = [...value.goals, ...(Array.isArray(value.retiredGoals) ? value.retiredGoals : [])]
         .map((goal) => normalizeGoal(goal, period))
         .filter((goal) => goal.activeFromDay);
-      return { period, goals };
+      return { period, goals, heldDays: uniqueDays(value?.heldDays, period.lastDay) };
     } catch (_error) {
       return null;
     }
@@ -96,6 +96,7 @@
   }
 
   function scoreDay(snapshot, day) {
+    if (snapshot.heldDays?.includes(day)) return null;
     const activeGoals = snapshot.goals.filter((goal) => (
       goal.activeFromDay <= day && goal.activeUntilDay >= day
     ));

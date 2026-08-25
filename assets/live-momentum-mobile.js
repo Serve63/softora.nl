@@ -23,7 +23,8 @@
     endGameGoals: document.querySelector('.end-game-goals')
   };
 
-  function getMessage(score, completed, total) {
+  function getMessage(score, completed, total, noData = false) {
+    if (noData) return ['Deze dag staat op geen data en telt niet mee.', 'Klik op de datum om te herstellen.'];
     if (!total || !completed) return ['Kies één doel en zet de dag in beweging.', 'Begin met één.'];
     if (score < 50) return ['De eerste winst staat. Pak nu het volgende doel.', `${total - completed} te gaan.`];
     if (score < 100) return ['Je hebt momentum. Maak de dag nu af.', `${total - completed} te gaan.`];
@@ -32,15 +33,18 @@
 
   function syncSummary() {
     const todayCells = Array.from(grid.querySelectorAll('.status.is-today'));
+    const noData = todayCells.some((cell) => cell.classList.contains('is-on-hold'));
     const completed = todayCells.filter((cell) => cell.classList.contains('is-done')).length;
-    const total = todayCells.length;
+    const total = noData ? 0 : todayCells.length;
     const score = total ? Math.round((completed / total) * 100) : 0;
-    const [summaryMessage, summaryNextStep] = getMessage(score, completed, total);
+    const [summaryMessage, summaryNextStep] = getMessage(score, completed, total, noData);
 
     scoreRing?.style.setProperty('--momentum-mobile-score', `${score * 3.6}deg`);
     scoreRing?.setAttribute('aria-valuenow', String(score));
-    if (scoreValue) scoreValue.textContent = `${score}%`;
-    if (completedValue) completedValue.textContent = `${completed} / ${total}`;
+    if (noData) scoreRing?.setAttribute('aria-valuetext', 'Geen data');
+    else scoreRing?.removeAttribute('aria-valuetext');
+    if (scoreValue) scoreValue.textContent = noData ? '—' : `${score}%`;
+    if (completedValue) completedValue.textContent = noData ? 'Geen data' : `${completed} / ${total}`;
     if (message) message.textContent = summaryMessage;
     if (nextStep) nextStep.textContent = summaryNextStep;
   }

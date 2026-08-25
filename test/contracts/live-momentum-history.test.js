@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const history = require('../../assets/live-momentum-history');
 const historyState = require('../../assets/live-momentum-history-state');
 
-function snapshot(period, goals, retiredGoals = []) {
-  return JSON.stringify({ version: 2, period, goals, retiredGoals });
+function snapshot(period, goals, retiredGoals = [], heldDays = []) {
+  return JSON.stringify({ version: 2, period, goals, retiredGoals, heldDays });
 }
 
 function values(entries) {
@@ -25,6 +25,23 @@ test('maandgemiddelde start op de vroegste werkelijk geregistreerde dag en telt 
   assert.equal(result.months[0].days[0].score, 100);
   assert.equal(result.months[0].days[2].score, 0);
   assert.equal(result.months[0].average, (200 / 19));
+});
+
+test('dagen op geen data verdwijnen uit de maandscore terwijl gewone 0%-dagen blijven meetellen', () => {
+  const result = history.buildMonthlyAverages(values([['2026-08', snapshot('2026-08', [
+    { activeFromDay: 18, doneDays: [18] },
+  ], [], [20])]]), new Date('2026-08-21T12:00:00.000Z'));
+  const month = result.months[0];
+
+  assert.deepEqual(month.days.map((day) => day.day), [18, 19, 21]);
+  assert.deepEqual(month.days.map((day) => day.score), [100, 0, 0]);
+  assert.equal(month.dayCount, 3);
+  assert.equal(month.average, 100 / 3);
+});
+
+test('historische score blijft achterwaarts compatibel zonder heldDays-veld', () => {
+  const result = history.scoreDay({ goals: [{ activeFromDay: 1, activeUntilDay: 31, doneDays: [] }] }, 20);
+  assert.equal(result.score, 0);
 });
 
 test('volledige maand, schrikkeljaar en maandgrens gebruiken alle kalenderdagen', () => {
@@ -123,6 +140,7 @@ test('verwijderde doelen blijven als historische waarheid tot de vorige tracked 
     version: 2,
     normalizeGoal: (goal) => ({ ...goal }),
     getGoals: () => [{ id: 'active', label: 'Actief', activeFromDay: 1, doneDays: [] }],
+    getHeldDays: () => [6, 7],
     getLegacyMissionState: () => null,
     getEndGameState: () => ({})
   });
@@ -133,4 +151,5 @@ test('verwijderde doelen blijven als historische waarheid tot de vorige tracked 
   assert.equal(stored.retiredGoals.length, 1);
   assert.equal(stored.retiredGoals[0].activeUntilDay, 10);
   assert.deepEqual(stored.retiredGoals[0].doneDays, [4, 5]);
+  assert.deepEqual(stored.heldDays, [6, 7]);
 });

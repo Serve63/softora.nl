@@ -32,6 +32,7 @@
   const goalActionsApi = window.SoftoraMomentumGoalActions;
   const endGameCardsApi = window.SoftoraMomentumEndGameCards;
   const historyStateApi = window.SoftoraMomentumHistoryState;
+  const dayHoldApi = window.SoftoraMomentumDayHold;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
     { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [], touchedDays: [] },
@@ -60,7 +61,7 @@
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let draggedGoalId = '';
-  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !endGameProgress || !goalActionsApi || !endGameCardsApi || !historyStateApi) {
+  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !endGameProgress || !goalActionsApi || !endGameCardsApi || !historyStateApi || !dayHoldApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -83,6 +84,7 @@
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
   const isEmpty = (cell) => cell.classList.contains('is-empty');
   const formatDay = (day) => `${day} ${PERIOD.label.toLocaleLowerCase('nl-NL')}`;
+  const dayHold = dayHoldApi.createController({ grid, chart, lastDay: PERIOD.lastDay, getToday: () => TODAY, getStatusCells, getDay, formatDay, isReady: () => stateReady, onChange: () => { refreshCellData(); updateChart(); markStateChanged(); } });
   const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
   const getIcon = (key) => ICONS_BY_KEY.get(key) || ICONS_BY_KEY.get(DEFAULT_ICON_KEY) || null;
   function sanitizeDayList(value) {
@@ -126,7 +128,7 @@
       activeFromDay
     };
   }
-  const historyState = historyStateApi.createController({ stateKey: STATE_KEY, maxRetiredGoals: MAX_GOALS * 4, period: PERIOD, periodKey: PERIOD_KEY, version: STATE_VERSION, normalizeGoal, getGoals: getCurrentGoals, getLegacyMissionState: endGameCards.getLegacyMissionState, getEndGameState: endGameCards.getState });
+  const historyState = historyStateApi.createController({ stateKey: STATE_KEY, maxRetiredGoals: MAX_GOALS * 4, period: PERIOD, periodKey: PERIOD_KEY, version: STATE_VERSION, normalizeGoal, getGoals: getCurrentGoals, getHeldDays: dayHold.getState, getLegacyMissionState: endGameCards.getLegacyMissionState, getEndGameState: endGameCards.getState });
   function removeLegacyTrailingGoalPlaceholders(goals) {
     const cleanedGoals = [...goals];
     let needsMigration = false;
@@ -193,6 +195,7 @@
       }
       return {
         goals,
+        heldDays: sanitizeDayList(parsed.heldDays).filter((day) => day <= TODAY),
         retiredGoals: (Array.isArray(parsed.retiredGoals) ? parsed.retiredGoals : []).slice(0, MAX_GOALS * 4).map(historyState.normalizeRetiredGoal).filter(Boolean),
         needsMigration:
           parsed.version !== STATE_VERSION ||
@@ -230,8 +233,7 @@
         return null;
       }
       return {
-        goals,
-        retiredGoals: [],
+        goals, heldDays: [], retiredGoals: [],
         needsMigration: true,
         endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
       };
@@ -347,27 +349,21 @@
     const day = getDay(cell);
     const checked = isChecked(cell);
     const tracked = isTracked(cell);
-    const empty = isEmpty(cell);
-    const missed = tracked && !checked && day > 0 && day <= TODAY;
+    const empty = isEmpty(cell), held = dayHold.isHeld(day);
+    const missed = !held && tracked && !checked && day > 0 && day <= TODAY;
     cell.classList.toggle('is-missed', missed);
-    cell.setAttribute('role', 'checkbox'); cell.setAttribute('aria-disabled', String(day > TODAY));
-    cell.setAttribute('tabindex', day > TODAY ? '-1' : '0');
+    cell.setAttribute('role', 'checkbox'); cell.setAttribute('aria-disabled', String(day > TODAY || held));
+    cell.setAttribute('tabindex', day > TODAY || held ? '-1' : '0');
     cell.setAttribute('aria-checked', checked ? 'true' : 'false');
-    const statusLabel = day > TODAY ? ', nog niet beschikbaar' : checked ? ', afgerond' : empty ? ', leeg' : tracked ? ', niet afgerond' : ', nog niet bijgehouden';
+    const statusLabel = held ? ', geen data' : day > TODAY ? ', nog niet beschikbaar' : checked ? ', afgerond' : empty ? ', leeg' : tracked ? ', niet afgerond' : ', nog niet bijgehouden';
     cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${statusLabel}`);
   }
   function getDayScore(day) {
-    const statusCells = getStatusCells(); const goalRows = getGoalRows();
-    const cellsForDay = statusCells.filter((cell) => getDay(cell) === day
-      && historyState.isActiveRow(goalRows[Number(cell.dataset.task || 0)], day));
-    const checkedCount = cellsForDay.filter(isChecked).length;
-    if (!cellsForDay.length) {
-      return null;
-    }
-    return Math.round((checkedCount / cellsForDay.length) * 100);
+    return dayHold.scoreDay({ day, statusCells: getStatusCells(), goalRows: getGoalRows(), getDay, isChecked,
+      isHeld: dayHold.isHeld, isActiveRow: historyState.isActiveRow });
   }
   function ensureBarLabel(wrap) {
-    let label = wrap.querySelector('.bar-label');
+    let label = wrap.querySelector('.bar-label:not(.bar-no-data-label)');
     const bar = wrap.querySelector('.bar');
     if (!label && bar) {
       label = document.createElement('span');
@@ -403,12 +399,13 @@
     }
     wrap.style.setProperty('--bar-height', `${barHeight}px`);
     bar.style.setProperty('--bar-height', `${barHeight}px`);
-    const label = shouldShowScore ? ensureBarLabel(wrap) : wrap.querySelector('.bar-label');
+    const label = shouldShowScore ? ensureBarLabel(wrap) : wrap.querySelector('.bar-label:not(.bar-no-data-label)');
     if (shouldShowScore && label) {
       label.textContent = `${score}%`;
     } else if (label) {
       label.remove();
     }
+    dayHold.syncChartDay(wrap, bar, day);
   }
   function updateScore() {
     if (!TODAY) {
@@ -417,10 +414,11 @@
       }
       return;
     }
-    const score = getDayScore(TODAY);
-    const safeScore = Number.isFinite(score) ? score : 0;
+    const score = getDayScore(TODAY), noData = dayHold.isHeld(TODAY);
     if (srSummary) {
-      srSummary.textContent = `${formatDay(TODAY)} is vandaag met een momentumscore van ${safeScore} procent.`;
+      srSummary.textContent = noData
+        ? `${formatDay(TODAY)} is vandaag op geen data gezet.`
+        : `${formatDay(TODAY)} is vandaag met een momentumscore van ${Number.isFinite(score) ? score : 0} procent.`;
     }
   }
   function updateChart() {
@@ -460,6 +458,7 @@
   }
   function refreshCellData() {
     const statusCells = getStatusCells(), headers = grid.querySelectorAll('.habit-day');
+    dayHold.syncGrid();
     statusCells.forEach((cell, index) => {
       const day = DAYS[index % TOTAL_DAYS];
       const task = Math.floor(index / TOTAL_DAYS);
@@ -800,7 +799,7 @@
       header.className = 'habit-day';
       header.setAttribute('role', 'columnheader');
       header.classList.toggle('is-muted', day < PERIOD.startDay);
-      header.innerHTML = `<span>${PERIOD.shortLabel}</span><b>${day}</b>`;
+      dayHold.decorateHeader(header, day, PERIOD.shortLabel);
       fragment.append(header);
     });
     goals.forEach((goal, index) => {
@@ -954,6 +953,7 @@
     }
     const storedState = resolveStoredState(response.values || {});
     historyState.hydrate(response.values, storedState?.retiredGoals);
+    dayHold.hydrate(storedState?.heldDays);
     renderGridShell(storedState?.goals || getDefaultGoals());
     endGameCards.render(storedState?.endGameCards);
     refreshCellData();
@@ -1068,7 +1068,7 @@
       return;
     }
     const cell = event.target.closest('.status');
-    if (!cell || !grid.contains(cell) || getDay(cell) > TODAY) {
+    if (!cell || !grid.contains(cell) || getDay(cell) > TODAY || dayHold.isHeld(getDay(cell))) {
       return;
     }
     toggleCell(cell);
@@ -1092,7 +1092,7 @@
       return;
     }
     const cell = event.target.closest('.status');
-    if (!cell || !grid.contains(cell) || getDay(cell) > TODAY || ![' ', 'Enter'].includes(event.key)) {
+    if (!cell || !grid.contains(cell) || getDay(cell) > TODAY || dayHold.isHeld(getDay(cell)) || ![' ', 'Enter'].includes(event.key)) {
       return;
     }
     event.preventDefault();
