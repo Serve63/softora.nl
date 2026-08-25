@@ -2842,7 +2842,7 @@ test('mailbox index store weigert elke directe statuswrite zonder generatievaste
 
 test('generatievaste mailbox state mutation v2 is atomisch en alleen voor service_role uitvoerbaar', () => {
   const migration = fs.readFileSync(
-    path.resolve(__dirname, '../../supabase/migrations/20260825143830_mailbox_state_mutation_strong_identity.sql'),
+    path.resolve(__dirname, '../../supabase/migrations/20260825145746_mailbox_state_mutation_strong_identity.sql'),
     'utf8'
   );
   assert.match(migration, /softora_apply_mailbox_state_mutation_v2/);

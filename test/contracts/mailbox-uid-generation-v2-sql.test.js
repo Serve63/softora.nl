@@ -24,7 +24,7 @@ const targetManifestCheckpointMigration = fs.readFileSync(path.join(
 ), 'utf8');
 const strongIdentityMutationMigration = fs.readFileSync(path.join(
   repoRoot,
-  'supabase/migrations/20260825143830_mailbox_state_mutation_strong_identity.sql'
+  'supabase/migrations/20260825145746_mailbox_state_mutation_strong_identity.sql'
 ), 'utf8');
 const schema = fs.readFileSync(path.join(repoRoot, 'supabase/data-ops-schema.sql'), 'utf8');
 

@@ -49,7 +49,7 @@ if (!databaseUrl) {
   ), 'utf8');
   const strongIdentityMutationMigration = fs.readFileSync(path.resolve(
     __dirname,
-    '../../supabase/migrations/20260825143830_mailbox_state_mutation_strong_identity.sql'
+    '../../supabase/migrations/20260825145746_mailbox_state_mutation_strong_identity.sql'
   ), 'utf8');
   const sendProvenanceFoundation = fs.readFileSync(path.resolve(
     __dirname,
