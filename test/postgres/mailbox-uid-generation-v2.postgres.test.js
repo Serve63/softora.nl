@@ -4414,4 +4414,781 @@ begin
     assert.match(indexes[0].indexdef, /\(active_uid_generation_id\).*WHERE \(active_uid_generation_id IS NOT NULL\)/i);
     assert.match(indexes[1].indexdef, /\(pending_uid_generation_id\).*WHERE \(pending_uid_generation_id IS NOT NULL\)/i);
   });
+
+// mailbox-final-activation-scale-regression:start
+  test('800 Sent-rijen finaliseren met echte resolver, state-erfenis, outbound guards en timeoutreplay', async (t) => {
+    const client = await connect();
+    const scaleMigration = fs.readFileSync(path.resolve(
+      __dirname,
+      '../../supabase/migrations/20260825001646_scale_mailbox_final_activation.sql'
+    ), 'utf8');
+    const lineageResolverMigration = fs.readFileSync(path.resolve(
+      __dirname,
+      '../../supabase/migrations/20260817132639_deduplicate_mailbox_lineage_resolver_results.sql'
+    ), 'utf8');
+    const outboundGuardLedgerMigration = fs.readFileSync(path.resolve(
+      __dirname,
+      '../../supabase/migrations/20260818142317_mailbox_outbound_guard_ledger.sql'
+    ), 'utf8');
+
+    function sentSnapshotRows({
+      accountEmail,
+      count,
+      messageNamespace,
+      providerNamespace,
+      recipientDomain,
+      updatedAt,
+    }) {
+      const rootMessageId = `${messageNamespace}-1@test.softora.nl`;
+      return Array.from({ length: count }, (_, index) => {
+        const uid = index + 1;
+        const recipient = `recipient-${uid}@${recipientDomain}`;
+        return messageRow(uid, `${providerNamespace}-${uid}`, {
+          account_email: accountEmail,
+          folder: 'sent',
+          message_id: `${messageNamespace}-${uid}@test.softora.nl`,
+          in_reply_to: uid === 1 ? null : rootMessageId,
+          references_text: uid === 1 ? null : `<${rootMessageId}>`,
+          sender_name: 'Softora',
+          sender_email: accountEmail,
+          recipients_text: recipient,
+          subject: uid === 1
+            ? 'Kleine vraag over jullie website'
+            : 'Re: Kleine vraag over jullie website',
+          unread: true,
+          starred: false,
+          payload: {
+            source: 'imap-sync',
+            direction: 'sent',
+            originalCampaignOutbound: true,
+            toDisplay: recipient,
+          },
+          updated_at: updatedAt,
+        });
+      });
+    }
+
+    async function resolverCallCount() {
+      return Number((await client.query(`
+        select call_count from public.softora_mailbox_lineage_test_metrics
+        where operation='resolver'
+      `)).rows[0].call_count);
+    }
+
+    async function resetResolverCallCount() {
+      await client.query(`
+        update public.softora_mailbox_lineage_test_metrics
+        set call_count=0 where operation='resolver'
+      `);
+    }
+
+    async function finalizationSnapshot({
+      syncKey,
+      generationId,
+      commitId,
+      recipientEmail,
+    }) {
+      return (await client.query(`
+        select
+          state.active_uid_generation_id::text as active_generation_id,
+          state.pending_uid_generation_id::text as pending_generation_id,
+          state.status,
+          state.lock_token,
+          (select pg_catalog.count(*)::integer
+            from public.softora_mailbox_messages as message
+            where message.uid_generation_id=$2::uuid) as generation_rows,
+          (select pg_catalog.count(*)::integer
+            from public.softora_mailbox_uid_generation_commits as mutation
+            where mutation.commit_id=$3) as commit_rows,
+          (select pg_catalog.count(*)::integer
+            from public.softora_outbound_recipient_guards as outbound_guard
+            where outbound_guard.key_type='email'
+              and outbound_guard.key_value=$4) as recipient_guards,
+          (select pg_catalog.count(*)::integer
+            from public.softora_mailbox_campaign_lineage_roots as root
+            where root.account_email=state.account_email) as roots,
+          (select pg_catalog.count(*)::integer
+            from public.softora_mailbox_message_lineage_edges as edge
+            where edge.account_email=state.account_email) as edges,
+          (select pg_catalog.count(*)::integer
+            from public.softora_mailbox_campaign_lineage_members as member
+            where member.account_email=state.account_email) as members,
+          (select pg_catalog.count(*)::integer
+            from public.softora_mailbox_campaign_lineage_discoveries as discovery
+            where discovery.account_email=state.account_email
+              and discovery.active) as active_discoveries
+        from public.softora_mailbox_sync_state as state
+        where state.sync_key=$1
+      `, [syncKey, generationId, commitId, recipientEmail])).rows[0];
+    }
+
+    // The historical resolver migration contains the production SQL, while
+    // the original compact fixture used an inlined approximation. Supply its
+    // real dependencies and table shape before wrapping the resolver solely to
+    // count actual calls made by the production rebuild path.
+    await client.query(`
+      alter table public.softora_mailbox_campaign_lineage_discoveries
+        add column if not exists last_confirmed_at timestamptz
+          not null default pg_catalog.clock_timestamp();
+      create unique index if not exists
+        softora_mailbox_campaign_lineage_discoveries_message_root_idx
+        on public.softora_mailbox_campaign_lineage_discoveries(
+          message_key,root_message_key
+        );
+      alter table public.softora_mailbox_campaign_lineage_members
+        add column if not exists message_date timestamptz,
+        add column if not exists is_incoming boolean not null default false,
+        add column if not exists is_proven_automated boolean not null default false,
+        add column if not exists lineage_discovered_at timestamptz,
+        add column if not exists updated_at timestamptz
+          not null default pg_catalog.clock_timestamp();
+
+      create table public.softora_outbound_recipient_guards (
+        guard_key text primary key,
+        key_type text not null,
+        key_value text not null,
+        reservation_id text,
+        provider text,
+        channel text,
+        sender_email text,
+        recipient_email text,
+        recipient_domain text,
+        recipient_company_key text,
+        recipient_id text,
+        recipient_company text,
+        status text not null default 'reserved',
+        source text not null default 'unknown',
+        actor text,
+        permanent boolean not null default false,
+        payload jsonb not null default '{}'::jsonb,
+        expires_at timestamptz,
+        last_seen_at timestamptz not null default pg_catalog.clock_timestamp(),
+        created_at timestamptz not null default pg_catalog.clock_timestamp(),
+        updated_at timestamptz not null default pg_catalog.clock_timestamp()
+      );
+      create unique index softora_outbound_recipient_guards_key_idx
+        on public.softora_outbound_recipient_guards(key_type,key_value);
+      alter table public.softora_outbound_recipient_guards enable row level security;
+      revoke all on table public.softora_outbound_recipient_guards
+        from public,anon,authenticated;
+      grant select,insert,update,delete
+        on public.softora_outbound_recipient_guards to service_role;
+
+      create or replace function public.softora_is_mailbox_campaign_root(
+        p_folder text,p_subject text,p_in_reply_to text,
+        p_references_text text,p_payload jsonb
+      ) returns boolean
+      language sql immutable security invoker set search_path=''
+      as $function$
+        select (
+          pg_catalog.lower(pg_catalog.btrim(coalesce(p_folder,'')))='sent'
+          or (
+            pg_catalog.lower(pg_catalog.btrim(coalesce(p_folder,'')))='instantly'
+            and pg_catalog.lower(pg_catalog.btrim(coalesce(
+              coalesce(p_payload,'{}'::jsonb)->>'direction',''
+            )))='sent'
+          )
+        ) and (
+          pg_catalog.lower(pg_catalog.btrim(coalesce(
+            coalesce(p_payload,'{}'::jsonb)->>'originalCampaignOutbound',''
+          )))='true'
+          or (
+            nullif(pg_catalog.btrim(coalesce(p_in_reply_to,'')),'') is null
+            and nullif(pg_catalog.btrim(coalesce(p_references_text,'')),'') is null
+            and pg_catalog.regexp_replace(
+              pg_catalog.lower(pg_catalog.btrim(coalesce(p_subject,''))),
+              '^\\s*((re|fw|fwd)\\s*:\\s*)+','','i'
+            ) in ('kleine vraag over jullie website','nieuw webdesign')
+          )
+        );
+      $function$;
+
+      create or replace function public.softora_is_mailbox_incoming_message(
+        p_account_email text,p_folder text,p_sender_email text,
+        p_recipients_text text,p_payload jsonb
+      ) returns boolean
+      language sql immutable security invoker set search_path=''
+      as $function$
+        select pg_catalog.lower(pg_catalog.btrim(coalesce(p_sender_email,'')))
+          is distinct from
+          pg_catalog.lower(pg_catalog.btrim(coalesce(p_account_email,'')));
+      $function$;
+
+      create or replace function public.softora_has_proven_automated_reply(
+        p_payload jsonb
+      ) returns boolean
+      language sql immutable security invoker set search_path=''
+      as $function$
+        select pg_catalog.lower(pg_catalog.btrim(coalesce(
+          coalesce(p_payload,'{}'::jsonb)->>'automatedReplyEvidence',''
+        )))='true';
+      $function$;
+
+      create or replace function public.softora_canonical_mailbox_message_key(
+        p_account_email text,p_message_id text
+      ) returns text
+      language sql stable security invoker set search_path=''
+      as $function$
+        with candidates as (
+          select
+            messages.message_key,
+            pg_catalog.jsonb_build_array(
+              pg_catalog.lower(pg_catalog.btrim(coalesce(messages.sender_email,''))),
+              pg_catalog.lower(pg_catalog.btrim(coalesce(messages.recipients_text,''))),
+              pg_catalog.lower(pg_catalog.btrim(coalesce(messages.subject,''))),
+              public.softora_normalize_mailbox_message_id(messages.in_reply_to),
+              pg_catalog.lower(pg_catalog.btrim(coalesce(messages.references_text,'')))
+            )::text as envelope_signature,
+            messages.date as message_date,
+            case
+              when public.softora_is_mailbox_campaign_root(
+                messages.folder,messages.subject,messages.in_reply_to,
+                messages.references_text,messages.payload
+              ) then 0
+              when pg_catalog.lower(pg_catalog.btrim(messages.folder))='sent' then 1
+              when pg_catalog.lower(pg_catalog.btrim(messages.folder))='instantly'
+                and pg_catalog.lower(pg_catalog.btrim(coalesce(
+                  messages.payload->>'direction',''
+                )))='sent' then 1
+              when pg_catalog.lower(pg_catalog.btrim(messages.folder))='coldmail' then 2
+              else 3
+            end as source_priority,
+            case
+              when messages.has_body and not messages.body_truncated then 0
+              when messages.has_body then 1
+              else 2
+            end as body_priority
+          from public.softora_mailbox_messages as messages
+          where messages.account_email=pg_catalog.lower(pg_catalog.btrim(
+              coalesce(p_account_email,'')
+            ))
+            and messages.deleted_at is null
+            and public.softora_normalize_mailbox_message_id(messages.message_id)
+              =public.softora_normalize_mailbox_message_id(p_message_id)
+        ), resolved as (
+          select
+            pg_catalog.count(distinct candidates.envelope_signature)
+              as signature_count,
+            pg_catalog.min(candidates.message_date) as earliest_message_date,
+            pg_catalog.max(candidates.message_date) as latest_message_date,
+            (pg_catalog.array_agg(
+              candidates.message_key order by candidates.source_priority,
+              candidates.body_priority,candidates.message_key
+            ))[1] as canonical_message_key
+          from candidates
+        )
+        select case
+          when resolved.signature_count=1
+            and resolved.latest_message_date-resolved.earliest_message_date
+              <=interval '1 minute'
+            then resolved.canonical_message_key
+          else null
+        end
+        from resolved;
+      $function$;
+    `);
+    await applyTrackedSql(client, lineageResolverMigration);
+    await client.query(`
+      alter function public.softora_resolve_mailbox_campaign_lineage(text,text[])
+        rename to softora_resolve_mailbox_campaign_lineage_impl;
+      insert into public.softora_mailbox_lineage_test_metrics(operation,call_count)
+      values('resolver',0) on conflict(operation) do update set call_count=0;
+      create or replace function public.softora_resolve_mailbox_campaign_lineage(
+        p_account_email text,p_start_keys text[]
+      ) returns table(
+        message_key text,account_email text,message_id text,
+        parent_message_key text,root_message_key text,root_message_id text,
+        lineage_depth integer
+      ) language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+        update public.softora_mailbox_lineage_test_metrics
+        set call_count=call_count+1 where operation='resolver';
+        return query
+        select resolved.message_key,resolved.account_email,resolved.message_id,
+          resolved.parent_message_key,resolved.root_message_key,
+          resolved.root_message_id,resolved.lineage_depth
+        from public.softora_resolve_mailbox_campaign_lineage_impl(
+          p_account_email,p_start_keys
+        ) as resolved;
+      end;
+      $function$;
+
+      drop function public.softora_rebuild_mailbox_campaign_lineage(
+        text,text[],boolean,jsonb
+      );
+      create or replace function public.softora_rebuild_mailbox_campaign_lineage(
+        p_account_email text,p_start_keys text[],
+        p_backfill boolean default false,
+        p_previous_roots jsonb default '{}'::jsonb
+      ) returns void
+      language plpgsql volatile security invoker set search_path=''
+      as $function$
+      begin
+        insert into public.softora_mailbox_campaign_lineage_discoveries (
+          message_key,root_message_key,account_email,
+          first_discovered_at,last_confirmed_at
+        )
+        select
+          resolved.message_key,resolved.root_message_key,resolved.account_email,
+          case when p_backfill then coalesce(
+            messages.created_at,pg_catalog.clock_timestamp()
+          ) else pg_catalog.clock_timestamp() end,
+          pg_catalog.clock_timestamp()
+        from public.softora_resolve_mailbox_campaign_lineage(
+          p_account_email,p_start_keys
+        ) as resolved
+        join public.softora_mailbox_messages as messages
+          on messages.message_key=resolved.message_key
+        on conflict (message_key, root_message_key) do update set
+          account_email = excluded.account_email,
+          first_discovered_at = case
+            when coalesce(p_previous_roots->>excluded.message_key, '')
+              = excluded.root_message_key
+              then public.softora_mailbox_campaign_lineage_discoveries.first_discovered_at
+            else excluded.first_discovered_at
+          end,
+          last_confirmed_at = excluded.last_confirmed_at,
+          active = true,
+          last_disconnected_at = null;
+
+        insert into public.softora_mailbox_campaign_lineage_members (
+          message_key,account_email,message_id,parent_message_key,
+          root_message_key,root_message_id,lineage_depth,message_date,
+          is_incoming,is_proven_automated,lineage_discovered_at,
+          created_at,updated_at
+        )
+        select
+          resolved.message_key,resolved.account_email,resolved.message_id,
+          resolved.parent_message_key,resolved.root_message_key,
+          resolved.root_message_id,resolved.lineage_depth,messages.date,
+          public.softora_is_mailbox_incoming_message(
+            messages.account_email,messages.folder,messages.sender_email,
+            messages.recipients_text,messages.payload
+          ),
+          public.softora_has_proven_automated_reply(messages.payload),
+          discoveries.first_discovered_at,pg_catalog.clock_timestamp(),
+          pg_catalog.clock_timestamp()
+        from public.softora_resolve_mailbox_campaign_lineage(
+          p_account_email,p_start_keys
+        ) as resolved
+        join public.softora_mailbox_campaign_lineage_discoveries as discoveries
+          on discoveries.message_key=resolved.message_key
+          and discoveries.root_message_key=resolved.root_message_key
+        join public.softora_mailbox_messages as messages
+          on messages.message_key=resolved.message_key
+        on conflict (message_key) do update set
+          account_email=excluded.account_email,message_id=excluded.message_id,
+          parent_message_key=excluded.parent_message_key,
+          root_message_key=excluded.root_message_key,
+          root_message_id=excluded.root_message_id,
+          lineage_depth=excluded.lineage_depth,
+          message_date=excluded.message_date,is_incoming=excluded.is_incoming,
+          is_proven_automated=excluded.is_proven_automated,
+          lineage_discovered_at=excluded.lineage_discovered_at,
+          updated_at=excluded.updated_at;
+      end;
+      $function$;
+    `);
+
+    await applyTrackedSql(client, outboundGuardLedgerMigration);
+    const outboundTriggerDefinitionBefore = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_sync_mailbox_outbound_recipient_guards()'
+          ::pg_catalog.regprocedure
+      ) as definition
+    `)).rows[0].definition;
+    await applyTrackedSql(client, scaleMigration);
+    const outboundTriggerDefinitionAfter = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_sync_mailbox_outbound_recipient_guards()'
+          ::pg_catalog.regprocedure
+      ) as definition
+    `)).rows[0].definition;
+    assert.equal(outboundTriggerDefinitionAfter, outboundTriggerDefinitionBefore);
+    assert.match(outboundTriggerDefinitionAfter, /softora_record_mailbox_outbound_recipient_guards/);
+    assert.deepEqual((await client.query(`
+      select tgname,tgenabled
+      from pg_catalog.pg_trigger
+      where tgrelid='public.softora_mailbox_messages'::pg_catalog.regclass
+        and tgname='softora_sync_mailbox_outbound_recipient_guards'
+        and not tgisinternal
+    `)).rows[0], {
+      tgname: 'softora_sync_mailbox_outbound_recipient_guards',
+      tgenabled: 'O',
+    });
+
+    const finalizerDefinition = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_commit_mailbox_sync_pass_v2(text,text,text,uuid,bigint,text,jsonb,jsonb,jsonb,bigint,bigint,boolean,integer,bigint)'
+          ::pg_catalog.regprocedure
+      ) as definition
+    `)).rows[0].definition;
+    assert.match(finalizerDefinition, /prior_state as materialized/i);
+    assert.doesNotMatch(finalizerDefinition, /left join lateral \(/i);
+    const rebuildDefinition = (await client.query(`
+      select pg_catalog.pg_get_functiondef(
+        'public.softora_rebuild_mailbox_campaign_lineage(text,text[],boolean,jsonb)'
+          ::pg_catalog.regprocedure
+      ) as definition
+    `)).rows[0].definition;
+    assert.equal(
+      (rebuildDefinition.match(/public\.softora_resolve_mailbox_campaign_lineage\(/g) || []).length,
+      1
+    );
+    assert.match(rebuildDefinition, /resolved_lineage as materialized/i);
+
+    // Force a real statement timeout after the insert/retire/lineage work has
+    // started. PostgreSQL must roll the entire RPC back; retrying the same
+    // commit ID must then succeed once and its next invocation must replay.
+    const rollbackAccount = 'finalizer-rollback@softora.nl';
+    const rollbackSyncKey = `${rollbackAccount}|sent`;
+    const rollbackOldRows = sentSnapshotRows({
+      accountEmail: rollbackAccount,
+      count: 8,
+      messageNamespace: 'rollback-shared',
+      providerNamespace: 'rollback-old',
+      recipientDomain: 'rollback-old.example',
+      updatedAt: '2026-08-24T08:00:00.000Z',
+    });
+    const rollbackNewRows = sentSnapshotRows({
+      accountEmail: rollbackAccount,
+      count: 8,
+      messageNamespace: 'rollback-shared',
+      providerNamespace: 'rollback-new',
+      recipientDomain: 'rollback-new.example',
+      updatedAt: '2026-08-25T08:00:00.000Z',
+    });
+    await client.query(`
+      insert into public.softora_mailbox_sync_state(
+        sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+      ) values($1,$2,'sent','idle',0,0,null)
+    `, [rollbackSyncKey, rollbackAccount]);
+    await activateSnapshot(client, {
+      syncKey: rollbackSyncKey,
+      token: 'rollback-first-token',
+      commitId: 'rollback-first-commit',
+      uidValidity: 9100,
+      rows: rollbackOldRows,
+    });
+    await lease(client, rollbackSyncKey, 'rollback-final-token');
+    const rollbackPrepared = await prepare(
+      client, rollbackSyncKey, 'rollback-final-token', 9101, 9
+    );
+    const rollbackArgs = {
+      syncKey: rollbackSyncKey,
+      token: 'rollback-final-token',
+      commitId: 'rollback-timeout-replay-commit',
+      generationId: rollbackPrepared.target_generation_id,
+      uidValidity: 9101,
+      rows: rollbackNewRows,
+      fromUid: 1,
+      throughUid: 8,
+      complete: true,
+      messageCount: 8,
+      lastUid: 8,
+    };
+    const rollbackRecipient = 'recipient-1@rollback-new.example';
+    const beforeTimeout = await finalizationSnapshot({
+      syncKey: rollbackSyncKey,
+      generationId: rollbackPrepared.target_generation_id,
+      commitId: rollbackArgs.commitId,
+      recipientEmail: rollbackRecipient,
+    });
+    await client.query(`
+      create or replace function public.test_delay_final_activation_for_timeout()
+      returns trigger language plpgsql volatile set search_path=''
+      as $function$
+      begin
+        if new.sync_key='finalizer-rollback@softora.nl|sent'
+          and old.active_uid_generation_id
+            is distinct from new.active_uid_generation_id then
+          perform pg_catalog.pg_sleep(1);
+        end if;
+        return new;
+      end;
+      $function$;
+      create trigger test_delay_final_activation_for_timeout
+      before update of active_uid_generation_id
+      on public.softora_mailbox_sync_state
+      for each row execute function public.test_delay_final_activation_for_timeout();
+    `);
+    await resetResolverCallCount();
+    await client.query('begin');
+    try {
+      await client.query("set local statement_timeout='250ms'");
+      await assert.rejects(
+        commit(client, rollbackArgs),
+        (error) => error?.code === '57014'
+          && /statement timeout/i.test(String(error?.message || ''))
+      );
+    } finally {
+      await client.query('rollback');
+    }
+    await client.query(`
+      drop trigger test_delay_final_activation_for_timeout
+        on public.softora_mailbox_sync_state;
+      drop function public.test_delay_final_activation_for_timeout();
+    `);
+    assert.deepEqual(await finalizationSnapshot({
+      syncKey: rollbackSyncKey,
+      generationId: rollbackPrepared.target_generation_id,
+      commitId: rollbackArgs.commitId,
+      recipientEmail: rollbackRecipient,
+    }), beforeTimeout);
+    assert.equal(await resolverCallCount(), 0);
+
+    await client.query('begin');
+    await client.query("set local statement_timeout='8s'");
+    const rollbackRetry = await commit(client, rollbackArgs);
+    await client.query('set constraints all immediate');
+    await client.query('commit');
+    assert.equal(rollbackRetry.activated, true);
+    assert.equal(await resolverCallCount(), 1);
+    const rollbackGuardCount = (await client.query(`
+      select pg_catalog.count(*)::integer as count
+      from public.softora_outbound_recipient_guards
+      where key_type='email' and key_value=$1 and permanent and status='sent'
+    `, [rollbackRecipient])).rows[0].count;
+    assert.equal(rollbackGuardCount, 1);
+    const rollbackReplay = await commit(client, rollbackArgs);
+    assert.equal(rollbackReplay.replayed, true);
+    assert.equal(await resolverCallCount(), 1);
+    assert.equal((await client.query(`
+      select pg_catalog.count(*)::integer as count
+      from public.softora_outbound_recipient_guards
+      where key_type='email' and key_value=$1 and permanent and status='sent'
+    `, [rollbackRecipient])).rows[0].count, rollbackGuardCount);
+
+    // The production-sized path uses Sent, 800 external recipients, a normal
+    // active generation plus two independently stale visible generations.
+    // State is deliberately split across those generations so ranking and
+    // tombstone-inclusive inheritance cannot pass accidentally.
+    const messageCount = 800;
+    const scaleAccount = 'finalizer-scale-800@softora.nl';
+    const scaleSyncKey = `${scaleAccount}|sent`;
+    const scaleOldRows = sentSnapshotRows({
+      accountEmail: scaleAccount,
+      count: messageCount,
+      messageNamespace: 'scale-800-shared',
+      providerNamespace: 'scale-800-old',
+      recipientDomain: 'scale-800.example',
+      updatedAt: '2026-08-23T10:00:00.000Z',
+    });
+    const scaleNewRows = sentSnapshotRows({
+      accountEmail: scaleAccount,
+      count: messageCount,
+      messageNamespace: 'scale-800-shared',
+      providerNamespace: 'scale-800-new',
+      recipientDomain: 'scale-800.example',
+      updatedAt: '2026-08-25T10:00:00.000Z',
+    });
+    await client.query(`
+      insert into public.softora_mailbox_sync_state(
+        sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+      ) values($1,$2,'sent','idle',0,0,null)
+    `, [scaleSyncKey, scaleAccount]);
+    const scaleFirst = await activateSnapshot(client, {
+      syncKey: scaleSyncKey,
+      token: 'scale-800-first-token',
+      commitId: 'scale-800-first-commit',
+      uidValidity: 9200,
+      rows: scaleOldRows,
+    });
+    const scaleActiveGeneration = scaleFirst.prepared.target_generation_id;
+    const staleGenerationA = '81111111-1111-4111-8111-111111111111';
+    const staleGenerationB = '82222222-2222-4222-8222-222222222222';
+    const readAt = '2026-08-24T10:01:00.000Z';
+    const dismissedAt = '2026-08-24T10:03:00.000Z';
+    const mutationAt = '2026-08-24T10:04:00.000Z';
+    const mutationKey = 'd'.repeat(64);
+    const deletedAt = '2026-08-24T10:05:00.000Z';
+    const logicalTombstoneAt = '2026-08-24T10:06:00.000Z';
+    await client.query(`
+      insert into public.softora_mailbox_uid_generations(
+        generation_id,sync_key,account_email,folder,uid_validity,
+        selection_policy,status,scan_upper_uid,scanned_through_uid,
+        scan_complete,snapshot_message_count,activated_at,superseded_at
+      ) values
+        ($1::uuid,$3,$4,'sent',9198,'staged-rebuild-v2','superseded',
+          3,3,true,3,clock_timestamp()-interval '3 minutes',
+          clock_timestamp()-interval '2 minutes'),
+        ($2::uuid,$3,$4,'sent',9199,'staged-rebuild-v2','superseded',
+          6,6,true,3,clock_timestamp()-interval '2 minutes',
+          clock_timestamp()-interval '1 minute')
+    `, [staleGenerationA, staleGenerationB, scaleSyncKey, scaleAccount]);
+    await client.query(`
+      insert into public.softora_mailbox_message_tombstones(
+        account_email,normalized_message_id,deleted_at,updated_at
+      ) values($1,$2,$3::timestamptz,$3::timestamptz)
+      on conflict(account_email,normalized_message_id) do update set
+        deleted_at=excluded.deleted_at,updated_at=excluded.updated_at
+    `, [
+      scaleAccount,
+      'scale-800-shared-6@test.softora.nl',
+      logicalTombstoneAt,
+    ]);
+    await client.query(`
+      alter table public.softora_mailbox_messages
+        disable trigger softora_mailbox_messages_coerce_uid_generation;
+      alter table public.softora_mailbox_messages
+        disable trigger softora_refresh_mailbox_message_lineage
+    `);
+    try {
+      await client.query(`
+        insert into public.softora_mailbox_messages(
+          message_key,account_email,folder,uid,uid_validity,uid_generation_id,
+          provider_id,message_id,in_reply_to,references_text,sender_name,
+          sender_email,recipients_text,subject,preview,body_text,
+          body_truncated,has_body,date,internal_date,unread,softora_read_at,
+          state_revision,state_mutation_key,state_mutation_at,starred,
+          reply_dismissed_at,payload,updated_at,deleted_at
+        )
+        select
+          $2||'|gen:'||$1::text||'|'||source.uid::text,
+          source.account_email,source.folder,source.uid,9198,$1::uuid,
+          'scale-stale-a:'||source.uid::text,source.message_id,
+          source.in_reply_to,source.references_text,source.sender_name,
+          source.sender_email,source.recipients_text,source.subject,
+          source.preview,source.body_text,source.body_truncated,source.has_body,
+          source.date,source.internal_date,
+          case when source.uid=1 then false else source.unread end,
+          case when source.uid=1 then $3::timestamptz else null end,
+          0,null,null,source.uid=2,
+          case when source.uid=3 then $4::timestamptz else null end,
+          source.payload,'2026-08-24T11:00:00.000Z'::timestamptz,null
+        from public.softora_mailbox_messages as source
+        where source.uid_generation_id=$5::uuid and source.uid between 1 and 3
+      `, [
+        staleGenerationA, scaleSyncKey, readAt, dismissedAt,
+        scaleActiveGeneration,
+      ]);
+      await client.query(`
+        insert into public.softora_mailbox_messages(
+          message_key,account_email,folder,uid,uid_validity,uid_generation_id,
+          provider_id,message_id,in_reply_to,references_text,sender_name,
+          sender_email,recipients_text,subject,preview,body_text,
+          body_truncated,has_body,date,internal_date,unread,softora_read_at,
+          state_revision,state_mutation_key,state_mutation_at,starred,
+          reply_dismissed_at,payload,updated_at,deleted_at
+        )
+        select
+          $2||'|gen:'||$1::text||'|'||source.uid::text,
+          source.account_email,source.folder,source.uid,9199,$1::uuid,
+          'scale-stale-b:'||source.uid::text,source.message_id,
+          source.in_reply_to,source.references_text,source.sender_name,
+          source.sender_email,source.recipients_text,source.subject,
+          source.preview,source.body_text,source.body_truncated,source.has_body,
+          source.date,source.internal_date,source.unread,null,
+          case when source.uid=4 then 42 else 0 end,
+          case when source.uid=4 then $3 else null end,
+          case when source.uid=4 then $4::timestamptz else null end,
+          source.starred,source.reply_dismissed_at,source.payload,
+          '2026-08-24T12:00:00.000Z'::timestamptz,
+          case when source.uid=5 then $5::timestamptz else null end
+        from public.softora_mailbox_messages as source
+        where source.uid_generation_id=$6::uuid and source.uid between 4 and 6
+      `, [
+        staleGenerationB, scaleSyncKey, mutationKey, mutationAt, deletedAt,
+        scaleActiveGeneration,
+      ]);
+    } finally {
+      await client.query(`
+        alter table public.softora_mailbox_messages
+          enable trigger softora_mailbox_messages_coerce_uid_generation;
+        alter table public.softora_mailbox_messages
+          enable trigger softora_refresh_mailbox_message_lineage
+      `);
+    }
+
+    assert.equal((await client.query(`
+      select pg_catalog.count(distinct uid_generation_id)::integer as count
+      from public.softora_mailbox_messages
+      where account_email=$1 and folder='sent'
+        and generation_superseded_at is null
+    `, [scaleAccount])).rows[0].count, 3);
+    await lease(client, scaleSyncKey, 'scale-800-final-token');
+    const scalePrepared = await prepare(
+      client, scaleSyncKey, 'scale-800-final-token', 9201, messageCount + 1
+    );
+    const scaleArgs = {
+      syncKey: scaleSyncKey,
+      token: 'scale-800-final-token',
+      commitId: 'scale-800-final-commit',
+      generationId: scalePrepared.target_generation_id,
+      uidValidity: 9201,
+      rows: scaleNewRows,
+      fromUid: 1,
+      throughUid: messageCount,
+      complete: true,
+      messageCount,
+      lastUid: messageCount,
+    };
+    await resetResolverCallCount();
+    await client.query('begin');
+    await client.query("set local statement_timeout='8s'");
+    const scaleStartedAt = Date.now();
+    const scaleActivated = await commit(client, scaleArgs);
+    await client.query('set constraints all immediate');
+    await client.query('commit');
+    const scaleElapsedMs = Date.now() - scaleStartedAt;
+    t.diagnostic(
+      `finale RPC + SET CONSTRAINTS + COMMIT: ${scaleElapsedMs} ms`
+    );
+    assert.equal(scaleActivated.activated, true);
+    assert.ok(
+      scaleElapsedMs < 8_000,
+      `800 Sent-rijen plus SET CONSTRAINTS/commit duurden ${scaleElapsedMs} ms`
+    );
+    assert.equal(await resolverCallCount(), 1);
+
+    const inherited = (await client.query(`
+      select uid,unread,softora_read_at,state_revision,state_mutation_key,
+        state_mutation_at,starred,reply_dismissed_at,deleted_at
+      from public.softora_mailbox_messages
+      where uid_generation_id=$1::uuid and uid between 1 and 6
+      order by uid
+    `, [scalePrepared.target_generation_id])).rows;
+    assert.equal(inherited[0].unread, false);
+    assert.equal(inherited[0].softora_read_at.toISOString(), readAt);
+    assert.equal(inherited[1].starred, true);
+    assert.equal(inherited[2].reply_dismissed_at.toISOString(), dismissedAt);
+    assert.equal(Number(inherited[3].state_revision), 42);
+    assert.equal(inherited[3].state_mutation_key, mutationKey);
+    assert.equal(inherited[3].state_mutation_at.toISOString(), mutationAt);
+    assert.equal(inherited[4].deleted_at.toISOString(), deletedAt);
+    assert.equal(inherited[5].deleted_at.toISOString(), logicalTombstoneAt);
+
+    assert.equal((await client.query(`
+      select pg_catalog.count(*)::integer as count
+      from public.softora_mailbox_messages
+      where account_email=$1 and folder='sent'
+        and uid_generation_id=any($2::uuid[])
+        and generation_superseded_at is not null
+        and deleted_at is not null
+    `, [
+      scaleAccount,
+      [scaleActiveGeneration, staleGenerationA, staleGenerationB],
+    ])).rows[0].count, messageCount + 6);
+    assert.deepEqual((await client.query(`
+      select key_type,pg_catalog.count(*)::integer as count,
+        pg_catalog.bool_and(permanent and status='sent') as durable
+      from public.softora_outbound_recipient_guards
+      where sender_email=$1 and recipient_domain='scale-800-example'
+      group by key_type order by key_type
+    `, [scaleAccount])).rows, [
+      { key_type: 'domain', count: 1, durable: true },
+      { key_type: 'email', count: messageCount, durable: true },
+    ]);
+
+    const scaleReplay = await commit(client, scaleArgs);
+    assert.equal(scaleReplay.replayed, true);
+    assert.equal(await resolverCallCount(), 1);
+    assert.equal((await client.query(`
+      select pg_catalog.count(*)::integer as count
+      from public.softora_mailbox_uid_generation_commits
+      where commit_id=$1
+    `, [scaleArgs.commitId])).rows[0].count, 1);
+  });
+// mailbox-final-activation-scale-regression:end
 }
