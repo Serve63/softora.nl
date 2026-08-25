@@ -97,7 +97,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .portrait-caption strong { color: var(--navy); font-size: 12px; }
 .portrait-phone { color: inherit; text-decoration: none; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #2cc979; box-shadow: 0 0 0 5px rgba(44,201,121,.15); }
-.portrait-stamp { position: absolute; z-index: 4; right: -36px; bottom: 12px; width: 115px; height: 115px; display: grid; place-items: center; border-radius: 50%; background: var(--navy); color: #fff; font-size: 8px; text-align: center; line-height: 1.5; letter-spacing: .18em; padding: 20px; transform: rotate(11deg); }
 
 .ticker { overflow: hidden; background: var(--accent-light); color: #fff; }
 .ticker > div { width: 100%; padding: 18px 16px; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-align: center; text-transform: uppercase; white-space: nowrap; }
@@ -286,7 +285,6 @@ footer a { color: #fff; text-underline-offset: 3px; }
   .portrait-orbit { width: 410px; height: 410px; left: -55px; }
   .portrait-card { width: calc(100% - 25px); }
   .portrait-caption { bottom: 12px; min-width: 230px; }
-  .portrait-stamp { right: -7px; bottom: -32px; width: 95px; height: 95px; }
   .mail-section { padding: 82px 16px; }
   .mail-card { grid-template-columns: 1fr; }
   .mail-portrait { max-height: 390px; }
