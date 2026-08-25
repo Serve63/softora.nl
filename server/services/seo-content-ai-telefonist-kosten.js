@@ -199,7 +199,17 @@ const AI_TELEFONIST_KOSTEN_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Begroot acceptatie met echte gesprekken en menselijke beslissers',
       paragraphs: Object.freeze([
-        'Maak vóór livegang een vaste set gespreksscenario’s. Neem korte en lange vragen, dialect of achtergrondgeluid, ontbrekende informatie, onderbrekingen, een naam die moeilijk wordt verstaan, een vraag buiten scope, een afspraakconflict, een expliciete mensvraag en een mislukte koppeling op. Noteer per scenario de verwachte reactie, toegestane actie, stopregel, opgeslagen gegevens en eigenaar van het oordeel.',
+        Object.freeze({
+          text:
+            'Maak vóór livegang een vaste set gespreksscenario’s. Neem korte en lange vragen, dialect of achtergrondgeluid, ontbrekende informatie, onderbrekingen, een naam die moeilijk wordt verstaan, een vraag buiten scope, een afspraakconflict, een expliciete mensvraag en een mislukte koppeling op. Noteer per scenario de verwachte reactie, toegestane actie, stopregel, opgeslagen gegevens en eigenaar van het oordeel. De acceptatietest voor een AI telefonist zet gesprek, audio, systeemactie, overdracht, foutgedrag en herstel als afzonderlijke bewijsniveaus naast elkaar.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'acceptatietest voor een AI telefonist',
+              href: '/kennisbank/ai-telefonist-acceptatietest-opstellen',
+              availableFrom: '2026-08-25',
+            }),
+          ]),
+        }),
         'Test niet alleen of er geluid terugkomt. Controleer antwoordinhoud, timing, onderbreekbaarheid, herhaling, juiste uitspraak, datavelden, webhookresultaat, overdracht en herstel. Classificeer een bevinding als gespreksontwerp, kennis, spraak, telefonie, koppeling, proces of beheer. Daardoor kan een leverancier gericht herstellen en voorkom je dat ieder probleem met extra prompttekst wordt bestreden.',
         'Leg een go-no-go vast. Een proceseigenaar accepteert de taak; een inhoudseigenaar controleert antwoorden; een medewerker beoordeelt de samenvatting en overdracht; techniek controleert de koppeling en logging. AI beslist niet zelf dat de route goed genoeg is. Reserveer in de begroting tijd voor hertesten nadat een fout is hersteld.',
       ]),
@@ -264,6 +274,7 @@ const AI_TELEFONIST_KOSTEN_CONTENT_ITEM = Object.freeze({
     Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
     Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
     Object.freeze({ label: 'AI telefonist koppelen aan CRM of agenda', href: '/kennisbank/ai-telefonist-crm-koppeling' }),
+    Object.freeze({ label: 'AI telefonist testen vóór livegang', href: '/kennisbank/ai-telefonist-acceptatietest-opstellen', availableFrom: '2026-08-25' }),
   ]),
 });
 

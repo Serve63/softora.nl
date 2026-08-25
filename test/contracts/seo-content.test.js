@@ -1428,6 +1428,48 @@ test('AI-telefonist CRM-gids maakt events, duplicatecontrole en herstel toetsbaa
   ]);
 });
 
+test('AI-telefonist acceptatiegids scheidt gesprek, audio, actie, overdracht en herstel', () => {
+  const now = new Date('2026-08-25T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'ai-telefonist-acceptatietest-opstellen', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const costHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonist-kosten-mkb', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const crmHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('kennisbank', 'ai-telefonist-crm-koppeling', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-25');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/ai-telefonist');
+  assert.ok(item.informationGain.includes('zeslaagse voice-acceptatieset'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.visualQualityVersion, undefined);
+  assert.equal(item.secondaryImage, undefined);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/ai-telefonist-acceptatietest-opstellen">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"datePublished":"2026-08-25"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /Gebruik vier testvormen voor vier verschillende vragen/);
+  assert.match(html, /Mock functies voordat je echte systemen laat schrijven/);
+  assert.match(html, /href="\/ai-telefonist">AI telefonist laten maken<\/a>/);
+  assert.match(html, /href="\/kennisbank\/ai-telefonist-crm-koppeling">AI telefonie koppelen aan CRM of agenda<\/a>/);
+  assert.match(html, /href="\/blog\/ai-telefonie-menselijke-overdracht">gids over menselijke overdracht<\/a>/);
+  assert.match(html, /href="https:\/\/wa\.me\/31643262792"/);
+  assert.match(costHtml, /href="\/kennisbank\/ai-telefonist-acceptatietest-opstellen">acceptatietest voor een AI telefonist<\/a>/);
+  assert.match(crmHtml, /href="\/kennisbank\/ai-telefonist-acceptatietest-opstellen">acceptatietest voor een AI telefonist<\/a>/);
+  assert.match(html, /Het doel is niet om perfecte verstaanbaarheid, foutloze acties of gegarandeerde bereikbaarheid te beloven/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/ai-telefonist-acceptatietest-opstellen');
+  assert.equal(sitemapEntry.lastmod, '2026-08-25');
+});
+
 test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs toetsbaar', () => {
   const now = new Date('2026-08-20T12:00:00.000Z');
   const item = getSeoContentItem('kennisbank', 'wat-is-procesautomatisering', { now });

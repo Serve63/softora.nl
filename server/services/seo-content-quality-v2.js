@@ -15,6 +15,7 @@ const { AI_TELEFONIST_CRM_CONTENT_ITEM } = require('./seo-content-ai-telefonist-
 const { PROCESS_AUTOMATION_CONTENT_ITEM } = require('./seo-content-procesautomatisering');
 const { CUSTOMER_PORTAL_CONTENT_ITEM } = require('./seo-content-klantportaal');
 const { AI_TELEFONIST_DEFINITION_CONTENT_ITEM } = require('./seo-content-ai-telefonist-definition');
+const { AI_TELEFONIST_ACCEPTATIE_CONTENT_ITEM } = require('./seo-content-ai-telefonist-acceptatie');
 
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
@@ -34,6 +35,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   PROCESS_AUTOMATION_CONTENT_ITEM,
   CUSTOMER_PORTAL_CONTENT_ITEM,
   AI_TELEFONIST_DEFINITION_CONTENT_ITEM,
+  AI_TELEFONIST_ACCEPTATIE_CONTENT_ITEM,
 ]);
 
 module.exports = {
