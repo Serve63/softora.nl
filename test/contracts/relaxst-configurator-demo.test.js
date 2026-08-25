@@ -11,7 +11,7 @@ const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
   assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260825-6"/);
-  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260825-2"/);
+  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260825-3"/);
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
   assert.match(html, /Interactieve conceptdemo/);
@@ -25,7 +25,7 @@ test('Relaxst demo keeps the configurator as a self-contained public page', () =
 test('Relaxst demo exposes the promised product choices and live price logic', () => {
   assert.match(script, /const MODELS =/);
   assert.match(script, /comfora:/);
-  assert.match(script, /udenhout:/);
+  assert.match(script, /linea:/);
   assert.match(script, /zeus:/);
   assert.match(script, /const UPHOLSTERY =/);
   assert.match(script, /const MECHANISMS =/);
@@ -33,6 +33,7 @@ test('Relaxst demo exposes the promised product choices and live price logic', (
   assert.match(script, /mechanism-grid/);
   assert.match(script, /function totalPrice\(\)/);
   assert.match(script, /Plan gratis zitadvies/);
+  assert.doesNotMatch(html + script, /Udenhout/);
 });
 
 test('Relaxst demo includes responsive and accessible interaction states', () => {

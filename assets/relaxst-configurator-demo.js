@@ -7,8 +7,8 @@
       note: 'Zacht & ondersteunend',
       image: 'https://www.relaxst.nl/wp-content/uploads/2025/12/Relaxst-1-.jpg',
     },
-    udenhout: {
-      name: 'Udenhout', code: 'UN-01', price: 2343,
+    linea: {
+      name: 'Linea', code: 'LI-02', price: 2343,
       note: 'Compact & stijlvol',
       image: 'https://www.relaxst.nl/wp-content/uploads/2024/11/Relaxst-1-12.jpg',
     },
@@ -55,7 +55,7 @@
 
   const state = {
     step: 1,
-    model: 'udenhout',
+    model: 'linea',
     upholstery: 'stof',
     color: 'zand',
     size: 'M',
