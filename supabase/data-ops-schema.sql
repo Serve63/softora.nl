@@ -7341,8 +7341,9 @@ notify pgrst, 'reload schema';
 -- Final UID-generation activation must stay comfortably below the mailbox
 -- client's fixed deadline even when a Sent snapshot, several historical
 -- generations and many logical tombstones are involved. Preserve the exact
--- activation semantics while making its three remaining hot paths set based:
--- prior-state inheritance, campaign-lineage resolution and stale retirement.
+-- activation semantics while making its remaining hot paths index/set based:
+-- canonical Message-ID lookup, prior-state inheritance, campaign-lineage
+-- resolution and stale retirement.
 
 do $preflight$
 declare
@@ -7378,6 +7379,19 @@ begin
     ) is not null then
     raise exception using errcode = '55000',
       message = 'MAILBOX_FINAL_ACTIVATION_SCALE_INDEX_DRIFT';
+  end if;
+
+  if pg_catalog.to_regclass(
+      'public.softora_mailbox_message_id_exact_lookup_idx'
+    ) is not null then
+    v_definition := pg_catalog.pg_get_indexdef(pg_catalog.to_regclass(
+      'public.softora_mailbox_message_id_exact_lookup_idx'
+    ));
+    if v_definition is distinct from
+      'CREATE INDEX softora_mailbox_message_id_exact_lookup_idx ON public.softora_mailbox_messages USING btree (account_email, softora_normalize_mailbox_message_id(message_id)) WHERE ((deleted_at IS NULL) AND (NULLIF(btrim(message_id), ''''::text) IS NOT NULL))' then
+      raise exception using errcode = '55000',
+        message = 'MAILBOX_FINAL_ACTIVATION_SCALE_CANONICAL_INDEX_DRIFT';
+    end if;
   end if;
 
   foreach v_signature in array array[
@@ -7479,6 +7493,19 @@ begin
   end if;
 end;
 $preflight$;
+
+-- The existing exact-lookup index used a raw non-empty predicate that the
+-- planner could not infer from normalized equality, so canonical lookups
+-- ignored it. Rebuild the same physical index with the resolver's exact
+-- predicate instead of keeping a redundant parallel index.
+drop index if exists public.softora_mailbox_message_id_exact_lookup_idx;
+create index softora_mailbox_message_id_exact_lookup_idx
+on public.softora_mailbox_messages (
+  account_email,
+  public.softora_normalize_mailbox_message_id(message_id)
+)
+where deleted_at is null
+  and public.softora_normalize_mailbox_message_id(message_id) is not null;
 
 create index if not exists softora_mailbox_messages_prior_state_active_idx
 on public.softora_mailbox_messages (
@@ -8143,6 +8170,8 @@ grant execute on function public.softora_rebuild_mailbox_campaign_lineage(
 
 comment on index public.softora_mailbox_messages_prior_state_active_idx is
   'Covers tombstone-inclusive prior mailbox state handoff for active UID generations.';
+comment on index public.softora_mailbox_message_id_exact_lookup_idx is
+  'Supports canonical mailbox Message-ID resolution with the exact visible-row predicate.';
 comment on function public.softora_mailbox_lineage_activation_row_matches_v2(
   text, text, text, uuid, timestamptz, text, text, uuid, timestamptz
 ) is 'Fails closed unless a mailbox row belongs to the exact new generation or any captured old generation in one activation batch.';
@@ -8155,6 +8184,20 @@ declare
   v_definition text;
   v_resolver_calls integer;
 begin
+  v_definition := case
+    when pg_catalog.to_regclass(
+      'public.softora_mailbox_message_id_exact_lookup_idx'
+    ) is null then null
+    else pg_catalog.pg_get_indexdef(pg_catalog.to_regclass(
+      'public.softora_mailbox_message_id_exact_lookup_idx'
+    ))
+  end;
+  if v_definition is distinct from
+    'CREATE INDEX softora_mailbox_message_id_exact_lookup_idx ON public.softora_mailbox_messages USING btree (account_email, softora_normalize_mailbox_message_id(message_id)) WHERE ((deleted_at IS NULL) AND (softora_normalize_mailbox_message_id(message_id) IS NOT NULL))' then
+    raise exception using errcode = '55000',
+      message = 'MAILBOX_FINAL_ACTIVATION_SCALE_CANONICAL_INDEX_POSTCONDITION_FAILED';
+  end if;
+
   v_definition := pg_catalog.pg_get_functiondef(
     'public.softora_commit_mailbox_sync_pass_v2(text,text,text,uuid,bigint,text,jsonb,jsonb,jsonb,bigint,bigint,boolean,integer,bigint)'::pg_catalog.regprocedure
   );

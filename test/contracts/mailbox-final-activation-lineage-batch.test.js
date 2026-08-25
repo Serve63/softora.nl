@@ -234,25 +234,48 @@ test('data-ops bootstrap spiegelt de schaalfix byte-exact onder een eigen marker
   assert.match(scaleMigration, /notify pgrst, 'reload schema';/);
 });
 
-test('prior-state-index matcht scope, genormaliseerd Message-ID, sortering en statekolommen', () => {
+test('prior-state- en canonical-indexen matchen hun exacte querypredicaten', () => {
   const block = markedBlockBetween(scaleMigration, scaleStartMarker, scaleEndMarker);
-  const indexSql = block.match(
+  const priorIndexSql = block.match(
     /create index if not exists softora_mailbox_messages_prior_state_active_idx[\s\S]*?;/i
   )?.[0] || '';
-  assert.notEqual(indexSql, '', 'prior-state-indexdefinitie ontbreekt');
+  assert.notEqual(priorIndexSql, '', 'prior-state-indexdefinitie ontbreekt');
   assert.match(
-    indexSql,
+    priorIndexSql,
     /create index if not exists softora_mailbox_messages_prior_state_active_idx\s+on public\.softora_mailbox_messages\s*\(\s*account_email,\s*folder,\s*public\.softora_normalize_mailbox_message_id\(message_id\),\s*updated_at desc,\s*message_key\s*\)/i
   );
   assert.match(
-    indexSql,
+    priorIndexSql,
     /include\s*\(\s*uid_generation_id,\s*softora_read_at,\s*state_revision,\s*state_mutation_key,\s*state_mutation_at,\s*starred,\s*reply_dismissed_at,\s*deleted_at\s*\)/i
   );
   assert.match(
-    indexSql,
+    priorIndexSql,
     /where\s+generation_superseded_at is null\s+and public\.softora_normalize_mailbox_message_id\(message_id\) is not null/i
   );
-  assert.doesNotMatch(indexSql, /deleted_at is null/i);
+  assert.doesNotMatch(priorIndexSql, /deleted_at is null/i);
+
+  const canonicalIndexSql = block.match(
+    /drop index if exists public\.softora_mailbox_message_id_exact_lookup_idx;\s*(create index softora_mailbox_message_id_exact_lookup_idx[\s\S]*?;)/i
+  )?.[1] || '';
+  assert.notEqual(canonicalIndexSql, '', 'canonical Message-ID-index ontbreekt');
+  assert.match(
+    canonicalIndexSql,
+    /create index softora_mailbox_message_id_exact_lookup_idx\s+on public\.softora_mailbox_messages\s*\(\s*account_email,\s*public\.softora_normalize_mailbox_message_id\(message_id\)\s*\)/i
+  );
+  assert.match(
+    canonicalIndexSql,
+    /where\s+deleted_at is null\s+and public\.softora_normalize_mailbox_message_id\(message_id\) is not null/i
+  );
+  assert.doesNotMatch(canonicalIndexSql, /generation_superseded_at is null/i);
+  assert.match(
+    block,
+    /drop index if exists public\.softora_mailbox_message_id_exact_lookup_idx;/i
+  );
+  assert.match(block, /MAILBOX_FINAL_ACTIVATION_SCALE_CANONICAL_INDEX_DRIFT/);
+  assert.match(
+    block,
+    /MAILBOX_FINAL_ACTIVATION_SCALE_CANONICAL_INDEX_POSTCONDITION_FAILED/
+  );
 });
 
 test('finalizer materialiseert staged en prior state set-based zonder nieuwe laterale lookup', () => {

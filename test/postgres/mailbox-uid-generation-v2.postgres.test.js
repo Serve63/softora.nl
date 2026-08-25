@@ -4798,6 +4798,35 @@ begin
           ::pg_catalog.regprocedure
       ) as definition
     `)).rows[0].definition;
+    await client.query(`
+      create index softora_mailbox_message_id_exact_lookup_idx
+      on public.softora_mailbox_messages (
+        account_email,
+        public.softora_normalize_mailbox_message_id(message_id)
+      )
+      where deleted_at is null
+    `);
+    await assert.rejects(
+      applyTrackedSql(client, scaleMigration),
+      /MAILBOX_FINAL_ACTIVATION_SCALE_CANONICAL_INDEX_DRIFT/
+    );
+    await client.query(`
+      drop index public.softora_mailbox_message_id_exact_lookup_idx
+    `);
+    await client.query(`
+      create index softora_mailbox_message_id_exact_lookup_idx
+      on public.softora_mailbox_messages (
+        account_email,
+        public.softora_normalize_mailbox_message_id(message_id)
+      )
+      where deleted_at is null
+        and nullif(pg_catalog.btrim(message_id), '') is not null
+    `);
+    assert.match((await client.query(`
+      select pg_catalog.pg_get_indexdef(pg_catalog.to_regclass(
+        'public.softora_mailbox_message_id_exact_lookup_idx'
+      )) as definition
+    `)).rows[0].definition, /nullif\(btrim\(message_id\)/i);
     await applyTrackedSql(client, scaleMigration);
     const outboundTriggerDefinitionAfter = (await client.query(`
       select pg_catalog.pg_get_functiondef(
@@ -4817,6 +4846,21 @@ begin
       tgname: 'softora_sync_mailbox_outbound_recipient_guards',
       tgenabled: 'O',
     });
+
+    const canonicalIndexDefinition = (await client.query(`
+      select pg_catalog.pg_get_indexdef(pg_catalog.to_regclass(
+        'public.softora_mailbox_message_id_exact_lookup_idx'
+      )) as definition
+    `)).rows[0].definition;
+    assert.match(
+      canonicalIndexDefinition,
+      /\(account_email, softora_normalize_mailbox_message_id\(message_id\)\)/i
+    );
+    assert.match(
+      canonicalIndexDefinition,
+      /deleted_at is null[\s\S]*softora_normalize_mailbox_message_id\(message_id\) is not null/i
+    );
+    assert.doesNotMatch(canonicalIndexDefinition, /nullif\(btrim\(message_id\)/i);
 
     const finalizerDefinition = (await client.query(`
       select pg_catalog.pg_get_functiondef(
