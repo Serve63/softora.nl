@@ -282,6 +282,7 @@ function createService(overrides = {}) {
   const outboundGuardCalls = [];
   const defaultOutboundRecipientGuardStore = {
     findRecipientConflict: async () => null,
+    findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }),
     getHistoricalMailboxLedgerStatus: async () => ({ ok: true }),
     reserveRecipients: async (items, options) => {
       outboundGuardCalls.push({ type: 'reserve', items, options });
@@ -8216,6 +8217,69 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(sentMessages[0].inReplyTo, '<incoming-1@example.test>');
   assert.match(sentMessages[0].text, /Zullen we kort bellen/);
   assert.equal(Object.keys(getReplyState().processed).length, 1);
+});
+
+test('coldmail auto-reply rechecks the permanent suppression list before SMTP', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-suppressed@example.test>',
+    subject: 'Re: Kleine vraag over jullie website',
+    text: 'Hoi Servé, klinkt interessant. Kun je meer vertellen?',
+    from: { value: [{ address: 'reply@blocked.example', name: 'Blocked Company' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-suppressed@softora>',
+  };
+  let suppressionChecks = 0;
+  const { service, sentMessages } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict(identities) {
+        suppressionChecks += 1;
+        assert.equal(identities[0].recipientEmail, 'reply@blocked.example');
+        assert.equal(identities[0].recipientCompany, 'Blocked Company BV');
+        return {
+          ok: true,
+          conflict: {
+            guard_key: 'company:blocked-company-bv',
+            recipient_company: 'Blocked Company BV',
+          },
+        };
+      },
+    },
+    rows: [{
+      id: 'suppressed-company', bedrijf: 'Blocked Company BV', naam: 'Contact',
+      email: 'reply@blocked.example', status: 'gemaild', databaseStatus: 'gemaild',
+      lastColdmailSentAt: '2026-08-20T10:00:00.000Z',
+      lastColdmailSenderEmail: 'serve@softora.nl', mail: true,
+    }],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () { yield { uid: 1, source: 'raw-message', flags: new Set() }; },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: true, status: 200 },
+      data: {
+        model: 'gpt-5.5-pro',
+        choices: [{ message: { content: 'Dit antwoord mag niet worden verstuurd.' } }],
+      },
+    }),
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  assert.ok(suppressionChecks >= 1);
+  assert.equal(result.replied, 0);
+  assert.equal(sentMessages.length, 0);
+  assert.match(result.errors.join('\n'), /permanente blokkadelijst/i);
 });
 
 test('coldmail auto-reply does not send while a coldmail safety pause is active', async () => {

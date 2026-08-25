@@ -4,6 +4,9 @@ const {
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
 } = require('./mailbox-send-provenance-store');
+const {
+  assertOutboundRecipientsNotSuppressed,
+} = require('../security/outbound-mail-suppression');
 
 const INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS = 3 * 60 * 1000;
 
@@ -326,6 +329,7 @@ async function sendMailboxMessage({
   normalizeString,
   threadProvenance,
   mailboxSendProvenanceStore,
+  outboundRecipientGuardStore,
 }) {
   if (normalizeString(body.provider).toLowerCase() !== 'instantly') {
     return sendMessage({
@@ -339,6 +343,15 @@ async function sendMailboxMessage({
       threadProvenance,
     });
   }
+  const recipientEmails = [body.to, body.cc, body.bcc]
+    .flatMap((value) => Array.isArray(value) ? value : String(value || '').split(/[;,]/))
+    .map((value) => normalizeString(value).toLowerCase())
+    .filter(Boolean);
+  await assertOutboundRecipientsNotSuppressed({
+    outboundRecipientGuardStore,
+    identities: recipientEmails.map((recipientEmail) => ({ recipientEmail })),
+    channel: 'instantly-mailbox-reply',
+  });
   if (threadProvenance?.mode !== 'reply') {
     const error = new Error('Instantly ondersteunt hier alleen een bewezen antwoord in de bestaande thread.');
     error.status = 409;

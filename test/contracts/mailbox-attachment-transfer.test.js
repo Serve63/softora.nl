@@ -5,6 +5,10 @@ const compose = require('../../assets/premium-mailbox-compose');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
 const mailboxError = require('../../assets/premium-mailbox-error');
 const { createMailboxComposeSend } = require('../../server/services/mailbox-compose-send');
+
+function createAllowingSuppressionStore() {
+  return { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
+}
 const {
   createMailboxAttachmentService,
 } = require('../../server/services/mailbox-attachment-service');
@@ -140,6 +144,7 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
   let cleanupCalls = 0;
   let reservedAttachments = null;
   const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
     getAccount: () => ({
       email: 'serve@softora.nl', name: 'Servé Creusen', smtpConfigured: true, smtpIdentityMatches: true,
       smtpHost: 'smtp.example.test', smtpPort: 465, smtpSecure: true, smtpUser: 'serve@softora.nl', smtpPass: 'secret',
@@ -200,6 +205,7 @@ test('ongeldige signed attachment wordt vóór provenance/provider afgewezen', a
   let providerCalls = 0;
   let reserveCalls = 0;
   const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
     getAccount: () => ({ email: 'serve@softora.nl', smtpConfigured: true, smtpIdentityMatches: true, smtpHost: 'x', smtpUser: 'serve@softora.nl', smtpPass: 'secret' }),
     isValidEmail: () => true,
     normalizeEmail: (value) => String(value || '').trim().toLowerCase(),

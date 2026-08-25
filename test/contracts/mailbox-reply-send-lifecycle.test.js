@@ -13,6 +13,9 @@ const { sendMailboxMessage } = require('../../server/services/mailbox-instantly-
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 const normalizeString = (value) => String(value || '').trim();
+const allowingSuppressionStore = {
+  findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }),
+};
 
 function responseRecorder() {
   return {
@@ -236,7 +239,7 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
     async fail() {}, async markUnknown() {},
   };
   const runtime = createMailboxComposeRuntime({
-    composeSendDependencies: {}, getAccount: () => null, instantlyMailboxService,
+    composeSendDependencies: { outboundRecipientGuardStore: allowingSuppressionStore }, getAccount: () => null, instantlyMailboxService,
     mailboxComposeThreadContext: resolver, mailboxSendProvenanceStore: provenanceStore,
     normalizeEmail, normalizeString, logger: { error() {} },
   });
@@ -360,6 +363,7 @@ test('ambiguous Instantly 5xx becomes reconcile-required and a retry never calls
   const send = () => sendMailboxMessage({
     body, instantlyMailboxService, sendMessage: async () => {}, normalizeString,
     threadProvenance, mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: allowingSuppressionStore,
   });
   await assert.rejects(send, (error) => error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
   await assert.rejects(send, (error) => error.code === 'MAILBOX_SEND_ALREADY_PROCESSING');
@@ -398,12 +402,42 @@ test('provider success followed by DB finalize failure records reconcile-require
       provider: 'instantly', providerThreadId: 'thread-1',
     },
     mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: allowingSuppressionStore,
   }), (error) => error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
   assert.deepEqual(unknownValues, {
     messageId: '<outbound-1@instantly>',
     providerMessageId: 'outbound-1',
     sentReconcileRequired: true,
   });
+});
+
+test('suppressed Instantly mailbox reply is blocked before provenance and provider calls', async () => {
+  let provenanceCalls = 0;
+  let providerCalls = 0;
+  await assert.rejects(() => sendMailboxMessage({
+    body: {
+      provider: 'instantly', owner: 'serve', account: 'serve@softora.nl',
+      providerMessageId: 'incoming-suppressed', providerThreadId: 'thread-suppressed',
+      to: 'contact@blocked.example', subject: 'Re: Vraag', body: 'Antwoord',
+    },
+    instantlyMailboxService: { async reply() { providerCalls += 1; } },
+    sendMessage: async () => {},
+    normalizeString,
+    threadProvenance: { mode: 'reply' },
+    mailboxSendProvenanceStore: {
+      async reserve() { provenanceCalls += 1; return { created: true, intent: {} }; },
+    },
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict() {
+        return {
+          ok: true,
+          conflict: { guard_key: 'domain:blocked-example', recipient_domain: 'blocked-example' },
+        };
+      },
+    },
+  }), (error) => error.code === 'OUTBOUND_RECIPIENT_SUPPRESSED' && error.status === 409);
+  assert.equal(provenanceCalls, 0);
+  assert.equal(providerCalls, 0);
 });
 
 test('mailbox send response hides raw Supabase cooldown details behind a safe retryable message', async () => {

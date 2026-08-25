@@ -1,6 +1,9 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const {
+  assertOutboundRecipientsNotSuppressed,
+} = require('../security/outbound-mail-suppression');
 
 function createConfirmationMailService(deps = {}) {
   const {
@@ -19,6 +22,7 @@ function createConfirmationMailService(deps = {}) {
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
     parseMailSource = (source) => simpleParser(source),
+    outboundRecipientGuardStore = null,
   } = deps;
 
   const {
@@ -212,6 +216,15 @@ function createConfirmationMailService(deps = {}) {
       error.code = 'INVALID_RECIPIENT_EMAIL';
       throw error;
     }
+
+    await assertOutboundRecipientsNotSuppressed({
+      outboundRecipientGuardStore,
+      identities: [{
+        recipientEmail: toEmail,
+        recipientCompany: normalizeString(appointment?.company || ''),
+      }],
+      channel: 'agenda-confirmation-mail',
+    });
 
     const transporter = getSmtpTransporter();
     if (!transporter) {

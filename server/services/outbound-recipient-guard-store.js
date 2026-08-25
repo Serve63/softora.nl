@@ -195,6 +195,31 @@ function createOutboundRecipientGuardStore(deps = {}) {
     return findRecipientConflictByKeys(client, keys);
   }
 
+  async function findRecipientSuppressionConflict(identities = []) {
+    const client = getClient();
+    if (!client) return { ok: false, reason: 'supabase_not_configured', conflict: null };
+    const keys = Array.from(new Set(
+      (Array.isArray(identities) ? identities : [identities])
+        .flatMap((identity) => getIdentityKeyRows(identity, normalizeString))
+        .map((row) => row.guardKey)
+        .filter(Boolean)
+    ));
+    if (!keys.length) return { ok: false, reason: 'no_recipient_identity', conflict: null };
+    for (let index = 0; index < keys.length; index += 500) {
+      const keyChunk = keys.slice(index, index + 500);
+      const { data, error } = await client
+        .from(table)
+        .select('*')
+        .in('guard_key', keyChunk)
+        .eq('suppressed', true)
+        .eq('permanent', true)
+        .limit(1);
+      if (error) throw error;
+      if (Array.isArray(data) && data.length) return { ok: true, conflict: data[0] };
+    }
+    return { ok: true, conflict: null };
+  }
+
   async function getHistoricalMailboxLedgerStatus() {
     const client = getClient();
     if (!client) return { ok: false, reason: 'supabase_not_configured', marker: null };
@@ -237,6 +262,17 @@ function createOutboundRecipientGuardStore(deps = {}) {
           source: truncateText(normalizeString(options.source), 120),
           actor: truncateText(normalizeString(options.actor), 160),
           permanent: options.permanent === true,
+          suppressed: options.suppressed === true,
+          suppression_reason: options.suppressed === true
+            ? truncateText(normalizeString(options.suppressionReason), 500)
+            : null,
+          suppression_source: options.suppressed === true
+            ? truncateText(normalizeString(options.suppressionSource || options.source), 120)
+            : null,
+          suppression_actor: options.suppressed === true
+            ? truncateText(normalizeString(options.suppressionActor || options.actor), 160)
+            : null,
+          suppressed_at: options.suppressed === true ? at : null,
           payload: options.payload && typeof options.payload === 'object' ? options.payload : {},
           expires_at: expiresAt,
           last_seen_at: at,
@@ -497,6 +533,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
 
   return {
     findRecipientConflict,
+    findRecipientSuppressionConflict,
     getHistoricalMailboxLedgerStatus,
     reserveRecipients,
     confirmReservation,

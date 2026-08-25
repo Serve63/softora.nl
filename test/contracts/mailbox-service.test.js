@@ -31,6 +31,12 @@ const TINY_PNG_DATA_URL =
 let provenanceSequence = 0;
 function createMailboxService(deps = {}) {
   const intents = new Map();
+  const outboundRecipientGuardStore = Object.prototype.hasOwnProperty.call(
+    deps,
+    'outboundRecipientGuardStore'
+  )
+    ? deps.outboundRecipientGuardStore
+    : { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
   const mailboxSendProvenanceStore = deps.mailboxSendProvenanceStore || {
     reserve: async (payload) => {
       const existing = intents.get(payload.idempotencyKey);
@@ -84,6 +90,7 @@ function createMailboxService(deps = {}) {
       : {}),
     mailboxSendProvenanceStore,
     mailboxComposeThreadContext,
+    outboundRecipientGuardStore,
   });
 }
 
@@ -187,6 +194,8 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
 
 function createOutboundGuardStore(calls = [], overrides = {}) {
   return {
+    findRecipientSuppressionConflict: async () =>
+      overrides.suppressionResult || { ok: true, conflict: null },
     reserveRecipients: async (items, options) => {
       calls.push({ type: 'reserve', items, options });
       if (overrides.reserveResult) return overrides.reserveResult;
@@ -1125,6 +1134,7 @@ test('mailbox service refuses manual webdesign sends when the central guard is u
         return { messageId: 'm-should-not-send', accepted: [message.to], rejected: [] };
       },
     }),
+    outboundRecipientGuardStore: null,
   });
 
   await assert.rejects(
@@ -1136,7 +1146,7 @@ test('mailbox service refuses manual webdesign sends when the central guard is u
         text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor unguarded.example.',
       }),
     (error) => {
-      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_UNAVAILABLE');
+      assert.equal(error.code, 'OUTBOUND_SUPPRESSION_GUARD_UNAVAILABLE');
       assert.equal(error.status, 503);
       return true;
     }
