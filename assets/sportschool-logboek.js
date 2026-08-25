@@ -73,6 +73,16 @@
     return String(value || '').toLocaleUpperCase('nl-NL');
   }
 
+  function fitNotesField(field) {
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${Math.max(field.scrollHeight, 28)}px`;
+  }
+
+  function fitVisibleNotesFields() {
+    list.querySelectorAll('.exercise-notes').forEach(fitNotesField);
+  }
+
   function normalizeExerciseTitle(value) {
     return upper(value).replace(/\s+/g, ' ').trim();
   }
@@ -737,17 +747,19 @@
     controls.className = 'exercise-controls';
     controls.append(metricGroup, createFormHistory(day, exercise));
 
-    const notes = document.createElement('input');
+    const notes = document.createElement('textarea');
     notes.className = 'exercise-notes';
-    notes.type = 'text';
+    notes.rows = 1;
     notes.value = exercise.notes;
     notes.placeholder = '';
     notes.autocomplete = 'off';
     notes.spellcheck = false;
-    notes.enterKeyHint = 'next';
+    notes.enterKeyHint = 'enter';
     notes.dataset.exerciseField = 'notes';
     notes.dataset.exerciseOrder = String(exercise.order);
+    notes.setAttribute('aria-label', `Notities ${exercise.title}`);
     notes.addEventListener('input', () => {
+      fitNotesField(notes);
       writeField(day, exercise.order, 'notes', notes.value);
     });
     notes.addEventListener('blur', () => {
@@ -958,6 +970,7 @@
     const exercises = readOrders(selectedDay).map((order) => readExercise(selectedDay, order));
 
     list.replaceChildren(...exercises.map((exercise) => createExerciseCard(selectedDay, exercise)));
+    fitVisibleNotesFields();
     if (loadStatusMessage) {
       loadStatusMessage.dataset.state = logbookLoadStatus;
       loadStatusMessage.hidden = logbookLoadStatus === 'ready';
@@ -1003,6 +1016,8 @@
     if (event.key === 'Escape') closeDayPicker();
   });
   window.addEventListener('pagehide', flushLocalSave);
+  window.addEventListener('resize', fitVisibleNotesFields, { passive: true });
+  document.fonts?.ready?.then(fitVisibleNotesFields).catch(() => {});
 
   async function boot() {
     const localState = loadLocalState();
