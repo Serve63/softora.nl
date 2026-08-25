@@ -409,7 +409,8 @@ test('kvk database keeps the wide desktop dashboard inside one viewport', () => 
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
 
-  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260824a/);
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260825a/);
+  assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
   assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{[^}]*min-height:\s*0\s*!important;[^}]*overflow:\s*hidden\s*!important/);
