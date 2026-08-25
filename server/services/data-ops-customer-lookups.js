@@ -1,4 +1,5 @@
 const CUSTOMER_COLUMNS = 'customer_id,company,email,database_status,lifecycle_status,payload,updated_at';
+const UNIQUE_CUSTOMER_EMAIL_LOOKUP_MAX_VALUES = 200;
 
 function createDataOpsCustomerLookups(deps = {}) {
   const {
@@ -62,6 +63,58 @@ function createDataOpsCustomerLookups(deps = {}) {
     };
   }
 
+  async function listUniqueCustomersByEmails(options = {}) {
+    const values = normalizeValues(options.emails, true);
+    if (!values.length) return [];
+    if (values.length > UNIQUE_CUSTOMER_EMAIL_LOOKUP_MAX_VALUES) return null;
+    return cachedRead(`unique-customers-by-email:${values.join(',')}`, async () => {
+      const rows = [];
+      for (let index = 0; index < values.length; index += 100) {
+        const valueChunk = values.slice(index, index + 100);
+        const valueSet = new Set(valueChunk);
+        const resultLimit = valueChunk.length + 1;
+        const result = await run(`list-unique-customers-by-emails:${index}`, (client) => client
+          .from(tableName)
+          .select(CUSTOMER_COLUMNS, { count: 'exact' })
+          .is('deleted_at', null)
+          .in('email', valueChunk)
+          .limit(resultLimit), {
+          timeoutMs: readQueryTimeoutMs,
+          bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+          suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+          suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+        });
+        if (!result.ok) return null;
+        const page = Array.isArray(result.data) ? result.data : [];
+        const exactCount = result.count === null || result.count === undefined
+          ? Number.NaN
+          : Number(result.count);
+        if (!Number.isFinite(exactCount) || exactCount !== page.length
+          || page.length >= resultLimit) return null;
+        const matchesByEmail = new Map();
+        for (const row of page) {
+          const storedEmail = normalizeString(row && row.email).toLowerCase();
+          const customer = normalizeCustomerRow(row);
+          const customerEmail = normalizeString(customer.email).toLowerCase();
+          if (!storedEmail || !valueSet.has(storedEmail) || customerEmail !== storedEmail
+            || matchesByEmail.has(storedEmail)) return null;
+          matchesByEmail.set(storedEmail, customer);
+        }
+        rows.push(...matchesByEmail.values());
+      }
+      const seen = new Set();
+      for (const row of rows) {
+        const key = normalizeString(row && row.id);
+        if (!key || seen.has(key)) return null;
+        seen.add(key);
+      }
+      return rows;
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
   async function listCustomersPage(options = {}) {
     const metaOnly = options.metaOnly === true;
     const offset = Math.max(0, Math.min(25000, Number.parseInt(String(options.offset || 0), 10) || 0));
@@ -110,6 +163,7 @@ function createDataOpsCustomerLookups(deps = {}) {
       inputKey: 'emails', column: 'email', cachePrefix: 'customers-by-email',
       operation: 'list-customers-by-emails', lowercase: true,
     }),
+    listUniqueCustomersByEmails,
     listCustomersByIds: createListByField({
       inputKey: 'customerIds', column: 'customer_id', cachePrefix: 'customers-by-id',
       operation: 'list-customers-by-ids',
@@ -117,4 +171,4 @@ function createDataOpsCustomerLookups(deps = {}) {
   };
 }
 
-module.exports = { createDataOpsCustomerLookups };
+module.exports = { UNIQUE_CUSTOMER_EMAIL_LOOKUP_MAX_VALUES, createDataOpsCustomerLookups };

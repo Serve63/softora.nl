@@ -3,6 +3,11 @@ const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
 const MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS = 8_000;
 const MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS = 2;
 const MAILBOX_SEND_RESERVATION_LEASE_MS = 30_000;
+const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC =
+  'softora_list_accepted_mailbox_send_provenance_by_message_ids';
+const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ACCOUNTS = 20;
+const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS = 200;
+const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS = 2000;
 
 function createCanonicalMailboxHash(parts = []) {
   const source = parts.map((value) => {
@@ -104,6 +109,8 @@ function createMailboxSendProvenanceStore(deps = {}) {
     reservationLeaseMs = MAILBOX_SEND_RESERVATION_LEASE_MS,
   } = deps;
   const normalizeEmail = (value) => normalizeString(value).toLowerCase();
+  const normalizeMessageId = (value) => normalizeString(value)
+    .toLowerCase().replace(/^[<>,\s]+|[<>,\s]+$/g, '');
   const getClient = () => (isSupabaseConfigured() ? getSupabaseClient() : null);
 
   const getCriticalClient = () => (isSupabaseConfigured() ? getSupabaseClient({
@@ -604,12 +611,89 @@ function createMailboxSendProvenanceStore(deps = {}) {
     }
   }
 
+  async function listAcceptedMessagesByMessageIds({
+    accountEmails = [],
+    messageIds = [],
+    maxRows = 500,
+  } = {}) {
+    const emails = Array.from(new Set(
+      (Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean)
+    ));
+    const ids = Array.from(new Set(
+      (Array.isArray(messageIds) ? messageIds : []).map(normalizeMessageId).filter(Boolean)
+    ));
+    const requestedMaxRows = Number(maxRows);
+    if (emails.length > MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ACCOUNTS
+      || ids.length > MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS
+      || !Number.isInteger(requestedMaxRows)
+      || requestedMaxRows < 1
+      || requestedMaxRows > MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS) {
+      const error = new Error('Te veel mailboxaccounts, Message-ID\'s of bewijsrijen aangevraagd.');
+      error.status = 400;
+      error.code = 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_INPUT_TOO_LARGE';
+      throw error;
+    }
+    if (!emails.length || !ids.length) return [];
+
+    try {
+      const result = await runCriticalQuery((client) => client.rpc(
+        MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC,
+        { p_account_emails: emails, p_message_ids: ids, p_max_rows: requestedMaxRows }
+      ));
+      const envelope = Array.isArray(result.data) && result.data.length === 1
+        ? result.data[0]
+        : result.data;
+      const rows = envelope && typeof envelope === 'object' && Array.isArray(envelope.rows)
+        ? envelope.rows
+        : null;
+      const returnedCount = Number(envelope && envelope.returned_count);
+      const envelopeMaxRows = Number(envelope && envelope.max_rows);
+      if (!rows || !Number.isInteger(returnedCount) || returnedCount !== rows.length
+        || envelopeMaxRows !== requestedMaxRows
+        || typeof envelope.complete !== 'boolean'
+        || typeof envelope.overflow !== 'boolean') {
+        const error = new Error('De gerichte sendprovenance-read gaf geen volledig bewijsresultaat.');
+        error.status = 503;
+        error.code = 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_INVALID_RESULT';
+        throw error;
+      }
+      if (!envelope.complete || envelope.overflow || rows.length > requestedMaxRows) {
+        const error = new Error('De gerichte sendprovenance-read overschreed de veilige bewijsgrens.');
+        error.status = 503;
+        error.code = 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_OVERFLOW';
+        throw error;
+      }
+
+      const requestedEmails = new Set(emails);
+      const requestedIds = new Set(ids);
+      return rows.map((row) => {
+        const intent = normalizeRow(row);
+        const canonicalMessageId = normalizeMessageId(
+          row && (row.canonical_message_id || row.sent_message_id)
+        );
+        if (intent.status !== 'accepted' || !requestedEmails.has(intent.accountEmail)
+          || !requestedIds.has(canonicalMessageId)
+          || canonicalMessageId !== normalizeMessageId(row && row.sent_message_id)) {
+          const error = new Error('De gerichte sendprovenance-read bevat bewijs buiten de gevraagde scope.');
+          error.status = 503;
+          error.code = 'MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_INVALID_RESULT';
+          throw error;
+        }
+        return { ...intent, canonicalMessageId };
+      });
+    } catch (error) {
+      logger.error('[MailboxSendProvenance][ListByMessageIds]', error?.message || error);
+      throw error;
+    }
+  }
+
   return {
     accept,
     fail,
     findByIdempotencyKey,
     isAvailable: () => Boolean(getClient()),
     listAcceptedMessages,
+    listAcceptedMessagesByMessageIds,
     markUnknown,
     preflight,
     preview,
@@ -619,6 +703,10 @@ function createMailboxSendProvenanceStore(deps = {}) {
 }
 
 module.exports = {
+  MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ACCOUNTS,
+  MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS,
+  MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS,
+  MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC,
   MAILBOX_SEND_PROVENANCE_TABLE,
   MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
   createMailboxAttachmentsFingerprint,
