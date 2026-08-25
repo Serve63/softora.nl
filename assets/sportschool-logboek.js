@@ -686,6 +686,32 @@
     return wrap;
   }
 
+  function createFormStatusVisual(status) {
+    if (!status) {
+      const empty = document.createElement('span');
+      empty.className = 'form-status-empty';
+      empty.textContent = '·';
+      return empty;
+    }
+
+    const svgNamespace = 'http://www.w3.org/2000/svg';
+    const icon = document.createElementNS(svgNamespace, 'svg');
+    icon.classList.add('form-status-icon');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.setAttribute('focusable', 'false');
+
+    const shape = document.createElementNS(svgNamespace, 'path');
+    shape.classList.add('form-status-icon-shape');
+    shape.setAttribute('d', {
+      down: 'M12 3V21 M4.5 13.5L12 21L19.5 13.5',
+      same: 'M3 12H21',
+      up: 'M12 21V3 M4.5 10.5L12 3L19.5 10.5',
+    }[status]);
+    icon.append(shape);
+    return icon;
+  }
+
   function createFormHistory(day, exercise) {
     const wrap = document.createElement('div');
     wrap.className = 'form-history';
@@ -712,18 +738,18 @@
       button.dataset.sessionRole = session.isCurrent ? 'current' : 'history';
       button.disabled = !session.isCurrent;
       button.title = session.isCurrent
-        ? 'Nieuwe sessie: tik voor rood omlaag, geel gelijk of groen omhoog'
+        ? 'Tik: rood omlaag, geel gelijk, groen omhoog en daarna weer leeg'
         : 'Eerdere sessie';
 
       const renderStatusButton = () => {
         const currentStatus = button.dataset.status || '';
         const statusPresentation = {
-          '': ['·', 'niet ingevuld'],
-          down: ['↓', 'zwakker'],
-          same: ['—', 'gelijk'],
-          up: ['↑', 'sterker'],
-        }[currentStatus] || ['·', 'niet ingevuld'];
-        button.textContent = statusPresentation[0];
+          '': 'niet ingevuld',
+          down: 'zwakker',
+          same: 'gelijk',
+          up: 'sterker',
+        }[currentStatus] || 'niet ingevuld';
+        button.replaceChildren(createFormStatusVisual(currentStatus));
         const sessionLabel = session.isCurrent
           ? 'huidige sessie'
           : session.date
@@ -731,7 +757,7 @@
             : `eerdere sessie ${index + 1}`;
         button.setAttribute(
           'aria-label',
-          `${exercise.title} ${sessionLabel}: ${statusPresentation[1]}`
+          `${exercise.title} ${sessionLabel}: ${statusPresentation}`
         );
       };
 

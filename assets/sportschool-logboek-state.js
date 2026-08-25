@@ -6,11 +6,12 @@
   const SOURCE_FIELDS = ['title', 'notes', 'sets', 'reps', 'kg'];
   const COMPLETION_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   const FORM_HISTORY_LENGTH = 3;
-  const FORM_STATUS_CYCLE = ['down', 'same', 'up'];
+  const FORM_STATUSES = ['down', 'same', 'up'];
+  const FORM_STATUS_CYCLE = ['', ...FORM_STATUSES];
 
   function normalizeFormStatus(value) {
     const status = String(value || '').trim().toLowerCase();
-    return FORM_STATUS_CYCLE.includes(status) ? status : '';
+    return FORM_STATUSES.includes(status) ? status : '';
   }
 
   function nextFormStatus(value) {
@@ -71,11 +72,18 @@
   function setFormSessionStatus(value, dateKey, status) {
     const history = normalizeFormSessionHistory(value);
     const normalizedDateKey = String(dateKey || '').trim();
-    const normalizedStatus = normalizeFormStatus(status);
-    if (!COMPLETION_DATE_PATTERN.test(normalizedDateKey) || !normalizedStatus) return history;
+    const requestedStatus = String(status || '').trim().toLowerCase();
+    if (
+      !COMPLETION_DATE_PATTERN.test(normalizedDateKey) ||
+      (requestedStatus && !FORM_STATUSES.includes(requestedStatus))
+    ) {
+      return history;
+    }
+    const historyWithoutDate = history.filter((entry) => entry.date !== normalizedDateKey);
+    if (!requestedStatus) return normalizeFormSessionHistory(historyWithoutDate);
     return normalizeFormSessionHistory([
-      ...history.filter((entry) => entry.date !== normalizedDateKey),
-      { date: normalizedDateKey, status: normalizedStatus },
+      ...historyWithoutDate,
+      { date: normalizedDateKey, status: requestedStatus },
     ]);
   }
 

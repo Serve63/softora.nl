@@ -436,9 +436,11 @@ textarea:focus-visible {
 }
 
 .form-status-button {
+  display: grid;
   width: 100%;
   min-width: 0;
-  height: 28px;
+  height: 30px;
+  place-items: center;
   padding: 0;
   color: rgba(127, 125, 141, 0.55);
   font-family: Inter, sans-serif;
@@ -450,6 +452,30 @@ textarea:focus-visible {
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+}
+
+.form-status-icon {
+  display: block;
+  width: 27px;
+  height: 27px;
+  overflow: visible;
+}
+
+.form-status-icon-shape {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.form-status-empty {
+  display: block;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 .form-status-button:disabled {
