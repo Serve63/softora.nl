@@ -177,7 +177,17 @@ const AI_TELEFONIST_CRM_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Test de systeemuitkomst, niet alleen het gesprek',
       paragraphs: Object.freeze([
-        'Maak vóór livegang vaste acceptatiescenario’s: normaal terugbelverzoek, bestaand contact, geen match, meerdere matches, ontbrekend telefoonnummer, dubbele webhook, analyse die later komt, ongeldig CRM-veld, tijdelijk onbereikbaar CRM, bezet agendaslot, verlopen afspraakvoorstel en een herstelpoging. Gebruik fictieve testgegevens en voorkom dat simulaties echte klantacties uitvoeren.',
+        Object.freeze({
+          text:
+            'Maak vóór livegang vaste acceptatiescenario’s: normaal terugbelverzoek, bestaand contact, geen match, meerdere matches, ontbrekend telefoonnummer, dubbele webhook, analyse die later komt, ongeldig CRM-veld, tijdelijk onbereikbaar CRM, bezet agendaslot, verlopen afspraakvoorstel en een herstelpoging. Gebruik fictieve testgegevens en voorkom dat simulaties echte klantacties uitvoeren. De volledige acceptatietest voor een AI telefonist verbindt deze systeemuitkomsten met gespreks-, audio-, overdrachts- en herstelbewijs.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'acceptatietest voor een AI telefonist',
+              href: '/kennisbank/ai-telefonist-acceptatietest-opstellen',
+              availableFrom: '2026-08-25',
+            }),
+          ]),
+        }),
         'Controleer per scenario het zichtbare eindbewijs: exact één CRM-record of taak, juiste bron en eigenaar, correcte agenda-id, geen overschreven leidende velden, een herkenbare foutstatus en een werkende herstelactie. Test ook dat een ongeldige handtekening niets verwerkt en dat een dubbele delivery wel succesvol kan worden bevestigd zonder een tweede resultaat te maken.',
         Object.freeze({
           text:
@@ -229,6 +239,7 @@ const AI_TELEFONIST_CRM_CONTENT_ITEM = Object.freeze({
     Object.freeze({ label: 'Wat is een CRM-integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
     Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
     Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    Object.freeze({ label: 'AI telefonist testen vóór livegang', href: '/kennisbank/ai-telefonist-acceptatietest-opstellen', availableFrom: '2026-08-25' }),
   ]),
 });
 

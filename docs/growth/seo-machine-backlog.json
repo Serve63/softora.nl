@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-18",
+  "updatedAt": "2026-08-25",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -2134,7 +2134,9 @@
     },
     {
       "id": "voice-acceptance-026",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-25",
+      "shippedPath": "/kennisbank/ai-telefonist-acceptatietest-opstellen",
       "path": "/kennisbank/ai-telefonist-acceptatietest-opstellen",
       "contentType": "kennisbank",
       "cluster": "ai-contact",
@@ -2148,13 +2150,13 @@
         {
           "type": "current-serp-and-buyer-language",
           "source": "Nederlandse SERP voor AI telefonist testen",
-          "observedAt": "2026-08-18",
+          "observedAt": "2026-08-25",
           "detail": "Actuele Nederlandse aanbiederspagina's van NeemtOp, LokaleAI, MIKE365 en Flireo gebruiken testen, zelf beoordelen en pas na akkoord live gaan als concrete kooptaal, maar publiceren geen leveranciersneutrale acceptatieset voor gesprek, systeemactie en herstel."
         },
         {
           "type": "primary-source",
           "source": "Retell AI Docs: Testing overview en LLM simulation testing",
-          "observedAt": "2026-08-18",
+          "observedAt": "2026-08-25",
           "detail": "De actuele documentatie onderscheidt handmatige playgroundtests, herhaalbare simulaties en echte web- of telefoontests, adviseert scenario's en succescriteria en ondersteunt function mocks. Dit onderbouwt een buyer task rond gelaagde acceptatie zonder tijdens simulatie echte klantacties uit te voeren."
         }
       ],
@@ -2164,7 +2166,7 @@
         "Livegaan na algemene tevredenheid zonder herhaalbare scenario's, eigenaar en go-no-go"
       ],
       "overlap": {
-        "checkedAt": "2026-08-18",
+        "checkedAt": "2026-08-25",
         "closestPaths": [
           "/blog/ai-telefonie-menselijke-overdracht",
           "/blog/ai-telefonist-kosten-mkb",
@@ -2219,7 +2221,96 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Herbevestig actuele voice-specifieke buyer questions en werk een compacte acceptatieset uit die simulatie, echte telefoontest, systeemactie, menselijke overdracht en herstel afzonderlijk bewijst."
+      "nextAction": "Beoordeel op 2026-09-08, 2026-09-22 en 2026-10-20 indexatie, relevante niet-merkgebonden ontdekking en navigatie naar /ai-telefonist zonder vroegtijdige causaliteitsclaim."
+    },
+    {
+      "id": "voice-monitoring-027",
+      "status": "ready",
+      "path": "/kennisbank/ai-telefonist-monitoring-na-livegang",
+      "contentType": "kennisbank",
+      "cluster": "ai-contact",
+      "primaryQuery": "ai telefonist kwaliteit monitoren",
+      "intent": "Na livegang afwijkingen in gesprek, audio, acties, overdracht en herstel gecontroleerd opsporen en beoordelen",
+      "intentClass": "risk",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-telefonist",
+      "clusterRole": "Beheergids voor steekproeven, signalen, alarmgrenzen, menselijke review en regressiebesluiten ná livegang, los van acceptatie vóór livegang en incidentherstel per koppeling",
+      "demandEvidence": [
+        {
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP voor AI telefonist monitoren kwaliteit",
+          "observedAt": "2026-08-25",
+          "detail": "Actuele resultaten van Klantcontact, CustomerFirst, huXam en Vodafone gebruiken quality monitoring, gespreksanalyse en achterblijvende oplossingskwaliteit als concrete beheervraag. De resultaten blijven grotendeels generiek voor klantcontact en bieden geen leveranciersneutrale monitoringskaart voor één AI-telefonieroute."
+        },
+        {
+          "type": "primary-source",
+          "source": "Retell AI Docs: live monitoring, analytics dashboard, alert rules en AI Quality Assurance",
+          "observedAt": "2026-08-25",
+          "detail": "De actuele documentatie onderscheidt live meekijken en ingrijpen, dashboards voor succes, latency, kosten en concurrency, drempelalerts en automatische kwaliteitsbeoordeling van echte gesprekken. Dit onderbouwt een buyer task rond meerdere signalen met menselijke review in plaats van één automatische kwaliteitsscore."
+        }
+      ],
+      "competitorPatterns": [
+        "Een algemene kwaliteitsscore tonen zonder scenario, steekproef, eigenaar of bewijs van de zakelijke uitkomst",
+        "Alle gesprekken analyseren maar geen grens instellen voor direct ingrijpen, pauzeren of teruggaan naar menselijke afhandeling",
+        "Dashboardmetingen verwarren met betrouwbare lead-, omzet- of klanttevredenheidsattributie"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-25",
+        "closestPaths": [
+          "/kennisbank/ai-telefonist-acceptatietest-opstellen",
+          "/kennisbank/ai-telefonist-crm-koppeling",
+          "/blog/ai-telefonist-kosten-mkb"
+        ],
+        "decision": "distinct",
+        "rationale": "De acceptatiegids besluit vóór livegang, de CRM-gids ontwerpt event- en herstelgedrag en de kostengids begroot beheer. Deze kandidaat behandelt uitsluitend het beheer na livegang: steekproefkeuze, signalen per laag, alarmgrenzen, menselijke override, wijzigingslog en terugvoer naar regressietests."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "AI telefonist monitoren na livegang",
+        "metaDescription": "Bepaal welke gesprekken je beoordeelt, welke signalen alarm geven en wanneer een mens ingrijpt, pauzeert of een regressietest toevoegt.",
+        "h1": "Hoe monitor je een AI telefonist na livegang?",
+        "outline": [
+          "Maak signalen per gesprek, spraak, actie, overdracht en herstel",
+          "Combineer risicogerichte steekproeven met vaste controles",
+          "Leg alarmgrenzen, eigenaar en menselijke override vast",
+          "Scheid technische metrics van zakelijke uitkomst en attributie",
+          "Voer bevindingen terug naar herstel, wijzigingslog en regressietest"
+        ],
+        "buyerQuestions": [
+          "Welke gesprekken van een AI telefonist moet je terugluisteren?",
+          "Wanneer moet een AI-telefonieroute direct worden gepauzeerd?",
+          "Welke metingen tonen kwaliteit zonder omzet of klanttevredenheid te verzinnen?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/ai-telefonist-acceptatietest-opstellen",
+          "/blog/ai-telefonist-kosten-mkb"
+        ],
+        "outgoingLinks": [
+          "/ai-telefonist",
+          "/blog/ai-telefonie-menselijke-overdracht"
+        ],
+        "conversionPath": "Van aantoonbare beheergrenzen naar een scopegesprek over één AI-telefonieroute met monitoring, menselijke controle en herstel.",
+        "claimRisk": "Geen volledige detectie, perfecte kwaliteit, absolute beschikbaarheid of causale lead- en omzetimpact beloven; benoem steekproefbeperkingen, datakwaliteit en menselijke beoordeling.",
+        "visualConcepts": [
+          "Risicogerichte monitoringskaart met vaste steekproef, incidenttrigger, eigenaar en pauzebesluit",
+          "Terugkoppellus van live gesprek via bevinding en herstel naar regressietest en gecontroleerde wijziging"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig actuele buyer questions en ontwerp een platformneutrale monitoringskaart waarin automatische signalen nooit het menselijke kwaliteits- of pauzebesluit vervangen."
     }
   ]
 }
