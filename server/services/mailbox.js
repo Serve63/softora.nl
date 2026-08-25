@@ -546,7 +546,7 @@ function createMailboxService(deps = {}) {
     mailboxComposeThreadContext = createMailboxComposeThreadContext({ mailboxIndexStore, instantlyMailboxService }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
     mailboxOutreachScope = createMailboxOutreachScope({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, getInstantlyAccounts: (owner) => instantlyMailboxService?.getConfiguredAccounts?.(owner) || [] }),
-    mailboxCampaignRepliesService = createMailboxCampaignRepliesService({ mailboxIndexStore, dataOpsStore, mailboxSendProvenanceStore, mailboxOutreachScope }),
+    mailboxCampaignRepliesService = createMailboxCampaignRepliesService({ mailboxIndexStore, dataOpsStore, mailboxSendProvenanceStore, mailboxOutreachScope, outboundRecipientGuardStore }),
     mailboxDiscoveryService = createMailboxDiscoveryService({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, mailboxOutreachScope, logger }),
   } = deps; const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||

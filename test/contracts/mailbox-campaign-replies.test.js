@@ -18,6 +18,7 @@ const {
 } = require('../../server/services/mailbox-campaign-replies');
 const { loadMailboxCampaignContactHistory } = require('../../server/services/mailbox-campaign-contact-history');
 const { collectCampaignThreadParticipantEmails } = require('../../server/services/mailbox-campaign-participants');
+const { getOutboundSenderIdentity } = require('../../server/services/outbound-sender-identity');
 
 test('campaign contact history ordent deelnemers globaal over coldmail en inbox vóór de cap', async () => {
   const baseMs = Date.parse('2026-01-01T00:00:00.000Z');
@@ -2427,4 +2428,661 @@ test('campaign reply service hydrateert alleen de zichtbare conversatieroots en 
   assert.ok(hydratedIds.every((id) => id.startsWith('inbox:')));
   assert.ok(messages.every((message) => message.threadMessages.length === 12));
   assert.ok(messages.every((message) => message.threadMessages.every((thread) => !thread.body)));
+});
+
+function createLegacyMissingRootScenario(options = {}) {
+  const accountEmail = options.accountEmail || 'serve@softora.nl';
+  const senderEmail = options.senderEmail || accountEmail;
+  const senderIdentity = getOutboundSenderIdentity(senderEmail);
+  const recipientEmail = options.recipientEmail || 'legacy-lead@example.nl';
+  const parentMessageId = options.parentMessageId || '<legacy-root@softora.nl>';
+  const sentAt = options.sentAt || '2026-08-20T12:49:00.000Z';
+  const incomingAt = options.incomingAt || '2026-08-20T13:12:00.000Z';
+  const subject = options.subject || 'Kleine vraag over jullie website';
+  const originalBody = Object.prototype.hasOwnProperty.call(options, 'originalBody')
+    ? options.originalBody
+    : [
+        'Goedendag,',
+        'Afgelopen week kwam ik jullie website legacy-lead.example tegen.',
+        'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+        'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
+        'Met vriendelijke groet,',
+        senderIdentity?.name || senderEmail,
+      ].join('\n');
+  const quotedSenderEmail = Object.prototype.hasOwnProperty.call(options, 'quotedSenderEmail')
+    ? options.quotedSenderEmail
+    : senderEmail;
+  const incomingBody = Object.prototype.hasOwnProperty.call(options, 'incomingBody')
+    ? options.incomingBody
+    : [
+        'Bedankt voor je bericht.',
+        '',
+        `On ${options.quotedAt || sentAt} ${quotedSenderEmail ? `Softora <${quotedSenderEmail}> ` : ''}wrote:`,
+        ...String(originalBody || '').split('\n').map((line) => `> ${line}`),
+      ].join('\n');
+  const incoming = {
+    id: 'inbox:legacy-root', uid: 71, folder: 'inbox', accountEmail,
+    from: 'Legacy lead', email: recipientEmail, to: accountEmail,
+    subject: `Re: ${subject}`, preview: 'Bedankt voor je bericht.', body: incomingBody,
+    date: incomingAt, messageId: '<legacy-reply@example.nl>',
+    inReplyTo: options.inReplyTo || parentMessageId, references: parentMessageId,
+  };
+  const defaultInboxMessages = [
+    incoming,
+    ...Array.from({ length: Number(options.consistentInboundCopies) || 0 }, (_value, index) => ({
+      ...incoming,
+      id: `inbox:legacy-root-copy-${index + 1}`,
+      uid: 72 + index,
+      date: new Date(Date.parse(incomingAt) + ((index + 1) * 60_000)).toISOString(),
+      messageId: `<legacy-reply-copy-${index + 1}@example.nl>`,
+    })),
+  ];
+  const inboxMessages = options.inboxMessages || defaultInboxMessages;
+  const customer = {
+    id: options.customerId || 'legacy-customer', bedrijf: 'Legacy Lead', email: recipientEmail,
+    campaignType: 'webdesign', lastColdmailProvider: 'softora',
+    coldmailSentMessageId: parentMessageId, outreachMessageId: parentMessageId,
+    lastColdmailSenderEmail: senderEmail, sentFromEmail: senderEmail,
+    sent_from_email: senderEmail, outreachSentFromEmail: senderEmail,
+    outreachSentAt: sentAt, outreach_sent_at: sentAt,
+  };
+  const guard = {
+    reservation_id: 'legacy-reservation', recipient_id: customer.id,
+    key_type: 'email', key_value: recipientEmail,
+    sender_email: senderEmail, recipient_email: recipientEmail,
+    provider: 'softora', channel: 'coldmail', status: 'sent', permanent: true,
+    payload: {
+      customerId: customer.id, senderEmail, recipientEmail,
+      messageId: parentMessageId, sentAt, expectedSubject: subject,
+      postSmtpReconciled: true,
+    },
+  };
+  const customers = options.customers || [
+    typeof options.mutateCustomer === 'function' ? options.mutateCustomer({ ...customer }) : customer,
+  ];
+  const guards = options.guards || [
+    typeof options.mutateGuard === 'function'
+      ? options.mutateGuard({ ...guard, payload: { ...guard.payload } })
+      : guard,
+  ];
+  const actualSent = {
+    id: 'sent:legacy-root', uid: 72, folder: 'sent', accountEmail: senderEmail,
+    from: senderIdentity?.name || senderEmail,
+    email: senderEmail, to: recipientEmail, subject, body: originalBody,
+    preview: originalBody, date: sentAt, messageId: parentMessageId,
+    originalCampaignOutbound: true,
+  };
+  const acceptedIntent = {
+    intentId: 'legacy-accepted-intent', owner: senderIdentity?.profileKey || '',
+    accountEmail: senderEmail, recipientEmail, mode: 'new-message', provider: 'smtp',
+    messageId: parentMessageId,
+    senderName: senderIdentity?.name || senderEmail,
+    subject, body: originalBody, acceptedAt: sentAt,
+  };
+  const acceptedLookups = [];
+  const customerLookups = [];
+  const guardLookups = [];
+  const storedLookups = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? inboxMessages : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? inboxMessages : [],
+      listMessagesByMessageIdsForAccounts: async () => options.actualSent ? [actualSent] : [],
+      listStoredMessageIdsByMessageIdsForAccounts: async (lookup) => {
+        storedLookups.push(lookup);
+        if (options.storedSentReadError) throw new Error('sent-index tijdelijk niet leesbaar');
+        if (options.storedSentReadNull) return null;
+        return options.storedSentMessageIds || (options.actualSent ? [parentMessageId] : []);
+      },
+      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      listUnthreadedSentCandidatesForConversations: async () => [],
+      listSentCandidatesForQuotedReplies: async () => options.sentCandidates || [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => customers,
+      listUniqueCustomersByEmails: async (lookup) => {
+        customerLookups.push(lookup);
+        return options.uniqueCustomerReadError ? null : customers;
+      },
+    },
+    mailboxSendProvenanceStore: {
+      isAvailable: () => options.acceptedStoreUnavailable !== true,
+      listAcceptedMessages: async () => [],
+      listAcceptedMessagesByMessageIds: async (lookup) => {
+        acceptedLookups.push(lookup);
+        if (options.acceptedReadError) throw new Error('provenance tijdelijk niet leesbaar');
+        return options.acceptedIntents || (options.acceptedSent ? [acceptedIntent] : []);
+      },
+    },
+    outboundRecipientGuardStore: {
+      listSentRecipientGroups: async (lookup) => {
+        guardLookups.push(lookup);
+        if (options.guardStoreError) throw new Error('guardstore tijdelijk niet leesbaar');
+        return guards;
+      },
+    },
+  });
+  return {
+    acceptedIntent, acceptedLookups, actualSent, customer, customerLookups,
+    guard, guardLookups, incoming, originalBody, service, storedLookups,
+  };
+}
+
+function buildLegacyMultiQuoteBody(bodies) {
+  const quotedBodies = Array.isArray(bodies) ? bodies : [];
+  return [
+    'Bedankt voor je bericht.',
+    ...quotedBodies.flatMap((body, index) => [
+      '',
+      ...(index ? [`Aanvullend citaat ${index + 1}.`, ''] : []),
+      'On 2026-08-20T12:49:00.000Z Softora <serve@softora.nl> wrote:',
+      ...String(body || '').split('\n').map((line) => `> ${line}`),
+    ]),
+  ].join('\n');
+}
+
+test('legacy outbound-root recovery werkt voor alle campagneaccounts en bewezen same-owner aliases', async (t) => {
+  const scenarios = [
+    ...CAMPAIGN_MAILBOX_ACCOUNTS.map((email) => ({
+      name: `direct account ${email}`,
+      accountEmail: email,
+      senderEmail: email,
+    })),
+    {
+      name: 'Servé same-owner alias',
+      accountEmail: 'servecreusen@softora.nl',
+      senderEmail: 'serve@softora.nl',
+    },
+    {
+      name: 'Martijn same-owner alias',
+      accountEmail: 'contact.venvisuals@gmail.com',
+      senderEmail: 'martijn@softora.nl',
+    },
+  ];
+  for (const scenario of scenarios) await t.test(scenario.name, async () => {
+    const fixture = createLegacyMissingRootScenario(scenario);
+    const replies = await fixture.service.listReplies({ limit: 100 });
+
+    assert.equal(replies.length, 1);
+    assert.equal(replies[0].threadMessages.length, 1);
+    const root = replies[0].threadMessages[0];
+    assert.equal(root.legacyAcceptedRoot, true);
+    assert.equal(root.accountEmail, scenario.senderEmail);
+    assert.equal(root.messageId, '<legacy-root@softora.nl>');
+    assert.equal(root.body.includes('fris webdesign gemaakt'), true);
+    assert.equal(root.originalCampaignOutbound, true);
+    assert.equal(root.threadCorrelationEvidence, 'exact-in-reply-to-customer-guard-structured-quote');
+    assert.equal(root.id, '');
+    assert.equal(root.recipientRoutingEvidenceKnown, true);
+    assert.equal(fixture.guardLookups.length, 1);
+    assert.deepEqual(fixture.guardLookups[0].recipientEmails, ['legacy-lead@example.nl']);
+    assert.equal(fixture.guardLookups[0].provider, 'softora');
+    assert.equal(fixture.guardLookups[0].channel, 'coldmail');
+    assert.equal(fixture.guardLookups[0].keyType, 'email');
+    assert.equal(fixture.guardLookups[0].maxRows, 2);
+  });
+});
+
+test('normale Sent-evidence slaat alle legacy bewijsreads over', async () => {
+  const base = createLegacyMissingRootScenario();
+  const fixture = createLegacyMissingRootScenario({ sentCandidates: [base.actualSent] });
+  const replies = await fixture.service.listReplies({ limit: 100 });
+
+  assert.equal(replies[0].threadMessages.length, 1);
+  assert.equal(replies[0].threadMessages[0].id, base.actualSent.id);
+  assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, undefined);
+  assert.equal(fixture.customerLookups.length, 0);
+  assert.equal(fixture.storedLookups.length, 0);
+  assert.equal(fixture.acceptedLookups.length, 0);
+  assert.equal(fixture.guardLookups.length, 0);
+});
+
+test('gemengde recovery bevraagt legacy bewijs uitsluitend voor de onopgeloste root', async () => {
+  const real = createLegacyMissingRootScenario({
+    recipientEmail: 'real-sent@example.nl', parentMessageId: '<real-sent-root@softora.nl>',
+    customerId: 'real-sent-customer',
+  });
+  const legacy = createLegacyMissingRootScenario({
+    recipientEmail: 'legacy-fallback@example.nl', parentMessageId: '<legacy-fallback-root@softora.nl>',
+    customerId: 'legacy-fallback-customer',
+  });
+  const fixture = createLegacyMissingRootScenario({
+    inboxMessages: [
+      { ...real.incoming, id: 'inbox:real-sent', uid: 81, messageId: '<real-reply@example.nl>' },
+      { ...legacy.incoming, id: 'inbox:legacy-fallback', uid: 82, messageId: '<legacy-reply@example.nl>' },
+    ],
+    customers: [real.customer, legacy.customer], guards: [legacy.guard],
+    sentCandidates: [real.actualSent],
+  });
+  const replies = await fixture.service.listReplies({ limit: 100 });
+  const realReply = replies.find((reply) => reply.email === 'real-sent@example.nl');
+  const legacyReply = replies.find((reply) => reply.email === 'legacy-fallback@example.nl');
+  const canonicalIds = (lookup) => Array.from(new Set(lookup.messageIds.map((value) => (
+    String(value).toLowerCase().replace(/^[<>,\s]+|[<>,\s]+$/g, '')
+  ))));
+
+  assert.equal(realReply.threadMessages[0].id, real.actualSent.id);
+  assert.equal(legacyReply.threadMessages[0].legacyAcceptedRoot, true);
+  assert.deepEqual(fixture.customerLookups.map((lookup) => lookup.emails), [
+    ['legacy-fallback@example.nl'],
+  ]);
+  assert.deepEqual(fixture.storedLookups.map(canonicalIds), [['legacy-fallback-root@softora.nl']]);
+  assert.deepEqual(fixture.acceptedLookups.map(canonicalIds), [['legacy-fallback-root@softora.nl']]);
+  assert.deepEqual(fixture.guardLookups.map((lookup) => lookup.recipientEmails), [
+    ['legacy-fallback@example.nl'],
+  ]);
+});
+
+test('legacy outbound-root recovery faalt gesloten bij iedere ontbrekende dubbele of conflicterende bron', async (t) => {
+  const cases = [
+    ['afwijkend customer Message-ID', {
+      mutateCustomer: (customer) => ({
+        ...customer,
+        coldmailSentMessageId: '<ander@softora.nl>',
+        outreachMessageId: '<ander@softora.nl>',
+      }),
+    }],
+    ['conflicterende customer-ID aliases', {
+      mutateCustomer: (customer) => ({ ...customer, customerId: 'ander-customer-id' }),
+    }],
+    ['afwijkende guard-afzender', {
+      mutateGuard: (guard) => ({
+        ...guard,
+        sender_email: 'martijn@softora.nl',
+        payload: { ...guard.payload, senderEmail: 'martijn@softora.nl' },
+      }),
+    }],
+    ['afwijkende ontvanger', {
+      mutateCustomer: (customer) => ({ ...customer, email: 'ander@example.nl' }),
+      mutateGuard: (guard) => ({
+        ...guard,
+        recipient_email: 'ander@example.nl',
+        payload: { ...guard.payload, recipientEmail: 'ander@example.nl' },
+      }),
+    }],
+    ['afwijkende canonieke guard key', {
+      mutateGuard: (guard) => ({ ...guard, key_value: 'ander@example.nl' }),
+    }],
+    ['afwijkend tijdstip', {
+      mutateGuard: (guard) => ({
+        ...guard,
+        payload: { ...guard.payload, sentAt: '2026-08-20T12:50:00.000Z' },
+      }),
+    }],
+    ['andere eigenaar', {
+      accountEmail: 'serve@softora.nl', senderEmail: 'martijn@softora.nl',
+    }],
+    ['afwijkend onderwerp', {
+      mutateGuard: (guard) => ({
+        ...guard,
+        payload: { ...guard.payload, expectedSubject: 'Nieuw webdesign' },
+      }),
+    }],
+    ['te korte quote', { originalBody: 'Kort geciteerd bericht zonder voldoende bronbewijs.' }],
+    ['twee klanten', (() => {
+      const base = createLegacyMissingRootScenario();
+      return { customers: [base.customer, { ...base.customer, id: 'legacy-customer-2' }] };
+    })()],
+    ['twee guards', (() => {
+      const base = createLegacyMissingRootScenario();
+      return {
+        guards: [base.guard, {
+          ...base.guard,
+          reservation_id: 'legacy-reservation-2',
+          payload: { ...base.guard.payload },
+        }],
+      };
+    })()],
+    ['onverzoende guard', {
+      mutateGuard: (guard) => ({
+        ...guard,
+        payload: { ...guard.payload, postSmtpReconciled: false },
+      }),
+    }],
+    ['guardstorefout', { guardStoreError: true }],
+    ['onvolledige unieke customer-read', { uniqueCustomerReadError: true }],
+    ['onleesbare Sent-bestaanread', { storedSentReadError: true }],
+    ['null Sent-bestaanread', { storedSentReadNull: true }],
+    ['niet-beschikbare accepted provenance-store', { acceptedStoreUnavailable: true }],
+    ['onleesbare accepted provenance', { acceptedReadError: true }],
+    ['bewust verwijderde of superseded Sent-root', {
+      storedSentMessageIds: ['<legacy-root@softora.nl>'],
+    }],
+    ['twee directe parents', {
+      inReplyTo: '<legacy-root@softora.nl> <tweede@softora.nl>',
+    }],
+    ['same-owner alias zonder expliciete quote-afzender', {
+      accountEmail: 'servecreusen@softora.nl', senderEmail: 'serve@softora.nl',
+      quotedSenderEmail: '',
+    }],
+    ['expliciete cross-owner quote-afzender', {
+      accountEmail: 'serve@softora.nl', senderEmail: 'serve@softora.nl',
+      quotedSenderEmail: 'martijn@softora.nl',
+    }],
+    ['expliciete onbekende quote-afzender', {
+      quotedSenderEmail: 'iemand-anders@example.nl',
+    }],
+    ['cross-owner terminale handtekening', (() => {
+      const base = createLegacyMissingRootScenario();
+      return { originalBody: base.originalBody.replace('Servé Creusen', 'Martijn van de Ven') };
+    })()],
+    ['realistische Gmail-minuut wijkt af', (() => {
+      const base = createLegacyMissingRootScenario();
+      return {
+        incomingBody: [
+          'Bedankt voor je bericht.', '',
+          'On Thu, Aug 20, 2026 at 2:50 PM Softora <serve@softora.nl>',
+          'wrote:',
+          ...base.originalBody.split('\n').map((line) => `> ${line}`),
+        ].join('\n'),
+      };
+    })()],
+    ['Nederlandse numerieke minuut wijkt af', { quotedAt: '20-08-2026 14:50' }],
+  ];
+  for (const [name, options] of cases) await t.test(name, async () => {
+    const fixture = createLegacyMissingRootScenario(options);
+    const replies = await fixture.service.listReplies({ limit: 100 });
+
+    assert.equal(replies.length, 1);
+    assert.deepEqual(replies[0].threadMessages, []);
+    assert.equal(replies[0].id, fixture.incoming.id);
+  });
+});
+
+test('legacy outbound-root recovery ondersteunt realistische Gmail- en Nederlandse quote-datums', async (t) => {
+  const gmailBase = createLegacyMissingRootScenario({
+    accountEmail: 'martijn@softora.nl', senderEmail: 'martijn@softora.nl',
+  });
+  const scenarios = [
+    {
+      name: 'gewrapte Gmail-header zonder e-mailadres',
+      options: {
+        accountEmail: 'martijn@softora.nl', senderEmail: 'martijn@softora.nl',
+        incomingBody: [
+          'Bedankt voor je bericht.', '',
+          'On Thu, Aug 20, 2026 at 2:49\u202fPM Martijn van de Ven',
+          'wrote:',
+          ...gmailBase.originalBody.split('\n').map((line) => `> ${line}`),
+        ].join('\n'),
+      },
+    },
+    {
+      name: 'Nederlandse lokale replyheader',
+      options: (() => {
+        const base = createLegacyMissingRootScenario();
+        return {
+          incomingBody: [
+            'Bedankt voor je bericht.', '',
+            'Op 20 augustus 2026 om 14:49 schreef Softora <serve@softora.nl>:',
+            ...base.originalBody.split('\n').map((line) => `> ${line}`),
+          ].join('\n'),
+        };
+      })(),
+    },
+    {
+      name: 'Nederlandse numerieke datum met dag eerst',
+      options: { quotedAt: '20-08-2026 14:49' },
+    },
+    {
+      name: 'Nederlandse reverse replyheader met jaar eerst',
+      options: (() => {
+        const sentAt = '2026-08-19T08:10:00.000Z';
+        const base = createLegacyMissingRootScenario({ sentAt });
+        return {
+          sentAt,
+          incomingAt: '2026-08-19T08:35:00.000Z',
+          incomingBody: [
+            'Bedankt voor je bericht.', '',
+            'Servé Creusen schreef op 2026-08-19 10:10:',
+            ...base.originalBody.split('\n').map((line) => `> ${line}`),
+          ].join('\n'),
+        };
+      })(),
+    },
+  ];
+
+  for (const scenario of scenarios) await t.test(scenario.name, async () => {
+    const fixture = createLegacyMissingRootScenario(scenario.options);
+    const replies = await fixture.service.listReplies({ limit: 100 });
+    assert.equal(replies[0].threadMessages.length, 1);
+    assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, true);
+  });
+});
+
+test('legacy outbound-root recovery bewaakt handtekeningeigenaars buiten een korte footertail', async (t) => {
+  const base = createLegacyMissingRootScenario();
+  const rejectedBodies = [
+    {
+      name: 'samengestelde cross-owner handtekening',
+      body: base.originalBody.replace('Servé Creusen', 'Martijn van de Ven | Softora'),
+    },
+    {
+      name: 'samengestelde cross-owner handtekening met slash',
+      body: base.originalBody.replace('Servé Creusen', 'Martijn van de Ven / Softora'),
+    },
+    {
+      name: 'cross-owner handtekening voor meer dan twaalf footerregels',
+      body: base.originalBody.replace(
+        'Servé Creusen',
+        ['Martijn van de Ven', ...Array.from({ length: 13 }, (_, index) => `Footerregel ${index + 1}`)].join('\n')
+      ),
+    },
+  ];
+
+  for (const scenario of rejectedBodies) await t.test(scenario.name, async () => {
+    const fixture = createLegacyMissingRootScenario({ originalBody: scenario.body });
+    const replies = await fixture.service.listReplies({ limit: 100 });
+    assert.deepEqual(replies[0].threadMessages, []);
+  });
+
+  await t.test('gewone prozavermelding van een andere eigenaar blijft toegestaan', async () => {
+    const originalBody = base.originalBody.replace(
+      'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
+      [
+        'Ik sprak Martijn van de Ven gisteren nog over vergelijkbare websites.',
+        'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
+      ].join('\n')
+    );
+    const fixture = createLegacyMissingRootScenario({ originalBody });
+    const replies = await fixture.service.listReplies({ limit: 100 });
+    assert.equal(replies[0].threadMessages.length, 1);
+    assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, true);
+  });
+});
+
+test('legacy outbound-root recovery behandelt expliciet gezoneerde month-first Gmail-tijden absoluut', async (t) => {
+  function createZonedScenario(quotedAt) {
+    const base = createLegacyMissingRootScenario();
+    return createLegacyMissingRootScenario({
+      incomingBody: [
+        'Bedankt voor je bericht.', '',
+        `On Thu, Aug 20, 2026 at ${quotedAt} Softora <serve@softora.nl>`,
+        'wrote:',
+        ...base.originalBody.split('\n').map((line) => `> ${line}`),
+      ].join('\n'),
+    });
+  }
+
+  for (const quotedAt of ['12:49 PM UTC', '12:49 PM +0000', '2:49 PM CEST']) {
+    await t.test(`matchende absolute tijd ${quotedAt}`, async () => {
+      const fixture = createZonedScenario(quotedAt);
+      const replies = await fixture.service.listReplies({ limit: 100 });
+      assert.equal(replies[0].threadMessages.length, 1);
+      assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, true);
+    });
+  }
+
+  for (const quotedAt of ['2:49 PM UTC', '2:49 PM +0000', '2:49 PM +2500', '2:49 PM XYZ']) {
+    await t.test(`afwijkende of ongeldige absolute tijd ${quotedAt}`, async () => {
+      const fixture = createZonedScenario(quotedAt);
+      const replies = await fixture.service.listReplies({ limit: 100 });
+      assert.deepEqual(replies[0].threadMessages, []);
+    });
+  }
+});
+
+test('legacy outbound-root recovery houdt virtuele quotes uniek en bewaart een echte RFC-root', async (t) => {
+  const base = createLegacyMissingRootScenario();
+  const incomingBody = buildLegacyMultiQuoteBody([base.originalBody, base.originalBody]);
+
+  await t.test('twee quote-segmenten maken geen virtuele root', async () => {
+    const fixture = createLegacyMissingRootScenario({ incomingBody });
+    const replies = await fixture.service.listReplies({ limit: 100 });
+    assert.deepEqual(replies[0].threadMessages, []);
+  });
+
+  await t.test('een exact opgeslagen Sent-root blijft met twee consistente segmenten behouden', async () => {
+    const fixture = createLegacyMissingRootScenario({ incomingBody, actualSent: true });
+    const replies = await fixture.service.listReplies({ limit: 100 });
+    assert.equal(replies[0].threadMessages.length, 1);
+    assert.equal(replies[0].threadMessages[0].id, 'sent:legacy-root');
+    assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, undefined);
+  });
+});
+
+test('legacy real-Sent recovery weigert twee verschillende kandidaten uit twee quote-segmenten', async () => {
+  const base = createLegacyMissingRootScenario();
+  const otherBody = base.originalBody
+    .replace('legacy-lead.example', 'ander-legacy-bedrijf.example')
+    .replace('fris webdesign', 'volledig nieuw webdesign');
+  const sentCandidates = [
+    {
+      ...base.actualSent,
+      id: 'sent:quoted-a',
+      messageId: '<quoted-a@softora.nl>',
+      date: '2026-08-20T12:40:00.000Z',
+    },
+    {
+      ...base.actualSent,
+      id: 'sent:quoted-b',
+      messageId: '<quoted-b@softora.nl>',
+      body: otherBody,
+      preview: otherBody,
+      date: '2026-08-20T12:41:00.000Z',
+    },
+  ];
+  const fixture = createLegacyMissingRootScenario({
+    incomingBody: buildLegacyMultiQuoteBody([base.originalBody, otherBody]),
+    sentCandidates,
+  });
+  const replies = await fixture.service.listReplies({ limit: 100 });
+  assert.deepEqual(replies[0].threadMessages, []);
+});
+
+test('legacy outbound-root recovery accepteert meerdere consistente inbounds binnen één RFC-thread', async () => {
+  const fixture = createLegacyMissingRootScenario({ consistentInboundCopies: 1 });
+  const replies = await fixture.service.listReplies({ limit: 100 });
+  const recoveredRoots = replies[0].threadMessages.filter((message) => message.legacyAcceptedRoot === true);
+  assert.equal(recoveredRoots.length, 1);
+  assert.equal(recoveredRoots[0].messageId, '<legacy-root@softora.nl>');
+});
+
+test('exacte accepted provenance matcht case-insensitive en wint van de virtuele fallback', async () => {
+  const base = createLegacyMissingRootScenario();
+  const fixture = createLegacyMissingRootScenario({
+    acceptedIntents: [{
+      ...base.acceptedIntent,
+      accountEmail: 'SERVE@SOFTORA.NL',
+      messageId: '<LEGACY-ROOT@SOFTORA.NL>',
+    }],
+  });
+  const replies = await fixture.service.listReplies({ limit: 100 });
+
+  assert.equal(replies[0].threadMessages.length, 1);
+  assert.equal(replies[0].threadMessages[0].id, 'accepted-sent:<LEGACY-ROOT@SOFTORA.NL>');
+  assert.equal(replies[0].threadMessages[0].accountEmail, 'serve@softora.nl');
+  assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, undefined);
+  assert.equal(replies[0].threadMessages[0].body, fixture.originalBody);
+  assert.equal(fixture.guardLookups.length, 0);
+});
+
+test('virtuele outbound-root bewaart alleen een exact gevalideerde Softora-previewlink', async () => {
+  const base = createLegacyMissingRootScenario();
+  const exactUrl = 'https://www.softora.nl/webdesign/legacy-lead?cid=kvk-1&sender=serve';
+  const originalBody = base.originalBody.replace(
+    'Met vriendelijke groet,',
+    `Bekijk het ontwerp via deze link [${exactUrl}]\nMet vriendelijke groet,`
+  );
+  const fixture = createLegacyMissingRootScenario({ originalBody });
+  const replies = await fixture.service.listReplies({ limit: 100 });
+
+  assert.equal(replies[0].threadMessages[0].webdesignLinkUrl, exactUrl);
+  assert.equal(replies[0].threadMessages[0].webdesignLinkUrl.endsWith(']'), false);
+});
+
+test('legacy outbound-root recovery batcht meer dan honderd ontvangers zonder queryverbreding', async () => {
+  const inbox = [];
+  const customers = [];
+  const guards = [];
+  for (let index = 0; index < 101; index += 1) {
+    const recipientEmail = `legacy-${index}@example.nl`;
+    const parentMessageId = `<legacy-root-${index}@softora.nl>`;
+    const fixture = createLegacyMissingRootScenario({
+      recipientEmail,
+      parentMessageId,
+      customerId: `legacy-customer-${index}`,
+    });
+    inbox.push({
+      ...fixture.incoming,
+      id: `inbox:legacy-root-${index}`,
+      uid: index + 1,
+      messageId: `<legacy-reply-${index}@example.nl>`,
+    });
+    customers.push(fixture.customer);
+    guards.push({ ...fixture.guard, reservation_id: `legacy-reservation-${index}` });
+  }
+  const guardLookups = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? inbox : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? inbox : [],
+      listMessagesByMessageIdsForAccounts: async () => [],
+      listStoredMessageIdsByMessageIdsForAccounts: async () => [],
+      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      listUnthreadedSentCandidatesForConversations: async () => [],
+      listSentCandidatesForQuotedReplies: async () => [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => customers,
+      listUniqueCustomersByEmails: async () => customers,
+    },
+    mailboxSendProvenanceStore: {
+      isAvailable: () => true,
+      listAcceptedMessages: async () => [],
+      listAcceptedMessagesByMessageIds: async () => [],
+    },
+    outboundRecipientGuardStore: {
+      listSentRecipientGroups: async (lookup) => {
+        guardLookups.push(lookup);
+        const recipients = new Set(lookup.recipientEmails);
+        return guards.filter((guard) => recipients.has(guard.recipient_email));
+      },
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 200 });
+
+  assert.equal(replies.length, 101);
+  assert.equal(replies.every((reply) => (
+    reply.threadMessages.length === 1 && reply.threadMessages[0].legacyAcceptedRoot === true
+  )), true);
+  assert.deepEqual(guardLookups.map((lookup) => lookup.recipientEmails.length), [100, 1]);
+  assert.deepEqual(guardLookups.map((lookup) => lookup.maxRows), [101, 2]);
+  assert.equal(guardLookups.every((lookup) => lookup.keyType === 'email'), true);
+});
+
+test('een teruggekeerde echte Sent-root vervangt de read-only fallback zonder dubbel bericht', async () => {
+  const before = createLegacyMissingRootScenario();
+  const beforeReplies = await before.service.listReplies({ limit: 100 });
+  assert.equal(beforeReplies[0].threadMessages.length, 1);
+  assert.equal(beforeReplies[0].threadMessages[0].legacyAcceptedRoot, true);
+
+  const after = createLegacyMissingRootScenario({ actualSent: true });
+  const afterReplies = await after.service.listReplies({ limit: 100 });
+  assert.equal(afterReplies[0].threadMessages.length, 1);
+  assert.equal(afterReplies[0].threadMessages[0].id, after.actualSent.id);
+  assert.equal(afterReplies[0].threadMessages[0].legacyAcceptedRoot, undefined);
+  assert.equal(afterReplies[0].threadMessages[0].messageId, after.actualSent.messageId);
 });
