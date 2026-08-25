@@ -5,11 +5,82 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   const SOURCE_FIELDS = ['title', 'notes', 'sets', 'reps', 'kg'];
   const COMPLETION_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+  const FORM_HISTORY_LENGTH = 3;
   const FORM_STATUS_CYCLE = ['down', 'same', 'up'];
 
+  function normalizeFormStatus(value) {
+    const status = String(value || '').trim().toLowerCase();
+    return FORM_STATUS_CYCLE.includes(status) ? status : '';
+  }
+
   function nextFormStatus(value) {
-    const currentIndex = FORM_STATUS_CYCLE.indexOf(String(value || '').trim().toLowerCase());
+    const currentIndex = FORM_STATUS_CYCLE.indexOf(normalizeFormStatus(value));
     return FORM_STATUS_CYCLE[(currentIndex + 1) % FORM_STATUS_CYCLE.length];
+  }
+
+  function normalizeFormSessionHistory(value) {
+    const entries = Array.isArray(value) ? value : [];
+    const legacyEntries = [];
+    const datedEntries = new Map();
+
+    entries.forEach((entry) => {
+      const status = normalizeFormStatus(typeof entry === 'string' ? entry : entry?.status);
+      if (!status) return;
+      const date = String(typeof entry === 'object' && entry ? entry.date || '' : '').trim();
+      if (COMPLETION_DATE_PATTERN.test(date)) {
+        datedEntries.set(date, { date, status });
+      } else {
+        legacyEntries.push({ status });
+      }
+    });
+
+    const datedHistory = [...datedEntries.values()].sort((left, right) => left.date.localeCompare(right.date));
+    return [...legacyEntries, ...datedHistory].slice(-FORM_HISTORY_LENGTH);
+  }
+
+  function padFormSessionSlots(entries) {
+    const padding = Array.from(
+      { length: Math.max(0, FORM_HISTORY_LENGTH - entries.length) },
+      () => ({ date: '', status: '', isCurrent: false })
+    );
+    return [...padding, ...entries].slice(-FORM_HISTORY_LENGTH);
+  }
+
+  function buildFormSessionSlots(value, dateKey, includeCurrentSlot) {
+    const history = normalizeFormSessionHistory(value);
+    const normalizedDateKey = String(dateKey || '').trim();
+    if (!includeCurrentSlot || !COMPLETION_DATE_PATTERN.test(normalizedDateKey)) {
+      return padFormSessionSlots(
+        history.map((entry) => ({ ...entry, isCurrent: false }))
+      );
+    }
+
+    const current = history.find((entry) => entry.date === normalizedDateKey);
+    const previous = history
+      .filter((entry) => entry.date !== normalizedDateKey)
+      .slice(-(FORM_HISTORY_LENGTH - 1))
+      .map((entry) => ({ ...entry, isCurrent: false }));
+    return padFormSessionSlots([
+      ...previous,
+      current
+        ? { ...current, isCurrent: true }
+        : { date: normalizedDateKey, status: '', isCurrent: true },
+    ]);
+  }
+
+  function setFormSessionStatus(value, dateKey, status) {
+    const history = normalizeFormSessionHistory(value);
+    const normalizedDateKey = String(dateKey || '').trim();
+    const normalizedStatus = normalizeFormStatus(status);
+    if (!COMPLETION_DATE_PATTERN.test(normalizedDateKey) || !normalizedStatus) return history;
+    return normalizeFormSessionHistory([
+      ...history.filter((entry) => entry.date !== normalizedDateKey),
+      { date: normalizedDateKey, status: normalizedStatus },
+    ]);
+  }
+
+  function legacyFormHistoryFromSessions(value) {
+    return buildFormSessionSlots(value, '', false).map((entry) => entry.status);
   }
 
   function normalizeCompletionDates(value) {
@@ -99,13 +170,17 @@
   }
 
   return {
+    buildFormSessionSlots,
     isCompletedOnDate,
+    legacyFormHistoryFromSessions,
     mergeExerciseSource,
     nextFormStatus,
     normalizeCompletionDates,
+    normalizeFormSessionHistory,
     readCanonicalExerciseSource,
     reconcileExerciseSources,
     setCompletedOnDate,
+    setFormSessionStatus,
     sourceValuesEqual,
   };
 });

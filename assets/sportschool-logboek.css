@@ -452,6 +452,16 @@ textarea:focus-visible {
   cursor: pointer;
 }
 
+.form-status-button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.form-status[data-session-role="current"] {
+  border-color: rgba(155, 35, 85, 0.28);
+  background: var(--softora-white);
+}
+
 .form-status-button[data-status="up"] {
   color: #3d945c;
 }

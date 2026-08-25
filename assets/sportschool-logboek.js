@@ -33,9 +33,6 @@
     '4 SETS - 8 TOT 10 HERHALINGEN',
     '3 RONDES - 45 SECONDEN',
   ]);
-  const FORM_HISTORY_LENGTH = 3;
-  const FORM_STATUSES = new Set(['up', 'down', 'same']);
-
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
   const logbookStateApi = window.SoftoraSportschoolLogbookState;
@@ -88,11 +85,7 @@
   }
 
   function normalizeFormHistory(value) {
-    const entries = Array.isArray(value) ? value : [];
-    return Array.from({ length: FORM_HISTORY_LENGTH }, (_, index) => {
-      const status = String(entries[index] || '').trim().toLowerCase();
-      return FORM_STATUSES.has(status) ? status : '';
-    });
+    return logbookStateApi.legacyFormHistoryFromSessions(value);
   }
 
   function exerciseSlotKey(day, order) {
@@ -110,6 +103,13 @@
       state.exerciseSources = {};
     }
     return state.exerciseSources;
+  }
+
+  function ensureFormSessions(state = logbookState) {
+    if (!state.formSessions || typeof state.formSessions !== 'object' || Array.isArray(state.formSessions)) {
+      state.formSessions = {};
+    }
+    return state.formSessions;
   }
 
   function cleanNotes(value, options = {}) {
@@ -194,7 +194,7 @@
   }
 
   function createDefaultState() {
-    const state = { version: 2, exerciseSources: {}, days: {} };
+    const state = { version: 3, exerciseSources: {}, formSessions: {}, days: {} };
     STORAGE_DAYS.forEach((day) => {
       state.days[day] = createDefaultDayState(day, state);
     });
@@ -273,7 +273,13 @@
     const stored = dayState.exercises?.[String(order)] || {};
     const { exerciseKey, source } = getExerciseSource(day, order, stored);
     const completedDates = logbookStateApi.normalizeCompletionDates(stored.completedDates);
-    const formHistory = normalizeFormHistory(stored.formHistory);
+    const formSessions = ensureFormSessions();
+    let formSessionHistory = logbookStateApi.normalizeFormSessionHistory(formSessions[exerciseKey]);
+    if (formSessionHistory.length === 0) {
+      formSessionHistory = logbookStateApi.normalizeFormSessionHistory(stored.formHistory);
+    }
+    formSessions[exerciseKey] = formSessionHistory;
+    const formHistory = normalizeFormHistory(formSessionHistory);
     dayState.exercises[String(order)] = { exerciseKey, ...source, completedDates, formHistory };
     return {
       order,
@@ -285,24 +291,27 @@
       kg: source.kg,
       completedDates,
       formHistory,
+      formSessionHistory,
       completed: logbookStateApi.isCompletedOnDate({ completedDates }, currentDateKey()),
     };
   }
 
-  function setFormHistory(day, order, slotIndex, status) {
+  function setCurrentFormStatus(day, order, status) {
+    if (storageDay(day) !== currentWeekday()) return readExercise(day, order);
     const dayState = getDayState(day);
     const key = String(order);
     const current = readExercise(day, order);
-    const formHistory = normalizeFormHistory(current.formHistory);
-    const nextStatus = FORM_STATUSES.has(status) ? status : '';
-    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= FORM_HISTORY_LENGTH) return;
-    if (formHistory[slotIndex] === nextStatus) return;
-    formHistory[slotIndex] = nextStatus;
+    const formSessions = ensureFormSessions();
+    const previousHistory = logbookStateApi.normalizeFormSessionHistory(formSessions[current.exerciseKey]);
+    const nextHistory = logbookStateApi.setFormSessionStatus(previousHistory, currentDateKey(), status);
+    if (JSON.stringify(previousHistory) === JSON.stringify(nextHistory)) return current;
+    formSessions[current.exerciseKey] = nextHistory;
     dayState.exercises[key] = {
       ...dayState.exercises[key],
-      formHistory,
+      formHistory: normalizeFormHistory(nextHistory),
     };
     markStateChanged();
+    return { ...current, formHistory: normalizeFormHistory(nextHistory), formSessionHistory: nextHistory };
   }
 
   function setExerciseCompleted(day, order, completed) {
@@ -328,16 +337,26 @@
       const previousExercise = readExercise(day, order);
       const nextExerciseKey = exerciseKeyForTitle(title, exerciseSlotKey(day, order));
       const sources = ensureExerciseSources();
+      const formSessions = ensureFormSessions();
       sources[nextExerciseKey] = logbookStateApi.mergeExerciseSource(
         sources[nextExerciseKey],
         { ...previousExercise, title },
         normalizeExerciseSource(day, order)
       );
+      if (
+        nextExerciseKey !== previousExercise.exerciseKey &&
+        logbookStateApi.normalizeFormSessionHistory(formSessions[nextExerciseKey]).length === 0
+      ) {
+        formSessions[nextExerciseKey] = logbookStateApi.normalizeFormSessionHistory(
+          formSessions[previousExercise.exerciseKey] || previousExercise.formHistory
+        );
+      }
+      const nextFormSessionHistory = logbookStateApi.normalizeFormSessionHistory(formSessions[nextExerciseKey]);
       const nextExercise = {
         exerciseKey: nextExerciseKey,
         ...sources[nextExerciseKey],
         completedDates: logbookStateApi.normalizeCompletionDates(previousExercise.completedDates),
-        formHistory: normalizeFormHistory(previousExercise.formHistory),
+        formHistory: normalizeFormHistory(nextFormSessionHistory),
       };
       changed =
         previousExercise.exerciseKey !== nextExercise.exerciseKey ||
@@ -393,7 +412,7 @@
                 reps: exercise.reps,
                 kg: exercise.kg,
                 completedDates: exercise.completedDates,
-                formHistory: exercise.formHistory,
+                formHistory: normalizeFormHistory(exercise.formSessionHistory),
               },
             ];
           })
@@ -401,15 +420,19 @@
       };
     });
     const sources = ensureExerciseSources();
+    const storedFormSessions = ensureFormSessions();
     const exerciseSources = {};
+    const formSessions = {};
     usedExerciseKeys.forEach((exerciseKey) => {
       if (sources[exerciseKey]) exerciseSources[exerciseKey] = normalizeExerciseSource('monday', 0, sources[exerciseKey]);
+      formSessions[exerciseKey] = logbookStateApi.normalizeFormSessionHistory(storedFormSessions[exerciseKey]);
     });
 
     const snapshot = {
-      version: 2,
+      version: 3,
       updatedAt: new Date().toISOString(),
       exerciseSources,
+      formSessions,
       days,
     };
     if (remoteBootstrapVersion === REMOTE_BOOTSTRAP_VERSION) {
@@ -446,6 +469,8 @@
     isApplyingStoredState = true;
     try {
       const canonicalSources = {};
+      const nextFormSessions = {};
+      const explicitFormSessionKeys = new Set();
       const nextDays = {};
       const entries = [];
       if (snapshot.exerciseSources && typeof snapshot.exerciseSources === 'object' && !Array.isArray(snapshot.exerciseSources)) {
@@ -453,6 +478,16 @@
           const key = String(exerciseKey || '').trim();
           if (!key) return;
           canonicalSources[key] = normalizeExerciseSource('monday', 0, source, { markLegacyNotes: true });
+        });
+      } else {
+        shouldPersistLoadedSnapshot = true;
+      }
+      if (snapshot.formSessions && typeof snapshot.formSessions === 'object' && !Array.isArray(snapshot.formSessions)) {
+        Object.entries(snapshot.formSessions).forEach(([exerciseKey, history]) => {
+          const key = String(exerciseKey || '').trim();
+          if (!key) return;
+          explicitFormSessionKeys.add(key);
+          nextFormSessions[key] = logbookStateApi.normalizeFormSessionHistory(history);
         });
       } else {
         shouldPersistLoadedSnapshot = true;
@@ -492,16 +527,32 @@
         });
       });
       const reconciled = logbookStateApi.reconcileExerciseSources(canonicalSources, entries);
+      reconciled.entries.forEach(({ exerciseKey, formHistory }) => {
+        if (explicitFormSessionKeys.has(exerciseKey)) return;
+        const currentHistory = logbookStateApi.normalizeFormSessionHistory(nextFormSessions[exerciseKey]);
+        const legacyHistory = logbookStateApi.normalizeFormSessionHistory(formHistory);
+        if (legacyHistory.length > currentHistory.length) nextFormSessions[exerciseKey] = legacyHistory;
+      });
       reconciled.entries.forEach(({ day, order, exerciseKey, source, completedDates, formHistory }) => {
+        const formSessionHistory = logbookStateApi.normalizeFormSessionHistory(
+          nextFormSessions[exerciseKey] || formHistory
+        );
+        nextFormSessions[exerciseKey] = formSessionHistory;
         nextDays[day].exercises[String(order)] = {
           exerciseKey,
           ...source,
           completedDates: logbookStateApi.normalizeCompletionDates(completedDates),
-          formHistory: normalizeFormHistory(formHistory),
+          formHistory: normalizeFormHistory(formSessionHistory),
         };
       });
       if (reconciled.repaired) shouldPersistLoadedSnapshot = true;
-      logbookState = { version: 2, exerciseSources: reconciled.exerciseSources, days: nextDays };
+      if (Number(snapshot.version) !== 3) shouldPersistLoadedSnapshot = true;
+      logbookState = {
+        version: 3,
+        exerciseSources: reconciled.exerciseSources,
+        formSessions: nextFormSessions,
+        days: nextDays,
+      };
       return true;
     } finally {
       isApplyingStoredState = false;
@@ -642,16 +693,27 @@
 
     const slots = document.createElement('div');
     slots.className = 'form-history-slots';
-    normalizeFormHistory(exercise.formHistory).forEach((status, index) => {
+    const isCurrentTrainingDay = storageDay(day) === currentWeekday();
+    const formSessionSlots = logbookStateApi.buildFormSessionSlots(
+      exercise.formSessionHistory,
+      currentDateKey(),
+      isCurrentTrainingDay
+    );
+    formSessionSlots.forEach((session, index) => {
       const slot = document.createElement('div');
       slot.className = 'form-status';
+      slot.dataset.sessionRole = session.isCurrent ? 'current' : 'history';
 
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'form-status-button';
-      button.dataset.status = status;
+      button.dataset.status = session.status;
       button.dataset.formSlot = String(index);
-      button.title = 'Tik: rood omlaag, geel gelijk, groen omhoog';
+      button.dataset.sessionRole = session.isCurrent ? 'current' : 'history';
+      button.disabled = !session.isCurrent;
+      button.title = session.isCurrent
+        ? 'Nieuwe sessie: tik voor rood omlaag, geel gelijk of groen omhoog'
+        : 'Eerdere sessie';
 
       const renderStatusButton = () => {
         const currentStatus = button.dataset.status || '';
@@ -662,18 +724,24 @@
           up: ['↑', 'sterker'],
         }[currentStatus] || ['·', 'niet ingevuld'];
         button.textContent = statusPresentation[0];
+        const sessionLabel = session.isCurrent
+          ? 'huidige sessie'
+          : session.date
+            ? `sessie ${session.date}`
+            : `eerdere sessie ${index + 1}`;
         button.setAttribute(
           'aria-label',
-          `${exercise.title} vormmoment ${index + 1}: ${statusPresentation[1]}`
+          `${exercise.title} ${sessionLabel}: ${statusPresentation[1]}`
         );
       };
 
       renderStatusButton();
       button.addEventListener('click', () => {
+        if (!session.isCurrent) return;
         const nextStatus = logbookStateApi.nextFormStatus(button.dataset.status);
         button.dataset.status = nextStatus;
         renderStatusButton();
-        setFormHistory(day, exercise.order, Number(button.dataset.formSlot), nextStatus);
+        setCurrentFormStatus(day, exercise.order, nextStatus);
       });
 
       slot.append(button);

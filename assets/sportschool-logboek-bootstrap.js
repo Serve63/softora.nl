@@ -1,6 +1,6 @@
 (() => {
   const STORAGE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  const VERSION = 1;
+  const VERSION = 2;
   const REMOTE_STORAGE_KEY = 'sportschool_logboek_v1';
   const LOCAL_STORAGE_KEY = 'softora_sportschool_logboek_v1';
 
@@ -31,10 +31,13 @@
 
     const remoteSources = isObject(remoteSnapshot.exerciseSources) ? remoteSnapshot.exerciseSources : {};
     const localSources = isObject(localSnapshot?.exerciseSources) ? localSnapshot.exerciseSources : {};
+    const remoteFormSessions = isObject(remoteSnapshot.formSessions) ? remoteSnapshot.formSessions : {};
+    const localFormSessions = isObject(localSnapshot?.formSessions) ? localSnapshot.formSessions : {};
     return {
       ...remoteSnapshot,
       remoteBootstrapVersion: VERSION,
       exerciseSources: { ...remoteSources, ...localSources },
+      formSessions: { ...remoteFormSessions, ...localFormSessions },
       days: mergedDays,
     };
   }
