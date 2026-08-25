@@ -46,6 +46,7 @@ function createMailboxDiscoveryRepository(deps = {}) {
       ...row,
       body_text: String(payload.timelineBodyText || ''),
     } : row, { includeBody: isAcceptedSendFallback });
+    const technicalThreadKey = String(row.technical_thread_key || '').trim();
     return {
       ...message,
       ...(isAcceptedSendFallback ? {
@@ -53,8 +54,9 @@ function createMailboxDiscoveryRepository(deps = {}) {
         localAcceptedSend: true,
         timelineSynthetic: true,
       } : {}),
-      messageKey: String(row.message_key || ''),
-      technicalThreadKey: String(row.technical_thread_key || ''),
+      messageKey: String(row.message_key || message.messageKey || ''),
+      technicalThreadKey,
+      conversationId: String(message.softoraConversationId || technicalThreadKey).trim(),
       externalContactEmail: String(row.external_contact_email || '').trim().toLowerCase(),
       canonicalOwner: String(row.canonical_owner || '').trim().toLowerCase(),
       searchMatch: row.match_message_key ? {

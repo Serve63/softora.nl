@@ -692,8 +692,9 @@ test('mailbox index store vindt de oudste campagne-uid zonder verwijderde histor
   );
 });
 
-test('mailbox index store bewaart gelezen status voor exact account, map en uid', async () => {
+test('mailbox index store bewaart gelezen status alleen voor de exacte generatievaste messageKey', async () => {
   const calls = [];
+  const messageKey = 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42';
   const query = {
     update(patch) {
       calls.push(['update', patch]);
@@ -726,6 +727,7 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'INBOX',
     id: 'inbox:42',
+    messageKey,
   });
 
   assert.equal(result.ok, true);
@@ -738,22 +740,23 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
+    ['eq', 'message_key', messageKey],
     ['is', 'deleted_at', null],
     ['is', 'generation_superseded_at', null],
-    ['eq', 'uid', 42],
   ]);
 });
 
 test('mailbox index store handelt de antwoordherinnering duurzaam af', async () => {
   const calls = [];
   const dismissedAt = '2026-08-04T15:10:00.000Z';
+  const messageKey = 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42';
   const query = {
     update(patch) { calls.push(['update', patch]); return query; },
     eq(column, value) { calls.push(['eq', column, value]); return query; },
     is(column, value) { calls.push(['is', column, value]); return query; },
     select(columns) { calls.push(['select', columns]); return query; },
     then(resolve) {
-      resolve({ data: [{ message_key: 'serve@softora.nl|inbox|42', reply_dismissed_at: dismissedAt }], error: null });
+      resolve({ data: [{ message_key: messageKey, reply_dismissed_at: dismissedAt }], error: null });
     },
   };
   const store = createMailboxIndexStore({
@@ -766,6 +769,7 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
     accountEmail: 'SERVE@SOFTORA.NL',
     folder: 'INBOX',
     id: 'inbox:42',
+    messageKey,
   });
 
   assert.equal(result.ok, true);
@@ -780,9 +784,9 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
+    ['eq', 'message_key', messageKey],
     ['is', 'deleted_at', null],
     ['is', 'generation_superseded_at', null],
-    ['eq', 'uid', 42],
     ['select', 'message_key,reply_dismissed_at'],
   ]);
 });
@@ -2785,6 +2789,8 @@ test('mailbox index store gebruikt de duurzame state-RPC met genormaliseerde ide
     folder: 'INBOX',
     id: 'inbox:259',
     uid: 259,
+    messageKey: 'serve290@gmail.com|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|259',
+    messageId: '<message-259@example.test>',
     mutationKey: 'a'.repeat(64),
     revision: 20260814165202001,
     unread: false,
@@ -2794,18 +2800,58 @@ test('mailbox index store gebruikt de duurzame state-RPC met genormaliseerde ide
   assert.equal(result.ok, true);
   assert.equal(result.row.state_revision, 20260814165202001);
   assert.deepEqual(rpcCalls, [[
-    'softora_apply_mailbox_state_mutation',
+    'softora_apply_mailbox_state_mutation_v2',
     {
       p_account_email: 'serve290@gmail.com',
       p_folder: 'inbox',
       p_uid: 259,
       p_provider_id: 'inbox:259',
+      p_expected_message_key: 'serve290@gmail.com|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|259',
+      p_expected_message_id: '<message-259@example.test>',
       p_mutation_key: 'a'.repeat(64),
       p_revision: 20260814165202001,
       p_unread: false,
       p_dismiss_reply: true,
     },
   ]]);
+});
+
+test('mailbox index store weigert elke directe statuswrite zonder generatievaste messageKey', async () => {
+  let calls = 0;
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => {
+      calls += 1;
+      return {};
+    },
+  });
+
+  const read = await store.markMessageRead({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uid: 42,
+  });
+  const dismissed = await store.markMessageReplyDismissed({
+    accountEmail: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uid: 42,
+  });
+
+  assert.equal(read.ok, false);
+  assert.equal(read.error.code, 'MAILBOX_STATE_IDENTITY_REQUIRED');
+  assert.equal(dismissed.ok, false);
+  assert.equal(dismissed.error.code, 'MAILBOX_STATE_IDENTITY_REQUIRED');
+  assert.equal(calls, 0);
+});
+
+test('generatievaste mailbox state mutation v2 is atomisch en alleen voor service_role uitvoerbaar', () => {
+  const migration = fs.readFileSync(
+    path.resolve(__dirname, '../../supabase/migrations/20260825143830_mailbox_state_mutation_strong_identity.sql'),
+    'utf8'
+  );
+  assert.match(migration, /softora_apply_mailbox_state_mutation_v2/);
+  assert.match(migration, /pg_advisory_xact_lock\(824031, 3\)/);
+  assert.match(migration, /message\.message_key = v_expected_message_key/);
+  assert.match(migration, /generation_superseded_at is null/);
+  assert.match(migration, /MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH/);
+  assert.doesNotMatch(migration, /grant execute[\s\S]*to (?:public|anon|authenticated)/i);
+  assert.match(migration, /grant execute[\s\S]*to service_role/i);
 });
 
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {

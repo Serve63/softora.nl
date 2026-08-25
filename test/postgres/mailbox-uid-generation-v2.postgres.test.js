@@ -47,6 +47,10 @@ if (!databaseUrl) {
     __dirname,
     '../../supabase/migrations/20260824224810_optimize_mailbox_final_activation_lineage.sql'
   ), 'utf8');
+  const strongIdentityMutationMigration = fs.readFileSync(path.resolve(
+    __dirname,
+    '../../supabase/migrations/20260825143830_mailbox_state_mutation_strong_identity.sql'
+  ), 'utf8');
   const sendProvenanceFoundation = fs.readFileSync(path.resolve(
     __dirname,
     '../../supabase/migrations/20260805200344_add_mailbox_send_provenance.sql'
@@ -1437,6 +1441,7 @@ begin
     `, [martijnCompatibilityGeneration]);
     await applyTrackedSql(client, targetManifestCheckpointMigration);
     await applyTrackedSql(client, finalActivationLineageMigration);
+    await applyTrackedSql(client, strongIdentityMutationMigration);
     await client.query(`
       update public.softora_mailbox_lineage_test_metrics set call_count=0
     `);
@@ -3492,6 +3497,80 @@ begin
     `)).rows[0].state_revision, '0');
   });
 
+  test('v2 state-mutatie weigert generation-A messageKey na UID-hergebruik en muteert alleen actieve B', async () => {
+    const client = await connect();
+    const accountEmail = 'state-identity@softora.nl';
+    const syncKey = `${accountEmail}|inbox`;
+    await client.query(`
+      insert into public.softora_mailbox_sync_state(
+        sync_key,account_email,folder,status,last_uid,message_count,uid_validity
+      ) values($1,$2,'inbox','idle',0,0,null)
+    `, [syncKey, accountEmail]);
+
+    const generationA = await activateSnapshot(client, {
+      syncKey,
+      token: 'state-identity-a-token',
+      commitId: 'state-identity-a-commit',
+      uidValidity: 1100,
+      rows: [messageRow(1, 'state-identity-a')],
+    });
+    const keyA = `${syncKey}|gen:${generationA.prepared.target_generation_id}|1`;
+
+    const generationB = await activateSnapshot(client, {
+      syncKey,
+      token: 'state-identity-b-token',
+      commitId: 'state-identity-b-commit',
+      uidValidity: 1200,
+      rows: [messageRow(1, 'state-identity-b')],
+    });
+    const keyB = `${syncKey}|gen:${generationB.prepared.target_generation_id}|1`;
+
+    await rejectsInSavepoint(
+      client,
+      () => client.query(`
+        select * from public.softora_apply_mailbox_state_mutation_v2(
+          $1,'inbox',1,'',$2,$3,$4,31,false,true
+        )
+      `, [accountEmail, keyA, 'state-identity-a-1@test.softora.nl', 'c'.repeat(64)]),
+      /MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH/
+    );
+    const beforeRows = (await client.query(`
+      select message_key,state_revision,unread,reply_dismissed_at
+      from public.softora_mailbox_messages
+      where account_email=$1 and folder='inbox' and uid=1
+    `, [accountEmail])).rows;
+    assert.equal(beforeRows.length, 2);
+    const beforeByKey = new Map(beforeRows.map((row) => [row.message_key, row]));
+    assert.deepEqual(beforeByKey.get(keyA), {
+      message_key: keyA, state_revision: '0', unread: true, reply_dismissed_at: null,
+    });
+    assert.deepEqual(beforeByKey.get(keyB), {
+      message_key: keyB, state_revision: '0', unread: true, reply_dismissed_at: null,
+    });
+
+    const applied = (await client.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1,'inbox',1,'',$2,$3,$4,32,false,true
+      )
+    `, [accountEmail, keyB, 'state-identity-b-1@test.softora.nl', 'd'.repeat(64)])).rows[0];
+    assert.equal(applied.applied, true);
+    assert.equal(applied.message_key, keyB);
+    const afterRows = (await client.query(`
+      select message_key,state_revision,unread,
+        reply_dismissed_at is not null as dismissed
+      from public.softora_mailbox_messages
+      where account_email=$1 and folder='inbox' and uid=1
+    `, [accountEmail])).rows;
+    assert.equal(afterRows.length, 2);
+    const afterByKey = new Map(afterRows.map((row) => [row.message_key, row]));
+    assert.deepEqual(afterByKey.get(keyA), {
+      message_key: keyA, state_revision: '0', unread: true, dismissed: false,
+    });
+    assert.deepEqual(afterByKey.get(keyB), {
+      message_key: keyB, state_revision: '32', unread: false, dismissed: true,
+    });
+  });
+
   test('incomplete stage en crash veranderen actieve zichtbaarheid niet; resume activeert atomisch', async () => {
     const client = await connect();
     const syncKey = 'serve@softora.nl|inbox';
@@ -4390,8 +4469,9 @@ begin
       'softora_skip_mailbox_sync_v2',
       'softora_fail_mailbox_sync_v2',
       'softora_apply_mailbox_state_mutation',
+      'softora_apply_mailbox_state_mutation_v2',
     ]])).rows;
-    assert.equal(rpcAcl.length, 7);
+    assert.equal(rpcAcl.length, 8);
     assert.ok(rpcAcl.every((row) => (
       !row.prosecdef
       && !row.anon_execute

@@ -63,18 +63,33 @@ function createMailboxReadMessageService(deps = {}) {
 
   function buildMutationKey(target, mutation) {
     return crypto.createHash('sha256').update([
-      'mailbox-state-v1',
+      'mailbox-state-v2',
       normalizeEmail(target.accountEmail),
       normalize(target.folder).toLowerCase(),
       Number(target.uid) || 0,
       normalize(target.id),
+      normalize(target.messageKey),
+      normalize(target.messageId).toLowerCase(),
       mutation.mutationId,
     ].join('|')).digest('hex');
   }
 
-  async function resolveTarget({ accountEmail, id, folder, uid, owner }) {
+  function requireExpectedMessageKey(value) {
+    const messageKey = normalize(value);
+    if (messageKey) return messageKey;
+    throw createSafeError(
+      'Mailboxstatus mist generatievaste berichtidentiteit.',
+      'MAILBOX_STATE_IDENTITY_REQUIRED',
+      409,
+      false
+    );
+  }
+
+  async function resolveTarget({ accountEmail, id, folder, uid, owner, messageKey, messageId }) {
     const normalizedFolder = normalize(folder || 'inbox').toLowerCase();
+    const expectedMessageId = normalize(messageId);
     if (normalizedFolder === 'instantly') {
+      const expectedMessageKey = requireExpectedMessageKey(messageKey);
       if (typeof instantlyMailboxService?.assertStoredMessageOwnership !== 'function') {
         throw createSafeError('Instantly-mailbox is tijdelijk niet beschikbaar.', 'INSTANTLY_MAILBOX_UNAVAILABLE', 503, true);
       }
@@ -90,6 +105,9 @@ function createMailboxReadMessageService(deps = {}) {
         uid: 0,
         id: `instantly:${normalize(stored.providerMessageId)}`,
         provider: 'instantly',
+        providerMessageId: normalize(stored.providerMessageId),
+        messageKey: expectedMessageKey,
+        messageId: expectedMessageId,
       };
     }
 
@@ -99,12 +117,15 @@ function createMailboxReadMessageService(deps = {}) {
       throw createSafeError('IMAP is niet geconfigureerd voor deze mailbox.', 'MAILBOX_IMAP_NOT_CONFIGURED', 503, false);
     }
     const messageRef = parseMessageReference({ id, folder: normalizedFolder, uid });
+    const expectedMessageKey = requireExpectedMessageKey(messageKey);
     return {
       accountEmail: normalizeEmail(account.email),
       folder: messageRef.folder,
       uid: messageRef.uid,
       id: normalize(id) || `${messageRef.folder}:${messageRef.uid}`,
       provider: 'imap',
+      messageKey: expectedMessageKey,
+      messageId: expectedMessageId,
       account,
     };
   }
@@ -119,6 +140,7 @@ function createMailboxReadMessageService(deps = {}) {
         id: target.id,
         folder: target.folder,
         uid: target.uid,
+        messageKey: normalize(row?.message_key),
       };
       const snapshotResult = mutation.dismissReply
         ? markMailboxCampaignSnapshotReplyDismissed(rawValue, identity, {
@@ -211,6 +233,14 @@ function createMailboxReadMessageService(deps = {}) {
     });
     if (result?.ok !== true || !result.row) {
       const sourceError = result?.error;
+      if (/MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH/i.test(normalize(sourceError?.message))) {
+        throw createSafeError(
+          'Dit mailboxbericht is inmiddels vervangen; vernieuw de mailbox.',
+          'MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH',
+          409,
+          false
+        );
+      }
       if (sourceError?.code === 'MAILBOX_INDEX_MESSAGE_NOT_FOUND' || sourceError?.code === 'P0002') {
         throw createSafeError('Mailboxbericht is niet meer beschikbaar.', 'MAILBOX_STATE_MESSAGE_NOT_FOUND', 404, false);
       }

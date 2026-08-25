@@ -36,6 +36,8 @@ test('mailbox campaign snapshot bewaart een geopende Instantly-mail duurzaam als
       folder: 'instantly',
       id: 'instantly:incoming-serve-1',
       uid: 0,
+      provider: 'instantly',
+      providerMessageId: 'incoming-serve-1',
     },
     { readAt }
   );
@@ -51,6 +53,7 @@ test('mailbox campaign snapshot bewaart een afgehandelde antwoordherinnering', (
     ok: true,
     messages: [{
       id: 'inbox:42',
+      messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
       uid: 42,
       folder: 'inbox',
       accountEmail: 'serve@softora.nl',
@@ -61,7 +64,13 @@ test('mailbox campaign snapshot bewaart een afgehandelde antwoordherinnering', (
   });
   const result = markMailboxCampaignSnapshotReplyDismissed(
     raw,
-    { accountEmail: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uid: 42 },
+    {
+      accountEmail: 'serve@softora.nl',
+      folder: 'inbox',
+      id: 'inbox:42',
+      uid: 42,
+      messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
+    },
     { dismissedAt: '2026-08-04T15:10:00.000Z' }
   );
   const [message] = parseMailboxCampaignSnapshot(result.serialized).messages;
@@ -69,6 +78,69 @@ test('mailbox campaign snapshot bewaart een afgehandelde antwoordherinnering', (
   assert.equal(result.changed, true);
   assert.equal(message.unread, false);
   assert.equal(message.replyDismissedAt, '2026-08-04T15:10:00.000Z');
+});
+
+test('mailbox campaign snapshot koppelt status aan generatievaste berichtidentiteit en nooit alleen aan UID', () => {
+  const oldGenerationKey = 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42';
+  const newGenerationKey = 'serve@softora.nl|inbox|gen:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb|42';
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:42-old',
+      messageKey: oldGenerationKey,
+      uid: 42,
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      unread: true,
+      messageId: '<old-generation@example.test>',
+      date: '2026-08-24T10:00:00.000Z',
+      threadMessages: [{
+        id: 'inbox:42-new',
+        messageKey: newGenerationKey,
+        uid: 42,
+        folder: 'inbox',
+        accountEmail: 'serve@softora.nl',
+        unread: true,
+        messageId: '<new-generation@example.test>',
+        date: '2026-08-25T10:00:00.000Z',
+      }],
+    }],
+  });
+
+  const result = markMailboxCampaignSnapshotReplyDismissed(raw, {
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+    messageKey: newGenerationKey,
+  }, { dismissedAt: '2026-08-25T10:05:00.000Z' });
+  const [root] = parseMailboxCampaignSnapshot(result.serialized).messages;
+
+  assert.equal(result.changed, true);
+  assert.equal(root.replyDismissedAt, '');
+  assert.equal(root.threadMessages[0].replyDismissedAt, '2026-08-25T10:05:00.000Z');
+});
+
+test('mailbox campaign snapshot erft zonder sterke identiteit geen status via een hergebruikte UID', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:42',
+      uid: 42,
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      unread: true,
+      date: '2026-08-25T10:00:00.000Z',
+    }],
+  });
+
+  const result = markMailboxCampaignSnapshotRead(raw, {
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+  }, { readAt: '2026-08-25T10:05:00.000Z' });
+
+  assert.equal(result.changed, false);
+  assert.equal(parseMailboxCampaignSnapshot(result.serialized).messages[0].unread, true);
 });
 
 test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct', () => {
@@ -98,6 +170,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     },
     threadMessages: index === 0 ? [{
       id: 'sent:201',
+      messageKey: 'serve@softora.nl|sent|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|201',
       uid: 201,
       folder: 'sent',
       accountEmail: 'serve@softora.nl',
@@ -131,6 +204,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.equal(parsed.messages[0].campaign.company, 'Bedrijf 0');
   assert.deepEqual(parsed.messages[0].threadMessages, [{
     id: 'sent:201',
+    messageKey: 'serve@softora.nl|sent|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|201',
     uid: 201,
     folder: 'sent',
     accountEmail: 'serve@softora.nl',
@@ -406,7 +480,7 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 14,
+    version: 15,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{

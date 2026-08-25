@@ -1,9 +1,10 @@
 (function (global) {
   'use strict';
 
-  const DB_NAME = 'softora_mailbox_state_outbox_v1';
+  const OUTBOX_SCHEMA_VERSION = 2;
+  const DB_NAME = 'softora_mailbox_state_outbox_v2';
   const STORE_NAME = 'mutations';
-  const CHANNEL_NAME = 'softora_mailbox_state_outbox_v1';
+  const CHANNEL_NAME = 'softora_mailbox_state_outbox_v2';
   const MAX_ATTEMPTS = 8;
   const REQUEST_TIMEOUT_MS = 20_000;
   const LEASE_MS = 30_000;
@@ -24,6 +25,20 @@
 
   function isRetryableStatus(status) {
     return [408, 429, 502, 503, 504].includes(Number(status));
+  }
+
+  function hasStrongIdentity(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    return Boolean(normalize(source.account) && normalize(source.messageKey));
+  }
+
+  function isCurrentRecord(record) {
+    return Boolean(
+      record &&
+      Number(record.schemaVersion) === OUTBOX_SCHEMA_VERSION &&
+      normalize(record.resourceKey) &&
+      hasStrongIdentity(record.payload)
+    );
   }
 
   function humanFailureMessage(status, payload) {
@@ -98,7 +113,7 @@
     }
 
     async function reconcileAmbiguous(record) {
-      if (!record.ambiguous) return false;
+      if (!isCurrentRecord(record) || !record.ambiguous) return false;
       try {
         const { response, data } = await request('/api/mailbox/messages/read/status', record);
         if (!response.ok || !data?.ok) return false;
@@ -112,6 +127,7 @@
     }
 
     async function send(record) {
+      if (!isCurrentRecord(record)) return;
       if (inflight.has(record.resourceKey)) return;
       inflight.add(record.resourceKey);
       try {
@@ -160,6 +176,7 @@
       const records = await store.list().catch(() => []);
       const nowMs = now();
       const due = records
+        .filter(isCurrentRecord)
         .filter((record) => record.status !== 'failed' && (settings.force || Number(record.nextAttemptAt || 0) <= nowMs))
         .sort((a, b) => Number(a.nextAttemptAt || 0) - Number(b.nextAttemptAt || 0));
       const sends = [];
@@ -168,7 +185,7 @@
         if (claimed) sends.push(send(claimed));
       }
       await Promise.all(sends);
-      const future = records.filter((record) => record.status !== 'failed' && Number(record.nextAttemptAt || 0) > nowMs);
+      const future = records.filter((record) => isCurrentRecord(record) && record.status !== 'failed' && Number(record.nextAttemptAt || 0) > nowMs);
       if (future.length) schedule(Math.min(...future.map((record) => Number(record.nextAttemptAt) - nowMs)));
       return due.length > 0;
     }
@@ -177,10 +194,13 @@
       sequence = (sequence + 1) % 1000;
       const nowMs = now();
       const resourceKey = normalize(meta.resourceKey);
-      if (!resourceKey) throw new Error('Mailbox-outbox mist resource-identiteit');
+      if (!resourceKey || !hasStrongIdentity(payload)) {
+        throw new Error('Mailbox-outbox mist generatievaste berichtidentiteit');
+      }
       const mutationId = createMutationId(cryptoImpl, nowMs, sequence, random);
       const revision = nowRevision(nowMs, sequence);
       const record = {
+        schemaVersion: OUTBOX_SCHEMA_VERSION,
         resourceKey, mutationId, revision,
         payload: { ...payload, mutationId, revision },
         identity: meta.identity || null,
@@ -200,7 +220,7 @@
 
     async function retry(resourceKey) {
       const current = await store.get(resourceKey);
-      if (!current) return false;
+      if (!isCurrentRecord(current)) return false;
       const updated = await store.update(resourceKey, current.mutationId, {
         status: 'pending', attempts: 0, nextAttemptAt: now(),
         leaseOwner: '', leaseUntil: 0, errorMessage: '',
@@ -213,9 +233,10 @@
 
     async function hydrate() {
       const records = await store.list().catch(() => []);
-      records.forEach((record) => emit(record.status === 'failed' ? 'failed' : 'pending', record, { broadcast: false }));
+      const currentRecords = records.filter(isCurrentRecord);
+      currentRecords.forEach((record) => emit(record.status === 'failed' ? 'failed' : 'pending', record, { broadcast: false }));
       schedule(0);
-      return records;
+      return currentRecords;
     }
 
     function subscribe(listener) {
@@ -235,7 +256,7 @@
         channel = new BroadcastChannelImpl(CHANNEL_NAME);
         channel.addEventListener?.('message', (event) => {
           const data = event?.data;
-          if (!data?.type || !data?.record) return;
+          if (!data?.type || !isCurrentRecord(data?.record)) return;
           emit(data.type, data.record, { result: data.result, message: data.message, broadcast: false });
           if (data.type === 'pending' || data.type === 'retry-scheduled') schedule(0);
         });
@@ -262,6 +283,7 @@
     ? require('./premium-browser-storage.js')
     : null);
   const api = {
+    OUTBOX_SCHEMA_VERSION,
     create,
     createMemoryStore: () => storage.createMemoryLatestRecordStore({ leaseMs: LEASE_MS }),
     isRetryableStatus,

@@ -84,6 +84,7 @@
     if (matchingRoot) {
       root.technicalThreadKey = matchingRoot.technicalThreadKey;
       root.messageKey = matchingRoot.messageKey || root.messageKey;
+      root.conversationId = matchingRoot.conversationId || root.conversationId;
     }
     const seen = new Set(rootIdentity ? [rootIdentity] : []);
     root.threadMessages = normalized.filter((message) => {
@@ -244,6 +245,7 @@
           normalized.searchQuery = query;
           normalized.externalContactEmail = message.externalContactEmail || normalized.externalContactEmail || '';
           normalized.technicalThreadKey = message.technicalThreadKey || normalized.technicalThreadKey || '';
+          normalized.conversationId = message.conversationId || normalized.conversationId || '';
           normalized.canonicalOwner = message.canonicalOwner || normalized.canonicalOwner || '';
           return normalized;
         });

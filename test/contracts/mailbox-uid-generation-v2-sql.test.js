@@ -22,6 +22,10 @@ const targetManifestCheckpointMigration = fs.readFileSync(path.join(
   repoRoot,
   'supabase/migrations/20260824193645_checkpoint_mailbox_uid_target_manifest.sql'
 ), 'utf8');
+const strongIdentityMutationMigration = fs.readFileSync(path.join(
+  repoRoot,
+  'supabase/migrations/20260825143830_mailbox_state_mutation_strong_identity.sql'
+), 'utf8');
 const schema = fs.readFileSync(path.join(repoRoot, 'supabase/data-ops-schema.sql'), 'utf8');
 
 function functionSqlFrom(source, name) {
@@ -568,6 +572,23 @@ test('state-mutatie sluit superseded generaties uit bij hergebruikte UID', () =>
   assert.ok(sql.indexOf('softora_mailbox_campaign_consistency') < sql.indexOf('from public.softora_mailbox_messages'));
 });
 
+test('v2 state-mutatie bindt een hergebruikte UID aan de exacte actieve messageKey', () => {
+  const sql = functionSqlFrom(
+    strongIdentityMutationMigration,
+    'softora_apply_mailbox_state_mutation_v2'
+  );
+  assert.match(sql, /where message\.message_key = v_expected_message_key/);
+  assert.match(sql, /message\.generation_superseded_at is null/);
+  assert.match(sql, /message\.deleted_at is null/);
+  assert.match(sql, /v_row\.uid is distinct from p_uid/);
+  assert.match(sql, /v_row\.provider_id is distinct from pg_catalog\.btrim\(p_provider_id\)/);
+  assert.match(sql, /softora_normalize_mailbox_message_id\(v_row\.message_id\)[\s\S]*?is distinct from v_expected_message_id/);
+  assert.match(sql, /message = 'MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH'/);
+  assert.ok(sql.indexOf('for update') < sql.indexOf('softora_apply_mailbox_state_mutation('));
+  assert.match(strongIdentityMutationMigration, /revoke all on function public\.softora_apply_mailbox_state_mutation_v2\([\s\S]*?from public, anon, authenticated, service_role/);
+  assert.match(strongIdentityMutationMigration, /grant execute on function public\.softora_apply_mailbox_state_mutation_v2\([\s\S]*?to service_role/);
+});
+
 test('oude IMAP writes en v1 statewissels zijn na migratie fail-closed', () => {
   const coerce = functionSql('softora_coerce_mailbox_uid_generation');
   const guard = functionSql('softora_guard_mailbox_uid_generation_v2_state');
@@ -615,6 +636,7 @@ test('bestaande mailboxselectie- en cosmetische filters worden niet hergedefinie
     targetOrderRepairMigration,
     anchorOptimizationMigration,
     targetManifestCheckpointMigration,
+    strongIdentityMutationMigration,
   ]) {
     assert.doesNotMatch(sql, /create or replace function public\.softora_is_campaign_mailbox_message/);
     assert.doesNotMatch(sql, /softora_filter_mailbox_outreach_contacts/);

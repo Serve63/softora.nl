@@ -1,6 +1,7 @@
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  getMailboxCampaignSnapshotMessageIdentity,
   parseMailboxCampaignSnapshot,
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
@@ -201,17 +202,6 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     return true;
   }
 
-  function getMailboxMessageIdentityKey(message) {
-    const source = message && typeof message === 'object' ? message : {};
-    const accountEmail = String(source.accountEmail || '').trim().toLowerCase();
-    const folder = String(source.storageFolder || source.folder || 'inbox').trim().toLowerCase();
-    const uid = Number(source.storageUid || source.uid) || 0;
-    if (!accountEmail || !folder) return '';
-    if (uid > 0) return `${accountEmail}|${folder}|uid:${uid}`;
-    const id = String(source.mailboxId || source.id || source.providerMessageId || '').trim();
-    return id ? `${accountEmail}|${folder}|id:${id}` : '';
-  }
-
   function getLatestMailboxStateTimestamp(first, second) {
     const candidates = [first, second]
       .map((value) => String(value || '').trim())
@@ -223,8 +213,8 @@ function createPremiumPageStateBootstrapService(deps = {}) {
   function reconcileMailboxSnapshotReadState(baseSnapshot, durableSnapshot) {
     if (!baseSnapshot || !durableSnapshot) return baseSnapshot;
     const durableStates = new Map();
-    const remember = (message) => {
-      const key = getMailboxMessageIdentityKey(message);
+    const remember = (message, fallbackAccountEmail = '') => {
+      const key = getMailboxCampaignSnapshotMessageIdentity(message, fallbackAccountEmail);
       const readAt = String(message && message.readAt || '').trim();
       const replyDismissedAt = String(message && message.replyDismissedAt || '').trim();
       if (key && (readAt || replyDismissedAt)) {
@@ -238,15 +228,24 @@ function createPremiumPageStateBootstrapService(deps = {}) {
           ),
         });
       }
-      (Array.isArray(message && message.threadMessages) ? message.threadMessages : []).forEach(remember);
+      (Array.isArray(message && message.threadMessages) ? message.threadMessages : [])
+        .forEach((threadMessage) => remember(
+          threadMessage,
+          String(message && message.accountEmail || fallbackAccountEmail)
+        ));
     };
     (Array.isArray(durableSnapshot.messages) ? durableSnapshot.messages : []).forEach(remember);
     if (!durableStates.size) return baseSnapshot;
-    const apply = (message) => {
-      const state = durableStates.get(getMailboxMessageIdentityKey(message));
+    const apply = (message, fallbackAccountEmail = '') => {
+      const state = durableStates.get(
+        getMailboxCampaignSnapshotMessageIdentity(message, fallbackAccountEmail)
+      );
       const threadMessages = (Array.isArray(message && message.threadMessages)
         ? message.threadMessages
-        : []).map(apply);
+        : []).map((threadMessage) => apply(
+          threadMessage,
+          String(message && message.accountEmail || fallbackAccountEmail)
+        ));
       if (!state) return { ...message, threadMessages };
       return {
         ...message,

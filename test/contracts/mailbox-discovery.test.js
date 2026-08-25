@@ -7,6 +7,7 @@ const { PGlite } = require('@electric-sql/pglite');
 const discoveryUi = require('../../assets/premium-mailbox-discovery');
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
+const { createMailboxDiscoveryRepository } = require('../../server/repositories/mailbox-discovery');
 const { createMailboxDiscoveryService } = require('../../server/services/mailbox-discovery');
 const { createMailboxOutreachScope } = require('../../server/services/mailbox-outreach-scope');
 
@@ -102,6 +103,43 @@ test('mailbox discovery beperkt owner-scope server-side en valideert query en cu
   await assert.rejects(() => service.getContactTimeline({ owner: 'serve', contactEmail: 'not-an-email' }), /Ongeldig contactadres/);
 });
 
+test('mailbox discovery bewaart de exacte conversatie-ID en valt alleen terug op de technische thread', async () => {
+  const repository = createMailboxDiscoveryRepository({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      rpc: async () => ({
+        data: [{
+          message_key: 'serve|inbox|generation-a|41',
+          technical_thread_key: 'imap:serve@softora.nl:<root@example.test>',
+          payload: { softoraConversationId: 'conversation:exact-search-result' },
+          total_count: 2,
+        }, {
+          message_key: 'serve|inbox|generation-a|42',
+          technical_thread_key: 'imap:serve@softora.nl:<fallback@example.test>',
+          payload: {},
+          total_count: 2,
+        }],
+      }),
+    }),
+    normalizeMessageRow: (row) => ({
+      id: row.message_key,
+      messageKey: row.message_key,
+      softoraConversationId: row.payload?.softoraConversationId || '',
+    }),
+  });
+
+  const result = await repository.search({
+    ownerAccounts: { serve: ['serve@softora.nl'] },
+    query: 'voorbeeld',
+    limit: 20,
+    offset: 0,
+  });
+
+  assert.equal(result.messages[0].messageKey, 'serve|inbox|generation-a|41');
+  assert.equal(result.messages[0].conversationId, 'conversation:exact-search-result');
+  assert.equal(result.messages[1].conversationId, 'imap:serve@softora.nl:<fallback@example.test>');
+});
+
 test('gedeelde outreachscope voegt provideraccounts toe en filtert de normale lijst exact', async () => {
   const calls = [];
   const scope = createMailboxOutreachScope({
@@ -135,9 +173,10 @@ test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart techn
     id: 'martijn@softora.nl|inbox:55',
     messageId: '<old-2@example.test>',
     email: 'psonnemans@ziggo.nl',
+    conversationId: 'conversation:stale-root',
   };
   const rows = [
-    { id: root.id, messageId: root.messageId, technicalThreadKey: 'imap:martijn:old', messageKey: 'old-2' },
+    { id: root.id, messageId: root.messageId, technicalThreadKey: 'imap:martijn:old', messageKey: 'old-2', conversationId: 'conversation:exact-root' },
     { id: 'new-in', messageId: '<new-1@example.test>', technicalThreadKey: 'imap:martijn:new', subject: 'afspraak 17/8' },
     { id: 'new-out', messageId: '<new-2@example.test>', technicalThreadKey: 'imap:martijn:new', subject: 'Re: afspraak 17/8' },
     { id: 'mirror', messageId: '<new-2@example.test>', technicalThreadKey: 'imap:martijn:new', subject: 'Re: afspraak 17/8' },
@@ -147,6 +186,7 @@ test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart techn
   assert.equal(root.contactTimelineTotal, 3);
   assert.equal(root.contactTimelineThreadCount, 2);
   assert.equal(root.technicalThreadKey, 'imap:martijn:old');
+  assert.equal(root.conversationId, 'conversation:exact-root');
   assert.equal(discoveryUi.resolveExternalContact(
     { folder: 'sent', email: 'martijn@softora.nl', to: 'psonnemans@ziggo.nl' },
     ['martijn@softora.nl']
@@ -291,7 +331,7 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
     getActiveMail: () => activeMail,
     setActiveMail: (value) => { activeMail = value; },
     getListElement: () => list,
-    normalizeMessage: (value) => ({ ...value }),
+    normalizeMessage: (value) => ({ id: value.id }),
     renderList: (value) => rendered.push(value),
     openMail() {},
     resetDetail: () => { resetDetailCalls += 1; },
@@ -301,11 +341,19 @@ test('zoekcontroller voorkomt stale A naar B resultaten en clear herstelt select
   const alpha = controller.runSearch();
   input.value = 'beta';
   const beta = controller.runSearch();
-  pending.get('beta')({ ok: true, json: async () => ({ ok: true, messages: [{ id: 'beta' }], totalCount: 1 }) });
+  pending.get('beta')({
+    ok: true,
+    json: async () => ({
+      ok: true,
+      messages: [{ id: 'beta', conversationId: 'conversation:beta-exact' }],
+      totalCount: 1,
+    }),
+  });
   assert.equal(await beta, true);
   pending.get('alpha')({ ok: true, json: async () => ({ ok: true, messages: [{ id: 'alpha' }], totalCount: 1 }) });
   assert.equal(await alpha, false);
   assert.deepEqual(messages.map((message) => message.id), ['beta']);
+  assert.equal(messages[0].conversationId, 'conversation:beta-exact');
   assert.equal(resetDetailCalls, 1);
   assert.equal(controller.canOpenResult(messages[0]), true);
   assert.equal(controller.canOpenResult({ id: 'stale-normal-row' }), false);

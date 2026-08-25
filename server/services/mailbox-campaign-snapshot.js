@@ -7,7 +7,7 @@ const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 14;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 15;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -22,6 +22,26 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
+}
+
+function getMailboxCampaignSnapshotMessageIdentity(message, fallbackAccountEmail = '') {
+  const source = message && typeof message === 'object' && !Array.isArray(message) ? message : {};
+  const accountEmail = text(
+    source.accountEmail || source.providerAccountEmail || fallbackAccountEmail,
+    320
+  ).trim().toLowerCase();
+  if (!accountEmail) return '';
+  const messageKey = text(source.messageKey, 2000).trim();
+  if (messageKey) return `message-key:${accountEmail}|${messageKey}`;
+  const messageId = text(source.messageId, 1000)
+    .trim()
+    .toLowerCase()
+    .replace(/^<+|>+$/g, '');
+  if (messageId) return `message-id:${accountEmail}|${messageId}`;
+  const providerMessageId = text(source.providerMessageId, 500).trim();
+  if (!providerMessageId) return '';
+  const provider = text(source.provider || 'provider', 50).trim().toLowerCase() || 'provider';
+  return `provider-message:${provider}|${accountEmail}|${providerMessageId}`;
 }
 
 function selectSnapshotMessages(value) {
@@ -178,6 +198,7 @@ function sanitizeThreadMessage(value, options = {}) {
   return {
     ...sanitizeProviderProvenance(source),
     id: text(source.id, 500),
+    messageKey: text(source.messageKey, 2000),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
     folder: text(source.folder || 'sent', 50).toLowerCase() || 'sent',
     accountEmail: text(source.accountEmail, 320).toLowerCase(),
@@ -252,6 +273,7 @@ function sanitizeMessage(value, options = {}) {
   return {
     ...sanitizeProviderProvenance(source),
     id: text(source.id, 500),
+    messageKey: text(source.messageKey, 2000),
     mailboxId: text(source.mailboxId || source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
     folder: text(source.folder || 'inbox', 50).toLowerCase() || 'inbox',
@@ -511,22 +533,15 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
 function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, options = {}) {
   const snapshot = parseMailboxCampaignSnapshot(rawValue);
   if (!snapshot) return { changed: false, serialized: String(rawValue || '') };
-  const accountEmail = text(identity.accountEmail, 320).toLowerCase();
-  const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
-  const uid = Number(identity.uid) || 0;
-  const id = text(identity.id, 500);
+  const identityKey = getMailboxCampaignSnapshotMessageIdentity(identity);
+  if (!identityKey) return { changed: false, serialized: String(rawValue || '') };
   const dismissedAt = text(options.dismissedAt || new Date().toISOString(), 100);
   let changed = false;
-  const matches = (message) => {
-    const messageFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
-    const messageUid = Number(message.storageUid || message.uid) || 0;
-    if (message.accountEmail !== accountEmail || messageFolder !== folder) return false;
-    if (uid > 0 && messageUid > 0) return messageUid === uid;
-    return message.mailboxId === id || message.id === id;
-  };
+  const matches = (message, fallbackAccountEmail = '') =>
+    getMailboxCampaignSnapshotMessageIdentity(message, fallbackAccountEmail) === identityKey;
   const messages = snapshot.messages.map((message) => {
     const threadMessages = (Array.isArray(message.threadMessages) ? message.threadMessages : []).map((threadMessage) => {
-      if (!matches(threadMessage)) return threadMessage;
+      if (!matches(threadMessage, message.accountEmail)) return threadMessage;
       changed = true;
       return { ...threadMessage, unread: false, replyDismissedAt: dismissedAt };
     });
@@ -549,22 +564,15 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
 function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) {
   const snapshot = parseMailboxCampaignSnapshot(rawValue);
   if (!snapshot) return { changed: false, serialized: String(rawValue || '') };
-  const accountEmail = text(identity.accountEmail, 320).toLowerCase();
-  const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
-  const uid = Number(identity.uid) || 0;
-  const id = text(identity.id, 500);
+  const identityKey = getMailboxCampaignSnapshotMessageIdentity(identity);
+  if (!identityKey) return { changed: false, serialized: String(rawValue || '') };
   const readAt = text(options.readAt || new Date().toISOString(), 100);
   let changed = false;
-  const matches = (message) => {
-    const messageFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
-    const messageUid = Number(message.storageUid || message.uid) || 0;
-    if (message.accountEmail !== accountEmail || messageFolder !== folder) return false;
-    if (uid > 0 && messageUid > 0) return messageUid === uid;
-    return message.mailboxId === id || message.id === id;
-  };
+  const matches = (message, fallbackAccountEmail = '') =>
+    getMailboxCampaignSnapshotMessageIdentity(message, fallbackAccountEmail) === identityKey;
   const messages = snapshot.messages.map((message) => {
     const threadMessages = (Array.isArray(message.threadMessages) ? message.threadMessages : []).map((threadMessage) => {
-      if (!matches(threadMessage)) return threadMessage;
+      if (!matches(threadMessage, message.accountEmail)) return threadMessage;
       changed = true;
       return { ...threadMessage, unread: false, readAt };
     });
@@ -586,6 +594,7 @@ module.exports = {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  getMailboxCampaignSnapshotMessageIdentity,
   markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
   parseMailboxCampaignSnapshot,
