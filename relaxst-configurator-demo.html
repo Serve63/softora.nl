@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff5f0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Stel jouw ideale relaxstoel samen | Relaxst</title>
+  <meta name="description" content="Interactieve conceptdemo voor de toekomstige Relaxst stoelconfigurator.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/relaxst-configurator-demo.css">
+  <script src="/assets/relaxst-configurator-demo.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#configurator" aria-label="Relaxst configurator">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Relaxst</span>
+    </a>
+    <nav aria-label="Hoofdnavigatie">
+      <a href="#configurator">Samenstellen</a>
+      <a href="#benefits">Zo werkt het</a>
+      <span class="concept-pill">Interactieve conceptdemo</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Jouw stoel. Jouw comfort.</p>
+        <h1 id="hero-title">Stel een relaxstoel samen die écht bij je past.</h1>
+        <p class="hero-intro">Kies stap voor stap het model, de bekleding, jouw maat en alle comfortfuncties. Je ziet direct wat mogelijk is én wat het kost.</p>
+        <div class="hero-proof" aria-label="Voordelen">
+          <span><b>01</b> Direct prijsinzicht</span>
+          <span><b>02</b> Op maat samengesteld</span>
+          <span><b>03</b> Advies van een zitspecialist</span>
+        </div>
+      </div>
+      <div class="hero-number" aria-hidden="true">01</div>
+    </section>
+
+    <section class="configurator" id="configurator" aria-labelledby="configurator-title">
+      <div class="product-stage">
+        <div class="stage-topline">
+          <span class="availability"><i></i> Beschikbaar om samen te stellen</span>
+          <span id="stage-model-code">Model UN-01</span>
+        </div>
+
+        <div class="product-visual">
+          <div class="visual-orbit" aria-hidden="true"></div>
+          <img id="chair-image" src="https://www.relaxst.nl/wp-content/uploads/2024/11/Relaxst-1-12.jpg" alt="Sta-op stoel Udenhout in de gekozen uitvoering">
+          <div class="material-chip" id="material-chip">
+            <span class="material-swatch" id="material-swatch"></span>
+            <span><small>Bekleding</small><strong id="material-label">Stof · Zand</strong></span>
+          </div>
+        </div>
+
+        <div class="product-caption">
+          <div>
+            <p>Jouw samenstelling</p>
+            <h2 id="selected-model-name">Udenhout</h2>
+          </div>
+          <div class="stage-price">
+            <span>Prijsindicatie</span>
+            <strong id="stage-price">€ 2.987</strong>
+            <small>incl. btw</small>
+          </div>
+        </div>
+
+        <div class="selection-tags" id="selection-tags" aria-label="Huidige keuzes"></div>
+      </div>
+
+      <div class="builder-panel">
+        <div class="builder-heading">
+          <div>
+            <p class="eyebrow">Persoonlijke configuratie</p>
+            <h2 id="configurator-title">Maak jouw stoel</h2>
+          </div>
+          <span class="step-count"><b id="current-step-number">1</b> / 5</span>
+        </div>
+
+        <ol class="steps" aria-label="Configuratiestappen">
+          <li><button type="button" data-step-target="1" class="is-active"><span>1</span><em>Model</em></button></li>
+          <li><button type="button" data-step-target="2"><span>2</span><em>Bekleding</em></button></li>
+          <li><button type="button" data-step-target="3"><span>3</span><em>Maat</em></button></li>
+          <li><button type="button" data-step-target="4"><span>4</span><em>Comfort</em></button></li>
+          <li><button type="button" data-step-target="5"><span>5</span><em>Overzicht</em></button></li>
+        </ol>
+
+        <div class="step-content" id="step-content" aria-live="polite"></div>
+
+        <div class="builder-actions">
+          <button type="button" class="button-secondary" id="previous-step">Terug</button>
+          <div class="compact-total">
+            <span>Jouw prijs</span>
+            <strong id="compact-price">€ 2.987</strong>
+          </div>
+          <button type="button" class="button-primary" id="next-step">Volgende stap <span aria-hidden="true">→</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="benefits" id="benefits" aria-label="Waarom configureren bij Relaxst">
+      <article>
+        <span>01</span>
+        <h3>Een stoel die klopt</h3>
+        <p>Van zithoogte tot rugondersteuning: iedere keuze wordt afgestemd op jouw lichaam en woonstijl.</p>
+      </article>
+      <article>
+        <span>02</span>
+        <h3>Geen verrassingen</h3>
+        <p>Je ziet meteen welke opties samen kunnen en hoe iedere keuze de totaalprijs verandert.</p>
+      </article>
+      <article>
+        <span>03</span>
+        <h3>Altijd persoonlijk advies</h3>
+        <p>Sla je samenstelling op en bespreek hem in Schijndel of Udenhout met een zitspecialist.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <div>
+      <a class="brand brand-footer" href="#configurator"><span>Relaxst</span></a>
+      <p>De specialist in verantwoord zitten.</p>
+    </div>
+    <p class="demo-note"><strong>Conceptdemo</strong> · Modellen, opties en prijzen zijn illustratief en worden later gevuld met aangeleverde productdata.</p>
+  </footer>
+
+  <div class="mobile-bar" aria-label="Mobiele configuratiebediening">
+    <div><span>Jouw prijs</span><strong id="mobile-price">€ 2.987</strong></div>
+    <button type="button" id="mobile-next">Volgende <span aria-hidden="true">→</span></button>
+  </div>
+
+  <dialog id="success-dialog">
+    <button type="button" class="dialog-close" aria-label="Venster sluiten">×</button>
+    <div class="dialog-icon" aria-hidden="true">✓</div>
+    <p class="eyebrow">Samenstelling gereed</p>
+    <h2>Dit is jouw ideale relaxstoel.</h2>
+    <p>In de definitieve versie kan de klant dit overzicht opslaan, mailen of direct gebruiken om gratis zitadvies te plannen.</p>
+    <div class="dialog-summary" id="dialog-summary"></div>
+    <button type="button" class="button-primary dialog-primary">Terug naar de configurator</button>
+  </dialog>
+</body>
+</html>
