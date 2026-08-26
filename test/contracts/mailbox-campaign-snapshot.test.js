@@ -218,6 +218,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     deliveredTo: '',
     recipientRoutingEvidenceKnown: false,
     attachments: [],
+    attachmentEvidenceKnown: false,
     subject: 'Re: Reactie 0',
     preview: '',
     body: 'Dankjewel voor je reactie.',
@@ -257,6 +258,45 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.deepEqual(parsed.messages.at(-1).bodyImages, []);
   assert.equal(parsed.messages.at(-1).bodyImagesTruncated, true);
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
+});
+
+test('mailbox campaign snapshot bewaart bekend bijlagebewijs voor root en thread', () => {
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:ruud-reply',
+      uid: 73,
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      date: '2026-08-26T10:00:00.000Z',
+      attachmentEvidenceKnown: true,
+      attachments: [],
+      threadMessages: [{
+        id: 'allmail:912',
+        uid: 912,
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        messageId: '<ruud-root@gmail.com>',
+        date: '2026-08-26T09:00:00.000Z',
+        attachmentEvidenceKnown: true,
+        attachments: [{
+          filename: 'webdesign-ruud-bos.pdf',
+          contentType: 'application/PDF',
+          size: 48123,
+        }],
+      }],
+    }],
+  });
+  const [message] = parseMailboxCampaignSnapshot(serialized).messages;
+
+  assert.equal(message.attachmentEvidenceKnown, true);
+  assert.deepEqual(message.attachments, []);
+  assert.equal(message.threadMessages[0].attachmentEvidenceKnown, true);
+  assert.deepEqual(message.threadMessages[0].attachments, [{
+    filename: 'webdesign-ruud-bos.pdf',
+    contentType: 'application/pdf',
+    size: 48123,
+  }]);
 });
 
 test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberichten', () => {
@@ -324,6 +364,41 @@ test('mailbox campaign snapshot bewaart durable send provenance across reload', 
   assert.equal(sent.softoraSendMode, 'reply');
   assert.equal(sent.softoraReplyTargetMessageId, '<blue-inbound@example.nl>');
   assert.equal(sent.softoraThreadProvenanceKnown, true);
+  assert.equal(sent.providerMessageIdHydrationEligible, true);
+});
+
+test('mailbox campaign snapshot migreert alleen een sterk bewezen legacy campagne-root', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:ruud',
+      folder: 'inbox',
+      accountEmail: 'martijnven123@gmail.com',
+      threadMessages: [{
+        id: '',
+        uid: 0,
+        folder: 'sent',
+        accountEmail: 'martijnven123@gmail.com',
+        messageId: '<ruud-root@gmail.com>',
+        to: 'info@ruudbosdesign.nl',
+        recipientRoutingEvidenceKnown: true,
+        originalCampaignOutbound: true,
+      }, {
+        id: '',
+        uid: 0,
+        folder: 'sent',
+        accountEmail: 'martijnven123@gmail.com',
+        messageId: '<unproven-root@gmail.com>',
+        originalCampaignOutbound: true,
+      }],
+    }],
+  });
+  const thread = parseMailboxCampaignSnapshot(raw).messages[0].threadMessages;
+  const proven = thread.find((message) => message.messageId === '<ruud-root@gmail.com>');
+  const unproven = thread.find((message) => message.messageId === '<unproven-root@gmail.com>');
+
+  assert.equal(proven.providerMessageIdHydrationEligible, true);
+  assert.equal(unproven.providerMessageIdHydrationEligible, undefined);
 });
 
 test('mailbox campaign snapshot bewaart volledige Instantly provenance voor root en thread', () => {

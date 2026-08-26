@@ -17,6 +17,29 @@ function normalizeText(value) {
   return String(value || '').trim();
 }
 
+function normalizeMessageId(value) {
+  return normalizeText(value).toLowerCase().replace(/^[<\s]+|[>\s]+$/g, '');
+}
+
+function normalizeMessageIdValue(value) {
+  return normalizeText(value).replace(/^[<\s]+|[>\s]+$/g, '');
+}
+
+function isValidMessageId(value) {
+  return /^[^<>\s@]{1,240}@[^<>\s@]{1,240}$/.test(normalizeMessageId(value));
+}
+
+function hasProviderMessageIdHydrationEvidence(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  return source.providerMessageIdHydrationEligible === true ||
+    source.localAcceptedSend === true ||
+    source.legacyAcceptedRoot === true ||
+    (
+      source.softoraThreadProvenanceKnown === true &&
+      Boolean(normalizeText(source.softoraSendIntentId))
+    );
+}
+
 function createAbortError() {
   const error = new Error('Mailbox body request geannuleerd.');
   error.name = 'AbortError';
@@ -250,6 +273,16 @@ function decorateMessage(mail, source) {
     recipientRoutingEvidenceKnown: message.recipientRoutingEvidenceKnown === true,
     recipientRoutingNeedsHydration,
     attachments: Array.isArray(message.attachments) ? message.attachments : [],
+    attachmentEvidenceKnown: message.attachmentEvidenceKnown === true,
+    attachmentHydrationAttempted: Boolean(
+      message.attachmentHydrationAttempted || message.attachmentEvidenceKnown
+    ),
+    providerMessageIdHydrationEligible:
+      hasProviderMessageIdHydrationEvidence(message) ||
+      Boolean(mail && mail.providerMessageIdHydrationEligible),
+    providerMessageIdHydrationAttempted: Boolean(
+      message.providerMessageIdHydrationAttempted || mail && mail.providerMessageIdHydrationAttempted
+    ),
     indexed: Boolean(message.indexed),
   };
 }
@@ -369,6 +402,8 @@ async function loadBody({
         mail.recipientRoutingEvidenceKnown = indexedMessage.recipientRoutingEvidenceKnown === true;
         mail.recipientRoutingNeedsHydration = !mail.recipientRoutingEvidenceKnown;
         mail.attachments = Array.isArray(indexedMessage.attachments) ? indexedMessage.attachments : [];
+        mail.attachmentEvidenceKnown = indexedMessage.attachmentEvidenceKnown === true;
+        if (mail.attachmentEvidenceKnown) mail.attachmentHydrationAttempted = true;
         mail.bodyLoadError = '';
         exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
         const needsLiveCampaignEnrichment = Boolean(
@@ -430,13 +465,23 @@ async function loadBody({
     mail.recipientRoutingEvidenceKnown = data.message.recipientRoutingEvidenceKnown === true;
     mail.recipientRoutingNeedsHydration = !mail.recipientRoutingEvidenceKnown;
     mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
+    mail.attachmentEvidenceKnown = data.message.attachmentEvidenceKnown === true;
+    mail.attachmentHydrationAttempted = true;
     mail.bodyLoadError = '';
     finalState = mail.bodyLoaded ? 'ready' : 'partial';
   } catch (error) {
     if (!stillCurrent()) return;
     if (bodyLoadDeadline.expired()) error = createBodyDeadlineError();
-    mail.webdesignLinkHydrationAttempted = true;
-    retryableFailure = error?.name !== 'AbortError' && Number(error?.status) !== 404;
+    const failureStatus = Number(error && error.status);
+    retryableFailure = error?.name !== 'AbortError' && Boolean(
+      error && error.retryable ||
+      !Number.isFinite(failureStatus) ||
+      isRetryableBodyStatus(failureStatus)
+    );
+    if (!retryableFailure && error?.name !== 'AbortError') {
+      mail.webdesignLinkHydrationAttempted = true;
+      mail.attachmentHydrationAttempted = true;
+    }
     if (exactBodyAvailable || normalizeText(mail.body || mail.preview)) {
       mail.bodyLoadError = '';
       finalState = 'partial';
@@ -494,10 +539,61 @@ function getThreadMessageRequest(message, mail) {
   const account = normalizeText(message && (message.accountEmail || mail && mail.accountEmail)).toLowerCase();
   const folder = normalizeText(message && (message.storageFolder || message.folder) || 'sent').toLowerCase() || 'sent';
   const id = normalizeText(message && (message.mailboxId || message.id));
-  return { account, folder, id, uid: Number(message && message.uid) || 0 };
+  const uid = Number(message && message.uid) || 0;
+  const requestMessageId = normalizeMessageIdValue(message && message.messageId);
+  const canonicalMessageId = normalizeMessageId(requestMessageId);
+  const uidlessMessageIdReference = Boolean(
+    !uid &&
+    ['sent', 'allmail'].includes(folder) &&
+    isValidMessageId(canonicalMessageId)
+  );
+  const providerMessageIdLookup = Boolean(
+    uidlessMessageIdReference &&
+    hasProviderMessageIdHydrationEvidence(message) &&
+    message && message.providerMessageIdHydrationAttempted !== true
+  );
+  return {
+    account,
+    folder,
+    id,
+    uid,
+    ...(providerMessageIdLookup ? {
+      messageId: `<${requestMessageId}>`,
+      providerMessageIdHydrationEligible: true,
+    } : {}),
+    providerMessageIdLookup,
+    uidlessMessageIdReference,
+    canonicalMessageId: providerMessageIdLookup ? canonicalMessageId : '',
+  };
+}
+
+function getThreadMessageRequestIdentity(reference) {
+  if (!reference || !reference.account) return '';
+  if (reference.uidlessMessageIdReference && !reference.providerMessageIdLookup) return '';
+  if (reference.providerMessageIdLookup && reference.canonicalMessageId) {
+    return `${reference.account}|message-id:${reference.canonicalMessageId}`;
+  }
+  const providerIdentity = reference.uid || normalizeText(reference.id);
+  return providerIdentity ? `${reference.account}|${reference.folder}|${providerIdentity}` : '';
+}
+
+function getThreadMessageResponseIdentity(source) {
+  const account = normalizeText(source && source.accountEmail).toLowerCase();
+  const requestMessageId = normalizeMessageId(source && source.requestMessageId);
+  if (account && requestMessageId) return `${account}|message-id:${requestMessageId}`;
+  const folder = normalizeText(source && source.folder).toLowerCase();
+  const providerIdentity = Number(source && source.uid) || normalizeText(source && source.id);
+  return account && folder && providerIdentity ? `${account}|${folder}|${providerIdentity}` : '';
 }
 
 function applyThreadMessagePayload(message, source, normalizeBodyImages, normalizeOptOutUrl) {
+  const previousEvidence = [
+    message.bodyImageEvidenceKnown,
+    message.webdesignLinkEvidenceKnown,
+    message.webdesignLinkUrl,
+    message.attachmentEvidenceKnown,
+    JSON.stringify(Array.isArray(message.attachments) ? message.attachments : []),
+  ].map((value) => String(value || '')).join('|');
   const body = normalizeText(source && source.body);
   if (body) {
     message.body = body;
@@ -533,11 +629,22 @@ function applyThreadMessagePayload(message, source, normalizeBodyImages, normali
   message.deliveredTo = normalizeText(source && source.deliveredTo);
   message.recipientRoutingEvidenceKnown = source && source.recipientRoutingEvidenceKnown === true;
   message.recipientRoutingHydrationAttempted = true;
-  message.attachments = Array.isArray(source && source.attachments) ? source.attachments : [];
+  if (source && source.attachmentEvidenceKnown === true) {
+    message.attachments = Array.isArray(source.attachments) ? source.attachments : [];
+    message.attachmentEvidenceKnown = true;
+    message.attachmentHydrationAttempted = true;
+  }
   const nextRouting = [message.to, message.toDisplay, message.cc, message.bcc, message.deliveredTo, message.recipientRoutingEvidenceKnown]
     .map((value) => String(value || ''))
     .join('|');
-  return Boolean(body) || previousRouting !== nextRouting;
+  const nextEvidence = [
+    message.bodyImageEvidenceKnown,
+    message.webdesignLinkEvidenceKnown,
+    message.webdesignLinkUrl,
+    message.attachmentEvidenceKnown,
+    JSON.stringify(Array.isArray(message.attachments) ? message.attachments : []),
+  ].map((value) => String(value || '')).join('|');
+  return Boolean(body) || previousRouting !== nextRouting || previousEvidence !== nextEvidence;
 }
 
 function needsThreadLinkHydration(message) {
@@ -548,6 +655,17 @@ function needsThreadLinkHydration(message) {
   const body = normalizeText(source.body || source.preview);
   if (!body || /https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+/i.test(body)) return false;
   return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\b(?:deze link|(?:open|bekijk) het via hier)\b/i.test(body);
+}
+
+function needsThreadAttachmentHydration(message) {
+  const source = message && typeof message === 'object' ? message : {};
+  if (source.attachmentEvidenceKnown === true) return false;
+  if (source.attachmentHydrationAttempted === true) return false;
+  const folder = normalizeText(source.storageFolder || source.folder).toLowerCase();
+  return hasProviderMessageIdHydrationEvidence(source) &&
+    !Number(source.uid) &&
+    ['sent', 'allmail'].includes(folder) &&
+    isValidMessageId(source.messageId);
 }
 
 function needsThreadImageHydration(message) {
@@ -585,6 +703,7 @@ async function loadThreadBodies({
       needsThreadBodyHydration(message) ||
       needsThreadImageHydration(message) ||
       needsThreadLinkHydration(message) ||
+      needsThreadAttachmentHydration(message) ||
       needsThreadRoutingHydration(message)
     )
   ));
@@ -609,14 +728,25 @@ async function loadThreadBodies({
   });
   let updated = false;
   try {
-    const targetByIdentity = new Map(
-      targets.map((message) => {
+    const targetEntries = targets.map((message) => {
         const reference = getThreadMessageRequest(message, mail);
-        return [`${reference.account}|${reference.folder}|${reference.uid || reference.id}`, { message, reference }];
-      })
+        return { message, reference, identity: getThreadMessageRequestIdentity(reference) };
+      });
+    const targetByIdentity = new Map(
+      targetEntries.filter(({ identity }) => identity).map((entry) => [entry.identity, entry])
     );
-    const targetReferences = Array.from(targetByIdentity.values()).map(({ reference }) => reference);
-    for (let offset = 0; offset < targetReferences.length; offset += 20) {
+    const indexedReferences = targetEntries
+      .filter(({ identity, reference }) => identity && !reference.providerMessageIdLookup)
+      .map(({ reference }) => reference);
+    const providerReferences = targetEntries
+      .filter(({ identity, reference }) => identity && reference.providerMessageIdLookup)
+      .map(({ reference }) => reference);
+    const referenceBatches = [];
+    for (let offset = 0; offset < indexedReferences.length; offset += 20) {
+      referenceBatches.push(indexedReferences.slice(offset, offset + 20));
+    }
+    providerReferences.forEach((reference) => referenceBatches.push([reference]));
+    for (const referenceBatch of referenceBatches) {
       try {
         const { response, data } = await fetchMailboxBodyJson(request, '/api/mailbox/messages/bodies', {
           method: 'POST',
@@ -624,7 +754,15 @@ async function loadThreadBodies({
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
-            messages: targetReferences.slice(offset, offset + 20),
+            messages: referenceBatch.map((reference) => {
+              const {
+                providerMessageIdLookup,
+                canonicalMessageId,
+                uidlessMessageIdReference,
+                ...payload
+              } = reference;
+              return payload;
+            }),
           }),
         }, { signal: bodyLoadDeadline.signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
         if (!response.ok || !data?.ok || !Array.isArray(data.messages)) {
@@ -632,10 +770,24 @@ async function loadThreadBodies({
         }
         if (!stillCurrent()) return false;
         data.messages.forEach((source) => {
-          if (source && source.resolved === false) return;
-          const identity = `${normalizeText(source.accountEmail).toLowerCase()}|${normalizeText(source.folder).toLowerCase()}|${Number(source.uid) || normalizeText(source.id)}`;
+          const identity = getThreadMessageResponseIdentity(source);
           const target = targetByIdentity.get(identity);
           if (!target) return;
+          if (source && source.resolved === false) {
+            if (source.providerMessageIdLookup === true) {
+              const retryable = source.providerLookupRetryable === true;
+              target.message.providerMessageIdHydrationRetryable = retryable;
+              if (!retryable) {
+                target.message.providerMessageIdHydrationAttempted = true;
+                target.message.webdesignLinkHydrationAttempted = true;
+                target.message.attachmentHydrationAttempted = true;
+                target.message.recipientRoutingHydrationAttempted = true;
+              }
+            }
+            return;
+          }
+          delete target.message.providerMessageIdHydrationRetryable;
+          target.message.providerMessageIdHydrationAttempted = true;
           updated = applyThreadMessagePayload(
             target.message,
             source,
@@ -661,13 +813,15 @@ async function loadThreadBodies({
       needsThreadBodyHydration(message) ||
       needsThreadImageHydration(message) ||
       needsThreadLinkHydration(message) ||
+      needsThreadAttachmentHydration(message) ||
       needsThreadRoutingHydration(message)
-    ));
+    ) && !getThreadMessageRequest(message, mail).uidlessMessageIdReference);
     for (let offset = 0; offset < detailTargets.length; offset += 2) {
       await Promise.all(detailTargets.slice(offset, offset + 2).map(async (message) => {
         const { account, folder, id } = getThreadMessageRequest(message, mail);
         if (!account || !id) {
           message.webdesignLinkHydrationAttempted = true;
+          message.attachmentHydrationAttempted = true;
           message.bodyLoadError = needsThreadBodyHydration(message)
             ? 'Volledig bericht kon niet worden geladen.'
             : '';
@@ -695,13 +849,23 @@ async function loadThreadBodies({
             normalizeOptOutUrl
           ) || updated;
           message.webdesignLinkHydrationAttempted = true;
+          message.attachmentHydrationAttempted = true;
           message.bodyLoadError = needsThreadBodyHydration(message)
             ? 'Volledig bericht is niet beschikbaar in het bronbericht.'
             : '';
         } catch (error) {
           if (bodyLoadDeadline.expired() || error?.name === 'AbortError') throw error;
           if (stillCurrent() && !(error && error.name === 'AbortError')) {
-            message.webdesignLinkHydrationAttempted = true;
+            const status = Number(error && error.status);
+            const retryable = Boolean(
+              error && error.retryable ||
+              !Number.isFinite(status) ||
+              isRetryableBodyStatus(status)
+            );
+            if (!retryable) {
+              message.webdesignLinkHydrationAttempted = true;
+              message.attachmentHydrationAttempted = true;
+            }
             message.bodyLoadError = needsThreadBodyHydration(message)
               ? getBodyLoadError(error, error?.status)
               : '';
@@ -717,7 +881,6 @@ async function loadThreadBodies({
   } catch (error) {
     if (stillCurrent() && bodyLoadDeadline.expired()) {
       targets.forEach((message) => {
-        message.webdesignLinkHydrationAttempted = true;
         message.bodyLoadError = needsThreadBodyHydration(message)
           ? getBodyLoadError(createBodyDeadlineError())
           : '';
@@ -795,6 +958,7 @@ window.SoftoraMailboxIndex = {
   isSyncInFlight: () => syncInFlight,
   loadBody,
   loadThreadBodies,
+  needsThreadAttachmentHydration,
   needsThreadLinkHydration,
   needsThreadImageHydration,
   needsThreadBodyHydration,

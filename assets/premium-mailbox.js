@@ -762,6 +762,19 @@ function normalizeMailboxApiMessage(message, options = {}) {
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
   const optOutUrl = normalizeMailboxOptOutUrl(message.optOutUrl);
+  const providerEvidenceFolder = String(message.storageFolder || message.folder || '').trim().toLowerCase();
+  const providerMessageIdHydrationEligible = message.providerMessageIdHydrationEligible === true || Boolean(
+    !Number(message.uid) &&
+    ['sent', 'allmail'].includes(providerEvidenceFolder) &&
+    (
+      message.localAcceptedSend === true ||
+      message.legacyAcceptedRoot === true ||
+      (
+        message.softoraThreadProvenanceKnown === true &&
+        String(message.softoraSendIntentId || '').trim()
+      )
+    )
+  );
   const mail = {
     id: message.id,
     folder: message.folder || options.folder || activeFolder,
@@ -774,6 +787,10 @@ function normalizeMailboxApiMessage(message, options = {}) {
     deliveredTo: message.deliveredTo || '',
     recipientRoutingEvidenceKnown: message.recipientRoutingEvidenceKnown === true,
     attachments: Array.isArray(message.attachments) ? message.attachments : [],
+    attachmentEvidenceKnown: message.attachmentEvidenceKnown === true,
+    attachmentHydrationAttempted: message.attachmentHydrationAttempted === true,
+    providerMessageIdHydrationEligible,
+    providerMessageIdHydrationAttempted: message.providerMessageIdHydrationAttempted === true,
     copyContext: message.copyContext || null,
     subject: message.subject || '(Geen onderwerp)',
     preview,

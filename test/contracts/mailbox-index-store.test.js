@@ -223,6 +223,7 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(listMessage.replyTo, 'reply@softora.nl');
   assert.equal(listMessage.cc, 'boekhouder@example.nl');
   assert.equal(listMessage.bcc, 'archief@example.nl');
+  assert.equal(listMessage.attachmentEvidenceKnown, true);
   assert.deepEqual(listMessage.attachments, [{
     filename: 'voorstel.pdf',
     contentType: 'application/pdf',
@@ -231,6 +232,36 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
 
   const detailMessage = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(detailMessage.body, 'Volledige tekst');
+});
+
+test('mailbox index onderscheidt legacy ontbrekend bijlagebewijs van bewezen nul bijlagen', () => {
+  const store = createMailboxIndexStore({
+    now: () => new Date('2026-08-26T12:00:00.000Z'),
+  });
+  const baseRow = {
+    message_key: 'serve@softora.nl|sent|42',
+    account_email: 'serve@softora.nl',
+    folder: 'sent',
+    uid: 42,
+    provider_id: '',
+    from_email: 'serve@softora.nl',
+    recipients_text: 'ruud@example.nl',
+    subject: 'Kleine vraag over jullie website',
+    preview: 'Preview',
+    date: '2026-08-26T10:00:00.000Z',
+    payload: { source: 'legacy-index-row' },
+  };
+
+  const unknown = store.normalizeMessageRow(baseRow);
+  const provenEmpty = store.normalizeMessageRow({
+    ...baseRow,
+    payload: { ...baseRow.payload, attachments: [] },
+  });
+
+  assert.equal(unknown.attachmentEvidenceKnown, false);
+  assert.deepEqual(unknown.attachments, []);
+  assert.equal(provenEmpty.attachmentEvidenceKnown, true);
+  assert.deepEqual(provenEmpty.attachments, []);
 });
 
 test('mailbox index store preserves durable Softora thread provenance from MIME headers', () => {
@@ -1733,6 +1764,7 @@ test('Equans detail hydrateert generation-aware exact zonder brede mailboxscan',
   assert.equal(messages[0].toDisplay, 'Servé Creusen <serve@softora.nl>');
   assert.equal(messages[0].cc, 'team@example.nl');
   assert.equal(messages[0].recipientRoutingEvidenceKnown, true);
+  assert.equal(messages[0].attachmentEvidenceKnown, true);
   assert.deepEqual(messages[0].attachments, [{ filename: 'reactie.txt', contentType: 'text/plain', size: 12 }]);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',

@@ -346,6 +346,34 @@ test('Gmail All Mail participant fallback covers received and sent directions', 
   ]);
 });
 
+test('exacte providerhydratie zoekt uitsluitend de originele Message-ID met behoud van casing', async () => {
+  const queries = [];
+  const requestedMessageId = '<5A61FA42-RuUd@GMAIL.COM>';
+  const selected = await resolveMailboxSyncUids({
+    client: {
+      async search(query, options) {
+        queries.push({ query, options });
+        return [912];
+      },
+    },
+    folder: 'sent',
+    limit: 1,
+    targetedOnly: true,
+    exactMessageIdOnly: true,
+    threadReferenceIds: [requestedMessageId],
+  });
+
+  assert.deepEqual(selected, [912]);
+  assert.deepEqual(queries, [{
+    query: {
+      since: CAMPAIGN_HISTORY_SINCE,
+      or: [{ header: { 'message-id': requestedMessageId } }],
+    },
+    options: { uid: true },
+  }]);
+  assert.doesNotMatch(JSON.stringify(queries), /references|in-reply-to/);
+});
+
 test('campaign history sync searches both coldmail subjects from campaign start', async () => {
   const queries = [];
   const options = [];

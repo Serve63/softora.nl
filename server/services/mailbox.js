@@ -1795,8 +1795,10 @@ function createMailboxService(deps = {}) {
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const rawText = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
+    const parsedFromName = displayName(parsed.from?.value); const parsedFromEmail = addressText(parsed.from?.value);
+    const campaignFolder = folder === 'allmail' && normalizeEmail(parsedFromEmail) === normalizeEmail(account.email) ? 'sent' : folder;
     const originalCampaignOutbound = isOriginalCampaignOutboundMessage({
-      folder,
+      folder: campaignFolder,
       subject: parsed.subject,
       body: rawText,
       inReplyTo: parsed.inReplyTo,
@@ -1817,15 +1819,13 @@ function createMailboxService(deps = {}) {
     const bodyImages = tagSentCampaignBodyImages(
       visiblePrimaryBodyImages,
       {
-        folder,
+        folder: campaignFolder,
         looksLikeCampaign: looksLikeWebdesignOutreach(parsed, text),
       }
     );
     const attachments = buildMailboxAttachmentMetadata(parsed);
     const bodyText = text;
     const preview = truncateText(bodyText.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
-    const parsedFromName = displayName(parsed.from?.value);
-    const parsedFromEmail = addressText(parsed.from?.value);
     const fromText = parsedFromName || account.name || account.email;
     return {
       id: `${folder}:${message.uid}`,
@@ -1847,7 +1847,7 @@ function createMailboxService(deps = {}) {
       body: bodyText || preview,
       optOutUrl,
       bodyImages,
-      attachments,
+      attachments, attachmentEvidenceKnown: true,
       inlineImages: bodyImages.map(bodyImageToInlineImage),
       date: date.toISOString(),
       messageId: normalizeString(parsed.messageId || ''),
@@ -1960,7 +1960,7 @@ function createMailboxService(deps = {}) {
     defaultLimit: DEFAULT_SYNC_LIMIT,
   });
   const { getInstantlyMessage, getMessageBodiesResponse } = createMailboxMessageBodiesService({
-    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, logger,
+    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, fetchMessagesFromImap, logger,
   }); const { providerThreadAuditResponse } = createMailboxProviderThreadAuditService({ assertReadableAccount, fetchMessagesFromImap, isValidEmail, logger, mailboxIndexStore });
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);
