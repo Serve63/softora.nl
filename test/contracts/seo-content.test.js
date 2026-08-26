@@ -1641,6 +1641,56 @@ test('adviesbureauspagina maakt projectstart en overdracht controleerbaar', () =
   ]);
 });
 
+test('website-migratiegids maakt URL-besluiten, livebewijs en herstel controleerbaar', () => {
+  const now = new Date('2026-08-26T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'website-migratie-zonder-seo-verlies', { now });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  const conversionHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('kennisbank', 'wat-is-een-conversiegerichte-website', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const linksHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('kennisbank', 'wat-is-interne-linkstructuur', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-26');
+  assert.equal(item.updatedAt, '2026-08-26');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/website-laten-maken');
+  assert.equal(item.sources.length, 4);
+  assert.ok(item.informationGain.includes('migratiekaart'));
+  assert.ok(item.wordCount >= 850);
+  assert.equal(item.faq.length, 0);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/website-migratie-zonder-seo-verlies">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="1000">/);
+  assert.match(html, /"datePublished":"2026-08-26"/);
+  assert.match(html, /"dateModified":"2026-08-26"/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /Geef iedere oude URL precies één besluit/);
+  assert.match(html, /Maak van livegang een begrensd go-no-go-besluit/);
+  assert.match(html, /href="\/website-laten-maken">website laten maken<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-interne-linkstructuur">interne linkstructuur<\/a>/);
+  assert.match(html, /href="\/blog\/website-laten-maken-mkb-paginas">benodigde MKB-websitepagina’s<\/a>/);
+  assert.match(html, /https:\/\/wa\.me\/31643262792/);
+  assert.match(conversionHtml, /href="\/kennisbank\/website-migratie-zonder-seo-verlies">website-migratieplan<\/a>/);
+  assert.match(linksHtml, /href="\/kennisbank\/website-migratie-zonder-seo-verlies">website-migratie<\/a>/);
+  assert.doesNotMatch(html, /nul SEO-verlies garanderen|garandeert ranking|altijd online/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/website-migratie-zonder-seo-verlies');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/website-leads-analytics-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));
