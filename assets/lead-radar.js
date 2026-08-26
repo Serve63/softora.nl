@@ -82,17 +82,16 @@
     const websiteUrl = signal.website_url || '';
     const websiteCandidates = Array.isArray(signal.website_candidates) ? signal.website_candidates.filter((candidate) => candidate && candidate.url).slice(0, 3) : [];
     const leadTitle = getLeadTitle(signal);
-    const leadSummary = String(signal.message_text || signal.snippet || '').trim();
+    const leadSummary = String(signal.display_summary || '').trim();
     const publishedDate = formatPublishedDate(signal.published_at);
     const candidateLinks = websiteCandidates.map((candidate) => `<a class="website-candidate" href="${escapeHtml(candidate.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.title || candidate.url)}</a>`).join('');
     const originalPostLink = originalUrl ? `<a class="lead-source-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open originele post" title="Open originele post"><span class="lead-source-icon" aria-hidden="true">↗</span></a>` : '<span class="lead-link-warning">Directe postlink niet beschikbaar</span>';
     const websiteDetails = websiteUrl || websiteCandidates.length || signal.website_title || signal.website_http_status || signal.website_redirect_url;
     const websiteMarkup = websiteDetails ? `<div class="lead-website">${websiteUrl ? `<a class="website-url" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(websiteUrl)}</a>` : websiteCandidates.length ? `<span class="website-url website-url--candidate">Mogelijke websites</span><div class="website-candidates">${candidateLinks}</div>` : ''}${signal.website_title ? `<small class="website-detail">Titel: ${escapeHtml(signal.website_title)}</small>` : ''}${signal.website_http_status ? `<small class="website-detail">HTTP: ${escapeHtml(signal.website_http_status)}</small>` : ''}${signal.website_redirect_url ? `<a class="website-detail" href="${escapeHtml(signal.website_redirect_url)}" target="_blank" rel="noopener noreferrer">Redirect bekijken</a>` : ''}</div>` : '';
-    const fullMessageMarkup = leadSummary ? `<details class="lead-full-message"><summary>Lees volledig</summary><p class="lead-full-message__text">${escapeHtml(leadSummary)}</p></details>` : '';
     const publishedDateMarkup = publishedDate ? `<time class="lead-published-date" datetime="${escapeHtml(signal.published_at)}">Gepost op ${escapeHtml(publishedDate)}</time>` : '';
     return `<article class="lead-card" data-signal-id="${escapeHtml(signal.id)}">
       <div class="lead-meta"><span class="platform-label platform-label--${platform}">${platform}</span>${originalPostLink}</div>
-      <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${leadSummary ? `<p class="lead-summary">${escapeHtml(leadSummary)}</p>${fullMessageMarkup}` : ''}</div>
+      <div class="lead-copy"><h3 class="lead-title">${escapeHtml(leadTitle)}</h3>${leadSummary ? `<p class="lead-summary">${escapeHtml(leadSummary)}</p>` : ''}</div>
       ${publishedDateMarkup}
       <div class="lead-side"><div class="lead-location"><strong>Regio</strong>${escapeHtml(signal.region || 'Onbekend')}</div>${websiteMarkup}</div>
     </article>`;

@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const { createLeadRadarQuality } = require('./lead-radar-quality'); const { createLeadRadarMaintenance } = require('./lead-radar-maintenance'); const { createLeadRadarEnrichment } = require('./lead-radar-enrichment'); const { createLeadRadarSourceVerifier } = require('./lead-radar-source');
 const { buildPublicScraperPlan, createLeadRadarScraperProvider } = require('./lead-radar-provider');
+const { summarizeLeadSignal } = require('./lead-radar-summary');
 const SIGNALS_TABLE = 'softora_social_lead_signals';
 const SCAN_RUNS_TABLE = 'softora_social_lead_scan_runs';
 const WEBSITE_STATUSES = Object.freeze([
@@ -538,7 +539,7 @@ function createLeadRadarService(deps = {}) {
     });
     const page = visibleSignals.slice(offset, offset + limit);
     return {
-      signals: page,
+      signals: page.map((signal) => ({ ...signal, display_summary: summarizeLeadSignal(signal) })),
       total: visibleSignals.length,
       limit,
       offset,

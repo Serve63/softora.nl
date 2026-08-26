@@ -32,6 +32,7 @@ const {
 } = require('../../server/services/lead-radar-source');
 const { registerLeadRadarRoutes } = require('../../server/routes/lead-radar');
 const { createLeadRadarEnrichment } = require('../../server/services/lead-radar-enrichment');
+const { summarizeLeadSignal } = require('../../server/services/lead-radar-summary');
 
 const repoRoot = path.join(__dirname, '../..');
 const readRepoFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -58,6 +59,37 @@ test('Lead Radar normaliseert alleen toegestane openbare URLs', () => {
   assert.equal(normalizeHttpUrl('http://localhost:3000', { allowPlatform: false }), '');
   assert.equal(normalizeHttpUrl('https://192.168.1.10/site', { allowPlatform: false }), '');
   assert.equal(normalizeHttpUrl('file:///C:/secret.txt', { allowPlatform: false }), '');
+});
+
+test('Lead Radar vat ruwe hulpvragen samen tot een Nederlandse zin', () => {
+  const cases = [
+    {
+      message_text: 'inlog probleem\nReacties: 2\nBeste mensen, Inloggen op de website gaat ineens niet meer. Gebruikersnaam en wachtwoord zijn goed, maar na klikken op login verschijnt dezelfde pagina weer, lijkt in een loop te zitten. Aanvragen nieuw wachtwoord geeft een wachtwoord reset link die ongeldig lijkt.',
+      expected: 'De gebruiker kan ondanks correcte inloggegevens niet meer inloggen, blijft in een loginlus hangen en krijgt ook geen geldige wachtwoordresetlink.',
+    },
+    {
+      message_text: 'Niet kunnen inloggen\nReacties: 0\nGoedemorgen alle, Sinds dat wordpress is geinstalleerd naar 7.1, kan ik niet meer inloggen naar mijn dashboard. Als ik op de blauwe Login knop klik gebeurt er helemaal nada.',
+      expected: 'De gebruiker kan sinds de installatie van WordPress 7.1 niet meer inloggen op het dashboard, terwijl de login-knop nergens op reageert.',
+    },
+    {
+      message_text: 'Foutmelding\nReacties: 9\nEr was een fout. De reactie is geen geldige JSON-reactie. Ik krijg deze melding als ik een nieuwe pdf wil uploaden.',
+      expected: 'De gebruiker krijgt bij het uploaden van een pdf de foutmelding dat de website geen geldige JSON-reactie teruggeeft.',
+    },
+    {
+      message_text: 'niet responsive mobile devices\nReacties: 1\nDe website is niet meer responsive op mobiele devices. Thema: Kalium en WPBakery. Hoe kan de website weer responsive worden?',
+      expected: 'De website is niet meer responsive op mobiele apparaten en de gebruiker zoekt hulp om dit in het huidige thema en WPBakery te herstellen.',
+    },
+    {
+      message_text: 'Twenty Fourteen, smalle tekstblokken\nReacties: 3\nIk gebruik Twenty Fourteen als thema. De teksten staan in een smalle layout. Hoe verklein ik de witruimte?',
+      expected: 'De tekstblokken in het Twenty Fourteen-thema zijn te smal en de gebruiker wil de witruimte aan beide zijkanten verkleinen.',
+    },
+  ];
+  cases.forEach(({ message_text, expected }) => {
+    const summary = summarizeLeadSignal({ message_text });
+    assert.equal(summary, expected);
+    assert.equal(summary.includes('\n'), false);
+    assert.equal(/reacties:|lees volledig/i.test(summary), false);
+  });
 });
 
 test('Lead Radar bouwt een begrensd plan voor eigen openbare bronadapters', () => {
@@ -735,8 +767,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260820a/);
-  assert.match(page, /lead-radar\.js\?v=20260826a/);
+  assert.match(page, /lead-radar\.css\?v=20260826b/);
+  assert.match(page, /lead-radar\.js\?v=20260826b/);
   assert.match(page, /id="scan-platforms" data-value="web,mastodon"/);
   assert.match(page, /data-custom-select-trigger[\s\S]*aria-haspopup="listbox"[\s\S]*aria-controls="scan-platforms-menu"/);
   assert.match(page, /data-value="web,mastodon" aria-selected="true">Alle openbare bronnen<\/button>[\s\S]*data-value="web" aria-selected="false">Open webfeeds<\/button>[\s\S]*data-value="mastodon" aria-selected="false">Mastodon<\/button>/);
@@ -758,10 +790,11 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(stylesheet, /\.custom-select__menu/);
   assert.match(stylesheet, /html, body[\s\S]*scrollbar-width:\s*none/);
   assert.match(stylesheet, /::-webkit-scrollbar[\s\S]*display:\s*none/);
-  assert.match(stylesheet, /\.lead-side\s*\{[\s\S]*align-items:\s*flex-end/);
+  assert.match(stylesheet, /\.lead-card\s*\{[\s\S]*align-items:\s*center/);
+  assert.match(stylesheet, /\.lead-side\s*\{[\s\S]*align-items:\s*flex-end[\s\S]*align-self:\s*center/);
   assert.match(stylesheet, /\.lead-source-link\s*\{[\s\S]*width:\s*28px/);
   assert.match(stylesheet, /\.lead-published-date\s*\{/);
-  assert.match(stylesheet, /\.lead-full-message\s+summary\s*\{/);
+  assert.doesNotMatch(stylesheet, /lead-full-message/);
   assert.doesNotMatch(stylesheet, /\.lead-date\s*\{|\.lead-source\s*\{/);
   assert.match(stylesheet, /lead-link-warning/);
   assert.match(script, /Leads laden/);
@@ -774,9 +807,9 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /<h3 class="lead-title">/);
   assert.doesNotMatch(script, /const leadTitle = signal\.author_name/);
   assert.match(script, /<p class="lead-summary">/);
+  assert.match(script, /signal\.display_summary/);
   assert.match(script, /function formatPublishedDate\(value\)/);
-  assert.match(script, /<details class="lead-full-message">[\s\S]*<summary>Lees volledig<\/summary>/);
-  assert.match(script, /lead-full-message__text/);
+  assert.doesNotMatch(script, /Lees volledig|lead-full-message/);
   assert.match(script, /lead-published-date/);
   assert.match(script, /lead-source-icon/);
   assert.match(script, /aria-label="Open originele post"/);
