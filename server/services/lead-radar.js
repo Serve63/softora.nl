@@ -29,7 +29,7 @@ const MAX_WEBSITE_LOOKUP_LIMIT = 50;
 // Source checks also recover missing publication dates from public post HTML.
 // Keep the number bounded so a manual round remains predictable.
 const DEFAULT_SOURCE_CHECK_LIMIT = 50;
-const MAX_LEAD_AGE_DAYS = 30;
+const MAX_LEAD_AGE_DAYS = 31;
 const DEFAULT_AUTO_SCAN_INTERVAL_MINUTES = 15;
 const DEFAULT_AUTO_SCAN_INITIAL_LOOKBACK_DAYS = 30;
 const DEFAULT_AUTO_SCAN_REFRESH_LOOKBACK_DAYS = 3;
