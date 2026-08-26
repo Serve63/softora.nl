@@ -34,6 +34,7 @@
     'attachments', 'optOutUrl', 'originalCampaignOutbound', 'webdesignLinkEvidenceKnown',
     'webdesignLinkHydrationAttempted', 'webdesignLinkUrl', 'recipientRoutingEvidenceKnown',
     'recipientRoutingNeedsHydration', 'to', 'toDisplay', 'cc', 'bcc', 'deliveredTo',
+    'attachmentEvidenceKnown', 'attachmentHydrationAttempted',
   ];
   const CONTACT_TIMELINE_FIELDS = [
     'contactTimelineLoaded', 'contactTimelineTotal', 'contactTimelineThreadCount',
@@ -87,9 +88,33 @@
     );
     const preserveHydration = current.bodyLoading === true ||
       getBodyCompleteness(current) > getBodyCompleteness(incoming);
+    const preserveAttachmentEvidence = current.attachmentEvidenceKnown === true &&
+      incoming.attachmentEvidenceKnown !== true;
+    const preserveAttachmentAttempt = current.attachmentHydrationAttempted === true &&
+      incoming.attachmentEvidenceKnown !== true &&
+      incoming.attachmentHydrationAttempted !== true;
+    const preserveWebdesignLinkEvidence = current.webdesignLinkEvidenceKnown === true &&
+      incoming.webdesignLinkEvidenceKnown !== true;
+    const preserveWebdesignLinkAttempt = current.webdesignLinkHydrationAttempted === true &&
+      incoming.webdesignLinkEvidenceKnown !== true &&
+      incoming.webdesignLinkHydrationAttempted !== true;
     Object.assign(current, incoming);
     if (preserveHydration) {
       HYDRATED_MESSAGE_FIELDS.forEach((field) => { current[field] = currentBody[field]; });
+    }
+    if (!preserveHydration && preserveAttachmentEvidence) {
+      current.attachments = currentBody.attachments;
+      current.attachmentEvidenceKnown = true;
+    }
+    if (!preserveHydration && preserveAttachmentAttempt) {
+      current.attachmentHydrationAttempted = true;
+    }
+    if (!preserveHydration && preserveWebdesignLinkEvidence) {
+      current.webdesignLinkEvidenceKnown = true;
+      current.webdesignLinkUrl = currentBody.webdesignLinkUrl;
+    }
+    if (!preserveHydration && preserveWebdesignLinkAttempt) {
+      current.webdesignLinkHydrationAttempted = true;
     }
     if (preserveContactTimeline) {
       CONTACT_TIMELINE_FIELDS.forEach((field) => { current[field] = currentContactTimeline[field]; });

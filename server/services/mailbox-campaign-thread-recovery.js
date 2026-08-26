@@ -626,9 +626,9 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
         inReplyTo: '', references: '',
         originalCampaignOutbound: true,
         hasBody: true, bodyLoaded: true, bodyTruncated: false,
-        bodyImageEvidenceKnown: true, embeddedImageCount: 0,
-        webdesignLinkEvidenceKnown: true, webdesignLinkUrl,
-        attachments: [], unread: false,
+        bodyImageEvidenceKnown: false, embeddedImageCount: 0,
+        webdesignLinkEvidenceKnown: Boolean(webdesignLinkUrl), webdesignLinkUrl,
+        attachmentEvidenceKnown: false, attachments: [], unread: false,
         legacyAcceptedRoot: true,
         threadCorrelationEvidence: 'exact-in-reply-to-customer-guard-structured-quote',
       };
@@ -863,7 +863,11 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
       providerMessageId: normalizeText(intent.providerMessageId),
       providerThreadId: normalizeText(intent.providerThreadId),
       providerOwner: normalizeText(intent.owner),
-      hasBody: true, bodyLoaded: true, bodyTruncated: false, unread: false, localAcceptedSend: true,
+      hasBody: true, bodyLoaded: true, bodyTruncated: false,
+      bodyImageEvidenceKnown: false, embeddedImageCount: 0,
+      webdesignLinkEvidenceKnown: false, webdesignLinkUrl: '',
+      attachmentEvidenceKnown: false, attachments: [],
+      unread: false, localAcceptedSend: true,
     };
   }
 

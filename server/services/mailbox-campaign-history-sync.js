@@ -31,6 +31,7 @@ async function searchThreadReplyUids({
   threadReferenceIds = [],
   threadRecipientTerms = [],
   includeThreadReferenceSearch = true,
+  exactMessageIdOnly = false,
   logger = console,
   accountEmail = '',
   folder = '',
@@ -51,11 +52,13 @@ async function searchThreadReplyUids({
   const replyUids = [];
   for (let offset = 0; offset < referenceIds.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = referenceIds.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
-    const alternatives = batch.flatMap((messageId) => [
-      { header: { references: messageId } },
-      { header: { 'in-reply-to': messageId } },
-      { header: { 'message-id': messageId } },
-    ]);
+    const alternatives = batch.flatMap((messageId) => exactMessageIdOnly
+      ? [{ header: { 'message-id': messageId } }]
+      : [
+          { header: { references: messageId } },
+          { header: { 'in-reply-to': messageId } },
+          { header: { 'message-id': messageId } },
+        ]);
     try {
       const found = await client.search(
         {
@@ -166,6 +169,7 @@ async function resolveMailboxSyncUids({
   folder = '',
   prioritizeTargetedUids = false,
   targetedOnly = false,
+  exactMessageIdOnly = false,
   targetedAfterUid = 0,
   targetedThroughUid = 0,
 } = {}) {
@@ -179,6 +183,7 @@ async function resolveMailboxSyncUids({
       threadReferenceIds,
       threadRecipientTerms: [],
       includeThreadReferenceSearch: true,
+      exactMessageIdOnly: exactMessageIdOnly === true,
       logger,
       accountEmail,
       folder,

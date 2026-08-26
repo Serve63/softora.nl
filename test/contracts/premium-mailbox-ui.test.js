@@ -1577,6 +1577,8 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
         body: '',
         hasBody: true,
         bodyTruncated: true,
+        attachmentEvidenceKnown: true,
+        attachments: [],
       },
       {
         id: 'sent:83',
@@ -1587,6 +1589,8 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
         body: 'Gedeeltelijke inhoud',
         hasBody: true,
         bodyTruncated: true,
+        attachmentEvidenceKnown: true,
+        attachments: [],
       },
       {
         id: 'sent:90',
@@ -1599,6 +1603,8 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
         body: 'Dit bericht was al volledig.',
         hasBody: true,
         bodyTruncated: false,
+        attachmentEvidenceKnown: true,
+        attachments: [],
       },
       {
         id: 'sent:91',
@@ -1609,6 +1615,8 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
         body: '',
         hasBody: true,
         bodyTruncated: true,
+        attachmentEvidenceKnown: true,
+        attachments: [],
       },
     ],
   };
@@ -1648,6 +1656,8 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
                 to: 'klant@example.nl',
                 toDisplay: 'Klant <klant@example.nl>',
                 recipientRoutingEvidenceKnown: true,
+                attachmentEvidenceKnown: true,
+                attachments: [],
               })),
           }),
         };
@@ -1672,6 +1682,8 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
             to: 'klant@example.nl',
             toDisplay: 'Klant <klant@example.nl>',
             recipientRoutingEvidenceKnown: true,
+            attachmentEvidenceKnown: true,
+            attachments: [],
           },
         }),
       };
@@ -1882,6 +1894,8 @@ test('threadhydratie begrenst werk en geeft elk niet geladen bericht een retry i
     body: '',
     hasBody: true,
     bodyTruncated: true,
+    attachmentEvidenceKnown: true,
+    attachments: [],
   }));
   const mail = { id: 'inbox:bounded', accountEmail: 'serve@softora.nl', threadMessages };
   const batches = [];
@@ -1899,6 +1913,8 @@ test('threadhydratie begrenst werk en geeft elk niet geladen bericht een retry i
           hasBody: true,
           bodyTruncated: false,
           bodyImageEvidenceKnown: true,
+          attachmentEvidenceKnown: true,
+          attachments: [],
         })),
       }),
     };
@@ -1944,6 +1960,8 @@ test('mailbox lekt geen previews uit gesorteerde inkomende en uitgaande threadka
     body: '',
     hasBody: true,
     bodyTruncated: false,
+    attachmentEvidenceKnown: true,
+    attachments: [],
     receivedAt: '2026-07-24T13:00:00.000Z',
   });
   const incoming = mailbox.normalizeMailboxApiMessage({
@@ -1959,6 +1977,8 @@ test('mailbox lekt geen previews uit gesorteerde inkomende en uitgaande threadka
     body: '',
     hasBody: true,
     bodyTruncated: false,
+    attachmentEvidenceKnown: true,
+    attachments: [],
     receivedAt: '2026-07-24T14:00:00.000Z',
   });
   const mail = {
@@ -2009,6 +2029,8 @@ test('mailbox lekt geen previews uit gesorteerde inkomende en uitgaande threadka
             bodyTruncated: false,
             bodyImageEvidenceKnown: true,
             embeddedImageCount: 0,
+            attachmentEvidenceKnown: true,
+            attachments: [],
           })),
         }),
       };
@@ -2246,6 +2268,152 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
     html,
     /deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/salon-tof\?cid=safe-row-247&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a>/
   );
+});
+
+test('UID-loze fallback retryt exact Message-ID en vervangt ruis door echte MIME-link en bijlage', async () => {
+  const helpers = loadMailboxHelpersForTest();
+  const requestedMessageId = '<5A61FA42-RuUd@GMAIL.COM>';
+  const exactUrl = 'https://www.softora.nl/webdesign/ruud-bos?cid=ruud-1&sender=martijn';
+  const message = {
+    id: '',
+    uid: 0,
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    messageId: requestedMessageId,
+    body: 'Virtuele fallback: bekijk het webdesign via deze link.',
+    hasBody: true,
+    bodyLoaded: true,
+    originalCampaignOutbound: true,
+    bodyImageEvidenceKnown: false,
+    webdesignLinkEvidenceKnown: false,
+    attachmentEvidenceKnown: false,
+    attachments: [],
+    recipientRoutingEvidenceKnown: false,
+  };
+  const mail = {
+    id: 'inbox:ruud-reply',
+    accountEmail: 'martijn@softora.nl',
+    receivedAt: '2026-08-26T10:00:00.000Z',
+    threadMessages: [message],
+  };
+  const requests = [];
+  let attempt = 0;
+  const fetchImpl = async (url, options = {}) => {
+    requests.push(String(url));
+    assert.equal(String(url), '/api/mailbox/messages/bodies');
+    const payload = JSON.parse(options.body);
+    assert.deepEqual(payload.messages, [{
+      account: 'martijn@softora.nl',
+      folder: 'sent',
+      id: '',
+      uid: 0,
+      messageId: requestedMessageId,
+    }]);
+    attempt += 1;
+    if (attempt === 1) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          messages: [{
+            id: '',
+            uid: 0,
+            folder: 'sent',
+            accountEmail: 'martijn@softora.nl',
+            requestMessageId: '<5a61fa42-ruud@gmail.com>',
+            providerMessageIdLookup: true,
+            providerLookupRetryable: true,
+            resolved: false,
+          }],
+        }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        messages: [{
+          id: 'allmail:912',
+          uid: 912,
+          folder: 'allmail',
+          accountEmail: 'martijn@softora.nl',
+          requestMessageId: '<5a61fa42-ruud@gmail.com>',
+          providerMessageIdLookup: true,
+          providerLookupRetryable: false,
+          resolved: true,
+          body: `Echte MIME-body: bekijk het webdesign via deze link [${exactUrl}].`,
+          hasBody: true,
+          bodyTruncated: false,
+          bodyImageEvidenceKnown: true,
+          bodyImages: [],
+          embeddedImageCount: 0,
+          originalCampaignOutbound: true,
+          webdesignLinkEvidenceKnown: true,
+          webdesignLinkUrl: exactUrl,
+          to: 'ruud@example.nl',
+          toDisplay: 'Ruud Bos <ruud@example.nl>',
+          recipientRoutingEvidenceKnown: true,
+          attachmentEvidenceKnown: true,
+          attachments: [{
+            filename: 'webdesign-ruud-bos.pdf',
+            contentType: 'application/pdf',
+            size: 48123,
+          }],
+        }],
+      }),
+    };
+  };
+
+  const firstUpdated = await helpers.index.loadThreadBodies({
+    mail,
+    fetchImpl,
+    getActiveMail: () => '',
+    openMail() {},
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+  });
+
+  assert.equal(firstUpdated, false);
+  assert.equal(message.providerMessageIdHydrationRetryable, true);
+  assert.equal(message.webdesignLinkHydrationAttempted, undefined);
+  assert.equal(message.attachmentHydrationAttempted, undefined);
+  assert.equal(helpers.index.needsThreadAttachmentHydration(message), true);
+
+  const secondUpdated = await helpers.index.loadThreadBodies({
+    mail,
+    fetchImpl,
+    getActiveMail: () => '',
+    openMail() {},
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+  });
+
+  assert.equal(secondUpdated, true);
+  assert.equal(message.providerMessageIdHydrationRetryable, undefined);
+  assert.match(message.body, /Echte MIME-body/);
+  assert.equal(message.webdesignLinkEvidenceKnown, true);
+  assert.equal(message.webdesignLinkUrl, exactUrl);
+  assert.equal(message.attachmentEvidenceKnown, true);
+  assert.equal(message.attachmentHydrationAttempted, true);
+  assert.deepEqual(message.attachments, [{
+    filename: 'webdesign-ruud-bos.pdf',
+    contentType: 'application/pdf',
+    size: 48123,
+  }]);
+  assert.equal(helpers.index.needsThreadAttachmentHydration(message), false);
+  assert.deepEqual(requests, [
+    '/api/mailbox/messages/bodies',
+    '/api/mailbox/messages/bodies',
+  ]);
+
+  const html = renderMailboxBodyForTest('Bedankt voor je bericht.', [], {
+    replyMailId: mail.id,
+    mail,
+  });
+  assert.match(html, /class="detail-mail-cta-link"/);
+  assert.match(html, /webdesign-ruud-bos\.pdf/);
 });
 
 test('mailbox houdt een bewezen outboundbody zichtbaar als alleen optionele linkverrijking faalt', async () => {
@@ -8294,6 +8462,52 @@ test('verse mailboxlijst behoudt de reeds gehydrateerde actieve body en objectre
   assert.deepEqual(opens, [{
     id: bootstrapMail.id,
     openOptions: { preserveVisibleDetail: true },
+  }]);
+});
+
+test('stale ownerrefresh wist echt MIME-link- en bijlagebewijs niet uit root of thread', () => {
+  const currentThread = {
+    id: 'sent:ruud-root',
+    messageId: '<ruud-root@gmail.com>',
+    body: 'Exact MIME-bericht.',
+    bodyLoaded: true,
+    webdesignLinkEvidenceKnown: true,
+    webdesignLinkUrl: 'https://www.softora.nl/webdesign/ruud-bos?cid=ruud-1',
+    attachmentEvidenceKnown: true,
+    attachmentHydrationAttempted: true,
+    attachments: [{ filename: 'webdesign-ruud-bos.pdf', contentType: 'application/pdf', size: 48123 }],
+  };
+  const current = {
+    id: 'inbox:ruud-reply',
+    body: 'Antwoord van Ruud.',
+    bodyLoaded: true,
+    threadMessages: [currentThread],
+  };
+  const [reconciled] = ownerSessionModule.reconcileMessages([current], [{
+    id: current.id,
+    body: current.body,
+    bodyLoaded: true,
+    threadMessages: [{
+      id: currentThread.id,
+      messageId: currentThread.messageId,
+      body: currentThread.body,
+      bodyLoaded: true,
+      webdesignLinkEvidenceKnown: false,
+      webdesignLinkUrl: '',
+      attachmentEvidenceKnown: false,
+      attachmentHydrationAttempted: false,
+      attachments: [],
+    }],
+  }]);
+
+  assert.strictEqual(reconciled, current);
+  assert.strictEqual(reconciled.threadMessages[0], currentThread);
+  assert.equal(currentThread.webdesignLinkEvidenceKnown, true);
+  assert.match(currentThread.webdesignLinkUrl, /\/webdesign\/ruud-bos/);
+  assert.equal(currentThread.attachmentEvidenceKnown, true);
+  assert.equal(currentThread.attachmentHydrationAttempted, true);
+  assert.deepEqual(currentThread.attachments, [{
+    filename: 'webdesign-ruud-bos.pdf', contentType: 'application/pdf', size: 48123,
   }]);
 });
 

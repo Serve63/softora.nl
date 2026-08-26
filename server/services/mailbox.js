@@ -1847,7 +1847,7 @@ function createMailboxService(deps = {}) {
       body: bodyText || preview,
       optOutUrl,
       bodyImages,
-      attachments,
+      attachments, attachmentEvidenceKnown: true,
       inlineImages: bodyImages.map(bodyImageToInlineImage),
       date: date.toISOString(),
       messageId: normalizeString(parsed.messageId || ''),
@@ -1960,7 +1960,7 @@ function createMailboxService(deps = {}) {
     defaultLimit: DEFAULT_SYNC_LIMIT,
   });
   const { getInstantlyMessage, getMessageBodiesResponse } = createMailboxMessageBodiesService({
-    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, logger,
+    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, fetchMessagesFromImap, logger,
   }); const { providerThreadAuditResponse } = createMailboxProviderThreadAuditService({ assertReadableAccount, fetchMessagesFromImap, isValidEmail, logger, mailboxIndexStore });
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);

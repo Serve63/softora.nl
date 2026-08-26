@@ -774,6 +774,8 @@ function normalizeMailboxApiMessage(message, options = {}) {
     deliveredTo: message.deliveredTo || '',
     recipientRoutingEvidenceKnown: message.recipientRoutingEvidenceKnown === true,
     attachments: Array.isArray(message.attachments) ? message.attachments : [],
+    attachmentEvidenceKnown: message.attachmentEvidenceKnown === true,
+    attachmentHydrationAttempted: message.attachmentHydrationAttempted === true,
     copyContext: message.copyContext || null,
     subject: message.subject || '(Geen onderwerp)',
     preview,
