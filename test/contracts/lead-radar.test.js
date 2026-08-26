@@ -786,7 +786,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
   assert.match(page, /lead-radar\.css\?v=20260826d/);
-  assert.match(page, /lead-radar\.js\?v=20260826d/);
+  assert.match(page, /lead-radar\.js\?v=20260827a/);
   assert.doesNotMatch(page, /id="scan-platforms"|id="scan-region-mode"|id="scan-max-age-days"|data-custom-select/);
   assert.doesNotMatch(page, /<select\b/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
@@ -836,7 +836,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
   assert.match(script, /platforms:\s*\['web', 'mastodon'\]/);
   assert.match(script, /regionMode:\s*'nationwide'/);
-  assert.match(script, /maxAgeDays:\s*14/);
+  assert.match(script, /maxAgeDays:\s*31/);
   assert.match(script, /maxQueries:\s*50/);
   assert.match(script, /websiteLookupLimit:\s*0/);
   assert.doesNotMatch(script, /data-custom-select-option|customSelects|setCustomDropdownOpen|selectedOptions/);
