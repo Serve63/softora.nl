@@ -12,6 +12,7 @@
     const confirmedStates = new Map();
     const pendingStates = new Map();
     const rejectedStates = new Map();
+    const failedRecords = new Map();
     const pendingOperations = new Map();
     const stateOutbox = options.outbox || global.SoftoraMailboxStateOutbox?.create?.({
       fetch: options.fetch,
@@ -98,6 +99,30 @@
       const targets = getConversationTargets(mail);
       let applied = false;
       targets.forEach((target) => {
+        const identity = getIdentity(target);
+        const key = identity ? getIdentityKey(identity) : '';
+        const failedRecord = key ? failedRecords.get(key) : null;
+        const readAt = String(target && (target.softoraReadAt || target.readAt) || '').trim();
+        const replyDismissedAt = String(target?.replyDismissedAt || '').trim();
+        const durableConfirmation = failedRecord && failedRecord.unread !== true && (
+          failedRecord.dismissReply === true ? Boolean(replyDismissedAt) : Boolean(readAt || replyDismissedAt)
+        );
+        if (durableConfirmation) {
+          pendingStates.delete(key);
+          rejectedStates.delete(key);
+          failedRecords.delete(key);
+          const confirmed = {
+            identity,
+            unread: false,
+            pending: false,
+            dismissReply: failedRecord.dismissReply === true,
+            targetKey: getIdentityKey(failedRecord.identity) || key,
+            replyDismissedAt,
+            savedAt: Date.now(),
+          };
+          confirmedStates.set(key, confirmed);
+          void stateOutbox?.confirmDurable?.(failedRecord, { readAt, replyDismissedAt });
+        }
         const state = getStateFor(target);
         if (state) applied = applyStateToTarget(target, state) || applied;
       });
@@ -465,6 +490,7 @@
         if (type === 'confirmed') {
           pendingStates.delete(key);
           rejectedStates.delete(key);
+          failedRecords.delete(key);
           confirmedStates.set(key, {
             identity,
             unread: record?.unread === true,
@@ -479,6 +505,7 @@
         if (type === 'failed') {
           pendingStates.delete(key);
           confirmedStates.delete(key);
+          if (key === getIdentityKey(record?.identity)) failedRecords.set(key, record);
           rejectedStates.set(key, {
             identity,
             unread: Boolean(record?.previous?.unread),
@@ -493,6 +520,7 @@
           return;
         }
         rejectedStates.delete(key);
+        failedRecords.delete(key);
         pendingStates.set(key, {
           identity,
           unread: record?.unread === true,

@@ -220,14 +220,34 @@
       return options.openMail?.(id, nextOptions);
     }
 
-    function keepConversationOpen(messages, previousActiveId, loadOptions = {}) {
+    function getConversationKey(message) {
+      const customKey = String(options.getConversationKey?.(message) || '').trim().toLowerCase();
+      if (customKey) return customKey;
+      const account = normalize(message?.accountEmail || message?.account);
+      const conversationId = normalize(message?.conversationId || message?.technicalThreadKey);
+      if (conversationId) return `${account}|conversation:${conversationId}`;
+      const messageId = normalize(message?.messageId).replace(/^<+|>+$/g, '');
+      return account && messageId ? `${account}|message:${messageId}` : '';
+    }
+
+    function keepConversationOpen(messages, previousActiveId, loadOptions = {}, previousActiveMessage = null) {
       if (loadOptions.openLatest !== false) return;
       const activeMessage = (Array.isArray(messages) ? messages : []).find(
         (message) => String(message && message.id) === String(previousActiveId || '')
       );
-      const nextMessage = activeMessage || (Array.isArray(messages) ? messages[0] : null);
+      const previousConversationKey = getConversationKey(previousActiveMessage);
+      const sameConversation = !activeMessage && previousConversationKey
+        ? (Array.isArray(messages) ? messages : []).find(
+          (message) => getConversationKey(message) === previousConversationKey
+        )
+        : null;
+      const nextMessage = activeMessage || sameConversation || (
+        loadOptions.allowUnrelatedFallback === false
+          ? null
+          : (Array.isArray(messages) ? messages[0] : null)
+      );
       if (nextMessage) openMessage(nextMessage.id, loadOptions);
-      else {
+      else if (loadOptions.allowUnrelatedFallback !== false) {
         options.setActiveMail?.(null);
         options.resetDetail?.();
       }
@@ -256,6 +276,14 @@
         ? token
         : session.begin(scope);
       token = candidate;
+      const activeIdAtLoad = options.getActiveMail?.();
+      const selectionVersionAtLoad = options.getSelectionVersion?.();
+      const activeMessageAtLoad = (options.getMessages?.() || []).find(
+        (message) => String(message && message.id) === String(activeIdAtLoad || '')
+      );
+      const activeMessageContextAtLoad = activeMessageAtLoad
+        ? { ...activeMessageAtLoad }
+        : null;
       const normalizeMessage = (message) => options.normalizeMessage?.(message, scope) || message;
       setBusy(true);
       try {
@@ -277,16 +305,20 @@
         if (campaignResult) {
           options.setSync?.(campaignResult.sync);
           const ownerMessages = options.campaignInbox.filterMessages(campaignResult.messages, scope.owner);
+          const currentMessages = options.getMessages?.() || [];
+          const activeId = options.getActiveMail?.();
+          const previousActiveMessage = currentMessages.find(
+            (message) => String(message && message.id) === String(activeId || '')
+          ) || null;
           const messages = reconcileMessages(
-            options.getMessages?.() || [],
+            currentMessages,
             options.filterDeleted?.(ownerMessages) || []
           );
-          const activeId = options.getActiveMail?.();
           if (campaignResult.fromCache) releaseTransientLoadingState(messages);
           options.setMessages?.(messages);
           options.prewarm?.(messages);
           options.renderList?.({ openLatest: loadOptions.openLatest !== false });
-          keepConversationOpen(messages, activeId, loadOptions);
+          keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
           options.setStatus?.('');
           setBusy(false);
           if (campaignResult.fromBootstrap && canApply(candidate)) {
@@ -294,6 +326,7 @@
               skipPageBootstrap: true,
               skipBackgroundSync: true,
               skipProviderRefresh: true,
+              showLoader: false,
               openLatest: false,
               preserveOnError: true,
               reuseActiveToken: true,
@@ -319,8 +352,13 @@
           return false;
         }
         const sync = data?.sync && typeof data.sync === 'object' ? data.sync : null;
+        const currentMessages = options.getMessages?.() || [];
+        const activeId = options.getActiveMail?.();
+        const previousActiveMessage = currentMessages.find(
+          (message) => String(message && message.id) === String(activeId || '')
+        ) || null;
         const messages = reconcileMessages(
-          options.getMessages?.() || [],
+          currentMessages,
           options.filterDeleted?.(
             Array.isArray(data.messages) ? data.messages.map(normalizeMessage) : []
           ) || []
@@ -329,7 +367,7 @@
         options.setMessages?.(messages);
         options.prewarm?.(messages);
         options.renderList?.({ openLatest: loadOptions.openLatest !== false });
-        keepConversationOpen(messages, options.getActiveMail?.(), loadOptions);
+        keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
         void hydrateOutreachContexts(candidate, loadOptions).catch(() => {});
         options.setStatus?.(sync?.warming ? 'Mailbox wordt bijgewerkt…' : '');
         if (sync?.refreshRecommended && !loadOptions.skipBackgroundSync) {
@@ -344,16 +382,33 @@
         }
         const currentMessages = options.getMessages?.() || [];
         if (loadOptions.preserveOnError && currentMessages.length) {
-          const activeId = options.getActiveMail?.();
-          releaseTransientLoadingState(currentMessages);
-          options.renderList?.({ openLatest: false });
-          const activeMessage = currentMessages.find(
-            (message) => String(message && message.id) === String(activeId || '')
+          const currentActiveId = options.getActiveMail?.();
+          const currentSelectionVersion = options.getSelectionVersion?.();
+          const selectionChanged = String(currentActiveId || '') !== String(activeIdAtLoad || '') || Boolean(
+            selectionVersionAtLoad !== undefined &&
+            currentSelectionVersion !== undefined &&
+            currentSelectionVersion !== selectionVersionAtLoad
           );
-          if (activeMessage) {
-            openMessage(activeMessage.id, loadOptions, { skipReadPersist: true });
+          if (selectionChanged) {
+            setBusy(false);
+            return false;
           }
-          else keepConversationOpen(currentMessages, activeId, { openLatest: false });
+          const activeMessage = currentMessages.find(
+            (message) => String(message && message.id) === String(activeIdAtLoad || '')
+          );
+          const previousConversationKey = getConversationKey(activeMessageContextAtLoad);
+          const logicalReplacement = !activeMessage && previousConversationKey
+            ? currentMessages.find((message) => getConversationKey(message) === previousConversationKey)
+            : null;
+          const recoveryMessage = activeMessage || logicalReplacement || null;
+          releaseTransientLoadingState(currentMessages);
+          if (String(activeIdAtLoad || '') && !recoveryMessage) {
+            options.setStatus?.('');
+            setBusy(false);
+            return false;
+          }
+          options.renderList?.({ openLatest: false });
+          if (recoveryMessage) openMessage(recoveryMessage.id, loadOptions, { skipReadPersist: true });
           options.setStatus?.('');
           setBusy(false);
           return false;

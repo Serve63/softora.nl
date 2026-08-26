@@ -209,6 +209,121 @@ test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart techn
   );
 });
 
+test('contacttijdlijn houdt All Mail-identiteit atomisch bij een Inbox-kopie met hetzelfde RFC Message-ID', () => {
+  const root = {
+    id: 'allmail:413', mailboxId: 'allmail:413', uid: 413,
+    accountEmail: 'contact.venvisuals@gmail.com', providerAccountEmail: 'contact.venvisuals@gmail.com',
+    folder: 'allmail', storageFolder: 'allmail', provider: 'imap', providerMessageId: 'allmail:413',
+    providerOwner: 'martijn', canonicalOwner: 'martijn',
+    messageKey: 'contact.venvisuals@gmail.com|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|413',
+    messageId: '<AM8P195MB10768DF6C18B1F777FB30BF3C3A72@AM8P195MB1076.EURP195.PROD.OUTLOOK.COM>',
+    email: 'praktijk@example.nl', to: 'contact.venvisuals@gmail.com',
+    externalContactEmail: 'praktijk@example.nl', conversationId: 'conversation:root',
+  };
+  const identityFields = [
+    'id', 'mailboxId', 'uid', 'accountEmail', 'providerAccountEmail', 'folder', 'storageFolder',
+    'provider', 'providerMessageId', 'providerOwner', 'canonicalOwner', 'messageKey', 'messageId',
+  ];
+  const before = Object.fromEntries(identityFields.map((field) => [field, root[field]]));
+  const inboxTwin = {
+    ...root,
+    id: 'inbox:151', mailboxId: 'inbox:151', uid: 151, folder: 'inbox', storageFolder: 'inbox',
+    providerMessageId: 'inbox:151',
+    messageKey: 'contact.venvisuals@gmail.com|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|151',
+    technicalThreadKey: 'imap:contact.venvisuals@gmail.com:praktijk',
+    conversationId: 'conversation:canonical',
+  };
+
+  discoveryUi.mergeContactTimeline(root, [inboxTwin], 'praktijk@example.nl', 1, {
+    accountEmails: ['contact.venvisuals@gmail.com'],
+    canonicalOwner: 'martijn',
+    getMessageOwner: () => 'martijn',
+  });
+
+  assert.deepEqual(Object.fromEntries(identityFields.map((field) => [field, root[field]])), before);
+  assert.equal(root.technicalThreadKey, 'imap:contact.venvisuals@gmail.com:praktijk');
+  assert.equal(root.conversationId, 'conversation:canonical');
+  assert.deepEqual(root.threadMessages, []);
+});
+
+test('contacttijdlijn neemt bevestigde duplicate-status monotone over en wist alleen stale UI-fouten', () => {
+  const root = {
+    id: 'allmail:413', uid: 413, folder: 'allmail', accountEmail: 'contact.venvisuals@gmail.com',
+    messageKey: 'contact.venvisuals@gmail.com|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|413',
+    messageId: '<same-message@example.test>', email: 'praktijk@example.nl',
+    to: 'contact.venvisuals@gmail.com', externalContactEmail: 'praktijk@example.nl',
+    unread: true, readPending: true, replyDismissPending: true, readError: 'Niet opgeslagen',
+  };
+  const durableTwin = {
+    ...root,
+    id: 'inbox:151', uid: 151, folder: 'inbox',
+    messageKey: 'contact.venvisuals@gmail.com|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|151',
+    readAt: '2026-08-18T14:46:48.499Z',
+    replyDismissedAt: '2026-08-18T14:46:48.499Z',
+    readPending: false, replyDismissPending: false, readError: '',
+  };
+  const options = {
+    accountEmails: ['contact.venvisuals@gmail.com'],
+    canonicalOwner: 'martijn',
+    getMessageOwner: () => 'martijn',
+  };
+
+  discoveryUi.mergeContactTimeline(root, [durableTwin], 'praktijk@example.nl', 1, options);
+  assert.equal(root.readAt, '2026-08-18T14:46:48.499Z');
+  assert.equal(root.softoraReadAt, '2026-08-18T14:46:48.499Z');
+  assert.equal(root.replyDismissedAt, '2026-08-18T14:46:48.499Z');
+  assert.equal(root.unread, false);
+  assert.equal(root.readPending, false);
+  assert.equal(root.replyDismissPending, false);
+  assert.equal(root.readError, '');
+  assert.equal(root.softoraReadConfirmed, true);
+
+  const existingReadAt = '2026-08-19T10:00:00.000Z';
+  const existingDismissedAt = '2026-08-19T10:01:00.000Z';
+  root.readAt = existingReadAt;
+  root.softoraReadAt = existingReadAt;
+  root.replyDismissedAt = existingDismissedAt;
+  discoveryUi.mergeContactTimeline(root, [{ ...durableTwin, readAt: '', replyDismissedAt: '' }], 'praktijk@example.nl', 1, options);
+  assert.equal(root.readAt, existingReadAt);
+  assert.equal(root.replyDismissedAt, existingDismissedAt);
+});
+
+test('contacttijdlijn laat een lopende dismiss staan tot exact die duurzame status is bevestigd', () => {
+  const optimisticDismissedAt = '2026-08-26T08:00:00.000Z';
+  const root = {
+    id: 'allmail:500', uid: 500, folder: 'allmail', accountEmail: 'contact.venvisuals@gmail.com',
+    messageKey: 'contact.venvisuals@gmail.com|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|500',
+    messageId: '<pending-dismiss@example.test>', email: 'praktijk@example.nl',
+    to: 'contact.venvisuals@gmail.com', externalContactEmail: 'praktijk@example.nl',
+    unread: false, readPending: true, replyDismissPending: true,
+    replyDismissedAt: optimisticDismissedAt, readError: '',
+  };
+  const options = {
+    accountEmails: ['contact.venvisuals@gmail.com'],
+    canonicalOwner: 'martijn',
+    getMessageOwner: () => 'martijn',
+  };
+  const twin = {
+    ...root,
+    id: 'inbox:250', uid: 250, folder: 'inbox',
+    messageKey: 'contact.venvisuals@gmail.com|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|250',
+    readAt: '2026-08-25T08:00:00.000Z', replyDismissedAt: '',
+    readPending: false, replyDismissPending: false,
+  };
+
+  discoveryUi.mergeContactTimeline(root, [twin], 'praktijk@example.nl', 1, options);
+  assert.equal(root.readPending, true);
+  assert.equal(root.replyDismissPending, true);
+  assert.equal(root.replyDismissedAt, optimisticDismissedAt);
+
+  const durableDismissedAt = '2026-08-26T08:00:03.500Z';
+  discoveryUi.mergeContactTimeline(root, [{ ...twin, replyDismissedAt: durableDismissedAt }], 'praktijk@example.nl', 1, options);
+  assert.equal(root.readPending, false);
+  assert.equal(root.replyDismissPending, false);
+  assert.equal(root.replyDismissedAt, durableDismissedAt);
+  assert.equal(root.softoraReadConfirmed, true);
+});
+
 test('contacttijdlijn laat alleen hetzelfde externe adres binnen exact dezelfde eigenaar toe', () => {
   const root = {
     id: 'martijn@softora.nl|sent:1',
@@ -419,6 +534,7 @@ test('contacttijdlijn behoudt een exacte alias bij eerste laadpagina en telt app
     }],
   };
   const requests = [];
+  const opens = [];
   const controller = discoveryUi.create({
     document: { getElementById: (id) => elements[id] || null, querySelector: () => null },
     async fetch(url) {
@@ -462,7 +578,7 @@ test('contacttijdlijn behoudt een exacte alias bij eerste laadpagina en telt app
     getAccountEmails: () => ['martijn@softora.nl'],
     getActiveMail: () => root.id,
     normalizeMessage: (message) => ({ ...message }),
-    openMail() {},
+    openMail: (id, options) => opens.push({ id, options }),
   });
 
   assert.equal(await controller.loadContactTimeline(root), true);
@@ -472,6 +588,15 @@ test('contacttijdlijn behoudt een exacte alias bij eerste laadpagina en telt app
   );
   assert.equal(root.contactTimelineTotal, 4);
   assert.equal(root.contactTimelineNextCursor, 'page-2');
+  assert.deepEqual(opens, [{
+    id: root.id,
+    options: {
+      skipBodyFetch: true,
+      skipContactTimeline: true,
+      skipReadPersist: true,
+      preserveVisibleDetail: true,
+    },
+  }]);
 
   assert.equal(await controller.loadMoreContactTimeline(root), true);
   assert.equal(requests[1].searchParams.get('cursor'), 'page-2');
@@ -482,6 +607,23 @@ test('contacttijdlijn behoudt een exacte alias bij eerste laadpagina en telt app
   assert.equal(root.contactTimelineRejectedCount, 1);
   assert.equal(root.contactTimelineTotal, 4);
   assert.equal(root.contactTimelineNextCursor, '');
+  assert.deepEqual(opens, [{
+    id: root.id,
+    options: {
+      skipBodyFetch: true,
+      skipContactTimeline: true,
+      skipReadPersist: true,
+      preserveVisibleDetail: true,
+    },
+  }, {
+    id: root.id,
+    options: {
+      skipBodyFetch: true,
+      skipContactTimeline: true,
+      skipReadPersist: true,
+      preserveVisibleDetail: true,
+    },
+  }]);
 });
 
 test('append bewaart een vroege aliasparent pending en bewijst hem pas met een latere directe seed', async () => {
@@ -580,6 +722,7 @@ test('volledige hide-tijdlijn accepteert exacte aliaslineage maar blijft fail-cl
       accountEmail: 'martijn@softora.nl', canonicalOwner: 'martijn', folder: 'inbox',
       email: 'lia@huidig.example', to: 'martijn@softora.nl', externalContactEmail: 'lia@huidig.example',
     };
+    const opens = [];
     const controller = discoveryUi.create({
       document: { getElementById: () => null, querySelector: () => null },
       fetch: async () => ({ ok: true, json: async () => ({ ok: true, messages, totalCount: messages.length, nextCursor: null }) }),
@@ -590,9 +733,9 @@ test('volledige hide-tijdlijn accepteert exacte aliaslineage maar blijft fail-cl
       getAccountEmails: () => options.accounts || ['martijn@softora.nl'],
       getActiveMail: () => root.id,
       normalizeMessage: (message) => ({ ...message }),
-      openMail() {},
+      openMail: (id, openOptions) => opens.push({ id, openOptions }),
     });
-    return { root, result: await controller.prepareCompleteContactTimelineForHide(root) };
+    return { root, result: await controller.prepareCompleteContactTimelineForHide(root), opens };
   }
 
   const validRoot = {
@@ -611,6 +754,15 @@ test('volledige hide-tijdlijn accepteert exacte aliaslineage maar blijft fail-cl
   const valid = await prepare([validRoot, linkedAlias]);
   assert.equal(valid.result, true);
   assert.deepEqual(valid.root.threadMessages.map((message) => message.id), ['sent:hide-parent']);
+  assert.deepEqual(valid.opens, [{
+    id: valid.root.id,
+    openOptions: {
+      skipBodyFetch: true,
+      skipContactTimeline: true,
+      skipReadPersist: true,
+      preserveVisibleDetail: true,
+    },
+  }]);
 
   const unrelated = {
     id: 'sent:hide-unrelated', messageId: '<hide-unrelated@example.test>',

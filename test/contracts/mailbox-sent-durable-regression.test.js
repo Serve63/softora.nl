@@ -23,8 +23,65 @@ const aliasLineageTimelineMigration = fs.readFileSync(path.resolve(
   __dirname,
   '../../supabase/migrations/20260825164216_mailbox_contact_timeline_alias_lineage.sql'
 ), 'utf8');
+const uidGenerationMigration = fs.readFileSync(path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260821202054_mailbox_uid_generation_epoch_v2.sql'
+), 'utf8');
+const stateMutationIdempotencyMigration = fs.readFileSync(path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260814150135_mailbox_state_mutation_idempotency.sql'
+), 'utf8');
+const duplicateStateConvergenceMigration = fs.readFileSync(path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260826075552_mailbox_duplicate_state_convergence.sql'
+), 'utf8');
 
-async function createTimelineDatabase() {
+function functionSqlFrom(source, name) {
+  const start = source.lastIndexOf(`create or replace function public.${name}(`);
+  assert.ok(start >= 0, `${name} ontbreekt`);
+  const functionSource = source.slice(start);
+  const delimiterMatch = functionSource.match(/\bas\s+(\$[a-z_][a-z0-9_]*\$|\$\$)/i);
+  assert.ok(delimiterMatch, `${name} heeft geen functie-start`);
+  const delimiter = delimiterMatch[1];
+  const opening = start + delimiterMatch.index + delimiterMatch[0].lastIndexOf(delimiter);
+  const closing = source.indexOf(`${delimiter};`, opening + delimiter.length);
+  assert.ok(closing > opening, `${name} heeft geen functie-einde`);
+  return source.slice(start, closing + delimiter.length + 1);
+}
+
+function effectiveStateMutationSql() {
+  const original = functionSqlFrom(uidGenerationMigration, 'softora_apply_mailbox_state_mutation');
+  const perKey = original
+    .replace(
+      '  perform pg_catalog.pg_advisory_xact_lock(824031, 3);',
+      `  perform public.softora_lock_mailbox_sync_key_v2(
+    pg_catalog.lower(pg_catalog.btrim(coalesce(p_account_email, '')))
+      || '|' || pg_catalog.lower(pg_catalog.btrim(coalesce(p_folder, '')))
+  );`
+    )
+    .replace(
+      "where scope = 'campaign' for update;",
+      "where scope = 'campaign';"
+    )
+    .replace(
+      `  returning message.* into v_row;
+
+  return query select v_row.message_key, true, false, false,`,
+      `  returning message.* into v_row;
+
+  perform public.softora_bump_mailbox_campaign_version_v2(
+    v_row.account_email, v_row.folder, true
+  );
+
+  return query select v_row.message_key, true, false, false,`
+    );
+  assert.doesNotMatch(perKey, /pg_advisory_xact_lock\(824031, 3\)/);
+  assert.match(perKey, /softora_lock_mailbox_sync_key_v2/);
+  assert.match(perKey, /softora_bump_mailbox_campaign_version_v2/);
+  return perKey;
+}
+
+async function createTimelineDatabase(options = {}) {
   const database = new PGlite();
   await database.exec(`
     create role anon;
@@ -214,10 +271,60 @@ async function createTimelineDatabase() {
       return;
     end;
     $function$;
+
+    create or replace function public.softora_lock_mailbox_sync_key_v2(p_sync_key text)
+    returns void language plpgsql volatile security invoker set search_path = '' as $function$
+    begin
+      return;
+    end;
+    $function$;
+
+    create or replace function public.softora_bump_mailbox_campaign_version_v2(
+      p_account_email text,
+      p_folder text,
+      p_visible_changed boolean
+    ) returns void language plpgsql volatile security invoker set search_path = '' as $function$
+    begin
+      if p_visible_changed then
+        update public.softora_mailbox_campaign_consistency
+        set content_version = content_version + 1,
+            updated_at = pg_catalog.clock_timestamp()
+        where scope = 'campaign';
+      end if;
+    end;
+    $function$;
   `);
   await database.exec(atomicVisibilityMigration);
   await database.exec(acceptedTimelineMigration);
   await database.exec(aliasLineageTimelineMigration);
+  await database.exec(functionSqlFrom(
+    stateMutationIdempotencyMigration,
+    'softora_preserve_mailbox_read_state'
+  ));
+  await database.exec(`
+    drop trigger if exists softora_mailbox_messages_preserve_read_state
+      on public.softora_mailbox_messages;
+    create trigger softora_mailbox_messages_preserve_read_state
+    before update on public.softora_mailbox_messages
+    for each row execute function public.softora_preserve_mailbox_read_state();
+
+    create or replace function public.softora_inherit_mailbox_message_tombstone()
+    returns trigger language plpgsql security invoker set search_path = '' as $function$
+    begin
+      return new;
+    end;
+    $function$;
+    drop trigger if exists softora_mailbox_messages_inherit_logical_tombstone
+      on public.softora_mailbox_messages;
+    create trigger softora_mailbox_messages_inherit_logical_tombstone
+    before insert or update of account_email, message_id, deleted_at
+    on public.softora_mailbox_messages
+    for each row execute function public.softora_inherit_mailbox_message_tombstone();
+  `);
+  await database.exec(effectiveStateMutationSql());
+  if (options.applyDuplicateStateConvergence !== false) {
+    await database.exec(duplicateStateConvergenceMigration);
+  }
   return database;
 }
 
@@ -792,6 +899,319 @@ test('contacttijdlijn koppelt een antwoordalias alleen via exact bewezen origin 
   }
 });
 
+test('duplicate mailboxstatus wordt eenmalig hersteld en na exacte v2-identiteit blijvend geconvergeerd', async () => {
+  const database = await createTimelineDatabase({ applyDuplicateStateConvergence: false });
+  const accountEmail = 'contact.venvisuals@gmail.com';
+  const messageId = '<same-duplicate-state@example.test>';
+  try {
+    await insertPhysical(database, {
+      key: `${accountEmail}|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|413`,
+      accountEmail, folder: 'allmail', uid: 413, providerId: 'allmail:413', messageId,
+      senderEmail: 'praktijk@example.nl', recipients: accountEmail, subject: 'Antwoord',
+      body: 'Antwoord uit de praktijk.', date: '2026-08-18T14:40:00.000Z',
+      searchDocument: 'praktijk@example.nl antwoord',
+    });
+    await insertPhysical(database, {
+      key: `${accountEmail}|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|151`,
+      accountEmail, folder: 'inbox', uid: 151, providerId: 'inbox:151', messageId,
+      senderEmail: 'praktijk@example.nl', recipients: accountEmail, subject: 'Antwoord',
+      body: 'Antwoord uit de praktijk.', date: '2026-08-18T14:40:00.000Z',
+      searchDocument: 'praktijk@example.nl antwoord',
+    });
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = false,
+          softora_read_at = '2026-08-18T14:46:48.499Z',
+          reply_dismissed_at = '2026-08-18T14:46:48.499Z',
+          state_revision = 1787064408117002,
+          state_mutation_key = $1,
+          state_mutation_at = '2026-08-18T14:46:48.499Z'
+      where folder = 'inbox' and uid = 151
+    `, ['a'.repeat(64)]);
+
+    await database.exec(duplicateStateConvergenceMigration);
+    const repaired = await database.query(`
+      select folder, unread, softora_read_at, reply_dismissed_at, state_revision, state_mutation_key
+      from public.softora_mailbox_messages
+      where account_email = $1 and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'same-duplicate-state@example.test']);
+    assert.equal(repaired.rows.length, 2);
+    assert.ok(repaired.rows.every((row) => row.unread === false));
+    assert.ok(repaired.rows.every((row) => new Date(row.softora_read_at).toISOString() === '2026-08-18T14:46:48.499Z'));
+    assert.ok(repaired.rows.every((row) => new Date(row.reply_dismissed_at).toISOString() === '2026-08-18T14:46:48.499Z'));
+    assert.ok(repaired.rows.every((row) => Number(row.state_revision) === 1787064408117002));
+    assert.ok(repaired.rows.every((row) => row.state_mutation_key === 'a'.repeat(64)));
+
+    const repairedState = repaired.rows.map((row) => ({
+      ...row,
+      softora_read_at: new Date(row.softora_read_at).toISOString(),
+      reply_dismissed_at: new Date(row.reply_dismissed_at).toISOString(),
+      state_revision: Number(row.state_revision),
+    }));
+    await database.exec(duplicateStateConvergenceMigration);
+    const repairedAfterRerun = await database.query(`
+      select folder, unread, softora_read_at, reply_dismissed_at, state_revision, state_mutation_key
+      from public.softora_mailbox_messages
+      where account_email = $1 and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'same-duplicate-state@example.test']);
+    assert.deepEqual(repairedAfterRerun.rows.map((row) => ({
+      ...row,
+      softora_read_at: new Date(row.softora_read_at).toISOString(),
+      reply_dismissed_at: new Date(row.reply_dismissed_at).toISOString(),
+      state_revision: Number(row.state_revision),
+    })), repairedState);
+
+    const futureMessageId = '<future-duplicate-state@example.test>';
+    await insertPhysical(database, {
+      key: `${accountEmail}|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|500`,
+      accountEmail, folder: 'allmail', uid: 500, providerId: 'allmail:500', messageId: futureMessageId,
+      senderEmail: 'nieuw@example.nl', recipients: accountEmail, subject: 'Nieuw antwoord',
+      body: 'Een nieuw antwoord.', date: '2026-08-26T07:00:00.000Z',
+      searchDocument: 'nieuw@example.nl nieuw antwoord',
+    });
+    await insertPhysical(database, {
+      key: `${accountEmail}|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|250`,
+      accountEmail, folder: 'inbox', uid: 250, providerId: 'inbox:250', messageId: futureMessageId,
+      senderEmail: 'nieuw@example.nl', recipients: accountEmail, subject: 'Nieuw antwoord',
+      body: 'Een nieuw antwoord.', date: '2026-08-26T07:00:00.000Z',
+      searchDocument: 'nieuw@example.nl nieuw antwoord',
+    });
+    const applied = await database.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1, 'allmail', 500, 'allmail:500', $2, $3, $4, 1787731200000001, false, true
+      )
+    `, [
+      accountEmail,
+      `${accountEmail}|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|500`,
+      futureMessageId,
+      'b'.repeat(64),
+    ]);
+    assert.equal(applied.rows[0].applied, true);
+    const converged = await database.query(`
+      select folder, unread, softora_read_at, reply_dismissed_at, state_revision
+      from public.softora_mailbox_messages
+      where account_email = $1 and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'future-duplicate-state@example.test']);
+    assert.equal(converged.rows.length, 2);
+    assert.ok(converged.rows.every((row) => row.unread === false));
+    assert.ok(converged.rows.every((row) => row.softora_read_at));
+    assert.ok(converged.rows.every((row) => row.reply_dismissed_at));
+    assert.ok(converged.rows.every((row) => Number(row.state_revision) === 1787731200000001));
+
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = false,
+          softora_read_at = '2026-08-26T07:05:00.000Z',
+          reply_dismissed_at = '2026-08-26T07:05:00.000Z',
+          state_revision = 1787731200000010,
+          state_mutation_key = $1,
+          state_mutation_at = '2026-08-26T07:05:00.000Z'
+      where account_email = $2 and folder = 'inbox' and uid = 250
+    `, ['e'.repeat(64), accountEmail]);
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = true,
+          softora_read_at = null,
+          reply_dismissed_at = null,
+          state_revision = 1787731200000005,
+          state_mutation_key = $1,
+          state_mutation_at = '2026-08-26T07:04:00.000Z'
+      where account_email = $2 and folder = 'allmail' and uid = 500
+    `, ['f'.repeat(64), accountEmail]);
+    const groupSuperseded = await database.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1, 'allmail', 500, 'allmail:500', $2, $3, $4, 1787731200000007, true, false
+      )
+    `, [
+      accountEmail,
+      `${accountEmail}|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|500`,
+      futureMessageId,
+      '1'.repeat(64),
+    ]);
+    assert.equal(groupSuperseded.rows[0].applied, false);
+    assert.equal(groupSuperseded.rows[0].superseded, true);
+    assert.equal(Number(groupSuperseded.rows[0].current_revision), 1787731200000010);
+    const latestGroupState = await database.query(`
+      select folder, unread, state_revision, state_mutation_key
+      from public.softora_mailbox_messages
+      where account_email = $1 and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'future-duplicate-state@example.test']);
+    assert.ok(latestGroupState.rows.every((row) => row.unread === false));
+    assert.ok(latestGroupState.rows.every((row) => Number(row.state_revision) === 1787731200000010));
+    assert.ok(latestGroupState.rows.every((row) => row.state_mutation_key === 'e'.repeat(64)));
+
+    const sameRevisionMessageId = '<same-revision-conflict@example.test>';
+    const sameRevisionInboxKey = `${accountEmail}|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|260`;
+    await insertPhysical(database, {
+      key: `${accountEmail}|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|510`,
+      accountEmail, folder: 'allmail', uid: 510, providerId: 'allmail:510',
+      messageId: sameRevisionMessageId, senderEmail: 'conflict@example.nl',
+      recipients: accountEmail, subject: 'Gelijke revisie', body: 'All Mail-kopie.',
+      date: '2026-08-26T07:19:00.000Z', searchDocument: 'conflict@example.nl gelijke revisie',
+    });
+    await insertPhysical(database, {
+      key: sameRevisionInboxKey, accountEmail, folder: 'inbox', uid: 260,
+      providerId: 'inbox:260', messageId: sameRevisionMessageId,
+      senderEmail: 'conflict@example.nl', recipients: accountEmail,
+      subject: 'Gelijke revisie', body: 'Inbox-kopie.',
+      date: '2026-08-26T07:19:00.000Z', searchDocument: 'conflict@example.nl gelijke revisie',
+    });
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = false, softora_read_at = '2026-08-26T07:20:00.000Z',
+          state_revision = 1787732400000020, state_mutation_key = $1,
+          state_mutation_at = '2026-08-26T07:20:00.000Z',
+          updated_at = '2026-08-26T07:20:00.000Z'
+      where account_email = $2 and folder = 'inbox' and uid = 260
+    `, ['6'.repeat(64), accountEmail]);
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = true, softora_read_at = null,
+          state_revision = 1787732400000020, state_mutation_key = $1,
+          state_mutation_at = '2026-08-26T07:21:00.000Z',
+          updated_at = '2026-08-26T07:21:00.000Z'
+      where account_email = $2 and folder = 'allmail' and uid = 510
+    `, ['7'.repeat(64), accountEmail]);
+    const equalRevisionUnreadWins = await database.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1, 'inbox', 260, 'inbox:260', $2, $3, $4, 1787732400000019, false, true
+      )
+    `, [accountEmail, sameRevisionInboxKey, sameRevisionMessageId, '8'.repeat(64)]);
+    assert.equal(equalRevisionUnreadWins.rows[0].superseded, true);
+    const unreadConvergence = await database.query(`
+      select unread, softora_read_at, state_revision, state_mutation_key
+      from public.softora_mailbox_messages
+      where account_email = $1
+        and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'same-revision-conflict@example.test']);
+    assert.ok(unreadConvergence.rows.every((row) => row.unread === true));
+    assert.ok(unreadConvergence.rows.every((row) => row.softora_read_at === null));
+    assert.ok(unreadConvergence.rows.every((row) => Number(row.state_revision) === 1787732400000020));
+    assert.ok(unreadConvergence.rows.every((row) => row.state_mutation_key === '7'.repeat(64)));
+
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = true, softora_read_at = null,
+          state_revision = 1787732400000030, state_mutation_key = $1,
+          state_mutation_at = '2026-08-26T07:30:00.000Z',
+          updated_at = '2026-08-26T07:30:00.000Z'
+      where account_email = $2 and folder = 'inbox' and uid = 260
+    `, ['9'.repeat(64), accountEmail]);
+    await database.query(`
+      update public.softora_mailbox_messages
+      set unread = false, softora_read_at = '2026-08-26T07:31:00.000Z',
+          state_revision = 1787732400000030, state_mutation_key = $1,
+          state_mutation_at = '2026-08-26T07:31:00.000Z',
+          updated_at = '2026-08-26T07:31:00.000Z'
+      where account_email = $2 and folder = 'allmail' and uid = 510
+    `, ['a'.repeat(64), accountEmail]);
+    const equalRevisionReadWins = await database.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1, 'inbox', 260, 'inbox:260', $2, $3, $4, 1787732400000029, true, false
+      )
+    `, [accountEmail, sameRevisionInboxKey, sameRevisionMessageId, 'b'.repeat(64)]);
+    assert.equal(equalRevisionReadWins.rows[0].superseded, true);
+    const readConvergence = await database.query(`
+      select unread, softora_read_at, state_revision, state_mutation_key
+      from public.softora_mailbox_messages
+      where account_email = $1
+        and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'same-revision-conflict@example.test']);
+    assert.ok(readConvergence.rows.every((row) => row.unread === false));
+    assert.ok(readConvergence.rows.every((row) => row.softora_read_at));
+    assert.ok(readConvergence.rows.every((row) => Number(row.state_revision) === 1787732400000030));
+    assert.ok(readConvergence.rows.every((row) => row.state_mutation_key === 'a'.repeat(64)));
+    const convergenceScope = await database.query(`
+      select coalesce(nullif(pg_catalog.current_setting(
+        'softora.mailbox_duplicate_state_convergence', true
+      ), ''), '') as scope
+    `);
+    assert.equal(convergenceScope.rows[0].scope, '');
+
+    const lateMessageId = '<late-duplicate-state@example.test>';
+    const lateAllMailKey = `${accountEmail}|allmail|gen:9460a489-cfec-4dbd-aea2-512f74ed755a|501`;
+    await insertPhysical(database, {
+      key: lateAllMailKey,
+      accountEmail, folder: 'allmail', uid: 501, providerId: 'allmail:501', messageId: lateMessageId,
+      senderEmail: 'later@example.nl', recipients: accountEmail, subject: 'Later antwoord',
+      body: 'Dit antwoord krijgt pas later een Inbox-kopie.', date: '2026-08-26T07:10:00.000Z',
+      searchDocument: 'later@example.nl later antwoord',
+    });
+    const lateApplied = await database.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1, 'allmail', 501, 'allmail:501', $2, $3, $4, 1787731800000001, false, true
+      )
+    `, [accountEmail, lateAllMailKey, lateMessageId, 'd'.repeat(64)]);
+    assert.equal(lateApplied.rows[0].applied, true);
+
+    await insertPhysical(database, {
+      key: `${accountEmail}|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|251`,
+      accountEmail, folder: 'inbox', uid: 251, providerId: 'inbox:251', messageId: lateMessageId,
+      senderEmail: 'later@example.nl', recipients: accountEmail, subject: 'Later antwoord',
+      body: 'Dit antwoord krijgt pas later een Inbox-kopie.', date: '2026-08-26T07:10:00.000Z',
+      searchDocument: 'later@example.nl later antwoord',
+    });
+    const lateCopies = await database.query(`
+      select folder, unread, softora_read_at, reply_dismissed_at, state_revision, state_mutation_key
+      from public.softora_mailbox_messages
+      where account_email = $1 and public.softora_normalize_mailbox_message_id(message_id) = $2
+      order by folder
+    `, [accountEmail, 'late-duplicate-state@example.test']);
+    assert.equal(lateCopies.rows.length, 2);
+    assert.ok(lateCopies.rows.every((row) => row.unread === false));
+    assert.ok(lateCopies.rows.every((row) => row.softora_read_at));
+    assert.ok(lateCopies.rows.every((row) => row.reply_dismissed_at));
+    assert.ok(lateCopies.rows.every((row) => Number(row.state_revision) === 1787731800000001));
+    assert.ok(lateCopies.rows.every((row) => row.state_mutation_key === 'd'.repeat(64)));
+
+    await insertPhysical(database, {
+      key: `${accountEmail}|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|252`,
+      accountEmail, folder: 'inbox', uid: 252, providerId: 'inbox:252',
+      messageId: '<different-late-state@example.test>',
+      senderEmail: 'later@example.nl', recipients: accountEmail, subject: 'Ander bericht',
+      body: 'Zelfde account maar een ander RFC Message-ID.', date: '2026-08-26T07:11:00.000Z',
+      searchDocument: 'later@example.nl ander bericht',
+    });
+    await insertPhysical(database, {
+      key: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|253',
+      accountEmail: 'serve@softora.nl', folder: 'inbox', uid: 253, providerId: 'inbox:253',
+      messageId: lateMessageId,
+      senderEmail: 'later@example.nl', recipients: 'serve@softora.nl', subject: 'Ander account',
+      body: 'Zelfde RFC Message-ID maar een ander account.', date: '2026-08-26T07:12:00.000Z',
+      searchDocument: 'later@example.nl ander account',
+    });
+    const boundedCopies = await database.query(`
+      select account_email, uid, softora_read_at, reply_dismissed_at, state_revision
+      from public.softora_mailbox_messages
+      where uid in (252, 253)
+      order by uid
+    `);
+    assert.equal(boundedCopies.rows.length, 2);
+    assert.ok(boundedCopies.rows.every((row) => row.softora_read_at === null));
+    assert.ok(boundedCopies.rows.every((row) => row.reply_dismissed_at === null));
+    assert.ok(boundedCopies.rows.every((row) => Number(row.state_revision) === 0));
+
+    await assert.rejects(() => database.query(`
+      select * from public.softora_apply_mailbox_state_mutation_v2(
+        $1, 'allmail', 500, 'allmail:500', $2, $3, $4, 1787731200000002, false, true
+      )
+    `, [
+      accountEmail,
+      `${accountEmail}|inbox|gen:af529f3c-36f9-4a70-afba-938186189917|250`,
+      futureMessageId,
+      'c'.repeat(64),
+    ]), /MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH/);
+  } finally {
+    await database.close();
+  }
+});
+
 test('aliaslineage gebruikt één fail-closed scope voor ancestor-only tijdlijn en zichtbaarheid', () => {
   assert.doesNotMatch(aliasLineageTimelineMigration, /min\(participant\)/i);
   assert.equal((aliasLineageTimelineMigration.match(/create or replace function public\.softora_mailbox_contact_timeline/gi) || []).length, 1);
@@ -801,6 +1221,72 @@ test('aliaslineage gebruikt één fail-closed scope voor ancestor-only tijdlijn 
   assert.match(aliasLineageTimelineMigration, /allowed_alias_origins[\s\S]*alias_match\.origin_contact_email/i);
   assert.match(aliasLineageTimelineMigration, /softora_mailbox_account_owner\(provenance\.account_email\)[\s\S]*softora_mailbox_account_owner\(provenance\.account_email\)/i);
   assert.match(aliasLineageTimelineMigration, /softora_mailbox_contact_scope\([\s\S]*v_owner_accounts, v_contact_email[\s\S]*v_physical_message_keys/i);
+});
+
+test('duplicate statusrepair bewaart visibility-per-key-logical lockvolgorde en blijft insert-only', () => {
+  const preserveReadState = functionSqlFrom(
+    duplicateStateConvergenceMigration,
+    'softora_preserve_mailbox_read_state'
+  );
+  assert.match(
+    preserveReadState,
+    /current_setting\([\s\S]*softora\.mailbox_duplicate_state_convergence[\s\S]*new\.state_revision = old\.state_revision[\s\S]*new\.state_mutation_key is distinct from old\.state_mutation_key/i
+  );
+  assert.match(
+    preserveReadState,
+    /v_convergence_scope = \([\s\S]*old\.account_email[\s\S]*softora_normalize_mailbox_message_id\(old\.message_id\)[\s\S]*v_convergence_scope = \([\s\S]*new\.account_email[\s\S]*softora_normalize_mailbox_message_id\(new\.message_id\)/i
+  );
+  const stateMutation = functionSqlFrom(
+    duplicateStateConvergenceMigration,
+    'softora_apply_mailbox_state_mutation_v2'
+  );
+  assert.match(
+    stateMutation,
+    /softora_lock_mailbox_sync_key_v2\([\s\S]*pg_advisory_xact_lock\([\s\S]*hashtext\(v_account_email\)[\s\S]*hashtext\(v_expected_message_id\)/i
+  );
+  assert.doesNotMatch(stateMutation, /pg_advisory_xact_lock\(824031, 3\)/i);
+  assert.match(
+    stateMutation,
+    /set_config\([\s\S]*softora\.mailbox_duplicate_state_convergence[\s\S]*sibling\.state_revision <= v_group_state\.state_revision[\s\S]*set_config\(/i
+  );
+  assert.match(
+    stateMutation,
+    /state_revision desc,[\s\S]*state_revision > 0 then sibling\.state_mutation_at[\s\S]*reply_dismissed_at is not null/i
+  );
+
+  const insertInheritance = functionSqlFrom(
+    duplicateStateConvergenceMigration,
+    'softora_inherit_mailbox_duplicate_state'
+  );
+  assert.match(
+    insertInheritance,
+    /pg_advisory_xact_lock\([\s\S]*hashtext\(v_account_email\)[\s\S]*hashtext\(v_message_id\)/i
+  );
+  assert.doesNotMatch(insertInheritance, /824031|softora_mailbox_campaign_consistency/i);
+  assert.match(
+    duplicateStateConvergenceMigration,
+    /create trigger softora_mailbox_messages_inherit_state_from_duplicate\s+before insert on public\.softora_mailbox_messages/i
+  );
+  assert.doesNotMatch(
+    duplicateStateConvergenceMigration,
+    /create trigger softora_mailbox_messages_inherit_state_from_duplicate[\s\S]{0,80}update/i
+  );
+  assert.match(
+    duplicateStateConvergenceMigration,
+    /do \$lock_duplicate_state_migration\$[\s\S]*softora_lock_mailbox_visibility_exclusive\(\)[\s\S]*softora_mailbox_campaign_consistency[\s\S]*for update[\s\S]*create or replace function public\.softora_apply_mailbox_state_mutation_v2/i
+  );
+  assert.match(
+    duplicateStateConvergenceMigration,
+    /do \$repair_duplicate_mailbox_state\$[\s\S]*softora_lock_mailbox_visibility_exclusive\(\)[\s\S]*softora_mailbox_campaign_consistency[\s\S]*for update[\s\S]*with ranked as materialized/i
+  );
+  assert.match(
+    duplicateStateConvergenceMigration,
+    /disable trigger softora_mailbox_messages_preserve_read_state[\s\S]*repair_duplicate_mailbox_state[\s\S]*enable trigger softora_mailbox_messages_preserve_read_state/i
+  );
+  assert.match(
+    stateMutation,
+    /get diagnostics v_changed_count = row_count;[\s\S]*softora_bump_mailbox_campaign_version_v2/i
+  );
 });
 
 test('aliasantwoord blijft vóór fysieke Sent-sync zichtbaar via exact account- en ownergebonden accepted provenance', async () => {

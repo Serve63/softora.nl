@@ -24,6 +24,21 @@ function isTemporaryMailboxSendInfrastructureError(error) {
     || /(?:abort|timeout|timed out|cooldown|504|503|fetch failed|network|temporar).*(?:supabase|postgrest|mailbox index)/i.test(text);
 }
 
+function setAcceptedSendIdentityHeaders(res, result = {}) {
+  if (!res || typeof res.setHeader !== 'function') return;
+  const sentMessage = result.sentMessage && typeof result.sentMessage === 'object'
+    ? result.sentMessage
+    : {};
+  [
+    ['X-Softora-Send-Intent-Id', result.intentId || sentMessage.softoraSendIntentId],
+    ['X-Softora-Message-Id', result.messageId || sentMessage.messageId],
+    ['X-Softora-Provider-Message-Id', result.providerMessageId || sentMessage.providerMessageId],
+  ].forEach(([name, rawValue]) => {
+    const value = String(rawValue || '').replace(/[\r\n]/g, '').trim().slice(0, 1000);
+    if (value) res.setHeader(name, value);
+  });
+}
+
 function createMailboxComposeRuntime(dependencies = {}) {
   const {
     composeSendDependencies,
@@ -102,6 +117,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
         mailboxSendProvenanceStore,
         outboundRecipientGuardStore: composeSendDependencies?.outboundRecipientGuardStore,
       });
+      setAcceptedSendIdentityHeaders(res, result);
       return res.status(200).json({ ok: true, result });
     } catch (error) {
       logger.error('[Mailbox][Send]', error?.message || error);

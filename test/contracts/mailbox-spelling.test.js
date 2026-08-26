@@ -273,6 +273,6 @@ test('composerfooter plaatst Spellingscontrole en inline undo direct naast Voorg
   assert.match(controllerSource, /action === 'spellcheck-compose'[\s\S]*void spellcheck\(\)/);
   assert.match(controllerSource, /action === 'undo-spelling'[\s\S]*undoSpelling\(\)/);
   assert.doesNotMatch(controllerSource, /spellcheck[\s\S]{0,500}\/api\/mailbox\/send/);
-  assert.match(page, /assets\/premium-mailbox-compose-controller\.js\?v=20260825b/);
+  assert.match(page, /assets\/premium-mailbox-compose-controller\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-mobile\.css\?v=20260822a/);
 });

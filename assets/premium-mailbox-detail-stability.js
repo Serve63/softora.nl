@@ -34,6 +34,7 @@
       const key = String(options.key || id);
       if (!id) return resolvedStale();
       if (
+        options.forceNewRun !== true &&
         activeRun &&
         !activeRun.settled &&
         activeRun.key === key &&
@@ -138,6 +139,7 @@
   function createController(options = {}) {
     const stability = create();
     let committedId = '';
+    let committedVisibilityKey = '';
     let committedHtml = '';
 
     function getDetail() {
@@ -146,13 +148,15 @@
 
     let pendingSequence = 0;
 
-    function setPending(id) {
+    function setPending(id, pendingOptions = {}) {
       const detail = getDetail();
       if (!detail) return '';
       const marker = String(++pendingSequence);
-      detail.classList?.add?.('is-detail-pending');
-      detail.setAttribute?.('aria-busy', 'true');
-      detail.setAttribute?.('inert', '');
+      if (pendingOptions.keepVisible !== true) {
+        detail.classList?.add?.('is-detail-pending');
+        detail.setAttribute?.('aria-busy', 'true');
+        detail.setAttribute?.('inert', '');
+      }
       if (detail.dataset) {
         detail.dataset.mailboxPendingId = String(id || '');
         detail.dataset.mailboxPendingMarker = marker;
@@ -178,23 +182,30 @@
       if (!detail || !mail) return false;
       const html = String(options.renderHtml?.(mail) || '');
       const id = String(mail.id || '');
+      const visibilityKey = String(options.getVisibilityKey?.(mail) || id);
       const domDirty = detail.dataset?.mailboxDomDirty === 'true';
       const changed = committedId !== id || committedHtml !== html || domDirty;
       if (changed) {
-        const preserveScroll = committedId === id;
+        const preserveScroll = committedVisibilityKey === visibilityKey;
         const previousBody = preserveScroll ? detail.querySelector?.('.detail-body') : null;
         const scrollTop = previousBody && Number.isFinite(Number(previousBody.scrollTop))
           ? Number(previousBody.scrollTop)
           : 0;
         detail.innerHTML = html;
         committedId = id;
+        committedVisibilityKey = visibilityKey;
         committedHtml = html;
         if (detail.dataset) detail.dataset.mailboxCommittedId = id;
+        if (detail.dataset) detail.dataset.mailboxCommittedVisibilityKey = visibilityKey;
         if (detail.dataset) delete detail.dataset.mailboxDomDirty;
         if (preserveScroll) {
           const nextBody = detail.querySelector?.('.detail-body');
           if (nextBody) nextBody.scrollTop = scrollTop;
         }
+      }
+      if (!changed) {
+        committedVisibilityKey = visibilityKey;
+        if (detail.dataset) detail.dataset.mailboxCommittedVisibilityKey = visibilityKey;
       }
       clearPending();
       options.afterCommit?.(mail, { changed });
@@ -251,15 +262,16 @@
       options.onSelect?.(mail, openOptions);
       options.renderList?.({ openLatest: false });
       const detail = getDetail();
+      const visibilityKey = String(options.getVisibilityKey?.(mail) || mail.id || '');
       const preserveVisibleDetail = Boolean(
         openOptions.preserveVisibleDetail === true &&
-        String(committedId || '') === String(mail.id || '') &&
-        String(detail?.dataset?.mailboxCommittedId || '') === String(mail.id || '')
+        String(committedVisibilityKey || '') === visibilityKey &&
+        String(detail?.dataset?.mailboxCommittedVisibilityKey || '') === visibilityKey
       );
       const keepDetailVisible = Boolean(
         preserveVisibleDetail && !detail?.classList?.contains?.('is-detail-pending')
       );
-      const pendingMarker = keepDetailVisible ? '' : setPending(mail.id);
+      const pendingMarker = setPending(mail.id, { keepVisible: keepDetailVisible });
       const isSelectionCurrent = () => Boolean(
         options.isTokenCurrent?.(token) !== false &&
         String(options.getActiveMail?.() || '') === String(mail.id || '') &&
@@ -270,6 +282,7 @@
         id: mail.id,
         identity: mail,
         key: getRunKey(mail, token, scope),
+        forceNewRun: openOptions.forceRootHydration === true,
         signal: token.signal,
         isCurrent: isSelectionCurrent,
         hydrate: (runContext) => hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext),
@@ -285,16 +298,20 @@
         },
         onError: options.onError,
       }).finally(() => {
-        if (pendingMarker) clearPending(pendingMarker);
+        clearPending(pendingMarker);
       });
     }
 
     function invalidate() {
       stability.invalidate();
       committedId = '';
+      committedVisibilityKey = '';
       committedHtml = '';
       const detail = getDetail();
-      if (detail?.dataset) delete detail.dataset.mailboxDomDirty;
+      if (detail?.dataset) {
+        delete detail.dataset.mailboxDomDirty;
+        delete detail.dataset.mailboxCommittedVisibilityKey;
+      }
       clearPending();
     }
 

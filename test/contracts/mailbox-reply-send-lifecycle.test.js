@@ -20,7 +20,9 @@ const allowingSuppressionStore = {
 function responseRecorder() {
   return {
     statusCode: 0,
+    headers: {},
     body: null,
+    setHeader(name, value) { this.headers[String(name).toLowerCase()] = value; return this; },
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
   };
@@ -262,6 +264,9 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
   const send = responseRecorder();
   await runtime.sendMessageResponse({ body: payload }, send);
   assert.equal(send.statusCode, 200);
+  assert.equal(send.headers['x-softora-provider-message-id'], 'provider-outbound-1');
+  assert.equal(send.headers['x-softora-message-id'], '<provider-outbound-1@instantly>');
+  assert.equal(send.headers['x-softora-send-intent-id'], send.body.result.intentId);
   assert.equal(adapterCalls.length, 1);
   assert.equal(adapterCalls[0].accountEmail, 'servecreusen@websoftora.com');
   assert.equal(adapterCalls[0].providerThreadId, flow.mail.providerThreadId);

@@ -575,6 +575,170 @@ test('tijdelijke indexfout bewaart de huidige mailbox en hervat afgebroken detai
   assert.deepEqual(toasts, []);
 });
 
+test('preserveOnError heropent niets wanneer de gebruikersselectie tijdens de load wijzigde', async () => {
+  const first = { id: 'mail-a', accountEmail: 'serve@softora.nl', messageId: '<a@example.test>' };
+  const second = { id: 'mail-b', accountEmail: 'serve@softora.nl', messageId: '<b@example.test>' };
+  let messages = [first, second];
+  let activeMail = first.id;
+  let selectionVersion = 1;
+  let rejectLoad;
+  const rendered = [];
+  const opened = [];
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      load: () => new Promise((_resolve, reject) => { rejectLoad = reject; }),
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => activeMail,
+    getSelectionVersion: () => selectionVersion,
+    setActiveMail: (value) => { activeMail = value; },
+    getListElement: () => ({ setAttribute() {} }),
+    renderList: (options) => rendered.push(options),
+    openMail: (id, options) => opened.push({ id, options }),
+    setSync() {},
+    setStatus() {},
+  });
+
+  const loading = view.load({ preserveOnError: true, showLoader: false, openLatest: false });
+  activeMail = second.id;
+  selectionVersion += 1;
+  activeMail = first.id;
+  selectionVersion += 1;
+  rejectLoad(new Error('tijdelijke indexfout'));
+
+  assert.equal(await loading, false);
+  assert.equal(activeMail, first.id);
+  assert.deepEqual(messages, [first, second]);
+  assert.deepEqual(rendered, []);
+  assert.deepEqual(opened, []);
+});
+
+test('preserveOnError remapt een verdwenen fysieke id via Message-ID zonder loader', async () => {
+  const previous = {
+    id: 'serve@softora.nl|inbox:42',
+    accountEmail: 'serve@softora.nl',
+    messageId: '<COPY-SWITCH@Example.Test>',
+  };
+  const replacement = {
+    id: 'serve@softora.nl|allmail:991',
+    accountEmail: 'serve@softora.nl',
+    messageId: 'copy-switch@example.test',
+  };
+  let messages = [previous];
+  let activeMail = previous.id;
+  let rejectLoad;
+  const opened = [];
+  const view = ownerSession.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: {
+      load: () => new Promise((_resolve, reject) => { rejectLoad = reject; }),
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => activeMail,
+    setActiveMail: (value) => { activeMail = value; },
+    getListElement: () => ({ setAttribute() {} }),
+    renderList() {},
+    openMail(id, options) { activeMail = id; opened.push({ id, options }); },
+    setSync() {},
+    setStatus() {},
+  });
+
+  const loading = view.load({
+    preserveOnError: true,
+    showLoader: false,
+    openLatest: true,
+  });
+  messages = [
+    { id: 'onverwant', accountEmail: 'serve@softora.nl', messageId: '<other@example.test>' },
+    replacement,
+  ];
+  rejectLoad(new Error('tijdelijke indexfout na UID-wissel'));
+
+  assert.equal(await loading, false);
+  assert.equal(activeMail, replacement.id);
+  assert.deepEqual(opened, [{
+    id: replacement.id,
+    options: { preserveVisibleDetail: true, skipReadPersist: true },
+  }]);
+});
+
+test('preserveOnError opent nooit een ongerelateerd eerste gesprek bij ontbrekende context', async () => {
+  const previous = {
+    id: 'verdwenen-fysieke-id',
+    accountEmail: 'serve@softora.nl',
+    messageId: '<verdwenen@example.test>',
+  };
+  let messages = [previous];
+  let activeMail = previous.id;
+  let rejectLoad;
+  let resetCount = 0;
+  let renderCount = 0;
+  const opened = [];
+  const view = ownerSession.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: {
+      load: () => new Promise((_resolve, reject) => { rejectLoad = reject; }),
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => activeMail,
+    setActiveMail: (value) => { activeMail = value; },
+    getListElement: () => ({ setAttribute() {} }),
+    renderList() {
+      renderCount += 1;
+      if (!messages.some((message) => String(message?.id || '') === String(activeMail || ''))) {
+        activeMail = null;
+      }
+    },
+    openMail: (id, options) => opened.push({ id, options }),
+    resetDetail: () => { resetCount += 1; },
+    setSync() {},
+    setStatus() {},
+  });
+
+  const loading = view.load({ preserveOnError: true, showLoader: false, openLatest: false });
+  messages = [{ id: 'eerste-maar-onverwant', accountEmail: 'serve@softora.nl', messageId: '<other@example.test>' }];
+  rejectLoad(new Error('tijdelijke indexfout zonder logische match'));
+
+  assert.equal(await loading, false);
+  assert.equal(activeMail, previous.id);
+  assert.deepEqual(opened, []);
+  assert.equal(renderCount, 0);
+  assert.equal(resetCount, 0);
+});
+
+test('preserveOnError verzint zonder voorafgaande selectie geen eerste gesprek', async () => {
+  const messages = [{ id: 'eerste-rij', accountEmail: 'serve@softora.nl' }];
+  let activeMail = null;
+  const opened = [];
+  const view = ownerSession.createView({
+    getScope: () => ({ account: 'serve@softora.nl', folder: 'inbox' }),
+    campaignInbox: {
+      async load() { throw new Error('tijdelijke indexfout'); },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages() {},
+    getActiveMail: () => activeMail,
+    setActiveMail: (value) => { activeMail = value; },
+    getListElement: () => ({ setAttribute() {} }),
+    renderList() {},
+    openMail: (id, options) => opened.push({ id, options }),
+    setSync() {},
+    setStatus() {},
+  });
+
+  assert.equal(await view.load({ preserveOnError: true, openLatest: false }), false);
+  assert.equal(activeMail, null);
+  assert.deepEqual(opened, []);
+});
+
 test('eerste tijdelijke indexfout toont nooit een technische foutmelding', async () => {
   let messages = [];
   const statuses = [];
