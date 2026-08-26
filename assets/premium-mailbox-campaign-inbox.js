@@ -284,6 +284,17 @@
     return '';
   }
 
+  function getConversationVisibilityKey(mail) {
+    if (!mail) return '';
+    const owner = String(getMessageOwner(mail) || '').trim().toLowerCase().replace('servé', 'serve');
+    const account = normalizeEmail(mail.accountEmail || mail.account || mail.campaign && mail.campaign.account);
+    const conversationId = String(mail.conversationId || '').trim().toLowerCase();
+    if (owner && account && conversationId) return `${owner}|${account}|conversation:${conversationId}`;
+    const messageId = normalizeMessageId(mail.messageId);
+    if (messageId) return `${owner}|${account}|message:${messageId}`;
+    return `${owner}|${account}|mailbox:${String(mail.id || '')}`;
+  }
+
   function getStableCampaignConversationId(mail) {
     if (
       !mail ||
@@ -500,6 +511,14 @@
       providerCampaignId: String(message.providerCampaignId || '').trim(),
       providerAccountEmail: normalizeEmail(message.providerAccountEmail || accountEmail),
       providerOwner: String(message.providerOwner || '').trim().toLowerCase(),
+      transportMessageId: message.transportMessageId || mail && mail.transportMessageId || '',
+      localAcceptedSend: message.localAcceptedSend === true || mail && mail.localAcceptedSend === true,
+      localAcceptedSendFallback: message.localAcceptedSendFallback === true || mail && mail.localAcceptedSendFallback === true,
+      softoraClientSendIdempotencyKey: String(message.softoraClientSendIdempotencyKey || mail && mail.softoraClientSendIdempotencyKey || ''),
+      softoraConversationId: String(message.softoraConversationId || mail && mail.softoraConversationId || ''),
+      softoraSendIntentId: String(message.softoraSendIntentId || mail && mail.softoraSendIntentId || ''),
+      softoraSendMode: String(message.softoraSendMode || mail && mail.softoraSendMode || ''),
+      softoraReplyTargetMessageId: String(message.softoraReplyTargetMessageId || mail && mail.softoraReplyTargetMessageId || ''),
       storageFolder: String(message.storageFolder || '').trim().toLowerCase(),
       direction: String(message.direction || '').trim().toLowerCase(),
       sourceFolders: Array.isArray(message.sourceFolders) ? message.sourceFolders : [],
@@ -978,7 +997,10 @@
       if (removedActiveMessage) options.setActiveId?.(null);
       options.renderList?.({ openLatest: false });
       const nextActiveId = typeof options.getActiveId === 'function' ? options.getActiveId() : null;
-      if (nextActiveId) options.openMail?.(nextActiveId, { skipBodyFetch: true });
+      if (nextActiveId) options.openMail?.(nextActiveId, {
+        skipBodyFetch: true,
+        preserveVisibleDetail: true,
+      });
       else options.resetDetail?.();
     });
     global.addEventListener?.('pagehide', unsubscribe, { once: true });
@@ -1085,6 +1107,7 @@
     getAccount,
     resolveReplyAccount,
     getConversationId,
+    getConversationVisibilityKey,
     getStableCampaignConversationId,
     getConversationAction,
     getActionMessageKey,

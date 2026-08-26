@@ -14,6 +14,7 @@
     const activeMail = options.getActiveMail?.();
     if (activeMail) options.openMail?.(activeMail, {
       skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true,
+      preserveVisibleDetail: true,
     });
     return changed;
   }
@@ -63,7 +64,10 @@
     void options.readController?.markRead?.(mail, { render() {
       options.renderList?.({ openLatest: false });
       if (!mail.readPending && String(options.getActiveMail?.()) === String(mail.id)) {
-        options.openMail?.(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
+        options.openMail?.(mail.id, {
+          skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true,
+          preserveVisibleDetail: true,
+        });
       }
     } });
     return true;
@@ -100,7 +104,10 @@
     const render = () => {
       options.renderList?.({ openLatest: false });
       if (String(options.getActiveMail?.()) === String(mail.id)) {
-        options.openMail?.(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
+        options.openMail?.(mail.id, {
+          skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true,
+          preserveVisibleDetail: true,
+        });
       }
     };
     if (state.conversationAction?.kind === 'reply' && state.replyTarget?.readError) {
@@ -118,7 +125,10 @@
       return options.dismissReply?.(mail, { render() {
         options.renderList?.({ openLatest: false });
         if (!requestedMailId || requestedMailId !== activeMailIdAtRequest || String(options.getActiveMail?.() || '') !== activeMailIdAtRequest) return;
-        options.openMail?.(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
+        options.openMail?.(mail.id, {
+          skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true,
+          preserveVisibleDetail: true,
+        });
       } });
     }
     return retryRead(options);

@@ -31,7 +31,63 @@
       if (providerMessageId) return `provider:${providerMessageId}`;
       const messageId = normalizeMessageId(message?.messageId);
       if (messageId) return `message:${messageId}`;
+      const sendIntentId = normalize(message?.softoraSendIntentId || message?.sendIntentId);
+      if (sendIntentId) return `send-intent:${sendIntentId}`;
       return `local:${normalize(message?.id || message?.mailboxId)}`;
+    }
+
+    function getCanonicalMessageIdentities(message) {
+      const identities = new Set();
+      const providerMessageId = normalize(message?.providerMessageId);
+      const messageId = normalizeMessageId(message?.messageId);
+      const transportMessageId = normalizeMessageId(message?.transportMessageId);
+      const sendIntentId = normalize(message?.softoraSendIntentId || message?.sendIntentId);
+      if (providerMessageId) identities.add(`provider:${providerMessageId}`);
+      if (messageId) identities.add(`message:${messageId}`);
+      if (transportMessageId) identities.add(`transport:${transportMessageId}`);
+      if (sendIntentId) identities.add(`send-intent:${sendIntentId}`);
+      return identities;
+    }
+
+    function identitiesOverlap(left, right) {
+      const first = left instanceof Set ? left : getCanonicalMessageIdentities(left);
+      const second = right instanceof Set ? right : getCanonicalMessageIdentities(right);
+      for (const identity of first) {
+        if (second.has(identity)) return true;
+      }
+      return false;
+    }
+
+    function isSentMessage(message) {
+      return normalize(message?.direction) === 'sent' ||
+        normalize(message?.folder) === 'sent' ||
+        normalize(message?.storageFolder) === 'sent';
+    }
+
+    function isLocalAcceptedFallback(message) {
+      return message?.localAcceptedSendFallback === true &&
+        message?.localAcceptedSend === true &&
+        getCanonicalMessageIdentities(message).size === 0;
+    }
+
+    function candidateMatchesRecordScope(record, candidate) {
+      if (!record || !candidate || !isSentMessage(candidate) || isLocalAcceptedFallback(candidate)) return false;
+      if (normalize(record.accountEmail) !== normalize(candidate.accountEmail)) return false;
+      const candidateOwner = normalize(
+        options.campaignInbox?.getMessageOwner?.(candidate) || candidate.providerOwner || candidate.owner
+      );
+      return !record.owner || !candidateOwner || normalize(record.owner) === candidateOwner;
+    }
+
+    function isClientAcceptedForRecord(message, record) {
+      if (message?.localAcceptedSend !== true) return false;
+      const recordKey = String(record?.idempotencyKey || '').trim();
+      const messageKey = String(message?.softoraClientSendIdempotencyKey || '').trim();
+      return Boolean(recordKey && messageKey && recordKey === messageKey);
+    }
+
+    function isFallbackForRecord(message, record) {
+      return isLocalAcceptedFallback(message) && isClientAcceptedForRecord(message, record);
     }
 
     function getConversationKeys(mail) {
@@ -103,18 +159,31 @@
       if (!mail) return mail;
       const records = Array.from(acceptedSends.values()).filter((record) => recordMatchesMail(record, mail));
       if (!records.length) return mail;
-      const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages.slice() : [];
-      const identities = new Set([mail, ...messages].map(getMessageIdentity).filter(Boolean));
+      let messages = Array.isArray(mail.threadMessages) ? mail.threadMessages.slice() : [];
       records
         .sort((left, right) => Date.parse(left.acceptedAt) - Date.parse(right.acceptedAt))
         .forEach((record) => {
           const normalizedMessage = typeof options.normalizeAcceptedMessage === 'function'
             ? options.normalizeAcceptedMessage(record.message)
             : { ...record.message };
-          const identity = getMessageIdentity(normalizedMessage);
-          if (identity && !identities.has(identity)) {
+          record.message = normalizedMessage;
+          const canonicalIdentities = getCanonicalMessageIdentities(normalizedMessage);
+          const providerReplacement = canonicalIdentities.size
+            ? [mail, ...messages].find((candidate) => (
+                candidate?.localAcceptedSend !== true &&
+                candidateMatchesRecordScope(record, candidate) &&
+                identitiesOverlap(canonicalIdentities, candidate)
+              ))
+            : null;
+          if (providerReplacement) {
+            messages = messages.filter((message) => !isClientAcceptedForRecord(message, record));
+          }
+          const existingMessages = [mail, ...messages];
+          const alreadyPresent = canonicalIdentities.size
+            ? existingMessages.some((message) => identitiesOverlap(canonicalIdentities, message))
+            : existingMessages.some((message) => isFallbackForRecord(message, record));
+          if (!providerReplacement && !alreadyPresent) {
             messages.push(normalizedMessage);
-            identities.add(identity);
           }
           const acceptedAt = String(record.acceptedAt || '');
           const outboundAt = String(
@@ -144,6 +213,24 @@
       if (!record?.key) return;
       acceptedSends.set(record.key, record);
       options.onAcceptedSend?.(record);
+    }
+
+    function reportAcceptedSendPostprocessError(error, phase) {
+      try {
+        const logger = options.logger || global.console;
+        logger?.error?.('[MailboxCompose][AcceptedSendPostprocess]', {
+          phase: String(phase || 'unknown'),
+          message: String(error?.message || error || 'Lokale naverwerking mislukt'),
+        });
+      } catch (_) {}
+    }
+
+    function readResponseHeader(response, name) {
+      try {
+        return String(response?.headers?.get?.(name) || '').replace(/[\r\n]/g, '').trim();
+      } catch (_) {
+        return '';
+      }
     }
 
     function fieldValue(id) {
@@ -601,6 +688,7 @@
         sendBtn.setAttribute?.('aria-busy', 'true');
         sendBtn.textContent = 'Versturen…';
       }
+      let providerAccepted = false;
       try {
         const contextAtSend = replyContext ? { ...replyContext } : null;
         const currentMail = contextAtSend && options.findMail(contextAtSend.id);
@@ -677,8 +765,22 @@
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: serializedPayload,
         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.ok) {
+        const numericStatus = Number(response?.status);
+        providerAccepted = Number.isFinite(numericStatus) && numericStatus > 0
+          ? numericStatus === 200
+          : response?.ok === true;
+        const acceptedIdentityHeaders = providerAccepted ? {
+          intentId: readResponseHeader(response, 'X-Softora-Send-Intent-Id'),
+          messageId: readResponseHeader(response, 'X-Softora-Message-Id'),
+          providerMessageId: readResponseHeader(response, 'X-Softora-Provider-Message-Id'),
+        } : {};
+        let data = {};
+        try {
+          data = await response.json();
+        } catch (error) {
+          if (providerAccepted) reportAcceptedSendPostprocessError(error, 'response-body');
+        }
+        if (!providerAccepted) {
           throw global.SoftoraMailboxError?.fromResponse?.(
             response,
             data,
@@ -687,8 +789,10 @@
         }
         const result = data?.result && typeof data.result === 'object' ? data.result : {};
         const acceptedAt = new Date().toISOString();
-        const messageId = String(result.messageId || '').trim();
-        const providerMessageId = String(result.providerMessageId || '').trim();
+        const messageId = String(result.messageId || acceptedIdentityHeaders.messageId || '').trim();
+        const providerMessageId = String(
+          result.providerMessageId || acceptedIdentityHeaders.providerMessageId || ''
+        ).trim();
         const contextMail = contextAtSend
           ? options.findMail(contextAtSend.sourceMailId || contextAtSend.id)
           : null;
@@ -730,9 +834,33 @@
           unread: false,
           replyDismissedAt: acceptedAt,
           localAcceptedSend: true,
+          localAcceptedSendFallback: !providerMessageId && !messageId && !String(
+            result.sentMessage?.softoraSendIntentId || result.intentId || acceptedIdentityHeaders.intentId || ''
+          ).trim(),
           conversationId: String(result.sentMessage?.conversationId || contextAtSend?.conversationId || '').trim(),
+          softoraConversationId: String(
+            result.sentMessage?.softoraConversationId ||
+            result.sentMessage?.conversationId ||
+            contextAtSend?.conversationId ||
+            ''
+          ).trim(),
           softoraSendMode: sendMode,
-          softoraSendIntentId: String(result.sentMessage?.softoraSendIntentId || result.intentId || '').trim(),
+          softoraSendIntentId: String(
+            result.sentMessage?.softoraSendIntentId || result.intentId || acceptedIdentityHeaders.intentId || ''
+          ).trim(),
+          softoraReplyTargetMessageId: String(
+            result.sentMessage?.softoraReplyTargetMessageId ||
+            canonicalIdentity?.sourceMessageId ||
+            contextAtSend?.messageId ||
+            ''
+          ).trim(),
+          inReplyTo: String(
+            result.sentMessage?.inReplyTo ||
+            canonicalIdentity?.sourceMessageId ||
+            contextAtSend?.messageId ||
+            ''
+          ).trim(),
+          softoraClientSendIdempotencyKey: idempotencyKey,
         };
         const identity = getMessageIdentity(sentMessage);
         rememberAcceptedSend({
@@ -740,6 +868,7 @@
           owner: normalize(sendOwner),
           accountEmail: normalize(account),
           acceptedAt,
+          idempotencyKey,
           mode: sendMode,
           sourceMailId: String(contextAtSend?.sourceMailId || contextMail?.id || '').trim(),
           replyTarget: sendMode === 'reply' ? {
@@ -761,6 +890,20 @@
         close();
         options.toast('✓ Mail verzonden');
       } catch (error) {
+        if (providerAccepted) {
+          reportAcceptedSendPostprocessError(error, 'local-ui');
+          try {
+            close();
+          } catch (closeError) {
+            reportAcceptedSendPostprocessError(closeError, 'close-compose');
+          }
+          try {
+            options.toast('✓ Mail verzonden');
+          } catch (toastError) {
+            reportAcceptedSendPostprocessError(toastError, 'success-toast');
+          }
+          return;
+        }
         options.toast(global.SoftoraMailboxError?.normalize?.(error, 'Mail verzenden mislukt') || 'Mail verzenden mislukt');
       } finally {
         sendRequestActive = false;

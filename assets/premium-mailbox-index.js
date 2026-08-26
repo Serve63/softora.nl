@@ -115,6 +115,7 @@ function guardVisibleBodyLoading({ id, getMail, getActiveMail, getDetailElement,
       skipBodyFetch: true,
       skipThreadBodyFetch: true,
       skipReadPersist: true,
+      preserveVisibleDetail: true,
     });
   }, MAILBOX_BODY_PARTIAL_STATUS_DELAY_MS);
   visibleBodyLoadingDeadlines.set(key, { timer });
@@ -257,7 +258,7 @@ async function hydrateOutreachContexts({ getMails, setMails, renderList, getActi
   if (window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.hydrate === 'function') {
     setMails(await window.SoftoraMailboxOutreach.hydrate(getMails()));
     renderList();
-    if (getActiveMail()) openMail(getActiveMail(), { skipBodyFetch: true, skipReadPersist: true });
+    if (getActiveMail()) openMail(getActiveMail(), { skipBodyFetch: true, skipReadPersist: true, preserveVisibleDetail: true });
   }
   if (window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.applyIntentAfterLoad === 'function') {
     window.SoftoraMailboxOutreach.applyIntentAfterLoad({ getMails, openMail, renderList, toast });
@@ -459,7 +460,7 @@ async function loadBody({
         mail.bodyLoadState = finalState;
       }
       if (typeof getActiveMail === 'function' && String(getActiveMail()) === String(id)) {
-        openMail(id, { skipBodyFetch: true, skipReadPersist: true });
+        openMail(id, { skipBodyFetch: true, skipReadPersist: true, preserveVisibleDetail: true });
       }
     }
   }
@@ -735,7 +736,7 @@ async function loadThreadBodies({
       typeof getActiveMail === 'function' &&
       String(getActiveMail()) === String(mail.id)
     ) {
-      openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true });
+      openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipReadPersist: true, preserveVisibleDetail: true });
     }
   }
   return updated;
@@ -747,7 +748,7 @@ function retryBody({ id, getMail, loadMessageBody, openMail }) {
   mail.bodyLoadError = '';
   mail.bodyLoading = false;
   mail.bodyLoaded = false;
-  void loadMessageBody(mail.id);
+  void loadMessageBody(mail.id, { forceRootHydration: true });
   return true;
 }
 
@@ -777,7 +778,7 @@ function bindImageRecovery({ getActiveMail, getMail, loadMessageBody, openMail }
     mail.imageRecoveryAttempted = true;
     mail.bodyLoaded = false;
     mail.bodyImagesTruncated = true;
-    void loadMessageBody(mail.id);
+    void loadMessageBody(mail.id, { preserveVisibleDetail: true });
   }, true);
 }
 

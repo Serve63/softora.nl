@@ -137,6 +137,43 @@ test('niet-retrybare serverfout lekt geen raw Supabase- of cooldowntekst', async
   assert.doesNotMatch(JSON.stringify(harness.events), /Supabase|REST|504|cooldown|stack/i);
 });
 
+test('duurzaam bevestigde serverstaat verwijdert een terminal outboxrecord ook over reload', async () => {
+  const harness = createHarness(async () => response(409, {
+    ok: false, retryable: false, code: 'MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH',
+  }));
+  await harness.outbox.enqueue(mutationPayload(), { resourceKey: RESOURCE_KEY });
+  await harness.outbox.flush({ force: true });
+  const failed = await harness.store.get(RESOURCE_KEY);
+  assert.equal(failed.status, 'failed');
+
+  assert.equal(await harness.outbox.confirmDurable(failed, {
+    readAt: '2026-08-14T15:05:00.000Z',
+    replyDismissedAt: '2026-08-14T15:05:00.000Z',
+  }), true);
+  assert.equal(await harness.store.get(RESOURCE_KEY), null);
+  assert.equal(harness.events.some((event) => (
+    event.type === 'confirmed' && event.record.mutationId === failed.mutationId
+  )), true);
+  assert.deepEqual(await harness.outbox.hydrate(), []);
+});
+
+test('duurzame bevestiging kan nooit een nieuwere outboxmutatie via een oud mutationId wissen', async () => {
+  const harness = createHarness(async () => response(409, {
+    ok: false, retryable: false, code: 'MAILBOX_STATE_MESSAGE_IDENTITY_MISMATCH',
+  }));
+  await harness.outbox.enqueue(mutationPayload(), { resourceKey: RESOURCE_KEY });
+  await harness.outbox.flush({ force: true });
+  const failed = await harness.store.get(RESOURCE_KEY);
+  const newer = await harness.outbox.enqueue(mutationPayload({ dismissReply: false }), {
+    resourceKey: RESOURCE_KEY,
+  });
+
+  assert.equal(await harness.outbox.confirmDurable(failed, {
+    readAt: '2026-08-14T15:06:00.000Z',
+  }), false);
+  assert.equal((await harness.store.get(RESOURCE_KEY)).mutationId, newer.record.mutationId);
+});
+
 test('mailbox state outbox hydrateert of verstuurt nooit een oud UID-only record', async () => {
   const store = outboxModule.createMemoryStore();
   await store.putLatest({

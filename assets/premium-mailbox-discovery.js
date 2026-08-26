@@ -206,9 +206,29 @@
     const rootIdentity = getTimelineMessageIdentity(root);
     const matchingRoot = normalized.find((message) => getTimelineMessageIdentity(message) === rootIdentity);
     if (matchingRoot) {
-      root.technicalThreadKey = matchingRoot.technicalThreadKey;
-      root.messageKey = matchingRoot.messageKey || root.messageKey;
+      root.technicalThreadKey = matchingRoot.technicalThreadKey || root.technicalThreadKey;
       root.conversationId = matchingRoot.conversationId || root.conversationId;
+      const durableReadAt = String(matchingRoot.softoraReadAt || matchingRoot.readAt || '').trim();
+      const durableReplyDismissedAt = String(matchingRoot.replyDismissedAt || '').trim();
+      if (durableReadAt && !String(root.softoraReadAt || root.readAt || '').trim()) {
+        root.readAt = durableReadAt;
+        root.softoraReadAt = durableReadAt;
+      }
+      if (durableReplyDismissedAt) {
+        root.replyDismissedAt = durableReplyDismissedAt;
+        root.unread = false;
+        root.readPending = false;
+        root.replyDismissPending = false;
+        root.readError = '';
+        root.softoraReadConfirmed = true;
+      } else if (durableReadAt) {
+        root.unread = false;
+        if (!root.replyDismissPending) {
+          root.readPending = false;
+          root.readError = '';
+        }
+        root.softoraReadConfirmed = true;
+      }
     }
     const seen = new Set(rootIdentity ? [rootIdentity] : []);
     root.threadMessages = normalized.filter((message) => {
@@ -519,6 +539,7 @@
             skipBodyFetch: true,
             skipContactTimeline: true,
             skipReadPersist: true,
+            preserveVisibleDetail: true,
           });
         }
         return true;
@@ -659,6 +680,7 @@
           skipBodyFetch: true,
           skipContactTimeline: true,
           skipReadPersist: true,
+          preserveVisibleDetail: true,
         });
         return true;
       } catch (error) {

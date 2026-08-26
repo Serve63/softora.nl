@@ -231,6 +231,13 @@
       return true;
     }
 
+    async function confirmDurable(record, result = {}) {
+      if (!isCurrentRecord(record)) return false;
+      const completed = await store.complete(record.resourceKey, record.mutationId).catch(() => false);
+      if (completed) emit('confirmed', record, { result });
+      return completed;
+    }
+
     async function hydrate() {
       const records = await store.list().catch(() => []);
       const currentRecords = records.filter(isCurrentRecord);
@@ -265,6 +272,7 @@
 
     void hydrate();
     return {
+      confirmDurable,
       enqueue,
       flush,
       hydrate,
