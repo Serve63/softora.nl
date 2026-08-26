@@ -114,7 +114,7 @@ test('Lead Radar scant standaard gerichte Nederlandse feeds en laat de geblokkee
     selectedGroups: ['direct_website'],
     env: {},
   });
-  assert.ok(DEFAULT_PUBLIC_FEEDS.includes('https://nl.wordpress.org/support/view/all-topics/feed/'));
+  assert.equal(DEFAULT_PUBLIC_FEEDS.some((value) => value === 'https://nl.wordpress.org/support/view/all-topics/feed/'), true);
   assert.ok(plan.some((item) => item.sourceUrl === 'https://nl.wordpress.org/support/view/all-topics/feed/'));
   assert.equal(plan.some((item) => item.adapter === 'bluesky'), false);
 });
