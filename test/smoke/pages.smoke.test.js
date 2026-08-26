@@ -33,6 +33,7 @@ for (const target of pageSmokeTargets) {
 }
 
 const unlockedPublicSeoPaths = [
+  '/contact',
   '/diensten',
   '/ai-automatisering',
   '/website-laten-maken',

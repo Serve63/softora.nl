@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
+  <title>Contact met Softora | Bespreek je digitale idee</title>
+  <meta name="description" content="Neem rechtstreeks contact op met Softora over een website, bedrijfssoftware of AI-oplossing. Vertel kort wat je wilt bouwen en ontvang een heldere vervolgstap.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://www.softora.nl/contact">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Softora">
+  <meta property="og:locale" content="nl_NL">
+  <meta property="og:title" content="Contact met Softora | Bespreek je digitale idee">
+  <meta property="og:description" content="Vertel wat je wilt verbeteren of bouwen. Je spreekt rechtstreeks met de mensen die meedenken en realiseren.">
+  <meta property="og:url" content="https://www.softora.nl/contact">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Contact met Softora">
+  <meta name="twitter:description" content="Bespreek je website, software of AI-oplossing rechtstreeks met Softora.">
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/contact-page.css?v=20260826b">
+  <script src="/assets/contact-page.js?v=20260826b" defer></script>
+</head>
+<body>
+  <a class="contact-skip-link" href="#contact-form">Ga naar het contactformulier</a>
+  <header class="contact-header">
+    <a class="contact-wordmark" href="/" aria-label="Softora homepage">Softora.nl</a>
+    <nav class="contact-nav" aria-label="Hoofdnavigatie">
+      <a href="/diensten">Diensten</a>
+      <a href="/over-softora">Over Softora</a>
+      <span class="contact-nav-current" aria-current="page">Contact</span>
+      <a class="contact-nav-button" href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer">Start gesprek</a>
+    </nav>
+  </header>
+  <main>
+    <section class="contact-hero" aria-labelledby="contact-title">
+      <div class="contact-intro">
+        <p class="contact-eyebrow">Een goed project begint met een helder gesprek</p>
+        <h1 id="contact-title">Vertel ons wat je wilt <span>bouwen.</span></h1>
+        <p class="contact-lead">Een nieuwe website, maatwerksoftware of een slimme AI-flow? Deel kort waar je nu staat en wat er beter moet. Je krijgt een concrete eerste reactie, zonder verkooppraat.</p>
+        <div class="contact-direct" aria-label="Directe contactmogelijkheden">
+          <div>
+            <span class="contact-direct-label">E-mail</span>
+            <strong>info@softora.nl</strong>
+          </div>
+          <div>
+            <span class="contact-direct-label">Telefoon</span>
+            <strong>+31 6 43 26 27 92</strong>
+          </div>
+          <div>
+            <span class="contact-direct-label">Vestiging</span>
+            <strong>Oisterwijk, Nederland</strong>
+            <span class="contact-status-dot" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="contact-founders" aria-label="De oprichters van Softora">
+          <div class="contact-founder-initials" aria-hidden="true">
+            <span>SC</span>
+            <span>MV</span>
+          </div>
+          <p><strong>Rechtstreeks contact.</strong><br>Je spreekt met Servé of Martijn, de mensen die meedenken én bouwen.</p>
+        </div>
+      </div>
+      <div class="contact-form-card">
+        <div class="contact-form-heading">
+          <span>Projectintake</span>
+          <p>We lezen ieder bericht zelf.</p>
+        </div>
+        <form id="contact-form" novalidate>
+          <div class="contact-field-grid">
+            <label class="contact-field">
+              <span>Naam</span>
+              <input id="contact-name" name="name" type="text" autocomplete="name" maxlength="120" placeholder="Je naam" required>
+            </label>
+            <label class="contact-field">
+              <span>E-mail</span>
+              <input id="contact-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="200" placeholder="jij@bedrijf.nl" required>
+            </label>
+          </div>
+          <div class="contact-field-grid">
+            <label class="contact-field">
+              <span>Telefoon <small>optioneel</small></span>
+              <input id="contact-phone" name="phone" type="tel" autocomplete="tel" maxlength="80" placeholder="06 12 34 56 78">
+            </label>
+            <label class="contact-field">
+              <span>Waar gaat het over?</span>
+              <select id="contact-topic" name="topic">
+                <option value="Algemene vraag">Algemene vraag</option>
+                <option value="Website">Website</option>
+                <option value="Bedrijfssoftware">Bedrijfssoftware</option>
+                <option value="AI automatisering">AI automatisering</option>
+                <option value="Chatbot of AI telefonie">Chatbot of AI telefonie</option>
+                <option value="Anders">Anders</option>
+              </select>
+            </label>
+          </div>
+          <label class="contact-field">
+            <span>Wat wil je verbeteren of bouwen?</span>
+            <textarea id="contact-message" name="message" rows="6" maxlength="4000" placeholder="Vertel kort wat er nu speelt, wat je doel is en wanneer je wilt starten." required></textarea>
+          </label>
+          <label class="contact-honeypot" aria-hidden="true">
+            <span>Website</span>
+            <input id="contact-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off">
+          </label>
+          <div class="contact-submit-row">
+            <button type="submit" data-contact-submit data-softora-conversion="public-form-submit" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur je bericht <span aria-hidden="true">↗</span></button>
+            <p>Door te versturen ga je akkoord met ons <a href="/privacybeleid">privacybeleid</a>.</p>
+          </div>
+          <p class="contact-form-status" data-contact-status role="status" aria-live="polite"></p>
+        </form>
+        <section class="contact-success" data-contact-success hidden tabindex="-1" aria-labelledby="contact-success-title">
+          <span class="contact-success-mark" aria-hidden="true">✓</span>
+          <p class="contact-eyebrow">Bericht ontvangen</p>
+          <h2 id="contact-success-title">Dank je. We komen bij je terug.</h2>
+          <p>Je bericht staat veilig bij Softora. Wil je iets aanvullen? Ons e-mailadres is info@softora.nl.</p>
+        </section>
+      </div>
+    </section>
+    <section class="contact-next" aria-labelledby="contact-next-title">
+      <div class="contact-next-heading">
+        <p class="contact-eyebrow">Na je bericht</p>
+        <h2 id="contact-next-title">Van idee naar een heldere volgende stap.</h2>
+      </div>
+      <ol class="contact-next-steps">
+        <li><span>01</span><div><strong>We lezen je context</strong><p>We kijken naar je doel, huidige situatie en de vraag achter de vraag.</p></div></li>
+        <li><span>02</span><div><strong>Je krijgt een eerlijke reactie</strong><p>We zeggen wat logisch is, wat nog onduidelijk is en of Softora past.</p></div></li>
+        <li><span>03</span><div><strong>We bepalen de eerste stap</strong><p>Bij een goede match maken we scope, aanpak en vervolg concreet.</p></div></li>
+      </ol>
+    </section>
+  </main>
+  <footer class="contact-footer">
+    <div>
+      <a class="contact-wordmark contact-footer-wordmark" href="/">Softora.nl</a>
+      <p>Websites, software en AI die ondernemers vooruithelpen.</p>
+    </div>
+    <div class="contact-footer-links" data-softora-public-seo="internal-links">
+      <a href="/diensten">Diensten</a>
+      <a href="/website-laten-maken">Websites</a>
+      <a href="/bedrijfssoftware-op-maat">Software</a>
+      <a href="/ai-automatisering">AI</a>
+      <a href="/over-softora">Over Softora</a>
+      <a href="/privacybeleid">Privacy</a>
+    </div>
+    <p class="contact-footer-copy">© 2026 Softora.nl</p>
+  </footer>
+</body>
+</html>
