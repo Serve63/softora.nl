@@ -38,7 +38,7 @@ textarea {
   position: fixed;
   top: 10px;
   left: 10px;
-  z-index: 100;
+  z-index: 1100;
   padding: 10px 14px;
   border-radius: 4px;
   background: #fff;
@@ -48,68 +48,79 @@ textarea {
 .contact-skip-link:focus {
   transform: translateY(0);
 }
-.contact-header {
-  position: relative;
-  z-index: 20;
-  min-height: 82px;
+#navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: 100%;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 32px;
-  padding: 18px clamp(22px, 5vw, 76px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
-  background: var(--contact-night);
-  color: #fff;
+  align-items: center;
+  padding: 1rem clamp(1.5rem, 4vw, 4rem);
+  border-bottom: 1px solid rgba(27, 24, 31, 0.08);
+  background: #f8f7f4;
+  box-shadow: 0 14px 40px rgba(20, 16, 12, 0.08);
+  font-family: Oswald, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  backdrop-filter: blur(20px);
 }
-.contact-wordmark {
+.logo {
   position: relative;
-  display: inline-block;
-  font-family: Oswald, Inter, sans-serif;
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
+  color: #161316;
+  font-family: Oswald, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.6;
   letter-spacing: -0.02em;
   text-decoration: none;
-  text-transform: uppercase;
 }
-.contact-wordmark::after {
+.logo::after {
   content: "";
-  display: block;
-  width: 72px;
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 3.2ch;
   height: 3px;
-  margin-top: 5px;
-  background: var(--contact-accent-bright);
+  background: linear-gradient(90deg, var(--contact-accent) 0%, #cf7a91 100%);
 }
-.contact-nav {
+.nav-links {
   display: flex;
   align-items: center;
-  gap: clamp(14px, 2.4vw, 30px);
-  font-size: 13px;
-  font-weight: 700;
+  gap: 3rem;
 }
-.contact-nav a,
-.contact-nav-current {
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  transition: color 160ms ease, background 160ms ease;
-}
-.contact-nav a:hover,
-.contact-nav a:focus-visible,
-.contact-nav .contact-nav-current {
-  color: #fff;
-}
-.contact-nav .contact-nav-button {
-  min-height: 44px;
+.magnetic-btn {
   display: inline-flex;
   align-items: center;
-  padding: 0 18px;
-  border-radius: 5px;
+  gap: 0.75rem;
+  padding: 1.2rem 3rem;
+  border: 0;
+  border-radius: 999px;
   background: var(--contact-accent);
+  box-shadow: 0 18px 36px rgba(139, 34, 82, 0.18);
   color: #fff;
+  font-family: Oswald, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
 }
-.contact-nav .contact-nav-button:hover,
-.contact-nav .contact-nav-button:focus-visible {
+.magnetic-btn:hover,
+.magnetic-btn:focus-visible {
   background: var(--contact-accent-bright);
+  box-shadow: 0 0 40px rgba(139, 34, 82, 0.4);
+  transform: translateY(-2px);
+}
+.nav-start-btn {
+  padding: 0.8rem 1.5rem;
+  font-size: 0.85rem;
+}
+main {
+  padding-top: 84px;
 }
 .contact-hero {
   position: relative;
@@ -474,6 +485,9 @@ textarea {
   font-size: 14px;
 }
 @media (max-width: 1080px) {
+  .nav-start-btn {
+    display: none !important;
+  }
   .contact-hero {
     grid-template-columns: 1fr;
   }
@@ -492,22 +506,28 @@ textarea {
   }
 }
 @media (max-width: 760px) {
-  .contact-header {
-    min-height: 72px;
-    padding: 16px 20px;
+  #navbar {
+    gap: 12px;
+    padding: calc(14px + env(safe-area-inset-top)) 18px 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    background: #f8f7f4;
+    box-shadow: 0 10px 24px rgba(17, 19, 30, 0.06);
+    backdrop-filter: blur(18px);
   }
-  .contact-wordmark {
-    font-size: 23px;
+  .logo {
+    font-size: 1.45rem;
+    letter-spacing: -0.01em;
   }
-  .contact-wordmark::after {
-    width: 58px;
+  .logo::after {
+    bottom: -2px;
+    width: 2.8ch;
+    height: 2px;
   }
-  .contact-nav > a:not(.contact-nav-button),
-  .contact-nav-current {
-    display: none;
+  .nav-links {
+    gap: 0;
   }
-  .contact-nav .contact-nav-button {
-    min-height: 40px;
+  main {
+    padding-top: calc(66px + env(safe-area-inset-top));
   }
   .contact-intro {
     padding: 52px 22px 30px;
