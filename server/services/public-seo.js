@@ -20,6 +20,22 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     relatedLinks: ['/diensten', '/website-laten-maken', '/blog', '/kennisbank'],
   },
   {
+    fileName: 'contact.html',
+    path: '/contact',
+    title: 'Contact met Softora | Bespreek je digitale idee',
+    description:
+      'Neem rechtstreeks contact op met Softora over een website, bedrijfssoftware of AI-oplossing. Vertel kort wat je wilt bouwen en ontvang een heldere vervolgstap.',
+    kind: 'contact',
+    lastmod: '2026-08-26',
+    relatedLinks: [
+      '/diensten',
+      '/website-laten-maken',
+      '/bedrijfssoftware-op-maat',
+      '/ai-automatisering',
+      '/over-softora',
+    ],
+  },
+  {
     fileName: 'diensten.html',
     path: '/diensten',
     title: 'Softora diensten voor websites, software en AI',
@@ -680,6 +696,7 @@ const PUBLIC_SEO_INTERNAL_LINK_STYLE = [
 
 const PUBLIC_SEO_LINK_LABELS = Object.freeze({
   '/': 'Home',
+  '/contact': 'Contact',
   '/diensten': 'Alle diensten',
   '/website-laten-maken': 'Website laten maken',
   '/website-laten-maken-oisterwijk': 'Website laten maken Oisterwijk',
