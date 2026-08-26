@@ -59,7 +59,7 @@ test('contact page keeps a dedicated responsive stylesheet and no inline product
   const html = fs.readFileSync(path.join(repoRoot, 'contact.html'), 'utf8');
   const css = fs.readFileSync(path.join(repoRoot, 'assets/contact-page.css'), 'utf8');
 
-  assert.match(html, /assets\/contact-page\.css\?v=20260826d/);
+  assert.match(html, /assets\/contact-page\.css\?v=20260826e/);
   assert.match(html, /assets\/contact-page\.js\?v=20260826b/);
   assert.doesNotMatch(html, /<style\b|<script>(?:.|\n)*<\/script>/i);
   assert.doesNotMatch(html, /<footer\b/i);
@@ -70,6 +70,10 @@ test('contact page keeps a dedicated responsive stylesheet and no inline product
   assert.match(css, /#navbar \{[\s\S]*position: fixed;[\s\S]*background: #f8f7f4;[\s\S]*box-shadow: 0 14px 40px rgba\(20, 16, 12, 0\.08\)/);
   assert.match(css, /\.logo \{[\s\S]*font-size: 2rem;[\s\S]*font-weight: 700;[\s\S]*line-height: 1\.6/);
   assert.match(css, /\.magnetic-btn \{[\s\S]*border-radius: 999px;[\s\S]*background: var\(--contact-accent\)/);
+  assert.match(html, /<meta name="theme-color" content="#f8f7f4">/);
+  assert.match(css, /color-scheme: light/);
+  assert.match(css, /linear-gradient\(135deg, #faf7f3 0%, #f4eeea 58%, #efe5e7 100%\)/);
+  assert.doesNotMatch(css, /--contact-night|#10101c|#11111e|#171421|#24151e|#181621|#3e172a|#333345/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
