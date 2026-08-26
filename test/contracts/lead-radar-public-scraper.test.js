@@ -234,4 +234,12 @@ test('Lead Radar herkent natuurlijke website-, CRM- en AI-hulpvragen als prospec
     url: 'https://www.hoofdkraan.nl/j/rekenprogramma/60962',
     snippet: 'Ik zoek een computerprogrammeur die een programma voor kansberekeningen kan maken.',
   }).role, 'prospect');
+  assert.equal(classifySignal({
+    url: 'https://freelancer.nl/opdrachten/voorschoten/ai-development/personal-project-web-app-with-mysql-en-python-d8412b34',
+    snippet: 'I’m looking for some guidance in developing an app for personal use. My goal is to write as much of the code myself as possible and learn along the way.',
+  }).role, 'excluded');
+  assert.equal(classifySignal({
+    url: 'https://freelancer.nl/opdrachten/tilburg/app-development/zelf-app-bouwen-123',
+    snippet: 'Ik wil zelf leren programmeren en zoek alleen begeleiding en advies om de app zelf te bouwen.',
+  }).role, 'excluded');
 });

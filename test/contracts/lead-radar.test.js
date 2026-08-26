@@ -83,6 +83,22 @@ test('Lead Radar vat ruwe hulpvragen samen tot een Nederlandse zin', () => {
       message_text: 'Twenty Fourteen, smalle tekstblokken\nReacties: 3\nIk gebruik Twenty Fourteen als thema. De teksten staan in een smalle layout. Hoe verklein ik de witruimte?',
       expected: 'De tekstblokken in het Twenty Fourteen-thema zijn te smal en de gebruiker wil de witruimte aan beide zijkanten verkleinen.',
     },
+    {
+      message_text: 'Opdracht Omschrijving Voor onze sportschool zijn wij op zoek naar iemand met ervaring met websites, Virtuagym en Mollie. Alles moet worden gecontroleerd en geautomatiseerd.',
+      expected: 'De sportschool zoekt een ervaren specialist die de bestaande website, Virtuagym en Mollie controleert, optimaliseert en goed automatiseert.',
+    },
+    {
+      message_text: 'Opdracht Omschrijving website migreren van Jouwweb naar WordPress + PayPro-koppeling. Ik wil WooCommerce, abonnementen en behoud van SEO.',
+      expected: 'De opdrachtgever wil de bestaande Jouwweb-site naar WordPress en WooCommerce laten migreren, inclusief PayPro, abonnementen en behoud van SEO.',
+    },
+    {
+      message_text: 'Opdracht Omschrijving Beste Freelancers, Op dit moment zoek ik een wordpress specialist die kan helpen bij het bouwen van een Wordpress website. Alles is al uitgedacht en voorbereid.',
+      expected: 'De opdrachtgever zoekt een WordPress-specialist die de volledig voorbereide website technisch bouwt.',
+    },
+    {
+      message_text: 'Ik ben op zoek naar een computerprogrammeur die een programma kan maken voor kansberekeningen en getallen.',
+      expected: 'De aanvrager zoekt een programmeur die een rekenprogramma voor kansberekeningen en getallen bouwt.',
+    },
   ];
   cases.forEach(({ message_text, expected }) => {
     const summary = summarizeLeadSignal({ message_text });

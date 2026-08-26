@@ -13,7 +13,8 @@ function cleanSourceMessage(signal = {}) {
 
   return lines.join(' ')
     .replace(/\breacties:\s*\d+\b/gi, ' ')
-    .replace(/^(?:beste\s+(?:mensen|allemaal)|goedemorgen\s+(?:alle|allemaal)|goedendag|hallo|hoi)[,!:\s-]*/i, '')
+    .replace(/^opdracht\s+omschrijving\s*/i, '')
+    .replace(/^(?:beste\s+(?:mensen|allemaal|freelancers)|goedemorgen\s+(?:alle|allemaal)|goedendag|hallo|hoi)[,!:\s-]*/i, '')
     .replace(/\b(?:dank|bedankt)\s+(?:alvast\s+)?voor\s+(?:het\s+)?(?:meedenken|de\s+hulp)[.!?]*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -75,11 +76,26 @@ function summarizeLeadSignal(signal = {}) {
   if (/smalle? (?:layout|tekst|tekstblok)|smalle layout|witruimte/.test(normalized) && /twenty fourteen|witruimte/.test(normalized)) {
     return 'De tekstblokken in het Twenty Fourteen-thema zijn te smal en de gebruiker wil de witruimte aan beide zijkanten verkleinen.';
   }
-  if (/\b(?:i(?:'|’)?m|we(?:'|’)?re|we are) looking for\b/.test(normalized) && /\b(?:ai|agent|automation|workflow|operator)\b/.test(normalized)) {
-    return 'De opdrachtgever zoekt een specialist die een praktische AI-automatisering bouwt en koppelt aan de bestaande bedrijfssystemen.';
+  if (/\bsportschool\b/.test(normalized) && /\bvirtuagym\b/.test(normalized) && /\bmollie\b/.test(normalized)) {
+    return 'De sportschool zoekt een ervaren specialist die de bestaande website, Virtuagym en Mollie controleert, optimaliseert en goed automatiseert.';
+  }
+  if (/\bjouwweb\b/.test(normalized) && /\bwordpress\b/.test(normalized) && /\bpaypro\b/.test(normalized)) {
+    return 'De opdrachtgever wil de bestaande Jouwweb-site naar WordPress en WooCommerce laten migreren, inclusief PayPro, abonnementen en behoud van SEO.';
+  }
+  if (/\bwordpress\b/.test(normalized) && /\b(?:specialist|webdeveloper)\b/.test(normalized) && /\b(?:bouwen|bouwt|build)\b/.test(normalized) && /alles\b[^.!?]{0,100}\b(?:uitgedacht|voorbereid)\b/.test(normalized)) {
+    return 'De opdrachtgever zoekt een WordPress-specialist die de volledig voorbereide website technisch bouwt.';
+  }
+  if (/\bwordpress\b/.test(normalized) && /\b(?:specialist|webdeveloper)\b/.test(normalized) && /\b(?:bouwen|bouwt|build)\b/.test(normalized)) {
+    return 'De opdrachtgever zoekt een WordPress-specialist die een WordPress-website bouwt.';
+  }
+  if (/\b(?:computer)?programmeur\b/.test(normalized) && /\bkansberekeningen?\b/.test(normalized)) {
+    return 'De aanvrager zoekt een programmeur die een rekenprogramma voor kansberekeningen en getallen bouwt.';
   }
   if (/\b(?:web app|web application)\b/.test(normalized) && /\b(?:mysql|python|database)\b/.test(normalized)) {
     return 'De opdrachtgever zoekt iemand die een webapplicatie met een database en de genoemde technische koppelingen bouwt.';
+  }
+  if (/\b(?:i(?:'|’)?m|we(?:'|’)?re|we are) looking for\b/.test(normalized) && /\b(?:ai|agent|automation|workflow|operator)\b/.test(normalized)) {
+    return 'De opdrachtgever zoekt een specialist die een praktische AI-automatisering bouwt en koppelt aan de bestaande bedrijfssystemen.';
   }
   if (/\b(?:i(?:'|’)?m|we(?:'|’)?re|we are|i am) looking for\b/.test(normalized) && /\b(?:website|webshop|online store)\b/.test(normalized)) {
     return 'De opdrachtgever zoekt iemand die de gevraagde website of webshop professioneel bouwt, vernieuwt of technisch verbetert.';
