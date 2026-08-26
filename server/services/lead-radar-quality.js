@@ -335,6 +335,11 @@ function createLeadRadarQuality(deps) {
     const staffingRequest = /\b(?:\d{2,3}\s*uur(?:\s+per\s+week)?|voor\s+(?:een\s+)?(?:internationale\s+)?eindklant|team[^.!?]{0,100}versterken|dienstverband)\b/i.test(message);
     const nonBuildServiceRequest = /\b(?:google ads|social media|contentmarketing|leadgeneratie|cold calling|seo-specialist|cro-specialist|salespartner)\b/i.test(message) &&
       !/\b(?:maken|bouwen|ontwikkelen|ontwerpen|implementeren|inrichten|opzetten|migreren|overzetten|integreren|build|develop|create|implement|set up|migrate|integrate)\b[^.!?]{0,220}\b(?:website|webshop|software|programma|app|applicatie|crm|erp|portaal|dashboard|database|api|ai[- ]?(?:agent|assistant|operator|workflow))\b/i.test(message);
+    const guidanceRequest = /\b(?:looking for|seeking)\s+(?:some\s+)?(?:guidance|advice|tips?)\b/i.test(message) ||
+      /\b(?:zoek|zoeken|wil|willen|gevraagd)\b[^.!?]{0,100}\b(?:begeleiding|advies|tips?)\b/i.test(message);
+    const selfBuildPlan = /\b(?:write|build|develop)\b[^.!?]{0,160}\b(?:the\s+code|it|the\s+app)\b[^.!?]{0,80}\bmyself\b/i.test(message) ||
+      /\bzelf\b[^.!?]{0,120}\b(?:bouwen|ontwikkelen|programmeren|coderen|code\s+schrijven)\b/i.test(message);
+    const selfBuildGuidanceOnly = guidanceRequest && selfBuildPlan;
     const isRecruitment = Boolean(hasWebsiteContext && (
       recruitmentHits > 0 || staffingRequest || (designerHiringPhrase && !hasClientContext && !projectMarketplace)
     ));
@@ -352,20 +357,21 @@ function createLeadRadarQuality(deps) {
         (profileOnly && commercialCopy && (providerRoleHits > 0 || providerPromoHits > 0 || hasConcreteDigitalNeed)) ||
         (providerRoleHits > 0 && commercialCopy) || providerShowcaseHits > 0 || directSalesCta)
     );
-    const isWebsiteNeed = hasWebsiteContext && hasConcreteDigitalNeed && hasBuyerVoice && !isRecruitment && !productSearch && !publicSupportTopic;
+    const isWebsiteNeed = hasWebsiteContext && hasConcreteDigitalNeed && hasBuyerVoice && !isRecruitment && !productSearch && !publicSupportTopic && !selfBuildGuidanceOnly;
     const reasons = [];
     if (isRecruitment) reasons.push('Recruitment- of vacaturebericht, geen klantvraag');
     if (isProvider) reasons.push('Zelfpromotie van webdesign-, SEO- of marketingaanbieder');
     if (productSearch) reasons.push('Product- of marktplaatszoekopdracht, geen websitevraag');
     if (nonBuildServiceRequest) reasons.push('Marketing- of salesopdracht zonder concrete bouwvraag');
     if (publicSupportTopic) reasons.push('Openbare WordPress-supportvraag, geen concrete koopopdracht');
+    if (selfBuildGuidanceOnly) reasons.push('Zelfbouwvraag om begeleiding of advies, geen uit te besteden bouwopdracht');
     if (!hasWebsiteContext) reasons.push('Geen duidelijke website-, software- of automatiseringscontext in het bericht');
     if (!hasConcreteDigitalNeed) reasons.push('Geen concrete digitale hulpvraag gevonden');
     if (!hasBuyerVoice) reasons.push('Geen herkenbare klantvraag vanuit ondernemer gevonden');
     return {
-      role: (isRecruitment || publicSupportTopic || nonBuildServiceRequest) ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
+      role: (isRecruitment || publicSupportTopic || nonBuildServiceRequest || selfBuildGuidanceOnly) ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
       isProvider,
-      isExcluded: isRecruitment || productSearch || publicSupportTopic || nonBuildServiceRequest,
+      isExcluded: isRecruitment || productSearch || publicSupportTopic || nonBuildServiceRequest || selfBuildGuidanceOnly,
       isWebsiteNeed,
       providerConfidence,
       buyerIntentHits,
