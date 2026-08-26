@@ -26,9 +26,23 @@
     var openedWindow = window.open(MARTIJN_WHATSAPP_URL, '_blank', 'noopener,noreferrer');
     if (!openedWindow) window.location.href = MARTIJN_WHATSAPP_URL;
   }
+  function wireTopicSelectAccessibility(form) {
+    var select = form.querySelector('#contact-topic');
+    var wrapper = select && select.closest('.site-select');
+    var trigger = wrapper && wrapper.querySelector('.site-select-trigger');
+    var value = wrapper && wrapper.querySelector('.site-select-value');
+    var menu = wrapper && wrapper.querySelector('.site-select-menu');
+    if (!trigger || !value || !menu) return;
+    value.id = 'contact-topic-value';
+    menu.id = 'contact-topic-options';
+    trigger.setAttribute('aria-controls', menu.id);
+    trigger.setAttribute('aria-labelledby', 'contact-topic-label ' + value.id);
+    menu.setAttribute('aria-labelledby', 'contact-topic-label');
+  }
   function initContactForm() {
     var form = document.getElementById('contact-form');
     if (!form) return;
+    wireTopicSelectAccessibility(form);
     var statusElement = form.querySelector('[data-contact-status]');
     var submitButton = form.querySelector('[data-contact-submit]');
     var successPanel = document.querySelector('[data-contact-success]');
