@@ -3,10 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { classifySignal } = require('../../server/services/lead-radar');
+const { classifySignal, isEligibleAutomaticSignal } = require('../../server/services/lead-radar');
 const {
   BLUESKY_SEARCH_ENDPOINT,
-  DEFAULT_PROJECT_INDEXES,
+  DEFAULT_MASTODON_TAGS,
   DEFAULT_PUBLIC_FEEDS,
   buildPublicScraperPlan,
   createLeadRadarPublicFetcher,
@@ -16,11 +16,8 @@ const {
   stripHtml,
 } = require('../../server/services/lead-radar-public-scraper');
 const {
-  parseFreelancerDetail,
-  parseFreelancerIndex,
-  parseHoofdkraanDetail,
-  parseHoofdkraanIndex,
-} = require('../../server/services/lead-radar-project-sources');
+  classifyLeadSourceUrl,
+} = require('../../server/services/lead-radar-source-policy');
 
 function fetchResponse(body = '', { status = 200, headers = {} } = {}) {
   const normalizedHeaders = new Map(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), String(value)]));
@@ -102,6 +99,7 @@ test('Lead Radar bouwt een begrensd plan voor openbare bronadapters', () => {
     env: {
       LEAD_RADAR_PUBLIC_FEED_URLS: 'https://example.com/feed.xml,https://example.org/vragen.atom',
       LEAD_RADAR_MASTODON_INSTANCES: 'https://mastodon.nl',
+      LEAD_RADAR_MASTODON_TAGS: 'website',
       LEAD_RADAR_BLUESKY_ENABLED: 'true',
     },
   });
@@ -114,51 +112,31 @@ test('Lead Radar bouwt een begrensd plan voor openbare bronadapters', () => {
   assert.ok(plan.every((item) => !String(item.query).includes('site:facebook.com')));
 });
 
-test('Lead Radar scant standaard openbare opdrachtenites en laat WordPress-support en Bluesky uit', () => {
+test('Lead Radar scant standaard directe ondernemersbronnen en nooit opdrachtmarktplaatsen', async () => {
   const plan = buildPublicScraperPlan({
-    platforms: ['web', 'bluesky'],
+    platforms: ['web', 'mastodon', 'bluesky'],
     keywordGroups: { direct_website: ['website hulp gezocht'] },
     selectedGroups: ['direct_website'],
-    env: {},
+    env: {
+      LEAD_RADAR_PUBLIC_FEED_URLS: 'https://freelancer.nl/feed.xml,https://www.hoofdkraan.nl/rss,https://www.higherlevel.nl/rss/2-forum.xml/',
+      LEAD_RADAR_PROJECT_INDEX_URLS: 'https://freelancer.nl/opdrachten/development-en-it',
+    },
   });
-  assert.equal(DEFAULT_PUBLIC_FEEDS.length, 0);
-  assert.ok(DEFAULT_PROJECT_INDEXES.some((value) => value === 'https://freelancer.nl/opdrachten/development-en-it'));
-  assert.ok(DEFAULT_PROJECT_INDEXES.some((value) => value === 'https://www.hoofdkraan.nl/opdrachten/websites-en-applicaties'));
-  assert.equal(plan.filter((item) => item.adapter === 'project_index').length, DEFAULT_PROJECT_INDEXES.length);
+  assert.deepEqual(DEFAULT_PUBLIC_FEEDS, ['https://www.higherlevel.nl/rss/2-forum.xml/']);
+  assert.equal(plan.filter((item) => item.adapter === 'feed').length, 1);
+  assert.equal(plan.filter((item) => item.adapter === 'mastodon').length, DEFAULT_MASTODON_TAGS.length);
+  assert.equal(plan.some((item) => item.adapter === 'project_index'), false);
+  assert.equal(plan.some((item) => /freelancer|hoofdkraan/i.test(String(item.sourceUrl))), false);
   assert.equal(plan.some((item) => String(item.sourceUrl).includes('nl.wordpress.org/support')), false);
   assert.equal(plan.some((item) => item.adapter === 'bluesky'), false);
-});
+  assert.equal(classifyLeadSourceUrl('https://www.upwork.com/jobs/~123').category, 'project_marketplace');
+  assert.equal(classifyLeadSourceUrl('https://www.linkedin.com/jobs/view/123').category, 'recruitment_platform');
 
-test('Lead Radar leest opdrachttekst, open status en exacte datum uit openbare detailpagina’s', () => {
-  const freelancerIndex = parseFreelancerIndex(`<div class="card"><div class="card-body">
-    <h4 class="card-title">CRM-portaal laten bouwen</h4><div class="location">Utrecht</div>
-    <div class="posted">Geplaatst 1 dag geleden</div><div class="offers">3 Reacties</div>
-    <p class="card-text">Wij zoeken iemand die ons CRM-portaal kan bouwen.</p>
-    <a class="btn btn-primary" href="/opdrachten/crm/crm-portaal-abc123">Bekijk en Reageer</a>
-  </div></div>`, 'https://freelancer.nl/opdrachten/development-en-it');
-  assert.equal(freelancerIndex.length, 1);
-  const freelancerDetail = parseFreelancerDetail(`<div itemscope itemtype="http://schema.org/JobPosting">
-    <meta itemprop="identifier" content="frnlabc123"><h1 itemprop="title">CRM-portaal laten bouwen</h1>
-    <time itemprop="datePosted" datetime="2026-08-25 11:05:59">Geplaatst 25-08-2026</time>
-    <div class="detail"><div class="label">Status</div><div class="value">Open</div></div>
-    <div class="detail"><div class="label">Locatie</div><div class="value">Utrecht</div></div>
-    <div itemprop="description">Wij zoeken iemand die ons CRM-portaal kan bouwen en implementeren.</div>
-  </div>`, freelancerIndex[0].url, freelancerIndex[0]);
-  assert.equal(freelancerDetail.publishedAt, '2026-08-25T12:00:00.000Z');
-  assert.equal(freelancerDetail.region, 'Utrecht');
-
-  const hoofdkraanIndex = parseHoofdkraanIndex(`<div class="newContentBox projectResult">
-    <h2 class="h3Like"><a href="/j/rekenprogramma/60962">rekenprogramma</a></h2>
-    <div>Geplaatst: 25 aug Reacties: 6 Locatie: Op afstand Status: Match!</div>
-    <div class="projectResultDescription">Ik zoek een programmeur die een programma kan maken.</div>
-  </div>`, 'https://www.hoofdkraan.nl/opdrachten');
-  assert.equal(hoofdkraanIndex.length, 1);
-  const hoofdkraanDetail = parseHoofdkraanDetail(`<script type="application/ld+json">{
-    "@type":"JobPosting","title":"rekenprogramma","description":"Ik zoek een programmeur die een programma kan maken.",
-    "identifier":{"value":"60962"},"datePosted":"2026/08/25","jobLocation":{"address":{"addressLocality":"Utrecht"}}
-  }</script><div>Status: Open Heb je een soortgelijke klus?</div>`, hoofdkraanIndex[0].url, hoofdkraanIndex[0]);
-  assert.equal(hoofdkraanDetail.publishedAt, '2026-08-25T12:00:00.000Z');
-  assert.equal(hoofdkraanDetail.externalId, '60962');
+  const provider = createLeadRadarScraperProvider({ env: {}, fetchImpl: async () => fetchResponse('') });
+  await assert.rejects(
+    provider.search({ context: { adapter: 'feed', sourceUrl: 'https://www.fiverr.com/feed.xml' } }),
+    (error) => error.code === 'LEAD_RADAR_SOURCE_BLOCKED'
+  );
 });
 
 test('Lead Radar normaliseert feed-, Mastodon- en Bluesky-resultaten zonder betaalde provider', async () => {
@@ -167,6 +145,7 @@ test('Lead Radar normaliseert feed-, Mastodon- en Bluesky-resultaten zonder beta
     env: {
       LEAD_RADAR_PUBLIC_FEED_URLS: 'https://example.com/feed.xml',
       LEAD_RADAR_MASTODON_INSTANCES: 'https://example.org',
+      LEAD_RADAR_MASTODON_TAGS: 'website',
       LEAD_RADAR_MASTODON_PAGES: '1',
       LEAD_RADAR_BLUESKY_ENABLED: 'true',
       LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0',
@@ -194,7 +173,7 @@ test('Lead Radar normaliseert feed-, Mastodon- en Bluesky-resultaten zonder beta
     },
   });
   const feed = await provider.search({ context: { adapter: 'feed', sourceUrl: 'https://example.com/feed.xml' } });
-  const mastodon = await provider.search({ context: { adapter: 'mastodon', sourceUrl: 'https://example.org' } });
+  const mastodon = await provider.search({ context: { adapter: 'mastodon', sourceUrl: 'https://example.org', term: 'website' } });
   const bluesky = await provider.search({ query: 'automatisering hulp gezocht', context: { adapter: 'bluesky', term: 'automatisering hulp gezocht' } });
   assert.equal(feed[0].source_type, 'feed');
   assert.equal(mastodon[0].platform, 'mastodon');
@@ -204,6 +183,7 @@ test('Lead Radar normaliseert feed-, Mastodon- en Bluesky-resultaten zonder beta
   assert.equal(provider.getStatus().paid, false);
   assert.equal(provider.getStatus().provider, 'softora_public_scraper');
   assert.ok(calls.some((url) => url.endsWith('/robots.txt')));
+  assert.ok(calls.some((url) => new URL(url).pathname === '/api/v1/timelines/tag/website'));
 });
 
 test('Lead Radar herkent natuurlijke website-, CRM- en AI-hulpvragen als prospects', () => {
@@ -221,7 +201,13 @@ test('Lead Radar herkent natuurlijke website-, CRM- en AI-hulpvragen als prospec
   assert.equal(classifySignal({
     url: 'https://freelancer.nl/opdrachten/ai/ai-operator-123',
     snippet: 'I’m looking for a hands-on AI expert to help me build an operator connected to our CRM and business systems.',
-  }).role, 'prospect');
+  }).role, 'excluded');
+  assert.equal(isEligibleAutomaticSignal({
+    platform: 'web',
+    post_url: 'https://freelancer.nl/opdrachten/ai/ai-operator-123',
+    message_text: 'Voor ons bedrijf zoeken wij iemand die een AI-agent kan bouwen.',
+    published_at: new Date().toISOString(),
+  }, { allowUnknownPublicationDate: false }), false);
   assert.equal(classifySignal({
     url: 'https://freelancer.nl/opdrachten/automation/automation-developer-123',
     snippet: 'Voor een internationale eindklant zoeken wij een Automation Developer voor 40 uur per week om het team te versterken.',
@@ -233,7 +219,24 @@ test('Lead Radar herkent natuurlijke website-, CRM- en AI-hulpvragen als prospec
   assert.equal(classifySignal({
     url: 'https://www.hoofdkraan.nl/j/rekenprogramma/60962',
     snippet: 'Ik zoek een computerprogrammeur die een programma voor kansberekeningen kan maken.',
+  }).role, 'excluded');
+  assert.equal(classifySignal({
+    url: 'https://www.higherlevel.nl/forums/topic/123-website-gezocht/',
+    snippet: 'Voor mijn nieuwe kapsalon zoek ik iemand die een boekingswebsite kan bouwen.',
   }).role, 'prospect');
+  assert.equal(classifySignal({
+    url: 'https://www.higherlevel.nl/forums/topic/124-inlogprobleem/',
+    snippet: 'Na de WordPress-update werkt mijn login niet meer. Hoe kan ik dit zelf oplossen?',
+  }).role, 'excluded');
+  assert.equal(classifySignal({
+    url: 'https://www.higherlevel.nl/forums/topic/78648-zoeken-naar-informatie-binnen-een-website/',
+    snippet: 'Op onze site staan honderden artikelen. Wij maken gebruik van Sitesearch360 en willen graag van anderen horen welke programma’s zij gebruiken voor het zoeken binnen hun website.',
+  }).role, 'excluded');
+  assert.equal(classifySignal({
+    url: 'https://mastodon.social/@panwebsites/117151397080898222',
+    title: 'Pan Websites',
+    snippet: 'Not every business is the same. We build the website around your business goals. #WebDesign',
+  }).role, 'provider');
   assert.equal(classifySignal({
     url: 'https://freelancer.nl/opdrachten/voorschoten/ai-development/personal-project-web-app-with-mysql-en-python-d8412b34',
     snippet: 'I’m looking for some guidance in developing an app for personal use. My goal is to write as much of the code myself as possible and learn along the way.',
