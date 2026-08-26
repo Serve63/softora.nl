@@ -180,6 +180,16 @@ test('new content appears once when it also records an explicit new-url event', 
   assert.equal(events[0].eventAt, '2026-08-18');
 });
 
+test('website-migratiepublicatie staat eenmaal als nieuwe URL in het machineplan', () => {
+  const events = getSeoMachinePublicationPlan({ now: new Date('2026-08-26T12:00:00.000Z') })
+    .filter((event) => event.path === '/kennisbank/website-migratie-zonder-seo-verlies');
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].publicationKind, 'new_url');
+  assert.equal(events[0].eventAt, '2026-08-26');
+  assert.equal(events[0].status, 'live');
+});
+
 test('live publication ledger counts only verified public indexable URLs', async () => {
   const ledger = await collectLivePublicationLedger({
     expectedCommit: 'abc123',

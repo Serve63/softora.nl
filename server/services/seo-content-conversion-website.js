@@ -122,7 +122,17 @@ const CONVERSION_WEBSITE_CONTENT_ITEM = Object.freeze({
       heading: 'Kies repareren of opnieuw ontwerpen',
       paragraphs: Object.freeze([
         'Repareer wanneer de bezoekersvraag klopt en één of twee stappen lekken. Denk aan bewijs dat te laat staat, een onduidelijke CTA, onnodige velden of een ontbrekende ontvangstbevestiging. Herontwerp de route wanneer pagina’s dezelfde intentie claimen, de belofte niet past bij het aanbod, meerdere systemen eigenaar spelen of niemand kan aangeven wat na contact gebeurt.',
-        'Maak voor een herontwerp eerst de vijfdelige bewijskaart en de zes acceptatiescenario’s. Vergelijk voorstellen daarna op dezelfde scope: route, inhoud, toegankelijkheid, meetplan, overdracht, beheer en foutafhandeling. Zo voorkom je dat een voordelige offerte vooral onderdelen weglaat die pas na livegang zichtbaar worden.',
+        Object.freeze({
+          text:
+            'Maak voor een herontwerp eerst de vijfdelige bewijskaart en de zes acceptatiescenario’s. Vergelijk voorstellen daarna op dezelfde scope: route, inhoud, toegankelijkheid, meetplan, overdracht, beheer en foutafhandeling. Wanneer bestaande URL’s veranderen, hoort ook een website-migratieplan met redirects, canonicals en livebewijs in die scope. Zo voorkom je dat een voordelige offerte vooral onderdelen weglaat die pas na livegang zichtbaar worden.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'website-migratieplan',
+              href: '/kennisbank/website-migratie-zonder-seo-verlies',
+              availableFrom: '2026-08-26',
+            }),
+          ]),
+        }),
         Object.freeze({
           text: 'Softora kan één belangrijke route samen met het team uitwerken en toetsen voordat de rest van de website wordt verbouwd. Neem voor een eerste gesprek de huidige landingspagina, één representatieve aanvraag en de plek waar die aanvraag intern moet eindigen mee. Daarmee kunnen we de website-scope concreet maken zonder vooraf meer leads, omzet of rankings te beloven.',
           links: Object.freeze([

@@ -126,7 +126,17 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Onderhoud de structuur na wijzigingen en consolidaties',
       paragraphs: Object.freeze([
-        'Controleer interne links opnieuw wanneer een URL wijzigt, pagina’s worden samengevoegd of een nieuw artikel een bestaande taak overneemt. Werk oude ankerteksten en bestemmingen bij, voorkom redirectketens en laat sitemap, canonical en zichtbare navigatie dezelfde voorkeurs-URL aanwijzen.',
+        Object.freeze({
+          text:
+            'Controleer interne links opnieuw wanneer een URL wijzigt, pagina’s worden samengevoegd of een nieuw artikel een bestaande taak overneemt. Werk oude ankerteksten en bestemmingen bij, voorkom redirectketens en laat sitemap, canonical en zichtbare navigatie dezelfde voorkeurs-URL aanwijzen. Gebruik bij een website-migratie een vaste URL-kaart zodat iedere oude ingang één aantoonbare bestemming krijgt.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'website-migratie',
+              href: '/kennisbank/website-migratie-zonder-seo-verlies',
+              availableFrom: '2026-08-26',
+            }),
+          ]),
+        }),
         'Kijk na publicatie naar crawl- en indexatiesignalen, vertoningen, doorklikken naar money pages en echte contactacties voor zover die betrouwbaar gemeten worden. Een interne link kan ontdekking en begrip ondersteunen, maar garandeert geen indexatie of ranking. Als een pagina onbekend of niet geïndexeerd blijft, onderzoek dan ook inhoudelijke uniekheid, technische signalen en overlap voordat je simpelweg meer links toevoegt.',
       ]),
     }),

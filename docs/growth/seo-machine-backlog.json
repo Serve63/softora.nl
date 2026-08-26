@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-25",
+  "updatedAt": "2026-08-26",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1274,7 +1274,9 @@
     },
     {
       "id": "website-migration-013",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-26",
+      "shippedPath": "/kennisbank/website-migratie-zonder-seo-verlies",
       "path": "/kennisbank/website-migratie-zonder-seo-verlies",
       "contentType": "kennisbank",
       "cluster": "websites",
@@ -1286,21 +1288,27 @@
       "clusterRole": "Migratierisico voor websitekopers",
       "demandEvidence": [
         {
-          "type": "inventory-gap",
-          "source": "Softora SEO-contentinventaris",
-          "observedAt": "2026-07-17",
-          "detail": "De websitecluster behandelt prijs, pagina's, conversie en links, maar geen redirects, canonicals, sitemap en meetplan bij migratie."
+          "type": "current-autocomplete-and-buyer-language",
+          "source": "Nederlandse Google-autocomplete voor migratie website en website migreren",
+          "observedAt": "2026-08-26",
+          "detail": "Actuele suggesties bevatten migratie website, wat is website migratie, website migreren en WordPress website migreren. Dit bevestigt een concrete migratietaak zonder een ongeverifieerd zoekvolume of moeilijkheid te claimen."
+        },
+        {
+          "type": "primary-source",
+          "source": "Google Search Central over site moves, redirects, canonicalization en sitemaps",
+          "observedAt": "2026-08-26",
+          "detail": "De actuele documentatie maakt URL-mapping, permanente serverredirects, consistente canonicals, interne links, sitemaps en monitoring na een verhuizing controleerbaar en waarschuwt dat tijdelijke rankingfluctuaties normaal kunnen zijn."
         }
       ],
       "overlap": {
-        "checkedAt": "2026-07-17",
+        "checkedAt": "2026-08-26",
         "closestPaths": [
           "/blog/website-laten-maken-kosten-2026",
           "/blog/website-laten-maken-mkb-paginas",
           "/kennisbank/wat-is-interne-linkstructuur"
         ],
         "decision": "distinct",
-        "rationale": "De kandidaat behandelt migratie-inventaris, URL-mapping, redirects, canonicals, tracking en post-livecontrole als aparte taak."
+        "rationale": "De kostengids behandelt budget, de paginagids de benodigde inhoudsrollen en de linkgids het blijvende linknetwerk. Deze publicatie is eigenaar van de overgang tussen oud en nieuw: inventaris, URL-mapping, redirects, canonicals, sitemap, livebewijs en herstel. De dichtstbijzijnde corpusoverlap bleef met 0,039 laag."
       },
       "scores": {
         "businessFit": 5,
@@ -1329,7 +1337,7 @@
           "Welke signalen controleer je direct na migratie?"
         ],
         "incomingLinks": [
-          "/blog/website-laten-maken-mkb-paginas",
+          "/kennisbank/wat-is-een-conversiegerichte-website",
           "/kennisbank/wat-is-interne-linkstructuur"
         ],
         "outgoingLinks": [
@@ -1344,11 +1352,98 @@
         ],
         "structuredData": [
           "Article",
-          "FAQPage",
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Werk de checklist technisch correct uit en vermijd de claim dat rankingverlies volledig te voorkomen is."
+      "nextAction": "Beoordeel op 2026-09-09, 2026-09-23 en 2026-10-21 indexatie, relevante niet-merkgebonden ontdekking en navigatie naar /website-laten-maken; claim geen nul-verlies of causaliteit uit dagelijkse ruis."
+    },
+    {
+      "id": "website-monitoring-028",
+      "status": "ready",
+      "path": "/kennisbank/website-monitoring-na-livegang",
+      "contentType": "kennisbank",
+      "cluster": "websites",
+      "primaryQuery": "website monitoring",
+      "intent": "Een zakelijke website na livegang technisch, organisch en op conversie-uitkomsten bewaken",
+      "intentClass": "problem-solving",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Doorlopende beheergids voor signalen, alarmgrenzen, eigenaarschap en herstel na de stabilisatieperiode van een lancering of migratie",
+      "demandEvidence": [
+        {
+          "type": "current-autocomplete",
+          "source": "Nederlandse Google-autocomplete voor website monitoring",
+          "observedAt": "2026-08-26",
+          "detail": "Actuele suggesties bevatten website monitoring, website monitoring tools, website monitoring software en website monitoring for changes. Dit bevestigt herkenbare buyer language rond blijvende bewaking zonder een zoekvolume te verzinnen."
+        },
+        {
+          "type": "primary-source",
+          "source": "Google Search Console-documentatie en web.dev over Search performance, Core Web Vitals en veldmetingen",
+          "observedAt": "2026-08-26",
+          "detail": "De primaire bronnen scheiden zoekprestaties, indexatie en echte gebruikerservaring in verschillende rapporten en ondersteunen een monitoringskaart met technische signalen, organische cohorten en betrouwbare conversie-uitkomsten in plaats van één algemene score."
+        }
+      ],
+      "competitorPatterns": [
+        "Alleen uptime of snelheid bewaken zonder indexatie, contactroutes en inhoudelijke veranderingen",
+        "Dashboardgroen verwarren met een werkende bezoekers- en overdrachtsroute",
+        "Dagelijkse positie- of conversieruis als oorzaak van één websitewijziging presenteren"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-26",
+        "closestPaths": [
+          "/blog/website-leadgeneratie-mkb-meten",
+          "/kennisbank/wat-is-een-conversiegerichte-website",
+          "/blog/website-laten-maken-kosten-2026"
+        ],
+        "decision": "distinct",
+        "rationale": "De meetgids richt zich op de leadtrechter, de conversiegids op acceptatie van één bezoekersroute en de kostengids op bouwscope. Deze kandidaat is eigenaar van doorlopend beheer na livegang: signaalgroepen, alarmgrenzen, eigenaar, wijzigingslog, herstelactie en periodieke menselijke review."
+      },
+      "scores": {
+        "businessFit": 4,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 2
+      },
+      "weightedScore": 3.95,
+      "brief": {
+        "title": "Website monitoring na livegang: signalen, grenzen en herstel",
+        "metaDescription": "Bewaak bereikbaarheid, indexatie, zoekverkeer, gebruikerservaring en contactroutes met duidelijke alarmgrenzen, eigenaarschap en herstelacties.",
+        "h1": "Wat moet je aan een website monitoren na livegang?",
+        "outline": [
+          "Scheid bereikbaarheid, crawlbaarheid, gebruikerservaring en conversie",
+          "Bepaal per signaal een bron, grens en menselijke eigenaar",
+          "Controleer releases en belangrijke routes end-to-end",
+          "Beoordeel zoek- en conversiedata in passende cohorten",
+          "Voer incidenten en wijzigingen terug naar een herstel- en regressielog"
+        ],
+        "buyerQuestions": [
+          "Welke websiteproblemen moeten direct een alarm geven?",
+          "Hoe vaak controleer je indexatie en organische prestaties?",
+          "Wie beslist of een afwijking herstel, observatie of rollback vraagt?"
+        ],
+        "incomingLinks": [
+          "/blog/website-leadgeneratie-mkb-meten",
+          "/kennisbank/wat-is-een-conversiegerichte-website"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/kennisbank/website-migratie-zonder-seo-verlies"
+        ],
+        "conversionPath": "Van een controleerbare monitoringskaart naar een website-scopegesprek over beheer, meetbaarheid en herstel na livegang.",
+        "claimRisk": "Geen permanente uptime, volledige detectie, gegarandeerde rankings of betrouwbare leadattributie beloven; scheid technische observatie, organische richting en bewezen conversie-uitkomst.",
+        "visualConcepts": [
+          "Monitoringskaart met bereikbaarheid, crawlbaarheid, snelheid, zoekprestatie en contactroute per eigenaar",
+          "Beslisroute van signaal via bewijs en ernst naar observeren, herstellen, pauzeren of rollback"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig actuele vraagvormen en bouw een platformneutrale monitoringskaart waarin geen dashboard of automatische score het menselijke herstelbesluit vervangt."
     },
     {
       "id": "website-proposal-014",
