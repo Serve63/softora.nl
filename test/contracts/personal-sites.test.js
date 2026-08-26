@@ -39,6 +39,7 @@ test('personal pages are registered under the Softora subpaths', () => {
       2,
       `${slug} should route both CTA buttons to the Softora contact page`,
     );
+    assert.doesNotMatch(html, /↗/, `${slug} should not show arrow glyphs after CTA labels`);
     assert.ok(fs.existsSync(path.join(siteRoot, 'styles.css')));
     assert.ok(fs.existsSync(path.join(siteRoot, 'script.js')));
     assert.ok(fs.existsSync(path.join(siteRoot, 'assets')));
