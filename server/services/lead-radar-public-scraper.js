@@ -2,11 +2,13 @@
 
 const { parseDocument } = require('htmlparser2');
 const { assertWebsitePreviewUrlIsPublic } = require('../security/public-url');
+const {
+  DEFAULT_PROJECT_INDEXES,
+  createProjectSourceAdapter,
+  isSupportedProjectIndexUrl,
+} = require('./lead-radar-project-sources');
 
-const DEFAULT_PUBLIC_FEEDS = Object.freeze([
-  'https://www.higherlevel.nl/rss/2-forum.xml/',
-  'https://nl.wordpress.org/support/view/all-topics/feed/',
-]);
+const DEFAULT_PUBLIC_FEEDS = Object.freeze([]);
 const DEFAULT_MASTODON_INSTANCES = Object.freeze([
   'https://mastodon.nl',
 ]);
@@ -281,11 +283,17 @@ function buildPublicScraperPlan(options = {}) {
     : ['web', 'mastodon', 'bluesky'];
   const platforms = [...new Set(requested.filter((value) => ['web', 'mastodon', 'bluesky'].includes(value)))];
   const feeds = parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS);
+  const projectIndexes = parseUrlList(env.LEAD_RADAR_PROJECT_INDEX_URLS, DEFAULT_PROJECT_INDEXES)
+    .filter(isSupportedProjectIndexUrl);
   const mastodonInstances = parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES)
     .map((value) => value.replace(/\/$/, ''));
   const region = 'Nederland';
   const plan = [];
   if (platforms.includes('web')) {
+    projectIndexes.forEach((sourceUrl) => plan.push({
+      adapter: 'project_index', platform: 'web', region, keywordGroup: 'buyer_project', term: 'openbare concrete digitale opdracht',
+      query: sourceUrl, sourceUrl, maxResults: 25,
+    }));
     feeds.forEach((sourceUrl) => plan.push({
       adapter: 'feed', platform: 'web', region, keywordGroup: 'public_feed', term: 'openbare ondernemersvraag',
       query: sourceUrl, sourceUrl, maxResults: 100,
@@ -310,10 +318,17 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
   const publicFetcher = createLeadRadarPublicFetcher({ env, fetchImpl, logger });
   const config = {
     feeds: parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS),
+    projectIndexes: parseUrlList(env.LEAD_RADAR_PROJECT_INDEX_URLS, DEFAULT_PROJECT_INDEXES)
+      .filter(isSupportedProjectIndexUrl),
     mastodonInstances: parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES).map((value) => value.replace(/\/$/, '')),
     blueskyEnabled: parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, false),
     mastodonPages: safeLimit(env.LEAD_RADAR_MASTODON_PAGES, 3, 5),
   };
+  const projectSourceAdapter = createProjectSourceAdapter({
+    fetchPublic: publicFetcher.fetchPublic,
+    logger,
+    detailLimit: safeLimit(env.LEAD_RADAR_PROJECT_DETAIL_LIMIT, 20, 40),
+  });
 
   async function searchFeed(context, maxResults) {
     const result = await publicFetcher.fetchPublic(context.sourceUrl, { accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml;q=0.9' });
@@ -384,6 +399,7 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
     const normalizedContext = { ...context, query: context.query || query };
     const limit = safeLimit(maxResults, 25, 200);
     if (normalizedContext.adapter === 'feed') return searchFeed(normalizedContext, limit);
+    if (normalizedContext.adapter === 'project_index') return projectSourceAdapter.search(normalizedContext, limit);
     if (normalizedContext.adapter === 'mastodon') return searchMastodon(normalizedContext, limit);
     if (normalizedContext.adapter === 'bluesky') return searchBluesky(normalizedContext, limit);
     const error = new Error('Onbekende openbare scraperadapter.');
@@ -393,18 +409,19 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
 
   return {
     name: 'softora_public_scraper',
-    configured: Boolean(config.feeds.length || config.mastodonInstances.length || config.blueskyEnabled),
+    configured: Boolean(config.projectIndexes.length || config.feeds.length || config.mastodonInstances.length || config.blueskyEnabled),
     buildPlan(options = {}) {
       return buildPublicScraperPlan({ ...options, env });
     },
     search,
     getStatus() {
       return {
-        configured: Boolean(config.feeds.length || config.mastodonInstances.length || config.blueskyEnabled),
+        configured: Boolean(config.projectIndexes.length || config.feeds.length || config.mastodonInstances.length || config.blueskyEnabled),
         provider: 'softora_public_scraper',
         paid: false,
         message: 'Eigen Softora-scraper actief; er worden geen betaalde zoek-API’s gebruikt.',
         sources: {
+          projectIndexes: config.projectIndexes.length,
           publicFeeds: config.feeds.length,
           mastodonInstances: config.mastodonInstances.length,
           blueskyEnabled: config.blueskyEnabled,
@@ -418,6 +435,7 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
 module.exports = {
   BLUESKY_SEARCH_ENDPOINT,
   DEFAULT_MASTODON_INSTANCES,
+  DEFAULT_PROJECT_INDEXES,
   DEFAULT_PUBLIC_FEEDS,
   buildPublicScraperPlan,
   createLeadRadarPublicFetcher,

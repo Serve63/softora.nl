@@ -61,6 +61,7 @@ const RECRUITMENT_TERMS = Object.freeze([
   'vacature', 'we are hiring', 'we\'re hiring', 'hiring', 'team versterken',
   'ons team', 'voor ons mediateam', 'vrijwilliger', 'stagiair', 'stage',
   'fulltime', 'parttime', 'dienstverband', 'medewerker gezocht', 'collega gezocht',
+  'salespartner', 'sales partner', 'accountmanager', 'appointment setter', 'commercieel medewerker',
   'junior webdeveloper', 'front-end webdeveloper', 'front end webdeveloper',
   'senior webdeveloper', 'werken bij', 'bij ons werken', 'profiel past',
 ]);
@@ -286,7 +287,7 @@ function createLeadRadarQuality(deps) {
 
   function classifySignal(input = {}) {
     const author = text(input.author_name || input.authorName || input.title, 500).toLowerCase();
-    const message = `${input.message_text || input.messageText || input.snippet || ''}`.toLowerCase();
+    const message = `${input.title || ''} ${input.message_text || input.messageText || input.snippet || ''}`.toLowerCase();
     const sourceUrl = input.post_url || input.source_url || input.sourceUrl || input.url || '';
     const buyerIntentHits = countPhraseHits(message, BUYER_INTENT_TERMS);
     const providerRoleHits = countPhraseHits(author, PROVIDER_ROLE_TERMS);
@@ -296,6 +297,14 @@ function createLeadRadarQuality(deps) {
     const recruitmentHits = countPhraseHits(message, RECRUITMENT_TERMS);
     const productSearch = countPhraseHits(message, PRODUCT_SEARCH_TERMS) > 0;
     const profileOnly = isLikelyPlatformProfileUrl(sourceUrl);
+    const projectMarketplace = (() => {
+      try {
+        const hostname = new URL(sourceUrl).hostname.toLowerCase().replace(/^www\./, '');
+        return hostname === 'freelancer.nl' || hostname === 'hoofdkraan.nl';
+      } catch {
+        return false;
+      }
+    })();
     const publicSupportTopic = (() => {
       try {
         const parsed = new URL(sourceUrl);
@@ -305,20 +314,30 @@ function createLeadRadarQuality(deps) {
         return false;
       }
     })();
-    const hasWebsiteContext = /\b(websites?|websitebouwers?|webshops?|webwinkels?|webdesign|webdevelopers?|webapps?|dashboard|site|software|softwareontwikkelaars?|apps?|applicatie|systeem|crm|portaal|klantenportaal|automatisering|automatiseren|koppeling|api|chatbot|ai[- ]?(?:agent|assistent|oplossing|automatisering))\b/i.test(message);
-    const directCustomerHelpRequest = /\bkan\s+iemand\s+(?:mij|me|ons)\b[^.!?]{0,180}\b(?:helpen|maken|bouwen|ontwikkelen|vernieuwen|verbeteren|automatiseren|koppelen)\b/i.test(message) ||
-      /\b(?:ik\s+ben|wij\s+zijn|we\s+zijn)\s+op\s*zoek\s+naar\s+(?:iemand|een\s+(?:partij|bureau|freelancer|ontwikkelaar))\b/i.test(message);
+    const hasWebsiteContext = /\b(websites?|websitebouwers?|webshops?|webwinkels?|webdesign|webdevelopers?|developers?|programmeurs?|programma|webapps?|dashboard|site|software|softwareontwikkelaars?|apps?|applicatie|systeem|crm|erp|portaal|klantenportaal|automatisering|automatiseren|automation|koppeling|api|database|tool|chatbot|ai[- ]?(?:agent|assistant|assistent|operator|workflow|oplossing|automatisering))\b/i.test(message);
+    const directCustomerHelpRequest = /\bkan\s+iemand\s+(?:mij|me|ons)\b[^.!?]{0,220}\b(?:maken|bouwen|ontwikkelen|ontwerpen|implementeren|inrichten|opzetten|migreren|overzetten|integreren|automatiseren|moderniseren|vernieuwen|optimaliseren)\b/i.test(message) ||
+      /\b(?:ik\s+ben|wij\s+zijn|we\s+zijn)\s+op\s*zoek\s+naar\s+(?:iemand|een\s+(?:partij|bureau|freelancer|ontwikkelaar|developer|programmeur|specialist|expert))\b/i.test(message) ||
+      /\b(?:i(?:'|’)?m|we(?:'|’)?re|we are)\s+looking\s+for\b[^.!?]{0,220}\b(?:someone|developer|expert|specialist|agency|partner)\b/i.test(message);
+    const explicitCommissionAction = /\b(?:wil|willen|zoek|zoeken|nodig|gezocht|gevraagd|offerte|opdracht|laten|help(?:en)?|looking for|need|want)\b[^.!?]{0,240}\b(?:maken|bouwen|ontwikkelen|ontwerpen|implementeren|inrichten|opzetten|migreren|overzetten|integreren|koppelen|automatiseren|moderniseren|vernieuwen|redesignen|optimaliseren|build|develop|create|implement|set up|migrate|integrate|connect|automate|redesign|optimi[sz]e)\b/i.test(message) ||
+      /\b(?:maken|bouwen|ontwikkelen|ontwerpen|implementeren|inrichten|opzetten|migreren|overzetten|integreren|koppelen|automatiseren|moderniseren|vernieuwen|redesignen|optimaliseren|build|develop|create|implement|migrate|integrate|automate|redesign|optimi[sz]e)\b[^.!?]{0,200}\b(?:website|webshop|software|programma|app|applicatie|crm|erp|portaal|dashboard|database|api|automation|ai[- ]?(?:agent|assistant|operator|workflow))\b/i.test(message);
     const hasClientContext = countPhraseHits(message, CLIENT_CONTEXT_TERMS) > 0 ||
       /\b(ik|wij|we)\s+(?:ben|zijn)\s+op\s*zoek naar iemand\b/i.test(message) ||
       /\b(ik|wij|we)\s+(?:wil|willen|zoek|zoeken)\b[^.]{0,160}\b(website|webshop|webdesigner|websitebouwer|software|ontwikkelaar|app|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
-    const publicSupportHelpRequest = publicSupportTopic && hasWebsiteContext &&
-      /\b(?:kan(?:nen)?\s+(?:ik|wij|we)\s+niet|lukt\s+(?:mij|me|ons)\s+niet|gaat\s+(?:ineens\s+)?niet|werkt\s+niet|doet\s+het\s+niet|foutmelding|probleem|hulp|hoe\s+(?:kan|moet|krijg|maak|los))\b/i.test(message);
-    const hasConcreteDigitalNeed = buyerIntentHits > 0 || directCustomerHelpRequest || publicSupportHelpRequest;
     const buyerRequestHits = countPhraseHits(message, BUYER_REQUEST_TERMS);
+    const hasConcreteDigitalNeed = !publicSupportTopic && (
+      buyerRequestHits > 0 || directCustomerHelpRequest || explicitCommissionAction ||
+      (projectMarketplace && hasWebsiteContext && /\b(?:maken|bouwen|ontwikkelen|verbeteren|moderniseren|migreren|overzetten|inrichten|implementeren|integreren|automatiseren|build|develop|create|improve|migrate|integrate|automate)\b/i.test(message))
+    );
     const firstPersonWebsiteNeed = /\b(?:ik|wij|we|mijn|onze|ons)\b[^.]{0,180}\b(?:website|webshop|webwinkel|webdesigner|websitebouwer|webdeveloper|software|ontwikkelaar|app|applicatie|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
-    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed || directCustomerHelpRequest || publicSupportHelpRequest;
+    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed || directCustomerHelpRequest ||
+      (projectMarketplace && hasConcreteDigitalNeed);
     const designerHiringPhrase = /\b(webdesigner|webdeveloper)\s+gezocht\b/i.test(message);
-    const isRecruitment = Boolean(hasWebsiteContext && !hasClientContext && (recruitmentHits > 0 || designerHiringPhrase));
+    const staffingRequest = /\b(?:\d{2,3}\s*uur(?:\s+per\s+week)?|voor\s+(?:een\s+)?(?:internationale\s+)?eindklant|team[^.!?]{0,100}versterken|dienstverband)\b/i.test(message);
+    const nonBuildServiceRequest = /\b(?:google ads|social media|contentmarketing|leadgeneratie|cold calling|seo-specialist|cro-specialist|salespartner)\b/i.test(message) &&
+      !/\b(?:maken|bouwen|ontwikkelen|ontwerpen|implementeren|inrichten|opzetten|migreren|overzetten|integreren|build|develop|create|implement|set up|migrate|integrate)\b[^.!?]{0,220}\b(?:website|webshop|software|programma|app|applicatie|crm|erp|portaal|dashboard|database|api|ai[- ]?(?:agent|assistant|operator|workflow))\b/i.test(message);
+    const isRecruitment = Boolean(hasWebsiteContext && (
+      recruitmentHits > 0 || staffingRequest || (designerHiringPhrase && !hasClientContext && !projectMarketplace)
+    ));
     const strongPromotion = providerPromoHits >= 2 ||
       (providerPromoHits >= 1 && (providerRoleHits > 0 || providerMessageRoleHits > 0));
     const commercialCopy = countPhraseHits(message, PROVIDER_SALES_TERMS) > 0;
@@ -333,18 +352,20 @@ function createLeadRadarQuality(deps) {
         (profileOnly && commercialCopy && (providerRoleHits > 0 || providerPromoHits > 0 || hasConcreteDigitalNeed)) ||
         (providerRoleHits > 0 && commercialCopy) || providerShowcaseHits > 0 || directSalesCta)
     );
-    const isWebsiteNeed = hasWebsiteContext && hasConcreteDigitalNeed && hasBuyerVoice && !isRecruitment && !productSearch;
+    const isWebsiteNeed = hasWebsiteContext && hasConcreteDigitalNeed && hasBuyerVoice && !isRecruitment && !productSearch && !publicSupportTopic;
     const reasons = [];
     if (isRecruitment) reasons.push('Recruitment- of vacaturebericht, geen klantvraag');
     if (isProvider) reasons.push('Zelfpromotie van webdesign-, SEO- of marketingaanbieder');
     if (productSearch) reasons.push('Product- of marktplaatszoekopdracht, geen websitevraag');
+    if (nonBuildServiceRequest) reasons.push('Marketing- of salesopdracht zonder concrete bouwvraag');
+    if (publicSupportTopic) reasons.push('Openbare WordPress-supportvraag, geen concrete koopopdracht');
     if (!hasWebsiteContext) reasons.push('Geen duidelijke website-, software- of automatiseringscontext in het bericht');
     if (!hasConcreteDigitalNeed) reasons.push('Geen concrete digitale hulpvraag gevonden');
     if (!hasBuyerVoice) reasons.push('Geen herkenbare klantvraag vanuit ondernemer gevonden');
     return {
-      role: isRecruitment ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
+      role: (isRecruitment || publicSupportTopic || nonBuildServiceRequest) ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
       isProvider,
-      isExcluded: isRecruitment || productSearch,
+      isExcluded: isRecruitment || productSearch || publicSupportTopic || nonBuildServiceRequest,
       isWebsiteNeed,
       providerConfidence,
       buyerIntentHits,

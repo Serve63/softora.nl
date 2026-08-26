@@ -249,7 +249,7 @@ function scoreSignal(input = {}, { targetRegion = '' } = {}) {
   } else {
     reasons.push('Publicatiedatum onbekend');
   }
-  const classification = classifySignal({ message_text: message });
+  const classification = classifySignal({ ...input, message_text: message });
   const directWebsiteIntent = classification.isWebsiteNeed && !classification.isProvider && !classification.isExcluded;
   if (directWebsiteIntent) {
     score += 30;
@@ -360,7 +360,7 @@ function buildSignalFromProviderItem(item, context = {}) {
   const platform = normalizePlatform(item?.platform || context.platform || platformFromUrl(url));
   if (!url || !PLATFORMS.includes(platform)) return null;
   const messageText = text(item?.message_text || item?.messageText || item?.snippet || item?.description || '', MAX_MESSAGE_LENGTH);
-  const authorName = text(item?.author_name || item?.authorName || item?.title || '', 500);
+  const authorName = text(item?.author_name || item?.authorName || '', 500);
   const classification = classifySignal({
     url,
     source_url: url,
@@ -380,7 +380,7 @@ function buildSignalFromProviderItem(item, context = {}) {
   const explicitWebsite = normalizeHttpUrl(item?.website_url || item?.websiteUrl || '', { allowPlatform: false });
   const directWebsite = explicitWebsite || (platform === 'web' ? '' : extractUrls(messageText)[0] || '');
   const publishedAt = publication.publishedAt;
-  const region = text(context.region, 120);
+  const region = text(item?.region || context.region, 120);
   const sourceVerified = item?.source_verified === true;
   const input = {
     platform,
@@ -525,7 +525,7 @@ function createLeadRadarService(deps = {}) {
     const days = normalizeInteger(query.days, { min: 1, max: MAX_LEAD_AGE_DAYS }) || MAX_LEAD_AGE_DAYS;
     if (days > 0) {
       const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
-      request = request.gte('published_at', cutoff);
+      if (typeof request.gte === 'function') request = request.gte('published_at', cutoff);
     }
     if (typeof request.in === 'function' && !platform) request = request.in('platform', [...PLATFORMS]);
     if (typeof request.range === 'function') request = request.range(0, 4_999);
@@ -1086,9 +1086,9 @@ function createLeadRadarService(deps = {}) {
       const result = await request;
       return result.error ? null : result.count || 0;
     };
-    const [total, newCount, websiteFound, noWebsiteFound, notChecked, notWorking, latestAutomaticRun, latestRuns] = await Promise.all([
-      count(),
-      count('lead_status', 'new'),
+    const [visibleTotal, visibleNew, websiteFound, noWebsiteFound, notChecked, notWorking, latestAutomaticRun, latestRuns] = await Promise.all([
+      listSignals({ limit: 1, days: MAX_LEAD_AGE_DAYS }),
+      listSignals({ limit: 1, days: MAX_LEAD_AGE_DAYS, status: 'new' }),
       count('website_status', 'website_found'),
       count('website_status', 'no_website_found'),
       count('website_status', 'website_not_checked'),
@@ -1096,7 +1096,7 @@ function createLeadRadarService(deps = {}) {
       getLatestAutomaticRun(),
       listRuns(1),
     ]);
-    status.counts = { total, new: newCount, websiteFound, noWebsiteFound, notChecked, notWorking };
+    status.counts = { total: visibleTotal.total, new: visibleNew.total, websiteFound, noWebsiteFound, notChecked, notWorking };
     status.lastRun = summarizeScanRun(latestRuns?.[0]);
     status.autoScan.lastRun = summarizeScanRun(latestAutomaticRun);
     status.autoScan.initialBackfillCompleted = hasCompletedInitialBackfill(latestAutomaticRun, autoScanConfig);

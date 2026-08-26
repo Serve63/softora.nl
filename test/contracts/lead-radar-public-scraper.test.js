@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { classifySignal } = require('../../server/services/lead-radar');
 const {
   BLUESKY_SEARCH_ENDPOINT,
+  DEFAULT_PROJECT_INDEXES,
   DEFAULT_PUBLIC_FEEDS,
   buildPublicScraperPlan,
   createLeadRadarPublicFetcher,
@@ -14,6 +15,12 @@ const {
   parsePublicFeed,
   stripHtml,
 } = require('../../server/services/lead-radar-public-scraper');
+const {
+  parseFreelancerDetail,
+  parseFreelancerIndex,
+  parseHoofdkraanDetail,
+  parseHoofdkraanIndex,
+} = require('../../server/services/lead-radar-project-sources');
 
 function fetchResponse(body = '', { status = 200, headers = {} } = {}) {
   const normalizedHeaders = new Map(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), String(value)]));
@@ -107,16 +114,51 @@ test('Lead Radar bouwt een begrensd plan voor openbare bronadapters', () => {
   assert.ok(plan.every((item) => !String(item.query).includes('site:facebook.com')));
 });
 
-test('Lead Radar scant standaard gerichte Nederlandse feeds en laat de geblokkeerde Bluesky-zoekroute uit', () => {
+test('Lead Radar scant standaard openbare opdrachtenites en laat WordPress-support en Bluesky uit', () => {
   const plan = buildPublicScraperPlan({
     platforms: ['web', 'bluesky'],
     keywordGroups: { direct_website: ['website hulp gezocht'] },
     selectedGroups: ['direct_website'],
     env: {},
   });
-  assert.equal(DEFAULT_PUBLIC_FEEDS.some((value) => value === 'https://nl.wordpress.org/support/view/all-topics/feed/'), true);
-  assert.ok(plan.some((item) => item.sourceUrl === 'https://nl.wordpress.org/support/view/all-topics/feed/'));
+  assert.equal(DEFAULT_PUBLIC_FEEDS.length, 0);
+  assert.ok(DEFAULT_PROJECT_INDEXES.some((value) => value === 'https://freelancer.nl/opdrachten/development-en-it'));
+  assert.ok(DEFAULT_PROJECT_INDEXES.some((value) => value === 'https://www.hoofdkraan.nl/opdrachten/websites-en-applicaties'));
+  assert.equal(plan.filter((item) => item.adapter === 'project_index').length, DEFAULT_PROJECT_INDEXES.length);
+  assert.equal(plan.some((item) => String(item.sourceUrl).includes('nl.wordpress.org/support')), false);
   assert.equal(plan.some((item) => item.adapter === 'bluesky'), false);
+});
+
+test('Lead Radar leest opdrachttekst, open status en exacte datum uit openbare detailpagina’s', () => {
+  const freelancerIndex = parseFreelancerIndex(`<div class="card"><div class="card-body">
+    <h4 class="card-title">CRM-portaal laten bouwen</h4><div class="location">Utrecht</div>
+    <div class="posted">Geplaatst 1 dag geleden</div><div class="offers">3 Reacties</div>
+    <p class="card-text">Wij zoeken iemand die ons CRM-portaal kan bouwen.</p>
+    <a class="btn btn-primary" href="/opdrachten/crm/crm-portaal-abc123">Bekijk en Reageer</a>
+  </div></div>`, 'https://freelancer.nl/opdrachten/development-en-it');
+  assert.equal(freelancerIndex.length, 1);
+  const freelancerDetail = parseFreelancerDetail(`<div itemscope itemtype="http://schema.org/JobPosting">
+    <meta itemprop="identifier" content="frnlabc123"><h1 itemprop="title">CRM-portaal laten bouwen</h1>
+    <time itemprop="datePosted" datetime="2026-08-25 11:05:59">Geplaatst 25-08-2026</time>
+    <div class="detail"><div class="label">Status</div><div class="value">Open</div></div>
+    <div class="detail"><div class="label">Locatie</div><div class="value">Utrecht</div></div>
+    <div itemprop="description">Wij zoeken iemand die ons CRM-portaal kan bouwen en implementeren.</div>
+  </div>`, freelancerIndex[0].url, freelancerIndex[0]);
+  assert.equal(freelancerDetail.publishedAt, '2026-08-25T12:00:00.000Z');
+  assert.equal(freelancerDetail.region, 'Utrecht');
+
+  const hoofdkraanIndex = parseHoofdkraanIndex(`<div class="newContentBox projectResult">
+    <h2 class="h3Like"><a href="/j/rekenprogramma/60962">rekenprogramma</a></h2>
+    <div>Geplaatst: 25 aug Reacties: 6 Locatie: Op afstand Status: Match!</div>
+    <div class="projectResultDescription">Ik zoek een programmeur die een programma kan maken.</div>
+  </div>`, 'https://www.hoofdkraan.nl/opdrachten');
+  assert.equal(hoofdkraanIndex.length, 1);
+  const hoofdkraanDetail = parseHoofdkraanDetail(`<script type="application/ld+json">{
+    "@type":"JobPosting","title":"rekenprogramma","description":"Ik zoek een programmeur die een programma kan maken.",
+    "identifier":{"value":"60962"},"datePosted":"2026/08/25","jobLocation":{"address":{"addressLocality":"Utrecht"}}
+  }</script><div>Status: Open Heb je een soortgelijke klus?</div>`, hoofdkraanIndex[0].url, hoofdkraanIndex[0]);
+  assert.equal(hoofdkraanDetail.publishedAt, '2026-08-25T12:00:00.000Z');
+  assert.equal(hoofdkraanDetail.externalId, '60962');
 });
 
 test('Lead Radar normaliseert feed-, Mastodon- en Bluesky-resultaten zonder betaalde provider', async () => {
@@ -171,9 +213,25 @@ test('Lead Radar herkent natuurlijke website-, CRM- en AI-hulpvragen als prospec
   assert.equal(classifySignal({
     url: 'https://nl.wordpress.org/support/topic/niet-kunnen-inloggen/',
     snippet: 'Sinds de update kan ik niet meer inloggen op mijn dashboard.',
-  }).role, 'prospect');
+  }).role, 'excluded');
   assert.equal(classifySignal({
     url: 'https://example.com/blog/inlog-probleem',
     snippet: 'Sinds de update kan ik niet meer inloggen op mijn dashboard.',
   }).role, 'unclear');
+  assert.equal(classifySignal({
+    url: 'https://freelancer.nl/opdrachten/ai/ai-operator-123',
+    snippet: 'I’m looking for a hands-on AI expert to help me build an operator connected to our CRM and business systems.',
+  }).role, 'prospect');
+  assert.equal(classifySignal({
+    url: 'https://freelancer.nl/opdrachten/automation/automation-developer-123',
+    snippet: 'Voor een internationale eindklant zoeken wij een Automation Developer voor 40 uur per week om het team te versterken.',
+  }).role, 'excluded');
+  assert.equal(classifySignal({
+    url: 'https://freelancer.nl/opdrachten/marketing/shopify-cro-123',
+    snippet: 'Wij zoeken een Google Ads en CRO-specialist om onze Shopify-webshop verder te laten groeien.',
+  }).role, 'excluded');
+  assert.equal(classifySignal({
+    url: 'https://www.hoofdkraan.nl/j/rekenprogramma/60962',
+    snippet: 'Ik zoek een computerprogrammeur die een programma voor kansberekeningen kan maken.',
+  }).role, 'prospect');
 });
