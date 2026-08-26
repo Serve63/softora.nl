@@ -211,8 +211,8 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /"contactType":"sales"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
   assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260601a" defer><\/script>/);
-  assert.match(first, /<link rel="stylesheet" href="\/assets\/google-ads-consent\.css\?v=20260717a">/);
-  assert.match(first, /<script src="\/assets\/google-ads-consent\.js\?v=20260717a" defer><\/script>/);
+  assert.match(first, /<link rel="stylesheet" href="\/assets\/google-ads-consent\.css\?v=20260826a">/);
+  assert.match(first, /<script src="\/assets\/google-ads-consent\.js\?v=20260826a" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal((second.match(/data-softora-public-seo="internal-links"/g) || []).length, 1);

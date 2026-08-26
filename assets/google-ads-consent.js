@@ -130,12 +130,6 @@
     document.body.appendChild(banner);
   }
 
-  function addSettingsControl() {
-    if (document.querySelector('.softora-consent-settings, [data-cookie-settings]')) return;
-    var control = button('Cookie-instellingen', 'softora-consent-settings', showBanner);
-    document.body.appendChild(control);
-  }
-
   function bindExistingControls() {
     var controls = document.querySelectorAll('[data-cookie-choice]');
     for (var index = 0; index < controls.length; index += 1) {
@@ -169,7 +163,6 @@
       config = payload;
       state = readChoice();
       bindExistingControls();
-      addSettingsControl();
       if (state === 'granted') {
         updateConsent('granted');
         loadTag();
