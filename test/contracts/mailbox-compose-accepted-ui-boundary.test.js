@@ -3,7 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const composeModule = require('../../assets/premium-mailbox-compose.js');
 const composeControllerModule = require('../../assets/premium-mailbox-compose-controller.js');
+const readModule = require('../../assets/premium-mailbox-read.js');
+const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
 
 function createField(value = '') {
   return {
@@ -24,7 +27,14 @@ function createField(value = '') {
   };
 }
 
-function createScenario({ response, onAcceptedSend } = {}) {
+function createScenario({
+  response,
+  onAcceptedSend,
+  attachments = [],
+  accountEmail = 'serve290@gmail.com',
+  owner = 'serve',
+  messageKey = `${accountEmail}|coldmail|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|329`,
+} = {}) {
   const fields = new Map([
     ['c-to', createField()],
     ['c-subject', createField()],
@@ -40,7 +50,9 @@ function createScenario({ response, onAcceptedSend } = {}) {
     mailboxId: 'coldmail:329',
     uid: 329,
     folder: 'coldmail',
-    accountEmail: 'serve290@gmail.com',
+    accountEmail,
+    providerOwner: owner,
+    messageKey,
     email: 'info@peakboomadvies.nl',
     subject: 'RE: Kleine vraag over jullie website',
     messageId: '<reply@peakboomadvies.nl>',
@@ -61,16 +73,22 @@ function createScenario({ response, onAcceptedSend } = {}) {
       return typeof response === 'function' ? response(fetchCount) : response;
     },
     compose: {
-      buildReplyContext: (message) => ({ ...message, mode: 'reply', accountEmail: message.accountEmail }),
+      buildReplyContext: composeModule.buildReplyContext,
       resetOptionalFields() {},
       reset() {},
-      getAttachments: () => [],
+      getAttachments: () => attachments,
+      uploadAttachments: async (selected) => selected.map((attachment, index) => ({
+        reference: `signed-reference-${index}`,
+        filename: attachment.filename || attachment.name,
+        contentType: attachment.contentType || attachment.type,
+        size: attachment.size,
+      })),
     },
     campaignInbox: {
       resolveReplyAccount: (message) => message.accountEmail,
-      getMessageOwner: () => 'serve',
-      getOwnerByAccount: () => 'serve',
-      getOwnerLabel: () => 'Servé Creusen',
+      getMessageOwner: () => owner,
+      getOwnerByAccount: () => owner,
+      getOwnerLabel: () => owner === 'martijn' ? 'Martijn van de Ven' : 'Servé Creusen',
       getConversationAction: (message) => ({ kind: 'reply', isRoot: true, message }),
     },
     display: {
@@ -78,8 +96,8 @@ function createScenario({ response, onAcceptedSend } = {}) {
       formatDetailSubject: (value) => value,
     },
     getActiveFolder: () => 'outreach',
-    getAccount: () => 'serve290@gmail.com',
-    getOwner: () => 'serve',
+    getAccount: () => accountEmail,
+    getOwner: () => owner,
     findMail: () => mail,
     normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
     normalizeAcceptedMessage: (message) => ({ ...message }),
@@ -309,4 +327,174 @@ test('send-intent vervangt alleen de clientkaart en laat de providerkopie leiden
   controller.reconcile(mail);
 
   assert.deepEqual(mail.threadMessages, [providerCopy]);
+});
+
+test('geaccepteerde reply bewaart exact dezelfde accountgebonden messageKey zonder opslagwaarschuwing', async () => {
+  for (const identity of [
+    {
+      owner: 'serve',
+      accountEmail: 'serve290@gmail.com',
+      messageKey: 'serve290@gmail.com|coldmail|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|329',
+    },
+    {
+      owner: 'martijn',
+      accountEmail: 'martijn@softora.nl',
+      messageKey: 'martijn@softora.nl|coldmail|gen:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb|329',
+    },
+  ]) {
+    let acceptedRecord = null;
+    const scenario = createScenario({
+      ...identity,
+      response: {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          result: {
+            messageId: '<same-rfc-message-id@softora.nl>',
+            sentMessage: {
+              messageId: '<same-rfc-message-id@softora.nl>',
+              receivedAt: '2026-08-26T13:29:49.000Z',
+            },
+          },
+        }),
+      },
+      onAcceptedSend: (record) => { acceptedRecord = record; },
+    });
+    const writes = [];
+    let outboxListener = null;
+    const outbox = {
+      subscribe(listener) { outboxListener = listener; },
+      async enqueue(payload, metadata) {
+        const record = {
+          mutationId: `mutation-${identity.owner}`,
+          ...payload,
+          identity: metadata.identity,
+          identities: metadata.identities,
+          previous: metadata.previous,
+        };
+        writes.push({ payload, metadata, record });
+        return { ok: true, pending: true, record };
+      },
+    };
+    const readController = readModule.create({
+      outbox,
+      getAccount: (message) => message.accountEmail,
+      getFolder: (message) => message.folder,
+      getOwner: (message) => message.providerOwner,
+      getRequestId: (message) => message.mailboxId || message.id,
+      getConversationAction: (message) => ({ kind: 'reply', isRoot: true, message }),
+    });
+
+    await scenario.controller.send();
+    assert.ok(acceptedRecord);
+    assert.equal(acceptedRecord.replyTarget.messageKey, identity.messageKey);
+    const completion = uiStateModule.completeAcceptedSend({
+      record: acceptedRecord,
+      mails: [scenario.mail],
+      composeController: scenario.controller,
+      readController,
+      findMail: (id) => id === scenario.mail.id ? scenario.mail : null,
+      renderList() {},
+      getActiveMail: () => scenario.mail.id,
+      openMail() {},
+    });
+    const handled = await completion.handledPromise;
+
+    assert.equal(handled.ok, true);
+    assert.equal(handled.pending, true);
+    assert.equal(writes.length, 1);
+    assert.deepEqual({
+      account: writes[0].payload.account,
+      owner: writes[0].payload.owner,
+      folder: writes[0].payload.folder,
+      uid: writes[0].payload.uid,
+      messageKey: writes[0].payload.messageKey,
+      messageId: writes[0].payload.messageId,
+      dismissReply: writes[0].payload.dismissReply,
+    }, {
+      account: identity.accountEmail,
+      owner: identity.owner,
+      folder: 'coldmail',
+      uid: 329,
+      messageKey: identity.messageKey,
+      messageId: '<reply@peakboomadvies.nl>',
+      dismissReply: true,
+    });
+    assert.equal(scenario.mail.readError || '', '');
+
+    outboxListener({
+      type: 'confirmed',
+      record: writes[0].record,
+      result: { replyDismissedAt: '2026-08-26T13:29:50.000Z' },
+    });
+    assert.equal(scenario.mail.readPending, false);
+    assert.equal(scenario.mail.replyDismissPending, false);
+    assert.equal(scenario.mail.readError || '', '');
+    assert.equal(scenario.mail.replyDismissedAt, '2026-08-26T13:29:50.000Z');
+  }
+});
+
+test('geaccepteerde response zonder leesbare JSON behoudt alleen veilige lokale bijlagemetadata', async () => {
+  const selected = [{
+    filename: 'voorbeeld.png',
+    contentType: 'image/png',
+    size: 4,
+    file: { name: 'voorbeeld.png', privateBytes: 'niet tonen' },
+  }];
+  const scenario = createScenario({
+    attachments: selected,
+    response: {
+      ok: true,
+      status: 200,
+      json: async () => { throw new SyntaxError('afgebroken JSON'); },
+    },
+  });
+
+  await scenario.controller.send();
+  scenario.controller.reconcile(scenario.mail);
+  const sent = scenario.mail.threadMessages.find((message) => message.direction === 'sent');
+  assert.deepEqual(sent.attachments, [{
+    filename: 'voorbeeld.png',
+    contentType: 'image/png',
+    size: 4,
+  }]);
+  assert.equal('file' in sent.attachments[0], false);
+  assert.equal('reference' in sent.attachments[0], false);
+  assert.doesNotMatch(JSON.stringify(sent.attachments), /privateBytes|niet tonen/);
+});
+
+test('exacte idempotente replay neemt nooit bijlagemetadata uit de nieuwe clientrequest over', async () => {
+  const selected = [{
+    filename: 'niet-duurzaam.pdf',
+    contentType: 'application/pdf',
+    size: 321,
+    file: { name: 'niet-duurzaam.pdf', privateBytes: 'nooit tonen' },
+  }];
+  const scenario = createScenario({
+    attachments: selected,
+    response: {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        result: {
+          idempotentReplay: true,
+          messageId: '<duurzaam-accepted@softora.nl>',
+          sentMessage: {
+            messageId: '<duurzaam-accepted@softora.nl>',
+            subject: 'RE: Kleine vraag over jullie website',
+            body: 'Duurzaam opgeslagen antwoord.',
+            receivedAt: '2026-08-26T15:29:00.000Z',
+          },
+        },
+      }),
+    },
+  });
+
+  await scenario.controller.send();
+  scenario.controller.reconcile(scenario.mail);
+  const sent = scenario.mail.threadMessages.find((message) => message.direction === 'sent');
+  assert.deepEqual(sent.attachments, []);
+  assert.doesNotMatch(JSON.stringify(sent), /niet-duurzaam|privateBytes|nooit tonen/);
 });
