@@ -285,8 +285,9 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => db,
   });
-  const run = await service.runScan({ websiteLookupLimit: 0, maxAgeDays: 30 });
+  const run = await service.runScan({ websiteLookupLimit: 0, maxAgeDays: 31 });
   assert.equal(run.status, 'completed_with_errors');
+  assert.equal(run.max_age_days, 31);
   assert.equal(run.new_signal_count, 1, JSON.stringify({ run, signals: [...signals.values()] }, null, 2));
   assert.equal(run.verified_count, 1);
   assert.equal(run.error_count, 1);
