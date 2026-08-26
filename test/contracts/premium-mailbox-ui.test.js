@@ -183,14 +183,14 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-ui-state\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
-  assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260821a/);
+  assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260826b/);
   assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260826a/);
-  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826a/);
+  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260826a/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260822a') < page.indexOf('premium-mailbox-signature.js?v=20260825a'));
@@ -198,7 +198,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260826a'));
-  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260826a') < page.indexOf('premium-mailbox-index.js?v=20260826a'));
+  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260826a') < page.indexOf('premium-mailbox-index.js?v=20260826b'));
   assert.match(readSignatureScript(), /renderContactCard/);
   assert.match(readMessagePresentationScript(), /getSourceSafeMessagePresentation/);
   assert.match(readDetailStabilityScript(), /function create\(\)/);
@@ -4431,7 +4431,7 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260826a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260822a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260826a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260826b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -4482,7 +4482,7 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.deepEqual(JSON.parse(requests[1].options.body), { owner: 'both', fastRefresh: true });
   assert.equal(loads.length, 2);
   assert.deepEqual(loads[0], {
-    showLoader: false, skipBackgroundSync: true, skipProviderRefresh: true, skipPageBootstrap: true, openLatest: false, preserveOnError: true,
+    showLoader: false, skipBackgroundSync: true, skipProviderRefresh: true, skipPageBootstrap: true, openLatest: false, preserveOnError: true, reuseActiveToken: true,
   });
   assert.deepEqual(loads[1], loads[0]);
   assert.deepEqual(toasts, ['Mailbox volledig bijgewerkt']);
@@ -4525,7 +4525,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260821a/);
+  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260826b/);
   assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260826a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
@@ -8632,6 +8632,170 @@ test('stale ownerrefresh wist echt MIME-link- en bijlagebewijs niet uit root of 
   }]);
 });
 
+test('ownerrefresh met HTTP 207 laat een lopende providerlookup dezelfde conversatie verrijken', async () => {
+  const messageId = '<provider-race@example.test>';
+  const webdesignUrl = 'https://www.softora.nl/webdesign/provider-race?cid=generic-1&sender=serve';
+  const sourceMessage = {
+    id: 'inbox:provider-race',
+    mailboxId: 'inbox:provider-race',
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    storageFolder: 'inbox',
+    canonicalOwner: 'serve',
+    from: 'Voorbeeldcontact',
+    email: 'contact@example.test',
+    subject: 'Re: voorbeeldwebdesign',
+    body: 'Dank voor je bericht.',
+    hasBody: true,
+    bodyLoaded: true,
+    receivedAt: '2026-08-26T10:00:00.000Z',
+    campaign: {
+      account: 'serve@softora.nl',
+      company: 'Voorbeeldbedrijf',
+      actionRequired: true,
+    },
+    threadMessages: [{
+      id: '',
+      uid: 0,
+      folder: 'sent',
+      storageFolder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      messageId,
+      body: 'Bekijk het webdesign via deze link.',
+      hasBody: true,
+      bodyLoaded: true,
+      originalCampaignOutbound: true,
+      bodyImageEvidenceKnown: false,
+      webdesignLinkEvidenceKnown: false,
+      attachmentEvidenceKnown: false,
+      attachments: [],
+      providerMessageIdHydrationEligible: true,
+      recipientRoutingEvidenceKnown: false,
+    }],
+  };
+  let bodyRequests = 0;
+  let bodyRequestAborted = false;
+  let resolveBodyRequest;
+  let markBodyRequestStarted;
+  const bodyRequestStarted = new Promise((resolve) => { markBodyRequestStarted = resolve; });
+  const mailbox = loadMailboxHelpersForTest({
+    setTimeout,
+    clearTimeout,
+    campaignInboxLoad: async (_folder, normalizeMessage) => ({
+      fromBootstrap: false,
+      fromCache: false,
+      messages: [normalizeMessage(structuredClone(sourceMessage))],
+      sync: { warming: false, stale: false },
+    }),
+    fetch: async (url, init = {}) => {
+      assert.equal(String(url), '/api/mailbox/messages/bodies');
+      bodyRequests += 1;
+      assert.equal(bodyRequests, 1, 'dezelfde-scope ownerrefresh mag geen vervangende bodyrequest starten');
+      markBodyRequestStarted();
+      init.signal?.addEventListener?.('abort', () => { bodyRequestAborted = true; }, { once: true });
+      return new Promise((resolve) => { resolveBodyRequest = resolve; });
+    },
+  });
+  await mailbox.ready;
+  const mail = mailbox.normalizeMailboxApiMessage(structuredClone(sourceMessage));
+  mailbox.setMails([mail]);
+  const opening = mailbox.openMail(mail.id, {
+    skipBodyFetch: true,
+    skipContactTimeline: true,
+  });
+  await bodyRequestStarted;
+
+  const providerRequests = [];
+  const refreshController = refreshModule.create({
+    autoStart: false,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async (url) => {
+      providerRequests.push(String(url));
+      if (String(url) === '/api/mailbox/sync') {
+        return {
+          ok: true,
+          status: 207,
+          json: async () => ({ ok: false, results: [{ account: 'serve@softora.nl', ok: false }] }),
+        };
+      }
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'Tweede providerbatch bewust gestopt in deze test.' }),
+      };
+    },
+    loadMessages: mailbox.loadMailboxMessages,
+    setTimeout,
+    clearTimeout,
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+
+  try {
+    assert.equal(await refreshController.refresh(), false);
+    assert.equal(bodyRequestAborted, false);
+    assert.equal(bodyRequests, 1);
+    assert.equal(mailbox.getActiveMail(), mail.id);
+
+    resolveBodyRequest({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        messages: [{
+          resolved: true,
+          id: 'allmail:912',
+          uid: 912,
+          folder: 'allmail',
+          accountEmail: 'serve@softora.nl',
+          requestMessageId: messageId,
+          providerMessageIdLookup: true,
+          providerLookupRetryable: false,
+          body: `Exact MIME-bericht: bekijk het webdesign via deze link [${webdesignUrl}].`,
+          hasBody: true,
+          bodyTruncated: false,
+          bodyImageEvidenceKnown: true,
+          bodyImages: [],
+          embeddedImageCount: 0,
+          originalCampaignOutbound: true,
+          webdesignLinkEvidenceKnown: true,
+          webdesignLinkUrl: webdesignUrl,
+          to: 'contact@example.test',
+          toDisplay: 'Voorbeeldcontact <contact@example.test>',
+          recipientRoutingEvidenceKnown: true,
+          attachmentEvidenceKnown: true,
+          attachments: [{
+            filename: 'webdesign-provider-race.pdf',
+            contentType: 'application/pdf',
+            size: 48123,
+          }],
+        }],
+      }),
+    });
+    assert.equal((await opening).committed, true);
+
+    const currentMail = mailbox.getMails()[0];
+    const sentMessage = currentMail.threadMessages[0];
+    const detailHtml = mailbox.getElement('mail-detail').innerHTML;
+    assert.deepEqual(providerRequests, ['/api/mailbox/sync', '/api/mailbox/instantly/sync']);
+    assert.strictEqual(currentMail, mail);
+    assert.equal(mailbox.getActiveMail(), mail.id);
+    assert.equal(sentMessage.webdesignLinkEvidenceKnown, true);
+    assert.equal(sentMessage.webdesignLinkUrl, webdesignUrl);
+    assert.equal(sentMessage.attachmentEvidenceKnown, true);
+    assert.deepEqual(sentMessage.attachments, [{
+      filename: 'webdesign-provider-race.pdf', contentType: 'application/pdf', size: 48123,
+    }]);
+    assert.equal(sentMessage.bodyLoading, false);
+    assert.equal(currentMail.threadBodiesLoading, false);
+    assert.match(detailHtml, /class="detail-mail-cta-link"/);
+    assert.match(detailHtml, /webdesign-provider-race\.pdf/);
+  } finally {
+    refreshController.destroy();
+  }
+});
+
 test('ownerrefresh geeft de no-loader-intentie door aan alle behouden detailpaden', async () => {
   const current = {
     id: 'serve@softora.nl|inbox:focus-owner',
@@ -9047,6 +9211,7 @@ test('legacy achtergrondsync remapt een fysieke kopiewissel zonder eerste mail o
     skipBackgroundSync: true,
     openLatest: false,
     preserveOnError: true,
+    reuseActiveToken: true,
   }]);
   assert.deepEqual(fetchUrls, [
     '/api/mailbox/sync',

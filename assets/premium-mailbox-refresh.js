@@ -324,6 +324,7 @@
               skipPageBootstrap: true,
               openLatest: false,
               preserveOnError: true,
+              reuseActiveToken: true,
             });
             if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
             if (batchListUpdated === false) {
