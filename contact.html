@@ -21,8 +21,10 @@
   <meta name="twitter:title" content="Contact met Softora">
   <meta name="twitter:description" content="Bespreek je website, software of AI-oplossing rechtstreeks met Softora.">
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
-  <link rel="stylesheet" href="/assets/contact-page.css?v=20260826e">
-  <script src="/assets/contact-page.js?v=20260826b" defer></script>
+  <link rel="stylesheet" href="/assets/custom-selects.css?v=20260511a">
+  <link rel="stylesheet" href="/assets/contact-page.css?v=20260826j">
+  <script src="/assets/custom-selects.js?v=20260511a" defer></script>
+  <script src="/assets/contact-page.js?v=20260826c" defer></script>
 </head>
 <body>
   <a class="contact-skip-link" href="#contact-form">Ga naar het contactformulier</a>
@@ -36,7 +38,7 @@
     <section class="contact-hero" aria-labelledby="contact-title">
       <div class="contact-intro">
         <p class="contact-eyebrow">Een goed project begint met een helder gesprek</p>
-        <h1 id="contact-title">Vertel ons wat je wilt <span>bouwen.</span></h1>
+        <h1 id="contact-title">Stel je <span>vraag.</span></h1>
         <p class="contact-lead">Een nieuwe website, maatwerksoftware of een slimme AI-flow? Deel kort waar je nu staat en wat er beter moet. Je krijgt een concrete eerste reactie, zonder verkooppraat.</p>
         <div class="contact-direct" aria-label="Directe contactmogelijkheden">
           <div>
@@ -54,9 +56,13 @@
           </div>
         </div>
         <div class="contact-founders" aria-label="De oprichters van Softora">
-          <div class="contact-founder-initials" aria-hidden="true">
-            <span>SC</span>
-            <span>MV</span>
+          <div class="contact-founder-photos">
+            <span class="contact-founder-photo contact-founder-photo--serve">
+              <img src="/assets/softora-team-serve-creusen.jpg" alt="Servé Creusen, medeoprichter van Softora en direct aanspreekpunt" width="1600" height="1200" loading="lazy" decoding="async" fetchpriority="low">
+            </span>
+            <span class="contact-founder-photo contact-founder-photo--martijn">
+              <img src="/assets/softora-team-martijn-van-de-ven.png" alt="Martijn van de Ven, medeoprichter van Softora en direct aanspreekpunt" width="632" height="632" loading="lazy" decoding="async" fetchpriority="low">
+            </span>
           </div>
           <p><strong>Rechtstreeks contact.</strong><br>Je spreekt met Servé of Martijn, de mensen die meedenken én bouwen.</p>
         </div>
@@ -83,8 +89,8 @@
               <input id="contact-phone" name="phone" type="tel" autocomplete="tel" maxlength="80" placeholder="06 12 34 56 78">
             </label>
             <label class="contact-field">
-              <span>Waar gaat het over?</span>
-              <select id="contact-topic" name="topic">
+              <span id="contact-topic-label">Waar gaat het over?</span>
+              <select id="contact-topic" name="topic" data-custom-select="true">
                 <option value="Algemene vraag">Algemene vraag</option>
                 <option value="Website">Website</option>
                 <option value="Bedrijfssoftware">Bedrijfssoftware</option>

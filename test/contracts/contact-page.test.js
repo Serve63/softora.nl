@@ -22,7 +22,7 @@ test('contact page is a canonical indexable public route', () => {
   assert.equal(getIndexablePublicHtmlFileFromPath('/contact'), 'contact.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('contact.html'), '/contact');
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/contact">/);
-  assert.match(html, /<h1[^>]*>Vertel ons wat je wilt <span>bouwen\.<\/span><\/h1>/);
+  assert.match(html, /<h1[^>]*>Stel je <span>vraag\.<\/span><\/h1>/);
   assert.match(html, /data-softora-public-seo="internal-links"/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/contact<\/loc>/);
 });
@@ -39,8 +39,14 @@ test('contact page offers direct contact and an accessible project intake', () =
   assert.match(html, /id="contact-message"[^>]*maxlength="4000"[^>]*required/);
   assert.match(html, /data-contact-status[^>]*role="status"[^>]*aria-live="polite"/);
   assert.match(html, /data-contact-success hidden tabindex="-1"/);
-  assert.match(html, /<span>SC<\/span>/);
-  assert.match(html, /<span>MV<\/span>/);
+  assert.match(
+    html,
+    /<img src="\/assets\/softora-team-serve-creusen\.jpg" alt="Servé Creusen, medeoprichter van Softora en direct aanspreekpunt" width="1600" height="1200" loading="lazy" decoding="async" fetchpriority="low"/
+  );
+  assert.match(
+    html,
+    /<img src="\/assets\/softora-team-martijn-van-de-ven\.png" alt="Martijn van de Ven, medeoprichter van Softora en direct aanspreekpunt" width="632" height="632" loading="lazy" decoding="async" fetchpriority="low"/
+  );
 });
 
 test('contact form submits to the server-side route and opens the standard conversation channel', () => {
@@ -53,14 +59,18 @@ test('contact form submits to the server-side route and opens the standard conve
   assert.match(source, /AbortController/);
   assert.match(source, /window\.open\(MARTIJN_WHATSAPP_URL/);
   assert.match(source, /https:\/\/wa\.me\/31643262792/);
+  assert.match(source, /wireTopicSelectAccessibility/);
+  assert.match(source, /aria-labelledby', 'contact-topic-label ' \+ value\.id/);
 });
 
 test('contact page keeps a dedicated responsive stylesheet and no inline product code', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'contact.html'), 'utf8');
   const css = fs.readFileSync(path.join(repoRoot, 'assets/contact-page.css'), 'utf8');
 
-  assert.match(html, /assets\/contact-page\.css\?v=20260826e/);
-  assert.match(html, /assets\/contact-page\.js\?v=20260826b/);
+  assert.match(html, /assets\/custom-selects\.css\?v=20260511a/);
+  assert.match(html, /assets\/contact-page\.css\?v=20260826j/);
+  assert.match(html, /assets\/custom-selects\.js\?v=20260511a/);
+  assert.match(html, /assets\/contact-page\.js\?v=20260826c/);
   assert.doesNotMatch(html, /<style\b|<script>(?:.|\n)*<\/script>/i);
   assert.doesNotMatch(html, /<footer\b/i);
   assert.doesNotMatch(css, /min-height: calc\(100vh/);
@@ -72,8 +82,24 @@ test('contact page keeps a dedicated responsive stylesheet and no inline product
   assert.match(css, /\.magnetic-btn \{[\s\S]*border-radius: 999px;[\s\S]*background: var\(--contact-accent\)/);
   assert.match(html, /<meta name="theme-color" content="#f8f7f4">/);
   assert.match(css, /color-scheme: light/);
-  assert.match(css, /linear-gradient\(135deg, #faf7f3 0%, #f4eeea 58%, #efe5e7 100%\)/);
+  assert.match(css, /--contact-accent: #8b2252/);
+  assert.match(css, /\.contact-eyebrow \{[\s\S]*color: var\(--contact-accent\)/);
+  assert.match(css, /\.contact-intro h1 span \{[\s\S]*color: var\(--contact-accent\)/);
+  assert.match(css, /\.contact-founder-photo \{[\s\S]*border-radius: 50%/);
+  assert.match(css, /\.contact-founder-photo img \{[\s\S]*object-fit: cover/);
+  assert.match(html, /<select id="contact-topic" name="topic" data-custom-select="true">/);
+  assert.match(html, /<span id="contact-topic-label">Waar gaat het over\?<\/span>/);
+  assert.match(css, /\.contact-field \.site-select-menu \{[\s\S]*background: var\(--contact-paper\)/);
+  assert.match(css, /--contact-field-border: #cbc5c8/);
+  assert.match(css, /\.contact-field \.site-select-trigger \{[\s\S]*height: 48px !important;[\s\S]*padding: 11px 42px 11px 13px !important;[\s\S]*border: 1px solid var\(--contact-field-border\) !important/);
+  assert.match(css, /\.contact-field \.site-select-option\.is-selected::after \{[\s\S]*content: "✓"/);
+  assert.match(css, /linear-gradient\(135deg, #faf8f4 0%, #f3f0eb 58%, #eee9e4 100%\)/);
+  assert.doesNotMatch(css, /#d45b8e|rgba\(207, 122, 145/);
   assert.doesNotMatch(css, /--contact-night|#10101c|#11111e|#171421|#24151e|#181621|#3e172a|#333345/);
   assert.match(css, /@media \(max-width: 760px\)/);
+  assert.match(css, /\.contact-direct \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.contact-field textarea \{[\s\S]*height: 136px;[\s\S]*min-height: 136px/);
+  assert.match(css, /\.contact-submit-row button \{[\s\S]*min-height: 52px/);
+  assert.match(css, /@media \(max-width: 360px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
