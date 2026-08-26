@@ -3,14 +3,21 @@
 const { parseDocument } = require('htmlparser2');
 const { assertWebsitePreviewUrlIsPublic } = require('../security/public-url');
 const {
-  DEFAULT_PROJECT_INDEXES,
-  createProjectSourceAdapter,
-  isSupportedProjectIndexUrl,
-} = require('./lead-radar-project-sources');
+  isBlockedLeadSourceUrl,
+} = require('./lead-radar-source-policy');
 
-const DEFAULT_PUBLIC_FEEDS = Object.freeze([]);
+const DEFAULT_PUBLIC_FEEDS = Object.freeze([
+  'https://www.higherlevel.nl/rss/2-forum.xml/',
+]);
 const DEFAULT_MASTODON_INSTANCES = Object.freeze([
   'https://mastodon.nl',
+]);
+const DEFAULT_MASTODON_TAGS = Object.freeze([
+  'ondernemen',
+  'zzp',
+  'website',
+  'webshop',
+  'automatisering',
 ]);
 const BLUESKY_SEARCH_ENDPOINT = 'https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts';
 const DEFAULT_USER_AGENT = 'SoftoraLeadRadar/1.0 (+https://www.softora.nl/lead-radar)';
@@ -46,6 +53,13 @@ function parseUrlList(value, defaults = []) {
       return '';
     }
   }).filter(Boolean))];
+}
+
+function parseTagList(value, defaults = []) {
+  const configured = String(value || '').split(/[\n,]+/).map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+  return [...new Set((configured.length ? configured : defaults)
+    .map((entry) => String(entry || '').replace(/^#/, '').replace(/[^a-z0-9_-]/gi, '').slice(0, 80))
+    .filter(Boolean))];
 }
 
 function decodeEntities(value) {
@@ -112,7 +126,7 @@ function parsePublicFeed(xml, feedUrl) {
     const publishedAt = firstTag(block, ['pubDate', 'published', 'updated', 'dc:date']);
     const authorName = stripHtml(firstTag(block, ['dc:creator', 'author', 'name']), 500);
     const externalId = stripHtml(firstTag(block, ['guid', 'id']), 500) || url;
-    if (!url || (!title && !description)) return null;
+    if (!url || isBlockedLeadSourceUrl(url) || (!title && !description)) return null;
     return {
       platform: 'web',
       source_type: 'feed',
@@ -282,28 +296,25 @@ function buildPublicScraperPlan(options = {}) {
     ? options.platforms.map((value) => text(value, 30).toLowerCase())
     : ['web', 'mastodon', 'bluesky'];
   const platforms = [...new Set(requested.filter((value) => ['web', 'mastodon', 'bluesky'].includes(value)))];
-  const feeds = parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS);
-  const projectIndexes = parseUrlList(env.LEAD_RADAR_PROJECT_INDEX_URLS, DEFAULT_PROJECT_INDEXES)
-    .filter(isSupportedProjectIndexUrl);
+  const feeds = parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS)
+    .filter((value) => !isBlockedLeadSourceUrl(value));
   const mastodonInstances = parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES)
+    .filter((value) => !isBlockedLeadSourceUrl(value))
     .map((value) => value.replace(/\/$/, ''));
+  const mastodonTags = parseTagList(env.LEAD_RADAR_MASTODON_TAGS, DEFAULT_MASTODON_TAGS);
   const region = 'Nederland';
   const plan = [];
   if (platforms.includes('web')) {
-    projectIndexes.forEach((sourceUrl) => plan.push({
-      adapter: 'project_index', platform: 'web', region, keywordGroup: 'buyer_project', term: 'openbare concrete digitale opdracht',
-      query: sourceUrl, sourceUrl, maxResults: 25,
-    }));
     feeds.forEach((sourceUrl) => plan.push({
-      adapter: 'feed', platform: 'web', region, keywordGroup: 'public_feed', term: 'openbare ondernemersvraag',
+      adapter: 'feed', platform: 'web', region, keywordGroup: 'direct_owner_feed', term: 'directe openbare ondernemersvraag',
       query: sourceUrl, sourceUrl, maxResults: 100,
     }));
   }
   if (platforms.includes('mastodon')) {
-    mastodonInstances.forEach((sourceUrl) => plan.push({
-      adapter: 'mastodon', platform: 'mastodon', region, keywordGroup: 'public_timeline', term: 'openbare Nederlandse tijdlijn',
-      query: `${sourceUrl}/api/v1/timelines/public`, sourceUrl, maxResults: 120,
-    }));
+    mastodonInstances.forEach((sourceUrl) => mastodonTags.forEach((tag) => plan.push({
+      adapter: 'mastodon', platform: 'mastodon', region, keywordGroup: 'direct_owner_hashtag', term: tag,
+      query: `${sourceUrl}/api/v1/timelines/tag/${encodeURIComponent(tag)}`, sourceUrl, maxResults: 40,
+    })));
   }
   if (platforms.includes('bluesky') && parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, false)) {
     compactBlueskyTerms(options.keywordGroups || {}, options.selectedGroups || []).forEach((term) => plan.push({
@@ -317,18 +328,15 @@ function buildPublicScraperPlan(options = {}) {
 function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
   const publicFetcher = createLeadRadarPublicFetcher({ env, fetchImpl, logger });
   const config = {
-    feeds: parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS),
-    projectIndexes: parseUrlList(env.LEAD_RADAR_PROJECT_INDEX_URLS, DEFAULT_PROJECT_INDEXES)
-      .filter(isSupportedProjectIndexUrl),
-    mastodonInstances: parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES).map((value) => value.replace(/\/$/, '')),
+    feeds: parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS)
+      .filter((value) => !isBlockedLeadSourceUrl(value)),
+    mastodonInstances: parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES)
+      .filter((value) => !isBlockedLeadSourceUrl(value))
+      .map((value) => value.replace(/\/$/, '')),
+    mastodonTags: parseTagList(env.LEAD_RADAR_MASTODON_TAGS, DEFAULT_MASTODON_TAGS),
     blueskyEnabled: parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, false),
     mastodonPages: safeLimit(env.LEAD_RADAR_MASTODON_PAGES, 3, 5),
   };
-  const projectSourceAdapter = createProjectSourceAdapter({
-    fetchPublic: publicFetcher.fetchPublic,
-    logger,
-    detailLimit: safeLimit(env.LEAD_RADAR_PROJECT_DETAIL_LIMIT, 20, 40),
-  });
 
   async function searchFeed(context, maxResults) {
     const result = await publicFetcher.fetchPublic(context.sourceUrl, { accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml;q=0.9' });
@@ -338,8 +346,9 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
   async function searchMastodon(context, maxResults) {
     const items = [];
     let maxId = '';
+    const tag = parseTagList(context.term || context.tag, ['ondernemen'])[0];
     for (let page = 0; page < config.mastodonPages && items.length < maxResults; page += 1) {
-      const endpoint = new URL('/api/v1/timelines/public', context.sourceUrl);
+      const endpoint = new URL(`/api/v1/timelines/tag/${encodeURIComponent(tag)}`, context.sourceUrl);
       endpoint.searchParams.set('local', 'true');
       endpoint.searchParams.set('limit', '40');
       if (maxId) endpoint.searchParams.set('max_id', maxId);
@@ -398,8 +407,13 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
   async function search({ query, maxResults = 25, context = {} } = {}) {
     const normalizedContext = { ...context, query: context.query || query };
     const limit = safeLimit(maxResults, 25, 200);
+    const sourceCandidate = normalizedContext.sourceUrl || (/^https?:\/\//i.test(normalizedContext.query || '') ? normalizedContext.query : '');
+    if (sourceCandidate && isBlockedLeadSourceUrl(sourceCandidate)) {
+      const error = new Error('Deze bron is uitgesloten: Lead Radar gebruikt geen opdrachtmarktplaatsen of vacatureplatforms.');
+      error.code = 'LEAD_RADAR_SOURCE_BLOCKED';
+      throw error;
+    }
     if (normalizedContext.adapter === 'feed') return searchFeed(normalizedContext, limit);
-    if (normalizedContext.adapter === 'project_index') return projectSourceAdapter.search(normalizedContext, limit);
     if (normalizedContext.adapter === 'mastodon') return searchMastodon(normalizedContext, limit);
     if (normalizedContext.adapter === 'bluesky') return searchBluesky(normalizedContext, limit);
     const error = new Error('Onbekende openbare scraperadapter.');
@@ -409,21 +423,21 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
 
   return {
     name: 'softora_public_scraper',
-    configured: Boolean(config.projectIndexes.length || config.feeds.length || config.mastodonInstances.length || config.blueskyEnabled),
+    configured: Boolean(config.feeds.length || (config.mastodonInstances.length && config.mastodonTags.length) || config.blueskyEnabled),
     buildPlan(options = {}) {
       return buildPublicScraperPlan({ ...options, env });
     },
     search,
     getStatus() {
       return {
-        configured: Boolean(config.projectIndexes.length || config.feeds.length || config.mastodonInstances.length || config.blueskyEnabled),
+        configured: Boolean(config.feeds.length || (config.mastodonInstances.length && config.mastodonTags.length) || config.blueskyEnabled),
         provider: 'softora_public_scraper',
         paid: false,
-        message: 'Eigen Softora-scraper actief; er worden geen betaalde zoek-API’s gebruikt.',
+        message: 'Eigen Softora-scraper actief voor directe openbare ondernemersvragen; opdrachtmarktplaatsen zijn uitgesloten.',
         sources: {
-          projectIndexes: config.projectIndexes.length,
           publicFeeds: config.feeds.length,
           mastodonInstances: config.mastodonInstances.length,
+          mastodonHashtags: config.mastodonTags.length,
           blueskyEnabled: config.blueskyEnabled,
         },
         fetchPolicy: publicFetcher.getConfig(),
@@ -435,7 +449,7 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
 module.exports = {
   BLUESKY_SEARCH_ENDPOINT,
   DEFAULT_MASTODON_INSTANCES,
-  DEFAULT_PROJECT_INDEXES,
+  DEFAULT_MASTODON_TAGS,
   DEFAULT_PUBLIC_FEEDS,
   buildPublicScraperPlan,
   createLeadRadarPublicFetcher,
@@ -443,6 +457,7 @@ module.exports = {
   decodeEntities,
   isRobotsAllowed,
   parsePublicFeed,
+  parseTagList,
   parseUrlList,
   stripHtml,
 };

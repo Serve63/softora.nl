@@ -128,6 +128,7 @@
       regionMode: 'nationwide',
       regions: [],
       maxAgeDays: 14,
+      maxQueries: 50,
       websiteLookupLimit: 0,
       keywordGroups: ['direct_website', 'renew_or_repair', 'webshop', 'new_business', 'software_automation'],
     };

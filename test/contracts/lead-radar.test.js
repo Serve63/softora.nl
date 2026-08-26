@@ -115,6 +115,7 @@ test('Lead Radar bouwt een begrensd plan voor eigen openbare bronadapters', () =
     env: {
       LEAD_RADAR_PUBLIC_FEED_URLS: 'https://example.com/feed.xml,https://example.org/vragen.atom',
       LEAD_RADAR_MASTODON_INSTANCES: 'https://mastodon.nl',
+      LEAD_RADAR_MASTODON_TAGS: 'website',
       LEAD_RADAR_BLUESKY_ENABLED: 'true',
     },
   });
@@ -174,6 +175,7 @@ test('Lead Radar normaliseert openbare feed-, Mastodon- en Bluesky-resultaten zo
     env: {
       LEAD_RADAR_PUBLIC_FEED_URLS: 'https://example.com/feed.xml',
       LEAD_RADAR_MASTODON_INSTANCES: 'https://example.org',
+      LEAD_RADAR_MASTODON_TAGS: 'website',
       LEAD_RADAR_MASTODON_PAGES: '1',
       LEAD_RADAR_BLUESKY_ENABLED: 'true',
       LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0',
@@ -201,7 +203,7 @@ test('Lead Radar normaliseert openbare feed-, Mastodon- en Bluesky-resultaten zo
     },
   });
   const feed = await provider.search({ context: { adapter: 'feed', sourceUrl: 'https://example.com/feed.xml' } });
-  const mastodon = await provider.search({ context: { adapter: 'mastodon', sourceUrl: 'https://example.org' } });
+  const mastodon = await provider.search({ context: { adapter: 'mastodon', sourceUrl: 'https://example.org', term: 'website' } });
   const bluesky = await provider.search({ query: 'automatisering hulp gezocht', context: { adapter: 'bluesky', term: 'automatisering hulp gezocht' } });
   assert.equal(feed[0].source_type, 'feed');
   assert.equal(mastodon[0].platform, 'mastodon');
@@ -269,9 +271,9 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
       if (context.adapter === 'bluesky') throw new Error('Bron gaf HTTP 403.');
       return [{
         platform: 'web', source_type: 'feed', provider: 'softora_public_scraper',
-        url: 'https://freelancer.nl/opdrachten/crm/crm-portaal-abc123', title: 'CRM-portaal laten bouwen',
+        url: 'https://www.higherlevel.nl/forums/topic/123-crm-portaal-gezocht/', title: 'CRM-portaal laten bouwen',
         snippet: 'Wij zoeken iemand die voor ons bedrijf een CRM-portaal kan bouwen en implementeren.',
-        published_at: new Date().toISOString(), external_id: 'freelancer-opdracht-9',
+        published_at: new Date().toISOString(), external_id: 'directe-ondernemersvraag-9',
         source_verified: true, source_verification_reason: 'Rechtstreeks op openbare detailpagina gecontroleerd.',
       }];
     },
@@ -783,8 +785,8 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260826c/);
-  assert.match(page, /lead-radar\.js\?v=20260826c/);
+  assert.match(page, /lead-radar\.css\?v=20260826d/);
+  assert.match(page, /lead-radar\.js\?v=20260826d/);
   assert.doesNotMatch(page, /id="scan-platforms"|id="scan-region-mode"|id="scan-max-age-days"|data-custom-select/);
   assert.doesNotMatch(page, /<select\b/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
@@ -835,6 +837,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.match(script, /platforms:\s*\['web', 'mastodon'\]/);
   assert.match(script, /regionMode:\s*'nationwide'/);
   assert.match(script, /maxAgeDays:\s*14/);
+  assert.match(script, /maxQueries:\s*50/);
   assert.match(script, /websiteLookupLimit:\s*0/);
   assert.doesNotMatch(script, /data-custom-select-option|customSelects|setCustomDropdownOpen|selectedOptions/);
   assert.doesNotMatch(page, /id="scan-max-queries"|id="scan-website-limit"/);
@@ -851,10 +854,11 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_PUBLIC_FEED_URLS=/);
-  assert.match(envExample, /LEAD_RADAR_PROJECT_INDEX_URLS=.*freelancer\.nl.*hoofdkraan\.nl/);
-  assert.match(envExample, /LEAD_RADAR_PROJECT_DETAIL_LIMIT=20/);
+  assert.doesNotMatch(envExample, /LEAD_RADAR_PROJECT_INDEX_URLS|LEAD_RADAR_PROJECT_DETAIL_LIMIT/);
+  assert.match(envExample, /LEAD_RADAR_PUBLIC_FEED_URLS=https:\/\/www\.higherlevel\.nl\/rss\/2-forum\.xml\//);
   assert.doesNotMatch(envExample, /nl\.wordpress\.org\/support/);
   assert.match(envExample, /LEAD_RADAR_MASTODON_INSTANCES=/);
+  assert.match(envExample, /LEAD_RADAR_MASTODON_TAGS=ondernemen,zzp,website,webshop,automatisering/);
   assert.match(envExample, /LEAD_RADAR_BLUESKY_ENABLED=false/);
   assert.equal(envExample.toLowerCase().includes('data' + 'forseo'), false);
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
