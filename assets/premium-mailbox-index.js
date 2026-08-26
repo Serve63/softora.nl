@@ -318,6 +318,7 @@ async function syncInBackground({ account, folder, loadMessages }) {
       skipBackgroundSync: true,
       openLatest: false,
       preserveOnError: true,
+      reuseActiveToken: true,
     });
     setStatus('');
   } catch (_) {
