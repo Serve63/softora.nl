@@ -123,10 +123,14 @@
     catch (error) { state.signals = []; state.total = 0; renderSignals(); setInboxState(error.message, 'error'); }
   }
   async function startScan() {
-    const platforms = ($('#scan-platforms').dataset.value || 'web,mastodon').split(',').filter(Boolean);
-    const regionMode = $('#scan-region-mode').dataset.value || 'nationwide';
-    const maxAgeDays = Number($('#scan-max-age-days').dataset.value) || 30;
-    const payload = { platforms, regionMode, regions: [], maxAgeDays };
+    const payload = {
+      platforms: ['web', 'mastodon'],
+      regionMode: 'nationwide',
+      regions: [],
+      maxAgeDays: 14,
+      websiteLookupLimit: 0,
+      keywordGroups: ['direct_website', 'renew_or_repair', 'webshop', 'new_business', 'software_automation'],
+    };
     const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan bezig — resultaten worden na afloop bijgewerkt.';
     try {
       const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) });
@@ -145,59 +149,6 @@
     }
   }
 
-  const customSelects = Array.from(document.querySelectorAll('.custom-select'));
-  const customSelectOptions = (select) => Array.from(select.querySelectorAll('[data-custom-select-option]'));
-  function setCustomDropdownOpen(select, isOpen) {
-    const trigger = select.querySelector('[data-custom-select-trigger]');
-    const menu = select.querySelector('[role="listbox"]');
-    if (!trigger || !menu) return;
-    if (isOpen) customSelects.forEach((candidate) => { if (candidate !== select) setCustomDropdownOpen(candidate, false); });
-    select.classList.toggle('is-open', isOpen);
-    trigger.setAttribute('aria-expanded', String(isOpen));
-    menu.hidden = !isOpen;
-  }
-  function selectCustomOption(select, option) {
-    if (!option) return;
-    select.dataset.value = option.dataset.value || '';
-    const value = select.querySelector('.custom-select__value');
-    if (value) value.textContent = option.textContent.trim();
-    customSelectOptions(select).forEach((candidate) => candidate.setAttribute('aria-selected', String(candidate === option)));
-    setCustomDropdownOpen(select, false);
-    select.querySelector('[data-custom-select-trigger]')?.focus();
-  }
-  customSelects.forEach((select) => {
-    const trigger = select.querySelector('[data-custom-select-trigger]');
-    const menu = select.querySelector('[role="listbox"]');
-    const options = () => customSelectOptions(select);
-    trigger?.addEventListener('click', () => setCustomDropdownOpen(select, !select.classList.contains('is-open')));
-    trigger?.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        setCustomDropdownOpen(select, true);
-        (options().find((option) => option.getAttribute('aria-selected') === 'true') || options()[0])?.focus();
-      }
-    });
-    menu?.addEventListener('click', (event) => {
-      const option = event.target.closest('[data-custom-select-option]');
-      if (option) selectCustomOption(select, option);
-    });
-    menu?.addEventListener('keydown', (event) => {
-      const availableOptions = options();
-      if (!availableOptions.length) return;
-      const currentIndex = availableOptions.indexOf(event.target.closest('[data-custom-select-option]'));
-      if (event.key === 'Escape') { event.preventDefault(); setCustomDropdownOpen(select, false); trigger?.focus(); }
-      if (event.key === 'ArrowDown') { event.preventDefault(); availableOptions[(currentIndex + 1) % availableOptions.length]?.focus(); }
-      if (event.key === 'ArrowUp') { event.preventDefault(); availableOptions[(currentIndex - 1 + availableOptions.length) % availableOptions.length]?.focus(); }
-      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCustomOption(select, event.target.closest('[data-custom-select-option]')); }
-    });
-  });
-  document.addEventListener('click', (event) => { customSelects.forEach((select) => { if (!select.contains(event.target)) setCustomDropdownOpen(select, false); }); });
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    customSelects.forEach((select) => {
-      if (select.classList.contains('is-open')) { setCustomDropdownOpen(select, false); select.querySelector('[data-custom-select-trigger]')?.focus(); }
-    });
-  });
   $('#previous-page-button').addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); loadSignals(); });
   $('#next-page-button').addEventListener('click', () => { if (state.offset + state.signals.length < state.total) { state.offset += state.limit; loadSignals(); } });
   $('#scan-button').addEventListener('click', () => startScan());

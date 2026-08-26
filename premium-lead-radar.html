@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260826b">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260826c">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -24,62 +24,14 @@
 
     <section class="metric-grid" aria-label="Lead Radar tellingen">
       <article class="metric-card metric-card--primary"><span>Totale leads</span><strong id="metric-total">-</strong><small>opgeslagen in Lead Radar</small></article>
-      <article class="metric-card"><span>Nieuwe leads</span><strong id="metric-new">-</strong><small>nog te beoordelen</small></article>
-    </section>
-
-    <section class="scan-panel" aria-label="Lead Radar scan">
-      <div class="scan-panel__intro">
-        <div>
-            <p class="section-kicker">LANDDEKKING</p>
-            <h2>Nieuwe leads zoeken</h2>
+      <article class="metric-card metric-card--scan">
+        <div class="metric-card__summary"><span>Nieuwe leads</span><strong id="metric-new">-</strong><small>nog te beoordelen</small></div>
+        <button class="button button-primary scan-button" id="scan-button" type="button">Scan starten</button>
+        <div class="scan-progress" id="scan-progress" hidden role="status" aria-live="polite">
+          <div class="scan-progress__bar"><span id="scan-progress-bar"></span></div>
+          <span id="scan-progress-label">Scan wordt uitgevoerd...</span>
         </div>
-        <div class="scan-panel__controls">
-          <div class="scan-field">
-            <span class="scan-field__label">Bronnen</span>
-            <div class="custom-select" id="scan-platforms" data-value="web,mastodon">
-              <button class="custom-select__trigger" type="button" data-custom-select-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="scan-platforms-menu">
-                <span class="custom-select__value">Alle openbare bronnen</span>
-              </button>
-              <div class="custom-select__menu" id="scan-platforms-menu" role="listbox" tabindex="-1" hidden>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="web,mastodon" aria-selected="true">Alle openbare bronnen</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="web" aria-selected="false">Open webfeeds</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="mastodon" aria-selected="false">Mastodon</button>
-              </div>
-            </div>
-          </div>
-          <div class="scan-field">
-            <span class="scan-field__label">Regio</span>
-            <div class="custom-select" id="scan-region-mode" data-value="nationwide">
-              <button class="custom-select__trigger" type="button" data-custom-select-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="scan-region-mode-menu">
-                <span class="custom-select__value">Heel Nederland</span>
-              </button>
-              <div class="custom-select__menu" id="scan-region-mode-menu" role="listbox" tabindex="-1" hidden>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="nationwide" aria-selected="true">Heel Nederland</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="regional" aria-selected="false">Nederland + provincies en steden</button>
-              </div>
-            </div>
-          </div>
-          <div class="scan-field">
-            <span class="scan-field__label">Periode</span>
-            <div class="custom-select" id="scan-max-age-days" data-value="30">
-              <button class="custom-select__trigger" type="button" data-custom-select-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="scan-max-age-days-menu">
-                <span class="custom-select__value">Laatste 30 dagen</span>
-              </button>
-              <div class="custom-select__menu" id="scan-max-age-days-menu" role="listbox" tabindex="-1" hidden>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="30" aria-selected="true">Laatste 30 dagen</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="7" aria-selected="false">Laatste 7 dagen</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="3" aria-selected="false">Laatste 3 dagen</button>
-                <button class="custom-select__option" type="button" role="option" data-custom-select-option data-value="1" aria-selected="false">Laatste 24 uur</button>
-              </div>
-            </div>
-          </div>
-          <button class="button button-primary scan-button" id="scan-button" type="button">Scan starten</button>
-        </div>
-      </div>
-      <div class="scan-progress" id="scan-progress" hidden role="status" aria-live="polite">
-        <div class="scan-progress__bar"><span id="scan-progress-bar"></span></div>
-        <span id="scan-progress-label">Scan wordt uitgevoerd...</span>
-      </div>
+      </article>
     </section>
 
     <section class="inbox-section" aria-label="Lead Radar inbox">
@@ -98,6 +50,6 @@
     </section>
 
   </main>
-  <script src="/assets/lead-radar.js?v=20260826b" defer></script>
+  <script src="/assets/lead-radar.js?v=20260826c" defer></script>
 </body>
 </html>
