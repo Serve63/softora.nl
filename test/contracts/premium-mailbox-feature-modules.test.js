@@ -137,6 +137,154 @@ test('compose featuremodule neemt alleen expliciet gekozen veilige bijlagen mee'
   compose.resetOptionalFields(documentRef);
 });
 
+test('compose bewaakt alle clientgrenzen vóór een bijlage wordt toegevoegd', async () => {
+  const elements = new Map([
+    ['c-attachment-list', { innerHTML: '' }],
+    ['c-copy-fields', { hidden: true }],
+    ['c-cc', { value: '' }],
+    ['c-bcc', { value: '' }],
+    ['c-attachments', { value: '' }],
+  ]);
+  const documentRef = { getElementById: (id) => elements.get(id) || null };
+  const file = (name, size, type = 'application/pdf') => ({ name, size, type });
+
+  compose.resetOptionalFields(documentRef);
+  try {
+    const fiveFiles = Array.from({ length: 5 }, (_value, index) => file(`bijlage-${index + 1}.pdf`, 8));
+    assert.equal((await compose.addAttachments(fiveFiles, documentRef)).ok, true);
+    assert.equal(compose.getAttachments().length, 5);
+    const sixth = await compose.addAttachments([file('bijlage-6.pdf', 8)], documentRef);
+    assert.equal(sixth.ok, false);
+    assert.match(sixth.error, /maximaal 5 bijlagen/);
+    assert.equal(compose.getAttachments().length, 5);
+
+    compose.resetOptionalFields(documentRef);
+    const forbidden = await compose.addAttachments([
+      file('gevaar.exe', 8, 'application/octet-stream'),
+    ], documentRef);
+    assert.equal(forbidden.ok, false);
+    assert.match(forbidden.error, /wordt niet ondersteund/);
+    assert.equal(compose.getAttachments().length, 0);
+
+    const oversized = await compose.addAttachments([
+      file('te-groot.pdf', 4 * 1024 * 1024 + 1),
+    ], documentRef);
+    assert.equal(oversized.ok, false);
+    assert.match(oversized.error, /maximaal 4 MB/);
+    assert.equal(compose.getAttachments().length, 0);
+
+    const excessiveTotal = await compose.addAttachments([
+      file('deel-1.pdf', 3 * 1024 * 1024),
+      file('deel-2.pdf', 3 * 1024 * 1024),
+    ], documentRef);
+    assert.equal(excessiveTotal.ok, false);
+    assert.match(excessiveTotal.error, /samen maximaal 5 MB/);
+    assert.equal(compose.getAttachments().length, 0);
+  } finally {
+    compose.resetOptionalFields(documentRef);
+  }
+});
+
+test('compose dropzone gebruikt dezelfde bijlagevalidatie en laat niet-bestandsdrags ongemoeid', async () => {
+  function eventTarget(initial = {}) {
+    const listeners = new Map();
+    const classes = new Set();
+    return {
+      ...initial,
+      listeners,
+      classList: {
+        add: (value) => classes.add(value),
+        remove: (value) => classes.delete(value),
+        contains: (value) => classes.has(value),
+      },
+      addEventListener: (type, listener) => listeners.set(type, listener),
+    };
+  }
+  const overlay = eventTarget();
+  const input = eventTarget({ value: 'gekozen', files: [] });
+  const dropzone = eventTarget();
+  const body = eventTarget();
+  const elements = new Map([
+    ['compose-overlay', overlay],
+    ['c-attachments', input],
+    ['compose-attachment-dropzone', dropzone],
+    ['c-body', body],
+  ]);
+  const added = [];
+  const attachmentDocuments = [];
+  const toasts = [];
+  const documentRef = {
+    getElementById: (id) => elements.get(id) || null,
+    querySelector: () => null,
+  };
+  const controller = composeController.create({
+    document: documentRef,
+    compose: {
+      async addAttachments(files, receivedDocument) {
+        const list = Array.from(files || []);
+        added.push(list);
+        attachmentDocuments.push(receivedDocument);
+        if (list.some((file) => String(file?.name || '').endsWith('.exe'))) {
+          return { ok: false, error: 'Dit bestand wordt niet ondersteund.' };
+        }
+        return { ok: true };
+      },
+    },
+    toast: (message) => toasts.push(message),
+  });
+  controller.bind();
+
+  const files = [{ name: 'foto-1.png' }, { name: 'voorstel.pdf' }];
+  const transfer = { types: ['Files'], items: [{ kind: 'file' }], files, dropEffect: 'none' };
+  let prevented = 0;
+  let stopped = 0;
+  const dragEvent = {
+    dataTransfer: transfer,
+    preventDefault: () => { prevented += 1; },
+    stopPropagation: () => { stopped += 1; },
+  };
+  dropzone.listeners.get('dragenter')(dragEvent);
+  assert.equal(dropzone.classList.contains('is-dragover'), true);
+  dropzone.listeners.get('dragenter')(dragEvent);
+  dropzone.listeners.get('dragleave')(dragEvent);
+  assert.equal(dropzone.classList.contains('is-dragover'), true);
+  dropzone.listeners.get('dragleave')(dragEvent);
+  assert.equal(dropzone.classList.contains('is-dragover'), false);
+  dropzone.listeners.get('dragenter')(dragEvent);
+  assert.equal(dropzone.classList.contains('is-dragover'), true);
+  dropzone.listeners.get('dragover')(dragEvent);
+  assert.equal(transfer.dropEffect, 'copy');
+  await dropzone.listeners.get('drop')(dragEvent);
+  assert.deepEqual(added, [files]);
+  assert.deepEqual(attachmentDocuments, [documentRef]);
+  assert.equal(dropzone.classList.contains('is-dragover'), false);
+  assert.equal(prevented, 7);
+  assert.equal(stopped, 7);
+
+  let textDragPrevented = false;
+  await dropzone.listeners.get('drop')({
+    dataTransfer: { types: ['text/plain'], items: [], files: [] },
+    preventDefault: () => { textDragPrevented = true; },
+    stopPropagation() {},
+  });
+  assert.equal(textDragPrevented, false);
+  assert.equal(added.length, 1);
+
+  await dropzone.listeners.get('drop')({
+    dataTransfer: { types: ['Files'], items: [{ kind: 'file' }], files: [{ name: 'gevaar.exe' }] },
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert.equal(added.length, 2);
+  assert.deepEqual(toasts, ['Dit bestand wordt niet ondersteund.']);
+
+  input.files = [{ name: 'klik.pdf' }];
+  await input.listeners.get('change')();
+  assert.deepEqual(added.at(-1), input.files);
+  assert.equal(attachmentDocuments.at(-1), documentRef);
+  assert.equal(input.value, '');
+});
+
 test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete send', async () => {
   const requests = [];
   const values = {

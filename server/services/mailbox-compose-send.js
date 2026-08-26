@@ -3,6 +3,8 @@ const {
   renderMailboxComposeEmailHtml,
 } = require('./mailbox-compose-email-renderer');
 const {
+  createMailboxAttachmentsFingerprint,
+  createMailboxPayloadFingerprint,
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
 } = require('./mailbox-send-provenance-store');
@@ -142,6 +144,163 @@ function createMailboxComposeSend(deps = {}) {
     await mailboxAttachmentService.cleanupAttachments(references, threadProvenance);
   }
 
+  function createCombinedAttachmentLimitError(message, code = 'MAILBOX_ATTACHMENT_COMBINED_LIMIT') {
+    const error = new Error(
+      `Automatische webdesignafbeeldingen en handmatige bijlagen tellen samen mee. ${message}`
+    );
+    error.status = 400;
+    error.code = code;
+    return error;
+  }
+
+  function assertCombinedAttachmentLimits(attachments) {
+    const list = Array.isArray(attachments) ? attachments : [];
+    if (list.length > MAX_COMPOSE_ATTACHMENTS) {
+      throw createCombinedAttachmentLimitError(
+        `Je kunt samen maximaal ${MAX_COMPOSE_ATTACHMENTS} bijlagen versturen.`
+      );
+    }
+    let totalBytes = 0;
+    for (const attachment of list) {
+      const filename = normalizeString(attachment?.filename || attachment?.name) || 'zonder naam';
+      if (!Buffer.isBuffer(attachment?.content) || !attachment.content.length) {
+        throw createCombinedAttachmentLimitError(
+          `Bijlage "${filename}" kon niet veilig worden gemeten.`,
+          'MAILBOX_ATTACHMENT_COMBINED_INVALID'
+        );
+      }
+      const size = attachment.content.length;
+      if (size > MAX_COMPOSE_ATTACHMENT_BYTES) {
+        throw createCombinedAttachmentLimitError(`Bijlage "${filename}" mag maximaal 4 MB zijn.`);
+      }
+      totalBytes += size;
+      if (totalBytes > MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES) {
+        throw createCombinedAttachmentLimitError('De bijlagen mogen samen maximaal 5 MB zijn.');
+      }
+    }
+  }
+
+  function normalizeProviderRecipients(value) {
+    return Array.from(new Set((Array.isArray(value) ? value : [])
+      .map((recipient) => normalizeEmail(
+        recipient && typeof recipient === 'object' ? recipient.address : recipient
+      ))
+      .filter(Boolean)));
+  }
+
+  function createPrimaryRecipientNotAcceptedError(info, recipientEmail) {
+    const accepted = normalizeProviderRecipients(info?.accepted);
+    const rejected = normalizeProviderRecipients(info?.rejected);
+    const error = new Error([
+      `De SMTP-provider accepteerde de primaire ontvanger ${recipientEmail} niet.`,
+      `Geaccepteerd: ${accepted.join(', ') || 'geen'}.`,
+      `Afgewezen: ${rejected.join(', ') || 'geen'}.`,
+    ].join(' '));
+    error.status = 409;
+    error.code = 'MAILBOX_PRIMARY_RECIPIENT_NOT_ACCEPTED';
+    error.accepted = accepted;
+    error.rejected = rejected;
+    return error;
+  }
+
+  function assertAcceptedReplayContext(accepted, threadProvenance, accountEmail, recipientEmail) {
+    const normalizeProvider = (value) => normalizeString(value || 'smtp').toLowerCase();
+    const normalizedAccount = normalizeEmail(accountEmail);
+    const normalizedRecipient = normalizeEmail(recipientEmail);
+    const matches = accepted
+      && accepted.idempotencyKey === normalizeString(threadProvenance.idempotencyKey)
+      && accepted.owner === normalizeString(threadProvenance.owner).toLowerCase()
+      && accepted.accountEmail === normalizedAccount
+      && accepted.recipientEmail === normalizedRecipient
+      && normalizeEmail(threadProvenance.accountEmail) === normalizedAccount
+      && normalizeEmail(threadProvenance.recipientEmail) === normalizedRecipient
+      && accepted.mode === normalizeString(threadProvenance.mode).toLowerCase()
+      && accepted.conversationId === normalizeString(threadProvenance.conversationId)
+      && accepted.replyTargetMessageId === normalizeString(threadProvenance.replyTargetMessageId)
+      && accepted.references === normalizeString(threadProvenance.references)
+      && normalizeProvider(accepted.provider) === normalizeProvider(threadProvenance.provider)
+      && accepted.providerThreadId === normalizeString(threadProvenance.providerThreadId);
+    if (matches) return;
+    const error = new Error('De veilige verzend-ID hoort bij een andere mailbox- of threadcontext.');
+    error.status = 409;
+    error.code = 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH';
+    throw error;
+  }
+
+  function createAcceptedReplayPayloadMismatchError() {
+    const error = new Error(
+      'De veilige verzend-ID hoort bij andere mailinhoud of bijlagen; open de mail opnieuw voordat je opnieuw verzendt.'
+    );
+    error.status = 409;
+    error.code = 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH';
+    return error;
+  }
+
+  function assertAcceptedReplayPayload(accepted, payload) {
+    const attachmentsFingerprint = createMailboxAttachmentsFingerprint(payload.attachments);
+    const payloadFingerprint = createMailboxPayloadFingerprint({
+      subject: payload.subject,
+      body: payload.body,
+      cc: payload.cc,
+      bcc: payload.bcc,
+      attachmentsFingerprint,
+    }, normalizeString);
+    const durablePayloadFingerprint = normalizeString(accepted?.payloadFingerprint).toLowerCase();
+    const durableAttachmentsFingerprint = normalizeString(accepted?.attachmentsFingerprint).toLowerCase();
+    const durableFieldsFingerprint = createMailboxPayloadFingerprint({
+      subject: accepted?.subject,
+      body: accepted?.body,
+      cc: accepted?.cc,
+      bcc: accepted?.bcc,
+      attachmentsFingerprint: durableAttachmentsFingerprint,
+    }, normalizeString);
+    const matches = /^[0-9a-f]{64}$/.test(durablePayloadFingerprint)
+      && (!durableAttachmentsFingerprint || /^[0-9a-f]{64}$/.test(durableAttachmentsFingerprint))
+      && durablePayloadFingerprint === durableFieldsFingerprint
+      && durableAttachmentsFingerprint === attachmentsFingerprint
+      && durablePayloadFingerprint === payloadFingerprint;
+    if (matches) return;
+    throw createAcceptedReplayPayloadMismatchError();
+  }
+
+  function createAcceptedReplayResult(accepted) {
+    return {
+      messageId: accepted.messageId,
+      accepted: [accepted.recipientEmail],
+      rejected: [],
+      sentCopySaved: true,
+      intentId: accepted.intentId,
+      idempotentReplay: true,
+      sentMessage: {
+        id: `accepted-sent:${accepted.messageId || accepted.intentId}`,
+        mailboxId: `accepted-sent:${accepted.messageId || accepted.intentId}`,
+        folder: 'sent',
+        storageFolder: 'sent',
+        direction: 'sent',
+        accountEmail: accepted.accountEmail,
+        messageId: accepted.messageId,
+        from: accepted.senderName || accepted.accountEmail,
+        email: accepted.accountEmail,
+        to: accepted.recipientEmail,
+        toDisplay: accepted.recipientEmail,
+        cc: accepted.cc,
+        bcc: accepted.bcc,
+        recipientRoutingEvidenceKnown: true,
+        subject: accepted.subject,
+        body: accepted.body,
+        preview: accepted.body,
+        receivedAt: accepted.acceptedAt,
+        activityAt: accepted.acceptedAt,
+        hasBody: true,
+        bodyTruncated: false,
+        unread: false,
+        conversationId: accepted.conversationId,
+        softoraSendIntentId: accepted.intentId,
+        softoraSendMode: accepted.mode,
+      },
+    };
+  }
+
   return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments, threadProvenance }) {
     const account = getAccount(accountEmail);
     if (!account) {
@@ -175,7 +334,18 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       throw error;
     }
+    if (!threadProvenance || !mailboxSendProvenanceStore) {
+      const error = new Error('De duurzame threadcontext ontbreekt; verzending is veilig gestopt.');
+      error.status = 503;
+      error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
+      throw error;
+    }
     const explicitAttachments = await normalizeComposeAttachments(attachments, threadProvenance);
+    const explicitAttachmentMetadata = explicitAttachments.map((attachment) => ({
+      filename: normalizeString(attachment?.filename),
+      contentType: truncateText(normalizeString(attachment?.contentType), 120),
+      size: Buffer.isBuffer(attachment?.content) ? attachment.content.length : 0,
+    })).filter((attachment) => attachment.filename && attachment.size > 0);
     const cleanSubject = truncateText(normalizeString(subject), 240);
     if (!cleanSubject) {
       const error = new Error('Onderwerp is verplicht.');
@@ -189,18 +359,24 @@ function createMailboxComposeSend(deps = {}) {
       auth: { user: account.smtpUser, pass: account.smtpPass },
     });
     const normalizedText = normalizeString(text);
-    if (!threadProvenance || !mailboxSendProvenanceStore) {
-      const error = new Error('De duurzame threadcontext ontbreekt; verzending is veilig gestopt.');
-      error.status = 503;
-      error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
-      throw error;
-    }
     const webdesignParts = await buildMailboxWebdesignSendParts({
       accountEmail: account.email,
       to: normalizedTo,
       subject: cleanSubject,
       text: normalizedText,
     });
+    const outboundAttachments = [
+      ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
+      ...explicitAttachments,
+    ];
+    try {
+      assertCombinedAttachmentLimits(outboundAttachments);
+    } catch (error) {
+      await cleanupUploadedAttachments(attachments, threadProvenance).catch((cleanupError) => {
+        logger.warn('[MailboxAttachment][CleanupAfterCombinedLimit]', cleanupError?.message || cleanupError);
+      });
+      throw error;
+    }
     await assertOutboundRecipientsNotSuppressed({
       outboundRecipientGuardStore,
       identities: [
@@ -233,10 +409,6 @@ function createMailboxComposeSend(deps = {}) {
       'X-Softora-Conversation-Id': threadProvenance.conversationId || '',
       'X-Softora-Reply-Target-Message-Id': threadProvenance.replyTargetMessageId || '',
     };
-    const outboundAttachments = [
-      ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
-      ...explicitAttachments,
-    ];
     if (outboundAttachments.length) mail.attachments = outboundAttachments;
     const outboundReservation = webdesignParts
       ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
@@ -258,44 +430,24 @@ function createMailboxComposeSend(deps = {}) {
     if (!provenanceReservation.created) {
       if (provenanceReservation.intent.status === 'accepted') {
         const accepted = provenanceReservation.intent;
+        let replayError = null;
+        try {
+          assertAcceptedReplayContext(accepted, threadProvenance, account.email, normalizedTo);
+          assertAcceptedReplayPayload(accepted, {
+            subject: cleanSubject,
+            body: webdesignParts?.text || normalizedText,
+            cc: normalizedCc.join(', '),
+            bcc: normalizedBcc.join(', '),
+            attachments: outboundAttachments,
+          });
+        } catch (error) {
+          replayError = error;
+        }
         await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
           logger.warn('[MailboxAttachment][CleanupAfterIdempotentReplay]', error?.message || error);
         });
-        return {
-          messageId: accepted.messageId,
-          accepted: [normalizedTo],
-          rejected: [],
-          sentCopySaved: true,
-          intentId: accepted.intentId,
-          idempotentReplay: true,
-          sentMessage: {
-            id: `accepted-sent:${accepted.messageId || accepted.intentId}`,
-            mailboxId: `accepted-sent:${accepted.messageId || accepted.intentId}`,
-            folder: 'sent',
-            storageFolder: 'sent',
-            direction: 'sent',
-            accountEmail: accepted.accountEmail,
-            messageId: accepted.messageId,
-            from: accepted.senderName || accepted.accountEmail,
-            email: accepted.accountEmail,
-            to: accepted.recipientEmail,
-            toDisplay: accepted.recipientEmail,
-            cc: accepted.cc,
-            bcc: accepted.bcc,
-            recipientRoutingEvidenceKnown: true,
-            subject: accepted.subject,
-            body: accepted.body,
-            preview: accepted.body,
-            receivedAt: accepted.acceptedAt,
-            activityAt: accepted.acceptedAt,
-            hasBody: true,
-            bodyTruncated: false,
-            unread: false,
-            conversationId: accepted.conversationId,
-            softoraSendIntentId: accepted.intentId,
-            softoraSendMode: accepted.mode,
-          },
-        };
+        if (replayError) throw replayError;
+        return createAcceptedReplayResult(accepted);
       }
       const error = new Error('Deze verzending wordt al veilig verwerkt; wacht op bevestiging voordat je opnieuw probeert.');
       error.status = 409;
@@ -319,6 +471,26 @@ function createMailboxComposeSend(deps = {}) {
         logger.warn('[MailboxAttachment][CleanupAfterProviderFailure]', cleanupError?.message || cleanupError);
       });
       throw error;
+    }
+    const providerAcceptedRecipients = normalizeProviderRecipients(info?.accepted);
+    const providerRejectedRecipients = normalizeProviderRecipients(info?.rejected);
+    if (
+      !providerAcceptedRecipients.includes(normalizedTo)
+      || providerRejectedRecipients.includes(normalizedTo)
+    ) {
+      const acceptanceError = createPrimaryRecipientNotAcceptedError(info, normalizedTo);
+      if (typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+        await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, acceptanceError, {
+          messageId: normalizeString(info?.messageId || threadProvenance.messageId),
+          sentReconcileRequired: true,
+        }).catch((markError) => {
+          logger.error('[MailboxSendProvenance][PrimaryRecipientUnknown]', markError?.message || markError);
+        });
+      }
+      await cleanupUploadedAttachments(attachments, threadProvenance).catch((cleanupError) => {
+        logger.warn('[MailboxAttachment][CleanupAfterPrimaryRecipientRejected]', cleanupError?.message || cleanupError);
+      });
+      throw createMailboxReconcileRequiredError(acceptanceError);
     }
     const sentAt = now();
     const sentCopyPromise = Promise.resolve().then(() => appendSentMessage({
@@ -389,6 +561,7 @@ function createMailboxComposeSend(deps = {}) {
         hasBody: true,
         bodyTruncated: false,
         unread: false,
+        ...(explicitAttachmentMetadata.length ? { attachments: explicitAttachmentMetadata } : {}),
         conversationId: threadProvenance.conversationId,
         softoraSendIntentId: threadProvenance.intentId,
         softoraSendMode: threadProvenance.mode,

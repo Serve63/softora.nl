@@ -5,6 +5,10 @@ const compose = require('../../assets/premium-mailbox-compose');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
 const mailboxError = require('../../assets/premium-mailbox-error');
 const { createMailboxComposeSend } = require('../../server/services/mailbox-compose-send');
+const {
+  createMailboxAttachmentsFingerprint,
+  createMailboxPayloadFingerprint,
+} = require('../../server/services/mailbox-send-provenance-store');
 
 function createAllowingSuppressionStore() {
   return { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
@@ -199,6 +203,218 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
   assert.equal(cleanupCalls, 1);
   assert.equal(reservedAttachments.length, 3);
   assert.equal(result.messageId, '<attachment-success@softora.nl>');
+  assert.deepEqual(result.sentMessage.attachments, [0, 1, 2].map((index) => ({
+    filename: `screen-${index}.png`, contentType: 'image/png', size: 2,
+  })));
+  assert.equal(result.sentMessage.attachments.some((attachment) => 'content' in attachment || 'reference' in attachment), false);
+});
+
+test('accepted attachment-replay hydrateert opnieuw en eist exact dezelfde duurzame payload', async () => {
+  let providerCalls = 0;
+  let downloadCalls = 0;
+  let reserveCalls = 0;
+  let cleanupCalls = 0;
+  const durableAttachment = {
+    filename: 'bewijs.pdf',
+    contentType: 'application/pdf',
+    content: Buffer.from([1, 2, 3, 4]),
+    contentDisposition: 'attachment',
+  };
+  const durableAttachmentsFingerprint = createMailboxAttachmentsFingerprint([durableAttachment]);
+  const acceptedIntent = {
+    intentId: 'send:accepted-before-response-loss',
+    idempotencyKey: 'browser:attachment-response-loss',
+    owner: 'serve',
+    accountEmail: 'serve@softora.nl',
+    recipientEmail: 'prospect@example.nl',
+    mode: 'reply',
+    conversationId: 'conversation:accepted-attachment-replay',
+    replyTargetMessageId: '<inbound-replay@example.nl>',
+    references: '<root-replay@example.nl> <inbound-replay@example.nl>',
+    provider: 'smtp',
+    providerThreadId: '',
+    messageId: '<attachment-was-accepted@softora.nl>',
+    senderName: 'Servé Creusen',
+    subject: 'Bijlage',
+    body: 'Zie de bijlage.',
+    cc: 'cc@example.nl',
+    bcc: 'audit@example.nl',
+    attachmentsFingerprint: durableAttachmentsFingerprint,
+    payloadFingerprint: createMailboxPayloadFingerprint({
+      subject: 'Bijlage',
+      body: 'Zie de bijlage.',
+      cc: 'cc@example.nl',
+      bcc: 'audit@example.nl',
+      attachmentsFingerprint: durableAttachmentsFingerprint,
+    }),
+    status: 'accepted',
+    acceptedAt: '2026-08-26T15:00:00.000Z',
+  };
+  const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
+    getAccount: () => ({
+      email: 'serve@softora.nl', name: 'Servé Creusen', smtpConfigured: true, smtpIdentityMatches: true,
+      smtpHost: 'smtp.example.test', smtpPort: 465, smtpSecure: true, smtpUser: 'serve@softora.nl', smtpPass: 'secret',
+    }),
+    isValidEmail: (value) => /^[^@]+@[^@]+\.[^@]+$/.test(String(value || '')),
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, max) => String(value || '').slice(0, max),
+    createTransport: () => ({ sendMail: async () => { providerCalls += 1; } }),
+    buildMailboxWebdesignSendParts: async () => null,
+    mailboxSendProvenanceStore: {
+      reserve: async () => {
+        reserveCalls += 1;
+        return { created: false, intent: acceptedIntent };
+      },
+    },
+    mailboxAttachmentService: {
+      downloadAttachments: async (attachmentInputs) => {
+        downloadCalls += 1;
+        const changed = attachmentInputs.some((attachment) => attachment.reference === 'different-content');
+        return [{
+          ...durableAttachment,
+          content: changed ? Buffer.from([9, 9, 9, 9]) : Buffer.from(durableAttachment.content),
+        }];
+      },
+      cleanupAttachments: async () => { cleanupCalls += 1; },
+    },
+  });
+  const threadProvenance = {
+    intentId: 'send:new-request-id-after-response-loss',
+    idempotencyKey: acceptedIntent.idempotencyKey,
+    owner: acceptedIntent.owner,
+    accountEmail: acceptedIntent.accountEmail,
+    recipientEmail: acceptedIntent.recipientEmail,
+    mode: acceptedIntent.mode,
+    conversationId: acceptedIntent.conversationId,
+    replyTargetMessageId: acceptedIntent.replyTargetMessageId,
+    references: acceptedIntent.references,
+    messageId: '<newly-planned-but-unused@softora.nl>',
+    provider: acceptedIntent.provider,
+    providerThreadId: '',
+  };
+  const result = await sendMessage({
+    accountEmail: acceptedIntent.accountEmail,
+    to: acceptedIntent.recipientEmail,
+    cc: acceptedIntent.cc,
+    bcc: acceptedIntent.bcc,
+    subject: acceptedIntent.subject,
+    text: acceptedIntent.body,
+    attachments: [{
+      reference: 'freshly-uploaded-reference',
+      filename: 'client-metadata-wordt-niet-vertrouwd.pdf',
+      contentType: 'text/plain',
+      size: 999,
+    }],
+    threadProvenance,
+  });
+
+  assert.equal(result.idempotentReplay, true);
+  assert.equal(result.messageId, acceptedIntent.messageId);
+  assert.equal(result.intentId, acceptedIntent.intentId);
+  assert.equal(result.sentMessage.subject, acceptedIntent.subject);
+  assert.equal(result.sentMessage.body, acceptedIntent.body);
+  assert.equal(result.sentMessage.attachments, undefined);
+  assert.equal(providerCalls, 0);
+  assert.equal(downloadCalls, 1);
+  assert.equal(reserveCalls, 1);
+  assert.equal(cleanupCalls, 1);
+
+  const mismatchCases = [
+    { label: 'subject', overrides: { subject: 'Gewijzigd onderwerp' } },
+    { label: 'body', overrides: { text: 'Gewijzigde body.' } },
+    { label: 'CC', overrides: { cc: 'ander-cc@example.nl' } },
+    { label: 'BCC', overrides: { bcc: 'ander-audit@example.nl' } },
+    {
+      label: 'attachment bytes',
+      overrides: {
+        attachments: [{
+          reference: 'different-content', filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+        }],
+      },
+    },
+  ];
+  for (const { label, overrides } of mismatchCases) {
+    await assert.rejects(sendMessage({
+      accountEmail: acceptedIntent.accountEmail,
+      to: acceptedIntent.recipientEmail,
+      cc: acceptedIntent.cc,
+      bcc: acceptedIntent.bcc,
+      subject: acceptedIntent.subject,
+      text: acceptedIntent.body,
+      attachments: [{
+        reference: `fresh-reference-${label}`,
+        filename: 'bewijs.pdf',
+        contentType: 'application/pdf',
+        size: 4,
+      }],
+      threadProvenance,
+      ...overrides,
+    }), (error) => {
+      assert.equal(error.code, 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH', label);
+      assert.equal(error.status, 409, label);
+      return true;
+    });
+  }
+
+  const contextMismatchCases = [
+    {
+      label: 'recipient',
+      accountEmail: acceptedIntent.accountEmail,
+      to: 'other@example.nl',
+      provenance: { recipientEmail: 'other@example.nl' },
+    },
+    {
+      label: 'References met hetzelfde replyTarget',
+      accountEmail: acceptedIntent.accountEmail,
+      to: acceptedIntent.recipientEmail,
+      provenance: { references: '<ander-root@example.nl> <inbound-replay@example.nl>' },
+    },
+    {
+      label: 'owner',
+      accountEmail: acceptedIntent.accountEmail,
+      to: acceptedIntent.recipientEmail,
+      provenance: { owner: 'martijn' },
+    },
+    {
+      label: 'account',
+      accountEmail: 'martijn@softora.nl',
+      to: acceptedIntent.recipientEmail,
+      provenance: { accountEmail: 'martijn@softora.nl' },
+    },
+    {
+      label: 'providerThread',
+      accountEmail: acceptedIntent.accountEmail,
+      to: acceptedIntent.recipientEmail,
+      provenance: { providerThreadId: 'ander-provider-thread' },
+    },
+  ];
+  for (const mismatch of contextMismatchCases) {
+    await assert.rejects(sendMessage({
+      accountEmail: mismatch.accountEmail,
+      to: mismatch.to,
+      cc: acceptedIntent.cc,
+      bcc: acceptedIntent.bcc,
+      subject: acceptedIntent.subject,
+      text: acceptedIntent.body,
+      attachments: [{
+        reference: `context-${mismatch.label}`,
+        filename: 'bewijs.pdf',
+        contentType: 'application/pdf',
+        size: 4,
+      }],
+      threadProvenance: { ...threadProvenance, ...mismatch.provenance },
+    }), (error) => {
+      assert.equal(error.code, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH', mismatch.label);
+      assert.equal(error.status, 409, mismatch.label);
+      return true;
+    });
+  }
+  assert.equal(providerCalls, 0);
+  assert.equal(downloadCalls, 11);
+  assert.equal(reserveCalls, 11);
+  assert.equal(cleanupCalls, 11);
 });
 
 test('ongeldige signed attachment wordt vóór provenance/provider afgewezen', async () => {

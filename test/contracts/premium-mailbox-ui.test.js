@@ -189,7 +189,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
-  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260818b/);
+  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260826a/);
@@ -5099,7 +5099,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260826a/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260826b/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -5270,6 +5270,9 @@ test('compose toont optionele CC BCC en bijlagen maar verstuurt niets automatisc
   assert.match(pageSource, /id="c-bcc"/);
   assert.match(pageSource, /id="c-attachments" multiple hidden/);
   assert.match(pageSource, /data-mailbox-action="choose-attachments"/);
+  assert.match(pageSource, /id="compose-attachment-dropzone" role="group" aria-label="Bijlagen toevoegen: kies bestanden of sleep ze hierheen"/);
+  assert.match(pageSource, /class="compose-attachment-hint">of sleep bestanden hierheen<\/span>/);
+  assert.match(pageSource, /\.compose-attachment-row\.is-dragover \{[^}]*background:[^}]*box-shadow:/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*flex:\s*0 0 auto;[^}]*align-items:\s*center;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(pageSource, /\.compose-attach-button svg \{[^}]*width:\s*15px;[^}]*stroke:\s*currentColor/);
   assert.match(pageSource, /<button class="compose-attach-button"[^>]*>[\s\S]*<svg[^>]*aria-hidden="true"[\s\S]*<span>Bijlage toevoegen<\/span>/);
@@ -5279,6 +5282,8 @@ test('compose toont optionele CC BCC en bijlagen maar verstuurt niets automatisc
   assert.match(composeControllerSource, /bcc: fieldValue\('c-bcc'\)/);
   assert.match(composeControllerSource, /const attachments = options\.compose\.getAttachments\(\)/);
   assert.match(composeControllerSource, /attachments,/);
+  assert.match(composeControllerSource, /addEventListener\('drop'/);
+  assert.match(composeControllerSource, /event\.dataTransfer\.dropEffect = 'copy'/);
   assert.match(composeControllerSource, /action === 'send-mail'[\s\S]*void send\(\)/);
 });
 

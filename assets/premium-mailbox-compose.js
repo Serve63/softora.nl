@@ -273,6 +273,7 @@
       folder: mail.folder || options.activeFolder || 'inbox',
       uid: Number(mail.uid || 0) || 0,
       mailboxId: String(mail.mailboxId || mail.id || '').trim(),
+      messageKey: String(mail.messageKey || '').trim(),
       messageId: String(mail.messageId || '').trim(),
       inReplyTo: String(mail.inReplyTo || '').trim(),
       references: String(mail.references || '').trim(),

@@ -10,6 +10,7 @@
     let spellingUndo = null;
     let rewriteRequestActive = false;
     let sendRequestActive = false;
+    let attachmentDragDepth = 0;
     const configuredSpellingTimeout = Number(options.spellingTimeoutMs);
     const SPELLING_TIMEOUT_MS = configuredSpellingTimeout > 0 ? configuredSpellingTimeout : 8000;
 
@@ -237,6 +238,35 @@
       return String(documentRef?.getElementById(id)?.value || '');
     }
 
+    function getAttachmentMetadata(value) {
+      return (Array.isArray(value) ? value : []).map((attachment) => ({
+        filename: String(attachment?.filename || attachment?.name || '').trim(),
+        contentType: String(attachment?.contentType || attachment?.type || '').trim().toLowerCase(),
+        size: Math.max(0, Number(attachment?.size) || 0),
+      })).filter((attachment) => attachment.filename && attachment.size > 0);
+    }
+
+    function isFileDrag(event) {
+      const transfer = event?.dataTransfer;
+      if (!transfer) return false;
+      const types = Array.from(transfer.types || []).map((type) => String(type || '').toLowerCase());
+      if (types.includes('files')) return true;
+      if (Array.from(transfer.items || []).some((item) => String(item?.kind || '').toLowerCase() === 'file')) return true;
+      return Boolean(transfer.files?.length);
+    }
+
+    function clearAttachmentDragState() {
+      attachmentDragDepth = 0;
+      documentRef?.getElementById('compose-attachment-dropzone')?.classList.remove('is-dragover');
+    }
+
+    async function handleAttachmentFiles(files, input = null) {
+      const result = await options.compose.addAttachments(files, documentRef);
+      if (input) input.value = '';
+      if (result?.ok === false) options.toast(result.error);
+      return result;
+    }
+
     function getSpellingButton() {
       return documentRef?.querySelector('[data-mailbox-action="spellcheck-compose"]') || null;
     }
@@ -429,6 +459,7 @@
       composeGeneration += 1;
       abortSpellingRequest();
       spellingUndo = null;
+      clearAttachmentDragState();
       if (!optionsOverride.keepContext) {
         setReplyContext(null);
         options.compose.resetOptionalFields();
@@ -444,6 +475,7 @@
       composeGeneration += 1;
       abortSpellingRequest();
       spellingUndo = null;
+      clearAttachmentDragState();
       documentRef?.getElementById('compose-overlay')?.classList.remove('open');
       options.composeWindow?.reset?.();
       setReplyContext(null);
@@ -832,6 +864,13 @@
           bodyLoaded: true,
           bodyTruncated: false,
           unread: false,
+          attachments: getAttachmentMetadata(
+            result.idempotentReplay === true
+              ? result.sentMessage?.attachments
+              : Array.isArray(result.sentMessage?.attachments) && result.sentMessage.attachments.length
+                ? result.sentMessage.attachments
+                : attachments
+          ),
           replyDismissedAt: acceptedAt,
           localAcceptedSend: true,
           localAcceptedSendFallback: !providerMessageId && !messageId && !String(
@@ -880,6 +919,7 @@
             accountEmail: normalize(account),
             owner: normalize(sendOwner),
             providerOwner: normalize(sendOwner),
+            messageKey: String(contextAtSend?.messageKey || '').trim(),
             messageId: String(contextAtSend?.messageId || '').trim(),
             unread: false,
             replyDismissedAt: '',
@@ -937,9 +977,36 @@
       });
       const input = documentRef?.getElementById('c-attachments');
       input?.addEventListener('change', async () => {
-        const result = await options.compose.addAttachments(input.files);
-        input.value = '';
-        if (!result.ok) options.toast(result.error);
+        await handleAttachmentFiles(input.files, input);
+      });
+      const dropzone = documentRef?.getElementById('compose-attachment-dropzone');
+      dropzone?.addEventListener('dragenter', (event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        attachmentDragDepth += 1;
+        dropzone.classList.add('is-dragover');
+      });
+      dropzone?.addEventListener('dragover', (event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      });
+      dropzone?.addEventListener('dragleave', (event) => {
+        if (attachmentDragDepth <= 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        attachmentDragDepth = Math.max(0, attachmentDragDepth - 1);
+        if (!attachmentDragDepth) dropzone.classList.remove('is-dragover');
+      });
+      dropzone?.addEventListener('drop', async (event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const files = event.dataTransfer?.files;
+        clearAttachmentDragState();
+        if (files?.length) await handleAttachmentFiles(files);
       });
       documentRef?.getElementById('c-body')?.addEventListener('input', updateSpellingButton);
       updateSpellingButton();
