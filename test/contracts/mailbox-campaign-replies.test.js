@@ -2612,6 +2612,13 @@ test('legacy outbound-root recovery werkt voor alle campagneaccounts en bewezen 
     assert.equal(root.messageId, '<legacy-root@softora.nl>');
     assert.equal(root.body.includes('fris webdesign gemaakt'), true);
     assert.equal(root.originalCampaignOutbound, true);
+    assert.equal(root.bodyImageEvidenceKnown, false);
+    assert.equal(root.embeddedImageCount, 0);
+    assert.equal(root.webdesignLinkEvidenceKnown, false);
+    assert.equal(root.webdesignLinkUrl, '');
+    assert.equal(root.attachmentEvidenceKnown, false);
+    assert.deepEqual(root.attachments, []);
+    assert.equal(root.providerMessageIdHydrationEligible, true);
     assert.equal(root.threadCorrelationEvidence, 'exact-in-reply-to-customer-guard-structured-quote');
     assert.equal(root.id, '');
     assert.equal(root.recipientRoutingEvidenceKnown, true);
@@ -2994,6 +3001,11 @@ test('exacte accepted provenance matcht case-insensitive en wint van de virtuele
   assert.equal(replies[0].threadMessages[0].accountEmail, 'serve@softora.nl');
   assert.equal(replies[0].threadMessages[0].legacyAcceptedRoot, undefined);
   assert.equal(replies[0].threadMessages[0].body, fixture.originalBody);
+  assert.equal(replies[0].threadMessages[0].bodyImageEvidenceKnown, false);
+  assert.equal(replies[0].threadMessages[0].webdesignLinkEvidenceKnown, false);
+  assert.equal(replies[0].threadMessages[0].attachmentEvidenceKnown, false);
+  assert.deepEqual(replies[0].threadMessages[0].attachments, []);
+  assert.equal(replies[0].threadMessages[0].providerMessageIdHydrationEligible, true);
   assert.equal(fixture.guardLookups.length, 0);
 });
 
@@ -3007,8 +3019,10 @@ test('virtuele outbound-root bewaart alleen een exact gevalideerde Softora-previ
   const fixture = createLegacyMissingRootScenario({ originalBody });
   const replies = await fixture.service.listReplies({ limit: 100 });
 
+  assert.equal(replies[0].threadMessages[0].webdesignLinkEvidenceKnown, true);
   assert.equal(replies[0].threadMessages[0].webdesignLinkUrl, exactUrl);
   assert.equal(replies[0].threadMessages[0].webdesignLinkUrl.endsWith(']'), false);
+  assert.equal(replies[0].threadMessages[0].attachmentEvidenceKnown, false);
 });
 
 test('legacy outbound-root recovery batcht meer dan honderd ontvangers zonder queryverbreding', async () => {

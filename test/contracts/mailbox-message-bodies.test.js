@@ -25,7 +25,7 @@ function createService(overrides = {}) {
     assertMailboxMessageVisible: (message) => message,
     normalizeFolder: (value) => {
       const folder = String(value || 'inbox').trim().toLowerCase() || 'inbox';
-      return ['inbox', 'sent', 'coldmail'].includes(folder) ? folder : 'inbox';
+      return ['inbox', 'sent', 'coldmail', 'allmail'].includes(folder) ? folder : 'inbox';
     },
     mailboxIndexStore: {
       async getMessage({ accountEmail, folder, id }) {
@@ -60,6 +60,7 @@ function createService(overrides = {}) {
           bcc: '',
           deliveredTo: message.id === 'sent:42' ? '' : 'serve@softora.nl',
           recipientRoutingEvidenceKnown: true,
+          attachmentEvidenceKnown: true,
           attachments: message.id === 'sent:42'
             ? [{ filename: 'ontwerp.pdf', contentType: 'application/pdf', size: 2048 }]
             : [],
@@ -92,10 +93,14 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     folder: 'sent',
     accountEmail: 'serve@softora.nl',
     resolved: true,
+    requestMessageId: '',
+    providerMessageIdLookup: false,
+    providerLookupRetryable: false,
     body: 'Volledige inhoud voor sent:42',
     hasBody: true,
     bodyTruncated: false,
     bodyImageEvidenceKnown: true,
+    bodyImages: [],
     embeddedImageCount: 2,
     originalCampaignOutbound: true,
     webdesignLinkEvidenceKnown: true,
@@ -106,17 +111,23 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     bcc: '',
     deliveredTo: '',
     recipientRoutingEvidenceKnown: true,
+    attachmentEvidenceKnown: true,
     attachments: [{ filename: 'ontwerp.pdf', contentType: 'application/pdf', size: 2048 }],
+    optOutUrl: '',
   }, {
     id: 'inbox:43',
     uid: 43,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
     resolved: true,
+    requestMessageId: '',
+    providerMessageIdLookup: false,
+    providerLookupRetryable: false,
     body: 'Volledige inhoud voor inbox:43',
     hasBody: true,
     bodyTruncated: false,
     bodyImageEvidenceKnown: true,
+    bodyImages: [],
     embeddedImageCount: 0,
     originalCampaignOutbound: false,
     webdesignLinkEvidenceKnown: false,
@@ -127,7 +138,9 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     bcc: '',
     deliveredTo: 'serve@softora.nl',
     recipientRoutingEvidenceKnown: true,
+    attachmentEvidenceKnown: true,
     attachments: [],
+    optOutUrl: '',
   }]);
 });
 
@@ -209,6 +222,17 @@ test('mailbox body batch weigert onbegrensde, ongeldige en onbevoegde requests',
     }),
     (error) => error && error.status === 400
   );
+  await assert.rejects(
+    service.getMessageBodies({
+      messages: [{
+        account: 'serve@softora.nl',
+        folder: 'sent',
+        id: '',
+        messageId: '<unproven@example.test>',
+      }],
+    }),
+    (error) => error && error.status === 400
+  );
 });
 
 test('mailbox body batch hydrateert Instantly via exact provideraccount en provider-id', async () => {
@@ -228,10 +252,14 @@ test('mailbox body batch hydrateert Instantly via exact provideraccount en provi
     folder: 'instantly',
     accountEmail: 'serve@websoftora.com',
     resolved: true,
+    requestMessageId: '',
+    providerMessageIdLookup: false,
+    providerLookupRetryable: false,
     body: 'Volledige inhoud voor instantly:abc-123',
     hasBody: true,
     bodyTruncated: false,
     bodyImageEvidenceKnown: true,
+    bodyImages: [],
     embeddedImageCount: 0,
     originalCampaignOutbound: false,
     webdesignLinkEvidenceKnown: false,
@@ -242,7 +270,9 @@ test('mailbox body batch hydrateert Instantly via exact provideraccount en provi
     bcc: '',
     deliveredTo: 'serve@softora.nl',
     recipientRoutingEvidenceKnown: true,
+    attachmentEvidenceKnown: true,
     attachments: [],
+    optOutUrl: '',
   }]);
 
   await assert.rejects(
@@ -257,4 +287,218 @@ test('mailbox body batch hydrateert Instantly via exact provideraccount en provi
     }),
     (error) => error && error.status === 400
   );
+});
+
+test('UID-loze bewezen Sent-root hydrateert exact op Message-ID via Sent en daarna All Mail', async () => {
+  const calls = [];
+  const requestedMessageId = '<5A61FA42-RuUd@GMAIL.COM>';
+  const exactUrl = 'https://www.softora.nl/webdesign/ruud-bos?cid=ruud-1&sender=martijn';
+  const attachments = [{
+    filename: 'webdesign-ruud-bos.pdf',
+    contentType: 'application/pdf',
+    size: 48123,
+  }];
+  const service = createService({
+    assertReadableAccount(accountEmail) {
+      const email = String(accountEmail || '').trim().toLowerCase();
+      assert.equal(email, 'martijn@softora.nl');
+      return { email };
+    },
+    mailboxIndexStore: {
+      async hydrateMessageBodies() {
+        assert.fail('Een UID-loze Message-ID-root mag niet via de UID-index worden gehydrateerd.');
+      },
+    },
+    async fetchMessagesFromImap(options) {
+      calls.push(options);
+      if (options.folder === 'sent') return [];
+      return [{
+        id: 'allmail:912',
+        uid: 912,
+        folder: 'allmail',
+        messageId: '<5a61fa42-ruud@gmail.com>',
+        body: 'Dit is de echte MIME-body met de previewlink en bijlage.',
+        hasBody: true,
+        bodyTruncated: false,
+        bodyImageEvidenceKnown: true,
+        bodyImages: [{ alt: 'Preview', dataUrl: '/api/mailbox/message-image?id=allmail%3A912&index=0' }],
+        embeddedImageCount: 1,
+        originalCampaignOutbound: true,
+        webdesignLinkEvidenceKnown: true,
+        webdesignLinkUrl: exactUrl,
+        recipientRoutingEvidenceKnown: true,
+        to: 'ruud@example.nl',
+        toDisplay: 'Ruud Bos <ruud@example.nl>',
+        attachmentEvidenceKnown: true,
+        attachments,
+      }];
+    },
+  });
+
+  const [message] = await service.getMessageBodies({
+    messages: [{
+      account: 'martijn@softora.nl',
+      folder: 'sent',
+      id: 'accepted-sent:<5A61FA42-RuUd@GMAIL.COM>',
+      messageId: requestedMessageId,
+      providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.deepEqual(calls.map((call) => call.folder), ['sent', 'allmail']);
+  assert.equal(calls.every((call) => call.account.email === 'martijn@softora.nl'), true);
+  assert.equal(calls.every((call) => call.targetedOnly === true), true);
+  assert.equal(calls.every((call) => call.exactMessageIdOnly === true), true);
+  assert.equal(calls.every((call) => call.limit === 2), true);
+  assert.equal(calls.every((call) => call.imapOperationTimeoutMs === 18_000), true);
+  assert.deepEqual(calls.map((call) => call.threadReferenceIds), [
+    [requestedMessageId],
+    [requestedMessageId],
+  ]);
+  assert.equal(message.resolved, true);
+  assert.equal(message.accountEmail, 'martijn@softora.nl');
+  assert.equal(message.requestMessageId, requestedMessageId);
+  assert.equal(message.providerMessageIdLookup, true);
+  assert.equal(message.providerLookupRetryable, false);
+  assert.equal(message.body, 'Dit is de echte MIME-body met de previewlink en bijlage.');
+  assert.equal(message.webdesignLinkEvidenceKnown, true);
+  assert.equal(message.webdesignLinkUrl, exactUrl);
+  assert.equal(message.attachmentEvidenceKnown, true);
+  assert.deepEqual(message.attachments, attachments);
+  assert.deepEqual(message.bodyImages, [{
+    alt: 'Preview',
+    dataUrl: '/api/mailbox/message-image?id=allmail%3A912&index=0',
+  }]);
+});
+
+test('tijdelijk onopgeloste Message-ID-providerlookup blijft retryable en probeert beide Gmail-mappen', async () => {
+  const calls = [];
+  const service = createService({
+    mailboxIndexStore: {
+      async hydrateMessageBodies() {
+        assert.fail('Een UID-loze Message-ID-root mag niet via de UID-index worden gehydrateerd.');
+      },
+    },
+    async fetchMessagesFromImap(options) {
+      calls.push(options);
+      if (options.folder === 'sent') {
+        const error = new Error('IMAP-operatie timeout na 18000ms');
+        error.code = 'ETIMEDOUT';
+        throw error;
+      }
+      return [];
+    },
+    logger: { warn() {} },
+  });
+
+  const [message] = await service.getMessageBodies({
+    messages: [{
+      account: 'serve@softora.nl',
+      folder: 'sent',
+      id: '',
+      messageId: '<retry-root@GMAIL.COM>',
+      providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.deepEqual(calls.map((call) => call.folder), ['sent', 'allmail']);
+  assert.equal(message.resolved, false);
+  assert.equal(message.requestMessageId, '<retry-root@GMAIL.COM>');
+  assert.equal(message.providerMessageIdLookup, true);
+  assert.equal(message.providerLookupRetryable, true);
+  assert.equal(message.attachmentEvidenceKnown, false);
+  assert.deepEqual(message.attachments, []);
+});
+
+test('permanente providerfout blijft terminal en wordt niet als tijdelijke retry gemarkeerd', async () => {
+  const service = createService({
+    async fetchMessagesFromImap() {
+      const error = new Error('Authentication failed');
+      error.code = 'EAUTH';
+      error.status = 401;
+      throw error;
+    },
+    logger: { warn() {} },
+  });
+
+  const [message] = await service.getMessageBodies({
+    messages: [{
+      account: 'serve@softora.nl',
+      folder: 'sent',
+      id: '',
+      messageId: '<permanent-root@example.test>',
+      providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.equal(message.resolved, false);
+  assert.equal(message.providerLookupRetryable, false);
+});
+
+test('dubbele exacte Message-ID-providerresultaten worden terminal geweigerd', async () => {
+  const calls = [];
+  const service = createService({
+    async fetchMessagesFromImap(options) {
+      calls.push(options);
+      return [71, 72].map((uid) => ({
+        id: `sent:${uid}`,
+        uid,
+        folder: 'sent',
+        messageId: '<duplicate-root@example.test>',
+        body: `Dubbel ${uid}`,
+        bodyResolved: true,
+      }));
+    },
+    logger: { warn() {} },
+  });
+
+  const [message] = await service.getMessageBodies({
+    messages: [{
+      account: 'serve@softora.nl',
+      folder: 'sent',
+      id: '',
+      messageId: '<duplicate-root@example.test>',
+      providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].limit, 2);
+  assert.equal(message.resolved, false);
+  assert.equal(message.providerLookupRetryable, false);
+});
+
+test('Message-ID-providerhydratie is per batch begrensd tot één echte IMAP-lookup', async () => {
+  const calls = [];
+  const service = createService({
+    mailboxIndexStore: {
+      async hydrateMessageBodies() {
+        assert.fail('UID-loze Message-ID-roots mogen niet via de UID-index worden gehydrateerd.');
+      },
+    },
+    async fetchMessagesFromImap(options) {
+      calls.push(options);
+      return [];
+    },
+  });
+
+  const messages = await service.getMessageBodies({
+    messages: [{
+      account: 'serve@softora.nl', folder: 'sent', id: '', messageId: '<first@example.test>', providerMessageIdHydrationEligible: true,
+    }, {
+      account: 'serve@softora.nl', folder: 'sent', id: '', messageId: '<second@example.test>', providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.deepEqual(calls.map((call) => call.threadReferenceIds), [
+    ['<first@example.test>'],
+    ['<first@example.test>'],
+  ]);
+  assert.equal(messages.length, 2);
+  assert.equal(messages.every((message) => message.resolved === false), true);
+  assert.deepEqual(messages.map((message) => message.providerLookupRetryable), [false, true]);
+  assert.deepEqual(messages.map((message) => message.requestMessageId), [
+    '<first@example.test>',
+    '<second@example.test>',
+  ]);
 });

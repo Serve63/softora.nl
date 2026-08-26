@@ -178,6 +178,30 @@ function sanitizeAttachments(value) {
   }));
 }
 
+function isValidProviderMessageId(value) {
+  const normalized = text(value, 1000).trim().replace(/^[<\s]+|[>\s]+$/g, '');
+  return /^[^<>\s@]{1,240}@[^<>\s@]{1,240}$/.test(normalized);
+}
+
+function hasProviderMessageIdHydrationEvidence(source = {}) {
+  return source.providerMessageIdHydrationEligible === true ||
+    source.localAcceptedSend === true ||
+    source.legacyAcceptedRoot === true ||
+    (
+      source.softoraThreadProvenanceKnown === true &&
+      Boolean(text(source.softoraSendIntentId, 500))
+    ) ||
+    (
+      source.originalCampaignOutbound === true &&
+      !Number(source.uid) &&
+      ['sent', 'allmail'].includes(text(source.storageFolder || source.folder || 'sent', 50).toLowerCase()) &&
+      isValidProviderMessageId(source.messageId) &&
+      Boolean(text(source.accountEmail, 320).trim()) &&
+      source.recipientRoutingEvidenceKnown === true &&
+      Boolean(text(source.to || source.toDisplay, 2000).trim())
+    );
+}
+
 function sanitizeThreadMessage(value, options = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const rawBody = String(source.body || '');
@@ -212,6 +236,10 @@ function sanitizeThreadMessage(value, options = {}) {
     deliveredTo: text(source.deliveredTo, 1000),
     recipientRoutingEvidenceKnown: source.recipientRoutingEvidenceKnown === true,
     attachments: sanitizeAttachments(source.attachments),
+    attachmentEvidenceKnown: source.attachmentEvidenceKnown === true,
+    ...(hasProviderMessageIdHydrationEvidence(source)
+      ? { providerMessageIdHydrationEligible: true }
+      : {}),
     subject: text(source.subject || '(Geen onderwerp)', 1000),
     preview: text(source.preview, 1000),
     body,
@@ -288,6 +316,10 @@ function sanitizeMessage(value, options = {}) {
     deliveredTo: text(source.deliveredTo, 1000),
     recipientRoutingEvidenceKnown: source.recipientRoutingEvidenceKnown === true,
     attachments: sanitizeAttachments(source.attachments),
+    attachmentEvidenceKnown: source.attachmentEvidenceKnown === true,
+    ...(hasProviderMessageIdHydrationEvidence(source)
+      ? { providerMessageIdHydrationEligible: true }
+      : {}),
     subject: text(source.subject || '(Geen onderwerp)', 1000),
     preview: text(source.preview, 1000),
     body,

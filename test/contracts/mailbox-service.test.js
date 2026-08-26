@@ -1476,6 +1476,75 @@ test('mailbox service resolves Gmail All Mail through IMAP special-use metadata'
   assert.equal(messages[0].subject, 'Re: Nieuw webdesign');
 });
 
+test('mailbox service herkent een eigen Gmail All Mail-campagnekopie als verzonden MIME-bewijs', async () => {
+  const exactUrl = 'https://www.softora.nl/webdesign/ruud-bos?cid=ruud-1&sender=martijn';
+  const sentDate = new Date('2026-08-20T12:49:00.000Z');
+  const body = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website ruudbosdesign.nl tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken.',
+  ].join('\n');
+  const client = createFakeImapClient({
+    boxes: [{ path: '[Gmail]/Alle berichten', specialUse: '\\All' }],
+    messagesByMailbox: {
+      '[Gmail]/Alle berichten': [{
+        uid: 912,
+        flags: ['\\Seen'],
+        internalDate: sentDate,
+        source: {
+          date: sentDate,
+          text: body,
+          html: [
+            '<p>Goedendag,</p>',
+            '<p>Afgelopen week kwam ik jullie website ruudbosdesign.nl tegen.</p>',
+            '<p>Uit enthousiasme heb ik een fris webdesign gemaakt.</p>',
+            `<p>Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${exactUrl.replaceAll('&', '&amp;')}">link</a> bekijken.</p>`,
+          ].join(''),
+          subject: 'Kleine vraag over jullie website',
+          messageId: '<ruud-root@gmail.com>',
+          from: { value: [{ name: 'Martijn van de Ven', address: 'martijnven123@gmail.com' }] },
+          to: { value: [{ name: 'Ruud Bos', address: 'info@ruudbosdesign.nl' }] },
+          attachments: [{
+            filename: 'webdesign-ruud-bos.pdf',
+            contentType: 'application/pdf',
+            content: Buffer.from('pdf'),
+          }],
+        },
+      }],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'martijnven123@gmail.com',
+      name: 'Martijn',
+      imapHost: 'imap.gmail.com',
+      imapUser: 'martijnven123@gmail.com',
+      imapPass: 'secret',
+    }]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const [message] = await service.listMessages({
+    accountEmail: 'martijnven123@gmail.com',
+    folder: CAMPAIGN_GMAIL_ALL_MAIL_FOLDER,
+  });
+
+  assert.equal(message.folder, CAMPAIGN_GMAIL_ALL_MAIL_FOLDER);
+  assert.equal(message.originalCampaignOutbound, true);
+  assert.equal(message.webdesignLinkEvidenceKnown, true);
+  assert.equal(message.webdesignLinkUrl, exactUrl);
+  assert.deepEqual(message.attachments, [{
+    filename: 'webdesign-ruud-bos.pdf',
+    contentType: 'application/pdf',
+    size: 3,
+  }]);
+});
+
 test('mailbox service resolves Dutch sent folders without special-use metadata', async () => {
   const sentDate = new Date('2026-05-12T11:15:00.000Z');
   const client = createFakeImapClient({

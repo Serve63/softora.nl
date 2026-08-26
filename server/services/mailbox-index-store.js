@@ -367,7 +367,7 @@ function createMailboxIndexStore(deps = {}) {
       deliveredTo: normalizeString(payload.deliveredTo),
       recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true || Boolean(normalizeString(row.recipients_text)),
       replyTo: normalizeString(payload.replyTo),
-      attachments: normalizeAttachments(payload.attachments),
+      attachments: normalizeAttachments(payload.attachments), attachmentEvidenceKnown: Object.prototype.hasOwnProperty.call(payload, 'attachments'),
       autoSubmitted: normalizeString(payload.autoSubmitted),
       precedence: normalizeString(payload.precedence),
       autoResponseSuppress: normalizeString(payload.autoResponseSuppress),
@@ -941,7 +941,7 @@ function createMailboxIndexStore(deps = {}) {
         bcc: normalizeString(payload.bcc),
         deliveredTo: normalizeString(payload.deliveredTo),
         recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true || Boolean(normalizeString(row.recipients_text || message.to)),
-        attachments: normalizeAttachments(payload.attachments),
+        attachments: normalizeAttachments(payload.attachments), attachmentEvidenceKnown: Object.prototype.hasOwnProperty.call(payload, 'attachments'),
       };
     });
   }

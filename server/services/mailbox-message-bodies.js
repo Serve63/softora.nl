@@ -1,8 +1,41 @@
 const crypto = require('crypto');
 const MAX_MAILBOX_BODY_BATCH_SIZE = 20;
+const MAX_PROVIDER_MESSAGE_ID_HYDRATIONS_PER_BATCH = 1;
+const PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS = 18_000;
+const PROVIDER_MESSAGE_ID_MATCH_LIMIT = 2;
+const PROVIDER_MESSAGE_ID_FOLDERS = Object.freeze(['sent', 'allmail']);
+const RETRYABLE_PROVIDER_LOOKUP_CODES = new Set([
+  'ETIMEDOUT',
+  'ESOCKET',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'EPIPE',
+  'EAI_AGAIN',
+  'ENETDOWN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'MAILBOX_IMAP_OPERATION_TIMEOUT',
+]);
 
 function normalizeText(value) {
   return String(value || '').trim();
+}
+
+function normalizeMessageId(value) {
+  return normalizeText(value).replace(/^[<\s]+|[>\s]+$/g, '');
+}
+
+function isValidMessageId(value) {
+  return /^[^<>\s@]{1,240}@[^<>\s@]{1,240}$/.test(normalizeMessageId(value));
+}
+
+function isRetryableProviderLookupError(error) {
+  const code = normalizeText(error && error.code).toUpperCase();
+  const status = Number(error && (error.statusCode || error.status));
+  return RETRYABLE_PROVIDER_LOOKUP_CODES.has(code) ||
+    [408, 425, 429].includes(status) ||
+    (Number.isFinite(status) && status >= 500 && status <= 599);
 }
 
 function createMailboxMessageBodiesService({
@@ -12,6 +45,7 @@ function createMailboxMessageBodiesService({
   canUseMailboxIndex,
   assertMailboxMessageVisible,
   normalizeFolder,
+  fetchMessagesFromImap,
   logger = console,
 } = {}) {
   function normalizeMessageFolder(value) {
@@ -59,6 +93,64 @@ function createMailboxMessageBodiesService({
       : indexed;
   }
 
+  async function hydrateProviderMessageReference(reference) {
+    const unresolved = {
+      id: reference.id,
+      uid: 0,
+      folder: reference.folder,
+      accountEmail: reference.accountEmail,
+      messageId: reference.requestMessageId,
+      requestMessageId: reference.requestMessageId,
+      providerMessageIdLookup: true,
+      providerLookupRetryable: false,
+      bodyResolved: false,
+    };
+    if (typeof fetchMessagesFromImap !== 'function') return unresolved;
+    let transientFailure = false;
+    for (const folder of PROVIDER_MESSAGE_ID_FOLDERS) {
+      try {
+        const messages = await fetchMessagesFromImap({
+          account: reference.account,
+          folder,
+          limit: PROVIDER_MESSAGE_ID_MATCH_LIMIT,
+          targetedOnly: true,
+          exactMessageIdOnly: true,
+          threadReferenceIds: [reference.requestMessageId],
+          threadRecipientTerms: [],
+          imapOperationTimeoutMs: PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS,
+          logImapOperation: true,
+        });
+        const exact = (Array.isArray(messages) ? messages : []).filter((message) => (
+          normalizeMessageId(message && message.messageId).toLowerCase() === reference.canonicalMessageId
+        ));
+        if (exact.length === 1) {
+          return {
+            ...exact[0],
+            accountEmail: reference.accountEmail,
+            bodyResolved: true,
+            requestMessageId: reference.requestMessageId,
+            providerMessageIdLookup: true,
+          };
+        }
+        if (exact.length > 1) {
+          logger.warn?.('[MailboxDetail][MessageIdHydration] dubbel exact providerbericht geweigerd', {
+            account: reference.accountEmail,
+            folder,
+          });
+          return unresolved;
+        }
+      } catch (error) {
+        transientFailure = transientFailure || isRetryableProviderLookupError(error);
+        logger.warn?.('[MailboxDetail][MessageIdHydration]', {
+          account: reference.accountEmail,
+          folder,
+          code: normalizeText(error && (error.code || error.status)) || 'UNKNOWN',
+        });
+      }
+    }
+    return transientFailure ? { ...unresolved, providerLookupRetryable: true } : unresolved;
+  }
+
   async function getMessageBodies({ messages = [] } = {}) {
     const source = Array.isArray(messages) ? messages : [];
     if (!source.length || source.length > MAX_MAILBOX_BODY_BATCH_SIZE) {
@@ -103,9 +195,29 @@ function createMailboxMessageBodiesService({
       const uid = Number(message && message.uid) ||
         Number(id.match(/:(\d+)$/)?.[1] || id);
       if (!Number.isSafeInteger(uid) || uid <= 0) {
-        const error = new Error('Ongeldige mailboxberichtreferentie.');
-        error.status = 400;
-        throw error;
+        const providerMessageId = normalizeMessageId(message && message.messageId);
+        const canonicalMessageId = providerMessageId.toLowerCase();
+        if (
+          !message ||
+          message.providerMessageIdHydrationEligible !== true ||
+          !['sent', 'allmail'].includes(folder) ||
+          !isValidMessageId(providerMessageId)
+        ) {
+          const error = new Error('Ongeldige mailboxberichtreferentie.');
+          error.status = 400;
+          throw error;
+        }
+        return {
+          id,
+          uid: 0,
+          folder,
+          accountEmail: account.email,
+          account,
+          canonicalMessageId,
+          requestMessageId: `<${providerMessageId}>`,
+          providerMessageIdLookup: true,
+          providerMessageIdHydrationEligible: true,
+        };
       }
       return {
         id: id || `${folder}:${uid}`,
@@ -115,22 +227,54 @@ function createMailboxMessageBodiesService({
       };
     });
 
-    const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: references });
-    if (!Array.isArray(hydrated)) {
+    const indexedReferences = references.filter((reference) => reference.providerMessageIdLookup !== true);
+    const indexedHydrated = indexedReferences.length
+      ? await mailboxIndexStore.hydrateMessageBodies({ messages: indexedReferences })
+      : [];
+    if (!Array.isArray(indexedHydrated)) {
       const error = new Error('Mailboxberichtinhoud kon niet worden gelezen.');
       error.status = 503;
       throw error;
     }
+    let indexedOffset = 0;
+    const providerTargets = references
+      .filter((reference) => reference.providerMessageIdLookup === true)
+      .slice(0, MAX_PROVIDER_MESSAGE_ID_HYDRATIONS_PER_BATCH);
+    const providerHydrated = new Map();
+    for (const reference of providerTargets) {
+      providerHydrated.set(
+        `${reference.accountEmail}|${reference.canonicalMessageId}`,
+        await hydrateProviderMessageReference(reference)
+      );
+    }
+    const hydrated = references.map((reference) => {
+      if (reference.providerMessageIdLookup !== true) return indexedHydrated[indexedOffset++];
+      return providerHydrated.get(`${reference.accountEmail}|${reference.canonicalMessageId}`) || {
+        id: reference.id,
+        uid: 0,
+        folder: reference.folder,
+        accountEmail: reference.accountEmail,
+        messageId: reference.requestMessageId,
+        requestMessageId: reference.requestMessageId,
+        providerMessageIdLookup: true,
+        providerLookupRetryable: true,
+        bodyResolved: false,
+      };
+    });
     return hydrated.map((message) => ({
       id: normalizeText(message && message.id),
       uid: Number(message && message.uid) || 0,
       folder: normalizeMessageFolder(message && message.folder),
       accountEmail: normalizeText(message && message.accountEmail).toLowerCase(),
       resolved: message && message.bodyResolved === true,
+      requestMessageId: normalizeText(message && message.requestMessageId),
+      providerMessageIdLookup: message && message.providerMessageIdLookup === true,
+      providerLookupRetryable: message && message.providerLookupRetryable === true,
       body: normalizeText(message && message.body),
       hasBody: Boolean(message && (message.hasBody || message.body)),
       bodyTruncated: Boolean(message && message.bodyTruncated),
       bodyImageEvidenceKnown: Boolean(message && message.bodyImageEvidenceKnown),
+      bodyImages: Array.isArray(message && message.bodyImages) ? message.bodyImages.slice(0, 8) : [],
       embeddedImageCount: Math.max(
         0,
         Math.min(8, Number(message && message.embeddedImageCount) || 0)
@@ -144,7 +288,9 @@ function createMailboxMessageBodiesService({
       bcc: normalizeText(message && message.bcc),
       deliveredTo: normalizeText(message && message.deliveredTo),
       recipientRoutingEvidenceKnown: message && message.recipientRoutingEvidenceKnown === true,
+      attachmentEvidenceKnown: message && message.attachmentEvidenceKnown === true,
       attachments: Array.isArray(message && message.attachments) ? message.attachments : [],
+      optOutUrl: normalizeText(message && message.optOutUrl),
     }));
   }
 
@@ -157,6 +303,7 @@ function createMailboxMessageBodiesService({
         account: normalizeText(message && message.account).toLowerCase(),
         folder: normalizeText(message && message.folder).toLowerCase(),
         id: normalizeText(message && message.id),
+        messageId: normalizeText(message && message.messageId),
       }))
     )).digest('hex').slice(0, 16);
     res.setHeader('X-Mailbox-Request-Id', requestId);
