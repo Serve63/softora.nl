@@ -211,8 +211,8 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /"contactType":"sales"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
   assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260601a" defer><\/script>/);
-  assert.match(first, /<link rel="stylesheet" href="\/assets\/google-ads-consent\.css\?v=20260717a">/);
-  assert.match(first, /<script src="\/assets\/google-ads-consent\.js\?v=20260717a" defer><\/script>/);
+  assert.match(first, /<link rel="stylesheet" href="\/assets\/google-ads-consent\.css\?v=20260826a">/);
+  assert.match(first, /<script src="\/assets\/google-ads-consent\.js\?v=20260826a" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal((second.match(/data-softora-public-seo="internal-links"/g) || []).length, 1);
@@ -236,10 +236,11 @@ test('public seo renderer normalizes legacy contact CTAs to measured Martijn Wha
     siteOrigin: 'https://www.softora.nl',
   });
 
-  assert.equal((html.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length, 5);
-  assert.equal((html.match(/target="_blank"/g) || []).length, 5);
-  assert.equal((html.match(/data-softora-conversion-page="\/diensten"/g) || []).length, 5);
-  assert.equal((html.match(/data-softora-conversion-target="whatsapp"/g) || []).length, 5);
+  assert.equal((html.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length, 6);
+  assert.equal((html.match(/target="_blank"/g) || []).length, 6);
+  assert.equal((html.match(/data-softora-conversion-page="\/diensten"/g) || []).length, 6);
+  assert.equal((html.match(/data-softora-conversion-target="whatsapp"/g) || []).length, 6);
+  assert.match(html, /data-softora-conversion="sitewide-whatsapp-widget"/);
   assert.doesNotMatch(html, /href="mailto:|href="tel:|href="\/#contact|api\.whatsapp\.com|wa\.me\/31643262792\?/);
   assert.match(html, /rel="nofollow noopener noreferrer"/);
 });

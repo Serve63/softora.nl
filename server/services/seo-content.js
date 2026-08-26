@@ -6,9 +6,9 @@ const DEFAULT_LOGO_PATH = '/assets/softora-touch-icon.png';
 const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
 const SOFTORA_PUBLIC_PHONE = '+31643262792';
 const MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
+const { addPublicWhatsappWidgetIfMissing } = require('./public-whatsapp-widget');
 const SOFTORA_LOCALITY = 'Oisterwijk';
 const SOFTORA_REGION = 'Noord-Brabant';
-
 const SEO_CONTENT_COLLECTIONS = Object.freeze({
   blog: Object.freeze({
     key: 'blog',
@@ -3112,7 +3112,7 @@ function buildBreadcrumbItems(siteOrigin, entries) {
 
 function buildContentShell({ title, description, canonicalUrl, structuredData, body, ogType = 'website', image }) {
   const conversionPage = getPathFromUrl(canonicalUrl);
-  return [
+  return addPublicWhatsappWidgetIfMissing([
     '<!DOCTYPE html>',
     '<html lang="nl">',
     '<head>',
@@ -3141,7 +3141,7 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '</body>',
     '</html>',
     '',
-  ].join('\n');
+  ].join('\n'), { pagePath: conversionPage });
 }
 
 function renderRelatedLinks(links) {

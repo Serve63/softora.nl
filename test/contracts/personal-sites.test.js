@@ -34,6 +34,12 @@ test('personal pages are registered under the Softora subpaths', () => {
     const siteRoot = path.join(PERSONAL_SITES_ROOT, slug);
     const html = fs.readFileSync(path.join(siteRoot, 'index.html'), 'utf8');
     assert.match(html, new RegExp(`https://www\\.softora\\.nl/${slug}/`));
+    assert.equal(
+      (html.match(/href="https:\/\/www\.softora\.nl\/contact"/g) || []).length,
+      2,
+      `${slug} should route both CTA buttons to the Softora contact page`,
+    );
+    assert.doesNotMatch(html, /↗/, `${slug} should not show arrow glyphs after CTA labels`);
     assert.ok(fs.existsSync(path.join(siteRoot, 'styles.css')));
     assert.ok(fs.existsSync(path.join(siteRoot, 'script.js')));
     assert.ok(fs.existsSync(path.join(siteRoot, 'assets')));

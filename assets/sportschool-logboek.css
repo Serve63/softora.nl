@@ -64,7 +64,7 @@ textarea:focus-visible {
 }
 
 .gym-app {
-  width: min(100%, 430px);
+  width: min(100%, 400px);
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
@@ -79,8 +79,8 @@ textarea:focus-visible {
   z-index: 10;
   display: grid;
   place-items: center;
-  min-height: calc(94px + var(--safe-top));
-  padding: calc(18px + var(--safe-top)) 18px 14px;
+  min-height: calc(80px + var(--safe-top));
+  padding: calc(12px + var(--safe-top)) 14px 10px;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(18px);
 }
@@ -111,7 +111,7 @@ textarea:focus-visible {
   margin: 0;
   max-width: 300px;
   color: var(--softora-ink);
-  font-size: 23px;
+  font-size: 21px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 1px;
@@ -121,43 +121,43 @@ textarea:focus-visible {
 .day-trigger {
   appearance: none;
   border: 0;
-  padding: 5px 10px;
+  padding: 4px 8px;
   background: transparent;
   color: var(--softora-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.7px;
 }
 
 .gym-section {
-  padding: 24px 18px calc(28px + var(--safe-bottom));
+  padding: 16px 14px calc(22px + var(--safe-bottom));
 }
 
 .gym-section-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .gym-section h2 {
   margin: 0;
   color: var(--softora-ink);
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: 1px;
 }
 
 .icon-button {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   margin-left: auto;
   border: 1px solid var(--softora-purple-line);
-  border-radius: 13px;
+  border-radius: 11px;
   background: var(--softora-white);
   color: var(--softora-purple);
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 600;
   line-height: 1;
 }
@@ -169,13 +169,13 @@ textarea:focus-visible {
 
 .exercise-list {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .exercise-swipe {
   position: relative;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 10px;
   touch-action: pan-y;
 }
 
@@ -183,11 +183,11 @@ textarea:focus-visible {
 .completion-action {
   position: absolute;
   z-index: 0;
-  width: 108px;
+  width: 96px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--softora-white);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.6px;
 }
@@ -230,11 +230,11 @@ textarea:focus-visible {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 3px;
+  gap: 2px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--softora-purple-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--softora-white);
   touch-action: pan-y;
   transition:
@@ -276,10 +276,10 @@ textarea:focus-visible {
 
 .exercise-top {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  grid-template-rows: 38px minmax(34px, auto);
-  column-gap: 5px;
-  row-gap: 2px;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-rows: 34px minmax(30px, auto);
+  column-gap: 4px;
+  row-gap: 1px;
   align-items: center;
 }
 
@@ -291,9 +291,9 @@ textarea:focus-visible {
 .drag-handle {
   display: grid;
   gap: 2px;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
   place-content: center;
   padding: 0;
   border: 0;
@@ -335,7 +335,7 @@ textarea:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-ink);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.04;
   letter-spacing: 0.28px;
@@ -357,7 +357,7 @@ textarea:focus-visible {
   display: grid;
   grid-column: 3;
   grid-row: 1 / span 2;
-  gap: 2px;
+  gap: 1px;
   align-self: start;
   justify-items: end;
 }
@@ -365,16 +365,16 @@ textarea:focus-visible {
 .metric {
   display: grid;
   justify-items: center;
-  width: 36px;
-  min-height: 36px;
-  padding: 3px 2px 2px;
+  width: 32px;
+  min-height: 32px;
+  padding: 2px 1px 1px;
   border: 1px solid rgba(240, 220, 230, 0.86);
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(252, 248, 251, 0.75);
 }
 
 .metric-kg {
-  width: 46px;
+  width: 40px;
 }
 
 .metric:focus-within {
@@ -385,29 +385,29 @@ textarea:focus-visible {
 .metric-input {
   width: 100%;
   min-width: 0;
-  height: 22px;
+  height: 19px;
   padding: 0;
   color: var(--softora-ink);
   font-family: Oswald, Inter, sans-serif;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
 }
 
 .metric-kg .metric-input {
-  font-size: 10.5px;
+  font-size: 9.5px;
 }
 
 .metric-label {
   color: rgba(127, 125, 141, 0.8);
-  font-size: 6px;
+  font-size: 5.5px;
   font-weight: 700;
   letter-spacing: 0.3px;
 }
 
 .form-history {
-  min-height: 34px;
+  min-height: 30px;
 }
 
 .form-history-slots {
@@ -417,17 +417,17 @@ textarea:focus-visible {
 
 .form-status {
   display: grid;
-  width: 36px;
-  min-height: 34px;
+  width: 32px;
+  min-height: 30px;
   place-items: center;
-  padding: 2px;
+  padding: 1px;
   border: 1px solid rgba(240, 220, 230, 0.86);
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(252, 248, 251, 0.75);
 }
 
 .form-status:nth-child(3) {
-  width: 46px;
+  width: 40px;
 }
 
 .form-status:focus-within {
@@ -439,7 +439,7 @@ textarea:focus-visible {
   display: grid;
   width: 100%;
   min-width: 0;
-  height: 28px;
+  height: 26px;
   place-items: center;
   padding: 0;
   color: rgba(127, 125, 141, 0.55);
@@ -456,8 +456,8 @@ textarea:focus-visible {
 
 .form-status-icon {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   overflow: visible;
 }
 
@@ -472,7 +472,7 @@ textarea:focus-visible {
 
 .form-status-empty {
   display: block;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1;
   transform: translateY(-1px);
@@ -507,33 +507,33 @@ textarea:focus-visible {
   display: block;
   width: 100%;
   min-width: 0;
-  min-height: 28px;
+  min-height: 24px;
   margin: 0;
   padding: 0;
   overflow: hidden;
   resize: none;
   color: var(--softora-muted);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   letter-spacing: 0.15px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .rest-day {
-  margin: 22px 0 0;
+  margin: 16px 0 0;
   color: var(--softora-muted);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.7px;
   text-align: center;
 }
 
 .logbook-status {
-  margin: 22px 0 0;
+  margin: 16px 0 0;
   color: var(--softora-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.55px;
   text-align: center;
@@ -567,20 +567,20 @@ textarea:focus-visible {
 .day-picker-sheet {
   position: relative;
   z-index: 1;
-  width: min(100% - 24px, 406px);
+  width: min(100% - 24px, 380px);
   margin: 0 auto max(10px, var(--safe-bottom));
-  padding: 22px 18px 26px;
+  padding: 18px 14px 20px;
   border: 1px solid rgba(139, 34, 82, 0.12);
-  border-radius: 28px;
+  border-radius: 22px;
   background: var(--softora-white);
   box-shadow: 0 24px 70px rgba(25, 24, 39, 0.14);
   pointer-events: auto;
 }
 
 .day-picker-sheet h2 {
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   color: var(--softora-ink);
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: 1px;
   text-align: center;
@@ -589,16 +589,16 @@ textarea:focus-visible {
 .day-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .day-choice {
-  min-height: 46px;
+  min-height: 42px;
   border: 1px solid var(--softora-purple-line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--softora-white);
   color: var(--softora-ink);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.8px;
 }
@@ -617,10 +617,10 @@ textarea:focus-visible {
   }
 
   .gym-app {
-    margin-block: 22px;
-    min-height: calc(100vh - 44px);
+    margin-block: 16px;
+    min-height: calc(100vh - 32px);
     border: 1px solid var(--softora-purple-line);
-    border-radius: 30px;
+    border-radius: 24px;
     overflow: hidden;
     box-shadow: 0 24px 70px rgba(25, 24, 39, 0.08);
   }
