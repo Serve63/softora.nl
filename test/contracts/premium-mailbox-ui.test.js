@@ -8605,6 +8605,125 @@ test('achtergrondrefresh remapt een fysieke kopiewissel naar hetzelfde logische 
   }]);
 });
 
+test('legacy achtergrondsync remapt een fysieke kopiewissel zonder eerste mail of laadlaag', async () => {
+  const accountEmail = 'info@softora.nl';
+  const conversationId = 'conversation:info@softora.nl|peak-boom';
+  const sharedMessage = {
+    accountEmail,
+    folder: 'inbox',
+    conversationId,
+    messageId: '<peak-boom@example.test>',
+    from: 'Peak Boom',
+    email: 'contact@peak-boom.example',
+    to: accountEmail,
+    subject: 'Zelfde logische gesprek',
+    body: 'Deze reeds geladen inhoud blijft exact zichtbaar.',
+    hasBody: true,
+    recipientRoutingEvidenceKnown: true,
+    receivedAt: '2026-08-26T08:00:00.000Z',
+  };
+  const currentRaw = { ...sharedMessage, id: 'inbox:42', mailboxId: 'inbox:42', storageFolder: 'inbox' };
+  const replacementRaw = { ...sharedMessage, id: 'allmail:991', mailboxId: 'allmail:991', storageFolder: 'allmail' };
+  const unrelatedRaw = {
+    ...sharedMessage,
+    id: 'inbox:1',
+    mailboxId: 'inbox:1',
+    messageId: '<unrelated@example.test>',
+    conversationId: 'conversation:info@softora.nl|unrelated',
+    from: 'Onverwachte eerste mail',
+    email: 'unrelated@example.test',
+    subject: 'Deze mag niet openen',
+    body: 'Onverwante inhoud.',
+    receivedAt: '2026-08-26T09:00:00.000Z',
+  };
+  const fetchUrls = [];
+  const mailbox = loadMailboxHelpersForTest({
+    fetch: async (url) => {
+      const requestUrl = String(url);
+      fetchUrls.push(requestUrl);
+      if (requestUrl === '/api/mailbox/sync') {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (requestUrl.startsWith('/api/mailbox/messages?')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, messages: [unrelatedRaw, replacementRaw], sync: {} }),
+        };
+      }
+      throw new Error(`Onverwachte testrequest: ${requestUrl}`);
+    },
+  });
+  await mailbox.ready;
+  mailbox.setActiveFolder('inbox');
+  const current = mailbox.normalizeMailboxApiMessage(currentRaw, { folder: 'inbox' });
+  const replacement = mailbox.normalizeMailboxApiMessage(replacementRaw, { folder: 'inbox' });
+  mailbox.setMails([current]);
+  await mailbox.openMail(current.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+    skipReadPersist: true,
+    imagesPrepared: true,
+  });
+
+  const detail = mailbox.getElement('mail-detail');
+  const list = mailbox.getElement('mail-results-scroll');
+  list.scrollTop = 431;
+  const loaderActivations = [];
+  const originalAdd = detail.classList.add.bind(detail.classList);
+  const originalSetAttribute = detail.setAttribute.bind(detail);
+  detail.classList.add = (...names) => {
+    if (names.includes('is-detail-pending')) loaderActivations.push('class');
+    originalAdd(...names);
+  };
+  detail.setAttribute = (name, value) => {
+    if ((name === 'aria-busy' && String(value) === 'true') || name === 'inert') loaderActivations.push(name);
+    originalSetAttribute(name, value);
+  };
+  const innerHtmlDescriptor = Object.getOwnPropertyDescriptor(detail, 'innerHTML');
+  const renderedDetails = [];
+  Object.defineProperty(detail, 'innerHTML', {
+    configurable: true,
+    get: innerHtmlDescriptor.get,
+    set(value) {
+      renderedDetails.push(String(value));
+      innerHtmlDescriptor.set.call(this, value);
+    },
+  });
+  const loadOptionsSeen = [];
+
+  await mailbox.index.syncInBackground({
+    account: accountEmail,
+    folder: 'inbox',
+    loadMessages(loadOptions) {
+      loadOptionsSeen.push(loadOptions);
+      return mailbox.loadMailboxMessages(loadOptions);
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(JSON.parse(JSON.stringify(loadOptionsSeen)), [{
+    showLoader: false,
+    skipBackgroundSync: true,
+    openLatest: false,
+    preserveOnError: true,
+  }]);
+  assert.deepEqual(fetchUrls, [
+    '/api/mailbox/sync',
+    '/api/mailbox/messages?account=info%40softora.nl&folder=inbox&limit=50',
+  ]);
+  assert.equal(mailbox.getActiveMail(), replacement.id);
+  assert.equal(detail.dataset.mailboxCommittedId, replacement.id);
+  assert.equal(renderedDetails.length, 1);
+  assert.match(renderedDetails[0], /Deze reeds geladen inhoud blijft exact zichtbaar\./);
+  assert.doesNotMatch(renderedDetails[0], /Deze mag niet openen|Onverwante inhoud/);
+  assert.deepEqual(loaderActivations, []);
+  assert.equal(detail.classList.contains('is-detail-pending'), false);
+  assert.equal(detail.hasAttribute('inert'), false);
+  assert.notEqual(detail.getAttribute('aria-busy'), 'true');
+  assert.equal(list.scrollTop, 431);
+});
+
 test('focus en visibilitychange houden outreach stabiel door beide providerbatches', async () => {
   const mailbox = loadMailboxHelpersForTest();
   await mailbox.ready;

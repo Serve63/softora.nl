@@ -280,7 +280,12 @@ async function syncInBackground({ account, folder, loadMessages }) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ account, folder, limit: 50 }),
     });
-    await loadMessages({ showLoader: false, skipBackgroundSync: true });
+    await loadMessages({
+      showLoader: false,
+      skipBackgroundSync: true,
+      openLatest: false,
+      preserveOnError: true,
+    });
     setStatus('');
   } catch (_) {
     setStatus('');
