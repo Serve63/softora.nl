@@ -59,13 +59,17 @@ test('contact page keeps a dedicated responsive stylesheet and no inline product
   const html = fs.readFileSync(path.join(repoRoot, 'contact.html'), 'utf8');
   const css = fs.readFileSync(path.join(repoRoot, 'assets/contact-page.css'), 'utf8');
 
-  assert.match(html, /assets\/contact-page\.css\?v=20260826c/);
+  assert.match(html, /assets\/contact-page\.css\?v=20260826d/);
   assert.match(html, /assets\/contact-page\.js\?v=20260826b/);
   assert.doesNotMatch(html, /<style\b|<script>(?:.|\n)*<\/script>/i);
   assert.doesNotMatch(html, /<footer\b/i);
   assert.doesNotMatch(css, /min-height: calc\(100vh/);
   assert.match(css, /font-size: clamp\(52px, 5\.6vw, 88px\)/);
   assert.match(css, /width: min\(570px, calc\(100% - clamp\(34px, 6vw, 90px\)\)\)/);
+  assert.match(html, /<nav id="navbar"[^>]*>[\s\S]*class="logo"[^>]*>SOFTORA\.NL<\/a>[\s\S]*class="magnetic-btn magnetic nav-start-btn"[^>]*>Start Project<\/a>/);
+  assert.match(css, /#navbar \{[\s\S]*position: fixed;[\s\S]*background: #f8f7f4;[\s\S]*box-shadow: 0 14px 40px rgba\(20, 16, 12, 0\.08\)/);
+  assert.match(css, /\.logo \{[\s\S]*font-size: 2rem;[\s\S]*font-weight: 700;[\s\S]*line-height: 1\.6/);
+  assert.match(css, /\.magnetic-btn \{[\s\S]*border-radius: 999px;[\s\S]*background: var\(--contact-accent\)/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
