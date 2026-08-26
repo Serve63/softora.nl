@@ -5,6 +5,7 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const DEFAULT_DOMAIN = 'www.softora.nl';
 const DEFAULT_PROJECT = 'softora-nl';
+const DEFAULT_VERCEL_SCOPE = 'servec321-gmailcoms-projects';
 const DEFAULT_HEALTH_PATH = '/api/health/baseline';
 
 function run(command, args, options = {}) {
@@ -73,9 +74,11 @@ function resolveHealthDeploymentRef(payload) {
 function listLiveProductionVersionViolations(options = {}) {
   const domain = options.domain || DEFAULT_DOMAIN;
   const project = options.project || DEFAULT_PROJECT;
+  const vercelScope = options.vercelScope || DEFAULT_VERCEL_SCOPE;
   const runner = options.runner || run;
   const healthUrl = options.healthUrl || `https://${domain}${DEFAULT_HEALTH_PATH}`;
   const violations = [];
+  const vercelScopeArgs = vercelScope ? ['--scope', vercelScope] : [];
 
   const fetch = runner('git', ['fetch', 'origin', 'main', '--quiet']);
   if (fetch.status !== 0) {
@@ -124,7 +127,13 @@ function listLiveProductionVersionViolations(options = {}) {
     };
   }
 
-  const inspect = runner('npx', ['vercel', 'inspect', domain, '--format=json']);
+  const inspect = runner('npx', [
+    'vercel',
+    'inspect',
+    domain,
+    '--format=json',
+    ...vercelScopeArgs,
+  ]);
   if (inspect.status !== 0) {
     violations.push(`[live-production] Kon live deployment voor ${domain} niet inspecteren.`);
   }
@@ -135,7 +144,13 @@ function listLiveProductionVersionViolations(options = {}) {
     violations.push(`[live-production] Kon live deployment host voor ${domain} niet bepalen.`);
   }
 
-  const list = runner('npx', ['vercel', 'ls', project, '--format=json']);
+  const list = runner('npx', [
+    'vercel',
+    'ls',
+    project,
+    '--format=json',
+    ...vercelScopeArgs,
+  ]);
   if (list.status !== 0) {
     violations.push(`[live-production] Kon deploymentlijst voor ${project} niet ophalen.`);
   }

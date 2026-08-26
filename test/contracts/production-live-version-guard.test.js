@@ -26,11 +26,11 @@ function createRunner(overrides = {}) {
         },
       }),
     },
-    'npx vercel inspect www.softora.nl --format=json': {
+    'npx vercel inspect www.softora.nl --format=json --scope servec321-gmailcoms-projects': {
       status: 0,
       stdout: 'Fetching deployment\n{"url":"softora-live.vercel.app","target":"production"}',
     },
-    'npx vercel ls softora-nl --format=json': {
+    'npx vercel ls softora-nl --format=json --scope servec321-gmailcoms-projects': {
       status: 0,
       stdout: JSON.stringify({
         deployments: [
@@ -94,7 +94,7 @@ test('live production version guard blocks deployments without Git metadata', ()
         stdout: '',
         stderr: 'not found',
       },
-      'npx vercel ls softora-nl --format=json': {
+      'npx vercel ls softora-nl --format=json --scope servec321-gmailcoms-projects': {
         status: 0,
         stdout: JSON.stringify({
           deployments: [
@@ -132,6 +132,35 @@ test('live production version guard falls back to Vercel metadata while old prod
   assert.equal(result.ok, true);
   assert.equal(result.liveSha, 'main-sha');
   assert.equal(result.method, 'vercel');
+});
+
+test('live production version guard scopes Vercel fallback to the Softora team', () => {
+  const commands = [];
+  const runner = createRunner({
+    'curl --fail --silent --show-error --max-time 20 https://www.softora.nl/api/health/baseline': {
+      status: 0,
+      stdout: JSON.stringify({ ok: true, deployment: { commitSha: null } }),
+    },
+  });
+
+  const result = listLiveProductionVersionViolations({
+    runner: (command, args) => {
+      commands.push([command, ...args].join(' '));
+      return runner(command, args);
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(
+    commands.includes(
+      'npx vercel inspect www.softora.nl --format=json --scope servec321-gmailcoms-projects'
+    )
+  );
+  assert.ok(
+    commands.includes(
+      'npx vercel ls softora-nl --format=json --scope servec321-gmailcoms-projects'
+    )
+  );
 });
 
 test('live production version wait helper retries until Vercel auto deploy reaches main', async () => {
