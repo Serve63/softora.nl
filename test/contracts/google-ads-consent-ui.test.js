@@ -73,7 +73,9 @@ test('Google Ads tag-gate toont eerst toestemming en laadt Google nog niet', asy
     payload: { ok: true, enabled: true, consentMode: 'basic-v2', tagId: 'AW-123', conversionLabel: 'lead' },
   });
   assert.equal(result.head.children.length, 0);
+  assert.equal(result.body.children.length, 1);
   assert.equal(result.body.children.some((item) => item.className === 'softora-consent'), true);
+  assert.equal(result.body.children.some((item) => item.className === 'softora-consent-settings'), false);
   assert.equal(result.window.SoftoraGoogleAdsConsent.getState(), 'unknown');
   const consentDefault = result.window.dataLayer[0];
   assert.equal(consentDefault[0], 'consent');
@@ -89,6 +91,7 @@ test('Google Ads tag en conversie laden uitsluitend na eerder gegeven toestemmin
   });
   assert.equal(result.window.SoftoraGoogleAdsConsent.getState(), 'granted');
   assert.equal(result.head.children.length, 1);
+  assert.equal(result.body.children.length, 0);
   assert.equal(result.head.children[0].src, 'https://www.googletagmanager.com/gtag/js?id=AW-123');
   assert.equal(result.window.SoftoraGoogleAdsConsent.recordConversion({ id: 'event-1' }), true);
   const conversion = result.window.dataLayer.at(-1);
@@ -96,4 +99,12 @@ test('Google Ads tag en conversie laden uitsluitend na eerder gegeven toestemmin
   assert.equal(conversion[1], 'conversion');
   assert.equal(conversion[2].send_to, 'AW-123/lead');
   assert.equal(conversion[2].transaction_id, 'event-1');
+});
+
+test('Google Ads tag-gate toont na een keuze geen permanente instellingenknop', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../assets/google-ads-consent.js'), 'utf8');
+  const styles = fs.readFileSync(path.join(__dirname, '../../assets/google-ads-consent.css'), 'utf8');
+
+  assert.doesNotMatch(source, /softora-consent-settings|addSettingsControl/);
+  assert.doesNotMatch(styles, /softora-consent-settings/);
 });

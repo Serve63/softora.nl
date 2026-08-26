@@ -74,18 +74,10 @@
   fill: currentColor;
 }
 
-body:has(.softora-consent-settings) .whatsapp-widget {
-  bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px));
-}
-
 @media (max-width: 640px) {
   .whatsapp-widget {
     right: max(14px, env(safe-area-inset-right));
     bottom: max(14px, env(safe-area-inset-bottom));
-  }
-
-  body:has(.softora-consent-settings) .whatsapp-widget {
-    bottom: max(62px, calc(env(safe-area-inset-bottom) + 52px));
   }
 
   .whatsapp-widget-label {
