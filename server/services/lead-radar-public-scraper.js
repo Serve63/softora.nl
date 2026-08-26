@@ -5,6 +5,7 @@ const { assertWebsitePreviewUrlIsPublic } = require('../security/public-url');
 
 const DEFAULT_PUBLIC_FEEDS = Object.freeze([
   'https://www.higherlevel.nl/rss/2-forum.xml/',
+  'https://nl.wordpress.org/support/view/all-topics/feed/',
 ]);
 const DEFAULT_MASTODON_INSTANCES = Object.freeze([
   'https://mastodon.nl',
@@ -296,7 +297,7 @@ function buildPublicScraperPlan(options = {}) {
       query: `${sourceUrl}/api/v1/timelines/public`, sourceUrl, maxResults: 120,
     }));
   }
-  if (platforms.includes('bluesky') && parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, true)) {
+  if (platforms.includes('bluesky') && parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, false)) {
     compactBlueskyTerms(options.keywordGroups || {}, options.selectedGroups || []).forEach((term) => plan.push({
       adapter: 'bluesky', platform: 'bluesky', region, keywordGroup: 'buyer_intent', term,
       query: term, sourceUrl: BLUESKY_SEARCH_ENDPOINT, maxResults: 25,
@@ -310,7 +311,7 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
   const config = {
     feeds: parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS),
     mastodonInstances: parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES).map((value) => value.replace(/\/$/, '')),
-    blueskyEnabled: parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, true),
+    blueskyEnabled: parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, false),
     mastodonPages: safeLimit(env.LEAD_RADAR_MASTODON_PAGES, 3, 5),
   };
 
