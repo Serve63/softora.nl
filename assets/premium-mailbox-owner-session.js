@@ -35,6 +35,7 @@
     'webdesignLinkHydrationAttempted', 'webdesignLinkUrl', 'recipientRoutingEvidenceKnown',
     'recipientRoutingNeedsHydration', 'to', 'toDisplay', 'cc', 'bcc', 'deliveredTo',
     'attachmentEvidenceKnown', 'attachmentHydrationAttempted',
+    'providerMessageIdHydrationEligible', 'providerMessageIdHydrationAttempted',
   ];
   const CONTACT_TIMELINE_FIELDS = [
     'contactTimelineLoaded', 'contactTimelineTotal', 'contactTimelineThreadCount',
@@ -98,6 +99,12 @@
     const preserveWebdesignLinkAttempt = current.webdesignLinkHydrationAttempted === true &&
       incoming.webdesignLinkEvidenceKnown !== true &&
       incoming.webdesignLinkHydrationAttempted !== true;
+    const preserveProviderMessageIdHydrationEligibility =
+      current.providerMessageIdHydrationEligible === true &&
+      incoming.providerMessageIdHydrationEligible !== true;
+    const preserveProviderMessageIdHydrationAttempt =
+      current.providerMessageIdHydrationAttempted === true &&
+      incoming.providerMessageIdHydrationAttempted !== true;
     Object.assign(current, incoming);
     if (preserveHydration) {
       HYDRATED_MESSAGE_FIELDS.forEach((field) => { current[field] = currentBody[field]; });
@@ -115,6 +122,12 @@
     }
     if (!preserveHydration && preserveWebdesignLinkAttempt) {
       current.webdesignLinkHydrationAttempted = true;
+    }
+    if (!preserveHydration && preserveProviderMessageIdHydrationEligibility) {
+      current.providerMessageIdHydrationEligible = true;
+    }
+    if (!preserveHydration && preserveProviderMessageIdHydrationAttempt) {
+      current.providerMessageIdHydrationAttempted = true;
     }
     if (preserveContactTimeline) {
       CONTACT_TIMELINE_FIELDS.forEach((field) => { current[field] = currentContactTimeline[field]; });

@@ -2288,6 +2288,7 @@ test('UID-loze fallback retryt exact Message-ID en vervangt ruis door echte MIME
     webdesignLinkEvidenceKnown: false,
     attachmentEvidenceKnown: false,
     attachments: [],
+    providerMessageIdHydrationEligible: true,
     recipientRoutingEvidenceKnown: false,
   };
   const mail = {
@@ -2308,6 +2309,7 @@ test('UID-loze fallback retryt exact Message-ID en vervangt ruis door echte MIME
       id: '',
       uid: 0,
       messageId: requestedMessageId,
+      providerMessageIdHydrationEligible: true,
     }]);
     attempt += 1;
     if (attempt === 1) {
@@ -2414,6 +2416,119 @@ test('UID-loze fallback retryt exact Message-ID en vervangt ruis door echte MIME
   });
   assert.match(html, /class="detail-mail-cta-link"/);
   assert.match(html, /webdesign-ruud-bos\.pdf/);
+});
+
+test('UID-loos bericht zonder serverbewijs start geen Message-ID- of legacy detailrequest', async () => {
+  const helpers = loadMailboxHelpersForTest();
+  const message = {
+    id: 'accepted-sent:unproven',
+    uid: 0,
+    folder: 'sent',
+    direction: 'received',
+    accountEmail: 'martijn@softora.nl',
+    messageId: '<unproven@example.test>',
+    body: 'Onbewezen bericht.',
+    hasBody: true,
+    bodyLoaded: true,
+    originalCampaignOutbound: true,
+    bodyImageEvidenceKnown: true,
+    webdesignLinkEvidenceKnown: false,
+    attachmentEvidenceKnown: false,
+    recipientRoutingEvidenceKnown: false,
+  };
+  const mail = {
+    id: 'inbox:unproven',
+    accountEmail: 'martijn@softora.nl',
+    threadMessages: [message],
+  };
+  const requests = [];
+
+  const updated = await helpers.index.loadThreadBodies({
+    mail,
+    getActiveMail: () => '',
+    openMail() {},
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+    fetchImpl: async (url) => {
+      requests.push(String(url));
+      throw new Error('Een onbewezen UID-loos bericht mag geen request starten.');
+    },
+  });
+
+  assert.equal(updated, false);
+  assert.deepEqual(requests, []);
+  assert.equal(helpers.index.needsThreadAttachmentHydration(message), false);
+  assert.equal(message.webdesignLinkHydrationAttempted, undefined);
+  assert.equal(message.attachmentHydrationAttempted, undefined);
+});
+
+test('definitieve Message-ID no-match markeert terminal en start daarna geen POST of legacy GET', async () => {
+  const helpers = loadMailboxHelpersForTest();
+  const message = {
+    id: '',
+    uid: 0,
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    messageId: '<terminal-no-match@GMAIL.COM>',
+    body: 'Bewezen fallback met webdesign via deze link.',
+    hasBody: true,
+    bodyLoaded: true,
+    originalCampaignOutbound: true,
+    bodyImageEvidenceKnown: false,
+    webdesignLinkEvidenceKnown: false,
+    attachmentEvidenceKnown: false,
+    providerMessageIdHydrationEligible: true,
+    recipientRoutingEvidenceKnown: false,
+  };
+  const mail = {
+    id: 'inbox:terminal-no-match',
+    accountEmail: 'martijn@softora.nl',
+    threadMessages: [message],
+  };
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url: String(url), method: options.method || 'GET' });
+    assert.equal(String(url), '/api/mailbox/messages/bodies');
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        messages: [{
+          id: '',
+          uid: 0,
+          folder: 'sent',
+          accountEmail: 'martijn@softora.nl',
+          requestMessageId: '<terminal-no-match@gmail.com>',
+          providerMessageIdLookup: true,
+          providerLookupRetryable: false,
+          resolved: false,
+        }],
+      }),
+    };
+  };
+  const options = {
+    mail,
+    fetchImpl,
+    getActiveMail: () => '',
+    openMail() {},
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+  };
+
+  await helpers.index.loadThreadBodies(options);
+  await helpers.index.loadThreadBodies(options);
+
+  assert.deepEqual(requests, [{ url: '/api/mailbox/messages/bodies', method: 'POST' }]);
+  assert.equal(message.providerMessageIdHydrationAttempted, true);
+  assert.equal(message.providerMessageIdHydrationRetryable, false);
+  assert.equal(message.webdesignLinkHydrationAttempted, true);
+  assert.equal(message.attachmentHydrationAttempted, true);
+  const normalized = helpers.normalizeMailboxApiMessage({
+    ...message,
+    id: 'accepted-sent:<terminal-no-match@GMAIL.COM>',
+  });
+  assert.equal(normalized.providerMessageIdHydrationAttempted, true);
 });
 
 test('mailbox houdt een bewezen outboundbody zichtbaar als alleen optionele linkverrijking faalt', async () => {
@@ -8476,6 +8591,8 @@ test('stale ownerrefresh wist echt MIME-link- en bijlagebewijs niet uit root of 
     attachmentEvidenceKnown: true,
     attachmentHydrationAttempted: true,
     attachments: [{ filename: 'webdesign-ruud-bos.pdf', contentType: 'application/pdf', size: 48123 }],
+    providerMessageIdHydrationEligible: true,
+    providerMessageIdHydrationAttempted: true,
   };
   const current = {
     id: 'inbox:ruud-reply',
@@ -8497,6 +8614,8 @@ test('stale ownerrefresh wist echt MIME-link- en bijlagebewijs niet uit root of 
       attachmentEvidenceKnown: false,
       attachmentHydrationAttempted: false,
       attachments: [],
+      providerMessageIdHydrationEligible: false,
+      providerMessageIdHydrationAttempted: false,
     }],
   }]);
 
@@ -8506,6 +8625,8 @@ test('stale ownerrefresh wist echt MIME-link- en bijlagebewijs niet uit root of 
   assert.match(currentThread.webdesignLinkUrl, /\/webdesign\/ruud-bos/);
   assert.equal(currentThread.attachmentEvidenceKnown, true);
   assert.equal(currentThread.attachmentHydrationAttempted, true);
+  assert.equal(currentThread.providerMessageIdHydrationEligible, true);
+  assert.equal(currentThread.providerMessageIdHydrationAttempted, true);
   assert.deepEqual(currentThread.attachments, [{
     filename: 'webdesign-ruud-bos.pdf', contentType: 'application/pdf', size: 48123,
   }]);

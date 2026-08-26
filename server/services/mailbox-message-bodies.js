@@ -2,7 +2,21 @@ const crypto = require('crypto');
 const MAX_MAILBOX_BODY_BATCH_SIZE = 20;
 const MAX_PROVIDER_MESSAGE_ID_HYDRATIONS_PER_BATCH = 1;
 const PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS = 18_000;
+const PROVIDER_MESSAGE_ID_MATCH_LIMIT = 2;
 const PROVIDER_MESSAGE_ID_FOLDERS = Object.freeze(['sent', 'allmail']);
+const RETRYABLE_PROVIDER_LOOKUP_CODES = new Set([
+  'ETIMEDOUT',
+  'ESOCKET',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'EPIPE',
+  'EAI_AGAIN',
+  'ENETDOWN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'MAILBOX_IMAP_OPERATION_TIMEOUT',
+]);
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -14,6 +28,14 @@ function normalizeMessageId(value) {
 
 function isValidMessageId(value) {
   return /^[^<>\s@]{1,240}@[^<>\s@]{1,240}$/.test(normalizeMessageId(value));
+}
+
+function isRetryableProviderLookupError(error) {
+  const code = normalizeText(error && error.code).toUpperCase();
+  const status = Number(error && (error.statusCode || error.status));
+  return RETRYABLE_PROVIDER_LOOKUP_CODES.has(code) ||
+    [408, 425, 429].includes(status) ||
+    (Number.isFinite(status) && status >= 500 && status <= 599);
 }
 
 function createMailboxMessageBodiesService({
@@ -80,16 +102,17 @@ function createMailboxMessageBodiesService({
       messageId: reference.requestMessageId,
       requestMessageId: reference.requestMessageId,
       providerMessageIdLookup: true,
-      providerLookupRetryable: true,
+      providerLookupRetryable: false,
       bodyResolved: false,
     };
     if (typeof fetchMessagesFromImap !== 'function') return unresolved;
+    let transientFailure = false;
     for (const folder of PROVIDER_MESSAGE_ID_FOLDERS) {
       try {
         const messages = await fetchMessagesFromImap({
           account: reference.account,
           folder,
-          limit: 1,
+          limit: PROVIDER_MESSAGE_ID_MATCH_LIMIT,
           targetedOnly: true,
           exactMessageIdOnly: true,
           threadReferenceIds: [reference.requestMessageId],
@@ -103,6 +126,7 @@ function createMailboxMessageBodiesService({
         if (exact.length === 1) {
           return {
             ...exact[0],
+            accountEmail: reference.accountEmail,
             bodyResolved: true,
             requestMessageId: reference.requestMessageId,
             providerMessageIdLookup: true,
@@ -116,6 +140,7 @@ function createMailboxMessageBodiesService({
           return unresolved;
         }
       } catch (error) {
+        transientFailure = transientFailure || isRetryableProviderLookupError(error);
         logger.warn?.('[MailboxDetail][MessageIdHydration]', {
           account: reference.accountEmail,
           folder,
@@ -123,7 +148,7 @@ function createMailboxMessageBodiesService({
         });
       }
     }
-    return unresolved;
+    return transientFailure ? { ...unresolved, providerLookupRetryable: true } : unresolved;
   }
 
   async function getMessageBodies({ messages = [] } = {}) {
@@ -172,7 +197,12 @@ function createMailboxMessageBodiesService({
       if (!Number.isSafeInteger(uid) || uid <= 0) {
         const providerMessageId = normalizeMessageId(message && message.messageId);
         const canonicalMessageId = providerMessageId.toLowerCase();
-        if (!['sent', 'allmail'].includes(folder) || !isValidMessageId(providerMessageId)) {
+        if (
+          !message ||
+          message.providerMessageIdHydrationEligible !== true ||
+          !['sent', 'allmail'].includes(folder) ||
+          !isValidMessageId(providerMessageId)
+        ) {
           const error = new Error('Ongeldige mailboxberichtreferentie.');
           error.status = 400;
           throw error;
@@ -186,6 +216,7 @@ function createMailboxMessageBodiesService({
           canonicalMessageId,
           requestMessageId: `<${providerMessageId}>`,
           providerMessageIdLookup: true,
+          providerMessageIdHydrationEligible: true,
         };
       }
       return {

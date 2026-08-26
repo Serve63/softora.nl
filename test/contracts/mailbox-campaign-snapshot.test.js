@@ -364,6 +364,41 @@ test('mailbox campaign snapshot bewaart durable send provenance across reload', 
   assert.equal(sent.softoraSendMode, 'reply');
   assert.equal(sent.softoraReplyTargetMessageId, '<blue-inbound@example.nl>');
   assert.equal(sent.softoraThreadProvenanceKnown, true);
+  assert.equal(sent.providerMessageIdHydrationEligible, true);
+});
+
+test('mailbox campaign snapshot migreert alleen een sterk bewezen legacy campagne-root', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:ruud',
+      folder: 'inbox',
+      accountEmail: 'martijnven123@gmail.com',
+      threadMessages: [{
+        id: '',
+        uid: 0,
+        folder: 'sent',
+        accountEmail: 'martijnven123@gmail.com',
+        messageId: '<ruud-root@gmail.com>',
+        to: 'info@ruudbosdesign.nl',
+        recipientRoutingEvidenceKnown: true,
+        originalCampaignOutbound: true,
+      }, {
+        id: '',
+        uid: 0,
+        folder: 'sent',
+        accountEmail: 'martijnven123@gmail.com',
+        messageId: '<unproven-root@gmail.com>',
+        originalCampaignOutbound: true,
+      }],
+    }],
+  });
+  const thread = parseMailboxCampaignSnapshot(raw).messages[0].threadMessages;
+  const proven = thread.find((message) => message.messageId === '<ruud-root@gmail.com>');
+  const unproven = thread.find((message) => message.messageId === '<unproven-root@gmail.com>');
+
+  assert.equal(proven.providerMessageIdHydrationEligible, true);
+  assert.equal(unproven.providerMessageIdHydrationEligible, undefined);
 });
 
 test('mailbox campaign snapshot bewaart volledige Instantly provenance voor root en thread', () => {

@@ -629,6 +629,7 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
         bodyImageEvidenceKnown: false, embeddedImageCount: 0,
         webdesignLinkEvidenceKnown: Boolean(webdesignLinkUrl), webdesignLinkUrl,
         attachmentEvidenceKnown: false, attachments: [], unread: false,
+        providerMessageIdHydrationEligible: true,
         legacyAcceptedRoot: true,
         threadCorrelationEvidence: 'exact-in-reply-to-customer-guard-structured-quote',
       };
@@ -867,6 +868,7 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
       bodyImageEvidenceKnown: false, embeddedImageCount: 0,
       webdesignLinkEvidenceKnown: false, webdesignLinkUrl: '',
       attachmentEvidenceKnown: false, attachments: [],
+      providerMessageIdHydrationEligible: true,
       unread: false, localAcceptedSend: true,
     };
   }

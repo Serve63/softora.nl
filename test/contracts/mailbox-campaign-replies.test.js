@@ -2618,6 +2618,7 @@ test('legacy outbound-root recovery werkt voor alle campagneaccounts en bewezen 
     assert.equal(root.webdesignLinkUrl, '');
     assert.equal(root.attachmentEvidenceKnown, false);
     assert.deepEqual(root.attachments, []);
+    assert.equal(root.providerMessageIdHydrationEligible, true);
     assert.equal(root.threadCorrelationEvidence, 'exact-in-reply-to-customer-guard-structured-quote');
     assert.equal(root.id, '');
     assert.equal(root.recipientRoutingEvidenceKnown, true);
@@ -3004,6 +3005,7 @@ test('exacte accepted provenance matcht case-insensitive en wint van de virtuele
   assert.equal(replies[0].threadMessages[0].webdesignLinkEvidenceKnown, false);
   assert.equal(replies[0].threadMessages[0].attachmentEvidenceKnown, false);
   assert.deepEqual(replies[0].threadMessages[0].attachments, []);
+  assert.equal(replies[0].threadMessages[0].providerMessageIdHydrationEligible, true);
   assert.equal(fixture.guardLookups.length, 0);
 });
 

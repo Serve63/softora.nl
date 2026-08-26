@@ -222,6 +222,17 @@ test('mailbox body batch weigert onbegrensde, ongeldige en onbevoegde requests',
     }),
     (error) => error && error.status === 400
   );
+  await assert.rejects(
+    service.getMessageBodies({
+      messages: [{
+        account: 'serve@softora.nl',
+        folder: 'sent',
+        id: '',
+        messageId: '<unproven@example.test>',
+      }],
+    }),
+    (error) => error && error.status === 400
+  );
 });
 
 test('mailbox body batch hydrateert Instantly via exact provideraccount en provider-id', async () => {
@@ -305,7 +316,6 @@ test('UID-loze bewezen Sent-root hydrateert exact op Message-ID via Sent en daar
         id: 'allmail:912',
         uid: 912,
         folder: 'allmail',
-        accountEmail: 'martijn@softora.nl',
         messageId: '<5a61fa42-ruud@gmail.com>',
         body: 'Dit is de echte MIME-body met de previewlink en bijlage.',
         hasBody: true,
@@ -331,6 +341,7 @@ test('UID-loze bewezen Sent-root hydrateert exact op Message-ID via Sent en daar
       folder: 'sent',
       id: 'accepted-sent:<5A61FA42-RuUd@GMAIL.COM>',
       messageId: requestedMessageId,
+      providerMessageIdHydrationEligible: true,
     }],
   });
 
@@ -338,13 +349,14 @@ test('UID-loze bewezen Sent-root hydrateert exact op Message-ID via Sent en daar
   assert.equal(calls.every((call) => call.account.email === 'martijn@softora.nl'), true);
   assert.equal(calls.every((call) => call.targetedOnly === true), true);
   assert.equal(calls.every((call) => call.exactMessageIdOnly === true), true);
-  assert.equal(calls.every((call) => call.limit === 1), true);
+  assert.equal(calls.every((call) => call.limit === 2), true);
   assert.equal(calls.every((call) => call.imapOperationTimeoutMs === 18_000), true);
   assert.deepEqual(calls.map((call) => call.threadReferenceIds), [
     [requestedMessageId],
     [requestedMessageId],
   ]);
   assert.equal(message.resolved, true);
+  assert.equal(message.accountEmail, 'martijn@softora.nl');
   assert.equal(message.requestMessageId, requestedMessageId);
   assert.equal(message.providerMessageIdLookup, true);
   assert.equal(message.providerLookupRetryable, false);
@@ -385,6 +397,7 @@ test('tijdelijk onopgeloste Message-ID-providerlookup blijft retryable en probee
       folder: 'sent',
       id: '',
       messageId: '<retry-root@GMAIL.COM>',
+      providerMessageIdHydrationEligible: true,
     }],
   });
 
@@ -395,6 +408,64 @@ test('tijdelijk onopgeloste Message-ID-providerlookup blijft retryable en probee
   assert.equal(message.providerLookupRetryable, true);
   assert.equal(message.attachmentEvidenceKnown, false);
   assert.deepEqual(message.attachments, []);
+});
+
+test('permanente providerfout blijft terminal en wordt niet als tijdelijke retry gemarkeerd', async () => {
+  const service = createService({
+    async fetchMessagesFromImap() {
+      const error = new Error('Authentication failed');
+      error.code = 'EAUTH';
+      error.status = 401;
+      throw error;
+    },
+    logger: { warn() {} },
+  });
+
+  const [message] = await service.getMessageBodies({
+    messages: [{
+      account: 'serve@softora.nl',
+      folder: 'sent',
+      id: '',
+      messageId: '<permanent-root@example.test>',
+      providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.equal(message.resolved, false);
+  assert.equal(message.providerLookupRetryable, false);
+});
+
+test('dubbele exacte Message-ID-providerresultaten worden terminal geweigerd', async () => {
+  const calls = [];
+  const service = createService({
+    async fetchMessagesFromImap(options) {
+      calls.push(options);
+      return [71, 72].map((uid) => ({
+        id: `sent:${uid}`,
+        uid,
+        folder: 'sent',
+        messageId: '<duplicate-root@example.test>',
+        body: `Dubbel ${uid}`,
+        bodyResolved: true,
+      }));
+    },
+    logger: { warn() {} },
+  });
+
+  const [message] = await service.getMessageBodies({
+    messages: [{
+      account: 'serve@softora.nl',
+      folder: 'sent',
+      id: '',
+      messageId: '<duplicate-root@example.test>',
+      providerMessageIdHydrationEligible: true,
+    }],
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].limit, 2);
+  assert.equal(message.resolved, false);
+  assert.equal(message.providerLookupRetryable, false);
 });
 
 test('Message-ID-providerhydratie is per batch begrensd tot één echte IMAP-lookup', async () => {
@@ -413,9 +484,9 @@ test('Message-ID-providerhydratie is per batch begrensd tot één echte IMAP-loo
 
   const messages = await service.getMessageBodies({
     messages: [{
-      account: 'serve@softora.nl', folder: 'sent', id: '', messageId: '<first@example.test>',
+      account: 'serve@softora.nl', folder: 'sent', id: '', messageId: '<first@example.test>', providerMessageIdHydrationEligible: true,
     }, {
-      account: 'serve@softora.nl', folder: 'sent', id: '', messageId: '<second@example.test>',
+      account: 'serve@softora.nl', folder: 'sent', id: '', messageId: '<second@example.test>', providerMessageIdHydrationEligible: true,
     }],
   });
 
@@ -425,7 +496,7 @@ test('Message-ID-providerhydratie is per batch begrensd tot één echte IMAP-loo
   ]);
   assert.equal(messages.length, 2);
   assert.equal(messages.every((message) => message.resolved === false), true);
-  assert.equal(messages.every((message) => message.providerLookupRetryable === true), true);
+  assert.deepEqual(messages.map((message) => message.providerLookupRetryable), [false, true]);
   assert.deepEqual(messages.map((message) => message.requestMessageId), [
     '<first@example.test>',
     '<second@example.test>',
