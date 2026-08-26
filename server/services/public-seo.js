@@ -879,13 +879,13 @@ function addGoogleAdsConsentAssetsIfMissing(htmlRaw) {
   if (!hasTag(html, /<link\b[^>]*\bhref=["']\/assets\/google-ads-consent\.css(?:\?[^"']*)?["'][^>]*>/i)) {
     html = injectBeforeHeadClose(
       html,
-      '    <link rel="stylesheet" href="/assets/google-ads-consent.css?v=20260717a">'
+      '    <link rel="stylesheet" href="/assets/google-ads-consent.css?v=20260826a">'
     );
   }
   if (!hasTag(html, /<script\b[^>]*\bsrc=["']\/assets\/google-ads-consent\.js(?:\?[^"']*)?["'][^>]*>/i)) {
     html = injectBeforeBodyClose(
       html,
-      '    <script src="/assets/google-ads-consent.js?v=20260717a" defer></script>'
+      '    <script src="/assets/google-ads-consent.js?v=20260826a" defer></script>'
     );
   }
   return html;

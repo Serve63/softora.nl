@@ -75,13 +75,13 @@ test('de sitebrede widget blijft buiten interne en beschermde pagina-rendering',
   assert.doesNotMatch(rendered, /public-whatsapp-widget|data-softora-whatsapp-widget/);
 });
 
-test('de gedeelde widgetstijl is mobiel, toegankelijk en vrij van cookie-overlap', () => {
+test('de gedeelde widgetstijl is mobiel en toegankelijk zonder oude cookieknop-offset', () => {
   const css = fs.readFileSync(path.join(repoRoot, 'assets/public-whatsapp-widget.css'), 'utf8');
 
   assert.match(css, /\.whatsapp-widget\s*\{[\s\S]*position:\s*fixed;[\s\S]*pointer-events:\s*none;/);
   assert.match(css, /\.whatsapp-widget-btn\s*\{[\s\S]*width:\s*64px;[\s\S]*height:\s*64px;/);
   assert.match(css, /background:\s*linear-gradient\(145deg,\s*#30df6c 0%,\s*#19bf57 100%\)/);
-  assert.match(css, /body:has\(\.softora-consent-settings\) \.whatsapp-widget\s*\{[\s\S]*bottom:/);
+  assert.doesNotMatch(css, /softora-consent-settings/);
   assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*\.whatsapp-widget-label\s*\{[\s\S]*display:\s*none;/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
 });
