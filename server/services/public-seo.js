@@ -7,6 +7,7 @@ const MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
 const SOFTORA_LOCALITY = 'Oisterwijk';
 const SOFTORA_REGION = 'Noord-Brabant';
 const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
+const { addPublicWhatsappWidgetIfMissing } = require('./public-whatsapp-widget');
 
 const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
@@ -918,6 +919,7 @@ function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT
   html = addInternalLinksIfMissing(html, entry);
   html = addConversionTrackingAttributesIfMissing(html, entry);
   html = addGoogleAdsConsentAssetsIfMissing(html);
+  html = addPublicWhatsappWidgetIfMissing(html, { pagePath: entry.path });
   html = addPublicConversionTrackingScriptIfMissing(html);
 
   if (!hasTag(html, /<html\b[^>]*lang=["']nl["']/i)) {

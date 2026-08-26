@@ -236,10 +236,11 @@ test('public seo renderer normalizes legacy contact CTAs to measured Martijn Wha
     siteOrigin: 'https://www.softora.nl',
   });
 
-  assert.equal((html.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length, 5);
-  assert.equal((html.match(/target="_blank"/g) || []).length, 5);
-  assert.equal((html.match(/data-softora-conversion-page="\/diensten"/g) || []).length, 5);
-  assert.equal((html.match(/data-softora-conversion-target="whatsapp"/g) || []).length, 5);
+  assert.equal((html.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length, 6);
+  assert.equal((html.match(/target="_blank"/g) || []).length, 6);
+  assert.equal((html.match(/data-softora-conversion-page="\/diensten"/g) || []).length, 6);
+  assert.equal((html.match(/data-softora-conversion-target="whatsapp"/g) || []).length, 6);
+  assert.match(html, /data-softora-conversion="sitewide-whatsapp-widget"/);
   assert.doesNotMatch(html, /href="mailto:|href="tel:|href="\/#contact|api\.whatsapp\.com|wa\.me\/31643262792\?/);
   assert.match(html, /rel="nofollow noopener noreferrer"/);
 });
