@@ -75,6 +75,15 @@ function summarizeLeadSignal(signal = {}) {
   if (/smalle? (?:layout|tekst|tekstblok)|smalle layout|witruimte/.test(normalized) && /twenty fourteen|witruimte/.test(normalized)) {
     return 'De tekstblokken in het Twenty Fourteen-thema zijn te smal en de gebruiker wil de witruimte aan beide zijkanten verkleinen.';
   }
+  if (/\b(?:i(?:'|’)?m|we(?:'|’)?re|we are) looking for\b/.test(normalized) && /\b(?:ai|agent|automation|workflow|operator)\b/.test(normalized)) {
+    return 'De opdrachtgever zoekt een specialist die een praktische AI-automatisering bouwt en koppelt aan de bestaande bedrijfssystemen.';
+  }
+  if (/\b(?:web app|web application)\b/.test(normalized) && /\b(?:mysql|python|database)\b/.test(normalized)) {
+    return 'De opdrachtgever zoekt iemand die een webapplicatie met een database en de genoemde technische koppelingen bouwt.';
+  }
+  if (/\b(?:i(?:'|’)?m|we(?:'|’)?re|we are|i am) looking for\b/.test(normalized) && /\b(?:website|webshop|online store)\b/.test(normalized)) {
+    return 'De opdrachtgever zoekt iemand die de gevraagde website of webshop professioneel bouwt, vernieuwt of technisch verbetert.';
+  }
 
   return genericOneSentence(message);
 }

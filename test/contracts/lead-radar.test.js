@@ -253,10 +253,10 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
       if (context.adapter === 'bluesky') throw new Error('Bron gaf HTTP 403.');
       return [{
         platform: 'web', source_type: 'feed', provider: 'softora_public_scraper',
-        url: 'https://nl.wordpress.org/support/topic/niet-kunnen-inloggen-3/', title: 'Niet kunnen inloggen',
-        snippet: 'Sinds de update kan ik niet meer inloggen op mijn dashboard.',
-        published_at: new Date().toISOString(), external_id: 'wordpress-vraag-9',
-        source_verified: true, source_verification_reason: 'Rechtstreeks uit RSS gelezen.',
+        url: 'https://freelancer.nl/opdrachten/crm/crm-portaal-abc123', title: 'CRM-portaal laten bouwen',
+        snippet: 'Wij zoeken iemand die voor ons bedrijf een CRM-portaal kan bouwen en implementeren.',
+        published_at: new Date().toISOString(), external_id: 'freelancer-opdracht-9',
+        source_verified: true, source_verification_reason: 'Rechtstreeks op openbare detailpagina gecontroleerd.',
       }];
     },
   };
@@ -756,28 +756,20 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   );
   assert.match(page, /Totale leads/);
   assert.match(page, /Nieuwe leads/);
-  assert.match(page, /Nieuwe leads zoeken/);
+  assert.doesNotMatch(page, /Nieuwe leads zoeken|LANDDEKKING|Bronnen|Heel Nederland|Laatste 30 dagen/);
+  assert.match(page, /class="metric-card metric-card--scan"[\s\S]*id="metric-new"[\s\S]*id="scan-button"[^>]*>Scan starten<\/button>/);
   assert.match(page, /Recente leads/);
   assert.doesNotMatch(page, /bedrijfs- en websitecontrole/i);
-  assert.match(page, /Open webfeeds/);
-  assert.match(page, /Mastodon/);
+  assert.doesNotMatch(page, /Open webfeeds|Mastodon/);
   assert.doesNotMatch(page, /Bluesky/);
   assert.doesNotMatch(page, /LinkedIn|Facebook/);
   assert.doesNotMatch(page, /Instagram/);
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260826b/);
-  assert.match(page, /lead-radar\.js\?v=20260826b/);
-  assert.match(page, /id="scan-platforms" data-value="web,mastodon"/);
-  assert.match(page, /data-custom-select-trigger[\s\S]*aria-haspopup="listbox"[\s\S]*aria-controls="scan-platforms-menu"/);
-  assert.match(page, /data-value="web,mastodon" aria-selected="true">Alle openbare bronnen<\/button>[\s\S]*data-value="web" aria-selected="false">Open webfeeds<\/button>[\s\S]*data-value="mastodon" aria-selected="false">Mastodon<\/button>/);
-  assert.match(page, /id="scan-region-mode" data-value="nationwide"/);
-  assert.match(page, /data-custom-select-trigger[\s\S]*aria-controls="scan-region-mode-menu"/);
-  assert.match(page, /data-value="nationwide" aria-selected="true">Heel Nederland<\/button>[\s\S]*data-value="regional" aria-selected="false">Nederland \+ provincies en steden<\/button>/);
-  assert.match(page, /id="scan-max-age-days" data-value="30"/);
-  assert.match(page, /data-custom-select-trigger[\s\S]*aria-controls="scan-max-age-days-menu"/);
-  assert.match(page, /data-value="30" aria-selected="true">Laatste 30 dagen<\/button>[\s\S]*data-value="7" aria-selected="false">Laatste 7 dagen<\/button>[\s\S]*data-value="3" aria-selected="false">Laatste 3 dagen<\/button>[\s\S]*data-value="1" aria-selected="false">Laatste 24 uur<\/button>/);
+  assert.match(page, /lead-radar\.css\?v=20260826c/);
+  assert.match(page, /lead-radar\.js\?v=20260826c/);
+  assert.doesNotMatch(page, /id="scan-platforms"|id="scan-region-mode"|id="scan-max-age-days"|data-custom-select/);
   assert.doesNotMatch(page, /<select\b/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
   assert.doesNotMatch(page, /scan-status-text|maximaal 50 zoekacties|directe openbare posts met een echte websitevraag|publicatiedatum onbekend/i);
@@ -787,7 +779,9 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(stylesheet, /coverage-panel|coverage-summary|coverage-stat|runs-list|run-row|filter-bar|filter-submit|filter-search|scan-region-input/i);
   assert.doesNotMatch(stylesheet, /select\[multiple\]/);
   assert.doesNotMatch(stylesheet, /lead-actions|lead-notes|lead-author|lead-business|lead-engagement|business-match/);
-  assert.match(stylesheet, /\.custom-select__menu/);
+  assert.doesNotMatch(stylesheet, /custom-select|scan-panel|scan-field/);
+  assert.match(stylesheet, /\.metric-card--scan\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto/);
+  assert.match(stylesheet, /\.metric-card--scan \.scan-button\s*\{[\s\S]*justify-self:\s*end/);
   assert.match(stylesheet, /html, body[\s\S]*scrollbar-width:\s*none/);
   assert.match(stylesheet, /::-webkit-scrollbar[\s\S]*display:\s*none/);
   assert.match(stylesheet, /\.lead-card\s*\{[\s\S]*align-items:\s*center/);
@@ -822,14 +816,11 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
   assert.doesNotMatch(script, /Automatisch actief/);
   assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
-  assert.match(script, /const platforms = \(\$\('#scan-platforms'\)\.dataset\.value \|\| 'web,mastodon'\)\.split\(','\)\.filter\(Boolean\);/);
-  assert.match(script, /const regionMode = \$\('#scan-region-mode'\)\.dataset\.value \|\| 'nationwide';/);
-  assert.match(script, /const maxAgeDays = Number\(\$\('#scan-max-age-days'\)\.dataset\.value\) \|\| 30;/);
-  assert.match(script, /data-custom-select-option/);
-  assert.match(script, /customSelects/);
-  assert.match(script, /setCustomDropdownOpen/);
-  assert.doesNotMatch(script, /selectedOptions/);
-  assert.match(page, /id="scan-max-age-days"/);
+  assert.match(script, /platforms:\s*\['web', 'mastodon'\]/);
+  assert.match(script, /regionMode:\s*'nationwide'/);
+  assert.match(script, /maxAgeDays:\s*14/);
+  assert.match(script, /websiteLookupLimit:\s*0/);
+  assert.doesNotMatch(script, /data-custom-select-option|customSelects|setCustomDropdownOpen|selectedOptions/);
   assert.doesNotMatch(page, /id="scan-max-queries"|id="scan-website-limit"/);
 });
 
@@ -844,6 +835,9 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_PUBLIC_FEED_URLS=/);
+  assert.match(envExample, /LEAD_RADAR_PROJECT_INDEX_URLS=.*freelancer\.nl.*hoofdkraan\.nl/);
+  assert.match(envExample, /LEAD_RADAR_PROJECT_DETAIL_LIMIT=20/);
+  assert.doesNotMatch(envExample, /nl\.wordpress\.org\/support/);
   assert.match(envExample, /LEAD_RADAR_MASTODON_INSTANCES=/);
   assert.match(envExample, /LEAD_RADAR_BLUESKY_ENABLED=false/);
   assert.equal(envExample.toLowerCase().includes('data' + 'forseo'), false);
