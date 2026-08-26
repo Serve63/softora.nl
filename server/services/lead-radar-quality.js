@@ -296,16 +296,27 @@ function createLeadRadarQuality(deps) {
     const recruitmentHits = countPhraseHits(message, RECRUITMENT_TERMS);
     const productSearch = countPhraseHits(message, PRODUCT_SEARCH_TERMS) > 0;
     const profileOnly = isLikelyPlatformProfileUrl(sourceUrl);
+    const publicSupportTopic = (() => {
+      try {
+        const parsed = new URL(sourceUrl);
+        return parsed.hostname.toLowerCase() === 'nl.wordpress.org' &&
+          /^\/support\/topic\/[^/]+\/?$/i.test(parsed.pathname);
+      } catch {
+        return false;
+      }
+    })();
     const hasWebsiteContext = /\b(websites?|websitebouwers?|webshops?|webwinkels?|webdesign|webdevelopers?|webapps?|dashboard|site|software|softwareontwikkelaars?|apps?|applicatie|systeem|crm|portaal|klantenportaal|automatisering|automatiseren|koppeling|api|chatbot|ai[- ]?(?:agent|assistent|oplossing|automatisering))\b/i.test(message);
     const directCustomerHelpRequest = /\bkan\s+iemand\s+(?:mij|me|ons)\b[^.!?]{0,180}\b(?:helpen|maken|bouwen|ontwikkelen|vernieuwen|verbeteren|automatiseren|koppelen)\b/i.test(message) ||
       /\b(?:ik\s+ben|wij\s+zijn|we\s+zijn)\s+op\s*zoek\s+naar\s+(?:iemand|een\s+(?:partij|bureau|freelancer|ontwikkelaar))\b/i.test(message);
     const hasClientContext = countPhraseHits(message, CLIENT_CONTEXT_TERMS) > 0 ||
       /\b(ik|wij|we)\s+(?:ben|zijn)\s+op\s*zoek naar iemand\b/i.test(message) ||
       /\b(ik|wij|we)\s+(?:wil|willen|zoek|zoeken)\b[^.]{0,160}\b(website|webshop|webdesigner|websitebouwer|software|ontwikkelaar|app|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
-    const hasConcreteDigitalNeed = buyerIntentHits > 0 || directCustomerHelpRequest;
+    const publicSupportHelpRequest = publicSupportTopic && hasWebsiteContext &&
+      /\b(?:kan(?:nen)?\s+(?:ik|wij|we)\s+niet|lukt\s+(?:mij|me|ons)\s+niet|gaat\s+(?:ineens\s+)?niet|werkt\s+niet|doet\s+het\s+niet|foutmelding|probleem|hulp|hoe\s+(?:kan|moet|krijg|maak|los))\b/i.test(message);
+    const hasConcreteDigitalNeed = buyerIntentHits > 0 || directCustomerHelpRequest || publicSupportHelpRequest;
     const buyerRequestHits = countPhraseHits(message, BUYER_REQUEST_TERMS);
     const firstPersonWebsiteNeed = /\b(?:ik|wij|we|mijn|onze|ons)\b[^.]{0,180}\b(?:website|webshop|webwinkel|webdesigner|websitebouwer|webdeveloper|software|ontwikkelaar|app|applicatie|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
-    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed || directCustomerHelpRequest;
+    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed || directCustomerHelpRequest || publicSupportHelpRequest;
     const designerHiringPhrase = /\b(webdesigner|webdeveloper)\s+gezocht\b/i.test(message);
     const isRecruitment = Boolean(hasWebsiteContext && !hasClientContext && (recruitmentHits > 0 || designerHiringPhrase));
     const strongPromotion = providerPromoHits >= 2 ||

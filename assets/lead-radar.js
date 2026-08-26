@@ -124,7 +124,7 @@
     catch (error) { state.signals = []; state.total = 0; renderSignals(); setInboxState(error.message, 'error'); }
   }
   async function startScan() {
-    const platforms = ($('#scan-platforms').dataset.value || 'web,mastodon,bluesky').split(',').filter(Boolean);
+    const platforms = ($('#scan-platforms').dataset.value || 'web,mastodon').split(',').filter(Boolean);
     const regionMode = $('#scan-region-mode').dataset.value || 'nationwide';
     const maxAgeDays = Number($('#scan-max-age-days').dataset.value) || 30;
     const payload = { platforms, regionMode, regions: [], maxAgeDays };

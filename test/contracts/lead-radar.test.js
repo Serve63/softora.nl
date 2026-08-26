@@ -221,9 +221,9 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
       if (context.adapter === 'bluesky') throw new Error('Bron gaf HTTP 403.');
       return [{
         platform: 'web', source_type: 'feed', provider: 'softora_public_scraper',
-        url: 'https://example.com/vraag/9', title: 'Ondernemer',
-        snippet: 'Kan iemand me helpen bij het bouwen van een website voor ons bedrijf?',
-        published_at: new Date().toISOString(), external_id: 'vraag-9',
+        url: 'https://nl.wordpress.org/support/topic/niet-kunnen-inloggen-3/', title: 'Niet kunnen inloggen',
+        snippet: 'Sinds de update kan ik niet meer inloggen op mijn dashboard.',
+        published_at: new Date().toISOString(), external_id: 'wordpress-vraag-9',
         source_verified: true, source_verification_reason: 'Rechtstreeks uit RSS gelezen.',
       }];
     },
@@ -729,17 +729,17 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(page, /bedrijfs- en websitecontrole/i);
   assert.match(page, /Open webfeeds/);
   assert.match(page, /Mastodon/);
-  assert.match(page, /Bluesky/);
+  assert.doesNotMatch(page, /Bluesky/);
   assert.doesNotMatch(page, /LinkedIn|Facebook/);
   assert.doesNotMatch(page, /Instagram/);
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
   assert.match(page, /lead-radar\.css\?v=20260820a/);
-  assert.match(page, /lead-radar\.js\?v=20260820a/);
-  assert.match(page, /id="scan-platforms" data-value="web,mastodon,bluesky"/);
+  assert.match(page, /lead-radar\.js\?v=20260826a/);
+  assert.match(page, /id="scan-platforms" data-value="web,mastodon"/);
   assert.match(page, /data-custom-select-trigger[\s\S]*aria-haspopup="listbox"[\s\S]*aria-controls="scan-platforms-menu"/);
-  assert.match(page, /data-value="web,mastodon,bluesky" aria-selected="true">Alle openbare bronnen<\/button>[\s\S]*data-value="web" aria-selected="false">Open webfeeds<\/button>[\s\S]*data-value="mastodon" aria-selected="false">Mastodon<\/button>[\s\S]*data-value="bluesky" aria-selected="false">Bluesky<\/button>/);
+  assert.match(page, /data-value="web,mastodon" aria-selected="true">Alle openbare bronnen<\/button>[\s\S]*data-value="web" aria-selected="false">Open webfeeds<\/button>[\s\S]*data-value="mastodon" aria-selected="false">Mastodon<\/button>/);
   assert.match(page, /id="scan-region-mode" data-value="nationwide"/);
   assert.match(page, /data-custom-select-trigger[\s\S]*aria-controls="scan-region-mode-menu"/);
   assert.match(page, /data-value="nationwide" aria-selected="true">Heel Nederland<\/button>[\s\S]*data-value="regional" aria-selected="false">Nederland \+ provincies en steden<\/button>/);
@@ -789,7 +789,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(page, /auto-scan-status|Automatische scan staat uit|Automatisch actief|elke 15 minuten/i);
   assert.doesNotMatch(script, /Automatisch actief/);
   assert.doesNotMatch(script, /elke 15 minuten|nieuwe openbare signalen worden/i);
-  assert.match(script, /const platforms = \(\$\('#scan-platforms'\)\.dataset\.value \|\| 'web,mastodon,bluesky'\)\.split\(','\)\.filter\(Boolean\);/);
+  assert.match(script, /const platforms = \(\$\('#scan-platforms'\)\.dataset\.value \|\| 'web,mastodon'\)\.split\(','\)\.filter\(Boolean\);/);
   assert.match(script, /const regionMode = \$\('#scan-region-mode'\)\.dataset\.value \|\| 'nationwide';/);
   assert.match(script, /const maxAgeDays = Number\(\$\('#scan-max-age-days'\)\.dataset\.value\) \|\| 30;/);
   assert.match(script, /data-custom-select-option/);
@@ -812,7 +812,7 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   assert.match(envExample, /LEAD_RADAR_AUTO_SCAN_ENABLED=false/);
   assert.match(envExample, /LEAD_RADAR_PUBLIC_FEED_URLS=/);
   assert.match(envExample, /LEAD_RADAR_MASTODON_INSTANCES=/);
-  assert.match(envExample, /LEAD_RADAR_BLUESKY_ENABLED=true/);
+  assert.match(envExample, /LEAD_RADAR_BLUESKY_ENABLED=false/);
   assert.equal(envExample.toLowerCase().includes('data' + 'forseo'), false);
   assert.match(envExample, /LEAD_RADAR_SUPABASE_TIMEOUT_MS=10000/);
   assert.match(envExample, /LEAD_RADAR_RETENTION_DAYS=90/);

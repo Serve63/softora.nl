@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { classifySignal } = require('../../server/services/lead-radar');
 const {
   BLUESKY_SEARCH_ENDPOINT,
+  DEFAULT_PUBLIC_FEEDS,
   buildPublicScraperPlan,
   createLeadRadarPublicFetcher,
   createLeadRadarScraperProvider,
@@ -106,6 +107,18 @@ test('Lead Radar bouwt een begrensd plan voor openbare bronadapters', () => {
   assert.ok(plan.every((item) => !String(item.query).includes('site:facebook.com')));
 });
 
+test('Lead Radar scant standaard gerichte Nederlandse feeds en laat de geblokkeerde Bluesky-zoekroute uit', () => {
+  const plan = buildPublicScraperPlan({
+    platforms: ['web', 'bluesky'],
+    keywordGroups: { direct_website: ['website hulp gezocht'] },
+    selectedGroups: ['direct_website'],
+    env: {},
+  });
+  assert.ok(DEFAULT_PUBLIC_FEEDS.includes('https://nl.wordpress.org/support/view/all-topics/feed/'));
+  assert.ok(plan.some((item) => item.sourceUrl === 'https://nl.wordpress.org/support/view/all-topics/feed/'));
+  assert.equal(plan.some((item) => item.adapter === 'bluesky'), false);
+});
+
 test('Lead Radar normaliseert feed-, Mastodon- en Bluesky-resultaten zonder betaalde provider', async () => {
   const calls = [];
   const provider = createLeadRadarScraperProvider({
@@ -155,4 +168,12 @@ test('Lead Radar herkent natuurlijke website-, CRM- en AI-hulpvragen als prospec
   assert.equal(classifySignal({ snippet: 'Kan iemand me helpen bij het bouwen van een website voor ons bedrijf?' }).role, 'prospect');
   assert.equal(classifySignal({ snippet: 'Kan iemand ons helpen een CRM en dashboard te ontwikkelen?' }).role, 'prospect');
   assert.equal(classifySignal({ snippet: 'Wij zijn op zoek naar een partij voor een AI-agent die klantvragen automatiseert.' }).role, 'prospect');
+  assert.equal(classifySignal({
+    url: 'https://nl.wordpress.org/support/topic/niet-kunnen-inloggen/',
+    snippet: 'Sinds de update kan ik niet meer inloggen op mijn dashboard.',
+  }).role, 'prospect');
+  assert.equal(classifySignal({
+    url: 'https://example.com/blog/inlog-probleem',
+    snippet: 'Sinds de update kan ik niet meer inloggen op mijn dashboard.',
+  }).role, 'unclear');
 });
