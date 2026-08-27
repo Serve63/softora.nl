@@ -219,6 +219,45 @@ test('proof-gebonden signed references wijken nooit af vóór download, reserve 
   }
 });
 
+test('v2 bytehash-mismatch stopt na download maar vóór suppression, reserve en SMTP-provider', async () => {
+  const metadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }];
+  const calls = { inspect: 0, find: 0, builder: 0, download: 0, suppression: 0, reserve: 0, provider: 0 };
+  const send = createMailboxComposeSend(dependencies({
+    buildMailboxWebdesignSendParts: async () => { calls.builder += 1; return null; },
+    createTransport: () => ({ sendMail: async () => { calls.provider += 1; } }),
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict() {
+        calls.suppression += 1;
+        return { ok: true, conflict: null };
+      },
+    },
+    mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => { calls.find += 1; return null; },
+      reserve: async () => { calls.reserve += 1; throw new Error('reserve mag niet starten'); },
+    },
+    mailboxAttachmentService: {
+      inspectAttachments() { calls.inspect += 1; return metadata; },
+      async downloadAttachments() {
+        calls.download += 1;
+        throw Object.assign(new Error('zelfde grootte, andere bytes'), {
+          code: 'MAILBOX_ATTACHMENT_SHA256_MISMATCH', status: 409,
+        });
+      },
+    },
+  }));
+
+  await assert.rejects(send(input({
+    attachments: [{ reference: 'signed-v2-bytehash' }],
+    expectedAttachmentsMetadata: metadata,
+  })), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_MISMATCH' && error.status === 409);
+  assert.deepEqual(calls, {
+    inspect: 1, find: 2, builder: 1, download: 1,
+    suppression: 0, reserve: 0, provider: 0,
+  });
+});
+
 test('definitieve SMTP 550 plus mislukte fail-persist houdt dezelfde staging en blokkeert iedere retry-providercall', async () => {
   const metadata = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
   const resolved = [{ ...metadata[0], content: Buffer.from([1, 2, 3, 4]), contentDisposition: 'attachment' }];

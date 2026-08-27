@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const compose = require('../../assets/premium-mailbox-compose');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
@@ -9,7 +10,14 @@ const {
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
   createMailboxRequestPayloadFingerprint,
+  mailboxAttachmentsMetadataEqual,
 } = require('../../server/services/mailbox-send-provenance-store');
+const {
+  MAILBOX_ATTACHMENT_CONTENT_TYPE_BY_EXTENSION,
+  normalizeAttachmentMetadata,
+  normalizeContentType,
+  safeFilename,
+} = require('../../server/services/mailbox-attachment-policy');
 
 function createAllowingSuppressionStore() {
   return { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
@@ -37,6 +45,16 @@ function makeBinding(overrides = {}) {
 
 function decodeReference(reference) {
   return JSON.parse(Buffer.from(String(reference).split('.')[0], 'base64url').toString('utf8'));
+}
+
+function encodeReference(payload, secret = 'test-only-mailbox-attachment-secret') {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
+  return `${encoded}.${signature}`;
+}
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
 }
 
 function createStorageFixture() {
@@ -143,6 +161,226 @@ test('attachment context mismatch en groottegrenzen falen voor opslag of send', 
     /samen maximaal 5 MB/
   );
   assert.equal(fixture.calls.signed.length, 1);
+});
+
+test('v2 uploadplan bindt canonieke metadata en exacte SHA-256 aan reference en downloadbuffer', async () => {
+  const fixture = createStorageFixture();
+  const service = createMailboxAttachmentService({
+    getSupabaseClient: () => ({ storage: fixture.storage }),
+    secret: 'test-only-mailbox-attachment-secret',
+    randomUUID: () => 'hashed-upload',
+    now: () => new Date('2026-08-27T20:00:00.000Z'),
+    logger: { warn() {} },
+  });
+  const content = Buffer.from([1, 2, 3, 4]);
+  const expectedHash = sha256(content);
+  const [upload] = await service.createUploadPlan({
+    attachments: [{
+      filename: 'Ｒapport.PDF', contentType: 'application/octet-stream; charset=binary',
+      size: content.length, sha256: expectedHash,
+    }],
+    binding: makeBinding(),
+  });
+
+  assert.deepEqual(Object.keys(upload).sort(), [
+    'contentType', 'expiresAt', 'filename', 'reference', 'referenceVersion',
+    'sha256', 'signedUrl', 'size',
+  ]);
+
+  assert.deepEqual({
+    filename: upload.filename,
+    contentType: upload.contentType,
+    size: upload.size,
+    sha256: upload.sha256,
+    referenceVersion: upload.referenceVersion,
+  }, {
+    filename: 'Rapport.PDF',
+    contentType: 'application/pdf',
+    size: 4,
+    sha256: expectedHash,
+    referenceVersion: 2,
+  });
+  const signed = decodeReference(upload.reference);
+  assert.equal(signed.v, 2);
+  assert.equal(signed.sha256, expectedHash);
+  assert.equal(signed.filename, 'Rapport.PDF');
+  assert.equal(signed.contentType, 'application/pdf');
+
+  fixture.objects.set(signed.path, Buffer.from(content));
+  assert.deepEqual(service.inspectAttachments([upload], makeBinding()), [{
+    filename: 'Rapport.PDF', contentType: 'application/pdf', size: 4, sha256: expectedHash,
+  }]);
+  const [resolved] = await service.downloadAttachments([upload], makeBinding());
+  assert.deepEqual([...resolved.content], [...content]);
+  assert.equal(resolved.sha256, expectedHash);
+});
+
+test('zelfde naam MIME en grootte met andere bytes faalt na Storage-download vóór verdere verwerking', async () => {
+  const fixture = createStorageFixture();
+  const service = createMailboxAttachmentService({
+    getSupabaseClient: () => ({ storage: fixture.storage }),
+    secret: 'test-only-mailbox-attachment-secret',
+    randomUUID: () => 'toctou-upload',
+    now: () => new Date('2026-08-27T20:05:00.000Z'),
+    logger: { warn() {} },
+  });
+  const original = Buffer.from([1, 2, 3, 4]);
+  const overwritten = Buffer.from([9, 8, 7, 6]);
+  const [upload] = await service.createUploadPlan({
+    attachments: [{
+      filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+      sha256: sha256(original),
+    }],
+    binding: makeBinding(),
+  });
+  const path = decodeReference(upload.reference).path;
+  fixture.objects.set(path, original);
+  assert.equal(service.inspectAttachments([upload], makeBinding())[0].sha256, sha256(original));
+
+  fixture.objects.set(path, overwritten);
+  await assert.rejects(
+    service.downloadAttachments([upload], makeBinding()),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_MISMATCH' && error.status === 409
+  );
+  assert.deepEqual(fixture.calls.downloaded, [path]);
+});
+
+test('hashmetadata faalt gesloten op uppercase ongeldig gemengd swapped en andere bindingscope', async () => {
+  const fixture = createStorageFixture();
+  const service = createMailboxAttachmentService({
+    getSupabaseClient: () => ({ storage: fixture.storage }),
+    secret: 'test-only-mailbox-attachment-secret',
+    randomUUID: (() => { let index = 0; return () => `hash-validation-${++index}`; })(),
+    now: () => new Date('2026-08-27T20:10:00.000Z'),
+    logger: { warn() {} },
+  });
+  const hashA = sha256(Buffer.from([1, 1, 1, 1]));
+  const hashB = sha256(Buffer.from([2, 2, 2, 2]));
+  for (const sha of [hashA.toUpperCase(), ` ${hashA}`, hashA.slice(1), 123]) {
+    await assert.rejects(service.createUploadPlan({
+      attachments: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: sha }],
+      binding: makeBinding(),
+    }), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_INVALID');
+  }
+  await assert.rejects(service.createUploadPlan({
+    attachments: [null],
+    binding: makeBinding(),
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_INVALID');
+  await assert.rejects(service.createUploadPlan({
+    attachments: [
+      { filename: 'a.pdf', contentType: 'application/pdf', size: 4, sha256: hashA },
+      { filename: 'b.pdf', contentType: 'application/pdf', size: 4 },
+    ],
+    binding: makeBinding(),
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_HASH_MODE_MISMATCH');
+  assert.equal(fixture.calls.signed.length, 0, 'ongeldige hashmetadata mag geen upload-URL maken');
+
+  const uploads = await service.createUploadPlan({
+    attachments: [
+      { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: hashA },
+      { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: hashB },
+    ],
+    binding: makeBinding(),
+  });
+  const expected = uploads.map(({ filename, contentType, size, sha256: hash }) => ({
+    filename, contentType, size, sha256: hash,
+  }));
+  const swapped = service.inspectAttachments([...uploads].reverse(), makeBinding());
+  assert.equal(mailboxAttachmentsMetadataEqual(expected, swapped), false);
+  assert.notEqual(
+    createMailboxRequestPayloadFingerprint({ subject: 'Vraag', body: 'Body', attachmentsMetadata: expected }),
+    createMailboxRequestPayloadFingerprint({ subject: 'Vraag', body: 'Body', attachmentsMetadata: swapped })
+  );
+  await assert.rejects(
+    Promise.resolve().then(() => service.inspectAttachments(
+      uploads,
+      makeBinding({ accountEmail: 'martijn@softora.nl' })
+    )),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_CONTEXT_MISMATCH' && error.status === 409
+  );
+
+  const canonicalPayload = decodeReference(uploads[0].reference);
+  for (const [label, payload, expectedCode] of [
+    ['tekstversie', { ...canonicalPayload, v: '2' }, 'MAILBOX_ATTACHMENT_REFERENCE_INVALID'],
+    ['v2-zonder-hash', (() => { const value = { ...canonicalPayload }; delete value.sha256; return value; })(), 'MAILBOX_ATTACHMENT_REFERENCE_HASH_INVALID'],
+    ['v1-met-hash', { ...canonicalPayload, v: 1 }, 'MAILBOX_ATTACHMENT_REFERENCE_HASH_INVALID'],
+  ]) {
+    await assert.rejects(
+      Promise.resolve().then(() => service.inspectAttachments(
+        [{ reference: encodeReference(payload) }],
+        makeBinding()
+      )),
+      (error) => error.code === expectedCode,
+      label
+    );
+  }
+
+  await assert.rejects(
+    Promise.resolve().then(() => service.inspectAttachments(
+      [uploads[0], uploads[0]],
+      makeBinding()
+    )),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_REFERENCE_DUPLICATE' && error.status === 409
+  );
+  await assert.rejects(
+    service.downloadAttachments([uploads[0], uploads[0]], makeBinding()),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_REFERENCE_DUPLICATE' && error.status === 409
+  );
+  assert.equal(fixture.calls.downloaded.length, 0, 'dubbele references mogen Storage niet bereiken');
+});
+
+test('legacy v1 en hashgebonden v2 mogen niet in één sendbatch worden gemengd', async () => {
+  const fixture = createStorageFixture();
+  const service = createMailboxAttachmentService({
+    getSupabaseClient: () => ({ storage: fixture.storage }),
+    secret: 'test-only-mailbox-attachment-secret',
+    randomUUID: (() => { let index = 0; return () => `mixed-version-${++index}`; })(),
+    now: () => new Date('2026-08-27T20:15:00.000Z'),
+    logger: { warn() {} },
+  });
+  const [legacy] = await service.createUploadPlan({
+    attachments: [{ filename: 'legacy.pdf', contentType: 'application/pdf', size: 4 }],
+    binding: makeBinding(),
+  });
+  const [hashed] = await service.createUploadPlan({
+    attachments: [{
+      filename: 'hashed.pdf', contentType: 'application/pdf', size: 4,
+      sha256: sha256(Buffer.alloc(4, 1)),
+    }],
+    binding: makeBinding(),
+  });
+  assert.equal(legacy.referenceVersion, 1);
+  assert.equal(hashed.referenceVersion, 2);
+  await assert.rejects(
+    Promise.resolve().then(() => service.inspectAttachments([legacy, hashed], makeBinding())),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_HASH_MODE_MISMATCH'
+  );
+});
+
+test('extensionbeleid canonicaliseert alle MIME-aliases en bewaart NFKC en lange extensies', () => {
+  for (const [extension, canonical] of Object.entries(MAILBOX_ATTACHMENT_CONTENT_TYPE_BY_EXTENSION)) {
+    assert.equal(normalizeContentType('APPLICATION/OCTET-STREAM; CHARSET=BINARY', `Bestand.${extension.toUpperCase()}`), canonical);
+  }
+  assert.equal(normalizeContentType('', 'leeg.pdf'), 'application/pdf');
+  assert.equal(normalizeContentType('text/plain', 'alias.png'), 'image/png');
+  assert.equal(normalizeContentType('APPLICATION/PDF; charset=UTF-8', 'case.PDF'), 'application/pdf');
+  assert.equal(normalizeContentType('application/octet-stream', 'office.DOCX'),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  assert.equal(safeFilename('Ｆactuur．ＰＤＦ'), 'Factuur.PDF');
+  const longName = `${'a'.repeat(180)}.xlsx`;
+  const safeLongName = safeFilename(longName);
+  assert.equal(Array.from(safeLongName).length, 120);
+  assert.equal(safeLongName.endsWith('.xlsx'), true);
+  assert.deepEqual(normalizeAttachmentMetadata([{
+    filename: 'rapport.pdf', contentType: 'text/plain; charset=utf-8', size: 4,
+    sha256: 'a'.repeat(64),
+  }]), [{
+    filename: 'rapport.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }]);
+  assert.deepEqual(normalizeAttachmentMetadata([
+    { filename: 'a.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64) },
+    { filename: 'b.pdf', contentType: 'application/pdf', size: 4 },
+  ]), []);
 });
 
 test('compose send resolveert signed references naar echte MIME-bytes en roept de provider eenmaal aan', async () => {

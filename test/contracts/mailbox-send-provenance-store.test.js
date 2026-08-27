@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  createMailboxRequestPayloadFingerprint,
   createMailboxSendProvenanceStore,
   mailboxAttachmentsMetadataEqual,
   normalizeMailboxAttachmentsMetadata,
@@ -170,6 +171,57 @@ test('attachment metadata bewaart legacy-onbekend als null en vergelijkt arrays 
     { filename: 'deel-a.pdf', contentType: 'application/pdf', size: 3 * 1024 * 1024 },
     { filename: 'deel-b.pdf', contentType: 'application/pdf', size: 3 * 1024 * 1024 },
   ]), null);
+  assert.deepEqual(normalizeMailboxAttachmentsMetadata([{
+    filename: 'bewijs.pdf', contentType: 'text/plain', size: 4, sha256: 'a'.repeat(64),
+  }]), [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }]);
+  assert.equal(normalizeMailboxAttachmentsMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'A'.repeat(64),
+  }]), null);
+  assert.equal(normalizeMailboxAttachmentsMetadata([
+    { filename: 'a.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64) },
+    { filename: 'b.pdf', contentType: 'application/pdf', size: 4 },
+  ]), null);
+  assert.equal(mailboxAttachmentsMetadataEqual(
+    [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64) }],
+    [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'b'.repeat(64) }]
+  ), false);
+});
+
+test('provenance en request fingerprint bewaren v2 SHA-256 zonder downgrade', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-08-27T20:20:00.000Z'),
+  });
+  const metadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }];
+  const reserved = await store.reserve({
+    intentId: 'send:hash-bound', idempotencyKey: 'browser:hash-bound', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'reply',
+    conversationId: 'conversation:hash-bound', replyTargetMessageId: '<incoming@example.nl>',
+    references: '<incoming@example.nl>', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Re: Bijlage', body: 'Zie bijlage', requestBody: 'Zie bijlage',
+    attachmentsMetadata: metadata,
+  });
+  assert.deepEqual(reserved.intent.attachmentsMetadata, metadata);
+  assert.deepEqual(client.rows[0].attachments_metadata, metadata);
+  assert.equal(reserved.intent.requestPayloadFingerprint, createMailboxRequestPayloadFingerprint({
+    subject: 'Re: Bijlage', requestBody: 'Zie bijlage', attachmentsMetadata: metadata,
+  }));
+  assert.notEqual(
+    createMailboxRequestPayloadFingerprint({
+      subject: 'Re: Bijlage', requestBody: 'Zie bijlage', attachmentsMetadata: metadata,
+    }),
+    createMailboxRequestPayloadFingerprint({
+      subject: 'Re: Bijlage', requestBody: 'Zie bijlage', attachmentsMetadata: [{
+        ...metadata[0], sha256: 'b'.repeat(64),
+      }],
+    })
+  );
 });
 
 test('provenance-opslag onderscheidt ontbrekende attachmentmetadata van bewezen leeg', async () => {

@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const {
   MAILBOX_ATTACHMENT_EXTENSIONS,
+  MAILBOX_ATTACHMENT_SHA256_PATTERN,
   MAX_MAILBOX_ATTACHMENT_BYTES,
   MAX_MAILBOX_ATTACHMENTS,
   MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES,
@@ -9,7 +10,8 @@ const {
 } = require('./mailbox-attachment-policy');
 
 const MAILBOX_ATTACHMENT_BUCKET = 'softora-mailbox-attachments';
-const MAILBOX_ATTACHMENT_REFERENCE_VERSION = 1;
+const MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION = 1;
+const MAILBOX_ATTACHMENT_REFERENCE_VERSION = 2;
 const MAILBOX_ATTACHMENT_REFERENCE_TTL_MS = 30 * 60 * 1000;
 const MAILBOX_ATTACHMENT_STORAGE_TIMEOUT_MS = 8_000;
 const MAILBOX_ATTACHMENT_STORAGE_MAX_ATTEMPTS = 2;
@@ -211,24 +213,65 @@ function createMailboxAttachmentService(deps = {}) {
   }
 
   function validateMetadata(attachment = {}) {
-    const filename = safeFilename(attachment.filename || attachment.name);
+    const filename = safeFilename(attachment?.filename || attachment?.name);
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
     if (!filename || !MAILBOX_ATTACHMENT_EXTENSIONS.has(extension)) {
       throw createAttachmentError(`Bestand "${filename || 'zonder naam'}" wordt niet ondersteund.`);
     }
-    const size = Number(attachment.size);
+    const size = Number(attachment?.size);
     if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_MAILBOX_ATTACHMENT_BYTES) {
       throw createAttachmentError(`Bijlage "${filename}" mag maximaal 4 MB zijn.`);
     }
-    return {
+    const metadata = {
       filename,
-      contentType: normalizeContentType(attachment.contentType, filename),
+      contentType: normalizeContentType(attachment?.contentType, filename),
       size,
     };
+    if (Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256')) {
+      const sha256 = typeof attachment.sha256 === 'string' ? attachment.sha256 : '';
+      if (!MAILBOX_ATTACHMENT_SHA256_PATTERN.test(sha256)) {
+        throw createAttachmentError(
+          `De inhoudsvingerafdruk van bijlage "${filename}" is ongeldig.`,
+          'MAILBOX_ATTACHMENT_SHA256_INVALID'
+        );
+      }
+      metadata.sha256 = sha256;
+    }
+    return metadata;
+  }
+
+  function assertUniformHashMode(metadata = []) {
+    const hashModes = metadata.map((item) => Boolean(item?.sha256));
+    if (hashModes.some(Boolean) && !hashModes.every(Boolean)) {
+      throw createAttachmentError(
+        'Alle bijlagen moeten dezelfde veilige inhoudscontrole gebruiken; kies de bijlagen opnieuw.',
+        'MAILBOX_ATTACHMENT_HASH_MODE_MISMATCH',
+        409
+      );
+    }
+  }
+
+  function assertUniqueReferencePayloads(payloads = []) {
+    const paths = new Set();
+    for (const payload of payloads) {
+      const path = normalizeText(payload?.path);
+      if (paths.has(path)) {
+        throw createAttachmentError(
+          'Dezelfde bijlageverwijzing staat meer dan één keer in deze verzending; kies de bijlagen opnieuw.',
+          'MAILBOX_ATTACHMENT_REFERENCE_DUPLICATE',
+          409
+        );
+      }
+      paths.add(path);
+    }
   }
 
   function validateReferencePayload(payload, binding, { allowExpired = false } = {}) {
-    if (!payload || payload.v !== MAILBOX_ATTACHMENT_REFERENCE_VERSION || payload.bucket !== bucket) {
+    const referenceVersion = payload?.v;
+    if (!payload || ![
+      MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION,
+      MAILBOX_ATTACHMENT_REFERENCE_VERSION,
+    ].includes(referenceVersion) || payload.bucket !== bucket) {
       throw createAttachmentError('De bijlageverwijzing is ongeldig; kies de bijlage opnieuw.', 'MAILBOX_ATTACHMENT_REFERENCE_INVALID');
     }
     if (!allowExpired && Number(payload.expiresAt) < now().getTime()) {
@@ -244,8 +287,16 @@ function createMailboxAttachmentService(deps = {}) {
     if ((!isLegacyPath && !isExpiringPath) || unsafePathSegment) {
       throw createAttachmentError('De bijlageverwijzing is ongeldig; kies de bijlage opnieuw.', 'MAILBOX_ATTACHMENT_REFERENCE_INVALID');
     }
-    validateMetadata(payload);
-    return payload;
+    const metadata = validateMetadata(payload);
+    if ((referenceVersion === MAILBOX_ATTACHMENT_REFERENCE_VERSION && !metadata.sha256)
+      || (referenceVersion === MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION && metadata.sha256)) {
+      throw createAttachmentError(
+        'De bijlageverwijzing mist een eenduidige inhoudscontrole; kies de bijlage opnieuw.',
+        'MAILBOX_ATTACHMENT_REFERENCE_HASH_INVALID',
+        409
+      );
+    }
+    return { ...payload, ...metadata, v: referenceVersion };
   }
 
   async function removePaths(paths, options = {}) {
@@ -260,6 +311,7 @@ function createMailboxAttachmentService(deps = {}) {
       throw createAttachmentError(`Je kunt maximaal ${MAX_MAILBOX_ATTACHMENTS} bijlagen toevoegen.`);
     }
     const metadata = list.map(validateMetadata);
+    assertUniformHashMode(metadata);
     const totalBytes = metadata.reduce((total, item) => total + item.size, 0);
     if (totalBytes > MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES) {
       throw createAttachmentError('De bijlagen mogen samen maximaal 5 MB zijn.');
@@ -287,13 +339,17 @@ function createMailboxAttachmentService(deps = {}) {
           return signedUpload;
         });
         createdPaths.push(path);
+        const referenceVersion = item.sha256
+          ? MAILBOX_ATTACHMENT_REFERENCE_VERSION
+          : MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION;
         const reference = signReference({
-          v: MAILBOX_ATTACHMENT_REFERENCE_VERSION,
+          v: referenceVersion,
           bucket,
           path,
           filename: item.filename,
           contentType: item.contentType,
           size: item.size,
+          ...(item.sha256 ? { sha256: item.sha256 } : {}),
           bindingHash,
           expiresAt,
         }, signingSecret);
@@ -303,6 +359,8 @@ function createMailboxAttachmentService(deps = {}) {
           filename: item.filename,
           contentType: item.contentType,
           size: item.size,
+          ...(item.sha256 ? { sha256: item.sha256 } : {}),
+          referenceVersion,
           expiresAt,
         });
       }
@@ -326,6 +384,8 @@ function createMailboxAttachmentService(deps = {}) {
       binding,
       { allowExpired: options.allowExpired === true }
     ));
+    assertUniqueReferencePayloads(payloads);
+    assertUniformHashMode(payloads);
     const totalBytes = payloads.reduce((total, item) => total + Number(item.size || 0), 0);
     if (totalBytes > MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES) {
       throw createAttachmentError('De bijlagen mogen samen maximaal 5 MB zijn.');
@@ -334,6 +394,7 @@ function createMailboxAttachmentService(deps = {}) {
       filename: payload.filename,
       contentType: payload.contentType,
       size: Number(payload.size),
+      ...(payload.sha256 ? { sha256: payload.sha256 } : {}),
     }));
   }
 
@@ -346,6 +407,8 @@ function createMailboxAttachmentService(deps = {}) {
       verifyReference(attachment?.reference, signingSecret),
       binding
     ));
+    assertUniqueReferencePayloads(payloads);
+    assertUniformHashMode(payloads);
     const totalBytes = payloads.reduce((total, item) => total + Number(item.size || 0), 0);
     if (totalBytes > MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES) {
       throw createAttachmentError('De bijlagen mogen samen maximaal 5 MB zijn.');
@@ -369,11 +432,20 @@ function createMailboxAttachmentService(deps = {}) {
       if (!content?.length || content.length !== Number(payload.size)) {
         throw createAttachmentError(`Bijlage "${payload.filename}" kon niet veilig worden gecontroleerd.`, 'MAILBOX_ATTACHMENT_SIZE_MISMATCH');
       }
+      const actualSha256 = crypto.createHash('sha256').update(content).digest('hex');
+      if (payload.sha256 && actualSha256 !== payload.sha256) {
+        throw createAttachmentError(
+          `De inhoud van bijlage "${payload.filename}" wijkt af van de veilige uploadcontrole.`,
+          'MAILBOX_ATTACHMENT_SHA256_MISMATCH',
+          409
+        );
+      }
       resolved.push({
         filename: payload.filename,
         content,
         contentType: payload.contentType,
         contentDisposition: 'attachment',
+        ...(payload.sha256 ? { sha256: actualSha256 } : {}),
       });
     }
     return resolved;
@@ -519,6 +591,8 @@ function createMailboxAttachmentService(deps = {}) {
 module.exports = {
   MAILBOX_ATTACHMENT_BUCKET,
   MAILBOX_ATTACHMENT_EXTENSIONS,
+  MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION,
+  MAILBOX_ATTACHMENT_REFERENCE_VERSION,
   MAILBOX_ATTACHMENT_REFERENCE_TTL_MS,
   MAILBOX_ATTACHMENT_STORAGE_MAX_ATTEMPTS,
   MAILBOX_ATTACHMENT_STORAGE_PREFIX,
