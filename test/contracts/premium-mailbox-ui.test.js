@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { createControllerSendHarness } = require('../helpers/mailbox-compose-send-resilience');
 
 const pagePath = path.join(__dirname, '../../premium-mailbox.html');
 const scriptPath = path.join(__dirname, '../../assets/premium-mailbox.js');
@@ -18,6 +19,9 @@ const imagesScriptPath = path.join(__dirname, '../../assets/premium-mailbox-imag
 const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-refresh.js');
 const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
 const composeWindowScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-window.js');
+const attachmentDigestScriptPath = path.join(__dirname, '../../assets/premium-mailbox-attachment-digest.js');
+const composeSendStateScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-send-state.js');
+const composeSendResilienceScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-send-resilience.js');
 const composeAcceptedSendScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-accepted-send.js');
 const composeControllerScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-controller.js');
 const ownerSessionScriptPath = path.join(__dirname, '../../assets/premium-mailbox-owner-session.js');
@@ -47,6 +51,9 @@ const imagesModule = require('../../assets/premium-mailbox-images.js');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const composeModule = require('../../assets/premium-mailbox-compose.js');
 const composeWindowModule = require('../../assets/premium-mailbox-compose-window.js');
+const attachmentDigestModule = require('../../assets/premium-mailbox-attachment-digest.js');
+const composeSendStateModule = require('../../assets/premium-mailbox-compose-send-state.js');
+const composeSendResilienceModule = require('../../assets/premium-mailbox-compose-send-resilience.js');
 const composeAcceptedSendModule = require('../../assets/premium-mailbox-compose-accepted-send.js');
 const composeControllerModule = require('../../assets/premium-mailbox-compose-controller.js');
 const toastModule = require('../../assets/premium-mailbox-toast.js');
@@ -113,6 +120,18 @@ function readComposeScript() {
 
 function readComposeWindowScript() {
   return fs.readFileSync(composeWindowScriptPath, 'utf8');
+}
+
+function readAttachmentDigestScript() {
+  return fs.readFileSync(attachmentDigestScriptPath, 'utf8');
+}
+
+function readComposeSendStateScript() {
+  return fs.readFileSync(composeSendStateScriptPath, 'utf8');
+}
+
+function readComposeSendResilienceScript() {
+  return fs.readFileSync(composeSendResilienceScriptPath, 'utf8');
 }
 
 function readComposeAcceptedSendScript() {
@@ -183,7 +202,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260826a/);
-  assert.match(page, /assets\/premium-browser-storage\.js\?v=20260814a/);
+  assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-ui-state\.js\?v=20260827a/);
@@ -195,7 +214,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
-  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260827b/);
+  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260828a/);
+  assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
+  assert.match(page, /assets\/premium-mailbox-compose-send-state\.js\?v=20260828d/);
+  assert.match(page, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828e/);
   assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
@@ -206,8 +228,19 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260826a') < page.indexOf('premium-mailbox-index.js?v=20260826b'));
-  assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b'));
-  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b') < page.indexOf('premium-mailbox-compose-controller.js?v=20260827b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
+  assert.ok(page.indexOf('premium-browser-storage.js?v=20260828b') < page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c'));
+  assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20260828d'));
+  assert.ok(page.indexOf('premium-mailbox-compose-send-state.js?v=20260828d') < page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260828e'));
+  assert.ok(page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260828e') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b') < page.indexOf('premium-mailbox-compose-controller.js?v=20260828f'));
+  assert.equal(typeof composeSendStateModule.selectMarker, 'function');
+  assert.equal(typeof composeSendResilienceModule.create, 'function');
+  assert.equal(typeof attachmentDigestModule.bind, 'function');
+  assert.match(readAttachmentDigestScript(), /global\.SoftoraMailboxAttachmentDigest = api/);
+  assert.match(readComposeSendStateScript(), /global\.SoftoraMailboxComposeSendState = api/);
+  assert.match(readComposeSendResilienceScript(), /global\.SoftoraMailboxComposeSendResilience = api/);
+  assert.doesNotMatch(readComposeSendResilienceScript(), /\b(?:localStorage|sessionStorage|indexedDB)\b/);
   assert.equal(typeof composeAcceptedSendModule.create, 'function');
   assert.match(readComposeAcceptedSendScript(), /global\.SoftoraMailboxComposeAcceptedSend = api/);
   assert.match(readSignatureScript(), /renderContactCard/);
@@ -4546,7 +4579,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(ownerSessionSource, /\/api\/mailbox\/messages\?account=/);
   assert.match(deleteSource, /\/api\/mailbox\/messages\/\$\{action\}/);
-  assert.match(composeControllerSource, /\/api\/mailbox\/send/);
+  assert.match(readComposeSendResilienceScript(), /\/api\/mailbox\/send/);
   assert.match(composeControllerSource, /\/api\/mailbox\/rewrite/);
   assert.match(readComposeWindowScript(), /data-mailbox-compose-drag-handle/);
   assert.match(readComposeWindowScript(), /data-mailbox-compose-resize-zone/);
@@ -5393,8 +5426,11 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
+  assert.match(pageSource, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-send-state\.js\?v=20260828d/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828e/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260827b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260828f/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -5637,6 +5673,7 @@ test('geaccepteerde reply verschijnt direct roze en dedupliceert met vertraagde 
   const controller = composeControllerModule.create({
     document: documentRef,
     fetch: fetchImpl,
+    sendResilience: createControllerSendHarness(),
     compose: composeStub,
     campaignInbox: {
       getMessageOwner: () => 'serve',
@@ -5669,6 +5706,7 @@ test('geaccepteerde reply verschijnt direct roze en dedupliceert met vertraagde 
 
   resolveSend({
     ok: true,
+    status: 200,
     json: async () => ({
       ok: true,
       result: {
@@ -5905,8 +5943,9 @@ test('gecombineerde mailbox verstuurt via het concrete account en niet met owner
     },
     fetch: async (_url, options) => {
       requests.push(JSON.parse(options.body));
-      return { ok: true, json: async () => ({ ok: true, result: { messageId: '<owner-canonical@softora.nl>' } }) };
+      return { ok: true, status: 200, json: async () => ({ ok: true, result: { messageId: '<owner-canonical@softora.nl>' } }) };
     },
+    sendResilience: createControllerSendHarness(),
     compose: {
       buildReplyContext: (value) => ({ id: value.id, accountEmail: value.accountEmail, mode: 'reply' }),
       resetOptionalFields() {}, reset() {}, getAttachments: () => [], isUsed: () => false,

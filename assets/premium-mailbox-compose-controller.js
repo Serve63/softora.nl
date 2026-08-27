@@ -1,10 +1,17 @@
 (function (global) {
   const acceptedSendModule = global.SoftoraMailboxComposeAcceptedSend || (typeof require === 'function'
     ? require('./premium-mailbox-compose-accepted-send.js') : null);
+  const sendResilienceModule = global.SoftoraMailboxComposeSendResilience || (typeof require === 'function'
+    ? require('./premium-mailbox-compose-send-resilience.js') : null);
 
   function create(options = {}) {
     const documentRef = options.document || global.document;
     const acceptedSendState = acceptedSendModule.create(options);
+    const sendResilience = options.sendResilience || sendResilienceModule?.create?.({
+      ...(options.sendResilienceOptions || {}),
+      fetch: options.fetch,
+      logger: options.logger || global.console,
+    });
     let replyContext = null;
     let replyOwner = '';
     let composeGeneration = 0;
@@ -570,7 +577,8 @@
       }
       if (sendRequestActive) return;
       sendRequestActive = true;
-      const account = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
+      const sendComposeGeneration = composeGeneration;
+      const sendReplyContext = replyContext;
       const sendBtn = documentRef?.querySelector('.btn-send');
       const originalSendLabel = sendBtn ? sendBtn.textContent : '';
       if (sendBtn) {
@@ -580,7 +588,7 @@
       }
       let providerAccepted = false;
       try {
-        const contextAtSend = replyContext ? { ...replyContext } : null;
+        const contextAtSend = sendReplyContext ? { ...sendReplyContext } : null;
         const currentMail = contextAtSend && options.findMail(contextAtSend.id);
         const canonicalIdentity = contextAtSend?.replyIdentity && typeof contextAtSend.replyIdentity === 'object'
           ? { ...contextAtSend.replyIdentity }
@@ -596,12 +604,11 @@
         assertReplyOwner(account);
         const sendOwner = replyOwner;
         const sendMode = contextAtSend?.mode === 'reply' ? 'reply' : 'new-message';
-        const idempotencyKey = String(contextAtSend?.sendIdempotencyKey || '').trim() || global.crypto?.randomUUID?.() || [
+        let idempotencyKey = String(contextAtSend?.sendIdempotencyKey || '').trim() || global.crypto?.randomUUID?.() || [
           'mailbox-send',
           Date.now(),
           Math.random().toString(36).slice(2),
         ].join(':');
-        if (replyContext) replyContext.sendIdempotencyKey = idempotencyKey;
         const provider = String(canonicalIdentity?.provider || replyContext && replyContext.provider || '').trim().toLowerCase();
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
@@ -636,49 +643,51 @@
           body: fieldValue('c-body'),
           attachments: [],
         };
-        if (attachments.length) {
-          if (typeof options.compose.uploadAttachments !== 'function') {
-            throw new Error('Bijlagen zijn tijdelijk niet beschikbaar; laad de mailbox opnieuw.');
-          }
-          sendPayload.attachments = await options.compose.uploadAttachments(attachments, {
-            fetch: options.fetch,
-            payload: sendPayload,
-          });
+        if (!sendResilience || typeof sendResilience.execute !== 'function') {
+          const error = new Error('De veilige verzendbeveiliging is niet beschikbaar; de mail is niet verzonden.');
+          error.code = 'MAILBOX_SEND_RESILIENCE_UNAVAILABLE';
+          error.status = 503;
+          throw error;
         }
-        const serializedPayload = typeof options.compose.serializeSendPayload === 'function'
-          ? options.compose.serializeSendPayload(sendPayload)
-          : JSON.stringify(sendPayload);
-        const response = await options.fetch('/api/mailbox/send', {
-          method: 'POST',
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: serializedPayload,
+        if (attachments.length && typeof options.compose.uploadAttachments !== 'function') {
+          throw new Error('Bijlagen zijn tijdelijk niet beschikbaar; laad de mailbox opnieuw.');
+        }
+        const execution = await sendResilience.execute({
+          payload: sendPayload,
+          attachments,
+          fetch: options.fetch,
+          uploadAttachments: attachments.length ? options.compose.uploadAttachments : undefined,
+          serializeSendPayload: typeof options.compose.serializeSendPayload === 'function'
+            ? options.compose.serializeSendPayload
+            : JSON.stringify,
+          onIdempotencyKey: (nextIdempotencyKey) => {
+            idempotencyKey = String(nextIdempotencyKey || '').trim();
+            sendPayload.idempotencyKey = idempotencyKey;
+            if (contextAtSend) contextAtSend.sendIdempotencyKey = idempotencyKey;
+            if (
+              composeGeneration === sendComposeGeneration
+              && replyContext === sendReplyContext
+              && replyContext
+            ) replyContext.sendIdempotencyKey = idempotencyKey;
+          },
         });
-        const numericStatus = Number(response?.status);
-        providerAccepted = Number.isFinite(numericStatus) && numericStatus > 0
-          ? numericStatus === 200
-          : response?.ok === true;
+        const response = execution.response;
+        const data = execution.data && typeof execution.data === 'object' ? execution.data : {};
+        const result = execution.result && typeof execution.result === 'object'
+          ? execution.result
+          : data?.result && typeof data.result === 'object' ? data.result : {};
+        const acceptedPayload = execution.payload && typeof execution.payload === 'object'
+          ? execution.payload : { ...sendPayload, idempotencyKey };
+        idempotencyKey = String(execution.idempotencyKey || acceptedPayload.idempotencyKey || idempotencyKey).trim();
+        providerAccepted = true;
         const acceptedIdentityHeaders = providerAccepted ? {
           intentId: readResponseHeader(response, 'X-Softora-Send-Intent-Id'),
           messageId: readResponseHeader(response, 'X-Softora-Message-Id'),
           providerMessageId: readResponseHeader(response, 'X-Softora-Provider-Message-Id'),
         } : {};
-        let data = {};
-        try {
-          data = await response.json();
-        } catch (error) {
-          if (providerAccepted) reportAcceptedSendPostprocessError(error, 'response-body');
-        }
-        if (!providerAccepted) {
-          throw global.SoftoraMailboxError?.fromResponse?.(
-            response,
-            data,
-            'Mail verzenden mislukt'
-          ) || new Error('Mail verzenden mislukt');
-        }
-        const result = data?.result && typeof data.result === 'object' ? data.result : {};
-        const acceptedAt = new Date().toISOString();
+        const acceptedAt = String(
+          result.sentMessage?.receivedAt || result.sentMessage?.activityAt || new Date().toISOString()
+        );
         const messageId = String(result.messageId || acceptedIdentityHeaders.messageId || '').trim();
         const providerMessageId = String(
           result.providerMessageId || acceptedIdentityHeaders.providerMessageId || ''
@@ -708,14 +717,14 @@
           messageId: String(result.sentMessage?.messageId || messageId).trim(),
           from: String(result.sentMessage?.from || options.campaignInbox?.getOwnerLabel?.(replyOwner) || account),
           email: String(result.sentMessage?.email || account),
-          to: String(result.sentMessage?.to || to),
-          toDisplay: String(result.sentMessage?.toDisplay || result.sentMessage?.to || to),
-          cc: String(result.sentMessage?.cc || fieldValue('c-cc')),
-          bcc: String(result.sentMessage?.bcc || fieldValue('c-bcc')),
+          to: String(result.sentMessage?.to || acceptedPayload.to),
+          toDisplay: String(result.sentMessage?.toDisplay || result.sentMessage?.to || acceptedPayload.to),
+          cc: String(result.sentMessage?.cc || acceptedPayload.cc),
+          bcc: String(result.sentMessage?.bcc || acceptedPayload.bcc),
           recipientRoutingEvidenceKnown: true,
-          subject,
-          body: fieldValue('c-body'),
-          preview: fieldValue('c-body'),
+          subject: acceptedPayload.subject,
+          body: acceptedPayload.body,
+          preview: acceptedPayload.body,
           receivedAt: String(result.sentMessage?.receivedAt || acceptedAt),
           activityAt: String(result.sentMessage?.activityAt || result.sentMessage?.receivedAt || acceptedAt),
           hasBody: true,
@@ -785,13 +794,13 @@
           conversationKeys: Array.from(new Set(conversationKeys.filter(Boolean))),
           message: sentMessage,
         });
-        close();
+        if (composeGeneration === sendComposeGeneration && replyContext === sendReplyContext) close();
         options.toast('✓ Mail verzonden');
       } catch (error) {
         if (providerAccepted) {
           reportAcceptedSendPostprocessError(error, 'local-ui');
           try {
-            close();
+            if (composeGeneration === sendComposeGeneration && replyContext === sendReplyContext) close();
           } catch (closeError) {
             reportAcceptedSendPostprocessError(closeError, 'close-compose');
           }

@@ -29,7 +29,8 @@ function createField(value = '') {
 }
 
 function createScenario({
-  response,
+  sendResult = null,
+  sendError = null,
   onAcceptedSend,
   attachments = [],
   accountEmail = 'serve290@gmail.com',
@@ -63,15 +64,32 @@ function createScenario({
   };
   const toasts = [];
   const logs = [];
-  let fetchCount = 0;
+  let sendCount = 0;
   const controller = composeControllerModule.create({
     document: {
       getElementById: (id) => fields.get(id) || null,
       querySelector: (selector) => selector === '.btn-send' ? sendButton : null,
     },
-    fetch: async () => {
-      fetchCount += 1;
-      return typeof response === 'function' ? response(fetchCount) : response;
+    fetch: async () => { throw new Error('controllerfixture mag het netwerk niet rechtstreeks aanroepen'); },
+    sendResilience: {
+      async execute(input = {}) {
+        sendCount += 1;
+        input.onIdempotencyKey?.(input.payload?.idempotencyKey);
+        const error = typeof sendError === 'function' ? sendError(sendCount) : sendError;
+        if (error) throw error;
+        const result = typeof sendResult === 'function' ? sendResult(sendCount) : sendResult;
+        if (!result || typeof result !== 'object') throw new Error('Bewezen verzendresultaat ontbreekt.');
+        const payload = { ...input.payload, attachments: [] };
+        return {
+          response: { headers: { get() { return null; } } },
+          data: { ok: true, result },
+          result,
+          payload,
+          attachments: [],
+          idempotencyKey: payload.idempotencyKey,
+          recoveredByPreflight: false,
+        };
+      },
     },
     compose: {
       buildReplyContext: composeModule.buildReplyContext,
@@ -116,37 +134,32 @@ function createScenario({
   return {
     controller,
     fields,
-    getFetchCount: () => fetchCount,
+    getSendCount: () => sendCount,
     logs,
     mail,
     toasts,
   };
 }
 
-test('HTTP 200 blijft verzendsucces wanneer lokale accepted-send rendering faalt', async () => {
+test('bewezen verzendsucces blijft staan wanneer lokale accepted-send rendering faalt', async () => {
   const scenario = createScenario({
-    response: {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        ok: true,
-        result: {
-          messageId: '<softora-accepted@gmail.com>',
-          sentMessage: {
-            messageId: '<softora-accepted@gmail.com>',
-            receivedAt: '2026-08-26T07:54:03.667Z',
-          },
-        },
-      }),
+    sendResult: {
+      intentId: 'send:softora-accepted',
+      messageId: '<softora-accepted@gmail.com>',
+      sentMessage: {
+        softoraSendIntentId: 'send:softora-accepted',
+        messageId: '<softora-accepted@gmail.com>',
+        receivedAt: '2026-08-26T07:54:03.667Z',
+      },
     },
     onAcceptedSend() {
       throw new Error('render callback faalde na acceptatie');
     },
   });
-  const { controller, fields, getFetchCount, logs, mail, toasts } = scenario;
+  const { controller, fields, getSendCount, logs, mail, toasts } = scenario;
   await controller.send();
 
-  assert.equal(getFetchCount(), 1);
+  assert.equal(getSendCount(), 1);
   assert.equal(controller.getContext(), null);
   assert.ok(fields.get('compose-overlay').classList.removed.includes('open'));
   assert.ok(toasts.includes('✓ Mail verzonden'));
@@ -161,7 +174,7 @@ test('HTTP 200 blijft verzendsucces wanneer lokale accepted-send rendering faalt
   assert.equal(mail.threadMessages[0].messageId, '<softora-accepted@gmail.com>');
 
   await controller.send();
-  assert.equal(getFetchCount(), 1, 'een lokale naverwerkingsfout mag nooit dezelfde mail opnieuw versturen');
+  assert.equal(getSendCount(), 1, 'een lokale naverwerkingsfout mag nooit dezelfde mail opnieuw versturen');
 });
 
 for (const bodyFailure of [
@@ -174,49 +187,37 @@ for (const bodyFailure of [
     error: Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
   },
 ]) {
-  test(`HTTP 200 blijft verzendsucces bij ${bodyFailure.label}`, async () => {
+  test(`onzekere verzendbevestiging houdt de composer open bij ${bodyFailure.label}`, async () => {
     const scenario = createScenario({
-      response: {
-        ok: true,
-        status: 200,
-        json: async () => { throw bodyFailure.error; },
-      },
+      sendError: bodyFailure.error,
     });
-    const { controller, fields, getFetchCount, logs, mail, toasts } = scenario;
+    const { controller, fields, getSendCount, logs, mail, toasts } = scenario;
 
     await controller.send();
 
-    assert.equal(getFetchCount(), 1);
-    assert.equal(controller.getContext(), null);
-    assert.ok(fields.get('compose-overlay').classList.removed.includes('open'));
-    assert.ok(toasts.includes('✓ Mail verzonden'));
-    assert.equal(toasts.some((message) => /verzenden mislukt/i.test(message)), false);
-    assert.deepEqual(logs, [{
-      label: '[MailboxCompose][AcceptedSendPostprocess]',
-      detail: { phase: 'response-body', message: bodyFailure.error.message },
-    }]);
+    assert.equal(getSendCount(), 1);
+    assert.notEqual(controller.getContext(), null);
+    assert.equal(fields.get('compose-overlay').classList.removed.includes('open'), false);
+    assert.equal(toasts.includes('✓ Mail verzonden'), false);
+    assert.equal(toasts.some((message) => /verzenden mislukt/i.test(message)), true);
+    assert.deepEqual(logs, []);
 
     controller.reconcile(mail);
     const sentMessages = mail.threadMessages.filter((message) => message.direction === 'sent');
-    assert.equal(sentMessages.length, 1);
-    assert.equal(sentMessages[0].body, 'Dank voor je reactie.');
-    assert.equal(sentMessages[0].localAcceptedSend, true);
+    assert.equal(sentMessages.length, 0);
+    assert.match(String(controller.getContext()?.sendIdempotencyKey || ''), /\S/);
   });
 }
 
-test('een niet-200 response blijft een echte verzendfout, ook met onleesbare body', async () => {
+test('een definitieve verzendfout houdt de composer open en kan opnieuw worden geprobeerd', async () => {
   const scenario = createScenario({
-    response: {
-      ok: false,
-      status: 503,
-      json: async () => { throw new SyntaxError('upstream body afgebroken'); },
-    },
+    sendError: () => Object.assign(new Error('Mail verzenden mislukt'), { status: 503 }),
   });
-  const { controller, fields, getFetchCount, logs, mail, toasts } = scenario;
+  const { controller, fields, getSendCount, logs, mail, toasts } = scenario;
 
   await controller.send();
 
-  assert.equal(getFetchCount(), 1);
+  assert.equal(getSendCount(), 1);
   assert.notEqual(controller.getContext(), null);
   assert.equal(fields.get('compose-overlay').classList.removed.includes('open'), false);
   assert.equal(toasts.some((message) => /verzenden mislukt/i.test(message)), true);
@@ -226,86 +227,36 @@ test('een niet-200 response blijft een echte verzendfout, ook met onleesbare bod
   assert.equal(mail.threadMessages.filter((message) => message.direction === 'sent').length, 0);
 
   await controller.send();
-  assert.equal(getFetchCount(), 2, 'een echte niet-200 fout moet opnieuw geprobeerd kunnen worden');
+  assert.equal(getSendCount(), 2, 'een definitieve fout moet opnieuw geprobeerd kunnen worden');
 });
 
-test('malformed HTTP-200 gebruikt responseheaders als canonieke provideridentiteit', async () => {
-  const headers = new Map([
-    ['x-softora-send-intent-id', 'send:peakboom-header'],
-    ['x-softora-message-id', '<peakboom-provider@gmail.com>'],
-  ]);
+test('een door resilience afgewezen identiteit maakt nooit een lokale verzonden kaart', async () => {
   const scenario = createScenario({
-    response: {
-      ok: true,
-      status: 200,
-      headers: { get: (name) => headers.get(String(name).toLowerCase()) || null },
-      json: async () => { throw new SyntaxError('providerbody was onleesbaar'); },
-    },
+    sendError: Object.assign(new Error('Duurzame berichtidentiteit ontbreekt.'), {
+      code: 'MAILBOX_SEND_DURABLE_IDENTITY_MISSING',
+    }),
   });
-  const { controller, mail } = scenario;
+  const { controller, getSendCount, mail, toasts } = scenario;
 
   await controller.send();
   controller.reconcile(mail);
-  let sentMessages = mail.threadMessages.filter((message) => message.direction === 'sent');
-  assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].messageId, '<peakboom-provider@gmail.com>');
-  assert.equal(sentMessages[0].providerMessageId, '');
-  assert.equal(sentMessages[0].softoraSendIntentId, 'send:peakboom-header');
-  assert.equal(sentMessages[0].localAcceptedSendFallback, false);
-
-  const providerCopy = {
-    id: 'sent:peakboom-provider',
-    mailboxId: 'sent:peakboom-provider',
-    folder: 'sent',
-    storageFolder: 'sent',
-    direction: 'sent',
-    accountEmail: 'serve290@gmail.com',
-    messageId: '<peakboom-provider@gmail.com>',
-    from: 'Servé Creusen <serve290@gmail.com>',
-    email: 'serve290@gmail.com',
-    to: 'info@peakboomadvies.nl',
-    subject: 'RE: Kleine vraag over jullie website',
-    body: 'Dank voor je reactie.',
-    receivedAt: sentMessages[0].receivedAt,
-    conversationId: mail.conversationId,
-    softoraSendMode: 'reply',
-    softoraReplyTargetMessageId: mail.messageId,
-    localAcceptedSend: false,
-  };
-  mail.threadMessages.push(providerCopy);
-  controller.reconcile(mail);
-
-  sentMessages = mail.threadMessages.filter((message) => message.direction === 'sent');
-  assert.equal(sentMessages.length, 1);
-  assert.strictEqual(sentMessages[0], providerCopy);
-  assert.equal(sentMessages[0].messageId, '<peakboom-provider@gmail.com>');
-  assert.equal(sentMessages.some((message) => message.localAcceptedSendFallback === true), false);
-  mail.threadMessages = [];
-  controller.reconcile(mail);
-  assert.equal(mail.threadMessages.length, 1, 'bij een partial refresh komt de canonieke clientkaart terug');
-  assert.equal(mail.threadMessages[0].messageId, '<peakboom-provider@gmail.com>');
-  mail.threadMessages.push(providerCopy);
-  controller.reconcile(mail);
-  assert.deepEqual(mail.threadMessages, [providerCopy]);
+  assert.equal(mail.threadMessages.filter((message) => message.direction === 'sent').length, 0);
+  assert.equal(controller.getContext() !== null, true);
+  assert.equal(toasts.includes('✓ Mail verzonden'), false);
+  assert.equal(toasts.some((message) => /verzenden mislukt/i.test(message)), true);
+  assert.equal(getSendCount(), 1);
 });
 
 test('send-intent vervangt alleen de clientkaart en laat de providerkopie leidend', async () => {
   const scenario = createScenario({
-    response: {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        ok: true,
-        result: {
-          messageId: '<planned-peakboom@gmail.com>',
-          intentId: 'send:peakboom-intent',
-          sentMessage: {
-            messageId: '<planned-peakboom@gmail.com>',
-            softoraSendIntentId: 'send:peakboom-intent',
-            receivedAt: '2026-08-26T07:54:03.667Z',
-          },
-        },
-      }),
+    sendResult: {
+      messageId: '<planned-peakboom@gmail.com>',
+      intentId: 'send:peakboom-intent',
+      sentMessage: {
+        messageId: '<planned-peakboom@gmail.com>',
+        softoraSendIntentId: 'send:peakboom-intent',
+        receivedAt: '2026-08-26T07:54:03.667Z',
+      },
     },
   });
   const { controller, mail } = scenario;
@@ -346,19 +297,14 @@ test('geaccepteerde reply bewaart exact dezelfde accountgebonden messageKey zond
     let acceptedRecord = null;
     const scenario = createScenario({
       ...identity,
-      response: {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          ok: true,
-          result: {
-            messageId: '<same-rfc-message-id@softora.nl>',
-            sentMessage: {
-              messageId: '<same-rfc-message-id@softora.nl>',
-              receivedAt: '2026-08-26T13:29:49.000Z',
-            },
-          },
-        }),
+      sendResult: {
+        intentId: `send:same-rfc-${identity.owner}`,
+        messageId: '<same-rfc-message-id@softora.nl>',
+        sentMessage: {
+          softoraSendIntentId: `send:same-rfc-${identity.owner}`,
+          messageId: '<same-rfc-message-id@softora.nl>',
+          receivedAt: '2026-08-26T13:29:49.000Z',
+        },
       },
       onAcceptedSend: (record) => { acceptedRecord = record; },
     });
@@ -436,7 +382,7 @@ test('geaccepteerde reply bewaart exact dezelfde accountgebonden messageKey zond
   }
 });
 
-test('geaccepteerde response zonder leesbare JSON behoudt alleen veilige lokale bijlagemetadata', async () => {
+test('onleesbare response met lokale bijlage maakt nooit een optimistische verzonden kaart', async () => {
   const selected = [{
     filename: 'voorbeeld.png',
     contentType: 'image/png',
@@ -445,24 +391,16 @@ test('geaccepteerde response zonder leesbare JSON behoudt alleen veilige lokale 
   }];
   const scenario = createScenario({
     attachments: selected,
-    response: {
-      ok: true,
-      status: 200,
-      json: async () => { throw new SyntaxError('afgebroken JSON'); },
-    },
+    sendError: new SyntaxError('afgebroken JSON'),
   });
 
   await scenario.controller.send();
   scenario.controller.reconcile(scenario.mail);
   const sent = scenario.mail.threadMessages.find((message) => message.direction === 'sent');
-  assert.deepEqual(sent.attachments, [{
-    filename: 'voorbeeld.png',
-    contentType: 'image/png',
-    size: 4,
-  }]);
-  assert.equal('file' in sent.attachments[0], false);
-  assert.equal('reference' in sent.attachments[0], false);
-  assert.doesNotMatch(JSON.stringify(sent.attachments), /privateBytes|niet tonen/);
+  assert.equal(sent, undefined);
+  assert.notEqual(scenario.controller.getContext(), null);
+  assert.equal(scenario.toasts.includes('✓ Mail verzonden'), false);
+  assert.doesNotMatch(JSON.stringify(scenario.mail.threadMessages), /privateBytes|niet tonen/);
 });
 
 test('exacte idempotente replay neemt nooit bijlagemetadata uit de nieuwe clientrequest over', async () => {
@@ -474,22 +412,17 @@ test('exacte idempotente replay neemt nooit bijlagemetadata uit de nieuwe client
   }];
   const scenario = createScenario({
     attachments: selected,
-    response: {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        ok: true,
-        result: {
-          idempotentReplay: true,
-          messageId: '<duurzaam-accepted@softora.nl>',
-          sentMessage: {
-            messageId: '<duurzaam-accepted@softora.nl>',
-            subject: 'RE: Kleine vraag over jullie website',
-            body: 'Duurzaam opgeslagen antwoord.',
-            receivedAt: '2026-08-26T15:29:00.000Z',
-          },
-        },
-      }),
+    sendResult: {
+      idempotentReplay: true,
+      intentId: 'send:duurzaam-accepted',
+      messageId: '<duurzaam-accepted@softora.nl>',
+      sentMessage: {
+        softoraSendIntentId: 'send:duurzaam-accepted',
+        messageId: '<duurzaam-accepted@softora.nl>',
+        subject: 'RE: Kleine vraag over jullie website',
+        body: 'Duurzaam opgeslagen antwoord.',
+        receivedAt: '2026-08-26T15:29:00.000Z',
+      },
     },
   });
 

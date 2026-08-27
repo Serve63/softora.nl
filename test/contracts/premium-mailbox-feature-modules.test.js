@@ -8,6 +8,7 @@ const compose = require('../../assets/premium-mailbox-compose.js');
 const composeAcceptedSend = require('../../assets/premium-mailbox-compose-accepted-send.js');
 const composeWindow = require('../../assets/premium-mailbox-compose-window.js');
 const composeController = require('../../assets/premium-mailbox-compose-controller.js');
+const { createControllerSendHarness } = require('../helpers/mailbox-compose-send-resilience');
 const mailboxDelete = require('../../assets/premium-mailbox-delete.js');
 const mailboxRead = require('../../assets/premium-mailbox-read.js');
 const mailboxToast = require('../../assets/premium-mailbox-toast.js');
@@ -301,6 +302,7 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
     querySelector: () => null,
   };
   const controller = composeController.create({
+    sendResilience: createControllerSendHarness(),
     document: documentRef,
     compose: {
       getAttachments: () => [{ filename: 'voorstel.pdf', contentType: 'application/pdf', size: 4, file: { name: 'voorstel.pdf' } }],
@@ -428,6 +430,7 @@ test('gecombineerde mailbox verstuurt een Instantly-antwoord uitsluitend via de 
     subject: 'Re: Website',
   };
   const controller = composeController.create({
+    sendResilience: createControllerSendHarness(),
     document: {
       getElementById: (id) => values[id] || null,
       querySelector: () => null,
