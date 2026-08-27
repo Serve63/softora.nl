@@ -6,7 +6,68 @@
     'owner', 'account', 'recipient', 'provider', 'mode', 'conversationId',
     'replyTarget', 'providerThreadId',
   ]);
+  const STRICT_STORAGE_PREFIX_PATTERN = /^softora\.[a-z0-9][a-z0-9._-]{2,126}:$/i;
   let mailboxSendRetryMemoryRecords = [];
+
+  function createStrictPrefixedStorage(options = {}) {
+    const prefix = String(options.prefix || '');
+    if (!STRICT_STORAGE_PREFIX_PATTERN.test(prefix)) {
+      throw new Error('Duurzame browseropslag mist een geldige afgeschermde prefix.');
+    }
+    let storage;
+    if (Object.prototype.hasOwnProperty.call(options, 'storage')) {
+      storage = options.storage;
+    } else {
+      try { storage = global.localStorage; } catch (error) {
+        throw new Error('Duurzame browseropslag is niet beschikbaar.', { cause: error });
+      }
+    }
+    if (
+      !storage
+      || typeof storage.getItem !== 'function'
+      || typeof storage.setItem !== 'function'
+      || typeof storage.removeItem !== 'function'
+      || typeof storage.key !== 'function'
+      || !Number.isFinite(Number(storage.length))
+    ) {
+      throw new Error('Duurzame browseropslag is niet beschikbaar.');
+    }
+
+    function scopedKey(value) {
+      if (typeof value !== 'string' || !value.startsWith(prefix) || value.length <= prefix.length) {
+        throw new Error('Browseropslagsleutel valt buiten de toegestane prefix.');
+      }
+      return value;
+    }
+
+    function scopedKeys() {
+      const length = Number(storage.length);
+      if (!Number.isSafeInteger(length) || length < 0 || length > 10_000) {
+        throw new Error('Duurzame browseropslag heeft een ongeldige omvang.');
+      }
+      const keys = [];
+      for (let index = 0; index < length; index += 1) {
+        const key = storage.key(index);
+        if (typeof key === 'string' && key.startsWith(prefix) && key.length > prefix.length) keys.push(key);
+      }
+      return keys;
+    }
+
+    return Object.freeze({
+      get length() { return scopedKeys().length; },
+      key(index) {
+        const position = Number(index);
+        if (!Number.isSafeInteger(position) || position < 0) return null;
+        return scopedKeys()[position] ?? null;
+      },
+      getItem(key) { return storage.getItem(scopedKey(key)); },
+      setItem(key, value) {
+        if (typeof value !== 'string') throw new Error('Browseropslag accepteert uitsluitend tekstwaarden.');
+        storage.setItem(scopedKey(key), value);
+      },
+      removeItem(key) { storage.removeItem(scopedKey(key)); },
+    });
+  }
 
   function createScopedSendRetryStore(options = {}) {
     const storageKey = String(options.storageKey || MAILBOX_SEND_RETRY_STORAGE_KEY).trim();
@@ -252,6 +313,7 @@
     createMemoryLatestRecordStore,
     createScopedSendRetryStore,
     createScopedSessionRetryStore: createScopedSendRetryStore,
+    createStrictPrefixedStorage,
   };
   global.SoftoraPremiumBrowserStorage = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

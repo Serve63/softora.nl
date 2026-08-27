@@ -1318,3 +1318,64 @@ test('maximale batch deelt één absoluut stagingbudget over alle PUTs en retry'
   assert.equal(compose.getAttachments().length, 5);
   compose.resetOptionalFields(documentRef);
 });
+
+test('v2 uploadplan bindt request, response en staged reference aan exact dezelfde SHA-256', async () => {
+  const file = createBrowserFile('bewijs.pdf', 'application/pdf', [1, 2, 3, 4]);
+  const expectedSha256 = sha256(Buffer.from([1, 2, 3, 4]));
+  const selected = [{
+    file,
+    filename: file.name,
+    contentType: file.type,
+    size: file.size,
+    sha256: expectedSha256,
+  }];
+  const calls = [];
+  const references = await compose.uploadAttachments(selected, {
+    now: () => 1_000,
+    FormData: function BrokenFormData() { throw new Error('raw body test'); },
+    fetch: async (url, request) => {
+      calls.push({ url, request });
+      if (url === '/api/mailbox/attachments/upload-url') {
+        assert.deepEqual(JSON.parse(request.body).attachments, [{
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+          sha256: expectedSha256,
+        }]);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            uploads: [{
+              reference: 'opaque-v2-reference',
+              signedUrl: 'https://storage.test/v2-upload',
+              filename: file.name,
+              contentType: file.type,
+              size: file.size,
+              sha256: expectedSha256,
+              referenceVersion: 2,
+              expiresAt: 2_000_000,
+            }],
+          }),
+        };
+      }
+      assert.equal(url, 'https://storage.test/v2-upload');
+      assert.strictEqual(request.body, file);
+      return { ok: true, status: 200 };
+    },
+    payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+  });
+
+  assert.equal(calls.length, 2);
+  assert.deepEqual(references, [{
+    reference: 'opaque-v2-reference',
+    filename: file.name,
+    contentType: file.type,
+    size: file.size,
+    sha256: expectedSha256,
+    referenceVersion: 2,
+  }]);
+  assert.equal(references[0].expiresAt, 2_000_000);
+  assert.equal(Object.keys(references[0]).includes('expiresAt'), false);
+});

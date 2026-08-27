@@ -334,6 +334,8 @@
     const now = attachmentNow(options);
     return uploads.every((upload, index) => {
       const attachment = attachments[index];
+      const expectedSha256 = String(attachment?.sha256 || '');
+      const hashBound = /^[0-9a-f]{64}$/.test(expectedSha256);
       const rawReference = typeof upload?.reference === 'string' ? upload.reference : '';
       const rawSignedUrl = typeof upload?.signedUrl === 'string' ? upload.signedUrl : '';
       const reference = rawReference.trim();
@@ -354,6 +356,9 @@
         && size === Number(attachment?.size)
         && contentType === contentType.trim().toLowerCase()
         && isValidAttachmentContentType(contentType)
+        && (hashBound
+          ? upload?.sha256 === expectedSha256 && upload?.referenceVersion === 2
+          : upload?.sha256 === undefined && upload?.referenceVersion !== 2)
         && Number.isSafeInteger(expiresAt)
         && expiresAt > now
         && (batchExpiresAt === null || expiresAt === batchExpiresAt);
@@ -371,6 +376,7 @@
       filename: String(upload?.filename || '').trim(),
       contentType: String(upload?.contentType || '').trim().toLowerCase(),
       size: Math.max(0, Number(upload?.size) || 0),
+      ...(upload?.sha256 ? { sha256: upload.sha256, referenceVersion: upload.referenceVersion } : {}),
     })).filter((upload) => upload.reference);
   }
 
@@ -485,6 +491,7 @@
       filename: attachment.filename,
       contentType: attachment.contentType,
       size: attachment.size,
+      ...(attachment.sha256 ? { sha256: attachment.sha256 } : {}),
     }));
     const uploadPayload = { ...options.payload, attachments: metadata };
     const uploads = await requestAttachmentUploadPlan(fetchImpl, uploadPayload, list, operationOptions);
@@ -557,12 +564,19 @@
         }
         if (lastUploadError) throw lastUploadError;
       }
-      return uploads.map(({ reference, filename, contentType, size }) => ({
-        reference,
-        filename,
-        contentType,
-        size,
-      }));
+      return uploads.map(({ reference, filename, contentType, size, sha256, referenceVersion, expiresAt }) => {
+        const stagedReference = {
+          reference, filename, contentType, size,
+          ...(sha256 ? { sha256, referenceVersion } : {}),
+        };
+        Object.defineProperty(stagedReference, 'expiresAt', {
+          configurable: false,
+          enumerable: false,
+          value: expiresAt,
+          writable: false,
+        });
+        return stagedReference;
+      });
     } catch (error) {
       startAttachmentCleanup(options, getCleanupReferences(uploads));
       const normalized = mailboxError(error, 'Bijlage uploaden mislukt. Je mail is niet verzonden.', 'attachment-upload');

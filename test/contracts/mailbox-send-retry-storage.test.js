@@ -6,11 +6,57 @@ const browserStorage = require('../../assets/premium-browser-storage');
 function createFakeLocalStorage() {
   const values = new Map();
   return {
+    get length() { return values.size; },
+    key(index) { return Array.from(values.keys())[index] ?? null; },
     getItem(key) { return values.has(key) ? values.get(key) : null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); },
   };
 }
+
+test('strikte prefixopslag ziet en wijzigt uitsluitend de toegewezen namespace', () => {
+  const storage = createFakeLocalStorage();
+  const prefix = 'softora.mailbox.send-resilience.v1:';
+  storage.setItem('softora.mailbox.send-retry.v1', 'blijft-afgeschermd');
+  storage.setItem(`${prefix}existing`, 'bestaand');
+  const scoped = browserStorage.createStrictPrefixedStorage({ storage, prefix });
+
+  assert.equal(scoped.length, 1);
+  assert.equal(scoped.key(0), `${prefix}existing`);
+  assert.equal(scoped.key(1), null);
+  assert.equal(scoped.getItem(`${prefix}existing`), 'bestaand');
+  scoped.setItem(`${prefix}new`, 'nieuw');
+  assert.equal(storage.getItem(`${prefix}new`), 'nieuw');
+  assert.equal(scoped.length, 2);
+
+  assert.throws(() => scoped.getItem('softora.mailbox.send-retry.v1'), /buiten de toegestane prefix/);
+  assert.throws(() => scoped.setItem(prefix, 'leeg'), /buiten de toegestane prefix/);
+  assert.throws(() => scoped.setItem(`${prefix}object`, { fout: true }), /uitsluitend tekstwaarden/);
+  scoped.removeItem(`${prefix}existing`);
+  assert.equal(storage.getItem(`${prefix}existing`), null);
+  assert.equal(storage.getItem('softora.mailbox.send-retry.v1'), 'blijft-afgeschermd');
+});
+
+test('strikte prefixopslag faalt gesloten bij ongeldige prefix of ontbrekende duurzame storage', () => {
+  const storage = createFakeLocalStorage();
+  for (const prefix of ['', 'mailbox:', 'softora:', 'softora.mailbox', 'softora.mailbox:extra']) {
+    assert.throws(
+      () => browserStorage.createStrictPrefixedStorage({ storage, prefix }),
+      /geldige afgeschermde prefix/
+    );
+  }
+  assert.throws(
+    () => browserStorage.createStrictPrefixedStorage({ storage: null, prefix: 'softora.mailbox.safe:' }),
+    /niet beschikbaar/
+  );
+  assert.throws(
+    () => browserStorage.createStrictPrefixedStorage({
+      storage: { length: 0, getItem() {}, setItem() {}, removeItem() {} },
+      prefix: 'softora.mailbox.safe:',
+    }),
+    /niet beschikbaar/
+  );
+});
 
 function createScope(overrides = {}) {
   return {
