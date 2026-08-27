@@ -276,6 +276,29 @@ function aggregateRows(rows = []) {
   };
 }
 
+function aggregateNonBrandedPages(pageQueryRows = []) {
+  const byPage = new Map();
+  for (const row of normalizeSearchRows(pageQueryRows)) {
+    const page = rowKey(row, 0);
+    const query = rowKey(row, 1);
+    if (!page || !query || isBrandedQuery(query)) continue;
+    const current = byPage.get(page) || { clicks: 0, impressions: 0, weightedPosition: 0 };
+    current.clicks += toFiniteNumber(row.clicks);
+    current.impressions += toFiniteNumber(row.impressions);
+    current.weightedPosition += toFiniteNumber(row.position) * toFiniteNumber(row.impressions);
+    byPage.set(page, current);
+  }
+  return [...byPage.entries()]
+    .map(([page, totals]) => ({
+      page,
+      clicks: roundNumber(totals.clicks, 2),
+      impressions: roundNumber(totals.impressions, 2),
+      ctr: totals.impressions ? roundNumber(totals.clicks / totals.impressions, 4) : 0,
+      position: totals.impressions ? roundNumber(totals.weightedPosition / totals.impressions, 2) : 0,
+    }))
+    .sort((left, right) => right.clicks - left.clicks || right.impressions - left.impressions || left.page.localeCompare(right.page));
+}
+
 function buildUnclassifiedSegment(propertyTotals, visibleQueryTotals) {
   const clicks = Math.max(0, toFiniteNumber(propertyTotals.clicks) - toFiniteNumber(visibleQueryTotals.clicks));
   const impressions = Math.max(
@@ -355,6 +378,7 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const pageRows = rowsWithDelta(snapshot.pagesCurrent || [], snapshot.pagesPrevious || [], 0);
   const queryRows = rowsWithDelta(snapshot.queriesCurrent || [], snapshot.queriesPrevious || [], 0);
   const pageQueryRows = normalizeSearchRows(snapshot.pageQueryCurrent || []);
+  const nonBrandedPages = aggregateNonBrandedPages(pageQueryRows);
   const visibleCurrentTotals = aggregateRows(snapshot.queriesCurrent || []);
   const currentTotals = aggregateRows(snapshot.totalsCurrent || snapshot.queriesCurrent || []);
   const previousTotals = aggregateRows(snapshot.totalsPrevious || snapshot.queriesPrevious || []);
@@ -479,6 +503,7 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     },
     pages: {
       top: pageRows.sort(sortByNumberDesc('clicks')).slice(0, 20),
+      nonBranded: nonBrandedPages,
       rising: risingPages,
       declining: decliningPages,
     },
@@ -739,6 +764,15 @@ function formatAgentMarkdown(report = {}) {
     lines.push('', '## Dalende paginas', '');
     report.pages.declining.slice(0, 8).forEach((item) => {
       lines.push(`- ${item.page}: klikken ${item.clicksDelta}, vertoningen ${item.impressionsDelta}`);
+    });
+  }
+
+  if (Array.isArray(report.pages?.nonBranded) && report.pages.nonBranded.length > 0) {
+    lines.push('', '## Non-branded landingspaginas', '');
+    report.pages.nonBranded.slice(0, 10).forEach((item) => {
+      lines.push(
+        `- ${item.page}: ${item.clicks} klikken, ${item.impressions} vertoningen, CTR ${formatPercent(item.ctr)}, positie ${item.position}`
+      );
     });
   }
 

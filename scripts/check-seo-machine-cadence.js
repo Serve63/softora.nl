@@ -23,9 +23,17 @@ const {
 const {
   runSeoMachineIndexationReport,
 } = require('./seo-machine-indexation-report');
+const {
+  buildD28NonBrandedPerformance,
+} = require('../server/services/seo-machine-performance');
+const {
+  getSeoMachinePublicationPlan,
+} = require('../server/services/seo-machine-publication-plan');
 
 const DEFAULT_INDEXATION_REPORT_PATH = path.resolve(__dirname, '..', 'reports', 'seo-agent', 'indexation-latest.json');
 const DEFAULT_INDEXATION_MAX_AGE_MS = 30 * 60 * 1000;
+const DEFAULT_PERFORMANCE_REPORT_PATH = path.resolve(__dirname, '..', 'reports', 'seo-agent', 'latest.json');
+const DEFAULT_PERFORMANCE_MAX_AGE_MS = 30 * 60 * 1000;
 
 function loadFreshIndexationReport(
   filePath = DEFAULT_INDEXATION_REPORT_PATH,
@@ -43,13 +51,30 @@ function loadFreshIndexationReport(
   }
 }
 
+function loadFreshPerformanceReport(
+  filePath = DEFAULT_PERFORMANCE_REPORT_PATH,
+  now = new Date(),
+  maximumAgeMs = DEFAULT_PERFORMANCE_MAX_AGE_MS
+) {
+  try {
+    const report = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const generatedAt = new Date(report.generatedAt).getTime();
+    const age = now.getTime() - generatedAt;
+    if (!Number.isFinite(generatedAt) || age < 0 || age > maximumAgeMs) return null;
+    return report;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function runSeoMachineCadenceCheck(options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date(options.now || Date.now());
   const backlog = options.backlog || loadSeoMachineBacklog(options.filePath || DEFAULT_BACKLOG_PATH);
   const backlogResult = options.backlogResult || validateSeoMachineBacklog(backlog, options.validationOptions);
   const ledger = options.ledger || await runSeoMachinePublicationReport(options);
   let indexation = options.indexation || (!options.refreshIndexation && loadFreshIndexationReport(
     options.indexationReportPath,
-    options.now instanceof Date ? options.now : new Date(options.now || Date.now()),
+    now,
     options.indexationMaximumAgeMs
   ));
   if (!indexation) {
@@ -61,14 +86,25 @@ async function runSeoMachineCadenceCheck(options = {}) {
   }
   const quality = options.quality || buildContentOriginalityReport({
     sourceItems: SEO_CONTENT_ITEMS,
-    renderedItems: getSeoContentItems({ now: options.now || new Date() }),
+    renderedItems: getSeoContentItems({ now }),
+  });
+  const performanceReport = options.performanceReport || loadFreshPerformanceReport(
+    options.performanceReportPath,
+    now,
+    options.performanceMaximumAgeMs
+  );
+  const performance = options.performance || buildD28NonBrandedPerformance({
+    publicationPlan: options.publicationPlan || getSeoMachinePublicationPlan({ now }),
+    report: performanceReport,
+    now,
   });
   return {
     backlog: backlogResult.summary,
     ledger,
     indexation,
     quality,
-    cadence: evaluateSeoMachineState({ backlogResult, ledger, indexation, quality }),
+    performance,
+    cadence: evaluateSeoMachineState({ backlogResult, ledger, indexation, quality, performance }),
   };
 }
 
@@ -89,6 +125,12 @@ async function runCli() {
       + `newUrlFloor7d=${cadence.minimumNewUrlsPerWeek} newUrlDeficit=${cadence.newUrlDeficit} `
       + `maxNewUrls7d=${cadence.maximumNewUrlsPerWeek}`
     );
+    console.log(
+      `[seo-cadence] performance=${result.performance.status} `
+      + `d28Impressing=${result.performance.summary?.impressing ?? 'n/a'}/${result.performance.summary?.reviewed ?? 'n/a'} `
+      + `d28NonBrandClicks=${result.performance.summary?.clicks ?? 'n/a'} `
+      + `d28NonBrandImpressions=${result.performance.summary?.impressions ?? 'n/a'}`
+    );
     if (cadence.nextCandidate) {
       console.log(
         `[seo-cadence] next=${cadence.nextCandidate.id} score=${cadence.nextCandidate.score} `
@@ -108,6 +150,9 @@ if (require.main === module) runCli();
 module.exports = {
   DEFAULT_INDEXATION_MAX_AGE_MS,
   DEFAULT_INDEXATION_REPORT_PATH,
+  DEFAULT_PERFORMANCE_MAX_AGE_MS,
+  DEFAULT_PERFORMANCE_REPORT_PATH,
   loadFreshIndexationReport,
+  loadFreshPerformanceReport,
   runSeoMachineCadenceCheck,
 };

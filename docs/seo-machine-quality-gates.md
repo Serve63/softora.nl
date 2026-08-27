@@ -12,9 +12,11 @@ Deze poorten voorkomen dat productiesnelheid wordt verward met organische groei.
 
 ## Machine-Toestanden
 
-De dagelijkse `seo:cadence:check` beslist in deze volgorde: `operations_p0`, `data_degraded`, `indexation_recovery`, `quality_recovery`, `growth`, `scale`. Iedere succesvolle run levert een publieke verbetering. Daarnaast geldt een harde rollende nieuwe-URL-vloer: 0 in `operations_p0`, 1 in `data_degraded`, 2 in `indexation_recovery`, 2 in `quality_recovery`, 3 in `growth` en 5 in `scale`.
+De dagelijkse `seo:cadence:check` beslist in deze volgorde: `operations_p0`, `data_degraded`, `indexation_recovery`, `quality_recovery`, `performance_recovery`, `growth`, `scale`. Iedere succesvolle run levert een publieke verbetering. Daarnaast geldt een harde rollende nieuwe-URL-vloer: 0 in `operations_p0`, 1 in `data_degraded`, `indexation_recovery`, `quality_recovery` en `performance_recovery`, 3 in `growth` en 5 in `scale`.
 
 In `indexation_recovery` blijven contextuele links, discovery, consolidatie, canonicalherstel en versterking van bestaande pagina's belangrijk. In `quality_recovery` worden automatische opvultekst, overlap en herhaalde alinea's vervangen door pagina-eigen informatie. Geen van beide hersteltoestanden mag eindeloos alle nieuwe publicaties verdringen: als de vloer is gemist, wordt de volgende veilige publieke actie een nieuwe URL.
+
+In `performance_recovery` verbetert de machine eerst de query/pagina-match, snippet, interne route of positionering van bestaande output. Deze toestand start pas bij minimaal vijf reviewbare D28-URL's en minder dan 40% non-branded impressiedekking, of bij minimaal 100 cohortimpressies zonder klik. `scale` vereist minimaal 60% impressiedekking en ten minste een non-branded klik. Dit zijn interne capaciteitsgrenzen, geen Google-rankingfactoren.
 
 De live ledger rapporteert `newUrls`, `substantialRefreshes` en `otherGrowthActions` apart. Alleen `newUrls` telt voor de vloer. Een refresh kan wel meetellen voor het totale ritme, maar nooit doen alsof er een nieuwe indexeerbare ingang is gemaakt.
 
@@ -43,6 +45,7 @@ Voor iedere nieuwe URL en substantiële contentrefresh bestaat vóór het schrij
 - `0` geschat volume is `no_measurable_provider_volume`, niet `no_demand`. Geen enkele volume-, CPC-, difficulty-, intent- of trafficwaarde mag op zichzelf de keuze bepalen.
 - De uiteindelijke afweging combineert GSC, buyer task, business fit, Nederlandse SERP-intentie, actuele openbare bronnen, unieke informatiewinst, bestaande Softora-URL's en cannibalisatierisico.
 - Relevante termen krijgen per term `used`, `covered_semantically` of `rejected` met een korte reden. Er bestaat geen minimale keyworddichtheid, verplichte exact-matchtelling, meta-keywordsveld of automatische FAQ met varianten.
+- De callledger moet exact aansluiten op `callsUsed`; termen verwijzen naar hun researchtool. Minimaal één als `used` gemarkeerde term staat werkelijk in de zichtbare paginacopy en de voorlopige primaire term heeft een expliciet niet-afgewezen besluit.
 - Lees de definitieve tekst als mens: verwijder onnatuurlijke herhaling, losse keywordlijsten en secties die alleen bestaan om een variant te plaatsen. Titel, H1, intro, secties, metadata en ankertekst blijven primair helder en behulpzaam voor de koper.
 - `keyword_metrics`, `generate_article`, projectmutaties, backlinks, site audits en iedere betaalde fallback blijven verboden. Onbeschikbaarheid wordt als `external_research_unavailable` gerapporteerd en blokkeert een veilige GSC- en SERP-onderbouwde actie niet.
 
@@ -95,6 +98,8 @@ Dit zijn interne alarmsignalen, geen Google-rankingfactoren. Overschrijding zet 
 - `npm run seo:publications:report -- --json` geeft een betrouwbare live ledger.
 - `npm run seo:indexation:report -- --json` geeft verse inspectiestatus of expliciet `data_degraded`.
 - `npm run seo:visuals:check` blokkeert nieuwe repeterende beeldfamilies, zwakke beeldbriefs en ongeschikte previewformaten.
+- `npm run seo:keywords:check` blokkeert toekomstige nieuwe of substantieel vernieuwde content zonder geldige `keywordEvidence`; een bewezen `external_research_unavailable`-fallback blijft toegestaan.
+- `npm run seo:automation-state -- inspect` bewijst de actuele 15-runrotatie en wekelijkse Ubersuggest-discoverystatus zonder een tweede automation te maken.
 - `npm run seo:cadence:check` noemt toestand, verplichte actie, request evidence debt, nieuwe-URL-vloer, achterstand en maximum nieuwe URL's.
 - Gerichte tests en `npm run verify:critical` zijn groen.
 - PR, merge, productiecommit en live verificatie zijn aantoonbaar; merged-but-not-live telt nooit als publicatie.

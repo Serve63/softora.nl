@@ -19,11 +19,12 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /Onderhoud aan een oude PR[\s\S]*tellen niet als publieke groeilevering/i);
   assert.match(policy, /cooldown geldt alleen voor dezelfde URL/i);
   assert.match(policy, /nieuwe URL's en refreshes apart/i);
-  assert.match(policy, /minimaal 1 nieuwe URL in `data_degraded`[\s\S]*2 in `indexation_recovery`[\s\S]*2 in `quality_recovery`[\s\S]*3 in `growth`[\s\S]*5 in `scale`/i);
+  assert.match(policy, /minimaal 1 nieuwe URL in `data_degraded`[\s\S]*`indexation_recovery`[\s\S]*`quality_recovery`[\s\S]*`performance_recovery`[\s\S]*3 in `growth`[\s\S]*5 in `scale`/i);
   assert.match(policy, /`newUrls`[\s\S]*`substantialRefreshes`[\s\S]*`otherGrowthActions`/i);
   assert.match(policy, /Alleen `newUrls` verlaagt de nieuwe-URL-achterstand/i);
   assert.match(policy, /`indexation_recovery`/i);
   assert.match(policy, /`quality_recovery`/i);
+  assert.match(policy, /`performance_recovery`/i);
   assert.match(policy, /minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs/i);
   assert.match(policy, /Dagelijkse fallback-ladder/i);
   assert.match(policy, /bronvaste nieuws- of marktupdate/i);
@@ -36,6 +37,8 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.equal(packageJson.scripts['seo:publications:report'], 'node scripts/seo-machine-publication-report.js');
   assert.equal(packageJson.scripts['seo:indexation:report'], 'node scripts/seo-machine-indexation-report.js');
   assert.equal(packageJson.scripts['seo:visuals:check'], 'node scripts/check-seo-machine-visuals.js');
+  assert.equal(packageJson.scripts['seo:keywords:check'], 'node scripts/check-seo-machine-keywords.js');
+  assert.equal(packageJson.scripts['seo:automation-state'], 'node scripts/seo-machine-automation-state.js');
   assert.equal(packageJson.scripts['seo:cadence:check'], 'node scripts/check-seo-machine-cadence.js');
 });
 
@@ -66,4 +69,5 @@ test('SEO machine keeps Ubersuggest advisory and requires natural keyword eviden
   assert.match(qualityGates, /`0` geschat volume is `no_measurable_provider_volume`, niet `no_demand`/i);
   assert.match(qualityGates, /`used`, `covered_semantically` of `rejected`/i);
   assert.match(qualityGates, /`keyword_metrics`, `generate_article`[\s\S]*betaalde fallback blijven verboden/i);
+  assert.match(qualityGates, /seo:keywords:check` blokkeert/i);
 });

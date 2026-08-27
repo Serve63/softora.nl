@@ -5,7 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { evaluateSeoMachineState } = require('../../server/services/seo-machine-control-plane');
-const { loadFreshIndexationReport } = require('../../scripts/check-seo-machine-cadence');
+const {
+  loadFreshIndexationReport,
+  loadFreshPerformanceReport,
+} = require('../../scripts/check-seo-machine-cadence');
 
 function readyInputs(overrides = {}) {
   return {
@@ -31,6 +34,11 @@ function readyInputs(overrides = {}) {
       },
     },
     quality: { status: 'healthy', reasons: [] },
+    performance: {
+      status: 'scale_ready',
+      reasons: [],
+      summary: { reviewed: 5, impressing: 3, clicking: 1, impressions: 100, clicks: 1 },
+    },
     ...overrides,
   };
 }
@@ -49,7 +57,7 @@ test('control plane prioritizes indexation recovery over publication deficit', (
     ledger: {
       status: 'ready',
       errors: [],
-      windows: { '7': { qualifying: 5, newUrls: 1, substantialRefreshes: 4, otherGrowthActions: 0 } },
+      windows: { '7': { qualifying: 5, newUrls: 0, substantialRefreshes: 5, otherGrowthActions: 0 } },
     },
     indexation: {
       status: 'ready',
@@ -58,7 +66,7 @@ test('control plane prioritizes indexation recovery over publication deficit', (
   }));
   assert.equal(state.state, 'indexation_recovery');
   assert.equal(state.exitCode, 2);
-  assert.equal(state.minimumNewUrlsPerWeek, 2);
+  assert.equal(state.minimumNewUrlsPerWeek, 1);
   assert.equal(state.maximumNewUrlsPerWeek, 2);
   assert.equal(state.newUrlRequired, true);
   assert.equal(state.newUrlDeficit, 1);
@@ -73,19 +81,38 @@ test('control plane selects quality recovery before scaling new content', () => 
   assert.equal(state.action, 'replace_template_content_with_unique_information_or_consolidate');
 });
 
-test('quality recovery refreshes cannot satisfy the new URL floor', () => {
+test('quality recovery keeps one evidence-backed new URL in the rolling floor', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': { qualifying: 5, newUrls: 0, substantialRefreshes: 5, otherGrowthActions: 0 } },
+    },
+    quality: { status: 'quality_recovery', reasons: ['template_share'] },
+  }));
+  assert.equal(state.state, 'quality_recovery');
+  assert.equal(state.minimumNewUrlsPerWeek, 1);
+  assert.equal(state.newUrlRequired, true);
+  assert.equal(state.action, 'publish_new_url_from_highest_scoring_safe_ready_candidate');
+});
+
+test('control plane recovers weak D28 non-brand outcomes before scaling output', () => {
   const state = evaluateSeoMachineState(readyInputs({
     ledger: {
       status: 'ready',
       errors: [],
       windows: { '7': { qualifying: 5, newUrls: 1, substantialRefreshes: 4, otherGrowthActions: 0 } },
     },
-    quality: { status: 'quality_recovery', reasons: ['template_share'] },
+    performance: {
+      status: 'performance_recovery',
+      reasons: ['slechts 1/5 URLs met impressies'],
+      summary: { reviewed: 5, impressing: 1, clicking: 0, impressions: 120, clicks: 0 },
+    },
   }));
-  assert.equal(state.state, 'quality_recovery');
-  assert.equal(state.minimumNewUrlsPerWeek, 2);
-  assert.equal(state.newUrlRequired, true);
-  assert.equal(state.action, 'publish_new_url_from_highest_scoring_safe_ready_candidate');
+  assert.equal(state.state, 'performance_recovery');
+  assert.equal(state.minimumNewUrlsPerWeek, 1);
+  assert.equal(state.newUrlRequired, false);
+  assert.equal(state.action, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
 });
 
 test('growth requires three genuinely new URLs even when five total improvements are live', () => {
@@ -119,6 +146,18 @@ test('control plane scales only with healthy reviewable indexation', () => {
   assert.equal(state.exitCode, 0);
 });
 
+test('control plane refuses scale without positive D28 non-brand evidence', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    performance: {
+      status: 'learning',
+      reasons: [],
+      summary: { reviewed: 5, impressing: 2, clicking: 0, impressions: 40, clicks: 0 },
+    },
+  }));
+  assert.equal(state.state, 'growth');
+  assert.equal(state.minimumNewUrlsPerWeek, 3);
+});
+
 test('cadence check reuses only a fresh indexation report', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-indexation-'));
   const reportPath = path.join(directory, 'indexation-latest.json');
@@ -129,6 +168,20 @@ test('cadence check reuses only a fresh indexation report', () => {
   );
   assert.equal(
     loadFreshIndexationReport(reportPath, new Date('2026-07-23T11:00:00.000Z')),
+    null
+  );
+});
+
+test('cadence check reuses only a fresh GSC performance report', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-performance-'));
+  const reportPath = path.join(directory, 'latest.json');
+  fs.writeFileSync(reportPath, JSON.stringify({ status: 'ready', generatedAt: '2026-07-23T10:00:00.000Z' }));
+  assert.equal(
+    loadFreshPerformanceReport(reportPath, new Date('2026-07-23T10:10:00.000Z')).status,
+    'ready'
+  );
+  assert.equal(
+    loadFreshPerformanceReport(reportPath, new Date('2026-07-23T11:00:00.000Z')),
     null
   );
 });

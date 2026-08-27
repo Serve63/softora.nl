@@ -10,6 +10,8 @@ const DEFAULT_COMMERCIAL_TARGETS = Object.freeze([
   '/pakketten',
 ]);
 
+const { auditKeywordEvidence } = require('./seo-machine-keyword-evidence');
+
 const DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS = Object.freeze({
   '/diensten': 8,
   '/website-laten-maken': 8,
@@ -474,7 +476,11 @@ function auditContentQuality({ items = [], clusters = [], commercialTargets = DE
     }
   }
 
-  return [...issues, ...auditClaimSafety({ items })];
+  return [
+    ...issues,
+    ...auditKeywordEvidence({ items }),
+    ...auditClaimSafety({ items }),
+  ];
 }
 
 function auditLinkGraph({ graph, requiredIncoming = DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS } = {}) {
