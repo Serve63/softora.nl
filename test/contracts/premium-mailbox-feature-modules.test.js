@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox.js');
 const compose = require('../../assets/premium-mailbox-compose.js');
+const composeAcceptedSend = require('../../assets/premium-mailbox-compose-accepted-send.js');
 const composeWindow = require('../../assets/premium-mailbox-compose-window.js');
 const composeController = require('../../assets/premium-mailbox-compose-controller.js');
 const mailboxDelete = require('../../assets/premium-mailbox-delete.js');
@@ -699,5 +700,6 @@ test('lijst-, index-, image- en toastmodules bewaren de nieuwe mailboxinvariante
   assert.match(assetSource('premium-mailbox-index.js'), /attachments:/);
   assert.match(assetSource('premium-mailbox-images.js'), /detail-mail-section-history-sent/);
   assert.doesNotMatch(assetSource('premium-mailbox-images.js'), /Jouw eerdere mail/);
+  assert.equal(typeof composeAcceptedSend.create, 'function');
   assert.equal(typeof mailboxToast.create, 'function');
 });
