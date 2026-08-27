@@ -34,6 +34,18 @@ Nieuwe en substantieel vernieuwde content gebruikt `qualityVersion: 2` en voldoe
 - Geen stockfoto's, placeholders, generieke kantoorbeelden of decoratieve filler.
 - Auteur, reviewer, claims, CTA, mobiel gedrag, schema en publieke/private scheiding zijn groen.
 
+## Keywordbewijs En Natuurlijke Taal
+
+Voor iedere nieuwe URL en substantiële contentrefresh bestaat vóór het schrijven een `keywordEvidence`-brief. Ubersuggest is daarin adviserend en read-only; het mag nooit zelfstandig een kandidaat publiceren, afwijzen, scoren of woorden in de tekst afdwingen.
+
+- De vaste Nederlandse basis is `locId: 2528` met `language: Dutch`. Controleer de effectieve locale in iedere response die deze teruggeeft; Global- of United States-data wordt afgewezen als Nederlands bewijs.
+- Gebruik één tot drie onderbouwde seeds en combineer keyword suggestions, Google suggestions, keyword overview en SERP analysis. Alleen bij ontbrekende of conflicterende data zijn maximaal twee aanvullende read-only controles toegestaan.
+- `0` geschat volume is `no_measurable_provider_volume`, niet `no_demand`. Geen enkele volume-, CPC-, difficulty-, intent- of trafficwaarde mag op zichzelf de keuze bepalen.
+- De uiteindelijke afweging combineert GSC, buyer task, business fit, Nederlandse SERP-intentie, actuele openbare bronnen, unieke informatiewinst, bestaande Softora-URL's en cannibalisatierisico.
+- Relevante termen krijgen per term `used`, `covered_semantically` of `rejected` met een korte reden. Er bestaat geen minimale keyworddichtheid, verplichte exact-matchtelling, meta-keywordsveld of automatische FAQ met varianten.
+- Lees de definitieve tekst als mens: verwijder onnatuurlijke herhaling, losse keywordlijsten en secties die alleen bestaan om een variant te plaatsen. Titel, H1, intro, secties, metadata en ankertekst blijven primair helder en behulpzaam voor de koper.
+- `keyword_metrics`, `generate_article`, projectmutaties, backlinks, site audits en iedere betaalde fallback blijven verboden. Onbeschikbaarheid wordt als `external_research_unavailable` gerapporteerd en blokkeert een veilige GSC- en SERP-onderbouwde actie niet.
+
 ## Google-Aligned Visual System
 
 Vanaf `2026-08-05` draait voor iedere nieuwe of substantieel vernieuwde blog eerst `npm run seo:visuals:check`. De regel van exact twee beelden is een interne Softora-kwaliteitskeuze, geen door Google gepubliceerde rankingfactor.

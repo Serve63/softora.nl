@@ -93,6 +93,19 @@ De machine mag niet stilvallen wanneer GSC nog weinig top-20-query's toont. Bouw
 
 Scoor iedere kandidaat op business fit, conversienabijheid, vraagbewijs, verwachte non-branded klikruimte, haalbaarheid, unieke clusterrol en cannibalisatierisico. Ruwe zoekvolumes of concurrentieverkeer zijn nooit genoeg zonder Softora-fit.
 
+### Adviserend keywordbewijs
+
+Iedere nieuwe URL en iedere substantiële contentrefresh krijgt vóór het schrijven een machineleesbare `keywordEvidence`-brief. GSC blijft de eerste bron voor bestaande zichtbaarheid. Ubersuggest is uitsluitend een read-only hulpmiddel voor extra Nederlandse vraag-, taal- en SERP-signalen en neemt nooit een publicatie-, afwijzings-, score-, URL-, titel- of tekstbesluit.
+
+- Gebruik voor Nederland `locId: 2528` met `language: Dutch` en accepteer een resultaat alleen als de response de effectieve locatie `Netherlands` en taal `Dutch` bevestigt waar de tool die velden teruggeeft. Een Global- of United States-fallback telt niet als Nederlands bewijs.
+- Start met één tot drie onderbouwde seeds uit GSC, de buyer task, de backlogbrief en normale kopertaal. Een door Codex bedachte exacte formulering alleen is geen keywordbrief.
+- Gebruik wanneer Ubersuggest beschikbaar is minimaal `keyword_suggestions`, `google_suggestions`, `keyword_overview` en `serp_analysis`. Bij nulmetingen, ontbrekende intentie of een onduidelijke intentmatch mogen maximaal twee aanvullende read-only controles volgen, zoals `match_keywords`, een tweede overview of een tweede SERP. De totale Ubersuggest-cap is zes calls voor het gekozen contentitem en acht calls voor de volledige dagrun wanneer ook de wekelijkse discovery-pass nodig is.
+- De wekelijkse discovery-pass mag read-only domain-, competitor-, top-page- en content-idea-data gebruiken om nieuwe seeds te vinden. Geen gevonden term promoveert automatisch naar `ready`; iedere kandidaat doorloopt nog steeds vraagbewijs, business fit, buyer task, unieke clusterrol, live overlap en cannibalisatie.
+- `0` zoekvolume betekent alleen dat Ubersuggest voor die formulering geen meetbaar volume rapporteert. Het is geen bewijs van nul vraag en mag een kandidaat nooit zelfstandig blokkeren. CPC, difficulty, intent en traffic zijn eveneens providerschattingen, geen GSC-waarheid of conversiebewijs.
+- Gebruik nooit `keyword_metrics`, `generate_article`, projectmutaties, backlinktools, site audits, aankopen, upgrades, credit-top-ups of betaalde fallbacks. Als Ubersuggest niet beschikbaar is, leg `external_research_unavailable` vast en gebruik GSC plus normale openbare SERP-, autocomplete- en bronresearch; dit is geen operationele P0 en geen reden voor een no-op.
+- De brief bewaart minimaal retrievaldatum, toolnamen, effectieve locale, seeds, primaire zoekintentie, primaire term, relevante secundaire buyer language, echte vragen, SERP-paginatypen, afgewezen ruis, beperkingen en de uiteindelijke menselijke/machine-afweging buiten Ubersuggest.
+- Verwerk alleen termen die de koperstaak nauwkeuriger uitdrukken. Gebruik ze natuurlijk in titel, H1, intro, secties, metadata of ankertekst wanneer dat inhoudelijk klopt; er geldt geen keyworddichtheid, verplichte exact-matchtelling of lijst met varianten die koste wat kost in de pagina moet staan. Google kan betekenis en varianten begrijpen.
+
 Ieder hoofdcluster bestaat uit een money page met ondersteunende rollen zoals:
 
 - kosten en budgetkeuzes;

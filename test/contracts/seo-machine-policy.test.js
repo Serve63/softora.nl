@@ -53,3 +53,17 @@ test('SEO machine quality gates keep daily publishing claim-safe and visual-comp
   assert.match(qualityGates, /geen Google-rankingfactor/i);
   assert.match(qualityGates, /Doe geen backlink-outreach/i);
 });
+
+test('SEO machine keeps Ubersuggest advisory and requires natural keyword evidence', () => {
+  const policy = readRepoFile('docs/growth/seo-machine-policy.md');
+  const qualityGates = readRepoFile('docs/seo-machine-quality-gates.md');
+
+  assert.match(policy, /Iedere nieuwe URL en iedere substantiële contentrefresh[\s\S]*`keywordEvidence`-brief/i);
+  assert.match(policy, /Ubersuggest is uitsluitend een read-only hulpmiddel[\s\S]*nooit een publicatie-, afwijzings-, score-, URL-, titel- of tekstbesluit/i);
+  assert.match(policy, /`locId: 2528`[\s\S]*`language: Dutch`/i);
+  assert.match(policy, /`0` zoekvolume[\s\S]*mag een kandidaat nooit zelfstandig blokkeren/i);
+  assert.match(policy, /geen keyworddichtheid, verplichte exact-matchtelling/i);
+  assert.match(qualityGates, /`0` geschat volume is `no_measurable_provider_volume`, niet `no_demand`/i);
+  assert.match(qualityGates, /`used`, `covered_semantically` of `rejected`/i);
+  assert.match(qualityGates, /`keyword_metrics`, `generate_article`[\s\S]*betaalde fallback blijven verboden/i);
+});
