@@ -8,6 +8,12 @@ const {
   createMailboxRequestPayloadFingerprint,
   normalizeMailboxAttachmentsMetadata,
 } = require('./mailbox-send-provenance-store');
+const {
+  assertMailboxReconcileProofMatchesIntent,
+  createMailboxReconcileProof,
+  createMailboxReconcileProofError,
+  normalizeMailboxReconcileProof,
+} = require('./mailbox-send-reconcile-proof');
 
 const TEMPORARY_MAILBOX_SEND_MESSAGE =
   'De veilige verzendcontrole heeft tijdelijk geen verbinding. Je mail is niet verzonden en je concept blijft staan; probeer het opnieuw.';
@@ -104,6 +110,11 @@ function assertPreflightRetryPayload(intent, body, normalizeString) {
 function createPreflightAcceptedResult(intent, attachments) {
   const acceptedAt = intent.acceptedAt || intent.updatedAt || intent.createdAt || '';
   const messageId = intent.messageId || intent.providerMessageId || '';
+  if (!intent.intentId || !messageId) {
+    const cause = new Error('De geaccepteerde verzending mist een duurzame berichtidentiteit.');
+    cause.code = 'MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING';
+    throw createMailboxReconcileRequiredError(cause);
+  }
   const instantly = String(intent.provider || '').trim().toLowerCase() === 'instantly';
   return {
     provider: instantly ? 'instantly' : 'smtp',
@@ -154,6 +165,46 @@ function createPreflightAcceptedResult(intent, attachments) {
   };
 }
 
+function classifyPreflightConflict(intent, attachments) {
+  const reconciliationClear = intent?.reconcileRequired === false
+    && intent?.sentReconcileRequired === false;
+  if (intent?.status === 'accepted' && intent?.dispatchState === 'finished'
+    && reconciliationClear) {
+    return {
+      status: 'accepted',
+      acceptedResult: createPreflightAcceptedResult(intent, attachments),
+    };
+  }
+  if (intent?.status === 'failed' && intent?.dispatchState === 'finished'
+    && reconciliationClear) {
+    return { status: 'failed', acceptedResult: null };
+  }
+  if ((intent?.status === 'prepared' && ['reserved', 'started'].includes(intent?.dispatchState)
+      && reconciliationClear)
+    || (intent?.status === 'unknown' && intent?.dispatchState === 'started'
+      && intent?.reconcileRequired === true)) {
+    return { status: 'processing', acceptedResult: null };
+  }
+  const cause = new Error('De duurzame verzendstatus is onbekend of ongeldig.');
+  cause.code = 'MAILBOX_SEND_DURABLE_STATUS_INVALID';
+  throw createMailboxReconcileRequiredError(cause);
+}
+
+function hasMutablePreflightPayload(body = {}) {
+  const mode = String(body.mode || '').trim().toLowerCase();
+  return Boolean(
+    body && typeof body === 'object'
+    && String(body.account || '').trim()
+    && String(body.to || '').trim()
+    && ['reply', 'new-message'].includes(mode)
+    && Object.prototype.hasOwnProperty.call(body, 'subject')
+    && (Object.prototype.hasOwnProperty.call(body, 'body')
+      || Object.prototype.hasOwnProperty.call(body, 'text'))
+    && Array.isArray(body.attachmentsMetadata)
+    && (mode !== 'reply' || (body.context && typeof body.context === 'object'))
+  );
+}
+
 function createMailboxComposeRuntime(dependencies = {}) {
   const {
     composeSendDependencies,
@@ -179,6 +230,19 @@ function createMailboxComposeRuntime(dependencies = {}) {
     mailboxAttachmentService: resolvedMailboxAttachmentService,
     logger,
   });
+  const truncateComposeText = typeof composeSendDependencies?.truncateText === 'function'
+    ? composeSendDependencies.truncateText
+    : (value, maxLength) => {
+        const text = normalizeString(value);
+        return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+      };
+
+  function normalizeComposeRecipientText(value) {
+    const recipients = (Array.isArray(value) ? value : String(value || '').split(/[;,]/))
+      .map(normalizeEmail)
+      .filter(Boolean);
+    return Array.from(new Set(recipients)).join(', ');
+  }
 
   async function sendMessage(input = {}) {
     if (input.threadProvenance) return sendMessageWithProvenance(input);
@@ -354,6 +418,10 @@ function createMailboxComposeRuntime(dependencies = {}) {
       ...body,
       account: threadProvenance.accountEmail,
       owner: threadProvenance.owner,
+      subject: truncateComposeText(body.subject, 240),
+      body: normalizeString(body.body || body.text || ''),
+      cc: normalizeComposeRecipientText(body.cc),
+      bcc: normalizeComposeRecipientText(body.bcc),
       provider: threadProvenance.provider === 'instantly' ? 'instantly' : '',
       providerMessageId: threadProvenance.provider === 'instantly' ? threadProvenance.replyTargetMessageId : '',
       providerThreadId: threadProvenance.provider === 'instantly' ? threadProvenance.providerThreadId : '',
@@ -382,6 +450,20 @@ function createMailboxComposeRuntime(dependencies = {}) {
             : null,
           conflict: null,
         };
+    if (body.reconcileProof !== undefined) {
+      if (!reservationCheck?.intent) {
+        throw createMailboxReconcileProofError(
+          'Het verzendbewijs kon niet tegen de actuele mailcontext worden gecontroleerd.',
+          'MAILBOX_SEND_RECONCILE_PROOF_UNAVAILABLE',
+          503
+        );
+      }
+      assertMailboxReconcileProofMatchesIntent(
+        body.reconcileProof,
+        reservationCheck.intent,
+        normalizeString
+      );
+    }
     return {
       threadProvenance,
       canonicalBody,
@@ -392,10 +474,92 @@ function createMailboxComposeRuntime(dependencies = {}) {
   async function preflightMessageResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const suppliedProof = body.reconcileProof === undefined
+        ? null
+        : normalizeMailboxReconcileProof(body.reconcileProof, normalizeString);
+      const idempotencyKey = normalizeString(body.idempotencyKey);
+      if (suppliedProof) {
+        if (!idempotencyKey) {
+          throw createMailboxReconcileProofError(
+            'Een veilige verzend-ID ontbreekt.',
+            'MAILBOX_SEND_IDEMPOTENCY_REQUIRED',
+            400
+          );
+        }
+        if (suppliedProof.idempotencyKey !== idempotencyKey) {
+          throw createMailboxReconcileProofError(
+            'Het verzendbewijs hoort bij een andere veilige verzend-ID.',
+            'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH'
+          );
+        }
+        if (typeof mailboxSendProvenanceStore?.findByIdempotencyKey !== 'function') {
+          throw createMailboxReconcileProofError(
+            'De duurzame verzendcontrole is niet beschikbaar.',
+            'MAILBOX_SEND_PROVENANCE_UNAVAILABLE',
+            503
+          );
+        }
+        const initiallyReadIntent = await mailboxSendProvenanceStore.findByIdempotencyKey(
+          idempotencyKey
+        );
+        if (initiallyReadIntent) {
+          assertMailboxReconcileProofMatchesIntent(
+            suppliedProof,
+            initiallyReadIntent,
+            normalizeString
+          );
+          const durableIntent = typeof mailboxSendProvenanceStore.reconcilePreflight === 'function'
+            ? await mailboxSendProvenanceStore.reconcilePreflight(
+                idempotencyKey,
+                initiallyReadIntent
+              )
+            : initiallyReadIntent;
+          if (!durableIntent) {
+            throw createMailboxReconcileRequiredError(
+              new Error('Het eerder gelezen duurzame verzendintent is verdwenen.')
+            );
+          }
+          const reconcileProof = assertMailboxReconcileProofMatchesIntent(
+            suppliedProof,
+            durableIntent,
+            normalizeString
+          );
+          const classified = classifyPreflightConflict(
+            durableIntent,
+            reconcileProof.attachmentsMetadata
+          );
+          return res.status(200).json({
+            ok: true,
+            result: {
+              preflight: true,
+              status: classified.status,
+              ...(classified.acceptedResult ? { acceptedResult: classified.acceptedResult } : {}),
+              externalEffect: false,
+              provider: reconcileProof.provider,
+              owner: reconcileProof.owner,
+              accountEmail: reconcileProof.accountEmail,
+              mode: reconcileProof.mode,
+              conversationId: reconcileProof.conversationId,
+              replyTargetMessageId: reconcileProof.replyTargetMessageId,
+              providerThreadId: reconcileProof.providerThreadId,
+              reconcileProof,
+              reservationReady: false,
+              reservationConflictStatus: normalizeString(durableIntent.status),
+            },
+          });
+        }
+        if (!hasMutablePreflightPayload(body)) {
+          throw createMailboxReconcileProofError(
+            'De verzend-ID is nog niet duurzaam geregistreerd; bewijs eerst opnieuw de actuele replybron.',
+            'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED'
+          );
+        }
+      }
       const { canonicalBody, reservationCheck, threadProvenance } = await prepareMessage(body, { checkReservation: true });
       const conflict = reservationCheck?.conflict || null;
       let retryStatus = 'ready';
       let acceptedResult = null;
+      let reconcileProof = null;
       if (conflict) {
         assertPreflightRetryContext(conflict, threadProvenance, normalizeEmail, normalizeString);
         const durableAttachments = assertPreflightRetryPayload(
@@ -403,13 +567,16 @@ function createMailboxComposeRuntime(dependencies = {}) {
           canonicalBody,
           normalizeString
         );
-        if (conflict.status === 'accepted') {
-          retryStatus = 'accepted';
-          acceptedResult = createPreflightAcceptedResult(conflict, durableAttachments);
-        } else if (conflict.status === 'failed') {
-          retryStatus = 'failed';
-        } else {
-          retryStatus = 'processing';
+        const classified = classifyPreflightConflict(conflict, durableAttachments);
+        retryStatus = classified.status;
+        acceptedResult = classified.acceptedResult;
+        reconcileProof = createMailboxReconcileProof(conflict, normalizeString);
+      } else {
+        try {
+          reconcileProof = createMailboxReconcileProof(reservationCheck?.intent, normalizeString);
+        } catch (error) {
+          if (body.reconcileProof !== undefined) throw error;
+          reconcileProof = null;
         }
       }
       return res.status(200).json({
@@ -426,6 +593,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
           conversationId: threadProvenance.conversationId,
           replyTargetMessageId: threadProvenance.replyTargetMessageId,
           providerThreadId: threadProvenance.providerThreadId,
+          ...(reconcileProof ? { reconcileProof } : {}),
           reservationReady: Boolean(
             reservationCheck?.intent?.sendIdentityKey
             && reservationCheck?.intent?.sendScopeKey

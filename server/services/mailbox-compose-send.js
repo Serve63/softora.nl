@@ -333,7 +333,17 @@ function createMailboxComposeSend(deps = {}) {
     };
   }
 
-  return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments, threadProvenance }) {
+  return async function sendMessage({
+    accountEmail,
+    to,
+    cc,
+    bcc,
+    subject,
+    text,
+    attachments,
+    expectedAttachmentsMetadata,
+    threadProvenance,
+  }) {
     let stagedAttachmentCleanupStarted = false;
     async function cleanupStagedAttachments() {
       if (stagedAttachmentCleanupStarted) return;
@@ -433,6 +443,18 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       error.code = 'MAILBOX_ATTACHMENT_METADATA_INVALID';
       throw error;
+    }
+    if (expectedAttachmentsMetadata !== undefined) {
+      const expectedMetadata = normalizeMailboxAttachmentsMetadata(expectedAttachmentsMetadata);
+      if (expectedMetadata === null
+        || !mailboxAttachmentsMetadataEqual(explicitAttachmentMetadata, expectedMetadata)) {
+        const error = new Error(
+          'De gekozen bijlagen wijken af van het vooraf bewezen verzendbewijs; kies de bijlagen opnieuw.'
+        );
+        error.status = 409;
+        error.code = 'MAILBOX_ATTACHMENT_METADATA_MISMATCH';
+        throw error;
+      }
     }
 
     const requestPayload = {

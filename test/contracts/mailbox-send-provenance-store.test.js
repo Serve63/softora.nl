@@ -599,6 +599,92 @@ test('an expired reserved row with another idempotency key is failed before a ne
   assert.equal(client.rows.find((row) => row.intent_id === replacement.intentId).status, 'prepared');
 });
 
+test('preflight reconciliation releases an expired reserved intent through exact CAS', async () => {
+  let currentTime = new Date('2026-08-24T13:48:00.000Z');
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => currentTime,
+    reservationLeaseMs: 30_000,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:expired-reconcile', idempotencyKey: 'browser:expired-reconcile', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'new-message',
+    conversationId: 'draft:expired-reconcile', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Vraag', body: 'Bericht', attachmentsMetadata: [],
+  };
+  await store.reserve(payload);
+  currentTime = new Date('2026-08-24T13:48:31.000Z');
+
+  const reconciled = await store.reconcilePreflight(payload.idempotencyKey);
+
+  assert.equal(reconciled.status, 'failed');
+  assert.equal(reconciled.dispatchState, 'finished');
+  assert.match(reconciled.error, /pre-dispatchreservering verliep/i);
+  assert.equal(client.rows[0].status, 'failed');
+  assert.equal(client.updateCalls, 1);
+});
+
+test('expired-reservation reconciliation rereads started and accepted CAS races without authorizing resend', async (t) => {
+  for (const [label, concurrentPatch, expected] of [
+    ['started', {
+      status: 'prepared', dispatch_state: 'started',
+      dispatch_started_at: '2026-08-24T13:49:30.000Z',
+      dispatch_lease_expires_at: '2026-08-24T13:51:30.000Z',
+      updated_at: '2026-08-24T13:49:30.000Z',
+      transition_token: '00000000-0000-4000-8000-000000000091',
+    }, { status: 'prepared', dispatchState: 'started' }],
+    ['accepted', {
+      status: 'accepted', dispatch_state: 'finished',
+      dispatch_lease_expires_at: null, sent_message_id: '<accepted-race@example.nl>',
+      accepted_at: '2026-08-24T13:49:30.000Z',
+      updated_at: '2026-08-24T13:49:30.000Z',
+      transition_token: '00000000-0000-4000-8000-000000000092',
+    }, { status: 'accepted', dispatchState: 'finished' }],
+  ]) {
+    await t.test(label, async () => {
+      let currentTime = new Date('2026-08-24T13:49:00.000Z');
+      let injectRace = true;
+      const client = createFakeSupabase({
+        onUpdate: ({ patch }) => {
+          if (patch.status !== 'failed' || !injectRace) return null;
+          injectRace = false;
+          return {
+            commit: false,
+            concurrentPatch,
+            error: { code: 'PGRST116', message: 'conditional row changed concurrently' },
+          };
+        },
+      });
+      const store = createMailboxSendProvenanceStore({
+        isSupabaseConfigured: () => true,
+        getSupabaseClient: () => client,
+        now: () => currentTime,
+        reservationLeaseMs: 30_000,
+        retryDelayMs: 0,
+      });
+      const payload = {
+        intentId: `send:expired-race-${label}`,
+        idempotencyKey: `browser:expired-race-${label}`,
+        owner: 'martijn', accountEmail: 'martijn@softora.nl', recipientEmail: 'lead@example.nl',
+        mode: 'new-message', conversationId: `draft:expired-race-${label}`, provider: 'smtp',
+        senderName: 'Martijn van de Ven', subject: 'Vraag', body: 'Bericht', attachmentsMetadata: [],
+      };
+      await store.reserve(payload);
+      currentTime = new Date('2026-08-24T13:49:31.000Z');
+
+      const reconciled = await store.reconcilePreflight(payload.idempotencyKey);
+
+      assert.equal(reconciled.status, expected.status);
+      assert.equal(reconciled.dispatchState, expected.dispatchState);
+      assert.notEqual(reconciled.status, 'failed');
+      assert.equal(client.rows[0].status, expected.status);
+    });
+  }
+});
+
 test('concurrent same-key reclaim exposes one renewed reservation and one provider dispatch', async () => {
   let currentTime = new Date('2026-08-24T13:49:00.000Z');
   const client = createFakeSupabase();

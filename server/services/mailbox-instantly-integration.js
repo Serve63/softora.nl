@@ -509,6 +509,9 @@ async function sendMailboxMessage({
       subject: body.subject,
       text: body.body || body.text || '',
       attachments: body.attachments,
+      expectedAttachmentsMetadata: body.reconcileProof === undefined
+        ? undefined
+        : body.attachmentsMetadata,
       threadProvenance,
     });
   }

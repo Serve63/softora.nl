@@ -377,6 +377,46 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return { intent: normalizeRow(row), conflict: await findReservationConflict(row) };
   }
 
+  async function reconcilePreflight(idempotencyKey, previouslyReadIntent = undefined) {
+    const normalizedKey = normalizeString(idempotencyKey);
+    if (!normalizedKey) {
+      const error = new Error('Een veilige verzend-ID ontbreekt.');
+      error.status = 400;
+      error.code = 'MAILBOX_SEND_IDEMPOTENCY_REQUIRED';
+      throw error;
+    }
+    let existing = previouslyReadIntent === undefined
+      ? await findByIdempotencyKey(normalizedKey)
+      : previouslyReadIntent;
+    if (!existing) return null;
+    if (existing.idempotencyKey !== normalizedKey) {
+      const error = new Error('De duurzame verzend-ID wijkt af van het eerder gelezen intent.');
+      error.status = 409;
+      error.code = 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH';
+      throw error;
+    }
+    existing = await reconcileExpiredStartedDispatch(existing);
+    if (!isExpiredReservedDispatch(existing)) return existing;
+    try {
+      return (await releaseExpiredReserved(existing)).intent;
+    } catch (error) {
+      let current = null;
+      try {
+        current = await findByIdempotencyKey(normalizedKey);
+      } catch (readError) {
+        error.recoveryError = readError;
+        throw error;
+      }
+      if (!current) {
+        const reconcileError = createMailboxReconcileRequiredError(error);
+        reconcileError.code = 'MAILBOX_SEND_RECONCILE_REQUIRED';
+        throw reconcileError;
+      }
+      if (matchesTransitionFilters(current, exactReservedCasFilters(existing))) throw error;
+      return reconcileExpiredStartedDispatch(current);
+    }
+  }
+
   async function reserve(input = {}) {
     const row = buildPreparedRow(input);
     assertPreparedRow(row);
@@ -750,6 +790,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
     markUnknown,
     preflight,
     preview,
+    reconcilePreflight,
     reserve,
     startDispatch,
   };

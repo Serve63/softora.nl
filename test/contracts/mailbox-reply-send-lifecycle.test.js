@@ -12,6 +12,9 @@ const {
   createMailboxRequestPayloadFingerprint,
   createMailboxSendProvenanceStore,
 } = require('../../server/services/mailbox-send-provenance-store');
+const {
+  createMailboxReconcileProof,
+} = require('../../server/services/mailbox-send-reconcile-proof');
 const { createInstantlyMailboxService } = require('../../server/services/instantly-mailbox');
 const { sendMailboxMessage } = require('../../server/services/mailbox-instantly-integration');
 
@@ -144,6 +147,32 @@ test('MHCBE suggested reply keeps one canonical identity through edit and send p
   assert.match(sendPayload.body, /geen mail in deze test/);
 });
 
+test('SMTP-router geeft proof-gebonden bijlagemetadata exact door aan de compose-guard', async () => {
+  const metadata = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
+  const calls = [];
+  await sendMailboxMessage({
+    body: {
+      provider: '', account: 'serve@softora.nl', to: 'prospect@example.nl',
+      subject: 'Bijlagebewijs', body: 'Zie de bijlage.', attachments: [{ reference: 'signed' }],
+      attachmentsMetadata: metadata, reconcileProof: { version: 1 },
+    },
+    sendMessage: async (input) => { calls.push(input); return { ok: true }; },
+    normalizeString,
+    threadProvenance: threadProvenanceForRouter(),
+  });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].expectedAttachmentsMetadata, metadata);
+});
+
+function threadProvenanceForRouter() {
+  return {
+    intentId: 'send:router-proof', idempotencyKey: 'browser:router-proof', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'prospect@example.nl', mode: 'reply',
+    conversationId: 'conversation:router-proof', replyTargetMessageId: '<incoming@example.nl>',
+    references: '<incoming@example.nl>', provider: 'smtp', providerThreadId: '',
+  };
+}
+
 test('rapid conversation switching sends only the exact latest opened message context', async () => {
   const requests = [];
   const acceptedRecords = [];
@@ -239,6 +268,7 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
   flow.values['c-body'].value = 'Veilige adaptertest.';
   await flow.controller.send();
   const payload = flow.requests[0].payload;
+  payload.attachmentsMetadata = [];
   const adapterCalls = [];
   const instantlyMailboxService = createInstantlyService(adapterCalls);
   const resolver = createMailboxComposeThreadContext({ instantlyMailboxService, randomUUID: () => 'fixed-uuid' });
@@ -253,7 +283,7 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
     async reserve(input) {
       reservedInputs.push(input);
       if (intents.has(input.idempotencyKey)) return { created: false, intent: intents.get(input.idempotencyKey) };
-      const intent = { ...input, status: 'prepared', dispatchState: 'reserved' };
+      const intent = { ...previewStore.preview(input), status: 'prepared', dispatchState: 'reserved' };
       intents.set(input.idempotencyKey, intent);
       return { created: true, intent };
     },
@@ -290,6 +320,30 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
     accountEmail: 'servecreusen@websoftora.com', reservationReady: true,
   });
   assert.equal(adapterCalls.length, 0);
+  assert.equal(preflight.body.result.reconcileProof.version, 1);
+  payload.reconcileProof = preflight.body.result.reconcileProof;
+
+  const readyAfterDurableMiss = responseRecorder();
+  await runtime.preflightMessageResponse({ body: payload }, readyAfterDurableMiss);
+  assert.equal(readyAfterDurableMiss.statusCode, 200);
+  assert.equal(readyAfterDurableMiss.body.result.status, 'ready');
+  assert.equal(readyAfterDurableMiss.body.result.reservationReady, true);
+  assert.deepEqual(readyAfterDurableMiss.body.result.reconcileProof, payload.reconcileProof);
+
+  const mismatchedSend = responseRecorder();
+  await runtime.sendMessageResponse({
+    body: {
+      ...payload,
+      reconcileProof: {
+        ...payload.reconcileProof,
+        requestPayloadFingerprint: 'f'.repeat(64),
+      },
+    },
+  }, mismatchedSend);
+  assert.equal(mismatchedSend.statusCode, 409);
+  assert.equal(mismatchedSend.body.code, 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH');
+  assert.equal(reservedInputs.length, 0);
+  assert.equal(adapterCalls.length, 0);
 
   const send = responseRecorder();
   await runtime.sendMessageResponse({ body: payload }, send);
@@ -302,6 +356,10 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
   assert.equal(adapterCalls[0].providerThreadId, flow.mail.providerThreadId);
   assert.equal(reservedInputs[0].requestBody, 'Veilige adaptertest.');
   assert.deepEqual(reservedInputs[0].attachmentsMetadata, []);
+  assert.equal(
+    intents.get(payload.idempotencyKey).requestPayloadFingerprint,
+    payload.reconcileProof.requestPayloadFingerprint
+  );
 
   const duplicate = responseRecorder();
   await runtime.sendMessageResponse({ body: payload }, duplicate);
@@ -344,6 +402,9 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
     bcc: body.bcc,
     attachmentsMetadata,
     requestPayloadFingerprint,
+    sendScopeKey: 'smtp-reply-scope:0a89c3e97b717763dc6c3976e663cb67e28465bd1697f49dac51b0c25ea4c2e5',
+    reconcileRequired: false,
+    sentReconcileRequired: false,
     messageId: '<accepted-preflight@softora.nl>',
     acceptedAt: '2026-08-27T17:00:00.000Z',
   };
@@ -369,7 +430,8 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
   ]) {
     await t.test(status, async () => {
       const response = responseRecorder();
-      await runtimeFor({ ...durable, status }).preflightMessageResponse({ body }, response);
+      const dispatchState = status === 'accepted' || status === 'failed' ? 'finished' : 'reserved';
+      await runtimeFor({ ...durable, status, dispatchState }).preflightMessageResponse({ body }, response);
       assert.equal(response.statusCode, 200);
       assert.equal(response.body.result.status, expected);
       assert.equal(response.body.result.reservationReady, false);
@@ -386,7 +448,7 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
 
   await t.test('context mismatch', async () => {
     const response = responseRecorder();
-    await runtimeFor({ ...durable, status: 'accepted', owner: 'martijn' })
+    await runtimeFor({ ...durable, status: 'accepted', dispatchState: 'finished', owner: 'martijn' })
       .preflightMessageResponse({ body }, response);
     assert.equal(response.statusCode, 409);
     assert.equal(response.body.code, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH');
@@ -394,7 +456,7 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
 
   await t.test('payload mismatch', async () => {
     const response = responseRecorder();
-    await runtimeFor({ ...durable, status: 'accepted' }).preflightMessageResponse({
+    await runtimeFor({ ...durable, status: 'accepted', dispatchState: 'finished' }).preflightMessageResponse({
       body: { ...body, body: 'Later gewijzigde tekst' },
     }, response);
     assert.equal(response.statusCode, 409);
@@ -411,6 +473,7 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
       await runtimeFor({
         ...durable,
         status: 'accepted',
+        dispatchState: 'finished',
         attachmentsMetadata: attachments,
         requestPayloadFingerprint: fingerprint,
       }).preflightMessageResponse({ body }, response);
@@ -419,6 +482,175 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
       assert.equal(response.body.result, undefined);
     });
   }
+});
+
+test('gemarkeerde preflight reconcileert duurzaam zonder de verdwenen replybron opnieuw te lezen', async (t) => {
+  const previewStore = createMailboxSendProvenanceStore();
+  const attachmentsMetadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }];
+  const baseIntent = previewStore.preview({
+    intentId: 'send:durable-reconcile', idempotencyKey: 'browser:durable-reconcile',
+    owner: 'serve', senderName: 'Servé Creusen', accountEmail: 'serve@softora.nl',
+    recipientEmail: 'prospect@example.nl', mode: 'reply', provider: 'smtp',
+    conversationId: 'conversation:durable-reconcile',
+    replyTargetMessageId: '<incoming-durable@example.nl>',
+    references: '<root-durable@example.nl> <incoming-durable@example.nl>',
+    providerThreadId: '', messageId: '<planned-durable@softora.nl>',
+    subject: 'Re: Veilige retry', body: 'Exact duurzaam antwoord',
+    requestBody: 'Exact duurzaam antwoord', cc: '', bcc: '', attachmentsMetadata,
+  });
+  const proof = createMailboxReconcileProof(baseIntent, normalizeString);
+
+  function runtimeFor(intent, counters = { resolver: 0 }) {
+    return createMailboxComposeRuntime({
+      composeSendDependencies: {},
+      mailboxComposeThreadContext: {
+        async resolve() {
+          counters.resolver += 1;
+          const error = new Error('mailbox index tijdelijk onbereikbaar');
+          error.code = 'MAILBOX_REPLY_TARGET_UNAVAILABLE';
+          throw error;
+        },
+      },
+      mailboxSendProvenanceStore: {
+        async findByIdempotencyKey(idempotencyKey) {
+          assert.equal(idempotencyKey, intent?.idempotencyKey || baseIntent.idempotencyKey);
+          return intent;
+        },
+        async reconcilePreflight(idempotencyKey, previouslyReadIntent) {
+          assert.equal(idempotencyKey, intent?.idempotencyKey || baseIntent.idempotencyKey);
+          assert.equal(previouslyReadIntent, intent);
+          return intent;
+        },
+      },
+      normalizeEmail,
+      normalizeString,
+      logger: { error() {}, warn() {} },
+    });
+  }
+
+  for (const [label, intent, expected] of [
+    ['accepted', {
+      ...baseIntent, status: 'accepted', dispatchState: 'finished',
+      messageId: '<accepted-durable@softora.nl>', acceptedAt: '2026-08-27T18:00:00.000Z',
+    }, 'accepted'],
+    ['unknown', {
+      ...baseIntent, status: 'unknown', dispatchState: 'started', reconcileRequired: true,
+    }, 'processing'],
+    ['failed', { ...baseIntent, status: 'failed', dispatchState: 'finished' }, 'failed'],
+  ]) {
+    await t.test(label, async () => {
+      const counters = { resolver: 0 };
+      const response = responseRecorder();
+      await runtimeFor(intent, counters).preflightMessageResponse({
+        body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: proof },
+      }, response);
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.result.status, expected);
+      assert.equal(response.body.result.reservationReady, false);
+      assert.deepEqual(response.body.result.reconcileProof, proof);
+      assert.equal(counters.resolver, 0, 'de verdwenen mutable replybron mag niet worden gelezen');
+      assert.equal(Boolean(response.body.result.acceptedResult), expected === 'accepted');
+    });
+  }
+
+  for (const [label, changedProof, code] of [
+    ['account', { ...proof, accountEmail: 'martijn@softora.nl' }, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH'],
+    ['owner', { ...proof, owner: 'martijn' }, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH'],
+    ['scope hash', {
+      ...proof, scopeFingerprint: `smtp-reply-scope:${'a'.repeat(64)}`,
+    }, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH'],
+    ['request hash', {
+      ...proof, requestPayloadFingerprint: 'b'.repeat(64),
+    }, 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH'],
+    ['attachments', {
+      ...proof,
+      attachmentsMetadata: [{ filename: 'ander.pdf', contentType: 'application/pdf', size: 4 }],
+    }, 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH'],
+    ['malformed hash', {
+      ...proof, requestPayloadFingerprint: 'geen-sha256',
+    }, 'MAILBOX_SEND_RECONCILE_PROOF_INVALID'],
+  ]) {
+    await t.test(`fail closed bij verkeerde ${label}`, async () => {
+      const counters = { resolver: 0 };
+      const response = responseRecorder();
+      await runtimeFor({
+        ...baseIntent, status: 'unknown', dispatchState: 'started', reconcileRequired: true,
+      }, counters).preflightMessageResponse({
+        body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: changedProof },
+      }, response);
+      assert.equal(response.statusCode, 409);
+      assert.equal(response.body.code, code);
+      assert.equal(counters.resolver, 0);
+    });
+  }
+
+  await t.test('proof-only zonder duurzame row autoriseert nooit ready', async () => {
+    let resolverCalls = 0;
+    const response = responseRecorder();
+    const runtime = createMailboxComposeRuntime({
+      composeSendDependencies: {},
+      mailboxComposeThreadContext: { async resolve() { resolverCalls += 1; } },
+      mailboxSendProvenanceStore: { async findByIdempotencyKey() { return null; } },
+      normalizeEmail,
+      normalizeString,
+      logger: { error() {}, warn() {} },
+    });
+    await runtime.preflightMessageResponse({
+      body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: proof },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED');
+    assert.equal(resolverCalls, 0);
+  });
+
+  await t.test('dezelfde scope en payload met een andere idempotency key accepteert het proof nooit', async () => {
+    const swappedIntent = {
+      ...baseIntent,
+      intentId: 'send:durable-reconcile-swapped',
+      idempotencyKey: 'browser:durable-reconcile-swapped',
+    };
+    const response = responseRecorder();
+    await runtimeFor(swappedIntent).preflightMessageResponse({
+      body: { idempotencyKey: swappedIntent.idempotencyKey, reconcileProof: proof },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH');
+  });
+
+  await t.test('accepted zonder duurzame berichtidentiteit faalt gesloten', async () => {
+    const response = responseRecorder();
+    await runtimeFor({
+      ...baseIntent, status: 'accepted', dispatchState: 'finished', messageId: '', providerMessageId: '',
+    }).preflightMessageResponse({
+      body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: proof },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+  });
+
+  await t.test('terminale status met open reconcilevlag faalt gesloten', async () => {
+    const response = responseRecorder();
+    await runtimeFor({
+      ...baseIntent, status: 'accepted', dispatchState: 'finished', reconcileRequired: true,
+      messageId: '<accepted-but-unreconciled@softora.nl>',
+    }).preflightMessageResponse({
+      body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: proof },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+  });
+
+  await t.test('onbekende duurzame status faalt gesloten', async () => {
+    const response = responseRecorder();
+    await runtimeFor({ ...baseIntent, status: 'ready', dispatchState: 'finished' })
+      .preflightMessageResponse({
+        body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: proof },
+      }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+  });
 });
 
 test('canonical source identity wins over stale opposite-provider sender while mismatched provenance fails closed', async () => {
