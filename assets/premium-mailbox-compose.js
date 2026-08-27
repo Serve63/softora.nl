@@ -557,12 +557,16 @@
         }
         if (lastUploadError) throw lastUploadError;
       }
-      return uploads.map(({ reference, filename, contentType, size }) => ({
-        reference,
-        filename,
-        contentType,
-        size,
-      }));
+      return uploads.map(({ reference, filename, contentType, size, expiresAt }) => {
+        const stagedReference = { reference, filename, contentType, size };
+        Object.defineProperty(stagedReference, 'expiresAt', {
+          configurable: false,
+          enumerable: false,
+          value: expiresAt,
+          writable: false,
+        });
+        return stagedReference;
+      });
     } catch (error) {
       startAttachmentCleanup(options, getCleanupReferences(uploads));
       const normalized = mailboxError(error, 'Bijlage uploaden mislukt. Je mail is niet verzonden.', 'attachment-upload');
