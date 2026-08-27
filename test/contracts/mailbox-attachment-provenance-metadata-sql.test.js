@@ -22,7 +22,7 @@ function assertAttachmentMetadataContract(sql, label) {
   assert.match(sql, /add column if not exists attachments_metadata jsonb/i, label);
   assert.match(sql, /attachments_metadata is null\s+or\s+public\.softora_mailbox_attachments_metadata_is_valid/i, label);
   assert.match(sql, /jsonb_array_length\(p_value\) > 5/i, label);
-  assert.match(sql, /v_key_count <> (?:3|case when v_has_sha256 then 4 else 3 end)/i, label);
+  assert.match(sql, /v_key_count <> (?:3|\(case when v_has_sha256 then 4 else 3 end\))/i, label);
   assert.match(sql, /v_size > 4194304/i, label);
   assert.match(sql, /return v_total <= 5242880/i, label);
   assert.match(sql, /old\.references_text, old\.mode, old\.owner, old\.attachments_metadata/i, label);
@@ -41,11 +41,23 @@ test('SHA-256 metadata-uitbreiding behoudt legacy en weigert downgrade, gemengd 
   for (const [label, sql] of [['sha256-migration', sha256Migration], ['data-ops-schema', schema]]) {
     assert.match(sql, /v_has_sha256 := pg_catalog\.jsonb_exists\(v_item, 'sha256'\)/i, label);
     assert.match(sql, /v_hash_mode is distinct from v_has_sha256[\s\S]*?return false/i, label);
-    assert.match(sql, /v_key_count <> case when v_has_sha256 then 4 else 3 end/i, label);
+    assert.match(sql, /v_key_count <> \(case when v_has_sha256 then 4 else 3 end\)/i, label);
+    assert.doesNotMatch(sql, /v_key_count <> case when v_has_sha256 then 4 else 3 end/i, label);
     assert.match(sql, /\(v_item->>'sha256'\) !~ '\^\[0-9a-f\]\{64\}\$'/i, label);
     assert.match(sql, /grant execute on function public\.softora_mailbox_attachments_metadata_is_valid\(jsonb\)\s+to service_role/i, label);
   }
   assert.match(sha256Migration, /notify pgrst, 'reload schema'/i);
+});
+
+test('PL/pgSQL key-count CASE blijft gehaakt zodat de innerlijke THEN niet de IF-expressie afbreekt', () => {
+  for (const [label, sql] of [['sha256-migration', sha256Migration], ['data-ops-schema', schema]]) {
+    const condition = sql.match(/if\s+v_key_count\s+<>[\s\S]*?or\s+pg_catalog\.jsonb_typeof\(v_item->'filename'\)/i)?.[0] || '';
+    assert.match(
+      condition,
+      /^if\s+v_key_count\s+<>\s+\(case\s+when\s+v_has_sha256\s+then\s+4\s+else\s+3\s+end\)\s+or/i,
+      label
+    );
+  }
 });
 
 test('metadata-validator gebruikt een uitvoerbare schema-gekwalificeerde slashcontrole', () => {

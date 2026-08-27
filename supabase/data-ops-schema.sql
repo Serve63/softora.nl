@@ -8442,7 +8442,7 @@ begin
     elsif v_hash_mode is distinct from v_has_sha256 then
       return false;
     end if;
-    if v_key_count <> case when v_has_sha256 then 4 else 3 end
+    if v_key_count <> (case when v_has_sha256 then 4 else 3 end)
       or pg_catalog.jsonb_typeof(v_item->'filename') <> 'string'
       or pg_catalog.char_length(pg_catalog.btrim(v_item->>'filename')) not between 1 and 120
       or (v_item->>'filename') <> pg_catalog.btrim(v_item->>'filename')
