@@ -8442,7 +8442,7 @@ begin
       or pg_catalog.jsonb_typeof(v_item->'contentType') <> 'string'
       or pg_catalog.char_length(pg_catalog.btrim(v_item->>'contentType')) not between 3 and 255
       or (v_item->>'contentType') <> pg_catalog.lower(pg_catalog.btrim(v_item->>'contentType'))
-      or pg_catalog.position('/' in (v_item->>'contentType')) <= 1
+      or pg_catalog.strpos(v_item->>'contentType', '/') <= 1
       or pg_catalog.jsonb_typeof(v_item->'size') <> 'number' then
       return false;
     end if;
