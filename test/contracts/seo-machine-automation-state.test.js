@@ -11,10 +11,8 @@ const {
   formatStateBlock,
   inspectAutomationState,
   recordUbersuggestRun,
-  startAutomationRun,
-} = require('../../server/services/seo-machine-automation-state');
-const {
   runAutomationStateCli,
+  startAutomationRun,
 } = require('../../scripts/seo-machine-automation-state');
 
 function createMemory(completedRunsInActiveThread = 6) {
@@ -114,9 +112,15 @@ test('automation-state inspect CLI fails closed when a required block is missing
   const memoryPath = createMemory();
   assert.throws(() => runAutomationStateCli([
     'inspect',
-    '--memory',
-    memoryPath,
     '--now',
     '2026-08-27T12:00:00.000Z',
-  ]), /Automation-state ongeldig/);
+  ], { memoryPath }), /Automation-state ongeldig/);
+});
+
+test('automation-state CLI rejects a command-line memory path override', () => {
+  assert.throws(() => runAutomationStateCli([
+    'inspect',
+    '--memory',
+    '/tmp/not-the-seo-automation.md',
+  ]), /memory-padoverride is niet toegestaan/);
 });
