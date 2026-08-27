@@ -8,6 +8,10 @@ const migration = fs.readFileSync(path.join(
   root,
   'supabase/migrations/20260827163903_mailbox_attachment_metadata.sql'
 ), 'utf8');
+const validatorFix = fs.readFileSync(path.join(
+  root,
+  'supabase/migrations/20260827174916_fix_mailbox_attachment_metadata_validator.sql'
+), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'supabase/data-ops-schema.sql'), 'utf8');
 
 function assertAttachmentMetadataContract(sql, label) {
@@ -29,3 +33,11 @@ test('additieve mailbox attachment-metadata migratie bewaart legacy-null en vali
   assert.match(schema, /attachments_metadata jsonb,/i);
 });
 
+test('metadata-validator gebruikt een uitvoerbare schema-gekwalificeerde slashcontrole', () => {
+  for (const [label, sql] of [['validator-fix', validatorFix], ['data-ops-schema', schema]]) {
+    assert.match(sql, /pg_catalog\.strpos\(v_item->>'contentType', '\/'\) <= 1/i, label);
+    assert.doesNotMatch(sql, /pg_catalog\.position\('\/' in/i, label);
+    assert.match(sql, /security invoker\s+set search_path = ''/i, label);
+    assert.match(sql, /grant execute on function public\.softora_mailbox_attachments_metadata_is_valid\(jsonb\)\s+to service_role/i, label);
+  }
+});
