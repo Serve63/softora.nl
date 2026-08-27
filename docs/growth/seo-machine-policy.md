@@ -13,6 +13,8 @@ Optimaliseer in deze volgorde:
 
 De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026. Dit is een agressieve stretch-doelstelling, geen garantie. Informatief verkeer zonder aantoonbare relatie met Softora's diensten krijgt geen voorrang op commercieel relevant verkeer.
 
+De automation blijft na het halen of verstrijken van die datum actief totdat Servé haar expliciet pauzeert. Na 31 december 2026 legt zij het deadline-resultaat eenmaal vast op basis van het toen beschikbare GSC-venster, stopt zij met een fictief "resterend tempo" en stuurt zij verder op rollende 28- en 90-daagse non-branded groei, gekwalificeerde money-pageklikken, betrouwbare conversies en bewijsgebaseerde kwartaalprognoses. Een gemiste stretchdeadline is geen reden om productie op te jagen; een gehaalde referentie is geen reden om te stoppen.
+
 ## Runritme
 
 ### Dagelijks
@@ -38,13 +40,20 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Houd minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs vooruit in `docs/growth/seo-machine-backlog.json`, verdeeld over de commerciële clusters. Dit versieerbare JSON-register is de enige backlogbron; de automation memory bewaart alleen runhistorie, experimenten en beslissingen.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
 - Backlinks en off-site linkbuilding vallen volledig buiten deze automation. Doe geen backlinkanalyse als actielijn, outreach, gastblogs, directoryplaatsingen, partner-/leveranciersprofielen, linkruil of betaalde links. Natuurlijke interne links binnen `softora.nl` blijven wel onderdeel van iedere relevante publicatie.
-- Bereken vanaf het actuele 28-daagse klikniveau en de resterende tijd tot 31 december 2026 de vereiste samengestelde groeicurve. Vergelijk werkelijke voortgang met die curve zonder dagelijkse ruis als causaliteit te presenteren.
+- Bereken tot en met 31 december 2026 vanaf het actuele 28-daagse klikniveau de vereiste samengestelde groeicurve. Gebruik daarna de deadlinebestendige `growthHorizon` uit het GSC-rapport: geen negatieve resterende maanden of verzonnen inhaaltempo, wel een eerlijke deadline-evaluatie en rollende 28/90-daagse voortgang.
 
 ### Maandelijks
 
 - Controleer cannibalisatie, overlap, orphan pages, stale content en indexatie-dekking.
 - Beoordeel echte trust-, case-, review-, citation- en authority-kansen.
 - Verbeter, consolideer, redirect of noindex alleen met aantoonbaar bewijs.
+
+### Blijvend compoundinggedrag
+
+- Bescherm bewezen winnaars. Wijzig URL, primaire intent, titel of H1 van een winnende pagina niet op dagelijkse ruis; eis een technisch/claimprobleem, duidelijke query-paginamismatch of consistente verslechtering in vergelijkbare vensters.
+- Laat D56-besluiten echt doorwerken: `won` leidt naar een unieke aangrenzende koperstaak of money-pageversterking, `neutral` en `insufficient-data` blijven op hold, en `lost` leidt alleen met bewijs tot iteratie, consolidatie of revert.
+- Zodra minimaal drie D56-experimenten `won` zijn, verdeelt de machine haar niet-bindende groeiruimte over een rollend venster: ongeveer 70% verdedigen/uitbouwen van bewezen clusters, 20% aangrenzende commerciële experimenten en 10% technische, trust- of corpusverbetering. Een control-planehersteltoestand en de nieuwe-URL-vloer gaan altijd voor deze portefeuillerichtlijn.
+- Voor die bewijsdrempel ligt de nadruk op betrouwbare indexatie, eerste relevante non-branded signalen en voldoende verschillende experimenten om echte winnaars te herkennen. Publicatievolume alleen is nooit compoundingbewijs.
 
 De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. Alleen de expliciete no-op-uitzonderingen hierboven mogen het tempo doorbreken.
 
@@ -57,12 +66,14 @@ De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. A
 | `operations_p0` | Live-versie, crawlbaarheid, sitemap, backlog of verplichte tooling blokkeert veilige uitvoering | Alleen de blocker repareren | 0 | 0 |
 | `data_degraded` | GSC- of URL Inspection-data ontbreekt of is onvoldoende betrouwbaar | Meting repareren en alleen eerder bewijsdekte veilige verbetering uitvoeren | 1 | 2 |
 | `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Een bewijsdekte nieuwe ingang behouden; vooral discovery, canonicals, consolidatie en contextuele links verbeteren | 1 | 2 |
-| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Een bewijsdekte nieuwe ingang behouden; vooral unieke informatiewinst toevoegen of overlap consolideren | 1 | 2 |
 | `performance_recovery` | Minimaal vijf D28-URL's zijn reviewbaar en minder dan 40% krijgt non-branded impressies, of de cohort heeft minstens 100 impressies zonder klik | Een bewijsdekte nieuwe ingang behouden; vooral query/pagina-match, snippets, interne routes en consolidatie verbeteren | 1 | 2 |
+| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Een bewijsdekte nieuwe ingang behouden; vooral unieke informatiewinst toevoegen of overlap consolideren | 1 | 2 |
 | `growth` | Techniek en herstelpoorten zijn groen | Hoogste verwachte gekwalificeerde impact kiezen | 3 | 5 |
 | `scale` | Minimaal vijf reviewbare URL's, minstens 80% D14/D28-indexatie, minstens 60% D28-dekking met non-branded impressies, ten minste een non-branded klik en groene kwaliteit | Gecontroleerd opschalen | 5 | 7 |
 
 Deze percentages zijn interne operationele veiligheidsgrenzen, geen door Google gepubliceerde rankingfactoren. Iedere niet-geindexeerde nieuwe URL krijgt een bewijsstatus `already_indexed`, `requested`, `quota_blocked`, `browser_blocked` of `failed` in de automation memory. Een status anders dan `already_indexed` of `requested` blijft openstaan voor de volgende run. Vraag niet opnieuw aan zonder materiele wijziging of gedocumenteerd vervolgvenster.
+
+Meetbare D28-uitkomstzwakte heeft na data- en indexatieherstel voorrang op generieke corpuskwaliteitsschuld. Daardoor kan een blijvend hoge historische templatescore niet eindeloos verbergen dat reviewbare pagina's geen relevante non-branded zichtbaarheid of klikken krijgen. Kandidaat-, claim-, overlap- en visualpoorten blijven wel harde publicatiepoorten: `performance_recovery` is nooit toestemming om zwakke of overlappende content te publiceren.
 
 `npm run seo:publications:report` rapporteert daarom afzonderlijk `newUrls`, `substantialRefreshes` en `otherGrowthActions`. Alleen `newUrls` verlaagt de nieuwe-URL-achterstand. Zodra `newUrlDeficit` groter is dan nul, overschrijft `publish_new_url_from_highest_scoring_safe_ready_candidate` de normale herstelactie voor die run.
 
@@ -136,7 +147,7 @@ De instructietekst is niet de poort. Deze zeven commando's leveren de afdwingbar
 - `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
 - `npm run seo:visuals:check` valideert beeldrollen, formaat, informatiewinst, familie-rotatie en pixelgelijkenis met de zes recentste blogs; vanaf de ingangsdatum blokkeert een rode kandidaat de publicatie.
 - `npm run seo:keywords:check` blokkeert toekomstige nieuwe en substantieel vernieuwde content zonder geldige Nederlandse `keywordEvidence`, zonder Ubersuggest ooit beslissingsmacht te geven.
-- `npm run seo:automation-state -- start-run` telt iedere heartbeat vóór SEO-effecten precies eenmaal; `inspect` valideert de 15-runrotatie en wekelijkse discovery-status; `rotate-thread` mag uitsluitend na run 15 de bewezen retargeting atomair vastleggen; `record-keywords` bewaart het begrensde adviserende Ubersuggest-gebruik.
+- `npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat, planning en task overeenkomen, en promptversie `SEO_MACHINE_PROMPT_VERSION=3` de kosten-, Qwen-, Edge/Codex-, langetermijn- en rotatiecontroles bevat. `start-run` herhaalt die installatie-audit en telt daarna iedere heartbeat vóór SEO-effecten precies eenmaal; `inspect` valideert de 15-runrotatie en wekelijkse discovery-status; `rotate-thread` mag uitsluitend na run 15 de bewezen retargeting atomair vastleggen; `record-keywords` bewaart het begrensde adviserende Ubersuggest-gebruik.
 - `npm run seo:cadence:check` combineert backlog, live ledger, indexatie, corpusoriginaliteit en non-branded D28-cohortprestaties. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
 De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation behandelt exitcode `2` als uitvoeropdracht. Bij `newUrlRequired=true` is dat expliciet een nieuwe URL uit de gevalideerde backlog; anders volgt zij de normale actie van de gekozen toestand.
@@ -180,7 +191,7 @@ Iedere score bevat `score`, `confidence` en een korte `evidence`-regel. Gebruik 
 
 Rapporteer daarnaast als productie- en leersignalen: nieuwe of substantieel vernieuwde URL's in de laatste 7 en 28 dagen, indexatiegraad van die cohort, aandeel met non-branded impressies, interne links naar money pages en betrouwbare organische conversies wanneer beschikbaar. Dit zijn geen extra scorecardcijfers zonder vaste definitie.
 
-Rapporteer de afstand tot 100.000 organische klikken per 28 dagen op 31 december 2026 als een stretch gap, inclusief huidig niveau, benodigde factor, benodigde samengestelde groei per resterende maand en een bewijsgebaseerde scenarioforecast. Presenteer dit nooit als garantie of als reden om kwaliteit, veiligheid of intentfit te verlagen.
+Rapporteer tot en met de deadline de afstand tot 100.000 organische klikken per 28 dagen op 31 december 2026 als een stretch gap, inclusief huidig niveau, benodigde factor, benodigde samengestelde groei per resterende maand en een bewijsgebaseerde scenarioforecast. Na de deadline rapporteer je het bewaarde deadline-resultaat en de actuele rollende 28/90-daagse richting zonder resterende-maandberekening. Presenteer dit nooit als garantie of als reden om kwaliteit, veiligheid of intentfit te verlagen.
 
 ## Experimentregister
 

@@ -4,6 +4,9 @@ const SEARCH_CONSOLE_INSPECTION_API_BASE = 'https://searchconsole.googleapis.com
 const SEARCH_CONSOLE_READONLY_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const DEFAULT_SITE_URL = 'sc-domain:softora.nl';
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
+const SEO_STRETCH_TARGET_CLICKS = 100000;
+const SEO_STRETCH_DEADLINE = '2026-12-31';
+const AVERAGE_MONTH_DAYS = 365.2425 / 12;
 const {
   getBusinessFit,
   isBrandedQuery,
@@ -45,6 +48,61 @@ function parseYyyyMmDd(value) {
 
 function formatYyyyMmDd(date) {
   return startOfUtcDay(date).toISOString().slice(0, 10);
+}
+
+function buildGrowthHorizon(options = {}) {
+  const targetClicks = Math.max(1, Math.round(toFiniteNumber(
+    options.targetClicks,
+    SEO_STRETCH_TARGET_CLICKS
+  )));
+  const currentClicks = Math.max(0, toFiniteNumber(options.currentClicks));
+  const deadline = normalizeString(options.deadline || SEO_STRETCH_DEADLINE);
+  const deadlineDate = parseYyyyMmDd(deadline);
+  if (!deadlineDate) throw new Error(`Ongeldige SEO-stretchdeadline: ${deadline}`);
+
+  const referenceInput = parseYyyyMmDd(options.referenceDate)
+    || new Date(options.referenceDate || Date.now());
+  const referenceDate = startOfUtcDay(referenceInput);
+  const remainingDaysRaw = Math.ceil((deadlineDate.getTime() - referenceDate.getTime()) / 86400000);
+  const deadlineElapsed = remainingDaysRaw < 0;
+  const remainingDays = deadlineElapsed ? 0 : remainingDaysRaw;
+  const remainingCompoundMonths = deadlineElapsed
+    ? null
+    : roundNumber(remainingDays / AVERAGE_MONTH_DAYS, 2);
+  const gap = Math.max(0, targetClicks - currentClicks);
+  const factorToTarget = currentClicks > 0
+    ? roundNumber(targetClicks / currentClicks, 4)
+    : null;
+  const canCalculatePace = gap > 0
+    && currentClicks > 0
+    && remainingCompoundMonths > 0;
+  const requiredMonthlyMultiplier = canCalculatePace
+    ? roundNumber((targetClicks / currentClicks) ** (1 / remainingCompoundMonths), 4)
+    : null;
+
+  let phase = 'stretch_countdown';
+  if (currentClicks >= targetClicks) phase = 'target_reached_defend_and_compound';
+  else if (deadlineElapsed) phase = 'evergreen_compounding_after_deadline';
+
+  return {
+    phase,
+    targetClicks,
+    deadline,
+    referenceDate: formatYyyyMmDd(referenceDate),
+    currentClicks: roundNumber(currentClicks, 2),
+    gap: roundNumber(gap, 2),
+    factorToTarget,
+    remainingDays: deadlineElapsed ? null : remainingDays,
+    remainingCompoundMonths,
+    requiredMonthlyMultiplier,
+    requiredMonthlyGrowthRate: requiredMonthlyMultiplier === null
+      ? null
+      : roundNumber(requiredMonthlyMultiplier - 1, 4),
+    deadlineStatus: deadlineElapsed
+      ? 'elapsed_requires_archived_deadline_snapshot'
+      : 'pending',
+    continuationRule: 'keep_running_until_explicitly_paused',
+  };
 }
 
 function resolveDateWindows(options = {}) {
@@ -474,10 +532,11 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     });
   });
 
+  const generatedAt = normalizeString(snapshot.generatedAt) || new Date().toISOString();
   return {
     status: 'ready',
     source: 'google-search-console',
-    generatedAt: normalizeString(snapshot.generatedAt) || new Date().toISOString(),
+    generatedAt,
     siteUrl: normalizeString(snapshot.siteUrl || DEFAULT_SITE_URL),
     dateWindows: snapshot.dateWindows,
     totals: {
@@ -488,6 +547,12 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
       ctrDelta: roundNumber(currentTotals.ctr - previousTotals.ctr, 4),
       positionDelta: roundNumber(currentTotals.position - previousTotals.position, 2),
     },
+    growthHorizon: buildGrowthHorizon({
+      currentClicks: currentTotals.clicks,
+      referenceDate: snapshot.dateWindows?.current?.endDate || generatedAt,
+      targetClicks: options.stretchTargetClicks,
+      deadline: options.stretchDeadline,
+    }),
     segments: {
       branded: aggregateRows(brandedQueryRows),
       nonBranded: aggregateRows(nonBrandedQueryRows),
@@ -724,6 +789,25 @@ function formatAgentMarkdown(report = {}) {
     );
   }
 
+  if (report.growthHorizon) {
+    const horizon = report.growthHorizon;
+    lines.push('## Langetermijnhorizon', '');
+    if (horizon.phase === 'stretch_countdown') {
+      const pace = horizon.requiredMonthlyGrowthRate === null
+        ? 'niet berekenbaar vanaf nul klikken of zonder resterende maand'
+        : `${formatPercent(horizon.requiredMonthlyGrowthRate)} samengestelde groei per maand`;
+      lines.push(
+        `Referentie: ${horizon.targetClicks} klikken per 28 dagen op ${horizon.deadline}.`,
+        `Gap: ${horizon.gap}; factor: ${horizon.factorToTarget ?? 'n/a'}; vereist tempo: ${pace}.`
+      );
+    } else if (horizon.phase === 'target_reached_defend_and_compound') {
+      lines.push('De stretchreferentie is in het actuele venster bereikt; verdedig winnaars en bouw gecontroleerd door.');
+    } else {
+      lines.push('De stretchdeadline is verstreken; bereken geen fictief resterend tempo en ga door op rollende 28/90-daagse bewijsvoering.');
+    }
+    lines.push('De machine blijft actief totdat Serve haar expliciet pauzeert.', '');
+  }
+
   if (report.technical) {
     lines.push(
       '## Techniek',
@@ -780,14 +864,18 @@ function formatAgentMarkdown(report = {}) {
 }
 
 module.exports = {
+  AVERAGE_MONTH_DAYS,
   DEFAULT_SITE_ORIGIN,
   DEFAULT_SITE_URL,
   GOOGLE_TOKEN_URL,
   SEARCH_CONSOLE_API_BASE,
   SEARCH_CONSOLE_INSPECTION_API_BASE,
   SEARCH_CONSOLE_READONLY_SCOPE,
+  SEO_STRETCH_DEADLINE,
+  SEO_STRETCH_TARGET_CLICKS,
   aggregateRows,
   analyzeRobotsTxt,
+  buildGrowthHorizon,
   buildSearchConsoleAgentReport,
   buildTechnicalOnlyAgentReport,
   buildUnclassifiedSegment,

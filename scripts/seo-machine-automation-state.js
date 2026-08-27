@@ -6,12 +6,75 @@ const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
 const DEFAULT_MAX_RUNS_PER_THREAD = 15;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const AUTOMATION_ID = 'softora-seo-actiemachine';
+const AUTOMATION_NAME = 'Softora SEO dagmachine';
+const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
+const AUTOMATION_PROMPT_VERSION = 3;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
 ]);
 const DEFAULT_MEMORY_PATH = path.join(
-  os.homedir(), '.codex', 'automations', 'softora-seo-actiemachine', 'memory.md'
+  os.homedir(), '.codex', 'automations', AUTOMATION_ID, 'memory.md'
 );
+const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
+const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
+const REQUIRED_PROMPT_MARKERS = Object.freeze([
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=3/ }),
+  Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
+  Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
+  Object.freeze({ label: 'edge_family_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
+  Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge[\s\S]*profileName=Codex/i }),
+  Object.freeze({ label: 'chrome_prohibition', pattern: /Google Chrome is forbidden/i }),
+  Object.freeze({ label: 'evergreen_continuation', pattern: /remains ACTIVE until Serve explicitly pauses/i }),
+  Object.freeze({ label: 'post_deadline_rule', pattern: /After 31 December 2026/i }),
+  Object.freeze({ label: 'cost_stop', pattern: /Never buy credits/i }),
+  Object.freeze({ label: 'qwen_stop', pattern: /Never use Qwen/i }),
+]);
+
+function parseTomlString(content, key) {
+  const safe = String(key).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = String(content || '').match(new RegExp(`^\\s*${safe}\\s*=\\s*("(?:\\\\.|[^"\\\\])*")\\s*$`, 'm'));
+  if (!match) return null;
+  try { return JSON.parse(match[1]); } catch (error) {
+    throw new Error(`automation.toml veld ${key} is ongeldig: ${error.message}`);
+  }
+}
+
+function parseAutomationToml(content) {
+  const versionMatch = String(content || '').match(/^\s*version\s*=\s*(\d+)\s*$/m);
+  return {
+    version: versionMatch ? Number(versionMatch[1]) : null,
+    id: parseTomlString(content, 'id'),
+    kind: parseTomlString(content, 'kind'),
+    name: parseTomlString(content, 'name'),
+    prompt: parseTomlString(content, 'prompt'),
+    status: parseTomlString(content, 'status'),
+    rrule: parseTomlString(content, 'rrule'),
+    targetThreadId: parseTomlString(content, 'target_thread_id'),
+  };
+}
+
+function findSeoAutomationPaths(automationsRoot) {
+  if (!fs.existsSync(automationsRoot)) return [];
+  const matches = [];
+  for (const entry of fs.readdirSync(automationsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const candidatePath = path.join(automationsRoot, entry.name, 'automation.toml');
+    if (!fs.existsSync(candidatePath)) continue;
+    const content = fs.readFileSync(candidatePath, 'utf8');
+    let config;
+    try { config = parseAutomationToml(content); } catch {
+      if (content.includes(AUTOMATION_ID) || content.includes(AUTOMATION_NAME)) matches.push(candidatePath);
+      continue;
+    }
+    if (
+      config.id === AUTOMATION_ID
+      || config.name === AUTOMATION_NAME
+      || String(config.prompt || '').includes(`sole automation id is ${AUTOMATION_ID}`)
+    ) matches.push(candidatePath);
+  }
+  return matches.sort();
+}
 function stateBlockPattern(name) {
   const safe = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`<!-- ${safe}_START -->\\s*\`\`\`json\\s*([\\s\\S]*?)\\s*\`\`\`\\s*<!-- ${safe}_END -->`, 'm');
@@ -126,6 +189,77 @@ function inspectAutomationState(memoryPath, now = new Date()) {
     ubersuggestStatePresent: Boolean(stored), weeklyDiscoveryDue: isWeeklyDiscoveryDue(ubersuggest, now),
   };
 }
+
+function auditAutomationInstallation({
+  memoryPath = DEFAULT_MEMORY_PATH,
+  automationPath = DEFAULT_AUTOMATION_PATH,
+  automationsRoot = DEFAULT_AUTOMATIONS_ROOT,
+  now = new Date(),
+} = {}) {
+  const errors = [];
+  let state = null;
+  let config = null;
+  try {
+    state = inspectAutomationState(memoryPath, now);
+    errors.push(...state.rotationErrors, ...state.ubersuggestErrors);
+  } catch (error) {
+    errors.push(`Automation memory kan niet worden gelezen: ${error.message}`);
+  }
+
+  try {
+    config = parseAutomationToml(fs.readFileSync(automationPath, 'utf8'));
+  } catch (error) {
+    errors.push(`Automationconfig kan niet worden gelezen: ${error.message}`);
+  }
+
+  const matchingAutomationPaths = findSeoAutomationPaths(automationsRoot);
+  if (matchingAutomationPaths.length !== 1) {
+    errors.push(`Er moeten exact 1 Softora SEO-automation zijn; gevonden: ${matchingAutomationPaths.length}.`);
+  } else if (path.resolve(matchingAutomationPaths[0]) !== path.resolve(automationPath)) {
+    errors.push('De enige gevonden Softora SEO-automation staat niet op het canonieke pad.');
+  }
+
+  const missingPromptMarkers = [];
+  if (config) {
+    if (config.version !== 1) errors.push('Automation version moet 1 zijn.');
+    if (config.id !== AUTOMATION_ID) errors.push(`Automation id moet ${AUTOMATION_ID} zijn.`);
+    if (config.kind !== 'heartbeat') errors.push('Automation kind moet heartbeat zijn.');
+    if (config.name !== AUTOMATION_NAME) errors.push(`Automation name moet ${AUTOMATION_NAME} zijn.`);
+    if (config.status !== 'ACTIVE') errors.push('Automation status moet ACTIVE zijn.');
+    if (config.rrule !== AUTOMATION_RRULE) errors.push('Automation schedule moet dagelijks om 08:15 blijven.');
+    if (!String(config.targetThreadId || '').trim()) errors.push('Automation target_thread_id ontbreekt.');
+    if (
+      state?.rotation?.activeThreadId
+      && config.targetThreadId !== state.rotation.activeThreadId
+    ) errors.push('Automation target_thread_id wijkt af van de actieve rotatietask.');
+    for (const marker of REQUIRED_PROMPT_MARKERS) {
+      if (!marker.pattern.test(String(config.prompt || ''))) missingPromptMarkers.push(marker.label);
+    }
+    if (missingPromptMarkers.length) {
+      errors.push(`Automationprompt mist verplichte controles: ${missingPromptMarkers.join(', ')}.`);
+    }
+  }
+
+  return {
+    status: errors.length ? 'invalid' : 'ready',
+    errors,
+    automation: config ? {
+      version: config.version,
+      id: config.id,
+      kind: config.kind,
+      name: config.name,
+      status: config.status,
+      rrule: config.rrule,
+      targetThreadId: config.targetThreadId,
+      missingPromptMarkers,
+    } : null,
+    matchingAutomationCount: matchingAutomationPaths.length,
+    matchingAutomationPaths,
+    rotation: state?.rotation || null,
+    ubersuggest: state?.ubersuggest || null,
+    weeklyDiscoveryDue: state?.weeklyDiscoveryDue ?? null,
+  };
+}
 function ensureAutomationState(memoryPath, now = new Date()) {
   return withMemoryLock(memoryPath, () => {
     const content = fs.readFileSync(memoryPath, 'utf8');
@@ -227,13 +361,26 @@ function parseArgs(argv) {
 function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
   const args = parseArgs(argv);
   const memoryPath = options.memoryPath || DEFAULT_MEMORY_PATH;
+  const auditOptions = {
+    memoryPath,
+    automationPath: options.automationPath || DEFAULT_AUTOMATION_PATH,
+    automationsRoot: options.automationsRoot || DEFAULT_AUTOMATIONS_ROOT,
+    now: new Date(args.now || Date.now()),
+  };
   let result;
-  if (args.command === 'inspect') {
+  if (args.command === 'audit') {
+    result = auditAutomationInstallation(auditOptions);
+    if (result.errors.length) throw new Error(`Automation-installatie ongeldig: ${result.errors.join(' ')}`);
+  } else if (args.command === 'inspect') {
     result = inspectAutomationState(memoryPath, new Date(args.now || Date.now()));
     const errors = [...result.rotationErrors, ...result.ubersuggestErrors];
     if (errors.length) throw new Error(`Automation-state ongeldig: ${errors.join(' ')}`);
   } else if (args.command === 'ensure') result = ensureAutomationState(memoryPath, new Date(args.now || Date.now()));
-  else if (args.command === 'start-run') result = startAutomationRun({ memoryPath, threadId: args.thread, invocationAt: args['invocation-at'] });
+  else if (args.command === 'start-run') {
+    const audit = auditAutomationInstallation(auditOptions);
+    if (audit.errors.length) throw new Error(`Automation-installatie ongeldig: ${audit.errors.join(' ')}`);
+    result = startAutomationRun({ memoryPath, threadId: args.thread, invocationAt: args['invocation-at'] });
+  }
   else if (args.command === 'rotate-thread') result = rotateAutomationThread({
     memoryPath, fromThreadId: args['from-thread'], toThreadId: args['to-thread'],
     rotatedAt: args['rotated-at'], evidence: args.evidence,
@@ -253,8 +400,10 @@ if (require.main === module) {
   }
 }
 module.exports = {
-  DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, ROTATION_BLOCK, UBERSUGGEST_BLOCK, UBERSUGGEST_STATUSES,
-  defaultUbersuggestState, ensureAutomationState, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue,
-  parseArgs, parseStateBlock, recordUbersuggestRun, replaceStateBlock, rotateAutomationThread, runAutomationStateCli,
-  startAutomationRun, validateRotationState, validateUbersuggestState,
+  AUTOMATION_ID, AUTOMATION_NAME, AUTOMATION_PROMPT_VERSION, AUTOMATION_RRULE, DEFAULT_AUTOMATION_PATH, DEFAULT_AUTOMATIONS_ROOT,
+  DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, REQUIRED_PROMPT_MARKERS, ROTATION_BLOCK, UBERSUGGEST_BLOCK,
+  UBERSUGGEST_STATUSES, auditAutomationInstallation, defaultUbersuggestState, ensureAutomationState,
+  findSeoAutomationPaths, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue, parseArgs,
+  parseAutomationToml, parseStateBlock, recordUbersuggestRun, replaceStateBlock, rotateAutomationThread,
+  runAutomationStateCli, startAutomationRun, validateRotationState, validateUbersuggestState,
 };
