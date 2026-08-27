@@ -56,13 +56,19 @@
         getCanonicalMessageIdentities(message).size === 0;
     }
 
+    function recordMatchesMailScope(record, mail) {
+      if (!record || !mail) return false;
+      const recordAccount = normalize(record.accountEmail);
+      const recordOwner = normalize(record.owner);
+      const mailAccount = normalize(mail.accountEmail);
+      const mailOwner = normalize(options.campaignInbox?.getMessageOwner?.(mail));
+      if (!recordAccount || !recordOwner || !mailAccount || !mailOwner) return false;
+      return recordAccount === mailAccount && recordOwner === mailOwner;
+    }
+
     function candidateMatchesRecordScope(record, candidate) {
       if (!record || !candidate || !isSentMessage(candidate) || isLocalAcceptedFallback(candidate)) return false;
-      if (normalize(record.accountEmail) !== normalize(candidate.accountEmail)) return false;
-      const candidateOwner = normalize(
-        options.campaignInbox?.getMessageOwner?.(candidate) || candidate.providerOwner || candidate.owner
-      );
-      return !record.owner || !candidateOwner || normalize(record.owner) === candidateOwner;
+      return recordMatchesMailScope(record, candidate);
     }
 
     function isClientAcceptedForRecord(message, record) {
@@ -88,13 +94,18 @@
 
     function recordMatchesMail(record, mail) {
       if (!record || !mail) return false;
+      if (!recordMatchesMailScope(record, mail)) return false;
       const sourceMailId = String(record.sourceMailId || '').trim();
       if (sourceMailId && sourceMailId === String(mail.id || '').trim()) return true;
-      if (normalize(record.owner) !== normalize(options.campaignInbox?.getMessageOwner?.(mail))) return false;
-      if (normalize(record.accountEmail) !== normalize(mail.accountEmail)) return false;
       const keys = getConversationKeys(mail);
       return (Array.isArray(record.conversationKeys) ? record.conversationKeys : [])
         .some((key) => keys.has(String(key || '').trim()));
+    }
+
+    function findScopedMail(record, mails) {
+      const matches = (Array.isArray(mails) ? mails : [])
+        .filter((mail) => recordMatchesMail(record, mail));
+      return matches.length === 1 ? matches[0] : null;
     }
 
     function reconcile(mail) {
@@ -158,6 +169,7 @@
     }
 
     return {
+      findScopedMail,
       getConversationKeys,
       getMessageIdentity,
       reconcile,

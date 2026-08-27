@@ -186,7 +186,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260814a/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260826a/);
-  assert.match(page, /assets\/premium-mailbox-ui-state\.js\?v=20260826a/);
+  assert.match(page, /assets\/premium-mailbox-ui-state\.js\?v=20260827a/);
   assert.match(page, /assets\/premium-mailbox-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
   assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260826b/);
@@ -196,7 +196,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260827b/);
-  assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827a/);
+  assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260826a/);
@@ -206,8 +206,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260826a') < page.indexOf('premium-mailbox-index.js?v=20260826b'));
-  assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827a'));
-  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827a') < page.indexOf('premium-mailbox-compose-controller.js?v=20260827a'));
+  assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b') < page.indexOf('premium-mailbox-compose-controller.js?v=20260827b'));
   assert.equal(typeof composeAcceptedSendModule.create, 'function');
   assert.match(readComposeAcceptedSendScript(), /global\.SoftoraMailboxComposeAcceptedSend = api/);
   assert.match(readSignatureScript(), /renderContactCard/);
@@ -5393,8 +5393,8 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827a/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260827a/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260827b/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -5812,6 +5812,14 @@ test('send-ack werkt contacttijdlijn, lijstactiviteit en exact replytarget atomi
     getConversationAction,
   });
   const composeController = {
+    findAcceptedMail(record, mails) {
+      const matches = mails.filter((mail) => (
+        mail.id === record.sourceMailId &&
+        mail.accountEmail === record.accountEmail &&
+        mail.owner === record.owner
+      ));
+      return matches.length === 1 ? matches[0] : null;
+    },
     reconcile(mail) {
       order.push('optimistic-card');
       if (!mail.threadMessages.some((message) => message.messageId === '<accepted-inkoop@softora.nl>')) {
@@ -5830,7 +5838,7 @@ test('send-ack werkt contacttijdlijn, lijstactiviteit en exact replytarget atomi
   let openCount = 0;
   const completion = uiStateModule.completeAcceptedSend({
     record: {
-      mode: 'reply', sourceMailId: root.id,
+      mode: 'reply', sourceMailId: root.id, accountEmail: 'martijn@softora.nl', owner: 'martijn',
       replyTarget: { ...inbound },
     },
     mails: [root],

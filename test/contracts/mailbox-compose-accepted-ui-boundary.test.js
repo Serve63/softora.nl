@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const composeModule = require('../../assets/premium-mailbox-compose.js');
+const acceptedSendModule = require('../../assets/premium-mailbox-compose-accepted-send.js');
 const composeControllerModule = require('../../assets/premium-mailbox-compose-controller.js');
 const readModule = require('../../assets/premium-mailbox-read.js');
 const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
@@ -497,4 +498,121 @@ test('exacte idempotente replay neemt nooit bijlagemetadata uit de nieuwe client
   const sent = scenario.mail.threadMessages.find((message) => message.direction === 'sent');
   assert.deepEqual(sent.attachments, []);
   assert.doesNotMatch(JSON.stringify(sent), /niet-duurzaam|privateBytes|nooit tonen/);
+});
+
+test('accepted plaatsing en reply-dismissal blijven bij dezelfde fysieke ID in beide arrayvolgordes accountgebonden', async () => {
+  for (const reverse of [false, true]) {
+    const acceptedAt = '2026-08-27T15:00:00.000Z';
+    const record = {
+      key: `serve-scope-${reverse}`,
+      owner: 'serve',
+      accountEmail: 'serve@softora.nl',
+      acceptedAt,
+      idempotencyKey: `serve-scope-key-${reverse}`,
+      mode: 'reply',
+      sourceMailId: 'inbox:42',
+      conversationKeys: ['conversation:shared-physical-id'],
+      replyTarget: {
+        id: 'inbox:42', mailboxId: 'inbox:42', folder: 'inbox',
+        accountEmail: 'serve@softora.nl', providerOwner: 'serve',
+        messageKey: 'serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|42',
+        messageId: '<serve-inbound@example.nl>', unread: false, replyDismissedAt: '',
+      },
+      message: {
+        id: 'accepted-sent:serve-scope', mailboxId: 'accepted-sent:serve-scope',
+        folder: 'sent', storageFolder: 'sent', direction: 'sent',
+        accountEmail: 'serve@softora.nl', providerOwner: 'serve',
+        messageId: '<serve-accepted@example.nl>', receivedAt: acceptedAt, activityAt: acceptedAt,
+        localAcceptedSend: true, localAcceptedSendFallback: false,
+        softoraClientSendIdempotencyKey: `serve-scope-key-${reverse}`,
+      },
+    };
+    const serveMail = {
+      id: 'inbox:42', mailboxId: 'inbox:42', accountEmail: 'serve@softora.nl',
+      providerOwner: 'serve', conversationId: 'conversation:shared-physical-id',
+      receivedAt: '2026-08-27T14:59:00.000Z', threadMessages: [],
+    };
+    const martijnMail = {
+      id: 'inbox:42', mailboxId: 'inbox:42', accountEmail: 'martijn@softora.nl',
+      providerOwner: 'martijn', conversationId: 'conversation:shared-physical-id',
+      receivedAt: '2026-08-27T14:59:00.000Z', threadMessages: [],
+    };
+    const state = acceptedSendModule.create({
+      campaignInbox: { getMessageOwner: (mail) => mail?.providerOwner || '' },
+      normalizeAcceptedMessage: (message) => ({ ...message }),
+      formatMailDate: () => ({ time: '15:00', date: 'Vandaag', listDate: 'Vandaag' }),
+    });
+    state.remember(record);
+    const dismissals = [];
+    let openCount = 0;
+    const completion = uiStateModule.completeAcceptedSend({
+      record,
+      mails: reverse ? [martijnMail, serveMail] : [serveMail, martijnMail],
+      composeController: {
+        findAcceptedMail: state.findScopedMail,
+        reconcile: state.reconcile,
+      },
+      readController: {
+        dismissReplyTarget(mail, target) {
+          dismissals.push({ mail, target });
+          return Promise.resolve({ ok: true });
+        },
+      },
+      renderList() {},
+      getActiveMail: () => 'inbox:42',
+      openMail() { openCount += 1; },
+    });
+
+    assert.equal(completion.mail, serveMail);
+    assert.equal(serveMail.threadMessages.length, 1);
+    assert.equal(serveMail.threadMessages[0].messageId, '<serve-accepted@example.nl>');
+    assert.deepEqual(martijnMail.threadMessages, []);
+    assert.equal(martijnMail.replyDismissedAt, undefined);
+    assert.equal(dismissals.length, 1);
+    assert.equal(dismissals[0].mail, serveMail);
+    assert.equal(openCount, 0);
+    assert.equal((await completion.handledPromise).ok, true);
+  }
+});
+
+test('accepted completion faalt gesloten zonder unieke volledige account- en ownerscope', () => {
+  const baseRecord = {
+    owner: 'serve', accountEmail: 'serve@softora.nl', mode: 'reply', sourceMailId: 'inbox:42',
+    conversationKeys: [], replyTarget: { id: 'inbox:42' },
+  };
+  const exactMail = {
+    id: 'inbox:42', accountEmail: 'serve@softora.nl', providerOwner: 'serve', threadMessages: [],
+  };
+  const cases = [
+    { record: { ...baseRecord, owner: '' }, mails: [exactMail] },
+    { record: { ...baseRecord, accountEmail: '' }, mails: [exactMail] },
+    { record: baseRecord, mails: [{ ...exactMail, providerOwner: '' }] },
+    { record: baseRecord, mails: [{ ...exactMail, accountEmail: '' }] },
+    { record: baseRecord, mails: [exactMail, { ...exactMail, threadMessages: [] }] },
+  ];
+
+  cases.forEach(({ record, mails }) => {
+    const state = acceptedSendModule.create({
+      campaignInbox: { getMessageOwner: (mail) => mail?.providerOwner || '' },
+    });
+    let reconcileCount = 0;
+    let dismissCount = 0;
+    let renderCount = 0;
+    const completion = uiStateModule.completeAcceptedSend({
+      record,
+      mails,
+      composeController: {
+        findAcceptedMail: state.findScopedMail,
+        reconcile() { reconcileCount += 1; },
+      },
+      readController: { dismissReplyTarget() { dismissCount += 1; } },
+      renderList() { renderCount += 1; },
+    });
+
+    assert.deepEqual(completion, { changed: false, handledPromise: null, mail: null });
+    assert.equal(reconcileCount, 0);
+    assert.equal(dismissCount, 0);
+    assert.equal(renderCount, 0);
+    mails.forEach((mail) => assert.deepEqual(mail.threadMessages, []));
+  });
 });

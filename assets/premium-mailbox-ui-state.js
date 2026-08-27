@@ -27,13 +27,19 @@
 
   function completeAcceptedSend(options = {}) {
     const record = options.record && typeof options.record === 'object' ? options.record : {};
-    const mail = options.findMail?.(record.sourceMailId) || null;
+    const mail = options.composeController?.findAcceptedMail?.(record, options.mails) || null;
+    if (!mail) return { changed: false, handledPromise: null, mail: null };
     let handledPromise = null;
     if (record.mode === 'reply' && record.replyTarget && options.readController?.dismissReplyTarget) {
       handledPromise = options.readController.dismissReplyTarget(mail, record.replyTarget, { render() {} });
     }
+    const scopedId = String(mail.id || '');
+    const scopedIdIsUnique = scopedId && (Array.isArray(options.mails) ? options.mails : [])
+      .filter((candidate) => String(candidate?.id || '') === scopedId).length === 1;
     const changed = refresh({
       ...options,
+      mails: [mail],
+      openMail: scopedIdIsUnique ? options.openMail : undefined,
       controller: options.composeController,
       onlyWhenChanged: false,
     });

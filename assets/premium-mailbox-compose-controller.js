@@ -873,6 +873,7 @@
     return {
       bind,
       close,
+      findAcceptedMail: acceptedSendState.findScopedMail,
       getContext: () => replyContext,
       handleAction,
       newMessage,
