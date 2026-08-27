@@ -133,8 +133,14 @@
           }
           const existingMessages = [mail, ...messages];
           const alreadyPresent = canonicalIdentities.size
-            ? existingMessages.some((message) => identitiesOverlap(canonicalIdentities, message))
-            : existingMessages.some((message) => isFallbackForRecord(message, record));
+            ? existingMessages.some((message) => (
+                candidateMatchesRecordScope(record, message) &&
+                identitiesOverlap(canonicalIdentities, message)
+              ))
+            : existingMessages.some((message) => (
+                recordMatchesMailScope(record, message) &&
+                isFallbackForRecord(message, record)
+              ));
           if (!providerReplacement && !alreadyPresent) {
             messages.push(normalizedMessage);
           }

@@ -198,3 +198,45 @@ test('accepted-send scoped finder muteert niets bij twee exact passende kandidat
   assert.deepEqual(serveMail.threadMessages, []);
   assert.deepEqual(duplicate.threadMessages, []);
 });
+
+test('providerkopie-dedupe laat een Martijn-kopie met Serv\u00e9s canonieke Message-ID in beide volgordes ongemoeid', () => {
+  for (const reverse of [false, true]) {
+    const state = createState();
+    const { record, serveMail } = createCollisionFixture();
+    const martijnProviderCopy = {
+      id: 'sent:martijn-provider-copy',
+      mailboxId: 'sent:martijn-provider-copy',
+      folder: 'sent',
+      storageFolder: 'sent',
+      direction: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      providerOwner: 'martijn',
+      messageId: '<accepted-collision@softora.nl>',
+      receivedAt: record.acceptedAt,
+    };
+    const unrelatedServeCopy = {
+      id: 'sent:serve-unrelated',
+      mailboxId: 'sent:serve-unrelated',
+      folder: 'sent',
+      storageFolder: 'sent',
+      direction: 'sent',
+      accountEmail: 'serve@softora.nl',
+      providerOwner: 'serve',
+      messageId: '<serve-unrelated@softora.nl>',
+      receivedAt: '2026-08-27T09:59:00.000Z',
+    };
+    serveMail.threadMessages = reverse
+      ? [martijnProviderCopy, unrelatedServeCopy]
+      : [unrelatedServeCopy, martijnProviderCopy];
+
+    state.remember(record);
+    state.reconcile(serveMail);
+
+    assert.equal(serveMail.threadMessages.includes(martijnProviderCopy), true);
+    assert.equal(serveMail.threadMessages.includes(unrelatedServeCopy), true);
+    assert.equal(serveMail.threadMessages.filter((message) => (
+      message.localAcceptedSend === true &&
+      message.messageId === '<accepted-collision@softora.nl>'
+    )).length, 1);
+  }
+});
