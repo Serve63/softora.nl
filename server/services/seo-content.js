@@ -1992,55 +1992,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-chatbot-overdracht',
-    title: 'Wat is chatbot overdracht?',
-    description:
-      'Een praktische uitleg van chatbot overdracht: wanneer een gesprek naar een medewerker gaat en welke context mee moet naar CRM of WhatsApp.',
-    category: 'Chatbots',
-    intent: 'Uitleg',
-    publishedAt: '2026-07-03',
-    updatedAt: '2026-07-03',
-    image: Object.freeze({
-      src: '/assets/seo-content/chatbot-menselijke-overdracht-klantcontact-softora.jpg',
-      alt: 'Chatbotgesprek wordt met samenvatting en context overgedragen aan een medewerker voor opvolging.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Chatbot overdracht betekent dat een gesprek op het juiste moment met context naar een medewerker of opvolgsysteem gaat.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'De simpele definitie',
-        paragraphs: Object.freeze([
-          'Chatbot overdracht is het moment waarop een chatbot een gesprek niet verder zelfstandig afhandelt, maar doorzet naar een medewerker, WhatsApp-route, mailbox, CRM-taak of ander opvolgsysteem.',
-          'Dat moment is belangrijk omdat klanten vaak eerst snelle hulp willen, maar bij specifieke vragen vertrouwen nodig hebben. Een goede overdracht voorkomt dat iemand opnieuw hetzelfde verhaal moet vertellen.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Welke context mee moet',
-        paragraphs: Object.freeze([
-          'Minimaal wil je naam, contactgegevens, vraag, onderwerp, bronpagina, samenvatting en voorgestelde vervolgstap bewaren. Bij commerciële gesprekken kunnen dienstinteresse, timing en urgentie ook nuttig zijn.',
-          'De chatbot hoeft niet alles perfect te beoordelen. Hij moet vooral helder maken wat bekend is, wat nog onzeker is en waarom menselijke opvolging logisch is.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Wanneer overdracht nodig is',
-        paragraphs: Object.freeze([
-          'Overdracht is nodig bij complexe vragen, duidelijke koopintentie, bestaande klantproblemen, privacygevoelige informatie of situaties waarin de chatbot geen betrouwbaar antwoord kan geven.',
-          'Voor Softora is chatbot overdracht onderdeel van de totale leadflow. De chatbot helpt aan de voorkant, CRM of WhatsApp houdt de vervolgstap vast en het team blijft eigenaar van relatie en inhoud.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
-      Object.freeze({ label: 'Chatbot en CRM koppelen', href: '/blog/chatbot-crm-koppeling-leads-opvolgen' }),
-      Object.freeze({ label: 'AI telefonie overdracht', href: '/blog/ai-telefonie-menselijke-overdracht' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'blog',
     slug: 'maatwerk-software-offerte-beoordelen',
     title: 'Maatwerk software offerte beoordelen: praktische checklist',

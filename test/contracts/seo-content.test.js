@@ -183,6 +183,30 @@ test('CRM kennisbankcluster ondersteunt sales pipeline en datakwaliteit richting
   assert.match(salesPipeline, /nieuwe lead, te kwalificeren, afspraak gepland, voorstel verstuurd/);
 });
 
+test('chatbot overdrachtsgids gebruikt een unieke Quality V2 handoffkaart met menselijke herstelroute', () => {
+  const item = getSeoContentItem('kennisbank', 'wat-is-chatbot-overdracht', {
+    now: new Date('2026-08-27T12:00:00.000Z'),
+  });
+  const sectionText = JSON.stringify(item.sections);
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.growthEventAt, '2026-08-27');
+  assert.equal(item.targetMoneyPage, '/chatbot-laten-maken');
+  assert.equal(item.overlapReview.decision, 'distinct');
+  assert.equal(item.overlapReview.closestPaths.length, 3);
+  assert.equal(item.sources.length, 2);
+  assert.match(item.informationGain, /achtveldige overdrachtskaart/);
+  assert.match(sectionText, /overdracht gevraagd/);
+  assert.match(sectionText, /expliciet mensverzoek/);
+  assert.match(sectionText, /CRM-record is geen gekwalificeerde lead/);
+  assert.match(html, /href="\/chatbot-laten-maken"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /href="\/blog\/chatbot-crm-koppeling-leads-opvolgen"/);
+  assert.doesNotMatch(html, /Serve Creusen/i);
+});
+
 test('seo content toont datumgebonden related links pas wanneer de steunpagina live is', () => {
   const beforeLeadQualification = buildSeoContentArticleHtml(
     getSeoContentItem('blog', 'ai-automatisering-leadkwalificatie-mkb', {
