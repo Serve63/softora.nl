@@ -13,15 +13,12 @@
   const MARKER_STATES = new Set(['armed', 'staged', 'dispatching', 'processing', 'accepted', 'failed']);
   const UNRESOLVED_STATES = new Set(['armed', 'staged', 'dispatching', 'processing']);
   const PROVEN_PRE_DISPATCH_STATES = new Set(['armed', 'staged']);
-
   function normalize(value) {
     return String(value || '').trim().toLowerCase();
   }
-
   function normalizeText(value) {
     return String(value || '').trim();
   }
-
   function createProtocolError(code, message, options = {}) {
     const error = new Error(String(message || 'Mail verzenden mislukt'));
     error.code = String(code || 'MAILBOX_SEND_RESILIENCE_FAILED');
@@ -30,7 +27,6 @@
     if (options.cause) error.cause = options.cause;
     return error;
   }
-
   function storageError(cause) {
     return createProtocolError(
       'MAILBOX_SEND_DURABLE_STATE_UNAVAILABLE',
@@ -38,17 +34,14 @@
       { status: 503, retryable: true, cause }
     );
   }
-
   function getNow(options = {}) {
     const value = typeof options.now === 'function' ? options.now() : Date.now();
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : Date.now();
   }
-
   function getCrypto(options = {}) {
     return options.crypto || global.crypto || null;
   }
-
   function getRandomToken(options = {}) {
     const cryptoRef = getCrypto(options);
     if (typeof options.randomUUID === 'function') return String(options.randomUUID());
@@ -59,12 +52,12 @@
       { status: 503 }
     );
   }
-
   function getStorage(options = {}) {
     let storage = options.storage;
     if (storage === undefined) {
+      const browserStorage = options.browserStorage || global.SoftoraPremiumBrowserStorage;
       try {
-        storage = global.localStorage;
+        storage = browserStorage?.createStrictPrefixedStorage?.({ prefix: STORAGE_PREFIX });
       } catch (error) {
         throw storageError(error);
       }
@@ -77,15 +70,13 @@
       || typeof storage.key !== 'function'
       || !Number.isFinite(Number(storage.length))
     ) {
-      throw storageError(new Error('localStorage ontbreekt'));
+      throw storageError(new Error('duurzame browseropslag ontbreekt'));
     }
     return storage;
   }
-
   function markerStorageKey(idempotencyKey) {
     return `${STORAGE_PREFIX}${encodeURIComponent(normalizeText(idempotencyKey))}`;
   }
-
   function parseMarker(raw, expectedKey = '') {
     if (typeof raw !== 'string' || !raw) return null;
     let marker;
@@ -183,9 +174,9 @@
     try {
       storage.setItem(storageKey, serialized);
       const readback = storage.getItem(storageKey);
-      if (readback !== serialized) throw new Error('localStorage write/readback mismatch');
+      if (readback !== serialized) throw new Error('duurzame opslag write/readback mismatch');
       const verified = parseMarker(readback, idempotencyKey);
-      if (verified.casToken !== next.casToken) throw new Error('localStorage CAS token mismatch');
+      if (verified.casToken !== next.casToken) throw new Error('duurzame opslag CAS token mismatch');
       return verified;
     } catch (error) {
       if (error?.code === 'MAILBOX_SEND_DURABLE_STATE_CORRUPT') throw error;
@@ -200,7 +191,7 @@
     try {
       storage.removeItem(markerStorageKey(marker.idempotencyKey));
       if (storage.getItem(markerStorageKey(marker.idempotencyKey)) !== null) {
-        throw new Error('localStorage delete/readback mismatch');
+        throw new Error('duurzame opslag delete/readback mismatch');
       }
       return true;
     } catch (error) {
@@ -231,6 +222,7 @@
       const filename = normalizeText(attachment?.filename || attachment?.name);
       const contentType = normalize(attachment?.contentType || attachment?.type);
       const size = Number(attachment?.size);
+      const sha256 = normalizeText(attachment?.sha256);
       if (
         !filename
         || Array.from(filename).length > 120
@@ -243,30 +235,28 @@
       ) return null;
       total += size;
       if (total > 5 * 1024 * 1024) return null;
-      normalized.push({ filename, contentType, size });
+      if (attachment?.sha256 !== undefined && !/^[0-9a-f]{64}$/.test(sha256)) return null;
+      normalized.push({ filename, contentType, size, ...(sha256 ? { sha256 } : {}) });
     }
+    if (normalized.some((item) => item.sha256) && !normalized.every((item) => item.sha256)) return null;
     return normalized;
   }
 
-  function attachmentMetadataFromSelection(attachments) {
-    const selected = Array.isArray(attachments) ? attachments : [];
-    if (selected.some((attachment) => !attachment?.file)) {
-      throw attachmentReselectError();
+  async function bindAttachmentSelection(value, options = {}) {
+    const attachments = Array.isArray(value) ? value : [];
+    if (!attachments.length) return { attachments: [], metadata: [], digest: null };
+    const digest = options.attachmentDigest || global.SoftoraMailboxAttachmentDigest;
+    if (!digest || typeof digest.bind !== 'function' || typeof digest.verify !== 'function') {
+      throw createProtocolError('MAILBOX_ATTACHMENT_DIGEST_UNAVAILABLE', 'De browser kan de bijlage niet veilig controleren; de mail is niet verzonden.', { status: 503 });
     }
-    const metadata = selected.map((attachment) => ({
-      filename: attachment?.filename || attachment?.name,
-      contentType: attachment?.contentType || attachment?.type,
-      size: attachment?.size,
-    }));
-    const normalized = normalizeAttachmentMetadata(metadata);
-    if (normalized === null) {
-      throw createProtocolError(
-        'MAILBOX_ATTACHMENT_METADATA_INVALID',
-        'De bijlagemetadata kon niet veilig worden vastgesteld; de mail is niet verzonden.',
-        { status: 400 }
-      );
-    }
-    return normalized;
+    const bound = await digest.bind(attachments, { crypto: getCrypto(options) });
+    const metadata = normalizeAttachmentMetadata(bound?.metadata);
+    if (
+      metadata === null
+      || bound?.attachments?.length !== metadata.length
+      || !metadata.every((attachment) => /^[0-9a-f]{64}$/.test(attachment.sha256 || ''))
+    ) throw createProtocolError('MAILBOX_ATTACHMENT_METADATA_INVALID', 'De bijlagemetadata kon niet veilig worden vastgesteld; de mail is niet verzonden.', { status: 400 });
+    return { attachments: bound.attachments, metadata, digest };
   }
 
   function canonicalFingerprintPayload(payload, attachmentsMetadata) {
@@ -498,23 +488,23 @@
 
   function extractDurableIdentity(result, response = null) {
     const sentMessage = result?.sentMessage && typeof result.sentMessage === 'object' ? result.sentMessage : {};
-    function exactValue(values) {
+    function exactField(values) {
       const unique = Array.from(new Set(values.map(normalizeText).filter(Boolean)));
-      return unique.length === 1 ? unique[0] : '';
+      return { value: unique.length === 1 ? unique[0] : '', conflict: unique.length > 1 };
     }
-    const intentId = exactValue([result?.intentId, sentMessage.softoraSendIntentId]);
-    const messageId = exactValue([result?.messageId, sentMessage.messageId]);
-    const providerMessageId = exactValue([result?.providerMessageId, sentMessage.providerMessageId]);
-    if (!intentId || (!messageId && !providerMessageId)) return null;
+    const intent = exactField([result?.intentId, sentMessage.softoraSendIntentId]);
+    const message = exactField([result?.messageId, sentMessage.messageId]);
+    const provider = exactField([result?.providerMessageId, sentMessage.providerMessageId]);
+    if (intent.conflict || message.conflict || provider.conflict || !intent.value || (!message.value && !provider.value)) return null;
     const headerIntentId = responseHeader(response, 'X-Softora-Send-Intent-Id');
     const headerMessageId = responseHeader(response, 'X-Softora-Message-Id');
     const headerProviderMessageId = responseHeader(response, 'X-Softora-Provider-Message-Id');
     if (
-      headerIntentId && headerIntentId !== intentId
-      || headerMessageId && messageId && headerMessageId !== messageId
-      || headerProviderMessageId && providerMessageId && headerProviderMessageId !== providerMessageId
+      headerIntentId && headerIntentId !== intent.value
+      || headerMessageId && message.value && headerMessageId !== message.value
+      || headerProviderMessageId && provider.value && headerProviderMessageId !== provider.value
     ) return null;
-    return { intentId, messageId, providerMessageId };
+    return { intentId: intent.value, messageId: message.value, providerMessageId: provider.value };
   }
 
   function expectedPreflightScope(payload) {
@@ -734,7 +724,7 @@
       }
       if (options.proofOnly === true && status === 'ready') {
         throw createProtocolError(
-          'MAILBOX_SEND_PREFLIGHT_INVALID',
+          'MAILBOX_SEND_PROOF_ONLY_READY_FORBIDDEN',
           'Een bewijscontrole zonder actuele mailinhoud mag geen nieuwe verzending vrijgeven.',
           { status: 502 }
         );
@@ -824,6 +814,8 @@
         && attachment?.filename === metadata.filename
         && attachment?.contentType === metadata.contentType
         && Number(attachment?.size) === metadata.size
+        && (!metadata.sha256 || attachment?.sha256 === metadata.sha256)
+        && (!metadata.sha256 || attachment?.referenceVersion === 2)
         && typeof attachment?.expiresAt === 'number'
         && Number.isSafeInteger(attachment.expiresAt)
         && Number(attachment.expiresAt) > now + MIN_STAGING_VALIDITY_MS;
@@ -853,6 +845,8 @@
         || upload?.filename !== metadata.filename
         || normalize(upload?.contentType) !== metadata.contentType
         || Number(upload?.size) !== metadata.size
+        || (metadata.sha256 && upload?.sha256 !== metadata.sha256)
+        || (metadata.sha256 && upload?.referenceVersion !== 2)
         || typeof expiresAt !== 'number'
         || !Number.isSafeInteger(expiresAt)
         || expiresAt <= now + MIN_STAGING_VALIDITY_MS
@@ -869,6 +863,7 @@
         filename: metadata.filename,
         contentType: metadata.contentType,
         size: metadata.size,
+        ...(metadata.sha256 ? { sha256: metadata.sha256, referenceVersion: 2 } : {}),
         expiresAt,
       };
     });
@@ -880,6 +875,7 @@
       filename: attachment.filename,
       contentType: attachment.contentType,
       size: attachment.size,
+      ...(attachment.sha256 ? { sha256: attachment.sha256, referenceVersion: attachment.referenceVersion } : {}),
     }));
   }
 
@@ -968,8 +964,8 @@
       }
       const serialize = typeof input.serializeSendPayload === 'function'
         ? input.serializeSendPayload : JSON.stringify;
-      const attachments = Array.isArray(input.attachments) ? input.attachments : [];
-      const attachmentsMetadata = attachmentMetadataFromSelection(attachments);
+      const selection = await bindAttachmentSelection(input.attachments, options);
+      const { attachments, metadata: attachmentsMetadata, digest: attachmentDigest } = selection;
       const payloadBase = {
         ...(input.payload && typeof input.payload === 'object' ? input.payload : {}),
         ...(input.payload?.replyIdentity && typeof input.payload.replyIdentity === 'object'
@@ -1054,6 +1050,9 @@
                 { ...options, proofOnly }
               );
             } catch (error) {
+              if (attachmentsUnavailable && error?.code === 'MAILBOX_SEND_PROOF_ONLY_READY_FORBIDDEN') {
+                throw attachmentReselectError();
+              }
               if (error?.code !== 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED' || !proofOnly) throw error;
               if (!markerIsProvenPreDispatch(marker)) throw error;
               if (attachmentsUnavailable) throw attachmentReselectError();
@@ -1106,6 +1105,8 @@
               continue;
             }
 
+          if (attachmentsUnavailable) throw attachmentReselectError();
+
           const provenAttemptPayload = {
             ...attemptPayload,
             reconcileProof: marker.reconcileProof,
@@ -1113,13 +1114,13 @@
           let staging = stagingIsReusable(marker, effectiveAttachmentsMetadata, options)
             ? marker.staging : [];
           if (effectiveAttachmentsMetadata.length && !staging.length) {
-            if (typeof input.uploadAttachments !== 'function') {
-              throw attachmentReselectError();
-            }
+            if (typeof input.uploadAttachments !== 'function' || attachments.length !== effectiveAttachmentsMetadata.length || !attachmentDigest) throw attachmentReselectError();
+            await attachmentDigest.verify(attachments, effectiveAttachmentsMetadata, { crypto: getCrypto(options) });
             const uploaded = await input.uploadAttachments(attachments, {
               fetch: fetchImpl,
               payload: provenAttemptPayload,
             });
+            await attachmentDigest.verify(attachments, effectiveAttachmentsMetadata, { crypto: getCrypto(options) });
             staging = normalizeStaging(uploaded, effectiveAttachmentsMetadata, options);
             marker = patchMarker(storage, marker, { state: 'staged', staging }, options);
           }
