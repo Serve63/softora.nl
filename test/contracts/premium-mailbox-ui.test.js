@@ -18,6 +18,7 @@ const imagesScriptPath = path.join(__dirname, '../../assets/premium-mailbox-imag
 const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-refresh.js');
 const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
 const composeWindowScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-window.js');
+const composeAcceptedSendScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-accepted-send.js');
 const composeControllerScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-controller.js');
 const ownerSessionScriptPath = path.join(__dirname, '../../assets/premium-mailbox-owner-session.js');
 const toastScriptPath = path.join(__dirname, '../../assets/premium-mailbox-toast.js');
@@ -46,6 +47,7 @@ const imagesModule = require('../../assets/premium-mailbox-images.js');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const composeModule = require('../../assets/premium-mailbox-compose.js');
 const composeWindowModule = require('../../assets/premium-mailbox-compose-window.js');
+const composeAcceptedSendModule = require('../../assets/premium-mailbox-compose-accepted-send.js');
 const composeControllerModule = require('../../assets/premium-mailbox-compose-controller.js');
 const toastModule = require('../../assets/premium-mailbox-toast.js');
 const listModule = require('../../assets/premium-mailbox-list.js');
@@ -111,6 +113,10 @@ function readComposeScript() {
 
 function readComposeWindowScript() {
   return fs.readFileSync(composeWindowScriptPath, 'utf8');
+}
+
+function readComposeAcceptedSendScript() {
+  return fs.readFileSync(composeAcceptedSendScriptPath, 'utf8');
 }
 
 function readComposeControllerScript() {
@@ -190,6 +196,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260826a/);
+  assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827a/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260826a/);
@@ -199,6 +206,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260826a'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260826a') < page.indexOf('premium-mailbox-index.js?v=20260826b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827a'));
+  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827a') < page.indexOf('premium-mailbox-compose-controller.js?v=20260827a'));
+  assert.equal(typeof composeAcceptedSendModule.create, 'function');
+  assert.match(readComposeAcceptedSendScript(), /global\.SoftoraMailboxComposeAcceptedSend = api/);
   assert.match(readSignatureScript(), /renderContactCard/);
   assert.match(readMessagePresentationScript(), /getSourceSafeMessagePresentation/);
   assert.match(readDetailStabilityScript(), /function create\(\)/);
@@ -5382,7 +5393,8 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-resize-zone--ne,\.compose-resize-zone--sw \{[^}]*cursor:\s*nesw-resize;/);
   assert.doesNotMatch(pageSource, /compose-resize-grip|data-mailbox-compose-resize-handle|compose-resize-zone::/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260826b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827a/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260827a/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });

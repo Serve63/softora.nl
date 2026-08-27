@@ -757,6 +757,10 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-compose-no-drag aria-label="Sluiten"/);
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
+  const acceptedSendAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-accepted-send.js?v=20260827a');
+  const composeControllerAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-controller.js?v=20260827a');
+  assert.ok(acceptedSendAssetIndex >= 0, 'accepted-send asset ontbreekt');
+  assert.ok(acceptedSendAssetIndex < composeControllerAssetIndex, 'accepted-send state hoort vóór de controller te laden');
   assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-owner-session\.js\?v=20260826a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260818b"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260821a"><\/script><script src="assets\/premium-mailbox-detail-stability\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260826b"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260820a"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260814a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260826a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260826a"><\/script>/);
 });
 
