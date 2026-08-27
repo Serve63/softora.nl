@@ -99,7 +99,7 @@ function preflightResult(payload, status = 'ready', overrides = {}) {
     replyTargetMessageId: payload.replyIdentity?.sourceMessageId || payload.context?.messageId || '',
     references: payload.context?.references || '',
     providerThreadId: payload.providerThreadId || payload.replyIdentity?.providerThreadId || '',
-    scopeFingerprint: 'a'.repeat(64),
+    scopeFingerprint: `${payload.provider || 'smtp'}-${payload.mode}-scope:${'a'.repeat(64)}`,
     requestPayloadFingerprint: 'b'.repeat(64),
     attachmentsMetadata: payload.attachmentsMetadata || [],
   };
@@ -135,8 +135,58 @@ function parseRequest(request) {
   return JSON.parse(request.body);
 }
 
+function mutableProofRequiredResponse() {
+  return response(409, {
+    ok: false,
+    code: 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED',
+    error: 'Mailcontrole mislukt',
+    detail: 'De verzend-ID is nog niet duurzaam geregistreerd; bewijs eerst opnieuw de actuele replybron.',
+  });
+}
+
+function acceptedSendResult(label) {
+  const intentId = `send:${label}`;
+  const messageId = `<${label}@softora.nl>`;
+  return {
+    intentId,
+    messageId,
+    sentMessage: { softoraSendIntentId: intentId, messageId },
+  };
+}
+
+async function seedMarker(options = {}) {
+  const payload = options.payload || basePayload();
+  const attachmentsMetadata = options.attachmentsMetadata || [];
+  const payloadFingerprint = await resilienceModule.createPayloadFingerprint(
+    payload,
+    attachmentsMetadata,
+    { crypto: globalThis.crypto }
+  );
+  const localScopeFingerprint = await resilienceModule.createLocalScopeFingerprint(
+    payload,
+    { crypto: globalThis.crypto }
+  );
+  const proofPayload = { ...payload, attachmentsMetadata };
+  const reconcileProof = options.reconcileProof || preflightResult(proofPayload).reconcileProof;
+  return resilienceModule.compareAndSwapMarker(options.storage, {
+    version: 1,
+    idempotencyKey: payload.idempotencyKey,
+    payloadFingerprint,
+    localScopeFingerprint,
+    state: options.state || 'armed',
+    createdAt: 1,
+    updatedAt: 1,
+    staging: options.staging || [],
+    attachmentsMetadata,
+    durableIdentity: null,
+    reconcileProof,
+    ...(options.sendStartedAt === undefined ? {} : { sendStartedAt: options.sendStartedAt }),
+  }, null, { now: () => 1, randomUUID: createRandomUUID('seed') });
+}
+
 function createProtocol(options = {}) {
   return resilienceModule.create({
+    ...options,
     storage: options.storage || new MemoryStorage(),
     locks: options.locks || createLockManager(),
     fetch: options.fetch,
@@ -151,6 +201,7 @@ test('marker is verified by write/readback before preflight, upload and send', a
   const storage = new MemoryStorage();
   const events = [];
   const payload = basePayload();
+  let readyProof = null;
   const protocol = createProtocol({
     storage,
     fetch: async (url, request) => {
@@ -161,10 +212,15 @@ test('marker is verified by write/readback before preflight, upload and send', a
       assert.equal(markers[0].idempotencyKey, requestPayload.idempotencyKey);
       assert.equal(markers[0].payloadFingerprint.length, 64);
       if (url.endsWith('/preflight')) {
-        return response(200, { ok: true, result: preflightResult(requestPayload) });
+        const result = preflightResult(requestPayload);
+        readyProof = result.reconcileProof;
+        return response(200, { ok: true, result });
       }
       assert.equal(markers[0].state, 'dispatching');
-      return response(200, { ok: true, result: { intentId: 'send:durable-first' } });
+      assert.deepEqual(requestPayload.reconcileProof, readyProof);
+      assert.equal(requestPayload.reconcileProof.idempotencyKey, requestPayload.idempotencyKey);
+      assert.deepEqual(requestPayload.reconcileProof.attachmentsMetadata, requestPayload.attachmentsMetadata);
+      return response(200, { ok: true, result: acceptedSendResult('durable-first') });
     },
   });
 
@@ -275,7 +331,7 @@ test('twee tabbladen delen de volledige Web Lock-flow en starten extern maar é�
     sendStartedResolve();
     await sendGate;
     accepted = true;
-    return response(200, { ok: true, result: { intentId: 'send:one-external-effect' } });
+    return response(200, { ok: true, result: acceptedSendResult('one-external-effect') });
   };
   const firstTab = createProtocol({ storage, locks, fetch, randomUUID: createRandomUUID('tab-a') });
   const secondTab = createProtocol({ storage, locks, fetch, randomUUID: createRandomUUID('tab-b') });
@@ -344,7 +400,7 @@ test('failed roteert naar een nieuw key die vóór upload opnieuw wordt opgeslag
           result: preflightResult(payload, preflightCalls === 1 ? 'failed' : 'ready'),
         });
       }
-      return response(200, { ok: true, result: { intentId: 'send:rotated' } });
+      return response(200, { ok: true, result: acceptedSendResult('rotated') });
     },
   });
   const result = await protocol.execute({
@@ -373,21 +429,47 @@ test('failed roteert naar een nieuw key die vóór upload opnieuw wordt opgeslag
   ]);
 });
 
-test('staging ouder dan dertig minuten wordt na preflight opnieuw geupload', async () => {
+test('verlopen pre-dispatch staging doet proof-only row-missing, behoudt de key en uploadt opnieuw', async () => {
   const storage = new MemoryStorage();
   const locks = createLockManager();
-  let now = 0;
+  let now = 31 * 60 * 1000;
   let uploadCalls = 0;
   let sendCalls = 0;
   const file = { filename: 'foto.png', contentType: 'image/png', size: 3, file: {} };
+  const payload = basePayload({ idempotencyKey: 'browser:staged-before-send' });
+  const metadata = [{ filename: file.filename, contentType: file.contentType, size: file.size }];
+  await seedMarker({
+    storage,
+    payload,
+    attachmentsMetadata: metadata,
+    state: 'staged',
+    staging: [{
+      reference: 'expired-opaque-reference',
+      filename: file.filename,
+      contentType: file.contentType,
+      size: file.size,
+      expiresAt: 30 * 60 * 1000,
+    }],
+  });
+  let preflightCalls = 0;
   const fetch = async (url, request) => {
-    const payload = parseRequest(request);
+    const requestPayload = parseRequest(request);
     if (url.endsWith('/preflight')) {
-      return response(200, { ok: true, result: preflightResult(payload) });
+      preflightCalls += 1;
+      if (preflightCalls === 1) {
+        assert.deepEqual(Object.keys(requestPayload).sort(), ['idempotencyKey', 'reconcileProof']);
+        return mutableProofRequiredResponse();
+      }
+      assert.equal('body' in requestPayload, true);
+      assert.equal(requestPayload.idempotencyKey, payload.idempotencyKey);
+      assert.deepEqual(requestPayload.reconcileProof, resilienceModule.readMarker(
+        storage,
+        payload.idempotencyKey
+      ).reconcileProof);
+      return response(200, { ok: true, result: preflightResult(requestPayload) });
     }
     sendCalls += 1;
-    if (sendCalls === 1) throw new Error('request bereikte server niet');
-    return response(200, { ok: true, result: { messageId: '<restaged@softora.nl>' } });
+    return response(200, { ok: true, result: acceptedSendResult('restaged') });
   };
   const uploadAttachments = async () => {
     uploadCalls += 1;
@@ -399,18 +481,119 @@ test('staging ouder dan dertig minuten wordt na preflight opnieuw geupload', asy
       expiresAt: now + 30 * 60 * 1000,
     }];
   };
-  const first = createProtocol({ storage, locks, fetch, now: () => now });
-  await assert.rejects(first.execute({
-    payload: basePayload(), attachments: [file], uploadAttachments,
-  }), /bereikte server niet/);
-  now = 31 * 60 * 1000;
   const retry = createProtocol({ storage, locks, fetch, now: () => now });
   const result = await retry.execute({
-    payload: basePayload({ idempotencyKey: 'browser:reload' }), attachments: [file], uploadAttachments,
+    payload: basePayload({ idempotencyKey: 'browser:reload' }),
+    attachments: [file],
+    uploadAttachments,
   });
   assert.equal(result.result.messageId, '<restaged@softora.nl>');
-  assert.equal(uploadCalls, 2);
-  assert.equal(result.attachments[0].reference, 'opaque-reference-2');
+  assert.equal(preflightCalls, 2);
+  assert.equal(uploadCalls, 1);
+  assert.equal(sendCalls, 1);
+  assert.equal(result.attachments[0].reference, 'opaque-reference-1');
+  assert.equal(resilienceModule.readMarker(storage, payload.idempotencyKey).state, 'accepted');
+});
+
+test('na ready-proof kan verwisselde bijlagemetadata nooit staging of send bereiken', async () => {
+  const storage = new MemoryStorage();
+  const file = { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, file: {} };
+  let sendCalls = 0;
+  const protocol = createProtocol({
+    storage,
+    now: () => 100,
+    fetch: async (url, request) => {
+      const payload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        return response(200, { ok: true, result: preflightResult(payload) });
+      }
+      sendCalls += 1;
+      throw new Error('send mag niet starten');
+    },
+  });
+  await assert.rejects(protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:swapped-attachment' }),
+    attachments: [file],
+    uploadAttachments: async () => [{
+      reference: 'opaque-swapped', filename: 'ander.pdf', contentType: file.contentType,
+      size: file.size, expiresAt: 60 * 60 * 1000,
+    }],
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_STAGING_INVALID');
+  assert.equal(sendCalls, 0);
+  const marker = resilienceModule.listMarkers(storage)[0];
+  assert.equal(marker.state, 'armed');
+  assert.deepEqual(marker.attachmentsMetadata, [{
+    filename: file.filename, contentType: file.contentType, size: file.size,
+  }]);
+  assert.ok(marker.reconcileProof);
+});
+
+test('lege opgeslagen bijlagemetadata met een bewezen bestand is corrupte state en stopt vóór netwerk', async () => {
+  const storage = new MemoryStorage();
+  const metadata = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
+  const payload = basePayload({ idempotencyKey: 'browser:asymmetric-attachments' });
+  const marker = await seedMarker({ storage, payload, attachmentsMetadata: metadata });
+  resilienceModule.compareAndSwapMarker(storage, {
+    ...marker,
+    attachmentsMetadata: [],
+  }, marker.casToken, { now: () => 2, randomUUID: createRandomUUID('asymmetric') });
+  let networkCalls = 0;
+  const protocol = createProtocol({
+    storage,
+    fetch: async () => {
+      networkCalls += 1;
+      throw new Error('netwerk mag niet starten');
+    },
+  });
+  await assert.rejects(protocol.execute({
+    payload,
+    attachments: [],
+  }), (error) => error.code === 'MAILBOX_SEND_DURABLE_STATE_CORRUPT');
+  assert.equal(networkCalls, 0);
+});
+
+test('bestaande gevraagde marker wordt nooit vervangen door een andere unieke bijlagefallback', async () => {
+  const storage = new MemoryStorage();
+  const requestedPayload = basePayload({ idempotencyKey: 'browser:requested-existing' });
+  const fallbackPayload = basePayload({ idempotencyKey: 'browser:other-fallback' });
+  const metadata = [{ filename: 'ander.pdf', contentType: 'application/pdf', size: 4 }];
+  await seedMarker({ storage, payload: requestedPayload, attachmentsMetadata: [] });
+  await seedMarker({ storage, payload: fallbackPayload, attachmentsMetadata: metadata });
+  let networkCalls = 0;
+  const protocol = createProtocol({
+    storage,
+    fetch: async () => {
+      networkCalls += 1;
+      throw new Error('netwerk mag niet starten');
+    },
+  });
+  await assert.rejects(protocol.execute({
+    payload: requestedPayload,
+    attachments: [],
+  }), (error) => error.code === 'MAILBOX_SEND_DURABLE_STATE_PAYLOAD_MISMATCH');
+  assert.equal(networkCalls, 0);
+  assert.equal(resilienceModule.listMarkers(storage).length, 2);
+});
+
+test('bijlagechip zonder lokale bestandsbytes eist herselectie vóór preflight of upload', async () => {
+  let networkCalls = 0;
+  let uploadCalls = 0;
+  const protocol = createProtocol({
+    fetch: async () => {
+      networkCalls += 1;
+      throw new Error('netwerk mag niet starten');
+    },
+  });
+  await assert.rejects(protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:missing-file-bytes' }),
+    attachments: [{ filename: 'chip.pdf', contentType: 'application/pdf', size: 4 }],
+    uploadAttachments: async () => {
+      uploadCalls += 1;
+      return [];
+    },
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_RESELECT_REQUIRED');
+  assert.equal(networkCalls, 0);
+  assert.equal(uploadCalls, 0);
 });
 
 test('malformed preflightvarianten stoppen allemaal vóór upload en send', async (t) => {
@@ -425,8 +608,38 @@ test('malformed preflightvarianten stoppen allemaal vóór upload en send', asyn
     'verkeerde mode': (result) => { result.mode = 'new-message'; },
     'verkeerde opaque conversation': (result) => { result.conversationId = 'conversation:casesensitive'; },
     'verkeerd replydoel': (result) => { result.replyTargetMessageId = '<other@example.nl>'; },
+    'scope zonder provider-mode-prefix': (result) => {
+      result.reconcileProof.scopeFingerprint = 'a'.repeat(64);
+    },
+    'scope met verkeerde mode-prefix': (result) => {
+      result.reconcileProof.scopeFingerprint = `smtp-new-message-scope:${'a'.repeat(64)}`;
+    },
+    'scope met hoofdletterhex': (result) => {
+      result.reconcileProof.scopeFingerprint = `smtp-reply-scope:${'A'.repeat(64)}`;
+    },
+    'requesthash met hoofdletterhex': (result) => {
+      result.reconcileProof.requestPayloadFingerprint = 'B'.repeat(64);
+    },
+    'references met case-drift': (result) => {
+      result.reconcileProof.references = '<root.case@example.nl> <inbound.case@example.nl>';
+    },
     'accepted zonder identiteit': (result) => {
       result.status = 'accepted'; result.reservationReady = false; result.acceptedResult = {};
+    },
+    'accepted met alleen intent': (result) => {
+      result.status = 'accepted'; result.reservationReady = false;
+      result.acceptedResult = { intentId: 'send:intent-only' };
+    },
+    'accepted met alleen message': (result) => {
+      result.status = 'accepted'; result.reservationReady = false;
+      result.acceptedResult = { messageId: '<message-only@softora.nl>' };
+    },
+    'accepted met strijdige intent IDs': (result) => {
+      result.status = 'accepted'; result.reservationReady = false;
+      result.acceptedResult = {
+        intentId: 'send:one', messageId: '<accepted@softora.nl>',
+        sentMessage: { softoraSendIntentId: 'send:two', messageId: '<accepted@softora.nl>' },
+      };
     },
   };
   for (const [label, mutate] of Object.entries(variants)) {
@@ -468,6 +681,44 @@ test('HTTP 200 zonder duurzame intent-, message- of provider-ID is nooit succes'
   );
   assert.equal(sendCalls, 1);
   assert.equal(resilienceModule.listMarkers(storage)[0].state, 'dispatching');
+});
+
+test('HTTP 200 vereist exact ok true en twee onderling consistente duurzame identiteiten', async (t) => {
+  const valid = acceptedSendResult('strict-success');
+  const variants = {
+    'ok ontbreekt': { result: valid },
+    'ok is string': { ok: 'true', result: valid },
+    'alleen intent': { ok: true, result: { intentId: valid.intentId } },
+    'alleen message': { ok: true, result: { messageId: valid.messageId } },
+    'strijdige intent': {
+      ok: true,
+      result: { ...valid, sentMessage: { ...valid.sentMessage, softoraSendIntentId: 'send:other' } },
+    },
+    'strijdige message': {
+      ok: true,
+      result: { ...valid, sentMessage: { ...valid.sentMessage, messageId: '<other@softora.nl>' } },
+    },
+  };
+  for (const [label, sendBody] of Object.entries(variants)) {
+    await t.test(label, async () => {
+      const storage = new MemoryStorage();
+      let sendCalls = 0;
+      const protocol = createProtocol({
+        storage,
+        fetch: async (url, request) => {
+          const payload = parseRequest(request);
+          if (url.endsWith('/preflight')) {
+            return response(200, { ok: true, result: preflightResult(payload) });
+          }
+          sendCalls += 1;
+          return response(200, sendBody);
+        },
+      });
+      await assert.rejects(protocol.execute({ payload: basePayload(), attachments: [] }));
+      assert.equal(sendCalls, 1);
+      assert.equal(resilienceModule.listMarkers(storage)[0].state, 'dispatching');
+    });
+  }
 });
 
 test('alleen een numerieke HTTP 200 kan send-succes zijn en elke andere 2xx reconcileert zonder resend', async (t) => {
@@ -578,21 +829,167 @@ test('sendtimeout blijft unresolved en een retry doet uitsluitend proof-reconcil
   assert.deepEqual(Object.keys(retryPayload).sort(), ['idempotencyKey', 'reconcileProof']);
 });
 
-test('een Softora identity-header is voldoende bij verloren responsebody', async () => {
+test('preflightdeadline omvat een hangende JSON-body, abort en geeft de Web Lock vrij', async () => {
+  const storage = new MemoryStorage();
+  const locks = createLockManager();
+  let phase = 'hanging-preflight-body';
+  let abortCalls = 0;
+  let sendCalls = 0;
+  class TrackingAbortController extends AbortController {
+    abort() {
+      abortCalls += 1;
+      return super.abort();
+    }
+  }
   const protocol = createProtocol({
+    storage,
+    locks,
+    preflightDeadlineMs: 5,
+    AbortController: TrackingAbortController,
+    setTimeout: (callback, delay) => setTimeout(callback, delay),
+    clearTimeout: (timer) => clearTimeout(timer),
     fetch: async (url, request) => {
       const payload = parseRequest(request);
       if (url.endsWith('/preflight')) {
+        if (phase === 'hanging-preflight-body') {
+          return { status: 200, ok: true, json: () => new Promise(() => {}) };
+        }
         return response(200, { ok: true, result: preflightResult(payload) });
       }
-      return response(200, new SyntaxError('afgekapt JSON'), {
-        'X-Softora-Send-Intent-Id': 'send:header-proof',
-      });
+      sendCalls += 1;
+      return response(200, { ok: true, result: acceptedSendResult('after-preflight-timeout') });
     },
   });
-  const result = await protocol.execute({ payload: basePayload(), attachments: [] });
-  assert.equal(result.result.intentId, undefined);
-  assert.equal(result.recoveredByPreflight, false);
+  await assert.rejects(
+    protocol.execute({ payload: basePayload(), attachments: [] }),
+    (error) => error.code === 'MAILBOX_SEND_PREFLIGHT_TIMEOUT' && error.retryable === true
+  );
+  assert.equal(abortCalls, 1);
+  assert.equal(sendCalls, 0);
+  assert.equal(resilienceModule.listMarkers(storage)[0].state, 'armed');
+  assert.equal(resilienceModule.listMarkers(storage)[0].reconcileProof, null);
+
+  phase = 'healthy';
+  const completed = await protocol.execute({ payload: basePayload(), attachments: [] });
+  assert.equal(completed.result.intentId, 'send:after-preflight-timeout');
+  assert.equal(sendCalls, 1);
+});
+
+test('senddeadline houdt dispatching en proof vast, row-missing resendt nooit en accepted herstelt later', async () => {
+  const storage = new MemoryStorage();
+  const locks = createLockManager();
+  const file = { filename: 'deadline.pdf', contentType: 'application/pdf', size: 4, file: {} };
+  let phase = 'hanging-send-body';
+  let abortCalls = 0;
+  let uploadCalls = 0;
+  let sendCalls = 0;
+  let providerStarts = 0;
+  const proofOnlyPayloads = [];
+  class TrackingAbortController extends AbortController {
+    abort() {
+      abortCalls += 1;
+      return super.abort();
+    }
+  }
+  const protocol = createProtocol({
+    storage,
+    locks,
+    now: () => 100,
+    sendDeadlineMs: 5,
+    AbortController: TrackingAbortController,
+    setTimeout: (callback, delay) => setTimeout(callback, delay),
+    clearTimeout: (timer) => clearTimeout(timer),
+    fetch: async (url, request) => {
+      const payload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        if (phase === 'hanging-send-body') {
+          return response(200, { ok: true, result: preflightResult(payload) });
+        }
+        proofOnlyPayloads.push(payload);
+        if (phase === 'row-missing') return mutableProofRequiredResponse();
+        return response(200, { ok: true, result: preflightResult(payload, 'accepted') });
+      }
+      sendCalls += 1;
+      providerStarts += 1;
+      return { status: 200, ok: true, json: () => new Promise(() => {}) };
+    },
+  });
+  await assert.rejects(protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:send-deadline' }),
+    attachments: [file],
+    uploadAttachments: async () => {
+      uploadCalls += 1;
+      return [{
+        reference: 'opaque-deadline', filename: file.filename, contentType: file.contentType,
+        size: file.size, expiresAt: 60 * 60 * 1000,
+      }];
+    },
+  }), (error) => error.code === 'MAILBOX_SEND_TIMEOUT' && error.retryable === true);
+  const afterTimeout = resilienceModule.listMarkers(storage)[0];
+  const durableProof = JSON.stringify(afterTimeout.reconcileProof);
+  assert.equal(afterTimeout.state, 'dispatching');
+  assert.equal(abortCalls, 1);
+  assert.equal(uploadCalls, 1);
+  assert.equal(sendCalls, 1);
+  assert.equal(providerStarts, 1);
+
+  phase = 'row-missing';
+  await assert.rejects(protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:send-deadline-reload' }),
+    attachments: [],
+  }), (error) => error.code === 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED');
+  assert.equal(JSON.stringify(resilienceModule.listMarkers(storage)[0].reconcileProof), durableProof);
+  assert.equal(resilienceModule.listMarkers(storage)[0].state, 'dispatching');
+  assert.equal(uploadCalls, 1);
+  assert.equal(sendCalls, 1);
+  assert.equal(providerStarts, 1);
+
+  phase = 'accepted';
+  const recovered = await protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:send-deadline-later' }),
+    attachments: [],
+  });
+  assert.equal(recovered.recoveredByPreflight, true);
+  assert.equal(recovered.attachments[0].reference, 'opaque-deadline');
+  assert.equal(uploadCalls, 1);
+  assert.equal(sendCalls, 1);
+  assert.equal(providerStarts, 1);
+  assert.equal(proofOnlyPayloads.length, 2);
+  assert.ok(proofOnlyPayloads.every((payload) => (
+    Object.keys(payload).sort().join(',') === 'idempotencyKey,reconcileProof'
+  )));
+});
+
+test('identity-headers zonder exacte successbody blijven dispatching en herstellen alleen via preflight', async () => {
+  const storage = new MemoryStorage();
+  const locks = createLockManager();
+  let accepted = false;
+  let sendCalls = 0;
+  const fetch = async (url, request) => {
+    const payload = parseRequest(request);
+    if (url.endsWith('/preflight')) {
+      return response(200, {
+        ok: true,
+        result: preflightResult(payload, accepted ? 'accepted' : 'ready'),
+      });
+    }
+    sendCalls += 1;
+    accepted = true;
+    return response(200, new SyntaxError('afgekapt JSON'), {
+      'X-Softora-Send-Intent-Id': 'send:header-proof',
+      'X-Softora-Message-Id': '<header-proof@softora.nl>',
+    });
+  };
+  const first = createProtocol({ storage, locks, fetch });
+  await assert.rejects(first.execute({ payload: basePayload(), attachments: [] }));
+  assert.equal(resilienceModule.listMarkers(storage)[0].state, 'dispatching');
+  const retry = createProtocol({ storage, locks, fetch });
+  const recovered = await retry.execute({
+    payload: basePayload({ idempotencyKey: 'browser:header-proof-retry' }),
+    attachments: [],
+  });
+  assert.equal(recovered.recoveredByPreflight, true);
+  assert.equal(sendCalls, 1);
 });
 
 test('meer dan twintig oude unresolved markers verdwijnen nooit door leeftijd of resolved-limiet', () => {
@@ -645,35 +1042,279 @@ test('keygebonden CAS weigert een verouderd token zonder de marker te wijzigen',
   assert.equal(resilienceModule.readMarker(storage, 'browser:cas').state, 'staged');
 });
 
-test('reload zonder eerder gekozen bijlage kan een unresolved send niet als nieuwe lege send omzeilen', async () => {
+test('reload zonder bijlage herstelt accepted en blokkeert processing uitsluitend via proof-only', async (t) => {
+  for (const status of ['accepted', 'processing']) {
+    await t.test(status, async () => {
+      const storage = new MemoryStorage();
+      const file = { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, file: {} };
+      const metadata = [{ filename: file.filename, contentType: file.contentType, size: file.size }];
+      const payload = basePayload({ idempotencyKey: `browser:missing-${status}` });
+      await seedMarker({
+        storage,
+        payload,
+        attachmentsMetadata: metadata,
+        state: 'dispatching',
+        sendStartedAt: 10,
+        staging: [{
+          reference: `opaque-${status}`,
+          filename: file.filename,
+          contentType: file.contentType,
+          size: file.size,
+          expiresAt: 60 * 60 * 1000,
+        }],
+      });
+      const calls = [];
+      const protocol = createProtocol({
+        storage,
+        now: () => 100,
+        fetch: async (url, request) => {
+          calls.push({ url, payload: parseRequest(request) });
+          assert.equal(url, '/api/mailbox/send/preflight');
+          const proofPayload = parseRequest(request);
+          return response(200, {
+            ok: true,
+            result: preflightResult(proofPayload, status),
+          });
+        },
+      });
+      const execution = protocol.execute({
+        payload: basePayload({ idempotencyKey: `browser:reload-${status}` }),
+        attachments: [],
+      });
+      if (status === 'accepted') {
+        const recovered = await execution;
+        assert.equal(recovered.recoveredByPreflight, true);
+        assert.equal(recovered.attachments[0].reference, `opaque-${status}`);
+        assert.equal(resilienceModule.readMarker(storage, payload.idempotencyKey).state, 'accepted');
+      } else {
+        await assert.rejects(execution, (error) => error.code === 'MAILBOX_SEND_ALREADY_PROCESSING');
+        assert.equal(resilienceModule.readMarker(storage, payload.idempotencyKey).state, 'processing');
+      }
+      assert.equal(calls.length, 1);
+      assert.deepEqual(Object.keys(calls[0].payload).sort(), ['idempotencyKey', 'reconcileProof']);
+    });
+  }
+});
+
+test('durable failed met verloren bijlage roteert key maar eist herselectie vóór een nieuwe send', async () => {
   const storage = new MemoryStorage();
-  const locks = createLockManager();
-  let fetchCalls = 0;
   const file = { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, file: {} };
-  const fetch = async (url, request) => {
-    fetchCalls += 1;
-    const payload = parseRequest(request);
-    if (url.endsWith('/preflight')) {
-      return response(200, { ok: true, result: preflightResult(payload) });
-    }
-    throw new Error('onzekere requestuitkomst');
-  };
-  const protocol = createProtocol({ storage, locks, fetch, now: () => 0 });
+  const metadata = [{ filename: file.filename, contentType: file.contentType, size: file.size }];
+  const payload = basePayload({ idempotencyKey: 'browser:missing-failed' });
+  await seedMarker({
+    storage,
+    payload,
+    attachmentsMetadata: metadata,
+    state: 'dispatching',
+    sendStartedAt: 10,
+    staging: [{
+      reference: 'opaque-failed', filename: file.filename, contentType: file.contentType,
+      size: file.size, expiresAt: 60 * 60 * 1000,
+    }],
+  });
+  let phase = 'reconcile-failed';
+  let sendCalls = 0;
+  let uploadCalls = 0;
+  let nextKey = '';
+  const protocol = createProtocol({
+    storage,
+    now: () => 100,
+    randomUUID: createRandomUUID('failed-reselect'),
+    fetch: async (url, request) => {
+      const requestPayload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        if (phase === 'reconcile-failed') {
+          assert.deepEqual(Object.keys(requestPayload).sort(), ['idempotencyKey', 'reconcileProof']);
+          phase = 'fresh-preflight';
+          return response(200, { ok: true, result: preflightResult(requestPayload, 'failed') });
+        }
+        assert.equal(requestPayload.idempotencyKey, nextKey);
+        return response(200, { ok: true, result: preflightResult(requestPayload) });
+      }
+      sendCalls += 1;
+      return response(200, { ok: true, result: acceptedSendResult('failed-reselected') });
+    },
+  });
   await assert.rejects(protocol.execute({
-    payload: basePayload(),
+    payload: basePayload({ idempotencyKey: 'browser:reload-failed' }),
+    attachments: [],
+    onIdempotencyKey: (value) => { nextKey = value; },
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_RESELECT_REQUIRED');
+  assert.notEqual(nextKey, payload.idempotencyKey);
+  assert.equal(sendCalls, 0);
+  assert.equal(resilienceModule.readMarker(storage, payload.idempotencyKey).state, 'failed');
+  assert.equal(resilienceModule.readMarker(storage, nextKey).state, 'armed');
+
+  const sent = await protocol.execute({
+    payload: basePayload({ idempotencyKey: nextKey }),
+    attachments: [file],
+    uploadAttachments: async () => {
+      uploadCalls += 1;
+      return [{
+        reference: 'opaque-reselected', filename: file.filename, contentType: file.contentType,
+        size: file.size, expiresAt: 60 * 60 * 1000,
+      }];
+    },
+  });
+  assert.equal(sent.idempotencyKey, nextKey);
+  assert.equal(uploadCalls, 1);
+  assert.equal(sendCalls, 1);
+});
+
+test('row-missing vóór send behoudt dezelfde key maar verstuurt na reload nooit zonder herselecteerde bijlage', async () => {
+  const storage = new MemoryStorage();
+  const file = { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, file: {} };
+  const metadata = [{ filename: file.filename, contentType: file.contentType, size: file.size }];
+  const payload = basePayload({ idempotencyKey: 'browser:staged-row-missing' });
+  await seedMarker({
+    storage,
+    payload,
+    attachmentsMetadata: metadata,
+    state: 'staged',
+    staging: [{
+      reference: 'opaque-before-reload', filename: file.filename, contentType: file.contentType,
+      size: file.size, expiresAt: 60 * 60 * 1000,
+    }],
+  });
+  let nextKey = '';
+  let preflightCalls = 0;
+  let sendCalls = 0;
+  const protocol = createProtocol({
+    storage,
+    now: () => 100,
+    fetch: async (url, request) => {
+      const requestPayload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        preflightCalls += 1;
+        if (Object.keys(requestPayload).length === 2) return mutableProofRequiredResponse();
+        assert.equal(requestPayload.idempotencyKey, nextKey);
+        assert.equal('body' in requestPayload, true);
+        return response(200, { ok: true, result: preflightResult(requestPayload) });
+      }
+      sendCalls += 1;
+      return response(200, { ok: true, result: acceptedSendResult('row-missing-reselected') });
+    },
+  });
+  await assert.rejects(protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:reload-row-missing' }),
+    attachments: [],
+    onIdempotencyKey: (value) => { nextKey = value; },
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_RESELECT_REQUIRED');
+  assert.equal(preflightCalls, 1);
+  assert.equal(sendCalls, 0);
+  assert.equal(nextKey, payload.idempotencyKey);
+
+  await protocol.execute({
+    payload: basePayload({ idempotencyKey: nextKey }),
     attachments: [file],
     uploadAttachments: async () => [{
-      reference: 'opaque-proof', filename: file.filename, contentType: file.contentType,
-      size: file.size, expiresAt: 30 * 60 * 1000,
+      reference: 'opaque-after-reselect', filename: file.filename, contentType: file.contentType,
+      size: file.size, expiresAt: 60 * 60 * 1000,
     }],
-  }), /onzekere requestuitkomst/);
-  assert.equal(fetchCalls, 2);
+  });
+  assert.equal(preflightCalls, 3);
+  assert.equal(sendCalls, 1);
+});
 
-  await assert.rejects(protocol.execute({
-    payload: basePayload({ idempotencyKey: 'browser:lost-file-after-reload' }),
-    attachments: [],
-  }), (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
-  assert.equal(fetchCalls, 2);
+test('row-missing na dispatching blijft bij elke retry proof-only en start nooit een extra send', async () => {
+  const storage = new MemoryStorage();
+  const file = { filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, file: {} };
+  const metadata = [{ filename: file.filename, contentType: file.contentType, size: file.size }];
+  const payload = basePayload({ idempotencyKey: 'browser:dispatching-row-missing' });
+  await seedMarker({
+    storage,
+    payload,
+    attachmentsMetadata: metadata,
+    state: 'dispatching',
+    sendStartedAt: 10,
+    staging: [{
+      reference: 'opaque-dispatching', filename: file.filename, contentType: file.contentType,
+      size: file.size, expiresAt: 60 * 60 * 1000,
+    }],
+  });
+  const calls = [];
+  const protocol = createProtocol({
+    storage,
+    fetch: async (url, request) => {
+      calls.push({ url, payload: parseRequest(request) });
+      assert.equal(url, '/api/mailbox/send/preflight');
+      return mutableProofRequiredResponse();
+    },
+  });
+  for (let retry = 0; retry < 2; retry += 1) {
+    await assert.rejects(protocol.execute({
+      payload: basePayload({ idempotencyKey: `browser:dispatching-retry-${retry}` }),
+      attachments: [],
+    }), (error) => error.code === 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED');
+  }
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => Object.keys(call.payload).sort().join(',') === 'idempotencyKey,reconcileProof'));
+  assert.equal(resilienceModule.listMarkers(storage).length, 1);
+  assert.equal(resilienceModule.readMarker(storage, payload.idempotencyKey).state, 'dispatching');
+});
+
+test('uploadplan- en PUT-timeout vóór send herstellen via row-missing naar exact één send', async (t) => {
+  for (const failurePoint of ['uploadplan', 'PUT']) {
+    await t.test(failurePoint, async () => {
+      const storage = new MemoryStorage();
+      const file = { filename: `${failurePoint}.pdf`, contentType: 'application/pdf', size: 4, file: {} };
+      const events = [];
+      let fullPreflights = 0;
+      let uploadCalls = 0;
+      let sendCalls = 0;
+      const protocol = createProtocol({
+        storage,
+        randomUUID: createRandomUUID(failurePoint),
+        now: () => 100,
+        fetch: async (url, request) => {
+          const requestPayload = parseRequest(request);
+          if (url.endsWith('/preflight')) {
+            if (Object.keys(requestPayload).length === 2) {
+              events.push('proof-only-row-missing');
+              return mutableProofRequiredResponse();
+            }
+            fullPreflights += 1;
+            events.push(`full-preflight-${fullPreflights}`);
+            return response(200, { ok: true, result: preflightResult(requestPayload) });
+          }
+          sendCalls += 1;
+          events.push('send');
+          return response(200, { ok: true, result: acceptedSendResult(`${failurePoint}-recovered`) });
+        },
+      });
+      const uploadAttachments = async () => {
+        uploadCalls += 1;
+        events.push(`${failurePoint}-${uploadCalls}`);
+        if (uploadCalls === 1) {
+          const error = new Error(`${failurePoint} timed out`);
+          error.name = 'AbortError';
+          throw error;
+        }
+        return [{
+          reference: `opaque-${failurePoint}`, filename: file.filename, contentType: file.contentType,
+          size: file.size, expiresAt: 60 * 60 * 1000,
+        }];
+      };
+      await assert.rejects(protocol.execute({
+        payload: basePayload({ idempotencyKey: `browser:${failurePoint}` }),
+        attachments: [file],
+        uploadAttachments,
+      }), (error) => error.name === 'AbortError');
+      assert.equal(sendCalls, 0);
+      assert.equal(resilienceModule.listMarkers(storage)[0].state, 'armed');
+
+      await protocol.execute({
+        payload: basePayload({ idempotencyKey: `browser:${failurePoint}-reload` }),
+        attachments: [file],
+        uploadAttachments,
+      });
+      assert.deepEqual(events, [
+        'full-preflight-1', `${failurePoint}-1`, 'proof-only-row-missing',
+        'full-preflight-2', `${failurePoint}-2`, 'send',
+      ]);
+      assert.equal(sendCalls, 1);
+    });
+  }
 });
 
 test('controller houdt één immutable draft door preflight upload send en accepted kaart en sluit geen nieuwe composer', async () => {

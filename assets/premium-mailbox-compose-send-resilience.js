@@ -8,8 +8,11 @@
   const MAX_RESOLVED_MARKERS = 20;
   const MIN_STAGING_VALIDITY_MS = 30_000;
   const MAX_FAILED_KEY_ROTATIONS = 2;
+  const PREFLIGHT_DEADLINE_MS = 15_000;
+  const SEND_DEADLINE_MS = 45_000;
   const MARKER_STATES = new Set(['armed', 'staged', 'dispatching', 'processing', 'accepted', 'failed']);
   const UNRESOLVED_STATES = new Set(['armed', 'staged', 'dispatching', 'processing']);
+  const PROVEN_PRE_DISPATCH_STATES = new Set(['armed', 'staged']);
 
   function normalize(value) {
     return String(value || '').trim().toLowerCase();
@@ -96,6 +99,9 @@
       );
     }
     const key = normalizeText(marker?.idempotencyKey);
+    const markerMetadata = Object.prototype.hasOwnProperty.call(marker || {}, 'attachmentsMetadata')
+      ? normalizeAttachmentMetadata(marker.attachmentsMetadata)
+      : [];
     const valid = marker
       && marker.version === MARKER_VERSION
       && key
@@ -106,6 +112,7 @@
       && MARKER_STATES.has(normalizeText(marker.state))
       && Number.isFinite(Number(marker.createdAt))
       && Number.isFinite(Number(marker.updatedAt))
+      && markerMetadata !== null
       && (marker.reconcileProof == null || typeof marker.reconcileProof === 'object');
     if (!valid) {
       throw createProtocolError(
@@ -113,7 +120,7 @@
         'De veilige verzendstatus is ongeldig; de mail is niet verzonden.'
       );
     }
-    return marker;
+    return { ...marker, attachmentsMetadata: markerMetadata };
   }
 
   function readMarker(storage, idempotencyKey) {
@@ -242,7 +249,11 @@
   }
 
   function attachmentMetadataFromSelection(attachments) {
-    const metadata = (Array.isArray(attachments) ? attachments : []).map((attachment) => ({
+    const selected = Array.isArray(attachments) ? attachments : [];
+    if (selected.some((attachment) => !attachment?.file)) {
+      throw attachmentReselectError();
+    }
+    const metadata = selected.map((attachment) => ({
       filename: attachment?.filename || attachment?.name,
       contentType: attachment?.contentType || attachment?.type,
       size: attachment?.size,
@@ -329,7 +340,13 @@
     }), options);
   }
 
-  function createMarker(idempotencyKey, payloadFingerprint, localScopeFingerprint, options = {}) {
+  function createMarker(
+    idempotencyKey,
+    payloadFingerprint,
+    localScopeFingerprint,
+    attachmentsMetadata,
+    options = {}
+  ) {
     const now = getNow(options);
     return compareAndSwapMarker(getStorage(options), {
       version: MARKER_VERSION,
@@ -340,6 +357,7 @@
       createdAt: now,
       updatedAt: now,
       staging: [],
+      attachmentsMetadata,
       durableIdentity: null,
       reconcileProof: null,
     }, null, options);
@@ -349,7 +367,14 @@
     return compareAndSwapMarker(storage, { ...marker, ...patch }, marker.casToken, options);
   }
 
-  function selectMarker(storage, requestedKey, payloadFingerprint, localScopeFingerprint, options = {}) {
+  function selectMarker(
+    storage,
+    requestedKey,
+    payloadFingerprint,
+    localScopeFingerprint,
+    attachmentsMetadata,
+    options = {}
+  ) {
     const requested = normalizeText(requestedKey);
     if (requested) {
       const exact = readMarker(storage, requested);
@@ -388,7 +413,79 @@
       .sort((left, right) => Number(right.updatedAt) - Number(left.updatedAt));
     if (recentAccepted.length) return recentAccepted[0];
     const idempotencyKey = requested || `browser:${getRandomToken(options)}`;
-    return createMarker(idempotencyKey, payloadFingerprint, localScopeFingerprint, options);
+    return createMarker(
+      idempotencyKey,
+      payloadFingerprint,
+      localScopeFingerprint,
+      attachmentsMetadata,
+      options
+    );
+  }
+
+  function markerAttachmentMetadata(marker) {
+    const stored = normalizeAttachmentMetadata(marker?.attachmentsMetadata);
+    const proof = marker?.reconcileProof && typeof marker.reconcileProof === 'object'
+      ? normalizeAttachmentMetadata(marker.reconcileProof.attachmentsMetadata)
+      : null;
+    if (stored === null || proof === null && marker?.reconcileProof) {
+      throw createProtocolError(
+        'MAILBOX_SEND_DURABLE_STATE_CORRUPT',
+        'De veilige bijlagestatus is ongeldig; de mail is niet verzonden.'
+      );
+    }
+    if (proof && !attachmentMetadataEqual(proof, stored)) {
+      throw createProtocolError(
+        'MAILBOX_SEND_DURABLE_STATE_CORRUPT',
+        'Het duurzame verzendbewijs wijkt af van de bewaarde bijlagestatus; de mail is niet verzonden.'
+      );
+    }
+    return proof || stored || [];
+  }
+
+  async function findMissingAttachmentMarker(
+    storage,
+    payload,
+    currentMetadata,
+    localScopeFingerprint,
+    options = {}
+  ) {
+    if (currentMetadata.length) return null;
+    const requestedKey = normalizeText(payload?.idempotencyKey);
+    const candidates = [];
+    for (const marker of listMarkers(storage)) {
+      if (!UNRESOLVED_STATES.has(marker.state)) continue;
+      if (marker.localScopeFingerprint !== localScopeFingerprint) continue;
+      const requiredMetadata = markerAttachmentMetadata(marker);
+      if (!requiredMetadata.length) continue;
+      const candidatePayload = { ...payload, idempotencyKey: marker.idempotencyKey };
+      const candidateFingerprint = await createPayloadFingerprint(
+        candidatePayload,
+        requiredMetadata,
+        options
+      );
+      if (candidateFingerprint !== marker.payloadFingerprint) continue;
+      if (marker.reconcileProof) {
+        validateReconcileProof(marker.reconcileProof, candidatePayload, requiredMetadata);
+      }
+      candidates.push({ marker, attachmentsMetadata: requiredMetadata });
+    }
+    if (requestedKey) {
+      const exact = candidates.filter(({ marker }) => marker.idempotencyKey === requestedKey);
+      if (exact.length === 1) return exact[0];
+      if (candidates.length && readMarker(storage, requestedKey)) {
+        throw createProtocolError(
+          'MAILBOX_SEND_DURABLE_STATE_PAYLOAD_MISMATCH',
+          'De gevraagde verzendstatus past niet exact bij deze bijlageherstelpoging; de mail is niet verzonden.'
+        );
+      }
+    }
+    if (candidates.length > 1) {
+      throw createProtocolError(
+        'MAILBOX_SEND_DURABLE_STATE_AMBIGUOUS',
+        'Meerdere onopgeloste verzendpogingen passen bij deze mail; er is niets opnieuw verzonden.'
+      );
+    }
+    return candidates[0] || null;
   }
 
   function responseHeader(response, name) {
@@ -401,21 +498,23 @@
 
   function extractDurableIdentity(result, response = null) {
     const sentMessage = result?.sentMessage && typeof result.sentMessage === 'object' ? result.sentMessage : {};
-    const identity = {
-      intentId: normalizeText(
-        result?.intentId || sentMessage.softoraSendIntentId
-        || responseHeader(response, 'X-Softora-Send-Intent-Id')
-      ),
-      messageId: normalizeText(
-        result?.messageId || sentMessage.messageId
-        || responseHeader(response, 'X-Softora-Message-Id')
-      ),
-      providerMessageId: normalizeText(
-        result?.providerMessageId || sentMessage.providerMessageId
-        || responseHeader(response, 'X-Softora-Provider-Message-Id')
-      ),
-    };
-    return identity.intentId || identity.messageId || identity.providerMessageId ? identity : null;
+    function exactValue(values) {
+      const unique = Array.from(new Set(values.map(normalizeText).filter(Boolean)));
+      return unique.length === 1 ? unique[0] : '';
+    }
+    const intentId = exactValue([result?.intentId, sentMessage.softoraSendIntentId]);
+    const messageId = exactValue([result?.messageId, sentMessage.messageId]);
+    const providerMessageId = exactValue([result?.providerMessageId, sentMessage.providerMessageId]);
+    if (!intentId || (!messageId && !providerMessageId)) return null;
+    const headerIntentId = responseHeader(response, 'X-Softora-Send-Intent-Id');
+    const headerMessageId = responseHeader(response, 'X-Softora-Message-Id');
+    const headerProviderMessageId = responseHeader(response, 'X-Softora-Provider-Message-Id');
+    if (
+      headerIntentId && headerIntentId !== intentId
+      || headerMessageId && messageId && headerMessageId !== messageId
+      || headerProviderMessageId && providerMessageId && headerProviderMessageId !== providerMessageId
+    ) return null;
+    return { intentId, messageId, providerMessageId };
   }
 
   function expectedPreflightScope(payload) {
@@ -429,6 +528,7 @@
       mode: normalize(payload?.mode),
       conversationId: normalizeText(replyIdentity.conversationId || context.conversationId),
       replyTargetMessageId: normalizeText(replyIdentity.sourceMessageId || context.messageId),
+      references: normalizeText(context.references),
       providerThreadId: normalizeText(
         payload?.providerThreadId || replyIdentity.providerThreadId || ''
       ),
@@ -443,6 +543,7 @@
     const proof = value && typeof value === 'object' ? value : null;
     const expected = expectedPreflightScope(payload);
     const proofMetadata = normalizeAttachmentMetadata(proof?.attachmentsMetadata);
+    const expectedScopePrefix = `${expected.provider}-${expected.mode}-scope:`;
     const valid = proof
       && proof.version === 1
       && typeof proof.idempotencyKey === 'string'
@@ -456,9 +557,12 @@
       && normalizeText(proof.replyTargetMessageId) === expected.replyTargetMessageId
       && normalizeText(proof.providerThreadId) === expected.providerThreadId
       && typeof proof.references === 'string'
-      && (expected.mode !== 'new-message' || proof.references === '')
-      && /^[0-9a-f]{64}$/i.test(normalizeText(proof.scopeFingerprint))
-      && /^[0-9a-f]{64}$/i.test(normalizeText(proof.requestPayloadFingerprint))
+      && proof.references === expected.references
+      && typeof proof.scopeFingerprint === 'string'
+      && proof.scopeFingerprint.startsWith(expectedScopePrefix)
+      && /^(smtp|instantly)-(reply|new-message)-scope:[0-9a-f]{64}$/.test(proof.scopeFingerprint)
+      && typeof proof.requestPayloadFingerprint === 'string'
+      && /^[0-9a-f]{64}$/.test(proof.requestPayloadFingerprint)
       && proofMetadata !== null
       && attachmentMetadataEqual(proofMetadata, attachmentsMetadata);
     if (!valid) {
@@ -480,8 +584,8 @@
       replyTargetMessageId: normalizeText(proof.replyTargetMessageId),
       references: String(proof.references),
       providerThreadId: normalizeText(proof.providerThreadId),
-      scopeFingerprint: normalizeText(proof.scopeFingerprint).toLowerCase(),
-      requestPayloadFingerprint: normalizeText(proof.requestPayloadFingerprint).toLowerCase(),
+      scopeFingerprint: proof.scopeFingerprint,
+      requestPayloadFingerprint: proof.requestPayloadFingerprint,
       attachmentsMetadata: proofMetadata,
     };
   }
@@ -497,7 +601,9 @@
       replyTargetMessageId: normalizeText(result?.replyTargetMessageId),
       providerThreadId: normalizeText(result?.providerThreadId),
     };
-    if (Object.keys(expected).some((key) => expected[key] !== actual[key])) {
+    const comparableExpected = { ...expected };
+    delete comparableExpected.references;
+    if (Object.keys(comparableExpected).some((key) => comparableExpected[key] !== actual[key])) {
       throw createProtocolError(
         'MAILBOX_SEND_PREFLIGHT_SCOPE_MISMATCH',
         'De veilige mailcontrole hoort bij een andere verzendcontext; er is niets verzonden.'
@@ -529,60 +635,176 @@
       );
   }
 
-  async function runPreflight(fetchImpl, requestPayload, expectedPayload, attachmentsMetadata, serialize) {
-    const response = await fetchImpl('/api/mailbox/send/preflight', {
-      method: 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: serialize(requestPayload),
-    });
-    const data = await parseJsonObject(response);
-    if (!responseIsHttp200(response) || data?.ok !== true) {
-      throw responseError(response, data, 'Veilige mailcontrole mislukt');
-    }
-    const result = data?.result;
-    const status = normalizeText(result?.status);
+  function boundedDeadline(value, fallback) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+  }
+
+  async function runWithDeadline(task, config, options = {}) {
+    const AbortControllerRef = options.AbortController || global.AbortController;
+    const setTimer = options.setTimeout || global.setTimeout;
+    const clearTimer = options.clearTimeout || global.clearTimeout;
     if (
-      !result
-      || result.preflight !== true
-      || result.externalEffect !== false
-      || !['accepted', 'processing', 'failed', 'ready'].includes(status)
+      typeof AbortControllerRef !== 'function'
+      || typeof setTimer !== 'function'
+      || typeof clearTimer !== 'function'
     ) {
       throw createProtocolError(
-        'MAILBOX_SEND_PREFLIGHT_INVALID',
-        'De veilige mailcontrole gaf geen geldige status; er is niets verzonden.',
-        { status: 502 }
-      );
-    }
-    assertPreflightScope(result, expectedPayload);
-    if (status === 'ready' && result.reservationReady !== true) {
-      throw createProtocolError(
-        'MAILBOX_SEND_PREFLIGHT_NOT_READY',
-        'De veilige verzending kon niet worden gereserveerd; er is niets verzonden.',
+        'MAILBOX_SEND_DEADLINE_UNAVAILABLE',
+        'De browser kan de verzenddeadline niet veilig bewaken; de mail is niet verzonden.',
         { status: 503, retryable: true }
       );
     }
-    if (status !== 'ready' && result.reservationReady !== false) {
-      throw createProtocolError(
-        'MAILBOX_SEND_PREFLIGHT_INVALID',
-        'De veilige mailcontrole gaf tegenstrijdige informatie; er is niets verzonden.',
-        { status: 502 }
-      );
+    const controller = new AbortControllerRef();
+    const timeoutMs = boundedDeadline(config.timeoutMs, config.fallbackTimeoutMs);
+    let timer = null;
+    let timeoutError = null;
+    const timeoutPromise = new Promise((_resolve, reject) => {
+      timer = setTimer(() => {
+        timeoutError = createProtocolError(config.code, config.message, {
+          status: 504,
+          retryable: true,
+        });
+        reject(timeoutError);
+        try { controller.abort(); } catch (_) {}
+      }, timeoutMs);
+    });
+    try {
+      return await Promise.race([
+        Promise.resolve().then(() => task(controller.signal)),
+        timeoutPromise,
+      ]);
+    } catch (error) {
+      if (timeoutError) throw timeoutError;
+      throw error;
+    } finally {
+      if (timer !== null) clearTimer(timer);
     }
-    if (status === 'accepted' && !extractDurableIdentity(result.acceptedResult)) {
-      throw createProtocolError(
-        'MAILBOX_SEND_DURABLE_IDENTITY_MISSING',
-        'De mailstatus mist een duurzame berichtidentiteit; er is niets opnieuw verzonden.',
-        { status: 409 }
+  }
+
+  function isExactMutableProofRequired(response, data) {
+    return response?.status === 409
+      && data?.ok === false
+      && data?.code === 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED'
+      && data?.result === undefined
+      && data?.reservationReady === undefined;
+  }
+
+  async function runPreflight(
+    fetchImpl,
+    requestPayload,
+    expectedPayload,
+    attachmentsMetadata,
+    serialize,
+    options = {}
+  ) {
+    return runWithDeadline(async (signal) => {
+      const response = await fetchImpl('/api/mailbox/send/preflight', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: serialize(requestPayload),
+        signal,
+      });
+      const data = await parseJsonObject(response);
+      if (isExactMutableProofRequired(response, data)) {
+        throw createProtocolError(
+          'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED',
+          normalizeText(data.detail) || 'De verzend-ID is nog niet duurzaam geregistreerd.',
+          { status: 409, retryable: true }
+        );
+      }
+      if (!responseIsHttp200(response) || data?.ok !== true) {
+        throw responseError(response, data, 'Veilige mailcontrole mislukt');
+      }
+      const result = data?.result;
+      const status = normalizeText(result?.status);
+      if (
+        !result
+        || result.preflight !== true
+        || result.externalEffect !== false
+        || !['accepted', 'processing', 'failed', 'ready'].includes(status)
+      ) {
+        throw createProtocolError(
+          'MAILBOX_SEND_PREFLIGHT_INVALID',
+          'De veilige mailcontrole gaf geen geldige status; er is niets verzonden.',
+          { status: 502 }
+        );
+      }
+      if (options.proofOnly === true && status === 'ready') {
+        throw createProtocolError(
+          'MAILBOX_SEND_PREFLIGHT_INVALID',
+          'Een bewijscontrole zonder actuele mailinhoud mag geen nieuwe verzending vrijgeven.',
+          { status: 502 }
+        );
+      }
+      assertPreflightScope(result, expectedPayload);
+      if (status === 'ready' && result.reservationReady !== true) {
+        throw createProtocolError(
+          'MAILBOX_SEND_PREFLIGHT_NOT_READY',
+          'De veilige verzending kon niet worden gereserveerd; er is niets verzonden.',
+          { status: 503, retryable: true }
+        );
+      }
+      if (status !== 'ready' && result.reservationReady !== false) {
+        throw createProtocolError(
+          'MAILBOX_SEND_PREFLIGHT_INVALID',
+          'De veilige mailcontrole gaf tegenstrijdige informatie; er is niets verzonden.',
+          { status: 502 }
+        );
+      }
+      if (status === 'accepted' && !extractDurableIdentity(result.acceptedResult)) {
+        throw createProtocolError(
+          'MAILBOX_SEND_DURABLE_IDENTITY_MISSING',
+          'De mailstatus mist een duurzame berichtidentiteit; er is niets opnieuw verzonden.',
+          { status: 409 }
+        );
+      }
+      const reconcileProof = validateReconcileProof(
+        result.reconcileProof,
+        expectedPayload,
+        attachmentsMetadata
       );
-    }
-    const reconcileProof = validateReconcileProof(
-      result.reconcileProof,
-      expectedPayload,
-      attachmentsMetadata
-    );
-    return { response, data, result, status, reconcileProof };
+      return { response, data, result, status, reconcileProof };
+    }, {
+      timeoutMs: options.preflightDeadlineMs,
+      fallbackTimeoutMs: PREFLIGHT_DEADLINE_MS,
+      code: 'MAILBOX_SEND_PREFLIGHT_TIMEOUT',
+      message: 'De veilige mailcontrole duurde te lang; er is niets verzonden.',
+    }, options);
+  }
+
+  async function runSendRequest(fetchImpl, sendPayload, serialize, options = {}) {
+    return runWithDeadline(async (signal) => {
+      const response = await fetchImpl('/api/mailbox/send', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: serialize(sendPayload),
+        signal,
+      });
+      const data = await parseJsonObject(response);
+      if (!responseIsHttp200(response) || data?.ok !== true) {
+        throw responseError(response, data, 'Mail verzenden mislukt');
+      }
+      const result = data?.result && typeof data.result === 'object' ? data.result : {};
+      const durableIdentity = extractDurableIdentity(result, response);
+      if (!durableIdentity) {
+        throw createProtocolError(
+          'MAILBOX_SEND_DURABLE_IDENTITY_MISSING',
+          'De server bevestigde geen volledige duurzame berichtidentiteit; er is niets automatisch opnieuw verzonden.',
+          { status: 409 }
+        );
+      }
+      return { response, data, result, durableIdentity };
+    }, {
+      timeoutMs: options.sendDeadlineMs,
+      fallbackTimeoutMs: SEND_DEADLINE_MS,
+      code: 'MAILBOX_SEND_TIMEOUT',
+      message: 'De verzendbevestiging duurde te lang; controleer de status voordat je opnieuw probeert.',
+    }, options);
   }
 
   function stagingIsReusable(marker, attachmentsMetadata, options = {}) {
@@ -680,6 +902,49 @@
     };
   }
 
+  function markerIsProvenPreDispatch(marker) {
+    return PROVEN_PRE_DISPATCH_STATES.has(normalizeText(marker?.state))
+      && !Object.prototype.hasOwnProperty.call(marker || {}, 'sendStartedAt');
+  }
+
+  function attachmentReselectError() {
+    return createProtocolError(
+      'MAILBOX_ATTACHMENT_RESELECT_REQUIRED',
+      'Kies de bijlagen opnieuw voordat je deze mail veilig verzendt.',
+      { status: 409 }
+    );
+  }
+
+  function rotateToFreshMarker(
+    storage,
+    marker,
+    payloadFingerprint,
+    localScopeFingerprint,
+    attachmentsMetadata,
+    failedRotations,
+    input,
+    options = {}
+  ) {
+    if (failedRotations >= MAX_FAILED_KEY_ROTATIONS) {
+      throw createProtocolError(
+        'MAILBOX_SEND_FAILED_KEY_ROTATION_EXHAUSTED',
+        'De eerdere verzending bleef definitief gestopt; er is geen nieuwe mail gestart.',
+        { status: 409 }
+      );
+    }
+    const nextKey = `browser:${getRandomToken(options)}`;
+    const successor = createMarker(
+      nextKey,
+      payloadFingerprint,
+      localScopeFingerprint,
+      attachmentsMetadata,
+      options
+    );
+    input.onIdempotencyKey?.(successor.idempotencyKey);
+    patchMarker(storage, marker, { state: 'failed', staging: [] }, options);
+    return successor;
+  }
+
   function ensureLocks(options = {}) {
     const locks = Object.prototype.hasOwnProperty.call(options, 'locks')
       ? options.locks
@@ -736,27 +1001,66 @@
           lockEntered = true;
           const storage = getStorage(options);
           pruneResolvedMarkers(storage, options);
-          let marker = selectMarker(
+          const missingAttachmentMatch = await findMissingAttachmentMarker(
             storage,
-            payloadBase.idempotencyKey,
-            payloadFingerprint,
+            payloadBase,
+            attachmentsMetadata,
             localScopeFingerprint,
             options
           );
+          let effectiveAttachmentsMetadata = attachmentsMetadata;
+          let effectivePayloadFingerprint = payloadFingerprint;
+          let attachmentsUnavailable = false;
+          let marker;
+          if (missingAttachmentMatch) {
+            marker = missingAttachmentMatch.marker;
+            effectiveAttachmentsMetadata = missingAttachmentMatch.attachmentsMetadata;
+            effectivePayloadFingerprint = marker.payloadFingerprint;
+            attachmentsUnavailable = true;
+          } else {
+            marker = selectMarker(
+              storage,
+              payloadBase.idempotencyKey,
+              payloadFingerprint,
+              localScopeFingerprint,
+              attachmentsMetadata,
+              options
+            );
+          }
           input.onIdempotencyKey?.(marker.idempotencyKey);
+          if (attachmentsUnavailable && !marker.reconcileProof) {
+            throw attachmentReselectError();
+          }
 
-        for (let failedRotations = 0; ; failedRotations += 1) {
-          const attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
-          const preflightRequest = marker.reconcileProof
-            ? { idempotencyKey: marker.idempotencyKey, reconcileProof: marker.reconcileProof }
-            : attemptPayload;
-          const preflight = await runPreflight(
-            fetchImpl,
-            preflightRequest,
-            attemptPayload,
-            attachmentsMetadata,
-            serialize
-          );
+          let failedRotations = 0;
+          let mutablePreflightRequired = false;
+          for (;;) {
+            const attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
+            const hasStoredProof = Boolean(marker.reconcileProof);
+            const proofOnly = hasStoredProof && !mutablePreflightRequired;
+            const preflightRequest = hasStoredProof
+              ? proofOnly
+                ? { idempotencyKey: marker.idempotencyKey, reconcileProof: marker.reconcileProof }
+                : { ...attemptPayload, reconcileProof: marker.reconcileProof }
+              : attemptPayload;
+            let preflight;
+            try {
+              preflight = await runPreflight(
+                fetchImpl,
+                preflightRequest,
+                attemptPayload,
+                effectiveAttachmentsMetadata,
+                serialize,
+                { ...options, proofOnly }
+              );
+            } catch (error) {
+              if (error?.code !== 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED' || !proofOnly) throw error;
+              if (!markerIsProvenPreDispatch(marker)) throw error;
+              if (attachmentsUnavailable) throw attachmentReselectError();
+              mutablePreflightRequired = true;
+              continue;
+            }
+            mutablePreflightRequired = false;
           if (
             marker.reconcileProof
             && JSON.stringify(marker.reconcileProof) !== JSON.stringify(preflight.reconcileProof)
@@ -786,43 +1090,47 @@
               { status: 409, retryable: true }
             );
           }
-          if (preflight.status === 'failed') {
-            marker = patchMarker(storage, marker, { state: 'failed', staging: [] }, options);
-            if (failedRotations >= MAX_FAILED_KEY_ROTATIONS) {
-              throw createProtocolError(
-                'MAILBOX_SEND_FAILED_KEY_ROTATION_EXHAUSTED',
-                'De eerdere verzending bleef definitief gestopt; er is geen nieuwe mail gestart.',
-                { status: 409 }
+            if (preflight.status === 'failed') {
+              marker = rotateToFreshMarker(
+                storage,
+                marker,
+                effectivePayloadFingerprint,
+                localScopeFingerprint,
+                effectiveAttachmentsMetadata,
+                failedRotations,
+                input,
+                options
               );
+              failedRotations += 1;
+              if (attachmentsUnavailable) throw attachmentReselectError();
+              continue;
             }
-            const nextKey = `browser:${getRandomToken(options)}`;
-            marker = createMarker(nextKey, payloadFingerprint, localScopeFingerprint, options);
-            input.onIdempotencyKey?.(marker.idempotencyKey);
-            continue;
-          }
 
           const provenAttemptPayload = {
             ...attemptPayload,
             reconcileProof: marker.reconcileProof,
           };
-          let staging = stagingIsReusable(marker, attachmentsMetadata, options)
+          let staging = stagingIsReusable(marker, effectiveAttachmentsMetadata, options)
             ? marker.staging : [];
-          if (attachmentsMetadata.length && !staging.length) {
+          if (effectiveAttachmentsMetadata.length && !staging.length) {
             if (typeof input.uploadAttachments !== 'function') {
-              throw createProtocolError(
-                'MAILBOX_ATTACHMENT_RESELECT_REQUIRED',
-                'Kies de bijlagen opnieuw voordat je deze mail veilig verzendt.',
-                { status: 409 }
-              );
+              throw attachmentReselectError();
             }
             const uploaded = await input.uploadAttachments(attachments, {
               fetch: fetchImpl,
               payload: provenAttemptPayload,
             });
-            staging = normalizeStaging(uploaded, attachmentsMetadata, options);
+            staging = normalizeStaging(uploaded, effectiveAttachmentsMetadata, options);
             marker = patchMarker(storage, marker, { state: 'staged', staging }, options);
           }
 
+          if (!marker.reconcileProof) {
+            throw createProtocolError(
+              'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED',
+              'De daadwerkelijke verzending mist het verplichte preflightbewijs; er is niets verzonden.',
+              { status: 409 }
+            );
+          }
           const sendPayload = {
             ...provenAttemptPayload,
             attachments: sendAttachmentsFromStaging(staging),
@@ -832,26 +1140,12 @@
             staging,
             sendStartedAt: getNow(options),
           }, options);
-          const response = await fetchImpl('/api/mailbox/send', {
-            method: 'POST',
-            credentials: 'same-origin',
-            cache: 'no-store',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: serialize(sendPayload),
-          });
-          const data = await parseJsonObject(response);
-          if (!responseIsHttp200(response) || data?.ok === false) {
-            throw responseError(response, data, 'Mail verzenden mislukt');
-          }
-          const result = data?.result && typeof data.result === 'object' ? data.result : {};
-          const durableIdentity = extractDurableIdentity(result, response);
-          if (!durableIdentity) {
-            throw createProtocolError(
-              'MAILBOX_SEND_DURABLE_IDENTITY_MISSING',
-              'De server bevestigde geen duurzame berichtidentiteit; er is niets automatisch opnieuw verzonden.',
-              { status: 409 }
-            );
-          }
+          const { response, data, result, durableIdentity } = await runSendRequest(
+            fetchImpl,
+            sendPayload,
+            serialize,
+            options
+          );
           try {
             marker = patchMarker(storage, marker, { state: 'accepted', durableIdentity }, options);
           } catch (error) {
