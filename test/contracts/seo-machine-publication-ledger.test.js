@@ -167,6 +167,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'scheduled',
       ],
+      [
+        '/kennisbank/wat-is-chatbot-overdracht',
+        '2026-08-27',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });

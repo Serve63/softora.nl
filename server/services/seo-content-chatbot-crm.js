@@ -206,6 +206,7 @@ const CHATBOT_CRM_CONTENT_ITEM = Object.freeze({
     Object.freeze({ label: 'Wat kost een chatbot?', href: '/blog/chatbot-kosten-mkb', availableFrom: '2026-08-04' }),
     Object.freeze({ label: 'Chatbot vs livechat', href: '/vergelijkingen/chatbot-vs-livechat' }),
     Object.freeze({ label: 'Wat is een CRM-integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
+    Object.freeze({ label: 'Chatbot-overdracht naar een medewerker', href: '/kennisbank/wat-is-chatbot-overdracht' }),
     Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
   ]),
 });
