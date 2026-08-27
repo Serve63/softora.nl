@@ -242,7 +242,21 @@ test('rapid conversation switching sends only the exact latest opened message co
     getAccount: () => 'serve@softora.nl', getOwner: () => 'both', getActiveFolder: () => 'outreach',
     fetch: async (url, options) => {
       requests.push({ url, payload: JSON.parse(options.body) });
-      return { ok: true, json: async () => ({ ok: true, result: {} }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          result: {
+            intentId: 'send:rapid-switch',
+            messageId: '<rapid-switch@softora.nl>',
+            sentMessage: {
+              softoraSendIntentId: 'send:rapid-switch',
+              messageId: '<rapid-switch@softora.nl>',
+            },
+          },
+        }),
+      };
     },
     onAcceptedSend: (record) => acceptedRecords.push(record),
     toast() {},

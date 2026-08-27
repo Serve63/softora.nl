@@ -1,13 +1,8 @@
 (function (global) {
   'use strict';
-
   const sendState = global.SoftoraMailboxComposeSendState || (
-    typeof module !== 'undefined'
-    && module.exports
-    && typeof require === 'function'
-      ? require('./premium-mailbox-compose-send-state')
-      : null
-  );
+    typeof module !== 'undefined' && module.exports && typeof require === 'function'
+      ? require('./premium-mailbox-compose-send-state') : null);
   if (!sendState) {
     throw new Error('SoftoraMailboxComposeSendState ontbreekt; veilig verzenden is gestopt.');
   }
@@ -42,7 +37,6 @@
     readMarker,
     selectMarker,
   } = sendState;
-
   function markerAttachmentMetadata(marker) {
     const stored = normalizeAttachmentMetadata(marker?.attachmentsMetadata);
     const proof = marker?.reconcileProof && typeof marker.reconcileProof === 'object'
@@ -62,13 +56,8 @@
     }
     return proof || stored || [];
   }
-
   async function findMissingAttachmentMarker(
-    storage,
-    payload,
-    currentMetadata,
-    localScopeFingerprint,
-    options = {}
+    storage, payload, currentMetadata, localScopeFingerprint, options = {}
   ) {
     if (currentMetadata.length) return null;
     const requestedKey = normalizeText(payload?.idempotencyKey);
@@ -80,10 +69,7 @@
       if (!requiredMetadata.length) continue;
       const candidatePayload = { ...payload, idempotencyKey: marker.idempotencyKey };
       const candidateFingerprint = await createPayloadFingerprint(
-        candidatePayload,
-        requiredMetadata,
-        options
-      );
+        candidatePayload, requiredMetadata, options);
       if (candidateFingerprint !== marker.payloadFingerprint) continue;
       if (marker.reconcileProof) {
         validateReconcileProof(marker.reconcileProof, candidatePayload, requiredMetadata);
@@ -108,7 +94,6 @@
     }
     return candidates[0] || null;
   }
-
   function responseHeader(response, name) {
     try {
       return normalizeText(response?.headers?.get?.(name)).replace(/[\r\n]/g, '');
@@ -116,7 +101,6 @@
       return '';
     }
   }
-
   function extractDurableIdentity(result, response = null) {
     const sentMessage = result?.sentMessage && typeof result.sentMessage === 'object' ? result.sentMessage : {};
     function exactField(values) {
@@ -137,7 +121,6 @@
     ) return null;
     return { intentId: intent.value, messageId: message.value, providerMessageId: provider.value };
   }
-
   function expectedPreflightScope(payload) {
     const context = payload?.context && typeof payload.context === 'object' ? payload.context : {};
     const replyIdentity = payload?.replyIdentity && typeof payload.replyIdentity === 'object'
@@ -155,11 +138,9 @@
       ),
     };
   }
-
   function attachmentMetadataEqual(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
   }
-
   function validateReconcileProof(value, payload, attachmentsMetadata) {
     const proof = value && typeof value === 'object' ? value : null;
     const expected = expectedPreflightScope(payload);
@@ -210,7 +191,6 @@
       attachmentsMetadata: proofMetadata,
     };
   }
-
   function assertPreflightScope(result, payload) {
     const expected = expectedPreflightScope(payload);
     const actual = {
@@ -231,13 +211,11 @@
       );
     }
   }
-
   function responseIsHttp200(response) {
     return typeof response?.status === 'number'
       && Number.isFinite(response.status)
       && response.status === 200;
   }
-
   async function parseJsonObject(response) {
     try {
       const data = await response?.json?.();
@@ -246,7 +224,6 @@
       return {};
     }
   }
-
   function responseError(response, data, fallback) {
     return global.SoftoraMailboxError?.fromResponse?.(response, data, fallback)
       || createProtocolError(
@@ -255,12 +232,10 @@
         { status: Number(response?.status) || 500, retryable: data?.retryable === true }
       );
   }
-
   function boundedDeadline(value, fallback) {
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
   }
-
   async function runWithDeadline(task, config, options = {}) {
     const AbortControllerRef = options.AbortController || global.AbortController;
     const setTimer = options.setTimeout || global.setTimeout;
@@ -302,7 +277,6 @@
       if (timer !== null) clearTimer(timer);
     }
   }
-
   function isExactMutableProofRequired(response, data) {
     return response?.status === 409
       && data?.ok === false
@@ -310,7 +284,6 @@
       && data?.result === undefined
       && data?.reservationReady === undefined;
   }
-
   async function runPreflight(
     fetchImpl,
     requestPayload,
@@ -395,7 +368,6 @@
       message: 'De veilige mailcontrole duurde te lang; er is niets verzonden.',
     }, options);
   }
-
   async function runSendRequest(fetchImpl, sendPayload, serialize, options = {}) {
     return runWithDeadline(async (signal) => {
       const response = await fetchImpl('/api/mailbox/send', {
@@ -427,7 +399,6 @@
       message: 'De verzendbevestiging duurde te lang; controleer de status voordat je opnieuw probeert.',
     }, options);
   }
-
   function stagingIsReusable(marker, attachmentsMetadata, options = {}) {
     const staging = Array.isArray(marker?.staging) ? marker.staging : [];
     if (!attachmentsMetadata.length) return staging.length === 0;
@@ -452,7 +423,6 @@
         && Number(attachment.expiresAt) > now + MIN_STAGING_VALIDITY_MS;
     });
   }
-
   function normalizeStaging(value, attachmentsMetadata, options = {}) {
     const uploads = Array.isArray(value) ? value : [];
     if (uploads.length !== attachmentsMetadata.length) {
@@ -499,7 +469,6 @@
       };
     });
   }
-
   function sendAttachmentsFromStaging(staging) {
     return (Array.isArray(staging) ? staging : []).map((attachment) => ({
       reference: attachment.reference,
@@ -509,7 +478,6 @@
       ...(attachment.sha256 ? { sha256: attachment.sha256, referenceVersion: attachment.referenceVersion } : {}),
     }));
   }
-
   function acceptedExecutionFromPreflight(preflight, marker, payload) {
     const attachments = Array.isArray(marker.staging) ? sendAttachmentsFromStaging(marker.staging) : [];
     const sentPayload = {
@@ -528,12 +496,10 @@
       recoveredByPreflight: true,
     };
   }
-
   function markerIsProvenPreDispatch(marker) {
     return PROVEN_PRE_DISPATCH_STATES.has(normalizeText(marker?.state))
       && !Object.prototype.hasOwnProperty.call(marker || {}, 'sendStartedAt');
   }
-
   function attachmentReselectError() {
     return createProtocolError(
       'MAILBOX_ATTACHMENT_RESELECT_REQUIRED',
@@ -541,16 +507,9 @@
       { status: 409 }
     );
   }
-
   function rotateToFreshMarker(
-    storage,
-    marker,
-    payloadFingerprint,
-    localScopeFingerprint,
-    attachmentsMetadata,
-    failedRotations,
-    input,
-    options = {}
+    storage, marker, payloadFingerprint, localScopeFingerprint, attachmentsMetadata,
+    failedRotations, input, options = {}
   ) {
     if (failedRotations >= MAX_FAILED_KEY_ROTATIONS) {
       throw createProtocolError(
@@ -571,7 +530,6 @@
     patchMarker(storage, marker, { state: 'failed', staging: [] }, options);
     return successor;
   }
-
   function ensureLocks(options = {}) {
     const locks = Object.prototype.hasOwnProperty.call(options, 'locks')
       ? options.locks
@@ -585,7 +543,6 @@
     }
     return locks;
   }
-
   function create(options = {}) {
     async function execute(input = {}) {
       const locks = ensureLocks(options);
@@ -614,7 +571,6 @@
       delete payloadBase.reconcileProof;
       const payloadFingerprint = await createPayloadFingerprint(payloadBase, attachmentsMetadata, options);
       const localScopeFingerprint = await createLocalScopeFingerprint(payloadBase, options);
-
       let lockEntered = false;
       try {
         return await locks.request(LOCK_NAME, { mode: 'exclusive' }, async (lock) => {
@@ -658,7 +614,6 @@
           if (attachmentsUnavailable && !marker.reconcileProof) {
             throw attachmentReselectError();
           }
-
           let failedRotations = 0;
           let mutablePreflightRequired = false;
           for (;;) {
@@ -735,9 +690,7 @@
               if (attachmentsUnavailable) throw attachmentReselectError();
               continue;
             }
-
           if (attachmentsUnavailable) throw attachmentReselectError();
-
           const provenAttemptPayload = {
             ...attemptPayload,
             reconcileProof: marker.reconcileProof,
@@ -755,7 +708,6 @@
             staging = normalizeStaging(uploaded, effectiveAttachmentsMetadata, options);
             marker = patchMarker(storage, marker, { state: 'staged', staging }, options);
           }
-
           if (!marker.reconcileProof) {
             throw createProtocolError(
               'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED',
@@ -803,10 +755,8 @@
         );
       }
     }
-
     return { execute };
   }
-
   const api = {
     LOCK_NAME,
     MARKER_VERSION,
