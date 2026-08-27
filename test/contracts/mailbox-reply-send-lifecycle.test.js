@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 require('../../assets/premium-mailbox-reply-identity');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
+const { createControllerSendHarness } = require('../helpers/mailbox-compose-send-resilience');
 const { createMailboxComposeThreadContext } = require('../../server/services/mailbox-compose-thread-context');
 const {
   TEMPORARY_MAILBOX_SEND_MESSAGE,
@@ -86,6 +87,7 @@ function createMhcbePayloadCapture() {
     subject: 'Kleine vraag over jullie website', body: 'Mogelijk kun je een screenshot delen.',
   };
   const controller = composeController.create({
+    sendResilience: createControllerSendHarness(),
     document: {
       getElementById: (id) => values[id] || null,
       querySelector: () => null,
@@ -201,6 +203,7 @@ test('rapid conversation switching sends only the exact latest opened message co
   };
   const current = new Map([[first.id, first], [second.id, second]]);
   const controller = composeController.create({
+    sendResilience: createControllerSendHarness(),
     document: {
       getElementById: (id) => values[id] || null,
       querySelector: () => null,
@@ -239,7 +242,21 @@ test('rapid conversation switching sends only the exact latest opened message co
     getAccount: () => 'serve@softora.nl', getOwner: () => 'both', getActiveFolder: () => 'outreach',
     fetch: async (url, options) => {
       requests.push({ url, payload: JSON.parse(options.body) });
-      return { ok: true, json: async () => ({ ok: true, result: {} }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          result: {
+            intentId: 'send:rapid-switch',
+            messageId: '<rapid-switch@softora.nl>',
+            sentMessage: {
+              softoraSendIntentId: 'send:rapid-switch',
+              messageId: '<rapid-switch@softora.nl>',
+            },
+          },
+        }),
+      };
     },
     onAcceptedSend: (record) => acceptedRecords.push(record),
     toast() {},

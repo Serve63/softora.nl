@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const compose = require('../../assets/premium-mailbox-compose');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
 const mailboxError = require('../../assets/premium-mailbox-error');
+const { createControllerSendHarness } = require('../helpers/mailbox-compose-send-resilience');
 const { createMailboxComposeSend } = require('../../server/services/mailbox-compose-send');
 const {
   createMailboxAttachmentsFingerprint,
@@ -735,6 +736,7 @@ test('lokale payloadafwijzing roept geen send-endpoint aan en dubbelklikken blij
     querySelector: () => null,
   };
   const controller = composeController.create({
+    sendResilience: createControllerSendHarness(),
     document: documentRef,
     compose: {
       getAttachments: () => [],
@@ -759,6 +761,7 @@ test('lokale payloadafwijzing roept geen send-endpoint aan en dubbelklikken blij
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
   const singleFlightController = composeController.create({
+    sendResilience: createControllerSendHarness(),
     document: documentRef,
     compose: {
       getAttachments: () => [],
@@ -818,6 +821,9 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
     payload: { account: 'serve@softora.nl', to: 'prospect@example.nl', subject: 'Screenshots' },
   });
   assert.deepEqual(refs.map((item) => item.reference), ['reference-0', 'reference-1', 'reference-2']);
+  assert.ok(refs.every((item, index) => item.expiresAt === uploads[index].expiresAt));
+  assert.ok(refs.every((item) => !Object.keys(item).includes('expiresAt')));
+  assert.ok(refs.every((item) => !JSON.stringify(item).includes('expiresAt')));
   assert.equal(calls.length, 4);
   assert.equal(calls.filter((call) => call.options.method === 'PUT').length, 3);
   assert.ok(calls.filter((call) => call.options.method === 'PUT').every((call) => call.options.body instanceof FormData));
