@@ -28,6 +28,8 @@ De automation blijft na het halen of verstrijken van die datum actief totdat Ser
 - Een no-op is alleen toegestaan bij een operationele P0 die veilige publicatie blokkeert, een onoplosbaar claim- of expertiseprobleem, aantoonbare cannibalisatie zonder uniek alternatief, of een merge/deployblokkade buiten de automation. Leg dan exact vast wat blokkeert, wie eigenaar is en welke actie nodig is.
 - Een tweede opeenvolgende content-no-op met dezelfde reden is niet toegestaan: los de blokkade op of kies de hoogst scorende publicatieklare kandidaat uit de backlog.
 - Gebruik bij kandidaatarmoede de vaste fallback-ladder hieronder; "geen duidelijke GSC-query" en "de money page staat in cooldown" zijn nooit geldige redenen om niets te shippen.
+- Iedere heartbeat opent na installatie-audit exact één lifecycle-invocation met `start-run` en sluit die vóór het eindrapport met `finish-run`. Een volgende invocation sluit een vergeten receipt alleen als `interrupted` en `unverified`; dat is zichtbare uitvoeringsschuld, nooit stil bewijs van succes.
+- Een bewezen ontbrekende connector-toolset in de actieve task mag tussen twee runs via `repair-thread-binding` naar exact één setup-only vervangtask worden hersteld. De bestaande automation-id, planning, ACTIVE-status, batch en teller blijven behouden; dit is geen normale vroege rotatie en maakt geen tweede automation.
 
 ### Wekelijks
 
@@ -140,14 +142,15 @@ Google-techniek blijft onderdeel van de beeldpoort: lokale crawlbare `<img src>`
 
 ## Machine Enforcement
 
-De instructietekst is niet de poort. Deze zeven commando's leveren de afdwingbare staat:
+De instructietekst is niet de poort. Deze acht commando's leveren de afdwingbare staat:
 
 - `npm run seo:backlog:check` valideert het JSON-schema, minimaal 15 `ready` briefs, unieke URL's en ID's, de vaste scoreformule, exact drie overlap-URL's, publicatiebriefvelden en minimaal 70% commerciële intentie. Deze validator draait ook tegen het echte register in de contracttests van `verify:critical`.
 - `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen en splitst nieuwe URL's, substantiële refreshes en overige groei-acties. Een event telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en de passende `datePublished` of `dateModified` toont.
 - `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
 - `npm run seo:visuals:check` valideert beeldrollen, formaat, informatiewinst, familie-rotatie en pixelgelijkenis met de zes recentste blogs; vanaf de ingangsdatum blokkeert een rode kandidaat de publicatie.
 - `npm run seo:keywords:check` blokkeert toekomstige nieuwe en substantieel vernieuwde content zonder geldige Nederlandse `keywordEvidence`, zonder Ubersuggest ooit beslissingsmacht te geven.
-- `npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat, planning en task overeenkomen, en promptversie `SEO_MACHINE_PROMPT_VERSION=3` de kosten-, Qwen-, Edge/Codex-, langetermijn- en rotatiecontroles bevat. `start-run` herhaalt die installatie-audit en telt daarna iedere heartbeat vóór SEO-effecten precies eenmaal; `inspect` valideert de 15-runrotatie en wekelijkse discovery-status; `rotate-thread` mag uitsluitend na run 15 de bewezen retargeting atomair vastleggen; `record-keywords` bewaart het begrensde adviserende Ubersuggest-gebruik.
+- `npm run seo:selection:check` vergelijkt de machineleesbare keuze vóór implementatie met het verse GSC-rapport. Minimaal de exacte top drie uit `queries.prioritized` wordt in volgorde beoordeeld; iedere skip heeft een toegestane reden en controleerbaar bewijs, en recency-bescherming vereist wijzigingsdatum, hercontroledatum en commit- of PR-referentie.
+- `npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat, planning/task/Ubersuggest-toolbinding overeenkomen, en promptversie `SEO_MACHINE_PROMPT_VERSION=4` de kosten-, Qwen-, Edge/Codex-, selectie-, lifecycle-, langetermijn- en rotatiecontroles bevat. `start-run` telt iedere heartbeat vóór SEO-effecten precies eenmaal; `finish-run` bewaart het exacte resultaat en publieke effect; `inspect` valideert lifecycle, 15-runrotatie en discovery-status; `rotate-thread` roteert uitsluitend na run 15 met een geldige receipt; `repair-thread-binding` behoudt bij een bewezen connectorbindingsdefect de bestaande teller; `record-tool-binding` vereist de vier afgesproken read-only Ubersuggest-tools; `record-keywords` bewaart het begrensde adviserende gebruik.
 - `npm run seo:cadence:check` combineert backlog, live ledger, indexatie, corpusoriginaliteit en non-branded D28-cohortprestaties. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
 De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation behandelt exitcode `2` als uitvoeropdracht. Bij `newUrlRequired=true` is dat expliciet een nieuwe URL uit de gevalideerde backlog; anders volgt zij de normale actie van de gekozen toestand.
@@ -169,6 +172,8 @@ Gebruik `queries.prioritized` uit `scripts/seo-agent-report.js` als eerste datag
 - houdt alleen commercieel passende queries op positie 20-40 als lagere-prioriteit `emerging` kans vast wanneer er nog geen top-20-kans is.
 
 De score is een beslissingshulpmiddel, geen bewijs van toekomstige groei. Controleer voor de uiteindelijke keuze altijd intentmatch, bestaande paginakwaliteit, recente experimenten, cannibalisatie en veilige uitvoerbaarheid.
+
+Voor implementatie schrijft iedere run `reports/seo-agent/selection-evidence.json` en draait `npm run seo:selection:check`. De brief koppelt aan exact dezelfde `generatedAt` als het actuele GSC-rapport, benoemt buyer task en verwachte gekwalificeerde impact, en neemt minimaal de eerste drie `queries.prioritized` in ongewijzigde volgorde en met hun echte score over. Een lager gerangschikte of niet-GSC-actie is toegestaan, maar alleen nadat iedere hoger gerangschikte kans expliciet en controleerbaar is afgevallen. "Recent gewijzigd" zonder datum, hercontroledatum en PR/commit is geen bewijs.
 
 Wanneer `queries.prioritized` geen sterke publicatiekandidaat bevat, is dat geen reden voor een no-op. Ga dan door naar de contentinventaris, actuele SERP-gaps en de gescoorde backlog. Noteer in de PR welk bewijs de keuze droeg.
 

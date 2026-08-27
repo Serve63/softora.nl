@@ -51,6 +51,14 @@ Voor iedere nieuwe URL en substantiële contentrefresh bestaat vóór het schrij
 - Lees de definitieve tekst als mens: verwijder onnatuurlijke herhaling, losse keywordlijsten en secties die alleen bestaan om een variant te plaatsen. Titel, H1, intro, secties, metadata en ankertekst blijven primair helder en behulpzaam voor de koper.
 - `keyword_metrics`, `generate_article`, projectmutaties, backlinks, site audits en iedere betaalde fallback blijven verboden. Onbeschikbaarheid wordt als `external_research_unavailable` gerapporteerd en blokkeert een veilige GSC- en SERP-onderbouwde actie niet.
 
+## Kandidaatkeuze En Uitvoeringsreceipt
+
+- Vóór implementatie koppelt `selection-evidence.json` aan de exacte `generatedAt` van het verse GSC-rapport en beoordeelt het minimaal de top drie `queries.prioritized` in dezelfde volgorde, met ongewijzigde query, pagina en score.
+- Iedere hoger gerangschikte skip gebruikt een begrensde reden plus controleerbaar bewijs. `recent_material_change` en `protect_proven_winner` vereisen `lastChangedAt`, `recheckAt` en een commit- of PR-referentie; overlap vereist drie concrete URL's; een nieuwe-URL-vloer vereist de echte cadence-deficitstaat.
+- De geselecteerde actie benoemt bron, buyer task, verwachte gekwalificeerde impact en vergelijkingsbewijs. Ubersuggest kan deze keuze informeren maar nooit beslissen.
+- `start-run` opent exact één invocation. `finish-run` sluit haar met outcome, publiek effect en bewijs; `published` vereist een Softora-URL en live commit. Een volgende run markeert een ontbrekende receipt automatisch als `interrupted` en `unverified`, zodat een crash nooit stil als succes verdwijnt.
+- De actieve automation-task heeft een vastgelegd toolbindingbewijs voor `mcp__ubersuggest__keyword_suggestions`, `mcp__ubersuggest__google_suggestions`, `mcp__ubersuggest__keyword_overview` en `mcp__ubersuggest__serp_analysis`. Provider-auth of quota kan daarna nog degraderen; een ontbrekende task-toolset is een afzonderlijk bindingsdefect.
+
 ## Google-Aligned Visual System
 
 Vanaf `2026-08-05` draait voor iedere nieuwe of substantieel vernieuwde blog eerst `npm run seo:visuals:check`. De regel van exact twee beelden is een interne Softora-kwaliteitskeuze, geen door Google gepubliceerde rankingfactor.
@@ -101,7 +109,8 @@ Dit zijn interne alarmsignalen, geen Google-rankingfactoren. Overschrijding zet 
 - `npm run seo:indexation:report -- --json` geeft verse inspectiestatus of expliciet `data_degraded`.
 - `npm run seo:visuals:check` blokkeert nieuwe repeterende beeldfamilies, zwakke beeldbriefs en ongeschikte previewformaten.
 - `npm run seo:keywords:check` blokkeert toekomstige nieuwe of substantieel vernieuwde content zonder geldige `keywordEvidence`; een bewezen `external_research_unavailable`-fallback blijft toegestaan.
-- `npm run seo:automation-state -- audit` bewijst exact één ACTIVE heartbeat, een overeenkomende rotatietask, de vaste 08:15-planning en promptversie `SEO_MACHINE_PROMPT_VERSION=3` met verplichte kosten-, Qwen-, Edge/Codex-, deadline- en rotatiecontroles. `start-run` herhaalt die audit en telt de heartbeat idempotent vóór SEO-effecten; `inspect` bewijst de actuele staat; `rotate-thread` roteert pas na run 15 atomair naar de bewezen nieuwe task; `record-keywords` bewaart de dagcaps en Ubersuggest-status zonder een tweede automation te maken.
+- `npm run seo:selection:check` blokkeert een keuze zonder exacte top-drie GSC-afweging of met vaag skipbewijs.
+- `npm run seo:automation-state -- audit` bewijst exact één ACTIVE heartbeat, een overeenkomende rotatietask en Ubersuggest-toolbinding, de vaste 08:15-planning en promptversie `SEO_MACHINE_PROMPT_VERSION=4` met verplichte kosten-, Qwen-, Edge/Codex-, selectie-, lifecycle-, deadline- en rotatiecontroles. `start-run` opent en telt de invocation idempotent vóór SEO-effecten; `finish-run` sluit haar met een afdwingbare receipt; `inspect` bewijst de actuele staat; `rotate-thread` vereist na run 15 eerst de receipt; `repair-thread-binding` behoudt de teller bij een bewezen connectorbindingsdefect; `record-tool-binding` en `record-keywords` bewaken respectievelijk task-tools en dagcaps zonder een tweede automation.
 - De GSC-output bevat een deadlinebestendige `growthHorizon`: vóór 31 december 2026 gap/factor/tempo, erna geen fictief resterend tempo maar een expliciete doorlopende 28/90-daagse compoundingfase totdat Servé de automation pauzeert.
 - `npm run seo:cadence:check` noemt toestand, verplichte actie, request evidence debt, nieuwe-URL-vloer, achterstand en maximum nieuwe URL's.
 - Gerichte tests en `npm run verify:critical` zijn groen.
