@@ -8,13 +8,18 @@ const {
   AUTOMATION_ID,
   AUTOMATION_NAME,
   AUTOMATION_RRULE,
+  REQUIRED_UBERSUGGEST_TOOLS,
   ROTATION_BLOCK,
+  RUN_LIFECYCLE_BLOCK,
   UBERSUGGEST_BLOCK,
   auditAutomationInstallation,
   ensureAutomationState,
+  finishAutomationRun,
   formatStateBlock,
   inspectAutomationState,
   recordUbersuggestRun,
+  recordUbersuggestToolBinding,
+  repairAutomationThreadBinding,
   rotateAutomationThread,
   runAutomationStateCli,
   startAutomationRun,
@@ -42,9 +47,12 @@ function createMemory(completedRunsInActiveThread = 6) {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=3',
+    'SEO_MACHINE_PROMPT_VERSION=4',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
+    'Run npm run seo:selection:check before implementation.',
+    'Close every outcome with npm run seo:automation-state -- finish-run.',
+    'Require mcp__ubersuggest__keyword_suggestions, mcp__ubersuggest__google_suggestions, mcp__ubersuggest__keyword_overview and mcp__ubersuggest__serp_analysis.',
     'Select agent.browsers.get("edge") and require family=edge followed by profileName=Codex.',
     'Google Chrome is forbidden.',
     'This automation remains ACTIVE until Serve explicitly pauses.',
@@ -52,6 +60,33 @@ function validAutomationPrompt() {
     'Never buy credits or use paid fallbacks.',
     'Never use Qwen.',
   ].join(' ');
+}
+
+function prepareOperationalState(memoryPath, threadId = 'thread-1') {
+  ensureAutomationState(memoryPath);
+  recordUbersuggestToolBinding({
+    memoryPath,
+    threadId,
+    checkedAt: '2026-08-27T12:00:00.000Z',
+    tools: REQUIRED_UBERSUGGEST_TOOLS.join(','),
+    evidence: 'Setup task exposed all four required read-only Ubersuggest tools.',
+  });
+  return memoryPath;
+}
+
+function createCompletedRun15Memory() {
+  const memoryPath = prepareOperationalState(createMemory(14));
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt: '2026-08-28T08:15:00+02:00',
+    finishedAt: '2026-08-28T09:00:00+02:00',
+    outcome: 'completed_no_publication',
+    publicEffect: 'none',
+    evidence: 'Run 15 completed safely without a public effect because operations P0 blocked publication.',
+  });
+  return memoryPath;
 }
 
 function createAutomationConfig(memoryPath, overrides = {}) {
@@ -84,7 +119,7 @@ function createAutomationConfig(memoryPath, overrides = {}) {
   };
 }
 
-test('automation state ensures one machine-readable Ubersuggest block without touching rotation', () => {
+test('automation state ensures Ubersuggest and lifecycle blocks without touching rotation', () => {
   const memoryPath = createMemory();
   const before = inspectAutomationState(memoryPath, new Date('2026-08-27T12:00:00Z'));
   assert.equal(before.ubersuggestStatePresent, false);
@@ -96,12 +131,15 @@ test('automation state ensures one machine-readable Ubersuggest block without to
   assert.equal(inspected.rotation.completedRunsInActiveThread, 6);
   assert.equal(inspected.ubersuggest.role, 'advisory_only');
   assert.equal(inspected.ubersuggestStatePresent, true);
+  assert.equal(inspected.lifecycleStatePresent, true);
+  assert.equal(inspected.lifecycle.activeRun, null);
   assert.equal(inspected.weeklyDiscoveryDue, true);
   assert.match(fs.readFileSync(memoryPath, 'utf8'), new RegExp(`${UBERSUGGEST_BLOCK}_START`));
+  assert.match(fs.readFileSync(memoryPath, 'utf8'), new RegExp(`${RUN_LIFECYCLE_BLOCK}_START`));
 });
 
 test('automation run start increments atomically and is idempotent for one invocation', () => {
-  const memoryPath = createMemory();
+  const memoryPath = prepareOperationalState(createMemory());
   const first = startAutomationRun({
     memoryPath,
     threadId: 'thread-1',
@@ -116,10 +154,90 @@ test('automation run start increments atomically and is idempotent for one invoc
   assert.equal(first.completedRunsInActiveThread, 7);
   assert.equal(duplicate.completedRunsInActiveThread, 7);
   assert.equal(duplicate.idempotent, true);
+  assert.equal(duplicate.lifecycle, 'running');
+});
+
+test('finish-run closes the active invocation with a durable live receipt', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  const receipt = finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt: '2026-08-28T08:15:00+02:00',
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'PR #1808 merged and production parity plus route verification passed.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+  });
+  const inspected = inspectAutomationState(memoryPath);
+
+  assert.equal(receipt.outcome, 'published');
+  assert.equal(inspected.lifecycle.activeRun, null);
+  assert.equal(inspected.lifecycle.lastReceipt.liveCommit, 'abcdef1234567890');
+  assert.equal(inspected.lifecycle.receipts.length, 1);
+  assert.equal(finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt: '2026-08-28T08:15:00+02:00',
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'PR #1808 merged and production parity plus route verification passed.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+  }).idempotent, true);
+});
+
+test('the next invocation exposes and seals an unfinished previous run as interrupted', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  const next = startAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt: '2026-08-29T08:15:00+02:00',
+  });
+
+  assert.equal(next.completedRunsInActiveThread, 8);
+  assert.equal(next.recoveredPreviousRun.outcome, 'interrupted');
+  assert.equal(next.recoveredPreviousRun.publicEffect, 'unverified');
+  assert.equal(inspectAutomationState(memoryPath).lifecycle.receipts[0].autoClosed, true);
+});
+
+test('mid-batch connector repair preserves count and requires fresh tool-binding proof', () => {
+  const memoryPath = prepareOperationalState(createMemory(7));
+  const repaired = repairAutomationThreadBinding({
+    memoryPath,
+    fromThreadId: 'thread-1',
+    toThreadId: 'thread-2',
+    repairedAt: '2026-08-28T12:00:00.000Z',
+    reason: 'ubersuggest_toolset_unavailable',
+    evidence: 'Setup-only replacement task exposed all required Ubersuggest tools.',
+  });
+  let inspected = inspectAutomationState(memoryPath);
+
+  assert.equal(repaired.activeThreadId, 'thread-2');
+  assert.equal(repaired.completedRunsInActiveThread, 7);
+  assert.deepEqual(repaired.previousThreadIds, ['thread-1']);
+  assert.equal(inspected.ubersuggest.boundThreadId, null);
+
+  recordUbersuggestToolBinding({
+    memoryPath,
+    threadId: 'thread-2',
+    checkedAt: '2026-08-28T12:01:00.000Z',
+    tools: REQUIRED_UBERSUGGEST_TOOLS.join(','),
+    evidence: 'Replacement setup turn listed all four tools and validate_site succeeded.',
+  });
+  inspected = inspectAutomationState(memoryPath);
+  assert.equal(inspected.ubersuggest.boundThreadId, 'thread-2');
+  assert.equal(inspected.ubersuggest.boundTools.length, 4);
 });
 
 test('automation state enforces the fifteen-run task ceiling', () => {
-  const memoryPath = createMemory(15);
+  const memoryPath = prepareOperationalState(createMemory(15));
   assert.throws(() => startAutomationRun({
     memoryPath,
     threadId: 'thread-1',
@@ -128,7 +246,7 @@ test('automation state enforces the fifteen-run task ceiling', () => {
 });
 
 test('automation state rotates atomically after run fifteen and is idempotent', () => {
-  const memoryPath = createMemory(15);
+  const memoryPath = createCompletedRun15Memory();
   const first = runAutomationStateCli([
     'rotate-thread',
     '--from-thread', 'thread-1',
@@ -153,7 +271,7 @@ test('automation state rotates atomically after run fifteen and is idempotent', 
 });
 
 test('automation state rejects early rotation and historical task reuse', () => {
-  const earlyMemoryPath = createMemory(14);
+  const earlyMemoryPath = prepareOperationalState(createMemory(14));
   assert.throws(() => rotateAutomationThread({
     memoryPath: earlyMemoryPath,
     fromThreadId: 'thread-1',
@@ -162,7 +280,7 @@ test('automation state rejects early rotation and historical task reuse', () => 
     evidence: 'Not due yet.',
   }), /ROTATION_NOT_DUE/);
 
-  const dueMemoryPath = createMemory(15);
+  const dueMemoryPath = createCompletedRun15Memory();
   const content = fs.readFileSync(dueMemoryPath, 'utf8');
   const rotation = inspectAutomationState(dueMemoryPath).rotation;
   rotation.previousThreadIds = ['thread-2'];
@@ -221,8 +339,7 @@ test('automation-state inspect CLI fails closed when a required block is missing
 });
 
 test('automation installation audit proves one active heartbeat, matching task and durable prompt controls', () => {
-  const memoryPath = createMemory();
-  ensureAutomationState(memoryPath);
+  const memoryPath = prepareOperationalState(createMemory());
   const paths = createAutomationConfig(memoryPath);
   const audit = auditAutomationInstallation({ memoryPath, ...paths });
 
@@ -233,8 +350,7 @@ test('automation installation audit proves one active heartbeat, matching task a
 });
 
 test('start-run CLI fails before increment when the automation target drifts', () => {
-  const memoryPath = createMemory();
-  ensureAutomationState(memoryPath);
+  const memoryPath = prepareOperationalState(createMemory());
   const paths = createAutomationConfig(memoryPath, { targetThreadId: 'wrong-thread' });
 
   assert.throws(() => runAutomationStateCli([
@@ -246,8 +362,7 @@ test('start-run CLI fails before increment when the automation target drifts', (
 });
 
 test('automation installation audit rejects a second Softora SEO automation', () => {
-  const memoryPath = createMemory();
-  ensureAutomationState(memoryPath);
+  const memoryPath = prepareOperationalState(createMemory());
   const paths = createAutomationConfig(memoryPath);
   const duplicateDirectory = path.join(paths.automationsRoot, 'seo-copy');
   fs.mkdirSync(duplicateDirectory);

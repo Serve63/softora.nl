@@ -4,24 +4,38 @@ const os = require('node:os');
 const path = require('node:path');
 const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
+const RUN_LIFECYCLE_BLOCK = 'SEO_RUN_LIFECYCLE_STATE';
 const DEFAULT_MAX_RUNS_PER_THREAD = 15;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTOMATION_ID = 'softora-seo-actiemachine';
 const AUTOMATION_NAME = 'Softora SEO dagmachine';
 const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
-const AUTOMATION_PROMPT_VERSION = 3;
+const AUTOMATION_PROMPT_VERSION = 4;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
 ]);
+const REQUIRED_UBERSUGGEST_TOOLS = Object.freeze([
+  'mcp__ubersuggest__keyword_suggestions',
+  'mcp__ubersuggest__google_suggestions',
+  'mcp__ubersuggest__keyword_overview',
+  'mcp__ubersuggest__serp_analysis',
+]);
+const RUN_OUTCOMES = Object.freeze([
+  'published', 'completed_no_publication', 'operations_p0', 'blocked', 'failed', 'interrupted',
+]);
+const PUBLIC_EFFECTS = Object.freeze(['live', 'scheduled', 'pr_only', 'none', 'unverified']);
 const DEFAULT_MEMORY_PATH = path.join(
   os.homedir(), '.codex', 'automations', AUTOMATION_ID, 'memory.md'
 );
 const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=3/ }),
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=4/ }),
   Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
   Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
+  Object.freeze({ label: 'finish_run_receipt', pattern: /seo:automation-state -- finish-run/i }),
+  Object.freeze({ label: 'selection_gate', pattern: /seo:selection:check/i }),
+  Object.freeze({ label: 'ubersuggest_tool_binding', pattern: /mcp__ubersuggest__keyword_suggestions[\s\S]*mcp__ubersuggest__serp_analysis/i }),
   Object.freeze({ label: 'edge_family_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
   Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge[\s\S]*profileName=Codex/i }),
   Object.freeze({ label: 'chrome_prohibition', pattern: /Google Chrome is forbidden/i }),
@@ -118,6 +132,23 @@ function validateRotationState(state) {
   } else if (new Set(previousThreadIds).size !== previousThreadIds.length) {
     errors.push('previousThreadIds bevat dubbelen.');
   }
+  if (state.bindingRepairHistory !== undefined) {
+    if (!Array.isArray(state.bindingRepairHistory)) {
+      errors.push('bindingRepairHistory is ongeldig.');
+    } else {
+      state.bindingRepairHistory.forEach((repair, index) => {
+        if (!repair || typeof repair !== 'object') errors.push(`bindingRepairHistory ${index + 1} is ongeldig.`);
+        else if (
+          !String(repair.fromThreadId || '').trim()
+          || !String(repair.toThreadId || '').trim()
+          || repair.fromThreadId === repair.toThreadId
+          || !Number.isFinite(new Date(repair.repairedAt).getTime())
+          || String(repair.reason || '').trim().length < 8
+          || String(repair.evidence || '').trim().length < 8
+        ) errors.push(`bindingRepairHistory ${index + 1} mist geldig bewijs.`);
+      });
+    }
+  }
   return errors;
 }
 function defaultUbersuggestState() {
@@ -125,6 +156,7 @@ function defaultUbersuggestState() {
     schemaVersion: 1, provider: 'ubersuggest', role: 'advisory_only', lastAuthCheckAt: null,
     lastWeeklyDiscoveryAt: null, lastStatus: 'not_checked', lastRunDate: null,
     contentCallsUsed: 0, weeklyCallsUsed: 0, lastEvidencePath: null,
+    boundThreadId: null, toolBindingCheckedAt: null, boundTools: [], toolBindingEvidence: null,
   };
 }
 function validDay(value) {
@@ -151,6 +183,98 @@ function validateUbersuggestState(state) {
     const evidencePath = String(state.lastEvidencePath || '');
     if (!evidencePath || path.isAbsolute(evidencePath) || evidencePath.split(/[\\/]+/).includes('..')) {
       errors.push('lastEvidencePath moet een veilig relatief repopad zijn.');
+    }
+  }
+  if (state.boundThreadId !== null && !String(state.boundThreadId || '').trim()) errors.push('boundThreadId is ongeldig.');
+  if (state.toolBindingCheckedAt !== null && !Number.isFinite(new Date(state.toolBindingCheckedAt).getTime())) {
+    errors.push('toolBindingCheckedAt is ongeldig.');
+  }
+  if (!Array.isArray(state.boundTools) || state.boundTools.some((tool) => !String(tool || '').trim())) {
+    errors.push('boundTools is ongeldig.');
+  } else if (new Set(state.boundTools).size !== state.boundTools.length) {
+    errors.push('boundTools bevat dubbelen.');
+  }
+  if (state.toolBindingEvidence !== null && String(state.toolBindingEvidence || '').trim().length < 8) {
+    errors.push('toolBindingEvidence is te vaag.');
+  }
+  return errors;
+}
+
+function defaultRunLifecycleState() {
+  return { schemaVersion: 1, activeRun: null, lastReceipt: null, receipts: [] };
+}
+
+function validIso(value) {
+  return Boolean(String(value || '').trim()) && Number.isFinite(new Date(value).getTime());
+}
+
+function validSoftoraUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''));
+    return parsed.protocol === 'https:' && ['softora.nl', 'www.softora.nl'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function validateRunIdentity(run, label = 'activeRun') {
+  const errors = [];
+  if (!run || typeof run !== 'object') return [`${label} is ongeldig.`];
+  if (!String(run.threadId || '').trim()) errors.push(`${label}.threadId ontbreekt.`);
+  if (!validIso(run.invocationAt)) errors.push(`${label}.invocationAt is ongeldig.`);
+  if (!validIso(run.startedAt)) errors.push(`${label}.startedAt is ongeldig.`);
+  if (!Number.isInteger(Number(run.runNumber)) || Number(run.runNumber) < 1 || Number(run.runNumber) > 15) {
+    errors.push(`${label}.runNumber is ongeldig.`);
+  }
+  return errors;
+}
+
+function validateRunReceipt(receipt, label = 'receipt') {
+  const errors = validateRunIdentity(receipt, label);
+  if (!validIso(receipt?.finishedAt)) errors.push(`${label}.finishedAt is ongeldig.`);
+  if (validIso(receipt?.startedAt) && validIso(receipt?.finishedAt)
+    && new Date(receipt.finishedAt) < new Date(receipt.startedAt)) errors.push(`${label}.finishedAt ligt voor startedAt.`);
+  if (!RUN_OUTCOMES.includes(String(receipt?.outcome || ''))) errors.push(`${label}.outcome is ongeldig.`);
+  if (!PUBLIC_EFFECTS.includes(String(receipt?.publicEffect || ''))) errors.push(`${label}.publicEffect is ongeldig.`);
+  if (String(receipt?.evidence || '').trim().length < 8 || String(receipt?.evidence || '').length > 500) {
+    errors.push(`${label}.evidence moet 8-500 tekens bevatten.`);
+  }
+  if (receipt?.prNumber !== null && receipt?.prNumber !== undefined
+    && (!Number.isInteger(Number(receipt.prNumber)) || Number(receipt.prNumber) < 1)) errors.push(`${label}.prNumber is ongeldig.`);
+  if (receipt?.liveCommit !== null && receipt?.liveCommit !== undefined
+    && !/^[a-f0-9]{7,40}$/i.test(String(receipt.liveCommit))) errors.push(`${label}.liveCommit is ongeldig.`);
+  if (receipt?.changedUrl !== null && receipt?.changedUrl !== undefined && !validSoftoraUrl(receipt.changedUrl)) {
+    errors.push(`${label}.changedUrl moet een geldige Softora-URL zijn.`);
+  }
+  if (receipt?.outcome === 'published' && receipt?.publicEffect !== 'live') {
+    errors.push(`${label} mag published alleen met publicEffect=live zijn.`);
+  }
+  if (receipt?.publicEffect === 'live' && (!receipt.liveCommit || !receipt.changedUrl)) {
+    errors.push(`${label} met live effect vereist liveCommit en changedUrl.`);
+  }
+  if (receipt?.outcome === 'interrupted' && receipt?.publicEffect !== 'unverified') {
+    errors.push(`${label} met interrupted vereist publicEffect=unverified.`);
+  }
+  return errors;
+}
+
+function validateRunLifecycleState(state) {
+  const errors = [];
+  if (!state || typeof state !== 'object') return ['Run-lifecyclestaat ontbreekt.'];
+  if (Number(state.schemaVersion) !== 1) errors.push('Run-lifecycle schemaVersion moet 1 zijn.');
+  if (state.activeRun !== null) errors.push(...validateRunIdentity(state.activeRun));
+  if (state.lastReceipt !== null) errors.push(...validateRunReceipt(state.lastReceipt, 'lastReceipt'));
+  if (!Array.isArray(state.receipts) || state.receipts.length > 30) {
+    errors.push('Run-lifecycle receipts is ongeldig.');
+  } else {
+    state.receipts.forEach((receipt, index) => errors.push(...validateRunReceipt(receipt, `receipts[${index}]`)));
+    const keys = state.receipts.map((receipt) => `${receipt.threadId}|${receipt.invocationAt}`);
+    if (new Set(keys).size !== keys.length) errors.push('Run-lifecycle receipts bevat dubbele invocations.');
+  }
+  if (state.lastReceipt !== null && Array.isArray(state.receipts)) {
+    const last = state.receipts.at(-1);
+    if (!last || last.threadId !== state.lastReceipt.threadId || last.invocationAt !== state.lastReceipt.invocationAt) {
+      errors.push('lastReceipt wijkt af van de laatste receipt.');
     }
   }
   return errors;
@@ -181,12 +305,16 @@ function writeMemoryAtomic(memoryPath, content) {
 function inspectAutomationState(memoryPath, now = new Date()) {
   const content = fs.readFileSync(memoryPath, 'utf8');
   const rotation = parseStateBlock(content, ROTATION_BLOCK);
-  const stored = parseStateBlock(content, UBERSUGGEST_BLOCK);
-  const ubersuggest = stored || defaultUbersuggestState();
+  const storedUbersuggest = parseStateBlock(content, UBERSUGGEST_BLOCK);
+  const ubersuggest = { ...defaultUbersuggestState(), ...(storedUbersuggest || {}) };
+  const storedLifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+  const lifecycle = storedLifecycle || defaultRunLifecycleState();
   return {
     rotation, rotationErrors: validateRotationState(rotation), ubersuggest,
-    ubersuggestErrors: stored ? validateUbersuggestState(stored) : ['Ubersuggest-staatblok ontbreekt.'],
-    ubersuggestStatePresent: Boolean(stored), weeklyDiscoveryDue: isWeeklyDiscoveryDue(ubersuggest, now),
+    ubersuggestErrors: storedUbersuggest ? validateUbersuggestState(ubersuggest) : ['Ubersuggest-staatblok ontbreekt.'],
+    ubersuggestStatePresent: Boolean(storedUbersuggest), weeklyDiscoveryDue: isWeeklyDiscoveryDue(ubersuggest, now),
+    lifecycle, lifecycleErrors: storedLifecycle ? validateRunLifecycleState(lifecycle) : ['Run-lifecyclestaatblok ontbreekt.'],
+    lifecycleStatePresent: Boolean(storedLifecycle),
   };
 }
 
@@ -201,7 +329,7 @@ function auditAutomationInstallation({
   let config = null;
   try {
     state = inspectAutomationState(memoryPath, now);
-    errors.push(...state.rotationErrors, ...state.ubersuggestErrors);
+    errors.push(...state.rotationErrors, ...state.ubersuggestErrors, ...state.lifecycleErrors);
   } catch (error) {
     errors.push(`Automation memory kan niet worden gelezen: ${error.message}`);
   }
@@ -232,6 +360,15 @@ function auditAutomationInstallation({
       state?.rotation?.activeThreadId
       && config.targetThreadId !== state.rotation.activeThreadId
     ) errors.push('Automation target_thread_id wijkt af van de actieve rotatietask.');
+    if (state?.rotation?.activeThreadId && state?.ubersuggest?.boundThreadId !== state.rotation.activeThreadId) {
+      errors.push('Ubersuggest-toolbinding is niet bewezen voor de actieve automation-task.');
+    }
+    const missingUbersuggestTools = REQUIRED_UBERSUGGEST_TOOLS.filter(
+      (toolName) => !state?.ubersuggest?.boundTools?.includes(toolName)
+    );
+    if (missingUbersuggestTools.length) {
+      errors.push(`Ubersuggest-toolbinding mist: ${missingUbersuggestTools.join(', ')}.`);
+    }
     for (const marker of REQUIRED_PROMPT_MARKERS) {
       if (!marker.pattern.test(String(config.prompt || ''))) missingPromptMarkers.push(marker.label);
     }
@@ -257,6 +394,7 @@ function auditAutomationInstallation({
     matchingAutomationPaths,
     rotation: state?.rotation || null,
     ubersuggest: state?.ubersuggest || null,
+    lifecycle: state?.lifecycle || null,
     weeklyDiscoveryDue: state?.weeklyDiscoveryDue ?? null,
   };
 }
@@ -267,11 +405,23 @@ function ensureAutomationState(memoryPath, now = new Date()) {
     const rotationErrors = validateRotationState(rotation);
     if (rotationErrors.length) throw new Error(`Ongeldige rotatiestaat: ${rotationErrors.join(' ')}`);
     const existing = parseStateBlock(content, UBERSUGGEST_BLOCK);
-    const ubersuggest = existing || defaultUbersuggestState();
+    const ubersuggest = { ...defaultUbersuggestState(), ...(existing || {}) };
     const errors = validateUbersuggestState(ubersuggest);
     if (errors.length) throw new Error(`Ongeldige Ubersuggest-staat: ${errors.join(' ')}`);
-    if (!existing) writeMemoryAtomic(memoryPath, replaceStateBlock(content, UBERSUGGEST_BLOCK, ubersuggest));
-    return { rotation, ubersuggest, weeklyDiscoveryDue: isWeeklyDiscoveryDue(ubersuggest, now), createdUbersuggestState: !existing };
+    const existingLifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycle = existingLifecycle || defaultRunLifecycleState();
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
+    const ubersuggestNeedsWrite = !existing || JSON.stringify(existing) !== JSON.stringify(ubersuggest);
+    let nextContent = content;
+    if (ubersuggestNeedsWrite) nextContent = replaceStateBlock(nextContent, UBERSUGGEST_BLOCK, ubersuggest);
+    if (!existingLifecycle) nextContent = replaceStateBlock(nextContent, RUN_LIFECYCLE_BLOCK, lifecycle);
+    if (nextContent !== content) writeMemoryAtomic(memoryPath, nextContent);
+    return {
+      rotation, ubersuggest, lifecycle, weeklyDiscoveryDue: isWeeklyDiscoveryDue(ubersuggest, now),
+      createdUbersuggestState: !existing, migratedUbersuggestState: Boolean(existing && ubersuggestNeedsWrite),
+      createdLifecycleState: !existingLifecycle,
+    };
   });
 }
 function startAutomationRun({ memoryPath, threadId, invocationAt }) {
@@ -280,14 +430,108 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
     const current = parseStateBlock(content, ROTATION_BLOCK);
     const errors = validateRotationState(current);
     if (errors.length) throw new Error(`Ongeldige rotatiestaat: ${errors.join(' ')}`);
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
     if (String(current.activeThreadId) !== String(threadId || '')) throw new Error('Verkeerde automation-task.');
     if (!String(invocationAt || '').trim() || !Number.isFinite(new Date(invocationAt).getTime())) throw new Error('invocationAt is ongeldig.');
-    if (current.lastInvocationAt === invocationAt) return { ...current, idempotent: true };
+    if (current.lastInvocationAt === invocationAt) {
+      const matchingReceipt = lifecycle.receipts.find(
+        (receipt) => receipt.threadId === threadId && receipt.invocationAt === invocationAt
+      );
+      return {
+        ...current,
+        lifecycle: matchingReceipt ? 'finished' : 'running',
+        receipt: matchingReceipt || null,
+        idempotent: true,
+      };
+    }
     if (Number(current.completedRunsInActiveThread) >= 15) throw new Error('ROTATION_REQUIRED: deze task heeft al 15 heartbeat-runs verwerkt.');
     const completedRunsInActiveThread = Number(current.completedRunsInActiveThread) + 1;
     const next = { ...current, completedRunsInActiveThread, lastInvocationAt: invocationAt, rotationStatus: completedRunsInActiveThread === 15 ? 'rotation_due' : 'active' };
-    writeMemoryAtomic(memoryPath, replaceStateBlock(content, ROTATION_BLOCK, next));
-    return next;
+    const receipts = [...lifecycle.receipts];
+    let recoveredPreviousRun = null;
+    if (lifecycle.activeRun) {
+      recoveredPreviousRun = {
+        ...lifecycle.activeRun,
+        finishedAt: invocationAt,
+        outcome: 'interrupted',
+        publicEffect: 'unverified',
+        evidence: 'Next invocation started before finish-run; previous external effects require reconciliation.',
+        prNumber: null,
+        liveCommit: null,
+        changedUrl: null,
+        autoClosed: true,
+      };
+      const receiptErrors = validateRunReceipt(recoveredPreviousRun, 'recoveredPreviousRun');
+      if (receiptErrors.length) throw new Error(`Vorige run kan niet veilig worden afgesloten: ${receiptErrors.join(' ')}`);
+      receipts.push(recoveredPreviousRun);
+    }
+    const activeRun = {
+      threadId: String(threadId), invocationAt, runNumber: completedRunsInActiveThread, startedAt: invocationAt,
+    };
+    const nextLifecycle = {
+      ...lifecycle,
+      activeRun,
+      lastReceipt: recoveredPreviousRun || lifecycle.lastReceipt,
+      receipts: receipts.slice(-30),
+    };
+    const nextLifecycleErrors = validateRunLifecycleState(nextLifecycle);
+    if (nextLifecycleErrors.length) throw new Error(`Nieuwe run-lifecyclestaat is ongeldig: ${nextLifecycleErrors.join(' ')}`);
+    let nextContent = replaceStateBlock(content, ROTATION_BLOCK, next);
+    nextContent = replaceStateBlock(nextContent, RUN_LIFECYCLE_BLOCK, nextLifecycle);
+    writeMemoryAtomic(memoryPath, nextContent);
+    return { ...next, lifecycle: 'running', activeRun, recoveredPreviousRun };
+  });
+}
+
+function finishAutomationRun({
+  memoryPath, threadId, invocationAt, finishedAt, outcome, publicEffect,
+  evidence, prNumber = null, liveCommit = null, changedUrl = null,
+}) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const rotation = parseStateBlock(content, ROTATION_BLOCK);
+    const rotationErrors = validateRotationState(rotation);
+    if (rotationErrors.length) throw new Error(`Ongeldige rotatiestaat: ${rotationErrors.join(' ')}`);
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
+    const existingReceipt = lifecycle.receipts.find(
+      (receipt) => receipt.threadId === threadId && receipt.invocationAt === invocationAt
+    );
+    if (!lifecycle.activeRun && existingReceipt) return { ...existingReceipt, idempotent: true };
+    if (!lifecycle.activeRun) throw new Error('NO_ACTIVE_RUN: er is geen open run om af te sluiten.');
+    if (lifecycle.activeRun.threadId !== String(threadId || '') || lifecycle.activeRun.invocationAt !== invocationAt) {
+      throw new Error('RUN_IDENTITY_MISMATCH: finish-run hoort niet bij de actieve invocation.');
+    }
+    if (rotation.activeThreadId !== threadId || rotation.lastInvocationAt !== invocationAt) {
+      throw new Error('RUN_ROTATION_MISMATCH: rotatie- en lifecyclestaat lopen uiteen.');
+    }
+    if (outcome === 'interrupted') throw new Error('interrupted is gereserveerd voor automatisch herstel bij een volgende invocation.');
+    const receipt = {
+      ...lifecycle.activeRun,
+      finishedAt,
+      outcome,
+      publicEffect,
+      evidence: String(evidence || '').trim(),
+      prNumber: prNumber === null || prNumber === undefined || prNumber === '' ? null : Number(prNumber),
+      liveCommit: liveCommit || null,
+      changedUrl: changedUrl || null,
+      autoClosed: false,
+    };
+    const receiptErrors = validateRunReceipt(receipt);
+    if (receiptErrors.length) throw new Error(`Ongeldige finish-run receipt: ${receiptErrors.join(' ')}`);
+    const nextLifecycle = {
+      ...lifecycle,
+      activeRun: null,
+      lastReceipt: receipt,
+      receipts: [...lifecycle.receipts, receipt].slice(-30),
+    };
+    const nextErrors = validateRunLifecycleState(nextLifecycle);
+    if (nextErrors.length) throw new Error(`Nieuwe run-lifecyclestaat is ongeldig: ${nextErrors.join(' ')}`);
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, RUN_LIFECYCLE_BLOCK, nextLifecycle));
+    return receipt;
   });
 }
 function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedAt, evidence }) {
@@ -296,6 +540,12 @@ function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedA
     const current = parseStateBlock(content, ROTATION_BLOCK);
     const errors = validateRotationState(current);
     if (errors.length) throw new Error(`Ongeldige rotatiestaat: ${errors.join(' ')}`);
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
+    const ubersuggest = { ...defaultUbersuggestState(), ...(parseStateBlock(content, UBERSUGGEST_BLOCK) || {}) };
+    const ubersuggestErrors = validateUbersuggestState(ubersuggest);
+    if (ubersuggestErrors.length) throw new Error(`Ongeldige Ubersuggest-staat: ${ubersuggestErrors.join(' ')}`);
     const fromThread = String(fromThreadId || '').trim();
     const toThread = String(toThreadId || '').trim();
     const rotationEvidence = String(evidence || '').trim();
@@ -313,6 +563,10 @@ function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedA
     if (Number(current.completedRunsInActiveThread) !== 15 || current.rotationStatus !== 'rotation_due') {
       throw new Error('ROTATION_NOT_DUE: roteer uitsluitend na de vijftiende heartbeat-run.');
     }
+    if (lifecycle.activeRun) throw new Error('RUN_NOT_FINISHED: sluit run 15 eerst af met finish-run.');
+    if (lifecycle.lastReceipt?.threadId !== fromThread || Number(lifecycle.lastReceipt?.runNumber) !== 15) {
+      throw new Error('RUN_15_RECEIPT_MISSING: rotatie vereist een geldige finish-run receipt voor run 15.');
+    }
     if (current.previousThreadIds.includes(toThread)) throw new Error('De nieuwe task is al als historische task gebruikt.');
     const next = {
       ...current,
@@ -327,7 +581,97 @@ function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedA
     };
     const nextErrors = validateRotationState(next);
     if (nextErrors.length) throw new Error(`Nieuwe rotatiestaat is ongeldig: ${nextErrors.join(' ')}`);
-    writeMemoryAtomic(memoryPath, replaceStateBlock(content, ROTATION_BLOCK, next));
+    const nextUbersuggest = {
+      ...ubersuggest,
+      boundThreadId: null,
+      toolBindingCheckedAt: null,
+      boundTools: [],
+      toolBindingEvidence: null,
+    };
+    let nextContent = replaceStateBlock(content, ROTATION_BLOCK, next);
+    nextContent = replaceStateBlock(nextContent, UBERSUGGEST_BLOCK, nextUbersuggest);
+    writeMemoryAtomic(memoryPath, nextContent);
+    return next;
+  });
+}
+
+function repairAutomationThreadBinding({ memoryPath, fromThreadId, toThreadId, repairedAt, reason, evidence }) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const current = parseStateBlock(content, ROTATION_BLOCK);
+    const errors = validateRotationState(current);
+    if (errors.length) throw new Error(`Ongeldige rotatiestaat: ${errors.join(' ')}`);
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
+    const ubersuggest = { ...defaultUbersuggestState(), ...(parseStateBlock(content, UBERSUGGEST_BLOCK) || {}) };
+    const fromThread = String(fromThreadId || '').trim();
+    const toThread = String(toThreadId || '').trim();
+    const repairReason = String(reason || '').trim();
+    const repairEvidence = String(evidence || '').trim();
+    if (!fromThread || !toThread || fromThread === toThread) throw new Error('Oude en nieuwe binding-task moeten geldig en verschillend zijn.');
+    if (!validIso(repairedAt)) throw new Error('repairedAt is ongeldig.');
+    if (repairReason.length < 8 || repairEvidence.length < 8) throw new Error('Binding-repair mist reden of bewijs.');
+    const previousRepair = current.bindingRepairHistory?.at(-1);
+    if (
+      current.activeThreadId === toThread
+      && previousRepair?.fromThreadId === fromThread
+      && previousRepair?.toThreadId === toThread
+      && previousRepair?.repairedAt === repairedAt
+    ) return { ...current, idempotent: true };
+    if (current.activeThreadId !== fromThread) throw new Error('De actieve task komt niet overeen met --from-thread.');
+    if (Number(current.completedRunsInActiveThread) >= 15 || current.rotationStatus !== 'active') {
+      throw new Error('BINDING_REPAIR_NOT_ALLOWED: gebruik na run 15 de normale rotatie.');
+    }
+    if (lifecycle.activeRun) throw new Error('RUN_NOT_FINISHED: repareer de taskbinding alleen tussen twee runs.');
+    if (current.previousThreadIds.includes(toThread)) throw new Error('De nieuwe binding-task is al historisch gebruikt.');
+    const repair = { fromThreadId: fromThread, toThreadId: toThread, repairedAt, reason: repairReason, evidence: repairEvidence };
+    const next = {
+      ...current,
+      activeThreadId: toThread,
+      previousThreadIds: [...current.previousThreadIds, fromThread],
+      bindingRepairHistory: [...(current.bindingRepairHistory || []), repair],
+      evidence: repairEvidence,
+    };
+    const nextErrors = validateRotationState(next);
+    if (nextErrors.length) throw new Error(`Nieuwe rotatiestaat is ongeldig: ${nextErrors.join(' ')}`);
+    const nextUbersuggest = {
+      ...ubersuggest,
+      boundThreadId: null,
+      toolBindingCheckedAt: null,
+      boundTools: [],
+      toolBindingEvidence: null,
+    };
+    let nextContent = replaceStateBlock(content, ROTATION_BLOCK, next);
+    nextContent = replaceStateBlock(nextContent, UBERSUGGEST_BLOCK, nextUbersuggest);
+    writeMemoryAtomic(memoryPath, nextContent);
+    return next;
+  });
+}
+
+function recordUbersuggestToolBinding({ memoryPath, threadId, checkedAt, tools, evidence }) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const rotation = parseStateBlock(content, ROTATION_BLOCK);
+    const rotationErrors = validateRotationState(rotation);
+    if (rotationErrors.length) throw new Error(`Ongeldige rotatiestaat: ${rotationErrors.join(' ')}`);
+    const current = { ...defaultUbersuggestState(), ...(parseStateBlock(content, UBERSUGGEST_BLOCK) || {}) };
+    const boundTools = Array.from(new Set(String(tools || '').split(',').map((tool) => tool.trim()).filter(Boolean))).sort();
+    if (rotation.activeThreadId !== String(threadId || '').trim()) throw new Error('Toolbinding hoort niet bij de actieve automation-task.');
+    if (!validIso(checkedAt)) throw new Error('checkedAt is ongeldig.');
+    const missing = REQUIRED_UBERSUGGEST_TOOLS.filter((toolName) => !boundTools.includes(toolName));
+    if (missing.length) throw new Error(`Toolbinding mist verplichte Ubersuggest-tools: ${missing.join(', ')}.`);
+    if (String(evidence || '').trim().length < 8) throw new Error('Toolbindingbewijs ontbreekt.');
+    const next = {
+      ...current,
+      boundThreadId: String(threadId).trim(),
+      toolBindingCheckedAt: checkedAt,
+      boundTools,
+      toolBindingEvidence: String(evidence).trim(),
+    };
+    const errors = validateUbersuggestState(next);
+    if (errors.length) throw new Error(`Ongeldige Ubersuggest-toolbinding: ${errors.join(' ')}`);
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, UBERSUGGEST_BLOCK, next));
     return next;
   });
 }
@@ -373,7 +717,7 @@ function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
     if (result.errors.length) throw new Error(`Automation-installatie ongeldig: ${result.errors.join(' ')}`);
   } else if (args.command === 'inspect') {
     result = inspectAutomationState(memoryPath, new Date(args.now || Date.now()));
-    const errors = [...result.rotationErrors, ...result.ubersuggestErrors];
+    const errors = [...result.rotationErrors, ...result.ubersuggestErrors, ...result.lifecycleErrors];
     if (errors.length) throw new Error(`Automation-state ongeldig: ${errors.join(' ')}`);
   } else if (args.command === 'ensure') result = ensureAutomationState(memoryPath, new Date(args.now || Date.now()));
   else if (args.command === 'start-run') {
@@ -381,9 +725,21 @@ function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
     if (audit.errors.length) throw new Error(`Automation-installatie ongeldig: ${audit.errors.join(' ')}`);
     result = startAutomationRun({ memoryPath, threadId: args.thread, invocationAt: args['invocation-at'] });
   }
+  else if (args.command === 'finish-run') result = finishAutomationRun({
+    memoryPath, threadId: args.thread, invocationAt: args['invocation-at'], finishedAt: args['finished-at'],
+    outcome: args.outcome, publicEffect: args['public-effect'], evidence: args.evidence,
+    prNumber: args['pr-number'], liveCommit: args['live-commit'], changedUrl: args['changed-url'],
+  });
   else if (args.command === 'rotate-thread') result = rotateAutomationThread({
     memoryPath, fromThreadId: args['from-thread'], toThreadId: args['to-thread'],
     rotatedAt: args['rotated-at'], evidence: args.evidence,
+  });
+  else if (args.command === 'repair-thread-binding') result = repairAutomationThreadBinding({
+    memoryPath, fromThreadId: args['from-thread'], toThreadId: args['to-thread'],
+    repairedAt: args['repaired-at'], reason: args.reason, evidence: args.evidence,
+  });
+  else if (args.command === 'record-tool-binding') result = recordUbersuggestToolBinding({
+    memoryPath, threadId: args.thread, checkedAt: args['checked-at'], tools: args.tools, evidence: args.evidence,
   });
   else if (args.command === 'record-keywords') result = recordUbersuggestRun({
     memoryPath, status: args.status, runDate: args['run-date'], contentCallsUsed: args['content-calls'],
@@ -401,9 +757,12 @@ if (require.main === module) {
 }
 module.exports = {
   AUTOMATION_ID, AUTOMATION_NAME, AUTOMATION_PROMPT_VERSION, AUTOMATION_RRULE, DEFAULT_AUTOMATION_PATH, DEFAULT_AUTOMATIONS_ROOT,
-  DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, REQUIRED_PROMPT_MARKERS, ROTATION_BLOCK, UBERSUGGEST_BLOCK,
+  DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, PUBLIC_EFFECTS, REQUIRED_PROMPT_MARKERS, REQUIRED_UBERSUGGEST_TOOLS,
+  ROTATION_BLOCK, RUN_LIFECYCLE_BLOCK, RUN_OUTCOMES, UBERSUGGEST_BLOCK,
   UBERSUGGEST_STATUSES, auditAutomationInstallation, defaultUbersuggestState, ensureAutomationState,
-  findSeoAutomationPaths, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue, parseArgs,
-  parseAutomationToml, parseStateBlock, recordUbersuggestRun, replaceStateBlock, rotateAutomationThread,
-  runAutomationStateCli, startAutomationRun, validateRotationState, validateUbersuggestState,
+  defaultRunLifecycleState, findSeoAutomationPaths, finishAutomationRun, formatStateBlock, inspectAutomationState,
+  isWeeklyDiscoveryDue, parseArgs, parseAutomationToml, parseStateBlock, recordUbersuggestRun,
+  recordUbersuggestToolBinding, repairAutomationThreadBinding, replaceStateBlock, rotateAutomationThread,
+  runAutomationStateCli, startAutomationRun, validateRotationState, validateRunLifecycleState,
+  validateRunReceipt, validateUbersuggestState,
 };
