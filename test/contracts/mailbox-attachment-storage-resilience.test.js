@@ -8,6 +8,7 @@ const {
   MAILBOX_ATTACHMENT_SWEEP_GRACE_MS,
   createMailboxAttachmentService,
 } = require('../../server/services/mailbox-attachment-service');
+const { createMailboxComposeRuntime } = require('../../server/services/mailbox-compose-runtime');
 
 function makeBinding(overrides = {}) {
   return {
@@ -616,4 +617,96 @@ test('attachment sweeper heeft een harde totaaldeadline bij een hangende Storage
   assert.equal(result.removed, 0);
   assert.equal(listCalls, 0, 'start nooit een Storage-call die niet binnen het resterende budget past');
   assert.ok(Date.now() - startedAt < 250);
+});
+
+test('compose runtime gebruikt voor cleanup uitsluitend de lokale bindingresolver en exposeert de begrensde sweeper', async () => {
+  const calls = { resolve: 0, cleanupBinding: 0, cleanup: 0, sweep: 0 };
+  const expectedBinding = makeBinding({ idempotencyKey: 'send:runtime-cleanup' });
+  const runtime = createMailboxComposeRuntime({
+    composeSendDependencies: {},
+    mailboxComposeThreadContext: {
+      async resolve() {
+        calls.resolve += 1;
+        throw new Error('cleanup mag de mailboxindex nooit lezen');
+      },
+      resolveAttachmentCleanupBinding(input) {
+        calls.cleanupBinding += 1;
+        assert.equal(input.body.idempotencyKey, expectedBinding.idempotencyKey);
+        return expectedBinding;
+      },
+    },
+    mailboxAttachmentService: {
+      async cleanupAttachments(attachments, binding) {
+        calls.cleanup += 1;
+        assert.deepEqual(attachments, [{ reference: 'signed-cleanup-reference' }]);
+        assert.deepEqual(binding, expectedBinding);
+        return { removed: 1 };
+      },
+      async sweepExpiredAttachments(options) {
+        calls.sweep += 1;
+        assert.deepEqual(options, { totalTimeoutMs: 3210 });
+        return { batches: 1, removed: 2, timedOut: false };
+      },
+    },
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    logger: { warn() {}, error() {} },
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+
+  await runtime.attachmentCleanupResponse({
+    body: {
+      account: expectedBinding.accountEmail,
+      to: expectedBinding.recipientEmail,
+      owner: expectedBinding.owner,
+      mode: expectedBinding.mode,
+      idempotencyKey: expectedBinding.idempotencyKey,
+      attachments: [{ reference: 'signed-cleanup-reference' }],
+    },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { ok: true, removed: 1 });
+  assert.deepEqual(await runtime.sweepExpiredAttachments({ totalTimeoutMs: 3210 }), {
+    batches: 1, removed: 2, timedOut: false,
+  });
+  assert.deepEqual(calls, { resolve: 0, cleanupBinding: 1, cleanup: 1, sweep: 1 });
+});
+
+test('compose cleanup faalt gesloten zonder lokale bindingresolver en gebruikt nooit prepareMessage als fallback', async () => {
+  let resolveCalls = 0;
+  let cleanupCalls = 0;
+  const runtime = createMailboxComposeRuntime({
+    composeSendDependencies: {},
+    mailboxComposeThreadContext: {
+      async resolve() { resolveCalls += 1; return makeBinding(); },
+    },
+    mailboxAttachmentService: {
+      async cleanupAttachments() { cleanupCalls += 1; return { removed: 1 }; },
+    },
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    logger: { warn() {}, error() {} },
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+
+  await runtime.attachmentCleanupResponse({ body: {
+    account: 'serve@softora.nl', to: 'prospect@example.nl', mode: 'new-message',
+    idempotencyKey: 'send:no-cleanup-binding', attachments: [{ reference: 'never-touch' }],
+  } }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.code, 'MAILBOX_ATTACHMENT_CLEANUP_BINDING_UNAVAILABLE');
+  assert.equal(resolveCalls, 0);
+  assert.equal(cleanupCalls, 0);
 });

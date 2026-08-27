@@ -8,7 +8,11 @@ const {
   TEMPORARY_MAILBOX_SEND_MESSAGE,
   createMailboxComposeRuntime,
 } = require('../../server/services/mailbox-compose-runtime');
-const { createMailboxSendProvenanceStore } = require('../../server/services/mailbox-send-provenance-store');
+const {
+  createMailboxRequestPayloadFingerprint,
+  createMailboxSendProvenanceStore,
+} = require('../../server/services/mailbox-send-provenance-store');
+const { createInstantlyMailboxService } = require('../../server/services/instantly-mailbox');
 const { sendMailboxMessage } = require('../../server/services/mailbox-instantly-integration');
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
@@ -16,6 +20,18 @@ const normalizeString = (value) => String(value || '').trim();
 const allowingSuppressionStore = {
   findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }),
 };
+
+function createRequiredInstantlyProvenanceStore(overrides = {}) {
+  return {
+    findByIdempotencyKey: async () => null,
+    reserve: async (input) => ({ created: true, intent: { ...input, status: 'prepared' } }),
+    startDispatch: async () => {},
+    accept: async (intentId, values) => ({ intentId, ...values, status: 'accepted' }),
+    fail: async (intentId) => ({ intentId, status: 'failed' }),
+    markUnknown: async (intentId) => ({ intentId, status: 'unknown' }),
+    ...overrides,
+  };
+}
 
 function responseRecorder() {
   return {
@@ -228,17 +244,31 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
   const resolver = createMailboxComposeThreadContext({ instantlyMailboxService, randomUUID: () => 'fixed-uuid' });
   const previewStore = createMailboxSendProvenanceStore();
   const intents = new Map();
+  const reservedInputs = [];
   const provenanceStore = {
     preview: (input) => previewStore.preview(input),
+    async findByIdempotencyKey(idempotencyKey) {
+      return intents.get(idempotencyKey) || null;
+    },
     async reserve(input) {
+      reservedInputs.push(input);
       if (intents.has(input.idempotencyKey)) return { created: false, intent: intents.get(input.idempotencyKey) };
-      const intent = { ...input, status: 'prepared' };
+      const intent = { ...input, status: 'prepared', dispatchState: 'reserved' };
       intents.set(input.idempotencyKey, intent);
       return { created: true, intent };
     },
-    async startDispatch() {},
-    async accept(intentId, values) { return { intentId, ...values, status: 'accepted' }; },
-    async fail() {}, async markUnknown() {},
+    async startDispatch(intentId) {
+      const entry = Array.from(intents.values()).find((intent) => intent.intentId === intentId);
+      if (entry) entry.dispatchState = 'started';
+    },
+    async accept(intentId, values) {
+      const entry = Array.from(intents.values()).find((intent) => intent.intentId === intentId);
+      const accepted = { ...entry, ...values, intentId, status: 'accepted', dispatchState: 'finished' };
+      if (entry?.idempotencyKey) intents.set(entry.idempotencyKey, accepted);
+      return accepted;
+    },
+    async fail(intentId) { return { intentId, status: 'failed' }; },
+    async markUnknown(intentId) { return { intentId, status: 'unknown' }; },
   };
   const runtime = createMailboxComposeRuntime({
     composeSendDependencies: { outboundRecipientGuardStore: allowingSuppressionStore }, getAccount: () => null, instantlyMailboxService,
@@ -270,10 +300,125 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
   assert.equal(adapterCalls.length, 1);
   assert.equal(adapterCalls[0].accountEmail, 'servecreusen@websoftora.com');
   assert.equal(adapterCalls[0].providerThreadId, flow.mail.providerThreadId);
+  assert.equal(reservedInputs[0].requestBody, 'Veilige adaptertest.');
+  assert.deepEqual(reservedInputs[0].attachmentsMetadata, []);
 
   const duplicate = responseRecorder();
   await runtime.sendMessageResponse({ body: payload }, duplicate);
+  assert.equal(duplicate.statusCode, 200);
+  assert.equal(duplicate.body.result.idempotentReplay, true);
+  assert.deepEqual(duplicate.body.result.sentMessage.attachments, []);
   assert.equal(adapterCalls.length, 1);
+});
+
+test('preflight classificeert accepted, processing en failed alleen na exact duurzaam context- en payloadbewijs', async (t) => {
+  const attachmentsMetadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }];
+  const body = {
+    account: 'serve@softora.nl', owner: 'serve', provider: '', mode: 'reply',
+    idempotencyKey: 'browser:preflight-proof', to: 'prospect@example.nl',
+    subject: 'Veilige retry', body: 'Exact verzonden antwoord', cc: '', bcc: '',
+    attachmentsMetadata,
+  };
+  const threadProvenance = {
+    intentId: 'send:preflight-proof', idempotencyKey: body.idempotencyKey,
+    owner: 'serve', senderName: 'Servé Creusen', accountEmail: body.account,
+    recipientEmail: body.to, mode: 'reply', conversationId: 'conversation:preflight-proof',
+    replyTargetMessageId: '<incoming-preflight@example.nl>',
+    references: '<root-preflight@example.nl> <incoming-preflight@example.nl>',
+    messageId: '<planned-preflight@softora.nl>', provider: 'smtp', providerThreadId: '',
+  };
+  const requestPayloadFingerprint = createMailboxRequestPayloadFingerprint({
+    subject: body.subject,
+    requestBody: body.body,
+    cc: body.cc,
+    bcc: body.bcc,
+    attachmentsMetadata,
+  });
+  const durable = {
+    ...threadProvenance,
+    subject: body.subject,
+    body: body.body,
+    cc: body.cc,
+    bcc: body.bcc,
+    attachmentsMetadata,
+    requestPayloadFingerprint,
+    messageId: '<accepted-preflight@softora.nl>',
+    acceptedAt: '2026-08-27T17:00:00.000Z',
+  };
+  function runtimeFor(conflict) {
+    return createMailboxComposeRuntime({
+      composeSendDependencies: {},
+      mailboxComposeThreadContext: { async resolve() { return threadProvenance; } },
+      mailboxSendProvenanceStore: {
+        async preflight(input) {
+          assert.equal(input.requestBody, input.body);
+          assert.deepEqual(input.attachmentsMetadata, attachmentsMetadata);
+          return { intent: input, conflict };
+        },
+      },
+      normalizeEmail,
+      normalizeString,
+      logger: { error() {}, warn() {} },
+    });
+  }
+
+  for (const [status, expected] of [
+    ['accepted', 'accepted'], ['prepared', 'processing'], ['failed', 'failed'],
+  ]) {
+    await t.test(status, async () => {
+      const response = responseRecorder();
+      await runtimeFor({ ...durable, status }).preflightMessageResponse({ body }, response);
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.result.status, expected);
+      assert.equal(response.body.result.reservationReady, false);
+      assert.equal(Boolean(response.body.result.acceptedResult), status === 'accepted');
+      if (status === 'accepted') {
+        assert.deepEqual(
+          response.body.result.acceptedResult.sentMessage.attachments,
+          durable.attachmentsMetadata
+        );
+        assert.equal(response.body.result.acceptedResult.sentMessage.body, durable.body);
+      }
+    });
+  }
+
+  await t.test('context mismatch', async () => {
+    const response = responseRecorder();
+    await runtimeFor({ ...durable, status: 'accepted', owner: 'martijn' })
+      .preflightMessageResponse({ body }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH');
+  });
+
+  await t.test('payload mismatch', async () => {
+    const response = responseRecorder();
+    await runtimeFor({ ...durable, status: 'accepted' }).preflightMessageResponse({
+      body: { ...body, body: 'Later gewijzigde tekst' },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH');
+  });
+
+  for (const [label, attachments, fingerprint] of [
+    ['legacy null', null, ''],
+    ['malformed', [{ filename: '../kapot.pdf', contentType: 'text/html', size: 9_000_000 }], requestPayloadFingerprint],
+    ['missing request fingerprint', attachmentsMetadata, ''],
+  ]) {
+    await t.test(label, async () => {
+      const response = responseRecorder();
+      await runtimeFor({
+        ...durable,
+        status: 'accepted',
+        attachmentsMetadata: attachments,
+        requestPayloadFingerprint: fingerprint,
+      }).preflightMessageResponse({ body }, response);
+      assert.equal(response.statusCode, 409);
+      assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+      assert.equal(response.body.result, undefined);
+    });
+  }
 });
 
 test('canonical source identity wins over stale opposite-provider sender while mismatched provenance fails closed', async () => {
@@ -330,22 +475,96 @@ test('canonical source identity wins over stale opposite-provider sender while m
   }), (error) => error.code === 'INSTANTLY_REPLY_IDENTITY_MISMATCH');
 });
 
+test('accepted Instantly-replay leest eenmaal duurzaam en start geen suppression, reserve of provider', async () => {
+  const counts = { find: 0, suppression: 0, reserve: 0, provider: 0 };
+  const body = {
+    provider: 'instantly', owner: 'serve', account: 'servecreusen@websoftora.com',
+    providerMessageId: 'incoming-accepted', providerThreadId: 'thread-accepted',
+    to: 'bestuur@mhcbe.nl', cc: '', bcc: '', subject: 'Re: Vraag',
+    body: 'Exact verzonden antwoord',
+  };
+  const threadProvenance = {
+    intentId: 'send:accepted-replay', idempotencyKey: 'browser:accepted-replay',
+    owner: 'serve', senderName: 'Servé Creusen', accountEmail: body.account,
+    recipientEmail: body.to, mode: 'reply', conversationId: 'instantly:thread-accepted',
+    replyTargetMessageId: 'incoming-accepted', references: 'incoming-accepted',
+    provider: 'instantly', providerThreadId: 'thread-accepted',
+  };
+  const accepted = {
+    ...threadProvenance,
+    status: 'accepted',
+    dispatchState: 'finished',
+    subject: body.subject,
+    body: body.body,
+    cc: '',
+    bcc: '',
+    attachmentsMetadata: [],
+    requestPayloadFingerprint: createMailboxRequestPayloadFingerprint({
+      subject: body.subject, requestBody: body.body, cc: '', bcc: '', attachmentsMetadata: [],
+    }),
+    messageId: '<outbound-accepted@instantly>',
+    providerMessageId: 'outbound-accepted',
+    acceptedAt: '2026-08-27T15:00:00.000Z',
+  };
+  const provenanceStore = createRequiredInstantlyProvenanceStore({
+    async findByIdempotencyKey() { counts.find += 1; return accepted; },
+    async reserve() { counts.reserve += 1; throw new Error('reserve mag niet starten'); },
+  });
+  const result = await sendMailboxMessage({
+    body,
+    instantlyMailboxService: {
+      async reply() { counts.provider += 1; throw new Error('provider mag niet starten'); },
+    },
+    sendMessage: async () => {},
+    normalizeString,
+    threadProvenance,
+    mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict() {
+        counts.suppression += 1;
+        return { ok: true, conflict: null };
+      },
+    },
+  });
+
+  assert.equal(result.idempotentReplay, true);
+  assert.equal(result.sentMessage.body, accepted.body);
+  assert.deepEqual(result.sentMessage.attachments, accepted.attachmentsMetadata);
+  assert.equal(result.sentMessage.attachmentEvidenceKnown, true);
+  assert.deepEqual(counts, { find: 1, suppression: 0, reserve: 0, provider: 0 });
+
+  accepted.attachmentsMetadata = null;
+  await assert.rejects(() => sendMailboxMessage({
+    body,
+    instantlyMailboxService: { async reply() { counts.provider += 1; } },
+    sendMessage: async () => {},
+    normalizeString,
+    threadProvenance,
+    mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: allowingSuppressionStore,
+  }), (error) => error.status === 409 && error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
+  assert.deepEqual(counts, { find: 2, suppression: 0, reserve: 0, provider: 0 });
+});
+
 test('ambiguous Instantly 5xx becomes reconcile-required and a retry never calls the adapter twice', async () => {
   let adapterCalls = 0;
   let intent = null;
-  const provenanceStore = {
+  const provenanceStore = createRequiredInstantlyProvenanceStore({
+    async findByIdempotencyKey() { return intent; },
     async reserve(input) {
       if (intent) return { created: false, intent };
-      intent = { ...input, status: 'prepared' };
+      intent = { ...input, status: 'prepared', dispatchState: 'reserved' };
       return { created: true, intent };
     },
-    async startDispatch() {},
+    async startDispatch() { intent.dispatchState = 'started'; },
     async markUnknown(_intentId, _error, values) {
-      intent = { ...intent, status: 'unknown', ...values };
+      intent = {
+        ...intent, status: 'unknown', dispatchState: 'started', reconcileRequired: true, ...values,
+      };
       return intent;
     },
     async fail() { throw new Error('ambiguous outcome must not become failed'); },
-  };
+  });
   const body = {
     provider: 'instantly', owner: 'martijn', account: 'martijn@websoftora.com',
     providerMessageId: 'message-1', providerThreadId: 'thread-1',
@@ -371,20 +590,177 @@ test('ambiguous Instantly 5xx becomes reconcile-required and a retry never calls
     outboundRecipientGuardStore: allowingSuppressionStore,
   });
   await assert.rejects(send, (error) => error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
-  await assert.rejects(send, (error) => error.code === 'MAILBOX_SEND_ALREADY_PROCESSING');
+  await assert.rejects(send, (error) => error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
   assert.equal(adapterCalls, 1);
   assert.equal(intent.status, 'unknown');
 });
 
+test('provider 200 plus lokale upsert-TypeError blijft accepted en kan niet opnieuw extern verzenden', async () => {
+  const counts = { provider: 0, upsert: 0, accept: 0, fail: 0, unknown: 0 };
+  let intent = null;
+  const body = {
+    provider: 'instantly', owner: 'serve', account: 'serve-sender@example.com',
+    providerMessageId: 'incoming-accepted-local-failure', providerThreadId: 'thread-local-failure',
+    to: 'prospect@example.org', cc: '', bcc: '', subject: 'Re: Vraag', body: 'Antwoord',
+  };
+  const threadProvenance = {
+    intentId: 'send:local-failure', idempotencyKey: 'browser:local-failure', owner: 'serve',
+    accountEmail: body.account, recipientEmail: body.to, mode: 'reply',
+    conversationId: 'instantly:thread-local-failure',
+    replyTargetMessageId: body.providerMessageId, references: body.providerMessageId,
+    provider: 'instantly', providerThreadId: body.providerThreadId,
+    messageId: '<incoming-parent-must-not-be-outbound@example.org>',
+  };
+  const mailboxIndexStore = {
+    async getProviderMessage() {
+      return {
+        providerOwner: 'serve', providerAccountEmail: body.account,
+        providerMessageId: body.providerMessageId, providerThreadId: body.providerThreadId,
+        folder: 'inbox', email: body.to,
+      };
+    },
+    async upsertProviderMessages() {
+      counts.upsert += 1;
+      throw new TypeError('lokale providerindex accepteert deze row niet');
+    },
+  };
+  const instantlyMailboxService = createInstantlyMailboxService({
+    config: {
+      enabled: true, apiKey: 'instant-key', webhookSecret: 'webhook-secret',
+      apiBaseUrl: 'https://api.instantly.test/api/v2',
+      accountOwners: { 'serve-sender@example.com': 'serve' },
+    },
+    mailboxIndexStore,
+    logger: { error() {} },
+    fetchJsonWithTimeout: async (url) => {
+      assert.equal(url.endsWith('/emails/reply'), true);
+      counts.provider += 1;
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          id: 'provider-outbound-local-failure', thread_id: body.providerThreadId,
+          body: { text: body.body }, timestamp_created: '2026-08-27T15:30:00.000Z',
+        },
+      };
+    },
+  });
+  const provenanceStore = createRequiredInstantlyProvenanceStore({
+    async findByIdempotencyKey(key) {
+      return intent?.idempotencyKey === key ? intent : null;
+    },
+    async reserve(input) {
+      if (intent) return { created: false, intent };
+      intent = {
+        ...input, status: 'prepared', dispatchState: 'reserved',
+        requestPayloadFingerprint: createMailboxRequestPayloadFingerprint(input),
+      };
+      return { created: true, intent };
+    },
+    async startDispatch() { intent.dispatchState = 'started'; },
+    async accept(_intentId, values) {
+      counts.accept += 1;
+      intent = { ...intent, ...values, status: 'accepted', dispatchState: 'finished' };
+      return intent;
+    },
+    async fail() { counts.fail += 1; throw new Error('accepted provider mag nooit failed worden'); },
+    async markUnknown() { counts.unknown += 1; throw new Error('provider-ID is duurzaam bekend'); },
+  });
+  const send = (provenance = threadProvenance) => sendMailboxMessage({
+    body, instantlyMailboxService, sendMessage: async () => {}, normalizeString,
+    threadProvenance: provenance, mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: allowingSuppressionStore,
+  });
+
+  const first = await send();
+  const replay = await send();
+  assert.equal(first.providerAccepted, true);
+  assert.equal(first.localIndexStored, false);
+  assert.equal(first.postAcceptWarningCode, 'INSTANTLY_REPLY_INDEX_STORE_FAILED');
+  assert.equal(first.sentMessage.messageId, 'provider-outbound-local-failure');
+  assert.notEqual(first.sentMessage.messageId, threadProvenance.messageId);
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(intent.messageId, 'provider-outbound-local-failure');
+
+  await assert.rejects(() => send({
+    ...threadProvenance,
+    intentId: 'send:local-failure-new-key',
+    idempotencyKey: 'browser:local-failure-new-key',
+  }), (error) => error.code === 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH');
+  assert.deepEqual(counts, { provider: 1, upsert: 1, accept: 1, fail: 0, unknown: 0 });
+});
+
+test('provider 200 met alleen teruggekaatste parent-ID wordt unknown en retryt de provider nooit', async () => {
+  let providerCalls = 0;
+  let intent = null;
+  const body = {
+    provider: 'instantly', owner: 'serve', account: 'serve-sender@example.com',
+    providerMessageId: 'incoming-no-outbound-id', providerThreadId: 'thread-no-outbound-id',
+    to: 'prospect@example.org', subject: 'Re: Vraag', body: 'Antwoord',
+  };
+  const threadProvenance = {
+    intentId: 'send:no-outbound-id', idempotencyKey: 'browser:no-outbound-id', owner: 'serve',
+    accountEmail: body.account, recipientEmail: body.to, mode: 'reply',
+    conversationId: 'instantly:thread-no-outbound-id',
+    replyTargetMessageId: body.providerMessageId, references: body.providerMessageId,
+    provider: 'instantly', providerThreadId: body.providerThreadId,
+    messageId: '<incoming-parent-must-not-be-outbound@example.org>',
+  };
+  const provenanceStore = createRequiredInstantlyProvenanceStore({
+    async findByIdempotencyKey() { return intent; },
+    async reserve(input) {
+      intent = {
+        ...input, status: 'prepared', dispatchState: 'reserved',
+        requestPayloadFingerprint: createMailboxRequestPayloadFingerprint(input),
+      };
+      return { created: true, intent };
+    },
+    async startDispatch() { intent.dispatchState = 'started'; },
+    async accept() { throw new Error('lege provideridentiteit mag nooit accepted worden'); },
+    async fail() { throw new Error('provider gaf al 200'); },
+    async markUnknown(_intentId, _error, values) {
+      intent = {
+        ...intent, ...values, status: 'unknown', dispatchState: 'started', reconcileRequired: true,
+      };
+      return intent;
+    },
+  });
+  const send = () => sendMailboxMessage({
+    body,
+    instantlyMailboxService: {
+      async reply() {
+        providerCalls += 1;
+        return {
+          providerAccepted: true,
+          providerMessageId: body.providerMessageId,
+          providerThreadId: body.providerThreadId,
+          sentMessage: { messageId: body.providerMessageId },
+        };
+      },
+    },
+    sendMessage: async () => {}, normalizeString, threadProvenance,
+    mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: allowingSuppressionStore,
+  });
+
+  await assert.rejects(send, (error) => (
+    error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+      && error.cause?.code === 'INSTANTLY_REPLY_ACCEPTED_IDENTITY_MISSING'
+  ));
+  await assert.rejects(send, (error) => error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
+  assert.equal(providerCalls, 1);
+  assert.equal(intent.status, 'unknown');
+  assert.equal(intent.providerMessageId || '', '');
+  assert.notEqual(intent.status, 'accepted');
+});
+
 test('provider success followed by DB finalize failure records reconcile-required with provider IDs', async () => {
   let unknownValues = null;
-  const provenanceStore = {
+  const provenanceStore = createRequiredInstantlyProvenanceStore({
+    async findByIdempotencyKey() { return null; },
     async reserve(input) { return { created: true, intent: { ...input, status: 'prepared' } }; },
-    async startDispatch() {},
     async accept() { throw new Error('database finalize unavailable'); },
     async markUnknown(_intentId, _error, values) { unknownValues = values; },
-    async fail() {},
-  };
+  });
   await assert.rejects(() => sendMailboxMessage({
     body: {
       provider: 'instantly', owner: 'serve', account: 'servecreusen@websoftora.com',
@@ -416,8 +792,79 @@ test('provider success followed by DB finalize failure records reconcile-require
   });
 });
 
-test('suppressed Instantly mailbox reply is blocked before provenance and provider calls', async () => {
-  let provenanceCalls = 0;
+test('definitieve Instantly-fout plus mislukte fail-persist wordt unknown en dezelfde key start nooit een tweede provider', async () => {
+  const counts = { find: 0, suppression: 0, reserve: 0, provider: 0, fail: 0, unknown: 0 };
+  let intent = null;
+  const body = {
+    provider: 'instantly', owner: 'martijn', account: 'martijn@websoftora.com',
+    providerMessageId: 'incoming-definitive', providerThreadId: 'thread-definitive',
+    to: 'bestuur@mhcbe.nl', subject: 'Re: Vraag', body: 'Antwoord',
+  };
+  const threadProvenance = {
+    intentId: 'send:definitive', idempotencyKey: 'browser:definitive', owner: 'martijn',
+    accountEmail: body.account, recipientEmail: body.to, mode: 'reply',
+    conversationId: 'instantly:thread-definitive',
+    replyTargetMessageId: 'incoming-definitive', references: 'incoming-definitive',
+    provider: 'instantly', providerThreadId: 'thread-definitive',
+  };
+  const provenanceStore = createRequiredInstantlyProvenanceStore({
+    async findByIdempotencyKey() { counts.find += 1; return intent; },
+    async reserve(input) {
+      counts.reserve += 1;
+      intent = { ...input, status: 'prepared', dispatchState: 'reserved' };
+      return { created: true, intent };
+    },
+    async startDispatch() { intent.dispatchState = 'started'; },
+    async fail() {
+      counts.fail += 1;
+      throw Object.assign(new Error('fail-persist timeout'), { code: '57014' });
+    },
+    async markUnknown(_intentId, _error, values) {
+      counts.unknown += 1;
+      intent = {
+        ...intent, ...values, status: 'unknown', dispatchState: 'started', reconcileRequired: true,
+      };
+      return intent;
+    },
+  });
+  const send = () => sendMailboxMessage({
+    body,
+    instantlyMailboxService: {
+      async reply() {
+        counts.provider += 1;
+        throw Object.assign(new Error('reply rejected'), { status: 422, code: 'INSTANTLY_REPLY_REJECTED' });
+      },
+    },
+    sendMessage: async () => {},
+    normalizeString,
+    threadProvenance,
+    mailboxSendProvenanceStore: provenanceStore,
+    outboundRecipientGuardStore: {
+      async findRecipientSuppressionConflict() {
+        counts.suppression += 1;
+        return { ok: true, conflict: null };
+      },
+    },
+  });
+
+  await assert.rejects(send, (error) => (
+    error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+      && error.cause?.code === '57014'
+      && error.providerError?.status === 422
+  ));
+  await assert.rejects(send, (error) => (
+    error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+      && error.cause?.code === 'MAILBOX_SEND_DISPATCH_OUTCOME_UNCERTAIN'
+  ));
+  assert.equal(intent.idempotencyKey, threadProvenance.idempotencyKey);
+  assert.deepEqual(counts, {
+    find: 2, suppression: 1, reserve: 1, provider: 1, fail: 1, unknown: 1,
+  });
+});
+
+test('suppressed Instantly mailbox reply is blocked after one replay-read but before reserve and provider', async () => {
+  let provenanceReads = 0;
+  let reserveCalls = 0;
   let providerCalls = 0;
   await assert.rejects(() => sendMailboxMessage({
     body: {
@@ -429,9 +876,10 @@ test('suppressed Instantly mailbox reply is blocked before provenance and provid
     sendMessage: async () => {},
     normalizeString,
     threadProvenance: { mode: 'reply' },
-    mailboxSendProvenanceStore: {
-      async reserve() { provenanceCalls += 1; return { created: true, intent: {} }; },
-    },
+    mailboxSendProvenanceStore: createRequiredInstantlyProvenanceStore({
+      async findByIdempotencyKey() { provenanceReads += 1; return null; },
+      async reserve() { reserveCalls += 1; return { created: true, intent: {} }; },
+    }),
     outboundRecipientGuardStore: {
       async findRecipientSuppressionConflict() {
         return {
@@ -441,7 +889,8 @@ test('suppressed Instantly mailbox reply is blocked before provenance and provid
       },
     },
   }), (error) => error.code === 'OUTBOUND_RECIPIENT_SUPPRESSED' && error.status === 409);
-  assert.equal(provenanceCalls, 0);
+  assert.equal(provenanceReads, 1);
+  assert.equal(reserveCalls, 0);
   assert.equal(providerCalls, 0);
 });
 

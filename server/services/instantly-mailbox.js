@@ -11,9 +11,10 @@ const {
   buildAutomatedReplyEvidence,
   isAutomatedCampaignReply,
 } = require('./mailbox-automated-reply');
-const { buildAcceptedSentMessage, normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
+const { normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
+const { finalizeInstantlyAcceptedReply } = require('./mailbox-instantly-reply-acceptance');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -1052,38 +1053,12 @@ function createInstantlyMailboxService(deps = {}) {
       },
     });
     const rawSent = response?.email || response?.data || response;
-    const normalizedSent = normalizeInstantlyMessage({
-      ...rawSent,
-      eaccount: account,
-      from_address_email: account,
-      email_type: 'sent',
-      in_reply_to: normalizeText(rawSent?.in_reply_to || stored.providerMessageId),
-      thread_id: normalizeText(rawSent?.thread_id || stored.providerThreadId),
-      campaign_id: normalizeText(rawSent?.campaign_id || stored.providerCampaignId),
+    return finalizeInstantlyAcceptedReply({
+      rawSent, stored, account, owner: selectedOwner,
+      subject: cleanSubject, body: cleanText, to: expectedRecipient,
+      ccAddresses, bccAddresses, normalizeInstantlyMessage,
+      mailboxIndexStore, logger,
     });
-    if (normalizedSent) {
-      const upsert = await mailboxIndexStore.upsertProviderMessages({
-        provider: 'instantly',
-        messages: [normalizedSent],
-      });
-      if (!upsert?.ok) {
-        logger.error('[InstantlyMailbox][ReplyStore]', 'Verzonden antwoord kon niet lokaal worden opgeslagen.');
-      }
-    }
-    return {
-      provider: 'instantly',
-      providerMessageId: normalizeText(normalizedSent?.providerMessageId || rawSent?.id),
-      providerThreadId: normalizeText(normalizedSent?.providerThreadId || stored.providerThreadId),
-      accountEmail: account,
-      owner: selectedOwner,
-      sentMessage: buildAcceptedSentMessage(normalizedSent, {
-        body: cleanText,
-        subject: cleanSubject,
-        to: expectedRecipient,
-        cc: ccAddresses.join(', '),
-        bcc: bccAddresses.join(', '),
-      }),
-    };
   }
 
   async function ingestWebhook(req) {

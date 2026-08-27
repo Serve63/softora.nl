@@ -1,9 +1,12 @@
 const { createMailboxSpellingService } = require('../services/mailbox-spelling');
 
+const MAILBOX_ATTACHMENT_CRON_SWEEP_TIMEOUT_MS = 5_000;
+
 function registerMailboxRoutes(app, deps = {}) {
   const coordinator = deps.coordinator;
   if (!coordinator) return;
   const spellingService = deps.spellingService || createMailboxSpellingService({ logger: deps.logger });
+  const logger = deps.logger || console;
   const requireAdmin =
     typeof deps.requirePremiumAdminApiAccess === 'function'
       ? deps.requirePremiumAdminApiAccess
@@ -12,6 +15,10 @@ function registerMailboxRoutes(app, deps = {}) {
   const supabaseOutageCronPause = String(
     deps.supabaseOutageCronPause || process.env.SUPABASE_OUTAGE_CRON_PAUSE || ''
   ).trim();
+  const attachmentSweepTimeoutMs = Math.max(1, Math.min(
+    MAILBOX_ATTACHMENT_CRON_SWEEP_TIMEOUT_MS,
+    Number(deps.attachmentSweepTimeoutMs) || MAILBOX_ATTACHMENT_CRON_SWEEP_TIMEOUT_MS
+  ));
 
   function isEnabledFlag(value) {
     if (typeof value === 'boolean') return value;
@@ -50,6 +57,33 @@ function registerMailboxRoutes(app, deps = {}) {
       });
     }
     return next();
+  }
+
+  async function sweepExpiredAttachmentsBeforeCronSync() {
+    if (typeof coordinator.sweepExpiredAttachments !== 'function') return;
+    let timeout = null;
+    try {
+      await Promise.race([
+        Promise.resolve().then(() => coordinator.sweepExpiredAttachments({
+          totalTimeoutMs: attachmentSweepTimeoutMs,
+        })),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => {
+            const error = new Error(
+              `Mailbox attachment cron sweep timeout na ${attachmentSweepTimeoutMs}ms`
+            );
+            error.code = 'MAILBOX_ATTACHMENT_CRON_SWEEP_TIMEOUT';
+            reject(error);
+          }, attachmentSweepTimeoutMs);
+        }),
+      ]);
+    } catch (error) {
+      if (typeof logger.warn === 'function') {
+        logger.warn('[MailboxAttachment][CronSweep]', error?.message || error);
+      }
+    } finally {
+      if (timeout !== null) clearTimeout(timeout);
+    }
   }
 
   app.get('/api/mailbox/accounts', requireAdmin, (req, res) => coordinator.accountsResponse(req, res));
@@ -92,12 +126,13 @@ function registerMailboxRoutes(app, deps = {}) {
     }
     coordinator.syncInstantlyMailboxResponse(req, res);
   });
-  app.get('/api/mailbox/sync', requireCronAccess, (req, res) => {
+  app.get('/api/mailbox/sync', requireCronAccess, async (req, res) => {
     if (shouldSkipCronForSupabaseOutage()) {
       sendSupabaseOutageCronPauseResponse(res);
       return;
     }
-    coordinator.syncMailboxResponse(req, res);
+    await sweepExpiredAttachmentsBeforeCronSync();
+    return coordinator.syncMailboxResponse(req, res);
   });
   app.post('/api/mailbox/send/preflight', requireAdmin, (req, res) =>
     coordinator.preflightMessageResponse(req, res)

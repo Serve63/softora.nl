@@ -110,6 +110,7 @@ function buildService(overrides = {}) {
     getCustomerSourcesByEmails: overrides.getCustomerSourcesByEmails,
     getUiStateValues: overrides.getUiStateValues,
     setUiStateValues: overrides.setUiStateValues,
+    logger: overrides.logger,
     now: () => new Date('2026-07-25T12:00:00.000Z'),
     fetchJsonWithTimeout: async (url, options) => {
       requests.push({ url, options });
@@ -1675,6 +1676,58 @@ test('reply reports unavailable provenance instead of a false owner mismatch dur
     }
   );
   assert.equal(requests.length, 0);
+});
+
+test('reply houdt provideracceptatie vast wanneer lokale indexopslag daarna faalt', async (t) => {
+  const failures = [
+    new TypeError('lokale normalisatie-upsert faalde'),
+    Object.assign(new Error('lokale upsert gaf 400'), { status: 400, code: 'LOCAL_UPSERT_400' }),
+  ];
+  for (const failure of failures) {
+    await t.test(failure.constructor.name + ':' + (failure.status || 'type'), async () => {
+      const store = createStore();
+      let providerPosts = 0;
+      const logged = [];
+      store.upsertProviderMessages = async () => { throw failure; };
+      const { service } = buildService({
+        store,
+        logger: { error(...args) { logged.push(args); } },
+        fetchJsonWithTimeout: async (url, options) => {
+          if (url.endsWith('/emails/reply')) providerPosts += 1;
+          return {
+            response: { ok: true, status: 200 },
+            data: {
+              id: 'sent-after-provider-accept',
+              thread_id: 'thread-serve',
+              body: { text: JSON.parse(options.body).body.text },
+              timestamp_created: '2026-07-25T12:00:00.000Z',
+            },
+          };
+        },
+      });
+      store.rows.push(service.normalizeInstantlyMessage(incoming()));
+
+      const result = await service.reply({
+        owner: 'serve',
+        accountEmail: 'serve-sender@example.com',
+        providerMessageId: 'incoming-serve-1',
+        providerThreadId: 'thread-serve',
+        to: 'prospect@example.org',
+        subject: 'Re: Kleine vraag',
+        text: 'Antwoord na provideracceptatie.',
+      });
+
+      assert.equal(providerPosts, 1);
+      assert.equal(result.providerAccepted, true);
+      assert.equal(result.providerMessageId, 'sent-after-provider-accept');
+      assert.equal(result.localIndexStored, false);
+      assert.equal(result.postAcceptWarningCode, 'INSTANTLY_REPLY_INDEX_STORE_FAILED');
+      assert.equal(logged.length, 1);
+      assert.deepEqual(Object.keys(logged[0][1]).sort(), [
+        'errorCode', 'errorStatus', 'providerMessageId', 'providerThreadId',
+      ]);
+    });
+  }
 });
 
 test('official Instantly lifecycle fields retain direction, unread state and attachments', () => {

@@ -2,6 +2,7 @@ const quotedThread = require('../../assets/premium-mailbox-quoted-thread.js');
 const { isOriginalCampaignOutboundMessage } = require('./mailbox-image-ownership');
 const { isExactSoftoraWebdesignUrl } = require('./mailbox-provider-rich-body');
 const { OUTBOUND_SENDER_IDENTITIES } = require('./outbound-sender-identity');
+const { normalizeMailboxAttachmentsMetadata } = require('./mailbox-send-provenance-store');
 const QUOTED_PARENT_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const LEGACY_GUARD_LOOKUP_BATCH_SIZE = 100;
 const RECOVERY_HYDRATION_BATCH_SIZE = 20;
@@ -836,6 +837,8 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
   function buildAcceptedProvenanceMessage(intent = {}) {
     const acceptedAt = normalizeText(intent.acceptedAt || intent.updatedAt || intent.createdAt);
     const messageId = normalizeText(intent.messageId || intent.providerMessageId);
+    const durableAttachments = normalizeMailboxAttachmentsMetadata(intent.attachmentsMetadata);
+    const attachmentEvidenceKnown = durableAttachments !== null;
     return {
       id: `accepted-sent:${messageId || intent.intentId}`,
       mailboxId: `accepted-sent:${messageId || intent.intentId}`,
@@ -867,7 +870,8 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
       hasBody: true, bodyLoaded: true, bodyTruncated: false,
       bodyImageEvidenceKnown: false, embeddedImageCount: 0,
       webdesignLinkEvidenceKnown: false, webdesignLinkUrl: '',
-      attachmentEvidenceKnown: false, attachments: [],
+      attachmentEvidenceKnown,
+      attachments: attachmentEvidenceKnown ? durableAttachments : [],
       providerMessageIdHydrationEligible: true,
       unread: false, localAcceptedSend: true,
     };

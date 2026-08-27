@@ -2102,7 +2102,7 @@ function createMailboxService(deps = {}) {
   const hideConversation = mailboxVisibility.hideConversation;
   const restoreConversation = mailboxVisibility.restoreConversation;
 
-  const { attachmentCleanupResponse, attachmentUploadResponse, preflightMessageResponse, resolveRewriteIdentity, sendMessage, sendMessageResponse } = createMailboxComposeRuntime({
+  const { attachmentCleanupResponse, attachmentUploadResponse, preflightMessageResponse, resolveRewriteIdentity, sendMessage, sendMessageResponse, sweepExpiredAttachments } = createMailboxComposeRuntime({
     composeSendDependencies: {
       getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
@@ -2418,7 +2418,7 @@ function createMailboxService(deps = {}) {
     listCampaignReplies,
     listMessages,
     listMessagesWithMeta,
-    syncMailboxResponse, syncInstantlyMailboxResponse,
+    syncMailboxResponse, syncInstantlyMailboxResponse, sweepExpiredAttachments,
     markMessageRead,
     getMessageReadStatus,
     hideConversation,

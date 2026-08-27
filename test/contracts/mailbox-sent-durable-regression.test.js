@@ -1657,7 +1657,50 @@ test('accepted reply van 13:51 houdt een ouder Karin-gesprek na refresh bovenaan
     references: '<karin-in@test>', messageId: '<karin-out@test>',
     senderName: 'Servé Creusen', subject: 'Re: Kleine vraag over jullie website',
     body: 'Antwoord om 13:51', acceptedAt: '2026-08-24T13:51:00Z', provider: 'smtp',
+    attachmentsMetadata: [{
+      filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+    }],
   });
+  const knownEmptySmtpReply = buildAcceptedProvenanceMessage({
+    intentId: 'empty-smtp-reply', accountEmail: 'serve@softora.nl',
+    recipientEmail: 'empty-smtp@example.nl', messageId: '<empty-smtp@test>',
+    subject: 'Leeg SMTP', body: 'Zonder bijlagen', acceptedAt: '2026-08-24T12:01:00Z',
+    provider: 'smtp', attachmentsMetadata: [],
+  });
+  const knownEmptyInstantlyReply = buildAcceptedProvenanceMessage({
+    intentId: 'empty-instantly-reply', accountEmail: 'servecreusen@websoftora.com',
+    recipientEmail: 'empty-instantly@example.nl', messageId: '<empty-instantly@test>',
+    subject: 'Leeg Instantly', body: 'Zonder bijlagen', acceptedAt: '2026-08-24T12:02:00Z',
+    provider: 'instantly', attachmentsMetadata: [],
+  });
+  const legacyAcceptedReply = buildAcceptedProvenanceMessage({
+    intentId: 'legacy-reply', accountEmail: 'serve@softora.nl',
+    recipientEmail: 'legacy@example.nl', messageId: '<legacy-out@test>',
+    subject: 'Legacy', body: 'Legacy body', acceptedAt: '2026-08-24T12:00:00Z',
+  });
+  const malformedAcceptedReply = buildAcceptedProvenanceMessage({
+    intentId: 'malformed-reply', accountEmail: 'serve@softora.nl',
+    recipientEmail: 'malformed@example.nl', messageId: '<malformed@test>',
+    subject: 'Malformed', body: 'Onbetrouwbare metadata', acceptedAt: '2026-08-24T12:03:00Z',
+    provider: 'smtp',
+    attachmentsMetadata: [{
+      filename: '../kapot.pdf', contentType: 'text/html', size: 9_000_000,
+    }],
+  });
+
+  assert.deepEqual(acceptedReply.attachments, [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }]);
+  assert.equal(acceptedReply.attachmentEvidenceKnown, true);
+  assert.deepEqual(knownEmptySmtpReply.attachments, []);
+  assert.equal(knownEmptySmtpReply.attachmentEvidenceKnown, true);
+  assert.deepEqual(knownEmptyInstantlyReply.attachments, []);
+  assert.equal(knownEmptyInstantlyReply.attachmentEvidenceKnown, true);
+  assert.equal(knownEmptyInstantlyReply.storageFolder, 'instantly');
+  assert.deepEqual(legacyAcceptedReply.attachments, []);
+  assert.equal(legacyAcceptedReply.attachmentEvidenceKnown, false);
+  assert.deepEqual(malformedAcceptedReply.attachments, []);
+  assert.equal(malformedAcceptedReply.attachmentEvidenceKnown, false);
 
   const conversations = attachSentThreadMessages(
     [karinInbound, newerInbound],
