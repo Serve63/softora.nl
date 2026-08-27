@@ -42,6 +42,7 @@ test('mailbox compose returns the exact accepted sent message for immediate reco
     confirmMailboxWebdesignOutboundRecipient: async () => {},
     appendSentMessage: async (payload) => { sentCopies.push(payload); return true; },
     mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => null,
       reserve: async (payload) => {
         reservations.push(payload);
         return { created: true, intent: { intentId: payload.intentId, status: 'prepared' } };
@@ -91,6 +92,7 @@ test('mailbox compose returns the exact accepted sent message for immediate reco
   assert.equal(sentCopies[0].mail.headers['X-Softora-Conversation-Id'], 'conversation:serve@softora.nl|customer');
   assert.equal(sentCopies[0].mail.headers['X-Softora-Send-Intent-Id'], 'send:test-1');
   assert.equal(reservations.length, 1);
+  assert.deepEqual(reservations[0].attachmentsMetadata, []);
   assert.equal(result.messageId, '<accepted-compose@softora.nl>');
   assert.deepEqual(result.sentMessage, {
     id: 'accepted-sent:<accepted-compose@softora.nl>',
@@ -115,6 +117,9 @@ test('mailbox compose returns the exact accepted sent message for immediate reco
     hasBody: true,
     bodyTruncated: false,
     unread: false,
+    attachments: [],
+    attachmentEvidenceKnown: true,
+    attachmentHydrationAttempted: true,
     conversationId: 'conversation:serve@softora.nl|customer',
     softoraSendIntentId: 'send:test-1',
     softoraSendMode: 'reply',
@@ -154,6 +159,7 @@ test('mailbox compose blocks suppressed TO, CC or BCC recipients before provenan
     buildMailboxWebdesignSendParts: async () => null,
     appendSentMessage: async () => true,
     mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => null,
       reserve: async () => { provenanceCalls += 1; return { created: true, intent: {} }; },
     },
   });
@@ -188,9 +194,13 @@ test('mailbox compose stays fail-closed before SMTP when the isolated provenance
   const query = {
     insert() { return query; },
     select() { return query; },
-    async single() {
+    eq() { return query; },
+    async maybeSingle() {
       provenanceCalls += 1;
       return { data: null, error: timeoutError };
+    },
+    async single() {
+      throw new Error('een mislukte early read mag geen insert starten');
     },
   };
   const provenanceStore = createMailboxSendProvenanceStore({
@@ -237,8 +247,8 @@ test('mailbox compose stays fail-closed before SMTP when the isolated provenance
 
   assert.equal(
     provenanceCalls,
-    1,
-    'zonder geslaagde read-back mag de reserveringsmutatie niet blind worden herhaald'
+    2,
+    'de geïsoleerde early guardread mag begrensd herstellen maar geen reserveringsmutatie starten'
   );
   assert.equal(smtpCalls, 0, 'SMTP mag nooit starten zonder duurzame prepared provenance');
 });
@@ -280,6 +290,7 @@ test('mailbox compose starts and completes the Sent copy when provenance finaliz
       return new Promise((resolve) => { releaseSentCopy = resolve; });
     },
     mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => null,
       reserve: async (input) => ({ created: true, intent: { ...input, status: 'prepared' } }),
       startDispatch: async () => calls.push('provenance:start'),
       accept: async () => {

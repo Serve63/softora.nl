@@ -215,7 +215,64 @@ function createMailboxComposeThreadContext(deps = {}) {
     return { ...base, provider: 'smtp', providerThreadId: '', replyTargetMessageId: storedMessageId, references };
   }
 
-  return { normalizeReplyIdentity, resolve, resolveReplyIdentity };
+  function resolveAttachmentCleanupBinding({ body = {}, accountEmail, recipientEmail, provider = 'smtp' } = {}) {
+    const mode = normalizeText(body.mode || 'new-message').toLowerCase();
+    if (!['reply', 'new-message'].includes(mode)) {
+      throw inputError('Ongeldige verzendmodus.', 'MAILBOX_SEND_MODE_INVALID');
+    }
+    const idempotencyKey = normalizeText(body.idempotencyKey).slice(0, 240);
+    if (!idempotencyKey) {
+      throw inputError('Een veilige verzend-ID ontbreekt.', 'MAILBOX_SEND_IDEMPOTENCY_REQUIRED');
+    }
+    const recipient = normalizeEmail(recipientEmail || body.to);
+    const context = body.context && typeof body.context === 'object' ? body.context : {};
+    const replyIdentity = normalizeReplyIdentity(body, provider);
+    if (mode === 'reply' && replyIdentity.provider === 'instantly') {
+      throw inputError(
+        'Instantly ondersteunt geen bijlagen bij antwoorden.',
+        'INSTANTLY_ATTACHMENTS_UNSUPPORTED'
+      );
+    }
+    const account = mode === 'reply'
+      ? normalizeEmail(replyIdentity.accountEmail || accountEmail || body.account)
+      : normalizeEmail(accountEmail || body.account);
+    const resolved = resolveOwner(account, body.owner);
+    const conversationId = normalizeText(
+      mode === 'reply' ? replyIdentity.conversationId || context.conversationId : context.conversationId
+    ).slice(0, 2000);
+    const replyTargetMessageId = mode === 'reply'
+      ? normalizeMessageId(replyIdentity.sourceMessageId || context.messageId)
+      : '';
+    if (mode === 'reply' && (!conversationId || !replyTargetMessageId)) {
+      throw inputError(
+        'De reply mist de lokaal gebonden cleanupcontext.',
+        'MAILBOX_ATTACHMENT_CLEANUP_CONTEXT_INVALID',
+        409
+      );
+    }
+    return {
+      accountEmail: account,
+      recipientEmail: recipient,
+      owner: resolved.owner,
+      senderName: resolved.senderName,
+      mode,
+      conversationId,
+      idempotencyKey,
+      provider: 'smtp',
+      providerThreadId: '',
+      replyTargetMessageId,
+      references: mode === 'reply'
+        ? parseReferences(context.references).concat(replyTargetMessageId).filter(Boolean).join(' ')
+        : '',
+    };
+  }
+
+  return {
+    normalizeReplyIdentity,
+    resolve,
+    resolveAttachmentCleanupBinding,
+    resolveReplyIdentity,
+  };
 }
 
 module.exports = {

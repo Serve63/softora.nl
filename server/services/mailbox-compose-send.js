@@ -5,20 +5,29 @@ const {
 const {
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
+  createMailboxRequestPayloadFingerprint,
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
+  isExpiredMailboxReservedDispatch,
+  mailboxAttachmentsMetadataEqual,
+  normalizeMailboxAttachmentsMetadata,
 } = require('./mailbox-send-provenance-store');
 const {
   assertOutboundRecipientsNotSuppressed,
 } = require('../security/outbound-mail-suppression');
+const {
+  MAILBOX_ATTACHMENT_EXTENSIONS,
+  MAX_MAILBOX_ATTACHMENT_BYTES,
+  MAX_MAILBOX_ATTACHMENTS,
+  MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES,
+  normalizeContentType,
+  safeFilename,
+} = require('./mailbox-attachment-policy');
 
-const MAX_COMPOSE_ATTACHMENTS = 5;
-const MAX_COMPOSE_ATTACHMENT_BYTES = 4 * 1024 * 1024;
-const MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES = 5 * 1024 * 1024;
-const COMPOSE_ATTACHMENT_EXTENSIONS = new Set([
-  'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
-  'ppt', 'pptx', 'txt', 'webp', 'xls', 'xlsx',
-]);
+const MAX_COMPOSE_ATTACHMENTS = MAX_MAILBOX_ATTACHMENTS;
+const MAX_COMPOSE_ATTACHMENT_BYTES = MAX_MAILBOX_ATTACHMENT_BYTES;
+const MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES = MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES;
+const COMPOSE_ATTACHMENT_EXTENSIONS = MAILBOX_ATTACHMENT_EXTENSIONS;
 
 function createMailboxComposeSend(deps = {}) {
   const {
@@ -97,11 +106,7 @@ function createMailboxComposeSend(deps = {}) {
     }
     let totalBytes = 0;
     return attachments.map((attachment) => {
-      const rawName = normalizeString(attachment && (attachment.filename || attachment.name))
-        .normalize('NFKC')
-        .replace(/[\u0000-\u001f\u007f/\\]+/g, '-')
-        .replace(/^\.+/, '')
-        .slice(0, 120);
+      const rawName = safeFilename(attachment && (attachment.filename || attachment.name));
       const extension = rawName.includes('.') ? rawName.split('.').pop().toLowerCase() : '';
       if (!rawName || !COMPOSE_ATTACHMENT_EXTENSIONS.has(extension)) {
         const error = new Error(`Bijlage "${rawName || 'zonder naam'}" heeft geen ondersteund bestandstype.`);
@@ -131,7 +136,7 @@ function createMailboxComposeSend(deps = {}) {
       return {
         filename: rawName,
         content,
-        contentType: truncateText(normalizeString(attachment && attachment.contentType), 120) || undefined,
+        contentType: normalizeContentType(attachment && attachment.contentType, rawName),
         contentDisposition: 'attachment',
       };
     });
@@ -236,15 +241,32 @@ function createMailboxComposeSend(deps = {}) {
     return error;
   }
 
+  function createAcceptedReplayAttachmentEvidenceError() {
+    const cause = new Error(
+      'De eerdere verzending bevat geen duurzaam bewijs of handmatige bijlagen aanwezig waren.'
+    );
+    cause.code = 'MAILBOX_SEND_ATTACHMENT_EVIDENCE_MISSING';
+    return createMailboxReconcileRequiredError(cause);
+  }
+
   function assertAcceptedReplayPayload(accepted, payload) {
-    const attachmentsFingerprint = createMailboxAttachmentsFingerprint(payload.attachments);
-    const payloadFingerprint = createMailboxPayloadFingerprint({
-      subject: payload.subject,
-      body: payload.body,
-      cc: payload.cc,
-      bcc: payload.bcc,
-      attachmentsFingerprint,
-    }, normalizeString);
+    const durableMetadata = normalizeMailboxAttachmentsMetadata(accepted?.attachmentsMetadata);
+    const requestedMetadata = normalizeMailboxAttachmentsMetadata(payload?.attachmentsMetadata);
+    if (durableMetadata === null) throw createAcceptedReplayAttachmentEvidenceError();
+    if (requestedMetadata === null) throw createAcceptedReplayPayloadMismatchError();
+
+    const durableRequestPayloadFingerprint = normalizeString(
+      accepted?.requestPayloadFingerprint
+    ).toLowerCase();
+    const requestedRequestPayloadFingerprint = createMailboxRequestPayloadFingerprint(
+      { ...payload, attachmentsMetadata: requestedMetadata },
+      normalizeString
+    );
+    if (/^[0-9a-f]{64}$/.test(durableRequestPayloadFingerprint)) {
+      if (requestedRequestPayloadFingerprint === durableRequestPayloadFingerprint) return;
+      throw createAcceptedReplayPayloadMismatchError();
+    }
+
     const durablePayloadFingerprint = normalizeString(accepted?.payloadFingerprint).toLowerCase();
     const durableAttachmentsFingerprint = normalizeString(accepted?.attachmentsFingerprint).toLowerCase();
     const durableFieldsFingerprint = createMailboxPayloadFingerprint({
@@ -254,16 +276,22 @@ function createMailboxComposeSend(deps = {}) {
       bcc: accepted?.bcc,
       attachmentsFingerprint: durableAttachmentsFingerprint,
     }, normalizeString);
-    const matches = /^[0-9a-f]{64}$/.test(durablePayloadFingerprint)
+    const storedPayloadIsIntact = /^[0-9a-f]{64}$/.test(durablePayloadFingerprint)
       && (!durableAttachmentsFingerprint || /^[0-9a-f]{64}$/.test(durableAttachmentsFingerprint))
-      && durablePayloadFingerprint === durableFieldsFingerprint
-      && durableAttachmentsFingerprint === attachmentsFingerprint
-      && durablePayloadFingerprint === payloadFingerprint;
+      && durablePayloadFingerprint === durableFieldsFingerprint;
+    const fieldsMatch = normalizeString(accepted?.subject) === normalizeString(payload?.subject)
+      && normalizeString(accepted?.body) === normalizeString(payload?.body)
+      && normalizeString(accepted?.cc).toLowerCase() === normalizeString(payload?.cc).toLowerCase()
+      && normalizeString(accepted?.bcc).toLowerCase() === normalizeString(payload?.bcc).toLowerCase();
+    const matches = storedPayloadIsIntact && fieldsMatch
+      && mailboxAttachmentsMetadataEqual(durableMetadata, requestedMetadata);
     if (matches) return;
     throw createAcceptedReplayPayloadMismatchError();
   }
 
   function createAcceptedReplayResult(accepted) {
+    const attachmentMetadata = normalizeMailboxAttachmentsMetadata(accepted?.attachmentsMetadata);
+    if (attachmentMetadata === null) throw createAcceptedReplayAttachmentEvidenceError();
     return {
       messageId: accepted.messageId,
       accepted: [accepted.recipientEmail],
@@ -294,14 +322,27 @@ function createMailboxComposeSend(deps = {}) {
         hasBody: true,
         bodyTruncated: false,
         unread: false,
+        attachments: attachmentMetadata,
+        attachmentEvidenceKnown: true,
+        attachmentHydrationAttempted: true,
         conversationId: accepted.conversationId,
         softoraSendIntentId: accepted.intentId,
         softoraSendMode: accepted.mode,
+        softoraReplyTargetMessageId: accepted.replyTargetMessageId,
       },
     };
   }
 
   return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments, threadProvenance }) {
+    let stagedAttachmentCleanupStarted = false;
+    async function cleanupStagedAttachments() {
+      if (stagedAttachmentCleanupStarted) return;
+      stagedAttachmentCleanupStarted = true;
+      await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
+        logger.warn('[MailboxAttachment][CleanupAfterSendLifecycle]', error?.message || error);
+      });
+    }
+
     const account = getAccount(accountEmail);
     if (!account) {
       const error = new Error('Mailbox-account niet gevonden.');
@@ -334,37 +375,154 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       throw error;
     }
-    if (!threadProvenance || !mailboxSendProvenanceStore) {
+    if (!threadProvenance || !mailboxSendProvenanceStore
+      || typeof mailboxSendProvenanceStore.findByIdempotencyKey !== 'function') {
       const error = new Error('De duurzame threadcontext ontbreekt; verzending is veilig gestopt.');
       error.status = 503;
       error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
       throw error;
     }
-    const explicitAttachments = await normalizeComposeAttachments(attachments, threadProvenance);
-    const explicitAttachmentMetadata = explicitAttachments.map((attachment) => ({
-      filename: normalizeString(attachment?.filename),
-      contentType: truncateText(normalizeString(attachment?.contentType), 120),
-      size: Buffer.isBuffer(attachment?.content) ? attachment.content.length : 0,
-    })).filter((attachment) => attachment.filename && attachment.size > 0);
     const cleanSubject = truncateText(normalizeString(subject), 240);
     if (!cleanSubject) {
       const error = new Error('Onderwerp is verplicht.');
       error.status = 400;
       throw error;
     }
-    const transporter = createTransport({
-      host: account.smtpHost,
-      port: account.smtpPort,
-      secure: account.smtpSecure,
-      auth: { user: account.smtpUser, pass: account.smtpPass },
-    });
     const normalizedText = normalizeString(text);
+    const normalizedCcText = normalizedCc.join(', ');
+    const normalizedBccText = normalizedBcc.join(', ');
+    const attachmentInputs = Array.isArray(attachments) ? attachments : [];
+    const referenceCount = attachmentInputs.filter((attachment) => (
+      normalizeString(attachment?.reference)
+    )).length;
+    if (referenceCount > 0 && referenceCount !== attachmentInputs.length) {
+      const error = new Error('Kies de bijlagen opnieuw; gemengde bijlagegegevens zijn niet veilig.');
+      error.status = 400;
+      error.code = 'MAILBOX_ATTACHMENT_REFERENCE_INVALID';
+      throw error;
+    }
+
+    let explicitAttachments = null;
+    let explicitAttachmentMetadata = null;
+    if (referenceCount > 0) {
+      if (!mailboxAttachmentService || typeof mailboxAttachmentService.inspectAttachments !== 'function') {
+        const error = new Error('Bijlagen zijn tijdelijk niet beschikbaar; probeer het opnieuw.');
+        error.status = 503;
+        error.code = 'MAILBOX_ATTACHMENT_STORAGE_UNAVAILABLE';
+        throw error;
+      }
+      explicitAttachmentMetadata = normalizeMailboxAttachmentsMetadata(
+        await mailboxAttachmentService.inspectAttachments(
+          attachmentInputs,
+          threadProvenance,
+          { allowExpired: true }
+        )
+      );
+    } else {
+      explicitAttachments = await normalizeComposeAttachments(attachmentInputs, threadProvenance);
+      explicitAttachmentMetadata = normalizeMailboxAttachmentsMetadata(
+        explicitAttachments.map((attachment) => ({
+          filename: normalizeString(attachment?.filename),
+          contentType: truncateText(normalizeString(attachment?.contentType), 120),
+          size: Buffer.isBuffer(attachment?.content) ? attachment.content.length : 0,
+        }))
+      );
+    }
+    if (explicitAttachmentMetadata === null) {
+      const error = new Error('De bijlagemetadata kon niet veilig worden vastgesteld.');
+      error.status = 400;
+      error.code = 'MAILBOX_ATTACHMENT_METADATA_INVALID';
+      throw error;
+    }
+
+    const requestPayload = {
+      subject: cleanSubject,
+      body: normalizedText,
+      requestBody: normalizedText,
+      cc: normalizedCcText,
+      bcc: normalizedBccText,
+      attachmentsMetadata: explicitAttachmentMetadata,
+    };
+    function processingError() {
+      const error = new Error('Deze verzending wordt al veilig verwerkt; wacht op bevestiging voordat je opnieuw probeert.');
+      error.status = 409;
+      error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
+      return error;
+    }
+    function previousFailedError() {
+      const error = new Error('De vorige verzendpoging is definitief gestopt; probeer opnieuw met een nieuwe veilige verzend-ID.');
+      error.status = 409;
+      error.code = 'MAILBOX_SEND_PREVIOUSLY_FAILED';
+      error.retryable = false;
+      return error;
+    }
+    function uncertainDispatchError(intent) {
+      const cause = new Error('Deze verzend-ID heeft een providerdispatch zonder duurzaam bevestigde eindstatus.');
+      cause.code = 'MAILBOX_SEND_DISPATCH_OUTCOME_UNCERTAIN';
+      cause.intentId = intent?.intentId;
+      return createMailboxReconcileRequiredError(cause);
+    }
+    function preparedReservationExpired(intent) {
+      if (typeof mailboxSendProvenanceStore.isExpiredReservedDispatch === 'function') {
+        return mailboxSendProvenanceStore.isExpiredReservedDispatch(intent);
+      }
+      return isExpiredMailboxReservedDispatch(intent, {
+        normalizeString,
+        nowMs: now().getTime(),
+      });
+    }
+    async function handleExistingIntent(intent) {
+      if (!intent) return null;
+      assertAcceptedReplayContext(intent, threadProvenance, account.email, normalizedTo);
+      if (intent.status === 'accepted') {
+        assertAcceptedReplayPayload(intent, requestPayload);
+        await cleanupStagedAttachments();
+        return createAcceptedReplayResult(intent);
+      }
+      if (intent.status === 'failed') {
+        await cleanupStagedAttachments();
+        throw previousFailedError();
+      }
+      if (intent.status === 'unknown' || intent.reconcileRequired === true
+        || (intent.status === 'prepared' && intent.dispatchState === 'started')) {
+        throw uncertainDispatchError(intent);
+      }
+      if (preparedReservationExpired(intent)) return null;
+      throw processingError();
+    }
+
+    async function findExistingIntent() {
+      try {
+        return await mailboxSendProvenanceStore.findByIdempotencyKey(
+          threadProvenance.idempotencyKey
+        );
+      } catch (error) {
+        error.status = Number(error.status) || 503;
+        error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_READ_FAILED';
+        throw error;
+      }
+    }
+
+    const existingIntent = await findExistingIntent();
+    const earlyReplay = await handleExistingIntent(existingIntent);
+    if (earlyReplay) return earlyReplay;
+
     const webdesignParts = await buildMailboxWebdesignSendParts({
       accountEmail: account.email,
       to: normalizedTo,
       subject: cleanSubject,
       text: normalizedText,
     });
+    if (explicitAttachments === null) {
+      try {
+        explicitAttachments = await normalizeComposeAttachments(attachmentInputs, threadProvenance);
+      } catch (error) {
+        const acceptedAfterStorageFailure = await findExistingIntent();
+        const replayAfterStorageFailure = await handleExistingIntent(acceptedAfterStorageFailure);
+        if (replayAfterStorageFailure) return replayAfterStorageFailure;
+        throw error;
+      }
+    }
     const outboundAttachments = [
       ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
       ...explicitAttachments,
@@ -372,9 +530,7 @@ function createMailboxComposeSend(deps = {}) {
     try {
       assertCombinedAttachmentLimits(outboundAttachments);
     } catch (error) {
-      await cleanupUploadedAttachments(attachments, threadProvenance).catch((cleanupError) => {
-        logger.warn('[MailboxAttachment][CleanupAfterCombinedLimit]', cleanupError?.message || cleanupError);
-      });
+      await cleanupStagedAttachments();
       throw error;
     }
     await assertOutboundRecipientsNotSuppressed({
@@ -423,53 +579,57 @@ function createMailboxComposeSend(deps = {}) {
       senderName: account.name || account.email,
       subject: cleanSubject,
       body: webdesignParts?.text || normalizedText,
-      cc: normalizedCc.join(', '),
-      bcc: normalizedBcc.join(', '),
+      requestBody: normalizedText,
+      cc: normalizedCcText,
+      bcc: normalizedBccText,
       attachments: outboundAttachments,
+      attachmentsMetadata: explicitAttachmentMetadata,
     });
     if (!provenanceReservation.created) {
-      if (provenanceReservation.intent.status === 'accepted') {
-        const accepted = provenanceReservation.intent;
-        let replayError = null;
-        try {
-          assertAcceptedReplayContext(accepted, threadProvenance, account.email, normalizedTo);
-          assertAcceptedReplayPayload(accepted, {
-            subject: cleanSubject,
-            body: webdesignParts?.text || normalizedText,
-            cc: normalizedCc.join(', '),
-            bcc: normalizedBcc.join(', '),
-            attachments: outboundAttachments,
-          });
-        } catch (error) {
-          replayError = error;
-        }
-        await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
-          logger.warn('[MailboxAttachment][CleanupAfterIdempotentReplay]', error?.message || error);
-        });
-        if (replayError) throw replayError;
-        return createAcceptedReplayResult(accepted);
-      }
-      const error = new Error('Deze verzending wordt al veilig verwerkt; wacht op bevestiging voordat je opnieuw probeert.');
-      error.status = 409;
-      error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
-      throw error;
+      const replay = await handleExistingIntent(provenanceReservation.intent);
+      if (replay) return replay;
+      throw processingError();
     }
     if (typeof mailboxSendProvenanceStore.startDispatch === 'function') {
       await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
     }
+    const transporter = createTransport({
+      host: account.smtpHost,
+      port: account.smtpPort,
+      secure: account.smtpSecure,
+      auth: { user: account.smtpUser, pass: account.smtpPass },
+    });
     let info;
     try {
       info = await transporter.sendMail(mail);
     } catch (error) {
-      if (isAmbiguousMailboxProviderError(error) && typeof mailboxSendProvenanceStore.markUnknown === 'function') {
-        await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, { sentReconcileRequired: true })
-          .catch((markError) => logger.error('[MailboxSendProvenance][Unknown]', markError?.message || markError));
+      if (isAmbiguousMailboxProviderError(error)) {
+        if (typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+          await mailboxSendProvenanceStore.markUnknown(
+            threadProvenance.intentId,
+            error,
+            { sentReconcileRequired: true }
+          ).catch((markError) => {
+            logger.error('[MailboxSendProvenance][Unknown]', markError?.message || markError);
+          });
+        }
         throw createMailboxReconcileRequiredError(error);
       }
-      await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-      await cleanupUploadedAttachments(attachments, threadProvenance).catch((cleanupError) => {
-        logger.warn('[MailboxAttachment][CleanupAfterProviderFailure]', cleanupError?.message || cleanupError);
-      });
+      try {
+        const failedIntent = await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+        if (!failedIntent || failedIntent.status !== 'failed') {
+          const persistenceError = new Error('De definitieve providerfout kon niet duurzaam worden vastgelegd.');
+          persistenceError.code = 'MAILBOX_SEND_PROVENANCE_FAIL_UNCONFIRMED';
+          throw persistenceError;
+        }
+      } catch (provenanceError) {
+        logger.error('[MailboxSendProvenance][FailAfterProviderRejection]', provenanceError?.message || provenanceError);
+        const reconcileError = createMailboxReconcileRequiredError(provenanceError);
+        reconcileError.providerError = error;
+        throw reconcileError;
+      }
+      await cleanupStagedAttachments();
+      error.retryable = false;
       throw error;
     }
     const providerAcceptedRecipients = normalizeProviderRecipients(info?.accepted);
@@ -487,9 +647,6 @@ function createMailboxComposeSend(deps = {}) {
           logger.error('[MailboxSendProvenance][PrimaryRecipientUnknown]', markError?.message || markError);
         });
       }
-      await cleanupUploadedAttachments(attachments, threadProvenance).catch((cleanupError) => {
-        logger.warn('[MailboxAttachment][CleanupAfterPrimaryRecipientRejected]', cleanupError?.message || cleanupError);
-      });
       throw createMailboxReconcileRequiredError(acceptanceError);
     }
     const sentAt = now();
@@ -529,9 +686,7 @@ function createMailboxComposeSend(deps = {}) {
       throw createMailboxReconcileRequiredError(error);
     }
     const sentCopySaved = await sentCopyPromise;
-    await cleanupUploadedAttachments(attachments, threadProvenance).catch((error) => {
-      logger.warn('[MailboxAttachment][CleanupAfterAcceptedSend]', error?.message || error);
-    });
+    await cleanupStagedAttachments();
     return {
       messageId: normalizeString(info?.messageId || ''),
       accepted: Array.isArray(info?.accepted) ? info.accepted : [],
@@ -550,8 +705,8 @@ function createMailboxComposeSend(deps = {}) {
         email: account.email,
         to: normalizedTo,
         toDisplay: normalizedTo,
-        cc: normalizedCc.join(', '),
-        bcc: normalizedBcc.join(', '),
+        cc: normalizedCcText,
+        bcc: normalizedBccText,
         recipientRoutingEvidenceKnown: true,
         subject: cleanSubject,
         body: webdesignParts?.text || normalizedText,
@@ -561,7 +716,9 @@ function createMailboxComposeSend(deps = {}) {
         hasBody: true,
         bodyTruncated: false,
         unread: false,
-        ...(explicitAttachmentMetadata.length ? { attachments: explicitAttachmentMetadata } : {}),
+        attachments: explicitAttachmentMetadata,
+        attachmentEvidenceKnown: true,
+        attachmentHydrationAttempted: true,
         conversationId: threadProvenance.conversationId,
         softoraSendIntentId: threadProvenance.intentId,
         softoraSendMode: threadProvenance.mode,

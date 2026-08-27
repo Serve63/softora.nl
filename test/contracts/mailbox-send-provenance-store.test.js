@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const {
   createMailboxSendProvenanceStore,
+  mailboxAttachmentsMetadataEqual,
+  normalizeMailboxAttachmentsMetadata,
 } = require('../../server/services/mailbox-send-provenance-store');
 const { createSupabaseStateStore } = require('../../server/services/supabase-state');
 
@@ -120,6 +122,7 @@ test('mailbox send provenance survives acceptance and prevents an idempotent res
     senderName: 'Martijn van de Ven',
     subject: 'Re: Kleine vraag over jullie website',
     body: 'Dankjewel voor je reactie.',
+    attachmentsMetadata: [{ filename: 'bewijs.pdf', contentType: 'text/plain', size: 4 }],
   };
 
   const first = await store.reserve(payload);
@@ -127,6 +130,10 @@ test('mailbox send provenance survives acceptance and prevents an idempotent res
   assert.match(client.rows[0].send_identity_key, /^smtp-reply:[0-9a-f]{64}$/);
   assert.match(client.rows[0].send_scope_key, /^smtp-reply-scope:[0-9a-f]{64}$/);
   assert.match(client.rows[0].payload_fingerprint, /^[0-9a-f]{64}$/);
+  assert.match(client.rows[0].request_payload_fingerprint, /^[0-9a-f]{64}$/);
+  assert.deepEqual(client.rows[0].attachments_metadata, [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }]);
   await store.accept(payload.intentId, {
     messageId: '<accepted@example.nl>',
     acceptedAt: '2026-08-05T20:01:00.000Z',
@@ -140,6 +147,55 @@ test('mailbox send provenance survives acceptance and prevents an idempotent res
   });
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].conversationId, 'conversation:blue');
+  assert.deepEqual(accepted[0].attachmentsMetadata, [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }]);
+});
+
+test('attachment metadata bewaart legacy-onbekend als null en vergelijkt arrays canoniek diep', () => {
+  assert.equal(normalizeMailboxAttachmentsMetadata(null), null);
+  assert.deepEqual(normalizeMailboxAttachmentsMetadata([]), []);
+  assert.deepEqual(normalizeMailboxAttachmentsMetadata([{
+    filename: ' bewijs.pdf ', contentType: 'text/plain; charset=utf-8', size: 4,
+  }]), [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }]);
+  assert.equal(mailboxAttachmentsMetadataEqual(
+    [{ filename: 'bewijs.pdf', contentType: 'text/plain', size: 4 }],
+    [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }]
+  ), true);
+  assert.equal(mailboxAttachmentsMetadataEqual([], null), false);
+  assert.equal(normalizeMailboxAttachmentsMetadata([{
+    filename: 'te-groot.pdf', contentType: 'application/pdf', size: 5 * 1024 * 1024,
+  }]), null);
+  assert.equal(normalizeMailboxAttachmentsMetadata([
+    { filename: 'deel-a.pdf', contentType: 'application/pdf', size: 3 * 1024 * 1024 },
+    { filename: 'deel-b.pdf', contentType: 'application/pdf', size: 3 * 1024 * 1024 },
+  ]), null);
+});
+
+test('provenance-opslag onderscheidt ontbrekende attachmentmetadata van bewezen leeg', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-08-27T16:00:00.000Z'),
+    logger: { error() {} },
+  });
+  const base = {
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    senderName: 'Servé Creusen', mode: 'reply', conversationId: 'conversation:metadata',
+    replyTargetMessageId: '<incoming@example.nl>', references: '<incoming@example.nl>',
+    provider: 'smtp', subject: 'Re: Metadata', body: 'Antwoord', cc: '', bcc: '',
+  };
+  await store.reserve({
+    ...base, intentId: 'send:metadata-unknown', idempotencyKey: 'browser:metadata-unknown',
+  });
+  await store.reserve({
+    ...base, intentId: 'send:metadata-empty', idempotencyKey: 'browser:metadata-empty',
+    conversationId: 'conversation:metadata-empty', replyTargetMessageId: '<incoming-empty@example.nl>',
+    references: '<incoming-empty@example.nl>', attachmentsMetadata: [],
+  });
+  assert.equal(client.rows[0].attachments_metadata, null);
+  assert.deepEqual(client.rows[1].attachments_metadata, []);
 });
 
 test('gerichte accepted-provenance lookup gebruikt één canonieke geaggregeerde RPC en behoudt ambiguïteit', async () => {
@@ -762,6 +818,34 @@ test('mailbox send provenance fails closed when durable storage is unavailable',
     error.code === 'MAILBOX_SEND_PROVENANCE_INVALID' ||
     error.code === 'MAILBOX_SEND_PROVENANCE_UNAVAILABLE'
   ));
+});
+
+test('definitieve fail-transitie propageert een opslagfout in plaats van vals succes te melden', async () => {
+  const storageError = Object.assign(new Error('fail update geweigerd'), { code: '42501' });
+  const client = createFakeSupabase({
+    onUpdate: ({ patch }) => patch.status === 'failed'
+      ? { commit: false, error: storageError }
+      : null,
+  });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:fail-persist', idempotencyKey: 'browser:fail-persist', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'new-message',
+    conversationId: 'draft:fail-persist', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Vraag', body: 'Bericht', attachmentsMetadata: [],
+  };
+  await store.reserve(payload);
+  await store.startDispatch(payload.intentId);
+  await assert.rejects(() => store.fail(payload.intentId, new Error('SMTP 550')), (error) => (
+    error.code === '42501' && /fail update geweigerd/.test(error.message)
+  ));
+  assert.equal(client.rows[0].status, 'prepared');
+  assert.equal(client.rows[0].dispatch_state, 'started');
 });
 
 test('semantic reply identity blocks a second browser key before provider dispatch', async () => {

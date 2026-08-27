@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   createMailboxComposeThreadContext,
 } = require('../../server/services/mailbox-compose-thread-context');
+const { createBindingHash } = require('../../server/services/mailbox-attachment-service');
 
 function createResolver(message, overrides = {}) {
   let sequence = 0;
@@ -63,6 +64,42 @@ test('mailbox reply context is resolved from the exact stored message and builds
   assert.equal(result.references, '<blue-original@example.nl> <blue-inbound@example.nl>');
   assert.equal(result.owner, 'martijn');
   assert.equal(result.mode, 'reply');
+});
+
+test('attachment cleanup reconstrueert exact dezelfde HMAC-binding zonder mailbox-indexread', async () => {
+  const storedMessage = {
+    id: 'inbox:25', folder: 'inbox', accountEmail: 'martijn@softora.nl',
+    email: 'info@blue-monkey.nl', messageId: '<blue-inbound@example.nl>',
+    references: '<blue-original@example.nl>',
+  };
+  const body = {
+    account: 'martijn@softora.nl', to: 'info@blue-monkey.nl', owner: 'martijn',
+    mode: 'reply', idempotencyKey: 'blue-cleanup-1',
+    context: {
+      id: 'inbox:25', folder: 'inbox', messageId: '<blue-inbound@example.nl>',
+      references: '<blue-original@example.nl>',
+      conversationId: 'conversation:martijn@softora.nl|blue',
+    },
+  };
+  const expected = await createResolver(storedMessage).resolve({
+    body, accountEmail: body.account, recipientEmail: body.to,
+  });
+  let indexReads = 0;
+  const outageResolver = createResolver(null, {
+    mailboxIndexStore: {
+      async getMessageForReplyProof() {
+        indexReads += 1;
+        throw new Error('index offline');
+      },
+    },
+  });
+  const cleanupBinding = outageResolver.resolveAttachmentCleanupBinding({
+    body, accountEmail: body.account, recipientEmail: body.to,
+  });
+  assert.equal(indexReads, 0);
+  assert.equal(createBindingHash(cleanupBinding), createBindingHash(expected));
+  assert.equal(cleanupBinding.replyTargetMessageId, '<blue-inbound@example.nl>');
+  assert.equal(cleanupBinding.owner, 'martijn');
 });
 
 test('mailbox reply proof uses the priority reader and accepts a normalized Reply-To target', async () => {

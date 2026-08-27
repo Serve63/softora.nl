@@ -8,6 +8,7 @@ const { createMailboxComposeSend } = require('../../server/services/mailbox-comp
 const {
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
+  createMailboxRequestPayloadFingerprint,
 } = require('../../server/services/mailbox-send-provenance-store');
 
 function createAllowingSuppressionStore() {
@@ -168,6 +169,7 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
     buildMailboxWebdesignSendParts: async () => null,
     appendSentMessage: async () => true,
     mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => null,
       reserve: async (input) => {
         reservedAttachments = input.attachments;
         return { created: true, intent: { intentId: input.intentId, status: 'prepared' } };
@@ -177,6 +179,9 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
       fail: async () => null,
     },
     mailboxAttachmentService: {
+      inspectAttachments: () => [0, 1, 2].map((index) => ({
+        filename: `screen-${index}.png`, contentType: 'image/png', size: 2,
+      })),
       downloadAttachments: async () => [1, 2, 3].map((_, index) => ({
         filename: `screen-${index}.png`, contentType: 'image/png', content: Buffer.from([index * 2 + 1, index * 2 + 2]), contentDisposition: 'attachment',
       })),
@@ -209,7 +214,7 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
   assert.equal(result.sentMessage.attachments.some((attachment) => 'content' in attachment || 'reference' in attachment), false);
 });
 
-test('accepted attachment-replay hydrateert opnieuw en eist exact dezelfde duurzame payload', async () => {
+test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist exact dezelfde duurzame requestpayload', async () => {
   let providerCalls = 0;
   let downloadCalls = 0;
   let reserveCalls = 0;
@@ -247,6 +252,11 @@ test('accepted attachment-replay hydrateert opnieuw en eist exact dezelfde duurz
       bcc: 'audit@example.nl',
       attachmentsFingerprint: durableAttachmentsFingerprint,
     }),
+    attachmentsMetadata: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }],
+    requestPayloadFingerprint: createMailboxRequestPayloadFingerprint({
+      subject: 'Bijlage', requestBody: 'Zie de bijlage.', cc: 'cc@example.nl', bcc: 'audit@example.nl',
+      attachmentsMetadata: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }],
+    }),
     status: 'accepted',
     acceptedAt: '2026-08-26T15:00:00.000Z',
   };
@@ -263,12 +273,18 @@ test('accepted attachment-replay hydrateert opnieuw en eist exact dezelfde duurz
     createTransport: () => ({ sendMail: async () => { providerCalls += 1; } }),
     buildMailboxWebdesignSendParts: async () => null,
     mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => acceptedIntent,
       reserve: async () => {
         reserveCalls += 1;
-        return { created: false, intent: acceptedIntent };
+        throw new Error('accepted replay mag niet opnieuw reserveren');
       },
     },
     mailboxAttachmentService: {
+      inspectAttachments: (attachmentInputs) => [{
+        filename: 'bewijs.pdf',
+        contentType: 'application/pdf',
+        size: attachmentInputs.some((attachment) => attachment.reference === 'different-content') ? 3 : 4,
+      }],
       downloadAttachments: async (attachmentInputs) => {
         downloadCalls += 1;
         const changed = attachmentInputs.some((attachment) => attachment.reference === 'different-content');
@@ -315,10 +331,13 @@ test('accepted attachment-replay hydrateert opnieuw en eist exact dezelfde duurz
   assert.equal(result.intentId, acceptedIntent.intentId);
   assert.equal(result.sentMessage.subject, acceptedIntent.subject);
   assert.equal(result.sentMessage.body, acceptedIntent.body);
-  assert.equal(result.sentMessage.attachments, undefined);
+  assert.deepEqual(result.sentMessage.attachments, [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }]);
+  assert.equal(result.sentMessage.attachmentEvidenceKnown, true);
   assert.equal(providerCalls, 0);
-  assert.equal(downloadCalls, 1);
-  assert.equal(reserveCalls, 1);
+  assert.equal(downloadCalls, 0);
+  assert.equal(reserveCalls, 0);
   assert.equal(cleanupCalls, 1);
 
   const mismatchCases = [
@@ -412,9 +431,9 @@ test('accepted attachment-replay hydrateert opnieuw en eist exact dezelfde duurz
     });
   }
   assert.equal(providerCalls, 0);
-  assert.equal(downloadCalls, 11);
-  assert.equal(reserveCalls, 11);
-  assert.equal(cleanupCalls, 11);
+  assert.equal(downloadCalls, 0);
+  assert.equal(reserveCalls, 0);
+  assert.equal(cleanupCalls, 1, 'alleen de geldige replay ruimt de stagingreference op');
 });
 
 test('ongeldige signed attachment wordt vóór provenance/provider afgewezen', async () => {
@@ -430,8 +449,14 @@ test('ongeldige signed attachment wordt vóór provenance/provider afgewezen', a
     createTransport: () => ({ sendMail: async () => { providerCalls += 1; } }),
     buildMailboxWebdesignSendParts: async () => null,
     appendSentMessage: async () => true,
-    mailboxSendProvenanceStore: { reserve: async () => { reserveCalls += 1; return { created: true, intent: {} }; } },
-    mailboxAttachmentService: { downloadAttachments: async () => { throw Object.assign(new Error('bad reference'), { code: 'MAILBOX_ATTACHMENT_REFERENCE_INVALID', status: 400 }); } },
+    mailboxSendProvenanceStore: {
+      findByIdempotencyKey: async () => null,
+      reserve: async () => { reserveCalls += 1; return { created: true, intent: {} }; },
+    },
+    mailboxAttachmentService: {
+      inspectAttachments: () => { throw Object.assign(new Error('bad reference'), { code: 'MAILBOX_ATTACHMENT_REFERENCE_INVALID', status: 400 }); },
+      downloadAttachments: async () => { throw new Error('Storage mag niet starten na ongeldige reference'); },
+    },
   });
   await assert.rejects(sendMessage({
     accountEmail: 'serve@softora.nl', to: 'prospect@example.nl', subject: 'x', text: 'y', attachments: [{ reference: 'bad' }],
