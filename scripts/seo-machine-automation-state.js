@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
@@ -9,8 +10,7 @@ const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
 ]);
 const DEFAULT_MEMORY_PATH = path.join(
-  process.env.CODEX_HOME || path.join(process.env.HOME || '', '.codex'),
-  'automations', 'softora-seo-actiemachine', 'memory.md'
+  os.homedir(), '.codex', 'automations', 'softora-seo-actiemachine', 'memory.md'
 );
 function stateBlockPattern(name) {
   const safe = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
