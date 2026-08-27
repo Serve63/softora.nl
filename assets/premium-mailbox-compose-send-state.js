@@ -100,28 +100,52 @@
       );
     }
     const key = normalizeText(marker?.idempotencyKey);
-    const markerMetadata = Object.prototype.hasOwnProperty.call(marker || {}, 'attachmentsMetadata')
-      ? normalizeAttachmentMetadata(marker.attachmentsMetadata)
-      : [];
+    const hasMetadata = Object.prototype.hasOwnProperty.call(marker || {}, 'attachmentsMetadata');
+    const rawMetadata = hasMetadata ? marker.attachmentsMetadata : [];
+    const markerMetadata = Array.isArray(rawMetadata)
+      ? normalizeAttachmentMetadata(rawMetadata)
+      : null;
+    const metadataIsCanonical = markerMetadata !== null
+      && JSON.stringify(rawMetadata) === JSON.stringify(markerMetadata);
+    const state = marker?.state;
     const valid = marker
       && marker.version === MARKER_VERSION
+      && typeof marker.idempotencyKey === 'string'
+      && marker.idempotencyKey === key
       && key
       && (!expectedKey || key === expectedKey)
-      && normalizeText(marker.casToken)
-      && /^[0-9a-f]{64}$/.test(normalizeText(marker.payloadFingerprint))
-      && /^[0-9a-f]{64}$/.test(normalizeText(marker.localScopeFingerprint))
-      && MARKER_STATES.has(normalizeText(marker.state))
-      && Number.isFinite(Number(marker.createdAt))
-      && Number.isFinite(Number(marker.updatedAt))
-      && markerMetadata !== null
-      && (marker.reconcileProof == null || typeof marker.reconcileProof === 'object');
+      && typeof marker.casToken === 'string'
+      && marker.casToken === normalizeText(marker.casToken)
+      && marker.casToken
+      && typeof marker.payloadFingerprint === 'string'
+      && /^[0-9a-f]{64}$/.test(marker.payloadFingerprint)
+      && typeof marker.localScopeFingerprint === 'string'
+      && /^[0-9a-f]{64}$/.test(marker.localScopeFingerprint)
+      && typeof state === 'string'
+      && MARKER_STATES.has(state)
+      && typeof marker.createdAt === 'number'
+      && Number.isFinite(marker.createdAt)
+      && typeof marker.updatedAt === 'number'
+      && Number.isFinite(marker.updatedAt)
+      && marker.createdAt >= 0
+      && marker.updatedAt >= marker.createdAt
+      && metadataIsCanonical
+      && (
+        marker.reconcileProof == null
+        || (typeof marker.reconcileProof === 'object' && !Array.isArray(marker.reconcileProof))
+      );
     if (!valid) {
       throw createProtocolError(
         'MAILBOX_SEND_DURABLE_STATE_CORRUPT',
         'De veilige verzendstatus is ongeldig; de mail is niet verzonden.'
       );
     }
-    return { ...marker, attachmentsMetadata: markerMetadata };
+    return {
+      ...marker,
+      idempotencyKey: key,
+      state,
+      attachmentsMetadata: markerMetadata,
+    };
   }
 
   function readMarker(storage, idempotencyKey) {
@@ -441,7 +465,7 @@
       payloadFingerprint,
       localScopeFingerprint,
       attachmentsMetadata,
-      options
+      { ...options, storage }
     );
   }
 

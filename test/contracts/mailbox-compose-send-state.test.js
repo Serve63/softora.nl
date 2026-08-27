@@ -80,11 +80,16 @@ test('marker-CAS bewaart readback en weigert stale of parallelle tokens', () => 
   );
 });
 
-test('beschadigde, uppercase of gemengde bijlagebewijzen falen gesloten', () => {
+test('beschadigde, non-canonieke of gemengde markers falen vóór selectie zonder tweede marker', () => {
   const base = markerInput({ casToken: 'cas-token' });
   for (const changed of [
     { ...base, payloadFingerprint: 'A'.repeat(64) },
     { ...base, localScopeFingerprint: 'B'.repeat(64) },
+    { ...base, state: ' armed ' },
+    { ...base, createdAt: '1' },
+    { ...base, updatedAt: null },
+    { ...base, attachmentsMetadata: {} },
+    { ...base, reconcileProof: [] },
     {
       ...base,
       attachmentsMetadata: [
@@ -93,11 +98,35 @@ test('beschadigde, uppercase of gemengde bijlagebewijzen falen gesloten', () => 
       ],
     },
   ]) {
+    const storage = new MemoryStorage();
+    storage.setItem(state.markerStorageKey(base.idempotencyKey), JSON.stringify(changed));
     assert.throws(
-      () => state.parseMarker(JSON.stringify(changed)),
+      () => state.selectMarker(
+        storage,
+        '',
+        'c'.repeat(64),
+        base.localScopeFingerprint,
+        [],
+        { now: () => 2, randomUUID: () => 'mag-niet-worden-gebruikt' }
+      ),
       (error) => error.code === 'MAILBOX_SEND_DURABLE_STATE_CORRUPT'
     );
+    assert.equal(storage.length, 1);
   }
+});
+
+test('canonieke marker wordt met genormaliseerde metadata teruggelezen', () => {
+  const parsed = state.parseMarker(JSON.stringify(markerInput({
+    casToken: 'cas-token',
+    attachmentsMetadata: [{
+      filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'c'.repeat(64),
+    }],
+  })));
+  assert.equal(parsed.idempotencyKey, 'browser:test');
+  assert.equal(parsed.state, 'armed');
+  assert.deepEqual(parsed.attachmentsMetadata, [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'c'.repeat(64),
+  }]);
 });
 
 test('payloadfingerprint bindt exacte SHA-256 bijlagebytes en lokale scope niet', async () => {
@@ -131,6 +160,24 @@ test('selectMarker weigert een onopgeloste context met andere inhoud of bijlagen
     ),
     (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT'
   );
+});
+
+test('selectMarker gebruikt de expliciet meegegeven storage ook bij een nieuwe marker', () => {
+  const storage = new MemoryStorage();
+  const created = state.selectMarker(
+    storage,
+    '',
+    'c'.repeat(64),
+    'd'.repeat(64),
+    [],
+    { now: () => 20, randomUUID: (() => {
+      const values = ['idempotency', 'cas-token'];
+      return () => values.shift();
+    })() }
+  );
+  assert.equal(created.idempotencyKey, 'browser:idempotency');
+  assert.equal(created.casToken, 'cas-token');
+  assert.equal(state.readMarker(storage, created.idempotencyKey).state, 'armed');
 });
 
 test('ongeldige WebCrypto-digestlengte levert nooit een fingerprint op', async () => {

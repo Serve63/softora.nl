@@ -1379,3 +1379,26 @@ test('v2 uploadplan bindt request, response en staged reference aan exact dezelf
   assert.equal(references[0].expiresAt, 2_000_000);
   assert.equal(Object.keys(references[0]).includes('expiresAt'), false);
 });
+
+test('aanwezige uppercase of ongeldige SHA-256 faalt vóór uploadplan en PUT in plaats van legacy fallback', async (t) => {
+  for (const sha256Value of ['A'.repeat(64), 'not-a-sha', '', undefined]) {
+    await t.test(String(sha256Value), async () => {
+      const file = createBrowserFile('bewijs.pdf', 'application/pdf', [1, 2, 3, 4]);
+      let networkCalls = 0;
+      await assert.rejects(compose.uploadAttachments([{
+        file,
+        filename: file.name,
+        contentType: file.type,
+        size: file.size,
+        sha256: sha256Value,
+      }], {
+        fetch: async () => {
+          networkCalls += 1;
+          throw new Error('netwerk mag niet worden aangeroepen');
+        },
+        payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+      }), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_INVALID');
+      assert.equal(networkCalls, 0);
+    });
+  }
+});

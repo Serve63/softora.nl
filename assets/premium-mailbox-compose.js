@@ -12,6 +12,7 @@
   const ATTACHMENT_UPLOAD_TIMEOUT_MS = 120_000;
   const ATTACHMENT_CLEANUP_TIMEOUT_MS = 10_000;
   const ATTACHMENT_STAGING_TIMEOUT_MS = 210_000;
+  const ATTACHMENT_SHA256_PATTERN = /^[0-9a-f]{64}$/;
   const ALLOWED_EXTENSIONS = new Set([
     'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
     'ppt', 'pptx', 'txt', 'webp', 'xls', 'xlsx',
@@ -334,8 +335,10 @@
     const now = attachmentNow(options);
     return uploads.every((upload, index) => {
       const attachment = attachments[index];
-      const expectedSha256 = String(attachment?.sha256 || '');
-      const hashBound = /^[0-9a-f]{64}$/.test(expectedSha256);
+      const hasSha256 = Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256');
+      const expectedSha256 = hasSha256 ? String(attachment.sha256) : '';
+      if (hasSha256 && !ATTACHMENT_SHA256_PATTERN.test(expectedSha256)) return false;
+      const hashBound = hasSha256;
       const rawReference = typeof upload?.reference === 'string' ? upload.reference : '';
       const rawSignedUrl = typeof upload?.signedUrl === 'string' ? upload.signedUrl : '';
       const reference = rawReference.trim();
@@ -472,6 +475,16 @@
   async function uploadAttachments(attachments, options = {}) {
     const list = Array.isArray(attachments) ? attachments : [];
     if (!list.length) return [];
+    for (const attachment of list) {
+      const hasSha256 = Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256');
+      if (hasSha256 && !ATTACHMENT_SHA256_PATTERN.test(String(attachment.sha256))) {
+        throw createAttachmentError({
+          code: 'MAILBOX_ATTACHMENT_SHA256_INVALID',
+          message: 'De bijlage heeft geen geldig veilig bestandsbewijs; kies het bestand opnieuw.',
+          status: 400,
+        });
+      }
+    }
     const fetchImpl = options.fetch || global.fetch?.bind(global);
     if (typeof fetchImpl !== 'function') {
       throw new Error('Bijlage uploaden is tijdelijk niet beschikbaar.');
@@ -491,7 +504,9 @@
       filename: attachment.filename,
       contentType: attachment.contentType,
       size: attachment.size,
-      ...(attachment.sha256 ? { sha256: attachment.sha256 } : {}),
+      ...(Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256')
+        ? { sha256: attachment.sha256 }
+        : {}),
     }));
     const uploadPayload = { ...options.payload, attachments: metadata };
     const uploads = await requestAttachmentUploadPlan(fetchImpl, uploadPayload, list, operationOptions);
