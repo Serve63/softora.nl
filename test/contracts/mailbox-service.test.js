@@ -4053,8 +4053,10 @@ test('mailbox image response serves exact-message MIME media with durable privat
   assert.equal(response.body.toString(), 'mailbox-image');
 });
 
-test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
+test('mailbox cron sync route requires CRON_SECRET before attachment sweep and sweeps only GET sync', async () => {
   let cronCalled = 0;
+  let sweepCalled = 0;
+  const callOrder = [];
   const routes = [];
   const app = {
     get(path, ...handlers) {
@@ -4071,8 +4073,14 @@ test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
       accountsResponse() {},
       listMessagesResponse() {},
       getMessageResponse() {},
+      async sweepExpiredAttachments(options) {
+        sweepCalled += 1;
+        callOrder.push('sweep');
+        assert.deepEqual(options, { totalTimeoutMs: 5_000 });
+      },
       syncMailboxResponse(_req, res) {
         cronCalled += 1;
+        callOrder.push('sync');
         res.status(200).json({ ok: true });
       },
       sendMessageResponse() {},
@@ -4084,17 +4092,30 @@ test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
   route[2][0]({ headers: { authorization: 'Bearer wrong' } }, blocked, () => {});
   assert.equal(blocked.statusCode, 401);
   assert.equal(cronCalled, 0);
+  assert.equal(sweepCalled, 0);
 
   const allowed = createResponseRecorder();
-  route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, allowed, () => {
-    route[2][1]({}, allowed);
-  });
+  await route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, allowed, () => (
+    route[2][1]({ method: 'GET' }, allowed)
+  ));
   assert.equal(allowed.statusCode, 200);
   assert.equal(cronCalled, 1);
+  assert.equal(sweepCalled, 1);
+  assert.deepEqual(callOrder, ['sweep', 'sync']);
+
+  const postRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/mailbox/sync');
+  const postResponse = createResponseRecorder();
+  await postRoute[2][0]({ method: 'POST' }, postResponse, () => (
+    postRoute[2][1]({ method: 'POST' }, postResponse)
+  ));
+  assert.equal(postResponse.statusCode, 200);
+  assert.equal(cronCalled, 2);
+  assert.equal(sweepCalled, 1);
 });
 
-test('mailbox cron sync skips safely during Supabase outage pause', () => {
+test('mailbox cron sync skips safely during Supabase outage pause before attachment sweep', async () => {
   let cronCalled = 0;
+  let sweepCalled = 0;
   const routes = [];
   const app = {
     get(path, ...handlers) {
@@ -4112,6 +4133,7 @@ test('mailbox cron sync skips safely during Supabase outage pause', () => {
       accountsResponse() {},
       listMessagesResponse() {},
       getMessageResponse() {},
+      async sweepExpiredAttachments() { sweepCalled += 1; },
       syncMailboxResponse(_req, res) {
         cronCalled += 1;
         res.status(200).json({ ok: true });
@@ -4122,22 +4144,103 @@ test('mailbox cron sync skips safely during Supabase outage pause', () => {
 
   const route = routes.find(([method, path]) => method === 'GET' && path === '/api/mailbox/sync');
   const paused = createResponseRecorder();
-  route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, paused, () => {
-    route[2][1]({}, paused);
-  });
+  await route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, paused, () => (
+    route[2][1]({ method: 'GET' }, paused)
+  ));
 
   assert.equal(paused.statusCode, 200);
   assert.equal(paused.body.ok, true);
   assert.equal(paused.body.skipped, true);
   assert.equal(paused.body.code, 'SUPABASE_OUTAGE_CRON_PAUSED');
   assert.equal(cronCalled, 0);
+  assert.equal(sweepCalled, 0);
+});
+
+test('mailbox cron sweep is hard begrensd en een timeout laat de gewone sync doorgaan', async () => {
+  const routes = [];
+  const warnings = [];
+  let syncCalled = 0;
+  const app = {
+    get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+    post() {},
+  };
+  registerMailboxRoutes(app, {
+    cronSecret: 'cron-secret',
+    attachmentSweepTimeoutMs: 15,
+    logger: { warn: (...args) => warnings.push(args) },
+    coordinator: {
+      sweepExpiredAttachments: async () => new Promise(() => {}),
+      syncMailboxResponse(_req, res) {
+        syncCalled += 1;
+        return res.status(200).json({ ok: true });
+      },
+    },
+  });
+  const route = routes.find(([method, path]) => method === 'GET' && path === '/api/mailbox/sync');
+  const response = createResponseRecorder();
+  const startedAt = Date.now();
+
+  await route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, response, () => (
+    route[2][1]({ method: 'GET' }, response)
+  ));
+
+  assert.ok(Date.now() - startedAt < 250);
+  assert.equal(syncCalled, 1);
+  assert.equal(response.statusCode, 200);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], '[MailboxAttachment][CronSweep]');
+  assert.match(String(warnings[0][1]), /timeout na 15ms/);
+});
+
+test('mailbox cron sweep failure never overwrites the ordinary sync response', async () => {
+  const routes = [];
+  const warnings = [];
+  const app = {
+    get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+    post() {},
+  };
+  registerMailboxRoutes(app, {
+    cronSecret: 'cron-secret',
+    logger: { warn: (...args) => warnings.push(args) },
+    coordinator: {
+      async sweepExpiredAttachments() { throw new Error('storage down'); },
+      syncMailboxResponse(_req, res) {
+        return res.status(207).json({ ok: false, partial: true });
+      },
+    },
+  });
+  const route = routes.find(([method, path]) => method === 'GET' && path === '/api/mailbox/sync');
+  const response = createResponseRecorder();
+
+  await route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, response, () => (
+    route[2][1]({ method: 'GET' }, response)
+  ));
+
+  assert.equal(response.statusCode, 207);
+  assert.deepEqual(response.body, { ok: false, partial: true });
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], '[MailboxAttachment][CronSweep]');
 });
 
 test('mailbox service exposes sync response handler for cron and admin routes', async () => {
-  const service = createMailboxService({ mailConfig: {} });
+  const sweepOptions = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAttachmentService: {
+      async sweepExpiredAttachments(options) {
+        sweepOptions.push(options);
+        return { batches: 1, removed: 2, timedOut: false };
+      },
+    },
+  });
 
   assert.equal(typeof service.syncMailboxResponse, 'function');
   assert.equal(typeof service.syncInstantlyMailboxResponse, 'function');
+  assert.equal(typeof service.sweepExpiredAttachments, 'function');
+  assert.deepEqual(await service.sweepExpiredAttachments({ totalTimeoutMs: 4321 }), {
+    batches: 1, removed: 2, timedOut: false,
+  });
+  assert.deepEqual(sweepOptions, [{ totalTimeoutMs: 4321 }]);
 
   const response = createResponseRecorder();
   await service.syncMailboxResponse({ query: {}, body: {} }, response);

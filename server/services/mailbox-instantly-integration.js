@@ -2,13 +2,182 @@ const { createInstantlyMailboxService } = require('./instantly-mailbox');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const {
   createMailboxReconcileRequiredError,
+  createMailboxRequestPayloadFingerprint,
   isAmbiguousMailboxProviderError,
+  normalizeMailboxAttachmentsMetadata,
 } = require('./mailbox-send-provenance-store');
 const {
   assertOutboundRecipientsNotSuppressed,
 } = require('../security/outbound-mail-suppression');
 
 const INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS = 3 * 60 * 1000;
+
+function createInstantlyReplayError(message, code, retryable) {
+  const error = new Error(message);
+  error.status = 409;
+  error.code = code;
+  if (typeof retryable === 'boolean') error.retryable = retryable;
+  return error;
+}
+
+function createInstantlyAttachmentEvidenceError() {
+  const cause = new Error(
+    'De eerdere Instantly-verzending bevat geen betrouwbaar duurzaam bijlagebewijs.'
+  );
+  cause.code = 'MAILBOX_SEND_ATTACHMENT_EVIDENCE_MISSING';
+  return createMailboxReconcileRequiredError(cause);
+}
+
+function assertInstantlyReplayContext(intent, provenance, body, normalizeString) {
+  const text = (value) => normalizeString(value);
+  const email = (value) => text(value).toLowerCase();
+  const matches = intent
+    && text(intent.idempotencyKey) === text(provenance.idempotencyKey)
+    && text(intent.owner).toLowerCase() === text(provenance.owner).toLowerCase()
+    && email(intent.accountEmail) === email(body.account)
+    && email(intent.recipientEmail) === email(body.to)
+    && email(provenance.accountEmail) === email(body.account)
+    && email(provenance.recipientEmail) === email(body.to)
+    && text(intent.mode).toLowerCase() === text(provenance.mode).toLowerCase()
+    && text(intent.conversationId) === text(provenance.conversationId)
+    && text(intent.replyTargetMessageId) === text(provenance.replyTargetMessageId)
+    && text(intent.references) === text(provenance.references)
+    && text(intent.provider || 'instantly').toLowerCase() === 'instantly'
+    && text(provenance.provider || 'instantly').toLowerCase() === 'instantly'
+    && text(intent.providerThreadId) === text(provenance.providerThreadId);
+  if (matches) return;
+  throw createInstantlyReplayError(
+    'De veilige verzend-ID hoort bij een andere mailbox- of threadcontext.',
+    'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH',
+    false
+  );
+}
+
+function assertInstantlyReplayPayload(intent, body, normalizeString) {
+  const durableMetadata = normalizeMailboxAttachmentsMetadata(intent?.attachmentsMetadata);
+  if (durableMetadata === null) throw createInstantlyAttachmentEvidenceError();
+  const requestedMetadata = body?.attachmentsMetadata === undefined
+    ? []
+    : normalizeMailboxAttachmentsMetadata(body.attachmentsMetadata);
+  if (requestedMetadata === null || requestedMetadata.length || durableMetadata.length) {
+    throw createInstantlyReplayError(
+      'De veilige verzend-ID hoort bij andere mailinhoud of bijlagen; open de mail opnieuw voordat je opnieuw verzendt.',
+      'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH',
+      false
+    );
+  }
+
+  const durableFingerprint = normalizeString(intent?.requestPayloadFingerprint).toLowerCase();
+  if (durableFingerprint) {
+    if (!/^[0-9a-f]{64}$/.test(durableFingerprint)) {
+      throw createInstantlyAttachmentEvidenceError();
+    }
+    const requestedFingerprint = createMailboxRequestPayloadFingerprint({
+      subject: body.subject,
+      requestBody: body.body || body.text || '',
+      cc: body.cc,
+      bcc: body.bcc,
+      attachmentsMetadata: requestedMetadata,
+    }, normalizeString);
+    if (requestedFingerprint === durableFingerprint) return durableMetadata;
+  } else {
+    const legacyFieldsMatch = normalizeString(intent.subject) === normalizeString(body.subject)
+      && normalizeString(intent.body) === normalizeString(body.body || body.text || '')
+      && normalizeString(intent.cc).toLowerCase() === normalizeString(body.cc).toLowerCase()
+      && normalizeString(intent.bcc).toLowerCase() === normalizeString(body.bcc).toLowerCase();
+    if (legacyFieldsMatch) return durableMetadata;
+  }
+  throw createInstantlyReplayError(
+    'De veilige verzend-ID hoort bij andere mailinhoud of bijlagen; open de mail opnieuw voordat je opnieuw verzendt.',
+    'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH',
+    false
+  );
+}
+
+function createInstantlyAcceptedReplayResult(intent, attachments) {
+  const acceptedAt = intent.acceptedAt || intent.updatedAt || intent.createdAt || '';
+  const messageId = intent.messageId || intent.providerMessageId || '';
+  return {
+    provider: 'instantly',
+    providerMessageId: intent.providerMessageId,
+    providerThreadId: intent.providerThreadId,
+    accountEmail: intent.accountEmail,
+    owner: intent.owner,
+    intentId: intent.intentId,
+    messageId,
+    idempotentReplay: true,
+    sentMessage: {
+      id: `accepted-sent:${messageId || intent.intentId}`,
+      mailboxId: `accepted-sent:${messageId || intent.intentId}`,
+      folder: 'sent',
+      storageFolder: 'instantly',
+      direction: 'sent',
+      accountEmail: intent.accountEmail,
+      provider: 'instantly',
+      providerOwner: intent.owner,
+      providerMessageId: intent.providerMessageId,
+      providerThreadId: intent.providerThreadId,
+      messageId,
+      from: intent.senderName || intent.accountEmail,
+      email: intent.accountEmail,
+      to: intent.recipientEmail,
+      toDisplay: intent.recipientEmail,
+      cc: intent.cc,
+      bcc: intent.bcc,
+      recipientRoutingEvidenceKnown: true,
+      subject: intent.subject,
+      body: intent.body,
+      preview: intent.body,
+      receivedAt: acceptedAt,
+      activityAt: acceptedAt,
+      hasBody: true,
+      bodyLoaded: true,
+      bodyTruncated: false,
+      unread: false,
+      attachments,
+      attachmentEvidenceKnown: true,
+      attachmentHydrationAttempted: true,
+      conversationId: intent.conversationId,
+      softoraConversationId: intent.conversationId,
+      softoraSendIntentId: intent.intentId,
+      softoraSendMode: intent.mode,
+      softoraReplyTargetMessageId: intent.replyTargetMessageId,
+    },
+  };
+}
+
+function resolveInstantlyExistingIntent(intent, threadProvenance, body, normalizeString) {
+  if (!intent) return null;
+  assertInstantlyReplayContext(intent, threadProvenance, body, normalizeString);
+  const durableAttachments = assertInstantlyReplayPayload(intent, body, normalizeString);
+  if (intent.status === 'accepted') {
+    return createInstantlyAcceptedReplayResult(intent, durableAttachments);
+  }
+  if (intent.status === 'failed') {
+    throw createInstantlyReplayError(
+      'De vorige verzendpoging is definitief gestopt; probeer opnieuw met een nieuwe veilige verzend-ID.',
+      'MAILBOX_SEND_PREVIOUSLY_FAILED',
+      false
+    );
+  }
+  if (
+    intent.status === 'unknown'
+    || intent.reconcileRequired === true
+    || (intent.status === 'prepared' && intent.dispatchState === 'started')
+  ) {
+    const cause = new Error(
+      'Deze Instantly-verzend-ID heeft een providerdispatch zonder duurzaam bevestigde eindstatus.'
+    );
+    cause.code = 'MAILBOX_SEND_DISPATCH_OUTCOME_UNCERTAIN';
+    cause.intentId = intent.intentId;
+    throw createMailboxReconcileRequiredError(cause);
+  }
+  throw createInstantlyReplayError(
+    'Dit Instantly-antwoord wordt al veilig verwerkt.',
+    'MAILBOX_SEND_ALREADY_PROCESSING',
+    true
+  );
+}
 
 function getMailboxMessageOwner(message) {
   const provider = String(message?.provider || '').trim().toLowerCase();
@@ -343,6 +512,34 @@ async function sendMailboxMessage({
       threadProvenance,
     });
   }
+  if (threadProvenance?.mode !== 'reply') {
+    const error = new Error('Instantly ondersteunt hier alleen een bewezen antwoord in de bestaande thread.');
+    error.status = 409;
+    error.code = 'INSTANTLY_NEW_MESSAGE_UNSUPPORTED';
+    throw error;
+  }
+  const requiredProvenanceMethods = [
+    'findByIdempotencyKey', 'reserve', 'startDispatch', 'accept', 'fail', 'markUnknown',
+  ];
+  if (!mailboxSendProvenanceStore || requiredProvenanceMethods.some(
+    (method) => typeof mailboxSendProvenanceStore[method] !== 'function'
+  )) {
+    const error = new Error('De duurzame Instantly-threadregistratie ontbreekt.');
+    error.status = 503;
+    error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
+    throw error;
+  }
+  const existing = await mailboxSendProvenanceStore.findByIdempotencyKey(
+    threadProvenance.idempotencyKey
+  );
+  const earlyReplay = resolveInstantlyExistingIntent(
+    existing,
+    threadProvenance,
+    body,
+    normalizeString
+  );
+  if (earlyReplay) return earlyReplay;
+
   const recipientEmails = [body.to, body.cc, body.bcc]
     .flatMap((value) => Array.isArray(value) ? value : String(value || '').split(/[;,]/))
     .map((value) => normalizeString(value).toLowerCase())
@@ -352,18 +549,6 @@ async function sendMailboxMessage({
     identities: recipientEmails.map((recipientEmail) => ({ recipientEmail })),
     channel: 'instantly-mailbox-reply',
   });
-  if (threadProvenance?.mode !== 'reply') {
-    const error = new Error('Instantly ondersteunt hier alleen een bewezen antwoord in de bestaande thread.');
-    error.status = 409;
-    error.code = 'INSTANTLY_NEW_MESSAGE_UNSUPPORTED';
-    throw error;
-  }
-  if (!mailboxSendProvenanceStore) {
-    const error = new Error('De duurzame Instantly-threadregistratie ontbreekt.');
-    error.status = 503;
-    error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
-    throw error;
-  }
   const reservation = await mailboxSendProvenanceStore.reserve({
     ...threadProvenance,
     accountEmail: body.account,
@@ -371,29 +556,20 @@ async function sendMailboxMessage({
     senderName: threadProvenance.senderName,
     subject: body.subject,
     body: body.body || body.text || '',
+    requestBody: body.body || body.text || '',
     cc: body.cc,
     bcc: body.bcc,
+    attachmentsMetadata: [],
   });
   if (!reservation.created) {
-    if (reservation.intent.status === 'accepted') {
-      return {
-        provider: 'instantly',
-        providerMessageId: reservation.intent.providerMessageId,
-        providerThreadId: reservation.intent.providerThreadId,
-        accountEmail: reservation.intent.accountEmail,
-        owner: reservation.intent.owner,
-        intentId: reservation.intent.intentId,
-        idempotentReplay: true,
-      };
-    }
-    const error = new Error('Dit Instantly-antwoord wordt al veilig verwerkt.');
-    error.status = 409;
-    error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
-    throw error;
+    return resolveInstantlyExistingIntent(
+      reservation.intent,
+      threadProvenance,
+      body,
+      normalizeString
+    );
   }
-  if (typeof mailboxSendProvenanceStore.startDispatch === 'function') {
-    await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
-  }
+  await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
   let result;
   try {
     result = await instantlyMailboxService.reply({
@@ -409,18 +585,62 @@ async function sendMailboxMessage({
       attachments: body.attachments,
     });
   } catch (error) {
-    if (isAmbiguousMailboxProviderError(error) && typeof mailboxSendProvenanceStore.markUnknown === 'function') {
+    if (isAmbiguousMailboxProviderError(error)) {
       await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, { sentReconcileRequired: true })
         .catch(() => null);
       throw createMailboxReconcileRequiredError(error);
     }
-    await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+    try {
+      const failedIntent = await mailboxSendProvenanceStore.fail(
+        threadProvenance.intentId,
+        error
+      );
+      if (!failedIntent || failedIntent.status !== 'failed') {
+        const persistenceError = new Error(
+          'De definitieve Instantly-providerfout kon niet duurzaam worden vastgelegd.'
+        );
+        persistenceError.code = 'MAILBOX_SEND_PROVENANCE_FAIL_UNCONFIRMED';
+        throw persistenceError;
+      }
+    } catch (provenanceError) {
+      await mailboxSendProvenanceStore.markUnknown(
+        threadProvenance.intentId,
+        provenanceError,
+        { sentReconcileRequired: true }
+      ).catch(() => null);
+      const reconcileError = createMailboxReconcileRequiredError(provenanceError);
+      reconcileError.providerError = error;
+      throw reconcileError;
+    }
+    error.retryable = false;
     throw error;
   }
+  const replyTargetProviderId = normalizeString(
+    threadProvenance.replyTargetMessageId || body.providerMessageId
+  );
+  const returnedProviderMessageId = normalizeString(result?.providerMessageId);
+  const returnedProviderMessageHeaderId = normalizeString(result?.sentMessage?.messageId);
+  const providerMessageId = returnedProviderMessageId !== replyTargetProviderId
+    ? returnedProviderMessageId
+    : '';
+  const providerMessageHeaderId = returnedProviderMessageHeaderId !== replyTargetProviderId
+    ? returnedProviderMessageHeaderId
+    : '';
+  if (!providerMessageId && !providerMessageHeaderId) {
+    const identityError = new Error(
+      'Instantly accepteerde het antwoord zonder een duurzame berichtidentiteit.'
+    );
+    identityError.code = 'INSTANTLY_REPLY_ACCEPTED_IDENTITY_MISSING';
+    await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, identityError, {
+      sentReconcileRequired: true,
+    }).catch(() => null);
+    throw createMailboxReconcileRequiredError(identityError);
+  }
   try {
+    const acceptedMessageId = providerMessageHeaderId || providerMessageId;
     const accepted = await mailboxSendProvenanceStore.accept(threadProvenance.intentId, {
-      messageId: result.sentMessage?.messageId,
-      providerMessageId: result.providerMessageId,
+      messageId: acceptedMessageId,
+      providerMessageId,
       providerThreadId: result.providerThreadId,
       acceptedAt: result.sentMessage?.receivedAt || new Date().toISOString(),
     });
@@ -429,6 +649,7 @@ async function sendMailboxMessage({
       intentId: accepted.intentId,
       sentMessage: {
         ...(result.sentMessage || {}),
+        messageId: acceptedMessageId,
         conversationId: threadProvenance.conversationId,
         softoraSendIntentId: threadProvenance.intentId,
         softoraSendMode: 'reply',
@@ -436,13 +657,11 @@ async function sendMailboxMessage({
       },
     };
   } catch (error) {
-    if (typeof mailboxSendProvenanceStore.markUnknown === 'function') {
-      await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, {
-        messageId: result?.sentMessage?.messageId,
-        providerMessageId: result?.providerMessageId,
-        sentReconcileRequired: true,
-      }).catch(() => null);
-    }
+    await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, {
+      messageId: providerMessageHeaderId || providerMessageId,
+      providerMessageId: result?.providerMessageId,
+      sentReconcileRequired: true,
+    }).catch(() => null);
     throw createMailboxReconcileRequiredError(error);
   }
 }
