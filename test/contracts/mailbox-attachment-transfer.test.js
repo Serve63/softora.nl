@@ -259,6 +259,9 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
       attachmentsMetadata: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }],
     }),
     status: 'accepted',
+    dispatchState: 'finished',
+    reconcileRequired: false,
+    sentReconcileRequired: false,
     acceptedAt: '2026-08-26T15:00:00.000Z',
   };
   const sendMessage = createMailboxComposeSend({

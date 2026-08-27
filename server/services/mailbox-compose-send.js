@@ -290,23 +290,44 @@ function createMailboxComposeSend(deps = {}) {
   }
 
   function createAcceptedReplayResult(accepted) {
+    const intentId = normalizeString(accepted?.intentId);
+    const replyTargetMessageId = normalizeString(accepted?.replyTargetMessageId);
+    const messageId = normalizeString(accepted?.messageId);
+    const providerMessageId = normalizeString(accepted?.providerMessageId);
+    const durableMessageId = [messageId, providerMessageId]
+      .find((value) => value && value !== replyTargetMessageId) || '';
+    const terminal = accepted?.status === 'accepted'
+      && accepted?.dispatchState === 'finished'
+      && accepted?.reconcileRequired === false
+      && accepted?.sentReconcileRequired === false;
+    if (!terminal || !intentId || !durableMessageId) {
+      const cause = new Error(
+        'De geaccepteerde verzending mist een terminale duurzame uitgaande berichtidentiteit.'
+      );
+      cause.code = terminal
+        ? 'MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING'
+        : 'MAILBOX_SEND_DURABLE_STATUS_INVALID';
+      throw createMailboxReconcileRequiredError(cause);
+    }
     const attachmentMetadata = normalizeMailboxAttachmentsMetadata(accepted?.attachmentsMetadata);
     if (attachmentMetadata === null) throw createAcceptedReplayAttachmentEvidenceError();
     return {
-      messageId: accepted.messageId,
+      messageId: durableMessageId,
+      ...(providerMessageId ? { providerMessageId } : {}),
       accepted: [accepted.recipientEmail],
       rejected: [],
       sentCopySaved: true,
-      intentId: accepted.intentId,
+      intentId,
       idempotentReplay: true,
       sentMessage: {
-        id: `accepted-sent:${accepted.messageId || accepted.intentId}`,
-        mailboxId: `accepted-sent:${accepted.messageId || accepted.intentId}`,
+        id: `accepted-sent:${durableMessageId}`,
+        mailboxId: `accepted-sent:${durableMessageId}`,
         folder: 'sent',
         storageFolder: 'sent',
         direction: 'sent',
         accountEmail: accepted.accountEmail,
-        messageId: accepted.messageId,
+        messageId: durableMessageId,
+        ...(providerMessageId ? { providerMessageId } : {}),
         from: accepted.senderName || accepted.accountEmail,
         email: accepted.accountEmail,
         to: accepted.recipientEmail,
@@ -326,14 +347,24 @@ function createMailboxComposeSend(deps = {}) {
         attachmentEvidenceKnown: true,
         attachmentHydrationAttempted: true,
         conversationId: accepted.conversationId,
-        softoraSendIntentId: accepted.intentId,
+        softoraSendIntentId: intentId,
         softoraSendMode: accepted.mode,
         softoraReplyTargetMessageId: accepted.replyTargetMessageId,
       },
     };
   }
 
-  return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments, threadProvenance }) {
+  return async function sendMessage({
+    accountEmail,
+    to,
+    cc,
+    bcc,
+    subject,
+    text,
+    attachments,
+    expectedAttachmentsMetadata,
+    threadProvenance,
+  }) {
     let stagedAttachmentCleanupStarted = false;
     async function cleanupStagedAttachments() {
       if (stagedAttachmentCleanupStarted) return;
@@ -433,6 +464,18 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       error.code = 'MAILBOX_ATTACHMENT_METADATA_INVALID';
       throw error;
+    }
+    if (expectedAttachmentsMetadata !== undefined) {
+      const expectedMetadata = normalizeMailboxAttachmentsMetadata(expectedAttachmentsMetadata);
+      if (expectedMetadata === null
+        || !mailboxAttachmentsMetadataEqual(explicitAttachmentMetadata, expectedMetadata)) {
+        const error = new Error(
+          'De gekozen bijlagen wijken af van het vooraf bewezen verzendbewijs; kies de bijlagen opnieuw.'
+        );
+        error.status = 409;
+        error.code = 'MAILBOX_ATTACHMENT_METADATA_MISMATCH';
+        throw error;
+      }
     }
 
     const requestPayload = {

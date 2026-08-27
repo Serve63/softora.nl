@@ -44,6 +44,8 @@ function acceptedIntent(overrides = {}) {
     }),
     status: 'accepted',
     dispatchState: 'finished',
+    reconcileRequired: false,
+    sentReconcileRequired: false,
     acceptedAt: '2026-08-27T15:00:00.000Z',
     messageId: '<accepted@softora.nl>',
     ...overrides,
@@ -120,6 +122,39 @@ test('accepted SMTP-replay zonder bijlagen stopt vóór alle vluchtige side-effe
   });
 });
 
+test('accepted SMTP-replay faalt gesloten bij niet-terminale status of ontbrekende uitgaande identity', async (t) => {
+  for (const [label, override] of [
+    ['intent ontbreekt', { intentId: '' }],
+    ['berichtidentiteit ontbreekt', { messageId: '', providerMessageId: '' }],
+    ['berichtidentiteit is alleen het replydoel', {
+      messageId: '<incoming@example.nl>', providerMessageId: '',
+    }],
+    ['dispatch is nog gestart', { dispatchState: 'started' }],
+    ['reconcile staat nog open', { reconcileRequired: true }],
+    ['sent-reconcile staat nog open', { sentReconcileRequired: true }],
+  ]) {
+    await t.test(label, async () => {
+      const accepted = acceptedIntent(override);
+      const calls = { builder: 0, reserve: 0, provider: 0 };
+      const send = createMailboxComposeSend(dependencies({
+        buildMailboxWebdesignSendParts: async () => { calls.builder += 1; return null; },
+        createTransport: () => ({ sendMail: async () => { calls.provider += 1; } }),
+        mailboxSendProvenanceStore: {
+          findByIdempotencyKey: async () => accepted,
+          reserve: async () => { calls.reserve += 1; throw new Error('reserve mag niet starten'); },
+        },
+      }));
+
+      await assert.rejects(send(input()), (error) => (
+        error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+          && ['MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING', 'MAILBOX_SEND_DURABLE_STATUS_INVALID']
+            .includes(error.cause?.code)
+      ));
+      assert.deepEqual(calls, { builder: 0, reserve: 0, provider: 0 });
+    });
+  }
+});
+
 test('legacy accepted attachmentsMetadata null faalt gesloten en wordt nooit als bewezen leeg getoond', async () => {
   const accepted = acceptedIntent({ attachmentsMetadata: null, requestPayloadFingerprint: '' });
   let builderCalls = 0;
@@ -139,6 +174,49 @@ test('legacy accepted attachmentsMetadata null faalt gesloten en wordt nooit als
   ));
   assert.equal(builderCalls, 0);
   assert.equal(providerCalls, 0);
+});
+
+test('proof-gebonden signed references wijken nooit af vóór download, reserve of provider', async (t) => {
+  const expected = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
+  for (const [label, inspected, expectedMetadata, inspectError] of [
+    ['swapped reference', [{ filename: 'ander.pdf', contentType: 'application/pdf', size: 4 }], expected, null],
+    ['filename', [{ filename: 'gewijzigd.pdf', contentType: 'application/pdf', size: 4 }], expected, null],
+    ['content type', [{ filename: 'bewijs.png', contentType: 'image/png', size: 4 }], expected, null],
+    ['size', [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 5 }], expected, null],
+    ['zero-attachment proof', expected, [], null],
+    ['expired reference', null, expected, Object.assign(new Error('upload verlopen'), {
+      code: 'MAILBOX_ATTACHMENT_REFERENCE_EXPIRED', status: 409,
+    })],
+  ]) {
+    await t.test(label, async () => {
+      const calls = { inspect: 0, download: 0, find: 0, builder: 0, reserve: 0, provider: 0 };
+      const send = createMailboxComposeSend(dependencies({
+        buildMailboxWebdesignSendParts: async () => { calls.builder += 1; return null; },
+        createTransport: () => ({ sendMail: async () => { calls.provider += 1; } }),
+        mailboxSendProvenanceStore: {
+          findByIdempotencyKey: async () => { calls.find += 1; return null; },
+          reserve: async () => { calls.reserve += 1; throw new Error('reserve mag niet starten'); },
+        },
+        mailboxAttachmentService: {
+          inspectAttachments() {
+            calls.inspect += 1;
+            if (inspectError) throw inspectError;
+            return inspected;
+          },
+          downloadAttachments: async () => { calls.download += 1; return []; },
+        },
+      }));
+      await assert.rejects(send(input({
+        attachments: [{ reference: `signed-${label}` }],
+        expectedAttachmentsMetadata: expectedMetadata,
+      })), (error) => inspectError
+        ? error.code === inspectError.code
+        : error.code === 'MAILBOX_ATTACHMENT_METADATA_MISMATCH');
+      assert.deepEqual(calls, {
+        inspect: 1, download: 0, find: 0, builder: 0, reserve: 0, provider: 0,
+      });
+    });
+  }
 });
 
 test('definitieve SMTP 550 plus mislukte fail-persist houdt dezelfde staging en blokkeert iedere retry-providercall', async () => {
