@@ -41,7 +41,20 @@ function validateRotationState(state) {
   if (!String(state.activeThreadId || '').trim()) errors.push('activeThreadId ontbreekt.');
   const completed = Number(state.completedRunsInActiveThread);
   if (!Number.isInteger(completed) || completed < 0 || completed > 15) errors.push('completedRunsInActiveThread is ongeldig.');
-  if (!['active', 'rotation_due'].includes(String(state.rotationStatus || ''))) errors.push('rotationStatus is ongeldig.');
+  const rotationStatus = String(state.rotationStatus || '');
+  if (!['active', 'rotation_due'].includes(rotationStatus)) errors.push('rotationStatus is ongeldig.');
+  if (Number.isInteger(completed) && completed < 15 && rotationStatus !== 'active') {
+    errors.push('rotationStatus moet active zijn onder 15 runs.');
+  }
+  if (completed === 15 && rotationStatus !== 'rotation_due') {
+    errors.push('rotationStatus moet rotation_due zijn bij 15 runs.');
+  }
+  const previousThreadIds = state.previousThreadIds;
+  if (!Array.isArray(previousThreadIds) || previousThreadIds.some((threadId) => !String(threadId || '').trim())) {
+    errors.push('previousThreadIds is ongeldig.');
+  } else if (new Set(previousThreadIds).size !== previousThreadIds.length) {
+    errors.push('previousThreadIds bevat dubbelen.');
+  }
   return errors;
 }
 function defaultUbersuggestState() {
@@ -143,6 +156,47 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
     return next;
   });
 }
+function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedAt, evidence }) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const current = parseStateBlock(content, ROTATION_BLOCK);
+    const errors = validateRotationState(current);
+    if (errors.length) throw new Error(`Ongeldige rotatiestaat: ${errors.join(' ')}`);
+    const fromThread = String(fromThreadId || '').trim();
+    const toThread = String(toThreadId || '').trim();
+    const rotationEvidence = String(evidence || '').trim();
+    if (!fromThread || !toThread || fromThread === toThread) throw new Error('Oude en nieuwe task moeten geldig en verschillend zijn.');
+    if (!String(rotatedAt || '').trim() || !Number.isFinite(new Date(rotatedAt).getTime())) throw new Error('rotatedAt is ongeldig.');
+    if (!rotationEvidence) throw new Error('Rotatiebewijs ontbreekt.');
+    if (
+      current.activeThreadId === toThread &&
+      Number(current.completedRunsInActiveThread) === 0 &&
+      current.previousThreadIds.at(-1) === fromThread &&
+      current.rotatedAt === rotatedAt &&
+      current.evidence === rotationEvidence
+    ) return { ...current, idempotent: true };
+    if (current.activeThreadId !== fromThread) throw new Error('De actieve task komt niet overeen met --from-thread.');
+    if (Number(current.completedRunsInActiveThread) !== 15 || current.rotationStatus !== 'rotation_due') {
+      throw new Error('ROTATION_NOT_DUE: roteer uitsluitend na de vijftiende heartbeat-run.');
+    }
+    if (current.previousThreadIds.includes(toThread)) throw new Error('De nieuwe task is al als historische task gebruikt.');
+    const next = {
+      ...current,
+      batchNumber: Number(current.batchNumber) + 1,
+      activeThreadId: toThread,
+      completedRunsInActiveThread: 0,
+      lastInvocationAt: null,
+      rotatedAt,
+      rotationStatus: 'active',
+      previousThreadIds: [...current.previousThreadIds, fromThread],
+      evidence: rotationEvidence,
+    };
+    const nextErrors = validateRotationState(next);
+    if (nextErrors.length) throw new Error(`Nieuwe rotatiestaat is ongeldig: ${nextErrors.join(' ')}`);
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, ROTATION_BLOCK, next));
+    return next;
+  });
+}
 function recordUbersuggestRun({ memoryPath, status, runDate, contentCallsUsed = 0, weeklyCallsUsed = 0, evidencePath = null, authCheckedAt = null, weeklyDiscoveryAt = null }) {
   return withMemoryLock(memoryPath, () => {
     const content = fs.readFileSync(memoryPath, 'utf8');
@@ -180,6 +234,10 @@ function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
     if (errors.length) throw new Error(`Automation-state ongeldig: ${errors.join(' ')}`);
   } else if (args.command === 'ensure') result = ensureAutomationState(memoryPath, new Date(args.now || Date.now()));
   else if (args.command === 'start-run') result = startAutomationRun({ memoryPath, threadId: args.thread, invocationAt: args['invocation-at'] });
+  else if (args.command === 'rotate-thread') result = rotateAutomationThread({
+    memoryPath, fromThreadId: args['from-thread'], toThreadId: args['to-thread'],
+    rotatedAt: args['rotated-at'], evidence: args.evidence,
+  });
   else if (args.command === 'record-keywords') result = recordUbersuggestRun({
     memoryPath, status: args.status, runDate: args['run-date'], contentCallsUsed: args['content-calls'],
     weeklyCallsUsed: args['weekly-calls'], evidencePath: args['evidence-path'], authCheckedAt: args['auth-checked-at'],
@@ -197,6 +255,6 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, ROTATION_BLOCK, UBERSUGGEST_BLOCK, UBERSUGGEST_STATUSES,
   defaultUbersuggestState, ensureAutomationState, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue,
-  parseArgs, parseStateBlock, recordUbersuggestRun, replaceStateBlock, runAutomationStateCli,
+  parseArgs, parseStateBlock, recordUbersuggestRun, replaceStateBlock, rotateAutomationThread, runAutomationStateCli,
   startAutomationRun, validateRotationState, validateUbersuggestState,
 };
