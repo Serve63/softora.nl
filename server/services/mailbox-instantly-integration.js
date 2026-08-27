@@ -94,29 +94,48 @@ function assertInstantlyReplayPayload(intent, body, normalizeString) {
   );
 }
 
-function createInstantlyAcceptedReplayResult(intent, attachments) {
+function createInstantlyAcceptedReplayResult(intent, attachments, normalizeString) {
   const acceptedAt = intent.acceptedAt || intent.updatedAt || intent.createdAt || '';
-  const messageId = intent.messageId || intent.providerMessageId || '';
+  const intentId = normalizeString(intent?.intentId);
+  const replyTargetMessageId = normalizeString(intent?.replyTargetMessageId);
+  const rawMessageId = normalizeString(intent?.messageId);
+  const providerMessageId = normalizeString(intent?.providerMessageId);
+  const providerThreadId = normalizeString(intent?.providerThreadId);
+  const messageId = [rawMessageId, providerMessageId]
+    .find((value) => value && value !== replyTargetMessageId) || '';
+  const terminal = intent?.status === 'accepted'
+    && intent?.dispatchState === 'finished'
+    && intent?.reconcileRequired === false
+    && intent?.sentReconcileRequired === false;
+  if (!terminal || !intentId || !messageId || !providerThreadId) {
+    const cause = new Error(
+      'De geaccepteerde Instantly-verzending mist een terminale duurzame uitgaande berichtidentiteit.'
+    );
+    cause.code = terminal
+      ? 'MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING'
+      : 'MAILBOX_SEND_DURABLE_STATUS_INVALID';
+    throw createMailboxReconcileRequiredError(cause);
+  }
   return {
     provider: 'instantly',
-    providerMessageId: intent.providerMessageId,
-    providerThreadId: intent.providerThreadId,
+    providerMessageId,
+    providerThreadId,
     accountEmail: intent.accountEmail,
     owner: intent.owner,
-    intentId: intent.intentId,
+    intentId,
     messageId,
     idempotentReplay: true,
     sentMessage: {
-      id: `accepted-sent:${messageId || intent.intentId}`,
-      mailboxId: `accepted-sent:${messageId || intent.intentId}`,
+      id: `accepted-sent:${messageId}`,
+      mailboxId: `accepted-sent:${messageId}`,
       folder: 'sent',
       storageFolder: 'instantly',
       direction: 'sent',
       accountEmail: intent.accountEmail,
       provider: 'instantly',
       providerOwner: intent.owner,
-      providerMessageId: intent.providerMessageId,
-      providerThreadId: intent.providerThreadId,
+      providerMessageId,
+      providerThreadId,
       messageId,
       from: intent.senderName || intent.accountEmail,
       email: intent.accountEmail,
@@ -139,7 +158,7 @@ function createInstantlyAcceptedReplayResult(intent, attachments) {
       attachmentHydrationAttempted: true,
       conversationId: intent.conversationId,
       softoraConversationId: intent.conversationId,
-      softoraSendIntentId: intent.intentId,
+      softoraSendIntentId: intentId,
       softoraSendMode: intent.mode,
       softoraReplyTargetMessageId: intent.replyTargetMessageId,
     },
@@ -151,7 +170,7 @@ function resolveInstantlyExistingIntent(intent, threadProvenance, body, normaliz
   assertInstantlyReplayContext(intent, threadProvenance, body, normalizeString);
   const durableAttachments = assertInstantlyReplayPayload(intent, body, normalizeString);
   if (intent.status === 'accepted') {
-    return createInstantlyAcceptedReplayResult(intent, durableAttachments);
+    return createInstantlyAcceptedReplayResult(intent, durableAttachments, normalizeString);
   }
   if (intent.status === 'failed') {
     throw createInstantlyReplayError(

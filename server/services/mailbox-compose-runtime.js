@@ -109,33 +109,39 @@ function assertPreflightRetryPayload(intent, body, normalizeString) {
 
 function createPreflightAcceptedResult(intent, attachments) {
   const acceptedAt = intent.acceptedAt || intent.updatedAt || intent.createdAt || '';
-  const messageId = intent.messageId || intent.providerMessageId || '';
-  if (!intent.intentId || !messageId) {
+  const intentId = String(intent.intentId || '').trim();
+  const rawMessageId = String(intent.messageId || '').trim();
+  const providerMessageId = String(intent.providerMessageId || '').trim();
+  const replyTargetMessageId = String(intent.replyTargetMessageId || '').trim();
+  const messageId = [rawMessageId, providerMessageId]
+    .find((value) => value && value !== replyTargetMessageId) || '';
+  const instantly = String(intent.provider || '').trim().toLowerCase() === 'instantly';
+  const providerThreadId = String(intent.providerThreadId || '').trim();
+  if (!intentId || !messageId || (instantly && !providerThreadId)) {
     const cause = new Error('De geaccepteerde verzending mist een duurzame berichtidentiteit.');
     cause.code = 'MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING';
     throw createMailboxReconcileRequiredError(cause);
   }
-  const instantly = String(intent.provider || '').trim().toLowerCase() === 'instantly';
   return {
     provider: instantly ? 'instantly' : 'smtp',
-    providerMessageId: intent.providerMessageId,
-    providerThreadId: intent.providerThreadId,
+    providerMessageId,
+    providerThreadId,
     messageId,
     accountEmail: intent.accountEmail,
     owner: intent.owner,
-    intentId: intent.intentId,
+    intentId,
     idempotentReplay: true,
     sentMessage: {
-      id: `accepted-sent:${messageId || intent.intentId}`,
-      mailboxId: `accepted-sent:${messageId || intent.intentId}`,
+      id: `accepted-sent:${messageId}`,
+      mailboxId: `accepted-sent:${messageId}`,
       folder: 'sent',
       storageFolder: instantly ? 'instantly' : 'sent',
       direction: 'sent',
       accountEmail: intent.accountEmail,
       provider: instantly ? 'instantly' : 'smtp',
       providerOwner: intent.owner,
-      providerMessageId: intent.providerMessageId,
-      providerThreadId: intent.providerThreadId,
+      providerMessageId,
+      providerThreadId,
       messageId,
       from: intent.senderName || intent.accountEmail,
       email: intent.accountEmail,
@@ -158,7 +164,7 @@ function createPreflightAcceptedResult(intent, attachments) {
       attachmentHydrationAttempted: true,
       conversationId: intent.conversationId,
       softoraConversationId: intent.conversationId,
-      softoraSendIntentId: intent.intentId,
+      softoraSendIntentId: intentId,
       softoraSendMode: intent.mode,
       softoraReplyTargetMessageId: intent.replyTargetMessageId,
     },
@@ -528,6 +534,9 @@ function createMailboxComposeRuntime(dependencies = {}) {
             durableIntent,
             reconcileProof.attachmentsMetadata
           );
+          if (classified.status === 'accepted' && classified.acceptedResult) {
+            setAcceptedSendIdentityHeaders(res, classified.acceptedResult);
+          }
           return res.status(200).json({
             ok: true,
             result: {
@@ -578,6 +587,9 @@ function createMailboxComposeRuntime(dependencies = {}) {
           if (body.reconcileProof !== undefined) throw error;
           reconcileProof = null;
         }
+      }
+      if (retryStatus === 'accepted' && acceptedResult) {
+        setAcceptedSendIdentityHeaders(res, acceptedResult);
       }
       return res.status(200).json({
         ok: true,

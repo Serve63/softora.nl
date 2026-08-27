@@ -442,6 +442,9 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
           durable.attachmentsMetadata
         );
         assert.equal(response.body.result.acceptedResult.sentMessage.body, durable.body);
+        assert.equal(response.headers['x-softora-send-intent-id'], durable.intentId);
+        assert.equal(response.headers['x-softora-message-id'], durable.messageId);
+        assert.equal(response.headers['x-softora-provider-message-id'], undefined);
       }
     });
   }
@@ -552,8 +555,81 @@ test('gemarkeerde preflight reconcileert duurzaam zonder de verdwenen replybron 
       assert.deepEqual(response.body.result.reconcileProof, proof);
       assert.equal(counters.resolver, 0, 'de verdwenen mutable replybron mag niet worden gelezen');
       assert.equal(Boolean(response.body.result.acceptedResult), expected === 'accepted');
+      if (expected === 'accepted') {
+        assert.equal(response.headers['x-softora-send-intent-id'], intent.intentId);
+        assert.equal(response.headers['x-softora-message-id'], intent.messageId);
+        assert.equal(response.headers['x-softora-provider-message-id'], undefined);
+      }
     });
   }
+
+  await t.test('Instantly accepted-preflight zet alle identityheaders en vereist providerthread', async () => {
+    const instantlyBaseIntent = previewStore.preview({
+      intentId: 'send:durable-instantly-reconcile',
+      idempotencyKey: 'browser:durable-instantly-reconcile',
+      owner: 'serve',
+      senderName: 'Servé Creusen',
+      accountEmail: 'servecreusen@websoftora.com',
+      recipientEmail: 'prospect@example.nl',
+      mode: 'reply',
+      provider: 'instantly',
+      conversationId: 'instantly:thread-durable-reconcile',
+      replyTargetMessageId: 'incoming-durable-instantly',
+      references: 'incoming-durable-instantly',
+      providerThreadId: 'thread-durable-reconcile',
+      messageId: '<planned-durable-instantly@softora.nl>',
+      subject: 'Re: Veilige Instantly-retry',
+      body: 'Exact duurzaam Instantly-antwoord',
+      requestBody: 'Exact duurzaam Instantly-antwoord',
+      cc: '',
+      bcc: '',
+      attachmentsMetadata: [],
+    });
+    const instantlyProof = createMailboxReconcileProof(instantlyBaseIntent, normalizeString);
+    const acceptedInstantlyIntent = {
+      ...instantlyBaseIntent,
+      status: 'accepted',
+      dispatchState: 'finished',
+      reconcileRequired: false,
+      sentReconcileRequired: false,
+      messageId: '<accepted-durable-instantly@softora.nl>',
+      providerMessageId: 'accepted-durable-instantly',
+      acceptedAt: '2026-08-27T18:05:00.000Z',
+    };
+    const acceptedResponse = responseRecorder();
+    await runtimeFor(acceptedInstantlyIntent).preflightMessageResponse({
+      body: {
+        idempotencyKey: instantlyBaseIntent.idempotencyKey,
+        reconcileProof: instantlyProof,
+      },
+    }, acceptedResponse);
+    assert.equal(acceptedResponse.statusCode, 200);
+    assert.equal(acceptedResponse.body.result.status, 'accepted');
+    assert.equal(
+      acceptedResponse.headers['x-softora-send-intent-id'],
+      acceptedInstantlyIntent.intentId
+    );
+    assert.equal(
+      acceptedResponse.headers['x-softora-message-id'],
+      acceptedInstantlyIntent.messageId
+    );
+    assert.equal(
+      acceptedResponse.headers['x-softora-provider-message-id'],
+      acceptedInstantlyIntent.providerMessageId
+    );
+
+    const missingThreadResponse = responseRecorder();
+    await runtimeFor({ ...acceptedInstantlyIntent, providerThreadId: '' })
+      .preflightMessageResponse({
+        body: {
+          idempotencyKey: instantlyBaseIntent.idempotencyKey,
+          reconcileProof: instantlyProof,
+        },
+      }, missingThreadResponse);
+    assert.equal(missingThreadResponse.statusCode, 409);
+    assert.equal(missingThreadResponse.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+    assert.deepEqual(missingThreadResponse.headers, {});
+  });
 
   for (const [label, changedProof, code] of [
     ['account', { ...proof, accountEmail: 'martijn@softora.nl' }, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH'],
@@ -628,6 +704,22 @@ test('gemarkeerde preflight reconcileert duurzaam zonder de verdwenen replybron 
     }, response);
     assert.equal(response.statusCode, 409);
     assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+  });
+
+  await t.test('accepted met alleen het inkomende replydoel als berichtidentiteit faalt gesloten', async () => {
+    const response = responseRecorder();
+    await runtimeFor({
+      ...baseIntent,
+      status: 'accepted',
+      dispatchState: 'finished',
+      messageId: baseIntent.replyTargetMessageId,
+      providerMessageId: '',
+    }).preflightMessageResponse({
+      body: { idempotencyKey: baseIntent.idempotencyKey, reconcileProof: proof },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_REQUIRED');
+    assert.deepEqual(response.headers, {});
   });
 
   await t.test('terminale status met open reconcilevlag faalt gesloten', async () => {
@@ -726,6 +818,8 @@ test('accepted Instantly-replay leest eenmaal duurzaam en start geen suppression
     ...threadProvenance,
     status: 'accepted',
     dispatchState: 'finished',
+    reconcileRequired: false,
+    sentReconcileRequired: false,
     subject: body.subject,
     body: body.body,
     cc: '',
@@ -776,6 +870,74 @@ test('accepted Instantly-replay leest eenmaal duurzaam en start geen suppression
     outboundRecipientGuardStore: allowingSuppressionStore,
   }), (error) => error.status === 409 && error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED');
   assert.deepEqual(counts, { find: 2, suppression: 0, reserve: 0, provider: 0 });
+});
+
+test('accepted Instantly-replay faalt gesloten bij niet-terminale status of ontbrekende uitgaande identity', async (t) => {
+  const body = {
+    provider: 'instantly', owner: 'serve', account: 'servecreusen@websoftora.com',
+    providerMessageId: 'incoming-invalid-accepted', providerThreadId: 'thread-invalid-accepted',
+    to: 'bestuur@mhcbe.nl', cc: '', bcc: '', subject: 'Re: Vraag',
+    body: 'Exact verzonden antwoord',
+  };
+  const threadProvenance = {
+    intentId: 'send:invalid-accepted-replay', idempotencyKey: 'browser:invalid-accepted-replay',
+    owner: 'serve', senderName: 'Servé Creusen', accountEmail: body.account,
+    recipientEmail: body.to, mode: 'reply', conversationId: 'instantly:thread-invalid-accepted',
+    replyTargetMessageId: body.providerMessageId, references: body.providerMessageId,
+    provider: 'instantly', providerThreadId: body.providerThreadId,
+  };
+  const baseAccepted = {
+    ...threadProvenance,
+    status: 'accepted', dispatchState: 'finished',
+    reconcileRequired: false, sentReconcileRequired: false,
+    subject: body.subject, body: body.body, cc: '', bcc: '', attachmentsMetadata: [],
+    requestPayloadFingerprint: createMailboxRequestPayloadFingerprint({
+      subject: body.subject, requestBody: body.body, cc: '', bcc: '', attachmentsMetadata: [],
+    }),
+    messageId: '<outbound-invalid-check@instantly>',
+    providerMessageId: 'outbound-invalid-check',
+    acceptedAt: '2026-08-27T15:00:00.000Z',
+  };
+
+  for (const [label, override] of [
+    ['intent ontbreekt', { intentId: '' }],
+    ['berichtidentiteit ontbreekt', { messageId: '', providerMessageId: '' }],
+    ['berichtidentiteit is alleen het replydoel', {
+      messageId: body.providerMessageId, providerMessageId: body.providerMessageId,
+    }],
+    ['providerthread ontbreekt', { providerThreadId: '' }],
+    ['dispatch is nog gestart', { dispatchState: 'started' }],
+    ['reconcile staat nog open', { reconcileRequired: true }],
+    ['sent-reconcile staat nog open', { sentReconcileRequired: true }],
+  ]) {
+    await t.test(label, async () => {
+      let providerCalls = 0;
+      let reserveCalls = 0;
+      const accepted = { ...baseAccepted, ...override };
+      const effectiveThreadProvenance = override.providerThreadId === ''
+        ? { ...threadProvenance, providerThreadId: '' }
+        : threadProvenance;
+      const provenanceStore = createRequiredInstantlyProvenanceStore({
+        async findByIdempotencyKey() { return accepted; },
+        async reserve() { reserveCalls += 1; throw new Error('reserve mag niet starten'); },
+      });
+      await assert.rejects(() => sendMailboxMessage({
+        body,
+        instantlyMailboxService: { async reply() { providerCalls += 1; } },
+        sendMessage: async () => {},
+        normalizeString,
+        threadProvenance: effectiveThreadProvenance,
+        mailboxSendProvenanceStore: provenanceStore,
+        outboundRecipientGuardStore: allowingSuppressionStore,
+      }), (error) => (
+        error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+          && ['MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING', 'MAILBOX_SEND_DURABLE_STATUS_INVALID']
+            .includes(error.cause?.code)
+      ));
+      assert.equal(reserveCalls, 0);
+      assert.equal(providerCalls, 0);
+    });
+  }
 });
 
 test('ambiguous Instantly 5xx becomes reconcile-required and a retry never calls the adapter twice', async () => {
@@ -891,7 +1053,14 @@ test('provider 200 plus lokale upsert-TypeError blijft accepted en kan niet opni
     async startDispatch() { intent.dispatchState = 'started'; },
     async accept(_intentId, values) {
       counts.accept += 1;
-      intent = { ...intent, ...values, status: 'accepted', dispatchState: 'finished' };
+      intent = {
+        ...intent,
+        ...values,
+        status: 'accepted',
+        dispatchState: 'finished',
+        reconcileRequired: false,
+        sentReconcileRequired: false,
+      };
       return intent;
     },
     async fail() { counts.fail += 1; throw new Error('accepted provider mag nooit failed worden'); },

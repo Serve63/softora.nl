@@ -44,6 +44,8 @@ function acceptedIntent(overrides = {}) {
     }),
     status: 'accepted',
     dispatchState: 'finished',
+    reconcileRequired: false,
+    sentReconcileRequired: false,
     acceptedAt: '2026-08-27T15:00:00.000Z',
     messageId: '<accepted@softora.nl>',
     ...overrides,
@@ -118,6 +120,39 @@ test('accepted SMTP-replay zonder bijlagen stopt vóór alle vluchtige side-effe
     builder: 0, transport: 0, suppression: 0, reserve: 0, start: 0,
     provider: 0, append: 0, cleanup: 0,
   });
+});
+
+test('accepted SMTP-replay faalt gesloten bij niet-terminale status of ontbrekende uitgaande identity', async (t) => {
+  for (const [label, override] of [
+    ['intent ontbreekt', { intentId: '' }],
+    ['berichtidentiteit ontbreekt', { messageId: '', providerMessageId: '' }],
+    ['berichtidentiteit is alleen het replydoel', {
+      messageId: '<incoming@example.nl>', providerMessageId: '',
+    }],
+    ['dispatch is nog gestart', { dispatchState: 'started' }],
+    ['reconcile staat nog open', { reconcileRequired: true }],
+    ['sent-reconcile staat nog open', { sentReconcileRequired: true }],
+  ]) {
+    await t.test(label, async () => {
+      const accepted = acceptedIntent(override);
+      const calls = { builder: 0, reserve: 0, provider: 0 };
+      const send = createMailboxComposeSend(dependencies({
+        buildMailboxWebdesignSendParts: async () => { calls.builder += 1; return null; },
+        createTransport: () => ({ sendMail: async () => { calls.provider += 1; } }),
+        mailboxSendProvenanceStore: {
+          findByIdempotencyKey: async () => accepted,
+          reserve: async () => { calls.reserve += 1; throw new Error('reserve mag niet starten'); },
+        },
+      }));
+
+      await assert.rejects(send(input()), (error) => (
+        error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
+          && ['MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING', 'MAILBOX_SEND_DURABLE_STATUS_INVALID']
+            .includes(error.cause?.code)
+      ));
+      assert.deepEqual(calls, { builder: 0, reserve: 0, provider: 0 });
+    });
+  }
 });
 
 test('legacy accepted attachmentsMetadata null faalt gesloten en wordt nooit als bewezen leeg getoond', async () => {

@@ -290,23 +290,44 @@ function createMailboxComposeSend(deps = {}) {
   }
 
   function createAcceptedReplayResult(accepted) {
+    const intentId = normalizeString(accepted?.intentId);
+    const replyTargetMessageId = normalizeString(accepted?.replyTargetMessageId);
+    const messageId = normalizeString(accepted?.messageId);
+    const providerMessageId = normalizeString(accepted?.providerMessageId);
+    const durableMessageId = [messageId, providerMessageId]
+      .find((value) => value && value !== replyTargetMessageId) || '';
+    const terminal = accepted?.status === 'accepted'
+      && accepted?.dispatchState === 'finished'
+      && accepted?.reconcileRequired === false
+      && accepted?.sentReconcileRequired === false;
+    if (!terminal || !intentId || !durableMessageId) {
+      const cause = new Error(
+        'De geaccepteerde verzending mist een terminale duurzame uitgaande berichtidentiteit.'
+      );
+      cause.code = terminal
+        ? 'MAILBOX_SEND_ACCEPTED_IDENTITY_MISSING'
+        : 'MAILBOX_SEND_DURABLE_STATUS_INVALID';
+      throw createMailboxReconcileRequiredError(cause);
+    }
     const attachmentMetadata = normalizeMailboxAttachmentsMetadata(accepted?.attachmentsMetadata);
     if (attachmentMetadata === null) throw createAcceptedReplayAttachmentEvidenceError();
     return {
-      messageId: accepted.messageId,
+      messageId: durableMessageId,
+      ...(providerMessageId ? { providerMessageId } : {}),
       accepted: [accepted.recipientEmail],
       rejected: [],
       sentCopySaved: true,
-      intentId: accepted.intentId,
+      intentId,
       idempotentReplay: true,
       sentMessage: {
-        id: `accepted-sent:${accepted.messageId || accepted.intentId}`,
-        mailboxId: `accepted-sent:${accepted.messageId || accepted.intentId}`,
+        id: `accepted-sent:${durableMessageId}`,
+        mailboxId: `accepted-sent:${durableMessageId}`,
         folder: 'sent',
         storageFolder: 'sent',
         direction: 'sent',
         accountEmail: accepted.accountEmail,
-        messageId: accepted.messageId,
+        messageId: durableMessageId,
+        ...(providerMessageId ? { providerMessageId } : {}),
         from: accepted.senderName || accepted.accountEmail,
         email: accepted.accountEmail,
         to: accepted.recipientEmail,
@@ -326,7 +347,7 @@ function createMailboxComposeSend(deps = {}) {
         attachmentEvidenceKnown: true,
         attachmentHydrationAttempted: true,
         conversationId: accepted.conversationId,
-        softoraSendIntentId: accepted.intentId,
+        softoraSendIntentId: intentId,
         softoraSendMode: accepted.mode,
         softoraReplyTargetMessageId: accepted.replyTargetMessageId,
       },
