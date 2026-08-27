@@ -38,6 +38,7 @@ function createMailboxService(deps = {}) {
     ? deps.outboundRecipientGuardStore
     : { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
   const mailboxSendProvenanceStore = deps.mailboxSendProvenanceStore || {
+    findByIdempotencyKey: async () => null,
     reserve: async (payload) => {
       const existing = intents.get(payload.idempotencyKey);
       if (existing) return { created: false, intent: existing };

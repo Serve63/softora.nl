@@ -72,6 +72,9 @@ function createHarness(options = {}) {
     suppression: [],
   };
   const provenanceStore = {
+    async findByIdempotencyKey() {
+      return null;
+    },
     async reserve(input) {
       calls.provenanceReserve.push(input);
       return { created: true, intent: { ...input, status: 'prepared' } };
@@ -85,6 +88,7 @@ function createHarness(options = {}) {
     },
     async fail(intentId, error) {
       calls.fail.push({ intentId, error });
+      return { intentId, status: 'failed' };
     },
     async markUnknown(intentId, error, values) {
       calls.markUnknown.push({ intentId, error, values });
@@ -138,6 +142,13 @@ function createHarness(options = {}) {
       },
     },
     mailboxAttachmentService: {
+      inspectAttachments() {
+        return resolvedManualAttachments.map((attachment) => ({
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          size: attachment.content.length,
+        }));
+      },
       async downloadAttachments() {
         return resolvedManualAttachments;
       },
@@ -193,7 +204,7 @@ test('SMTP-resolutie zonder primaire TO wordt unknown zonder valse Sent- of acce
   });
   assert.match(harness.calls.markUnknown[0].error.message, /Geaccepteerd: cc@example\.nl/);
   assert.match(harness.calls.markUnknown[0].error.message, /Afgewezen: prospect@example\.nl/);
-  assert.equal(harness.calls.cleanup.length, 1);
+  assert.equal(harness.calls.cleanup.length, 0, 'onzekere provideruitkomst bewaart staging voor reconciliatie');
   assert.equal(harness.calls.accept.length, 0);
   assert.equal(harness.calls.fail.length, 0);
   assert.equal(harness.calls.append.length, 0);

@@ -1,4 +1,7 @@
 const crypto = require('crypto');
+const {
+  normalizeAttachmentMetadata,
+} = require('./mailbox-attachment-policy');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
 const MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS = 8_000;
 const MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS = 2;
@@ -8,6 +11,36 @@ const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC =
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ACCOUNTS = 20;
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS = 200;
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS = 2000;
+
+function normalizeMailboxAttachmentsMetadata(value) {
+  if (value === null || value === undefined || !Array.isArray(value)) return null;
+  const normalized = normalizeAttachmentMetadata(value);
+  return normalized.length === value.length ? normalized : null;
+}
+
+function mailboxAttachmentsMetadataEqual(left, right) {
+  const normalizedLeft = normalizeMailboxAttachmentsMetadata(left);
+  const normalizedRight = normalizeMailboxAttachmentsMetadata(right);
+  if (normalizedLeft === null || normalizedRight === null) {
+    return normalizedLeft === normalizedRight;
+  }
+  return JSON.stringify(normalizedLeft) === JSON.stringify(normalizedRight);
+}
+
+function isExpiredMailboxReservedDispatch(intent, options = {}) {
+  const normalizeString = options.normalizeString || ((value) => String(value || '').trim());
+  if (intent?.status !== 'prepared' || intent?.dispatchState !== 'reserved') return false;
+  const nowMs = Number(options.nowMs);
+  if (!Number.isFinite(nowMs)) return false;
+  const explicitLeaseMs = Date.parse(normalizeString(intent.dispatchLeaseExpiresAt));
+  if (Number.isFinite(explicitLeaseMs)) return explicitLeaseMs <= nowMs;
+  const reservationLeaseMs = Math.max(5_000, Math.min(
+    120_000,
+    Number(options.reservationLeaseMs) || MAILBOX_SEND_RESERVATION_LEASE_MS
+  ));
+  const legacyBaseMs = Date.parse(normalizeString(intent.updatedAt || intent.createdAt));
+  return Number.isFinite(legacyBaseMs) && legacyBaseMs + reservationLeaseMs <= nowMs;
+}
 
 function createCanonicalMailboxHash(parts = []) {
   const source = parts.map((value) => {
@@ -58,6 +91,18 @@ function createMailboxAttachmentsFingerprint(attachments = []) {
   return normalized.length ? createCanonicalMailboxHash(normalized) : '';
 }
 
+function createMailboxRequestPayloadFingerprint(input = {}, normalizeString = (value) => String(value || '').trim()) {
+  const metadata = normalizeMailboxAttachmentsMetadata(input.attachmentsMetadata);
+  if (metadata === null) return '';
+  return createMailboxPayloadFingerprint({
+    subject: input.subject,
+    body: input.requestBody === undefined ? input.body : input.requestBody,
+    cc: input.cc,
+    bcc: input.bcc,
+    attachmentsFingerprint: `metadata:${JSON.stringify(metadata)}`,
+  }, normalizeString);
+}
+
 function createMailboxSendIdentityKey(input = {}, normalizeString = (value) => String(value || '').trim()) {
   const mode = normalizeString(input.mode).toLowerCase();
   const scope = createMailboxSendScopeKey(input, normalizeString);
@@ -69,8 +114,8 @@ function createMailboxSendIdentityKey(input = {}, normalizeString = (value) => S
 
 function isAmbiguousMailboxProviderError(error) {
   const code = String(error?.code || '').trim().toUpperCase();
-  const status = Number(error?.status || error?.statusCode || error?.responseCode || 0);
-  return ['ETIMEDOUT', 'ESOCKET', 'ECONNRESET', 'ECONNABORTED', 'EPIPE'].includes(code)
+  const status = Number(error?.status || error?.statusCode || 0);
+  return ['ETIMEDOUT', 'ESOCKET', 'ECONNECTION', 'ECONNRESET', 'ECONNABORTED', 'EPIPE'].includes(code)
     || status === 429
     || status >= 500;
 }
@@ -154,6 +199,8 @@ function createMailboxSendProvenanceStore(deps = {}) {
       intentId: normalizeString(row.intent_id), idempotencyKey: normalizeString(row.idempotency_key),
       sendIdentityKey: normalizeString(row.send_identity_key), sendScopeKey: normalizeString(row.send_scope_key),
       payloadFingerprint: normalizeString(row.payload_fingerprint), attachmentsFingerprint: normalizeString(row.attachments_fingerprint),
+      requestPayloadFingerprint: normalizeString(row.request_payload_fingerprint),
+      attachmentsMetadata: normalizeMailboxAttachmentsMetadata(row.attachments_metadata),
       owner: normalizeString(row.owner).toLowerCase(), accountEmail: normalizeEmail(row.account_email),
       recipientEmail: normalizeEmail(row.recipient_email), mode: normalizeString(row.mode).toLowerCase(),
       conversationId: normalizeString(row.conversation_id), replyTargetMessageId: normalizeString(row.reply_target_message_id),
@@ -184,6 +231,9 @@ function createMailboxSendProvenanceStore(deps = {}) {
       intent_id: normalizeString(input.intentId), idempotency_key: normalizeString(input.idempotencyKey),
       send_identity_key: sendIdentityKey, send_scope_key: sendScopeKey,
       payload_fingerprint: payloadFingerprint, attachments_fingerprint: attachmentsFingerprint,
+      request_payload_fingerprint: normalizeString(input.requestPayloadFingerprint)
+        || createMailboxRequestPayloadFingerprint(input, normalizeString) || null,
+      attachments_metadata: normalizeMailboxAttachmentsMetadata(input.attachmentsMetadata),
       owner: normalizeString(input.owner).toLowerCase(), account_email: normalizeEmail(input.accountEmail),
       recipient_email: normalizeEmail(input.recipientEmail), mode: normalizeString(input.mode).toLowerCase(),
       conversation_id: normalizeString(input.conversationId) || null,
@@ -261,11 +311,11 @@ function createMailboxSendProvenanceStore(deps = {}) {
   }
 
   function isExpiredReservedDispatch(intent) {
-    if (intent?.status !== 'prepared' || intent?.dispatchState !== 'reserved') return false;
-    const explicitLeaseMs = Date.parse(normalizeString(intent.dispatchLeaseExpiresAt));
-    if (Number.isFinite(explicitLeaseMs)) return explicitLeaseMs <= now().getTime();
-    const legacyBaseMs = Date.parse(normalizeString(intent.updatedAt || intent.createdAt));
-    return Number.isFinite(legacyBaseMs) && legacyBaseMs + getReservationLeaseMs() <= now().getTime();
+    return isExpiredMailboxReservedDispatch(intent, {
+      normalizeString,
+      nowMs: now().getTime(),
+      reservationLeaseMs: getReservationLeaseMs(),
+    });
   }
 
   function matchesReservationPayload(intent, row, { exactIntent = false } = {}) {
@@ -273,11 +323,13 @@ function createMailboxSendProvenanceStore(deps = {}) {
     const expected = normalizeRow(row);
     const fields = [
       'idempotencyKey', 'sendIdentityKey', 'sendScopeKey', 'payloadFingerprint', 'attachmentsFingerprint',
+      'requestPayloadFingerprint',
       'owner', 'accountEmail', 'recipientEmail', 'mode', 'conversationId', 'replyTargetMessageId',
       'references', 'provider', 'providerThreadId', 'senderName', 'subject', 'body', 'cc', 'bcc',
     ];
     if (exactIntent) fields.push('intentId', 'messageId');
-    return fields.every((field) => intent[field] === expected[field]);
+    return fields.every((field) => intent[field] === expected[field])
+      && mailboxAttachmentsMetadataEqual(intent.attachmentsMetadata, expected.attachmentsMetadata);
   }
 
   function exactReservedCasFilters(intent) {
@@ -592,7 +644,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
       });
     } catch (error) {
       logger.error('[MailboxSendProvenance][Fail]', error?.message || error);
-      return null;
+      throw error;
     }
   }
 
@@ -691,6 +743,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
     accept,
     fail,
     findByIdempotencyKey,
+    isExpiredReservedDispatch,
     isAvailable: () => Boolean(getClient()),
     listAcceptedMessages,
     listAcceptedMessagesByMessageIds,
@@ -709,12 +762,17 @@ module.exports = {
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC,
   MAILBOX_SEND_PROVENANCE_TABLE,
   MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
+  MAILBOX_SEND_RESERVATION_LEASE_MS,
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
+  createMailboxRequestPayloadFingerprint,
   createMailboxSendIdentityKey,
   createMailboxSendProvenanceStore,
   createMailboxSendScopeKey,
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
+  isExpiredMailboxReservedDispatch,
   isTransientMailboxProvenanceError,
+  mailboxAttachmentsMetadataEqual,
+  normalizeMailboxAttachmentsMetadata,
 };
