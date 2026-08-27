@@ -5,8 +5,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  AUTOMATION_ID,
+  AUTOMATION_NAME,
+  AUTOMATION_RRULE,
   ROTATION_BLOCK,
   UBERSUGGEST_BLOCK,
+  auditAutomationInstallation,
   ensureAutomationState,
   formatStateBlock,
   inspectAutomationState,
@@ -18,7 +22,9 @@ const {
 
 function createMemory(completedRunsInActiveThread = 6) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-automation-state-'));
-  const memoryPath = path.join(directory, 'memory.md');
+  const automationDirectory = path.join(directory, AUTOMATION_ID);
+  fs.mkdirSync(automationDirectory);
+  const memoryPath = path.join(automationDirectory, 'memory.md');
   const rotation = {
     schemaVersion: 1,
     maxRunsPerThread: 15,
@@ -32,6 +38,50 @@ function createMemory(completedRunsInActiveThread = 6) {
   };
   fs.writeFileSync(memoryPath, `History\n\n${formatStateBlock(ROTATION_BLOCK, rotation)}\n`);
   return memoryPath;
+}
+
+function validAutomationPrompt() {
+  return [
+    'SEO_MACHINE_PROMPT_VERSION=3',
+    `The sole automation id is ${AUTOMATION_ID}.`,
+    'Run npm run seo:automation-state -- start-run before effects.',
+    'Select agent.browsers.get("edge") and require family=edge followed by profileName=Codex.',
+    'Google Chrome is forbidden.',
+    'This automation remains ACTIVE until Serve explicitly pauses.',
+    'After 31 December 2026, continue on rolling evidence.',
+    'Never buy credits or use paid fallbacks.',
+    'Never use Qwen.',
+  ].join(' ');
+}
+
+function createAutomationConfig(memoryPath, overrides = {}) {
+  const automationDirectory = path.dirname(memoryPath);
+  const automationPath = path.join(automationDirectory, 'automation.toml');
+  const config = {
+    id: AUTOMATION_ID,
+    kind: 'heartbeat',
+    name: AUTOMATION_NAME,
+    prompt: validAutomationPrompt(),
+    status: 'ACTIVE',
+    rrule: AUTOMATION_RRULE,
+    targetThreadId: 'thread-1',
+    ...overrides,
+  };
+  fs.writeFileSync(automationPath, [
+    'version = 1',
+    `id = ${JSON.stringify(config.id)}`,
+    `kind = ${JSON.stringify(config.kind)}`,
+    `name = ${JSON.stringify(config.name)}`,
+    `prompt = ${JSON.stringify(config.prompt)}`,
+    `status = ${JSON.stringify(config.status)}`,
+    `rrule = ${JSON.stringify(config.rrule)}`,
+    `target_thread_id = ${JSON.stringify(config.targetThreadId)}`,
+    '',
+  ].join('\n'));
+  return {
+    automationPath,
+    automationsRoot: path.dirname(automationDirectory),
+  };
 }
 
 test('automation state ensures one machine-readable Ubersuggest block without touching rotation', () => {
@@ -168,6 +218,44 @@ test('automation-state inspect CLI fails closed when a required block is missing
     '--now',
     '2026-08-27T12:00:00.000Z',
   ], { memoryPath }), /Automation-state ongeldig/);
+});
+
+test('automation installation audit proves one active heartbeat, matching task and durable prompt controls', () => {
+  const memoryPath = createMemory();
+  ensureAutomationState(memoryPath);
+  const paths = createAutomationConfig(memoryPath);
+  const audit = auditAutomationInstallation({ memoryPath, ...paths });
+
+  assert.equal(audit.status, 'ready');
+  assert.equal(audit.matchingAutomationCount, 1);
+  assert.equal(audit.automation.targetThreadId, 'thread-1');
+  assert.deepEqual(audit.automation.missingPromptMarkers, []);
+});
+
+test('start-run CLI fails before increment when the automation target drifts', () => {
+  const memoryPath = createMemory();
+  ensureAutomationState(memoryPath);
+  const paths = createAutomationConfig(memoryPath, { targetThreadId: 'wrong-thread' });
+
+  assert.throws(() => runAutomationStateCli([
+    'start-run',
+    '--thread', 'thread-1',
+    '--invocation-at', '2026-08-28T08:15:00+02:00',
+  ], { memoryPath, ...paths }), /target_thread_id wijkt af/);
+  assert.equal(inspectAutomationState(memoryPath).rotation.completedRunsInActiveThread, 6);
+});
+
+test('automation installation audit rejects a second Softora SEO automation', () => {
+  const memoryPath = createMemory();
+  ensureAutomationState(memoryPath);
+  const paths = createAutomationConfig(memoryPath);
+  const duplicateDirectory = path.join(paths.automationsRoot, 'seo-copy');
+  fs.mkdirSync(duplicateDirectory);
+  fs.copyFileSync(paths.automationPath, path.join(duplicateDirectory, 'automation.toml'));
+
+  const audit = auditAutomationInstallation({ memoryPath, ...paths });
+  assert.equal(audit.status, 'invalid');
+  assert.match(audit.errors.join(' '), /exact 1 Softora SEO-automation/);
 });
 
 test('automation-state CLI rejects a command-line memory path override', () => {

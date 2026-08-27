@@ -29,6 +29,15 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /Dagelijkse fallback-ladder/i);
   assert.match(policy, /bronvaste nieuws- of marktupdate/i);
   assert.match(policy, /100\.000 organische klikken per 28 dagen uiterlijk 31 december 2026/i);
+  assert.match(policy, /blijft na het halen of verstrijken van die datum actief totdat Servé haar expliciet pauzeert/i);
+  assert.match(policy, /70% verdedigen\/uitbouwen van bewezen clusters[\s\S]*20% aangrenzende commerciële experimenten[\s\S]*10% technische/i);
+  assert.match(policy, /`npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat/i);
+  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=3`/i);
+  assert.match(qualityGates, /deadlinebestendige `growthHorizon`/i);
+  assert.ok(
+    qualityGates.indexOf('`performance_recovery`, `quality_recovery`') >= 0,
+    'meetbare performance recovery hoort voor generieke quality recovery te staan'
+  );
   assert.match(policy, /Backlinks en off-site linkbuilding vallen volledig buiten deze automation/i);
   assert.match(policy, /docs\/growth\/seo-machine-backlog\.json/i);
   assert.match(policy, /Exitcode `2` is `GROWTH_ACTION_REQUIRED`/i);

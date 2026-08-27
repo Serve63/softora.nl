@@ -115,6 +115,21 @@ test('control plane recovers weak D28 non-brand outcomes before scaling output',
   assert.equal(state.action, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
 });
 
+test('measured D28 performance recovery outranks generic corpus quality debt', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    quality: { status: 'quality_recovery', reasons: ['template_share'] },
+    performance: {
+      status: 'performance_recovery',
+      reasons: ['0/5 reviewbare URLs met non-branded impressies'],
+      summary: { reviewed: 5, impressing: 0, clicking: 0, impressions: 0, clicks: 0 },
+    },
+  }));
+
+  assert.equal(state.state, 'performance_recovery');
+  assert.equal(state.action, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
+  assert.deepEqual(state.reasons, ['0/5 reviewbare URLs met non-branded impressies']);
+});
+
 test('growth requires three genuinely new URLs even when five total improvements are live', () => {
   const state = evaluateSeoMachineState(readyInputs({
     ledger: {

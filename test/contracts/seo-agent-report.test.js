@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   SEARCH_CONSOLE_READONLY_SCOPE,
+  buildGrowthHorizon,
   buildSearchConsoleAgentReport,
   buildTechnicalOnlyAgentReport,
   createSearchConsoleClient,
@@ -115,7 +116,37 @@ test('seo agent keeps property totals separate from visible and unclassified que
   assert.equal(report.segments.unclassified.clicks, 14);
   assert.equal(report.segments.unclassified.impressions, 246);
   assert.equal(report.segments.unclassified.position, null);
+  assert.equal(report.growthHorizon.targetClicks, 100000);
+  assert.equal(report.growthHorizon.continuationRule, 'keep_running_until_explicitly_paused');
   assert.match(formatAgentMarkdown(report), /Niet classificeerbaar: 14 klikken, 246 vertoningen/);
+});
+
+test('SEO growth horizon calculates the pre-deadline pace without presenting it as a forecast', () => {
+  const horizon = buildGrowthHorizon({
+    currentClicks: 100,
+    referenceDate: '2026-08-31',
+  });
+
+  assert.equal(horizon.phase, 'stretch_countdown');
+  assert.equal(horizon.gap, 99900);
+  assert.equal(horizon.factorToTarget, 1000);
+  assert.ok(horizon.remainingCompoundMonths > 3);
+  assert.ok(horizon.requiredMonthlyGrowthRate > 0);
+  assert.equal(horizon.deadlineStatus, 'pending');
+});
+
+test('SEO growth horizon becomes evergreen after the deadline and never invents remaining pace', () => {
+  const horizon = buildGrowthHorizon({
+    currentClicks: 250,
+    referenceDate: '2027-01-15',
+  });
+
+  assert.equal(horizon.phase, 'evergreen_compounding_after_deadline');
+  assert.equal(horizon.remainingDays, null);
+  assert.equal(horizon.remainingCompoundMonths, null);
+  assert.equal(horizon.requiredMonthlyMultiplier, null);
+  assert.equal(horizon.requiredMonthlyGrowthRate, null);
+  assert.equal(horizon.deadlineStatus, 'elapsed_requires_archived_deadline_snapshot');
 });
 
 test('seo agent preserves sitemap download freshness and supports URL Inspection', async () => {

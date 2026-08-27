@@ -146,17 +146,6 @@ function evaluateSeoMachineState({
     }, shared);
   }
 
-  if (quality && quality.status === 'quality_recovery') {
-    return applyNewUrlFloor({
-      state: 'quality_recovery',
-      status: 'growth_action_required',
-      color: 'amber',
-      exitCode: 2,
-      action: 'replace_template_content_with_unique_information_or_consolidate',
-      publicActionRequired: true,
-      reasons: quality.reasons || ['Contentoriginaliteit is onvoldoende.'],
-    }, shared);
-  }
   if (performance.status === 'performance_recovery') {
     return applyNewUrlFloor({
       state: 'performance_recovery',
@@ -166,6 +155,18 @@ function evaluateSeoMachineState({
       action: 'improve_query_page_match_snippets_internal_routes_or_consolidate',
       publicActionRequired: true,
       reasons: performance.reasons || ['De D28-publicatiecohort levert onvoldoende non-branded zoeksignalen.'],
+    }, shared);
+  }
+
+  if (quality && quality.status === 'quality_recovery') {
+    return applyNewUrlFloor({
+      state: 'quality_recovery',
+      status: 'growth_action_required',
+      color: 'amber',
+      exitCode: 2,
+      action: 'replace_template_content_with_unique_information_or_consolidate',
+      publicActionRequired: true,
+      reasons: quality.reasons || ['Contentoriginaliteit is onvoldoende.'],
     }, shared);
   }
 
