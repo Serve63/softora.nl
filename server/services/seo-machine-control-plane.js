@@ -5,8 +5,9 @@ const SCALE_INDEXATION_THRESHOLD = 0.8;
 const NEW_URL_LIMITS = Object.freeze({
   operations_p0: Object.freeze({ minimum: 0, maximum: 0 }),
   data_degraded: Object.freeze({ minimum: 1, maximum: 2 }),
-  indexation_recovery: Object.freeze({ minimum: 2, maximum: 2 }),
-  quality_recovery: Object.freeze({ minimum: 2, maximum: 3 }),
+  indexation_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
+  quality_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
+  performance_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
   growth: Object.freeze({ minimum: 3, maximum: 5 }),
   scale: Object.freeze({ minimum: 5, maximum: 7 }),
 });
@@ -58,6 +59,7 @@ function evaluateSeoMachineState({
   ledger,
   indexation,
   quality,
+  performance,
   weeklyMinimum = DEFAULT_WEEKLY_MINIMUM,
 } = {}) {
   const operationErrors = [];
@@ -102,6 +104,7 @@ function evaluateSeoMachineState({
     reviewable,
     requestEvidenceDue,
     nextCandidate,
+    performance,
   };
 
   if (!indexation || !['ready', 'partial'].includes(indexation.status)) {
@@ -113,6 +116,18 @@ function evaluateSeoMachineState({
       action: 'repair_measurement_and_ship_only_evidence_backed_safe_improvement',
       publicActionRequired: true,
       reasons: (indexation && indexation.errors) || ['URL Inspection-data ontbreekt.'],
+    }, shared);
+  }
+
+  if (!performance || performance.status === 'data_degraded') {
+    return applyNewUrlFloor({
+      state: 'data_degraded',
+      status: 'growth_action_required',
+      color: 'amber',
+      exitCode: 2,
+      action: 'repair_measurement_and_ship_only_evidence_backed_safe_improvement',
+      publicActionRequired: true,
+      reasons: (performance && performance.reasons) || ['Non-branded GSC-paginadata voor publicatiecohorten ontbreekt.'],
     }, shared);
   }
 
@@ -142,6 +157,17 @@ function evaluateSeoMachineState({
       reasons: quality.reasons || ['Contentoriginaliteit is onvoldoende.'],
     }, shared);
   }
+  if (performance.status === 'performance_recovery') {
+    return applyNewUrlFloor({
+      state: 'performance_recovery',
+      status: 'growth_action_required',
+      color: 'amber',
+      exitCode: 2,
+      action: 'improve_query_page_match_snippets_internal_routes_or_consolidate',
+      publicActionRequired: true,
+      reasons: performance.reasons || ['De D28-publicatiecohort levert onvoldoende non-branded zoeksignalen.'],
+    }, shared);
+  }
 
   if (deficit > 0) {
     return applyNewUrlFloor({
@@ -156,7 +182,8 @@ function evaluateSeoMachineState({
   }
 
   const canScale = reviewable.inspected >= MINIMUM_REVIEWABLE_INDEXATION_SAMPLE
-    && reviewable.rate >= SCALE_INDEXATION_THRESHOLD;
+    && reviewable.rate >= SCALE_INDEXATION_THRESHOLD
+    && performance.status === 'scale_ready';
   return applyNewUrlFloor({
     state: canScale ? 'scale' : 'growth',
     status: 'on_track',

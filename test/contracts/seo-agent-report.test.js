@@ -217,6 +217,30 @@ test('seo agent prioritizes non-branded buyer intent and includes zero CTR oppor
   assert.match(formatAgentMarkdown(report), /Non-branded: 0 klikken, 280 vertoningen/);
 });
 
+test('seo agent exposes non-branded performance per landing page without branded leakage', () => {
+  const report = buildSearchConsoleAgentReport({
+    queriesCurrent: [],
+    queriesPrevious: [],
+    pagesCurrent: [],
+    pagesPrevious: [],
+    pageQueryCurrent: [
+      { keys: ['https://www.softora.nl/crm-systeem-op-maat', 'crm systeem op maat'], clicks: 1, impressions: 50, position: 8 },
+      { keys: ['https://www.softora.nl/crm-systeem-op-maat', 'crm laten maken'], clicks: 0, impressions: 25, position: 12 },
+      { keys: ['https://www.softora.nl/crm-systeem-op-maat', 'softora crm'], clicks: 5, impressions: 5, position: 1 },
+    ],
+    sitemaps: [],
+  });
+
+  assert.deepEqual(report.pages.nonBranded, [{
+    page: 'https://www.softora.nl/crm-systeem-op-maat',
+    clicks: 1,
+    impressions: 75,
+    ctr: 0.0133,
+    position: 9.33,
+  }]);
+  assert.match(formatAgentMarkdown(report), /Non-branded landingspaginas/);
+});
+
 test('seo opportunity scoring exposes deterministic business-fit inputs', () => {
   assert.equal(isBrandedQuery('Softora Oisterwijk'), true);
   assert.equal(getBusinessFit('crm op maat laten maken'), 5);

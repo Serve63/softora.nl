@@ -33,7 +33,7 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Vergelijk 7, 28 en 90 dagen voor non-branded verkeer, money pages en queryclusters.
 - Beoordeel welke experimenten voldoende data hebben en plan het volgende cluster.
 - Bewaak nieuwe URL's en refreshes apart. Een substantiële refresh, interne-linkactie of designverbetering mag de minimumvloer voor echt nieuwe URL's nooit invullen.
-- Houd per rollende 7 dagen minimaal 1 nieuwe URL in `data_degraded`, 2 in `indexation_recovery`, 2 in `quality_recovery`, 3 in `growth` en 5 in `scale`, binnen de maxima uit de control-plane-tabel.
+- Houd per rollende 7 dagen minimaal 1 nieuwe URL in `data_degraded`, `indexation_recovery`, `quality_recovery` en `performance_recovery`, 3 in `growth` en 5 in `scale`, binnen de maxima uit de control-plane-tabel.
 - Als de vloer is gemist, publiceert de eerstvolgende veilige run de hoogst scorende unieke backlogkandidaat. Alleen een echte operationele P0, aantoonbare cannibalisatie van alle veilige kandidaten of een externe merge/deployblokkade mag dit tegenhouden.
 - Houd minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs vooruit in `docs/growth/seo-machine-backlog.json`, verdeeld over de commerciële clusters. Dit versieerbare JSON-register is de enige backlogbron; de automation memory bewaart alleen runhistorie, experimenten en beslissingen.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
@@ -56,10 +56,11 @@ De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. A
 | --- | --- | --- | --- | --- |
 | `operations_p0` | Live-versie, crawlbaarheid, sitemap, backlog of verplichte tooling blokkeert veilige uitvoering | Alleen de blocker repareren | 0 | 0 |
 | `data_degraded` | GSC- of URL Inspection-data ontbreekt of is onvoldoende betrouwbaar | Meting repareren en alleen eerder bewijsdekte veilige verbetering uitvoeren | 1 | 2 |
-| `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Nieuwe-URL-vloer bewaken; daarnaast discovery, canonicals, consolidatie en contextuele links verbeteren | 2 | 2 |
-| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Nieuwe-URL-vloer bewaken; daarnaast unieke informatiewinst toevoegen of overlap consolideren | 2 | 3 |
+| `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Een bewijsdekte nieuwe ingang behouden; vooral discovery, canonicals, consolidatie en contextuele links verbeteren | 1 | 2 |
+| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Een bewijsdekte nieuwe ingang behouden; vooral unieke informatiewinst toevoegen of overlap consolideren | 1 | 2 |
+| `performance_recovery` | Minimaal vijf D28-URL's zijn reviewbaar en minder dan 40% krijgt non-branded impressies, of de cohort heeft minstens 100 impressies zonder klik | Een bewijsdekte nieuwe ingang behouden; vooral query/pagina-match, snippets, interne routes en consolidatie verbeteren | 1 | 2 |
 | `growth` | Techniek en herstelpoorten zijn groen | Hoogste verwachte gekwalificeerde impact kiezen | 3 | 5 |
-| `scale` | Minimaal vijf reviewbare URL's en minstens 80% D14/D28-indexatie, plus groene kwaliteit | Gecontroleerd opschalen | 5 | 7 |
+| `scale` | Minimaal vijf reviewbare URL's, minstens 80% D14/D28-indexatie, minstens 60% D28-dekking met non-branded impressies, ten minste een non-branded klik en groene kwaliteit | Gecontroleerd opschalen | 5 | 7 |
 
 Deze percentages zijn interne operationele veiligheidsgrenzen, geen door Google gepubliceerde rankingfactoren. Iedere niet-geindexeerde nieuwe URL krijgt een bewijsstatus `already_indexed`, `requested`, `quota_blocked`, `browser_blocked` of `failed` in de automation memory. Een status anders dan `already_indexed` of `requested` blijft openstaan voor de volgende run. Vraag niet opnieuw aan zonder materiele wijziging of gedocumenteerd vervolgvenster.
 
@@ -104,7 +105,9 @@ Iedere nieuwe URL en iedere substantiële contentrefresh krijgt vóór het schri
 - `0` zoekvolume betekent alleen dat Ubersuggest voor die formulering geen meetbaar volume rapporteert. Het is geen bewijs van nul vraag en mag een kandidaat nooit zelfstandig blokkeren. CPC, difficulty, intent en traffic zijn eveneens providerschattingen, geen GSC-waarheid of conversiebewijs.
 - Gebruik nooit `keyword_metrics`, `generate_article`, projectmutaties, backlinktools, site audits, aankopen, upgrades, credit-top-ups of betaalde fallbacks. Als Ubersuggest niet beschikbaar is, leg `external_research_unavailable` vast en gebruik GSC plus normale openbare SERP-, autocomplete- en bronresearch; dit is geen operationele P0 en geen reden voor een no-op.
 - De brief bewaart minimaal retrievaldatum, toolnamen, effectieve locale, seeds, primaire zoekintentie, primaire term, relevante secundaire buyer language, echte vragen, SERP-paginatypen, afgewezen ruis, beperkingen en de uiteindelijke menselijke/machine-afweging buiten Ubersuggest.
+- Iedere researchcall staat apart in de brief met tool, datum, niet-geheime argumenten en doel; `callsUsed` moet exact met die callledger overeenkomen. Iedere beoordeelde term verwijst terug naar de tool(s) waarin hij is gezien.
 - Verwerk alleen termen die de koperstaak nauwkeuriger uitdrukken. Gebruik ze natuurlijk in titel, H1, intro, secties, metadata of ankertekst wanneer dat inhoudelijk klopt; er geldt geen keyworddichtheid, verplichte exact-matchtelling of lijst met varianten die koste wat kost in de pagina moet staan. Google kan betekenis en varianten begrijpen.
+- Minimaal een bewezen term krijgt `used` en moet aantoonbaar in de zichtbare paginacopy staan. De voorlopige primaire term krijgt altijd een expliciet niet-afgewezen besluit; `covered_semantically` blijft beschikbaar wanneer exact gebruik onnatuurlijk zou zijn.
 
 Ieder hoofdcluster bestaat uit een money page met ondersteunende rollen zoals:
 
@@ -126,15 +129,19 @@ Google-techniek blijft onderdeel van de beeldpoort: lokale crawlbare `<img src>`
 
 ## Machine Enforcement
 
-De instructietekst is niet de poort. Deze vijf commando's leveren de afdwingbare staat:
+De instructietekst is niet de poort. Deze zeven commando's leveren de afdwingbare staat:
 
 - `npm run seo:backlog:check` valideert het JSON-schema, minimaal 15 `ready` briefs, unieke URL's en ID's, de vaste scoreformule, exact drie overlap-URL's, publicatiebriefvelden en minimaal 70% commerciële intentie. Deze validator draait ook tegen het echte register in de contracttests van `verify:critical`.
 - `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen en splitst nieuwe URL's, substantiële refreshes en overige groei-acties. Een event telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en de passende `datePublished` of `dateModified` toont.
 - `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
 - `npm run seo:visuals:check` valideert beeldrollen, formaat, informatiewinst, familie-rotatie en pixelgelijkenis met de zes recentste blogs; vanaf de ingangsdatum blokkeert een rode kandidaat de publicatie.
-- `npm run seo:cadence:check` combineert backlog, live ledger, indexatie en corpusoriginaliteit. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
+- `npm run seo:keywords:check` blokkeert toekomstige nieuwe en substantieel vernieuwde content zonder geldige Nederlandse `keywordEvidence`, zonder Ubersuggest ooit beslissingsmacht te geven.
+- `npm run seo:automation-state -- inspect` valideert de 15-runrotatie en bepaalt uit machineleesbare staat of de wekelijkse discovery-pass echt verschuldigd is.
+- `npm run seo:cadence:check` combineert backlog, live ledger, indexatie, corpusoriginaliteit en non-branded D28-cohortprestaties. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
 De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation behandelt exitcode `2` als uitvoeropdracht. Bij `newUrlRequired=true` is dat expliciet een nieuwe URL uit de gevalideerde backlog; anders volgt zij de normale actie van de gekozen toestand.
+
+`scale` is dus geen beloning voor publicatieaantallen. De machine schaalt pas wanneer een D28-cohort van minimaal vijf nieuwe URL's zowel indexeerbaar als aantoonbaar vindbaar is: minimaal 60% heeft non-branded impressies en de cohort heeft ten minste een non-branded klik. Minder dan 40% impressiedekking, of minimaal 100 impressies zonder klik, activeert `performance_recovery`. Dit zijn interne leer- en capaciteitsgrenzen, geen Google-rankingfactoren en geen causaliteitsclaim.
 
 ## Opportunity Ranking
 
