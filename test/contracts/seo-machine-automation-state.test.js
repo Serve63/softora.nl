@@ -11,6 +11,7 @@ const {
   formatStateBlock,
   inspectAutomationState,
   recordUbersuggestRun,
+  rotateAutomationThread,
   runAutomationStateCli,
   startAutomationRun,
 } = require('../../scripts/seo-machine-automation-state');
@@ -74,6 +75,58 @@ test('automation state enforces the fifteen-run task ceiling', () => {
     threadId: 'thread-1',
     invocationAt: '2026-08-28T08:15:00+02:00',
   }), /ROTATION_REQUIRED/);
+});
+
+test('automation state rotates atomically after run fifteen and is idempotent', () => {
+  const memoryPath = createMemory(15);
+  const first = runAutomationStateCli([
+    'rotate-thread',
+    '--from-thread', 'thread-1',
+    '--to-thread', 'thread-2',
+    '--rotated-at', '2026-08-28T09:15:00+02:00',
+    '--evidence', 'Same automation retargeted and verified.',
+  ], { memoryPath });
+  const duplicate = rotateAutomationThread({
+    memoryPath,
+    fromThreadId: 'thread-1',
+    toThreadId: 'thread-2',
+    rotatedAt: '2026-08-28T09:15:00+02:00',
+    evidence: 'Same automation retargeted and verified.',
+  });
+
+  assert.equal(first.batchNumber, 2);
+  assert.equal(first.activeThreadId, 'thread-2');
+  assert.equal(first.completedRunsInActiveThread, 0);
+  assert.equal(first.rotationStatus, 'active');
+  assert.deepEqual(first.previousThreadIds, ['thread-1']);
+  assert.equal(duplicate.idempotent, true);
+});
+
+test('automation state rejects early rotation and historical task reuse', () => {
+  const earlyMemoryPath = createMemory(14);
+  assert.throws(() => rotateAutomationThread({
+    memoryPath: earlyMemoryPath,
+    fromThreadId: 'thread-1',
+    toThreadId: 'thread-2',
+    rotatedAt: '2026-08-28T09:15:00+02:00',
+    evidence: 'Not due yet.',
+  }), /ROTATION_NOT_DUE/);
+
+  const dueMemoryPath = createMemory(15);
+  const content = fs.readFileSync(dueMemoryPath, 'utf8');
+  const rotation = inspectAutomationState(dueMemoryPath).rotation;
+  rotation.previousThreadIds = ['thread-2'];
+  fs.writeFileSync(dueMemoryPath, content.replace(
+    formatStateBlock(ROTATION_BLOCK, inspectAutomationState(dueMemoryPath).rotation),
+    formatStateBlock(ROTATION_BLOCK, rotation)
+  ));
+  assert.throws(() => rotateAutomationThread({
+    memoryPath: dueMemoryPath,
+    fromThreadId: 'thread-1',
+    toThreadId: 'thread-2',
+    rotatedAt: '2026-08-28T09:15:00+02:00',
+    evidence: 'Historical task reuse.',
+  }), /historische task/);
 });
 
 test('Ubersuggest state records bounded advisory usage and weekly freshness', () => {

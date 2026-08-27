@@ -99,7 +99,7 @@ Dit zijn interne alarmsignalen, geen Google-rankingfactoren. Overschrijding zet 
 - `npm run seo:indexation:report -- --json` geeft verse inspectiestatus of expliciet `data_degraded`.
 - `npm run seo:visuals:check` blokkeert nieuwe repeterende beeldfamilies, zwakke beeldbriefs en ongeschikte previewformaten.
 - `npm run seo:keywords:check` blokkeert toekomstige nieuwe of substantieel vernieuwde content zonder geldige `keywordEvidence`; een bewezen `external_research_unavailable`-fallback blijft toegestaan.
-- `npm run seo:automation-state -- inspect` bewijst de actuele 15-runrotatie en wekelijkse Ubersuggest-discoverystatus zonder een tweede automation te maken.
+- `npm run seo:automation-state -- start-run` telt de heartbeat idempotent vóór SEO-effecten; `inspect` bewijst de actuele staat; `rotate-thread` roteert pas na run 15 atomair naar de bewezen nieuwe task; `record-keywords` bewaart de dagcaps en Ubersuggest-status zonder een tweede automation te maken.
 - `npm run seo:cadence:check` noemt toestand, verplichte actie, request evidence debt, nieuwe-URL-vloer, achterstand en maximum nieuwe URL's.
 - Gerichte tests en `npm run verify:critical` zijn groen.
 - PR, merge, productiecommit en live verificatie zijn aantoonbaar; merged-but-not-live telt nooit als publicatie.

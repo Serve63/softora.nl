@@ -136,7 +136,7 @@ De instructietekst is niet de poort. Deze zeven commando's leveren de afdwingbar
 - `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
 - `npm run seo:visuals:check` valideert beeldrollen, formaat, informatiewinst, familie-rotatie en pixelgelijkenis met de zes recentste blogs; vanaf de ingangsdatum blokkeert een rode kandidaat de publicatie.
 - `npm run seo:keywords:check` blokkeert toekomstige nieuwe en substantieel vernieuwde content zonder geldige Nederlandse `keywordEvidence`, zonder Ubersuggest ooit beslissingsmacht te geven.
-- `npm run seo:automation-state -- inspect` valideert de 15-runrotatie en bepaalt uit machineleesbare staat of de wekelijkse discovery-pass echt verschuldigd is.
+- `npm run seo:automation-state -- start-run` telt iedere heartbeat vóór SEO-effecten precies eenmaal; `inspect` valideert de 15-runrotatie en wekelijkse discovery-status; `rotate-thread` mag uitsluitend na run 15 de bewezen retargeting atomair vastleggen; `record-keywords` bewaart het begrensde adviserende Ubersuggest-gebruik.
 - `npm run seo:cadence:check` combineert backlog, live ledger, indexatie, corpusoriginaliteit en non-branded D28-cohortprestaties. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
 De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation behandelt exitcode `2` als uitvoeropdracht. Bij `newUrlRequired=true` is dat expliciet een nieuwe URL uit de gevalideerde backlog; anders volgt zij de normale actie van de gekozen toestand.
