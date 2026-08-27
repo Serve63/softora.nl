@@ -96,7 +96,7 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
   );
 });
 
-test('content refreshes have an explicit machine-readable event plan', () => {
+test('content growth actions have an explicit machine-readable event plan', () => {
   const events = getSeoContentGrowthEventPlan({ now: new Date('2026-07-26T12:00:00.000Z') });
   assert.deepEqual(
     events.map((event) => [event.path, event.eventAt, event.publicationKind, event.status]),
@@ -171,6 +171,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         '/kennisbank/wat-is-chatbot-overdracht',
         '2026-08-27',
         'substantial_refresh',
+        'scheduled',
+      ],
+      [
+        '/blog/website-offerte-vergelijken',
+        '2026-08-28',
+        'other_growth_action',
         'scheduled',
       ],
     ]

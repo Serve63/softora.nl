@@ -596,10 +596,14 @@ test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inko
 
   assert.equal(item.image.src, '/assets/seo-content/website-offerte-vergelijkingsmatrix-softora.jpg');
   assert.equal(item.secondaryImage.src, '/assets/seo-content/website-offerte-oplevering-toegang-softora.jpg');
+  assert.equal(item.growthEventKind, 'other_growth_action');
+  assert.equal(item.growthEventAt, '2026-08-28');
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
   assert.match(html, /width="1600" height="1000" loading="lazy"/);
-  assert.match(html, /href="\/website-laten-maken"/);
+  assert.match(html, /je de <a href="\/website-laten-maken">website laat maken<\/a>/);
+  assert.match(html, /headings, <a href="\/kennisbank\/wat-is-interne-linkstructuur">interne links<\/a>/);
+  assert.match(html, /"dateModified":"2026-08-28"/);
   assert.match(costHtml, /href="\/blog\/website-offerte-vergelijken"/);
   assert.match(comparisonHtml, /href="\/blog\/website-offerte-vergelijken"/);
 });
