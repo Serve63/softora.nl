@@ -1,6 +1,122 @@
 (function (global) {
   'use strict';
 
+  const MAILBOX_SEND_RETRY_STORAGE_KEY = 'softora.mailbox.send-retry.v1';
+  const MAILBOX_SEND_RETRY_SCOPE_FIELDS = Object.freeze([
+    'owner', 'account', 'recipient', 'provider', 'mode', 'conversationId',
+    'replyTarget', 'providerThreadId',
+  ]);
+  let mailboxSendRetryMemoryRecords = [];
+
+  function createScopedSendRetryStore(options = {}) {
+    const storageKey = String(options.storageKey || MAILBOX_SEND_RETRY_STORAGE_KEY).trim();
+    const ttlMs = Math.max(1, Number(options.ttlMs) || 2 * 60 * 60 * 1000);
+    const maxEntries = Math.max(1, Math.min(100, Number(options.maxEntries) || 20));
+    const now = typeof options.now === 'function' ? options.now : () => Date.now();
+    let storage = options.storage || null;
+    if (!storage) {
+      try { storage = global.localStorage || null; } catch (_) { storage = null; }
+    }
+    let locks = options.locks || null;
+    if (!locks) {
+      try { locks = global.navigator?.locks || null; } catch (_) { locks = null; }
+    }
+
+    function canonicalScope(value = {}) {
+      return Object.fromEntries(MAILBOX_SEND_RETRY_SCOPE_FIELDS.map((field) => (
+        [field, String(value?.[field] || '').trim().toLowerCase()]
+      )));
+    }
+
+    function scopeKey(value) {
+      const scope = canonicalScope(value);
+      return JSON.stringify(MAILBOX_SEND_RETRY_SCOPE_FIELDS.map((field) => scope[field]));
+    }
+
+    function validRecords(value) {
+      const currentTime = Number(now()) || Date.now();
+      return (Array.isArray(value) ? value : []).map((record) => {
+        const createdAt = Number(record?.createdAt);
+        if (!(
+          record && typeof record.scope === 'object'
+          && String(record.idempotencyKey || '').trim()
+          && Number.isFinite(createdAt)
+          && createdAt > currentTime - ttlMs
+          && createdAt <= currentTime + 60_000
+        )) return null;
+        return {
+          scope: canonicalScope(record.scope),
+          idempotencyKey: String(record.idempotencyKey).trim(),
+          createdAt,
+          reconcileRequired: record.reconcileRequired === true,
+        };
+      }).filter(Boolean).slice(-maxEntries);
+    }
+
+    function read() {
+      if (!storage || typeof storage.getItem !== 'function') return validRecords(mailboxSendRetryMemoryRecords);
+      try {
+        return validRecords(JSON.parse(storage.getItem(storageKey) || '[]'));
+      } catch (_) {
+        return validRecords(mailboxSendRetryMemoryRecords);
+      }
+    }
+
+    function write(records) {
+      mailboxSendRetryMemoryRecords = validRecords(records);
+      if (!storage || typeof storage.setItem !== 'function') return;
+      try { storage.setItem(storageKey, JSON.stringify(mailboxSendRetryMemoryRecords)); }
+      catch (_) { storage = null; }
+    }
+
+    function withScopeLock(_scopeValue, operation) {
+      if (locks && typeof locks.request === 'function') {
+        return locks.request('softora-mailbox-send-retry-storage', { mode: 'exclusive' }, operation);
+      }
+      return Promise.resolve().then(operation);
+    }
+
+    return {
+      getOrCreate(scopeValue, createIdempotencyKey) {
+        return withScopeLock(scopeValue, () => {
+          const canonical = canonicalScope(scopeValue);
+          const key = scopeKey(canonical);
+          const records = read();
+          write(records);
+          const existing = records.find((record) => scopeKey(record.scope) === key);
+          if (existing) return {
+            ...existing,
+            scope: canonicalScope(existing.scope),
+            reused: true,
+            durable: Boolean(storage),
+          };
+          const idempotencyKey = String(createIdempotencyKey?.() || '').trim();
+          if (!idempotencyKey) throw new Error('Veilige verzend-ID ontbreekt.');
+          const created = { scope: canonical, idempotencyKey, createdAt: Number(now()) || Date.now() };
+          write([...records.filter((record) => scopeKey(record.scope) !== key), created]);
+          return { ...created, scope: { ...canonical }, reused: false, durable: Boolean(storage) };
+        });
+      },
+      remove(scopeValue) {
+        return withScopeLock(scopeValue, () => {
+          const key = scopeKey(scopeValue);
+          write(read().filter((record) => scopeKey(record.scope) !== key));
+        });
+      },
+      markReconcileRequired(scopeValue) {
+        return withScopeLock(scopeValue, () => {
+          const key = scopeKey(scopeValue);
+          const records = read();
+          const record = records.find((candidate) => scopeKey(candidate.scope) === key);
+          if (!record) return null;
+          const updated = { ...record, reconcileRequired: true };
+          write([...records.filter((candidate) => scopeKey(candidate.scope) !== key), updated]);
+          return { ...updated, scope: canonicalScope(updated.scope) };
+        });
+      },
+    };
+  }
+
   function createMemoryLatestRecordStore(options = {}) {
     const records = new Map();
     const leaseMs = Math.max(1, Number(options.leaseMs) || 30_000);
@@ -129,7 +245,14 @@
     };
   }
 
-  const api = { createLatestRecordStore, createMemoryLatestRecordStore };
+  const api = {
+    MAILBOX_SEND_RETRY_SCOPE_FIELDS,
+    MAILBOX_SEND_RETRY_STORAGE_KEY,
+    createLatestRecordStore,
+    createMemoryLatestRecordStore,
+    createScopedSendRetryStore,
+    createScopedSessionRetryStore: createScopedSendRetryStore,
+  };
   global.SoftoraPremiumBrowserStorage = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
