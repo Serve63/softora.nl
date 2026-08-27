@@ -16,6 +16,7 @@ function createAllowingSuppressionStore() {
 }
 const {
   createMailboxAttachmentService,
+  safeFilename: serverSafeFilename,
 } = require('../../server/services/mailbox-attachment-service');
 
 function makeBinding(overrides = {}) {
@@ -560,6 +561,7 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
     filename: file.name,
     contentType: file.type,
     size: file.size,
+    expiresAt: Date.now() + 30 * 60 * 1000,
   }));
   const refs = await compose.uploadAttachments(compose.getAttachments(), {
     fetch: async (url, options) => {
@@ -578,5 +580,500 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
   assert.equal(calls.length, 4);
   assert.equal(calls.filter((call) => call.options.method === 'PUT').length, 3);
   assert.ok(calls.filter((call) => call.options.method === 'PUT').every((call) => call.options.body instanceof FormData));
+  assert.ok(calls.filter((call) => call.options.method === 'PUT')
+    .every((call) => call.options.headers['x-upsert'] === 'true'));
+  compose.resetOptionalFields(documentRef);
+});
+
+function createAttachmentDocument() {
+  return { getElementById: () => ({ innerHTML: '', value: '', hidden: false }) };
+}
+
+function createBrowserFile(name, type = 'image/png', bytes = [1, 2, 3]) {
+  const file = new Blob([Buffer.from(bytes)], { type });
+  Object.defineProperty(file, 'name', { value: name });
+  return file;
+}
+
+function createValidUpload(file, index = 0, overrides = {}) {
+  return {
+    reference: `reference-${index}`,
+    signedUrl: `https://storage.test/upload-${index}`,
+    filename: serverSafeFilename(file.name),
+    contentType: file.type || 'application/octet-stream',
+    size: file.size,
+    expiresAt: Date.now() + 30 * 60 * 1000,
+    ...overrides,
+  };
+}
+
+test('clientbestandsnamen blijven exact gelijk aan de veilige serverpolicy', async () => {
+  const documentRef = createAttachmentDocument();
+  const names = [
+    'ﬁle.pdf',
+    'a\u0000b.pdf',
+    '../route\\bewijs.pdf',
+    '...report.pdf',
+    'design..final.pdf',
+    `offer\u200B\u202E${'a'.repeat(130)}.png`,
+    'résumé € 100% #1.pdf',
+  ];
+  for (const name of names) {
+    compose.resetOptionalFields(documentRef);
+    const file = createBrowserFile(name, name.endsWith('.png') ? 'image/png' : 'application/pdf');
+    assert.equal((await compose.addAttachments([file], documentRef)).ok, true, name);
+    assert.equal(compose.getAttachments()[0].filename, serverSafeFilename(name), name);
+  }
+  compose.resetOptionalFields(documentRef);
+});
+
+test('tijdelijke plan- en PUT-fouten retryen eenmaal met now=0, zonder retryvertraging en op exact dezelfde URL', async () => {
+  const documentRef = createAttachmentDocument();
+  compose.resetOptionalFields(documentRef);
+  const file = createBrowserFile('retry.png');
+  await compose.addAttachments([file], documentRef);
+  const upload = createValidUpload(file, 0, { expiresAt: 1_800_000 });
+  let planAttempts = 0;
+  let putAttempts = 0;
+  let sleepCalls = 0;
+  const putUrls = [];
+  const references = await compose.uploadAttachments(compose.getAttachments(), {
+    now: () => 0,
+    retryDelayMs: 0,
+    sleep: async () => { sleepCalls += 1; },
+    fetch: async (url, request) => {
+      if (url === '/api/mailbox/attachments/upload-url') {
+        planAttempts += 1;
+        if (planAttempts === 1) {
+          return { ok: false, status: 503, json: async () => ({ ok: false, retryable: true }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true, uploads: [upload] }) };
+      }
+      putUrls.push(url);
+      putAttempts += 1;
+      assert.equal(request.headers['x-upsert'], 'true');
+      if (putAttempts === 1) throw Object.assign(new Error('response verloren'), { code: 'ECONNRESET' });
+      return { ok: true, status: 200 };
+    },
+    payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+  });
+  assert.equal(planAttempts, 2);
+  assert.equal(putAttempts, 2);
+  assert.deepEqual(putUrls, [upload.signedUrl, upload.signedUrl]);
+  assert.equal(sleepCalls, 0);
+  assert.deepEqual(references.map((item) => item.reference), [upload.reference]);
+  compose.resetOptionalFields(documentRef);
+});
+
+test('tijdelijke HTTP-statussen retryen plan en PUT exact eenmaal en behouden de gekozen bijlage', async (t) => {
+  const documentRef = createAttachmentDocument();
+  for (const phase of ['plan', 'PUT']) {
+    for (const status of [408, 425, 429, 500, 502, 504]) {
+      await t.test(`${phase} HTTP ${status}`, async () => {
+        compose.resetOptionalFields(documentRef);
+        const file = createBrowserFile(`${phase.toLowerCase()}-${status}.png`);
+        await compose.addAttachments([file], documentRef);
+        const upload = createValidUpload(file);
+        let planAttempts = 0;
+        let putAttempts = 0;
+        const references = await compose.uploadAttachments(compose.getAttachments(), {
+          retryDelayMs: 0,
+          fetch: async (url) => {
+            if (url === '/api/mailbox/attachments/upload-url') {
+              planAttempts += 1;
+              if (phase === 'plan' && planAttempts === 1) {
+                return {
+                  ok: false,
+                  status,
+                  json: async () => ({ ok: false, code: 'ATTACHMENT_TEMPORARY' }),
+                };
+              }
+              return {
+                ok: true,
+                status: 200,
+                json: async () => ({ ok: true, uploads: [upload] }),
+              };
+            }
+            putAttempts += 1;
+            if (phase === 'PUT' && putAttempts === 1) {
+              return {
+                ok: false,
+                status,
+                json: async () => ({ ok: false, code: 'ATTACHMENT_TEMPORARY' }),
+              };
+            }
+            return { ok: true, status: 200 };
+          },
+          payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+        });
+        assert.equal(planAttempts, phase === 'plan' ? 2 : 1);
+        assert.equal(putAttempts, phase === 'PUT' ? 2 : 1);
+        assert.deepEqual(references.map((item) => item.reference), [upload.reference]);
+        assert.equal(compose.getAttachments().length, 1);
+        assert.strictEqual(compose.getAttachments()[0].file, file);
+      });
+    }
+  }
+  compose.resetOptionalFields(documentRef);
+});
+
+test('iedere definitieve 4xx stopt na één planrequest, ook als de body retryable claimt', async (t) => {
+  const documentRef = createAttachmentDocument();
+  compose.resetOptionalFields(documentRef);
+  const file = createBrowserFile('definitief.pdf', 'application/pdf');
+  await compose.addAttachments([file], documentRef);
+  for (const status of [400, 401, 403, 404, 405, 409, 410, 413, 415, 422, 451, 499]) {
+    await t.test(`HTTP ${status}`, async () => {
+      let attempts = 0;
+      await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+        retryDelayMs: 0,
+        fetch: async () => {
+          attempts += 1;
+          return {
+            ok: false,
+            status,
+            json: async () => ({ ok: false, retryable: true, code: 'PROVIDER_CLAIM' }),
+          };
+        },
+        payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+      }));
+      assert.equal(attempts, 1);
+      assert.equal(compose.getAttachments().length, 1);
+    });
+  }
+  compose.resetOptionalFields(documentRef);
+});
+
+test('hangende HTTP-400-body wordt voor plan en PUT nooit gelezen of als timeout geretryd', async (t) => {
+  const documentRef = createAttachmentDocument();
+  await t.test('plan', async () => {
+    compose.resetOptionalFields(documentRef);
+    const file = createBrowserFile('plan-400.pdf', 'application/pdf');
+    await compose.addAttachments([file], documentRef);
+    let planAttempts = 0;
+    let putAttempts = 0;
+    let bodyReads = 0;
+    await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+      planTimeoutMs: 5,
+      stagingTimeoutMs: 50,
+      retryDelayMs: 0,
+      fetch: async (url) => {
+        if (url === '/api/mailbox/attachments/upload-url') {
+          planAttempts += 1;
+          return {
+            ok: false,
+            status: 400,
+            json: () => {
+              bodyReads += 1;
+              return new Promise(() => {});
+            },
+          };
+        }
+        putAttempts += 1;
+        return { ok: true, status: 200 };
+      },
+      payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+    }), (error) => error.status === 400 && error.retryable === false);
+    assert.equal(planAttempts, 1);
+    assert.equal(putAttempts, 0);
+    assert.equal(bodyReads, 0);
+    assert.equal(compose.getAttachments().length, 1);
+    assert.strictEqual(compose.getAttachments()[0].file, file);
+  });
+
+  await t.test('PUT', async () => {
+    compose.resetOptionalFields(documentRef);
+    const file = createBrowserFile('put-400.pdf', 'application/pdf');
+    await compose.addAttachments([file], documentRef);
+    const upload = createValidUpload(file);
+    let planAttempts = 0;
+    let putAttempts = 0;
+    let bodyReads = 0;
+    await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+      uploadTimeoutMs: 5,
+      stagingTimeoutMs: 50,
+      retryDelayMs: 0,
+      fetch: async (url) => {
+        if (url === '/api/mailbox/attachments/upload-url') {
+          planAttempts += 1;
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true, uploads: [upload] }),
+          };
+        }
+        if (url === '/api/mailbox/attachments/cleanup') return { ok: true, status: 200 };
+        putAttempts += 1;
+        return {
+          ok: false,
+          status: 400,
+          json: () => {
+            bodyReads += 1;
+            return new Promise(() => {});
+          },
+        };
+      },
+      payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+    }), (error) => error.status === 400 && error.retryable === false);
+    assert.equal(planAttempts, 1);
+    assert.equal(putAttempts, 1);
+    assert.equal(bodyReads, 0);
+    assert.equal(compose.getAttachments().length, 1);
+    assert.strictEqual(compose.getAttachments()[0].file, file);
+  });
+  compose.resetOptionalFields(documentRef);
+});
+
+test('malformed HTTP-200-planbody retryt eenmaal en start daarna precies één PUT', async () => {
+  const documentRef = createAttachmentDocument();
+  compose.resetOptionalFields(documentRef);
+  const file = createBrowserFile('malformed.png');
+  await compose.addAttachments([file], documentRef);
+  const upload = createValidUpload(file);
+  let planAttempts = 0;
+  let putAttempts = 0;
+  const references = await compose.uploadAttachments(compose.getAttachments(), {
+    retryDelayMs: 0,
+    fetch: async (url) => {
+      if (url === '/api/mailbox/attachments/upload-url') {
+        planAttempts += 1;
+        if (planAttempts === 1) {
+          return { ok: true, status: 200, json: async () => { throw new SyntaxError('afgekapt JSON'); } };
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true, uploads: [upload] }) };
+      }
+      putAttempts += 1;
+      return { ok: true, status: 200 };
+    },
+    payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+  });
+  assert.equal(planAttempts, 2);
+  assert.equal(putAttempts, 1);
+  assert.equal(references[0].reference, upload.reference);
+  compose.resetOptionalFields(documentRef);
+});
+
+test('uploadplan valideert unieke references URLs HTTPS expiry contenttype bestandsnaam en integergrootte', async (t) => {
+  const documentRef = createAttachmentDocument();
+  const files = [createBrowserFile('strict-0.png'), createBrowserFile('strict-1.png', 'image/png', [4, 5, 6])];
+  const variants = {
+    'dubbele reference': (uploads) => { uploads[1].reference = uploads[0].reference; },
+    'dubbele URL': (uploads) => { uploads[1].signedUrl = uploads[0].signedUrl; },
+    'reference met witruimte': (uploads) => { uploads[0].reference = ` ${uploads[0].reference}`; },
+    'URL met witruimte': (uploads) => { uploads[0].signedUrl = `${uploads[0].signedUrl} `; },
+    'onveilige URL': (uploads) => { uploads[0].signedUrl = 'http://storage.test/upload'; },
+    'URL zonder host': (uploads) => { uploads[0].signedUrl = 'https://'; },
+    'verlopen': (uploads) => { uploads[0].expiresAt = 999; uploads[1].expiresAt = 999; },
+    'expiry is tekst': (uploads) => { uploads[0].expiresAt = String(uploads[0].expiresAt); },
+    'ongelijke expiry': (uploads) => { uploads[1].expiresAt += 1; },
+    'contenttype ontbreekt': (uploads) => { uploads[0].contentType = ''; },
+    'contenttype niet canoniek': (uploads) => { uploads[0].contentType = 'IMAGE/PNG'; },
+    'contenttype ongeldig': (uploads) => { uploads[0].contentType = 'image/png; charset=x'; },
+    'bestandsnaam wijkt af': (uploads) => { uploads[0].filename = 'ander.png'; },
+    'grootte is tekst': (uploads) => { uploads[0].size = String(uploads[0].size); },
+    'grootte is fractioneel': (uploads) => { uploads[0].size = 1.5; },
+    'grootte wijkt af': (uploads) => { uploads[0].size += 1; },
+  };
+  for (const [label, mutate] of Object.entries(variants)) {
+    await t.test(label, async () => {
+      compose.resetOptionalFields(documentRef);
+      await compose.addAttachments(files, documentRef);
+      const validUploads = files.map((file, index) => createValidUpload(file, index, {
+        expiresAt: 1_800_000,
+      }));
+      const malformedUploads = validUploads.map((upload) => ({ ...upload }));
+      mutate(malformedUploads);
+      let planAttempts = 0;
+      let putAttempts = 0;
+      const cleanupRequests = [];
+      const references = await compose.uploadAttachments(compose.getAttachments(), {
+        now: () => 1_000,
+        retryDelayMs: 0,
+        fetch: async (url, request) => {
+          if (url === '/api/mailbox/attachments/upload-url') {
+            planAttempts += 1;
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({ ok: true, uploads: planAttempts === 1 ? malformedUploads : validUploads }),
+            };
+          }
+          if (url === '/api/mailbox/attachments/cleanup') {
+            cleanupRequests.push(JSON.parse(request.body));
+            return { ok: true, status: 200 };
+          }
+          putAttempts += 1;
+          return { ok: true, status: 200 };
+        },
+        payload: { account: 'serve@softora.nl', to: 'prospect@example.nl', idempotencyKey: `strict:${label}` },
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(planAttempts, 2);
+      assert.equal(putAttempts, 2);
+      assert.equal(references.length, 2);
+      assert.equal(cleanupRequests.length, 1);
+    });
+  }
+  compose.resetOptionalFields(documentRef);
+});
+
+test('hangende planbody en verloren PUT-response worden afgebroken en begrensd herhaald', async (t) => {
+  const documentRef = createAttachmentDocument();
+  await t.test('planbody', async () => {
+    compose.resetOptionalFields(documentRef);
+    const file = createBrowserFile('plan-timeout.png');
+    await compose.addAttachments([file], documentRef);
+    const signals = [];
+    await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+      planTimeoutMs: 5,
+      stagingTimeoutMs: 100,
+      retryDelayMs: 0,
+      fetch: async (_url, request) => {
+        signals.push(request.signal);
+        return { ok: true, status: 200, json: () => new Promise(() => {}) };
+      },
+      payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+    }), (error) => error.code === 'MAILBOX_ATTACHMENT_REQUEST_TIMEOUT' && error.status === 504);
+    assert.equal(signals.length, 2);
+    assert.ok(signals.every((signal) => signal.aborted));
+  });
+
+  await t.test('PUT-response', async () => {
+    compose.resetOptionalFields(documentRef);
+    const file = createBrowserFile('put-timeout.png');
+    await compose.addAttachments([file], documentRef);
+    const upload = createValidUpload(file);
+    const putSignals = [];
+    let putAttempts = 0;
+    await compose.uploadAttachments(compose.getAttachments(), {
+      uploadTimeoutMs: 5,
+      stagingTimeoutMs: 100,
+      retryDelayMs: 0,
+      fetch: async (url, request) => {
+        if (url === '/api/mailbox/attachments/upload-url') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, uploads: [upload] }) };
+        }
+        putAttempts += 1;
+        putSignals.push(request.signal);
+        if (putAttempts === 1) return new Promise(() => {});
+        return { ok: true, status: 200 };
+      },
+      payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+    });
+    assert.equal(putAttempts, 2);
+    assert.equal(putSignals[0].aborted, true);
+    assert.equal(putSignals[1].aborted, false);
+  });
+  compose.resetOptionalFields(documentRef);
+});
+
+test('gedeeltelijke upload ruimt alle references begrensd keepalive op zonder de uploadfout te maskeren', async () => {
+  const documentRef = createAttachmentDocument();
+  compose.resetOptionalFields(documentRef);
+  const files = [createBrowserFile('partial-0.png'), createBrowserFile('partial-1.png', 'image/png', [4])];
+  await compose.addAttachments(files, documentRef);
+  const uploads = files.map((file, index) => createValidUpload(file, index));
+  let failedPutAttempts = 0;
+  const cleanupCalls = [];
+  await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+    retryDelayMs: 0,
+    cleanupTimeoutMs: 5,
+    fetch: async (url, request) => {
+      if (url === '/api/mailbox/attachments/upload-url') {
+        return { ok: true, status: 200, json: async () => ({ ok: true, uploads }) };
+      }
+      if (url === '/api/mailbox/attachments/cleanup') {
+        cleanupCalls.push({ request, payload: JSON.parse(request.body) });
+        if (cleanupCalls.length === 1) return new Promise(() => {});
+        return { ok: true, status: 200 };
+      }
+      if (url === uploads[0].signedUrl) return { ok: true, status: 200 };
+      failedPutAttempts += 1;
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({ ok: false, code: 'ATTACHMENT_STORAGE_TEMPORARY', retryable: true }),
+      };
+    },
+    payload: {
+      account: 'serve@softora.nl',
+      to: 'prospect@example.nl',
+      idempotencyKey: 'partial-cleanup',
+    },
+  }), (error) => error.code === 'ATTACHMENT_STORAGE_TEMPORARY' && error.status === 503);
+  assert.equal(failedPutAttempts, 2);
+  assert.equal(cleanupCalls.length, 1, 'de uploadfout komt terug terwijl cleanup nog loopt');
+  assert.equal(cleanupCalls[0].request.signal.aborted, false);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(cleanupCalls.length, 2);
+  assert.ok(cleanupCalls.every((call) => call.request.keepalive === true));
+  assert.ok(cleanupCalls.every((call) => call.payload.account === 'serve@softora.nl'));
+  assert.ok(cleanupCalls.every((call) => call.payload.idempotencyKey === 'partial-cleanup'));
+  assert.ok(cleanupCalls.every((call) => (
+    JSON.stringify(call.payload.attachments.map((item) => item.reference))
+      === JSON.stringify(uploads.map((item) => item.reference))
+  )));
+  assert.equal(compose.getAttachments().length, 2);
+  compose.resetOptionalFields(documentRef);
+});
+
+test('FormData-fallback uploadt hetzelfde File-object met het canonieke servercontenttype', async () => {
+  const documentRef = createAttachmentDocument();
+  compose.resetOptionalFields(documentRef);
+  const file = createBrowserFile('fallback.pdf', 'text/plain');
+  await compose.addAttachments([file], documentRef);
+  const upload = createValidUpload(file, 0, { contentType: 'application/pdf' });
+  let putRequest = null;
+  await compose.uploadAttachments(compose.getAttachments(), {
+    FormData: function BrokenFormData() { throw new Error('FormData ontbreekt'); },
+    fetch: async (url, request) => {
+      if (url === '/api/mailbox/attachments/upload-url') {
+        return { ok: true, status: 200, json: async () => ({ ok: true, uploads: [upload] }) };
+      }
+      putRequest = request;
+      return { ok: true, status: 200 };
+    },
+    payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+  });
+  assert.strictEqual(putRequest.body, file);
+  assert.equal(putRequest.headers['content-type'], 'application/pdf');
+  assert.equal(putRequest.headers['x-upsert'], 'true');
+  compose.resetOptionalFields(documentRef);
+});
+
+test('maximale batch deelt één absoluut stagingbudget over alle PUTs en retry', async () => {
+  const documentRef = createAttachmentDocument();
+  compose.resetOptionalFields(documentRef);
+  const files = Array.from({ length: 5 }, (_, index) => createBrowserFile(`batch-${index}.png`, 'image/png', [index + 1]));
+  await compose.addAttachments(files, documentRef);
+  const uploads = files.map((file, index) => createValidUpload(file, index, { expiresAt: 1_800_000 }));
+  let virtualNow = 1_000;
+  const attempts = new Map();
+  await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+    now: () => virtualNow,
+    stagingTimeoutMs: 100,
+    uploadTimeoutMs: 1_000,
+    retryDelayMs: 0,
+    fetch: async (url) => {
+      if (url === '/api/mailbox/attachments/upload-url') {
+        virtualNow += 5;
+        return { ok: true, status: 200, json: async () => ({ ok: true, uploads }) };
+      }
+      if (url === '/api/mailbox/attachments/cleanup') return { ok: true, status: 200 };
+      const count = (attempts.get(url) || 0) + 1;
+      attempts.set(url, count);
+      virtualNow += 15;
+      if (url.endsWith('upload-1') && count === 1) {
+        throw Object.assign(new Error('tijdelijke reset'), { code: 'ECONNRESET' });
+      }
+      if (url.endsWith('upload-4')) return new Promise(() => {});
+      return { ok: true, status: 200 };
+    },
+    payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_STAGING_TIMEOUT' && error.status === 504);
+  assert.equal(attempts.size, 5);
+  assert.equal(attempts.get(uploads[1].signedUrl), 2);
+  assert.equal(attempts.get(uploads[4].signedUrl), 1);
+  assert.equal(compose.getAttachments().length, 5);
   compose.resetOptionalFields(documentRef);
 });
