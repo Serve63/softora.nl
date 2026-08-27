@@ -95,3 +95,148 @@ test('accepted-send state blijft per controller, accountgebonden en wijkt voor d
   freshState.reconcile(freshMail);
   assert.deepEqual(freshMail.threadMessages, []);
 });
+
+function createCollisionFixture(overrides = {}) {
+  const acceptedAt = '2026-08-27T10:01:00.000Z';
+  const conversationId = 'campaign:serve@softora.nl|klant@example.nl|kleine-vraag';
+  const record = {
+    key: 'serve|serve@softora.nl|message:accepted-collision@softora.nl',
+    owner: ' SERVE ',
+    accountEmail: ' Serve@Softora.nl ',
+    acceptedAt,
+    idempotencyKey: 'send-key-collision',
+    sourceMailId: 'inbox:42',
+    conversationKeys: [conversationId],
+    message: {
+      id: 'accepted-sent:<accepted-collision@softora.nl>',
+      mailboxId: 'accepted-sent:<accepted-collision@softora.nl>',
+      folder: 'sent',
+      storageFolder: 'sent',
+      direction: 'sent',
+      accountEmail: 'serve@softora.nl',
+      providerOwner: 'serve',
+      messageId: '<accepted-collision@softora.nl>',
+      receivedAt: acceptedAt,
+      activityAt: acceptedAt,
+      localAcceptedSend: true,
+      localAcceptedSendFallback: false,
+      softoraClientSendIdempotencyKey: 'send-key-collision',
+    },
+    ...overrides.record,
+  };
+  const serveMail = {
+    id: 'inbox:42',
+    mailboxId: 'inbox:42',
+    conversationId,
+    accountEmail: ' SERVE@SOFTORA.NL ',
+    providerOwner: 'Serve',
+    receivedAt: '2026-08-27T10:00:00.000Z',
+    threadMessages: [],
+    ...overrides.serveMail,
+  };
+  const martijnMail = {
+    id: 'inbox:42',
+    mailboxId: 'inbox:42',
+    conversationId,
+    accountEmail: 'martijn@softora.nl',
+    providerOwner: 'martijn',
+    receivedAt: '2026-08-27T10:00:00.000Z',
+    threadMessages: [],
+    ...overrides.martijnMail,
+  };
+  return { record, serveMail, martijnMail };
+}
+
+test('accepted-send scoped finder kiest Servé vóór ID- en conversationmatch in beide arrayvolgordes', () => {
+  for (const matchBy of ['source-id', 'conversation']) {
+    for (const reverse of [false, true]) {
+      const state = createState();
+      const { record, serveMail, martijnMail } = createCollisionFixture({
+        record: { sourceMailId: matchBy === 'source-id' ? 'inbox:42' : 'inbox:niet-aanwezig' },
+      });
+      const mails = reverse ? [martijnMail, serveMail] : [serveMail, martijnMail];
+
+      assert.equal(state.findScopedMail(record, mails), serveMail);
+      state.remember(record);
+      state.reconcile(martijnMail);
+      assert.deepEqual(martijnMail.threadMessages, []);
+      assert.equal(martijnMail.replyDismissedAt, undefined);
+      state.reconcile(serveMail);
+      assert.equal(serveMail.threadMessages.length, 1);
+      assert.equal(serveMail.threadMessages[0].messageId, '<accepted-collision@softora.nl>');
+    }
+  }
+});
+
+test('accepted-send scope ontbreekt of botst: finder en reconcile falen gesloten', () => {
+  const cases = [
+    { name: 'record owner ontbreekt', overrides: { record: { owner: '' } } },
+    { name: 'record account ontbreekt', overrides: { record: { accountEmail: '' } } },
+    { name: 'mail owner ontbreekt', overrides: { serveMail: { providerOwner: '' } } },
+    { name: 'mail account ontbreekt', overrides: { serveMail: { accountEmail: '' } } },
+    { name: 'owner botst', overrides: { serveMail: { providerOwner: 'martijn' } } },
+    { name: 'account botst', overrides: { serveMail: { accountEmail: 'martijn@softora.nl' } } },
+  ];
+
+  cases.forEach(({ name, overrides }) => {
+    const state = createState();
+    const { record, serveMail } = createCollisionFixture(overrides);
+    assert.equal(state.findScopedMail(record, [serveMail]), null, name);
+    state.remember(record);
+    state.reconcile(serveMail);
+    assert.deepEqual(serveMail.threadMessages, [], name);
+    assert.equal(serveMail.replyDismissedAt, undefined, name);
+  });
+});
+
+test('accepted-send scoped finder muteert niets bij twee exact passende kandidaten', () => {
+  const state = createState();
+  const { record, serveMail } = createCollisionFixture();
+  const duplicate = { ...serveMail, threadMessages: [] };
+
+  assert.equal(state.findScopedMail(record, [serveMail, duplicate]), null);
+  assert.deepEqual(serveMail.threadMessages, []);
+  assert.deepEqual(duplicate.threadMessages, []);
+});
+
+test('providerkopie-dedupe laat een Martijn-kopie met Serv\u00e9s canonieke Message-ID in beide volgordes ongemoeid', () => {
+  for (const reverse of [false, true]) {
+    const state = createState();
+    const { record, serveMail } = createCollisionFixture();
+    const martijnProviderCopy = {
+      id: 'sent:martijn-provider-copy',
+      mailboxId: 'sent:martijn-provider-copy',
+      folder: 'sent',
+      storageFolder: 'sent',
+      direction: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      providerOwner: 'martijn',
+      messageId: '<accepted-collision@softora.nl>',
+      receivedAt: record.acceptedAt,
+    };
+    const unrelatedServeCopy = {
+      id: 'sent:serve-unrelated',
+      mailboxId: 'sent:serve-unrelated',
+      folder: 'sent',
+      storageFolder: 'sent',
+      direction: 'sent',
+      accountEmail: 'serve@softora.nl',
+      providerOwner: 'serve',
+      messageId: '<serve-unrelated@softora.nl>',
+      receivedAt: '2026-08-27T09:59:00.000Z',
+    };
+    serveMail.threadMessages = reverse
+      ? [martijnProviderCopy, unrelatedServeCopy]
+      : [unrelatedServeCopy, martijnProviderCopy];
+
+    state.remember(record);
+    state.reconcile(serveMail);
+
+    assert.equal(serveMail.threadMessages.includes(martijnProviderCopy), true);
+    assert.equal(serveMail.threadMessages.includes(unrelatedServeCopy), true);
+    assert.equal(serveMail.threadMessages.filter((message) => (
+      message.localAcceptedSend === true &&
+      message.messageId === '<accepted-collision@softora.nl>'
+    )).length, 1);
+  }
+});
