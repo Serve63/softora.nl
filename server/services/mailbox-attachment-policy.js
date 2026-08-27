@@ -1,6 +1,7 @@
 const MAX_MAILBOX_ATTACHMENTS = 5;
 const MAX_MAILBOX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 const MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES = 5 * 1024 * 1024;
+const MAILBOX_ATTACHMENT_SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 const MAILBOX_ATTACHMENT_EXTENSIONS = new Set([
   'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
@@ -53,8 +54,13 @@ function normalizeContentType(value, filename) {
 }
 
 function normalizeAttachmentMetadata(value) {
+  const source = (Array.isArray(value) ? value : []).slice(0, MAX_MAILBOX_ATTACHMENTS);
+  const hashPresence = source.map((attachment) => (
+    Boolean(attachment && Object.prototype.hasOwnProperty.call(attachment, 'sha256'))
+  ));
+  if (hashPresence.some(Boolean) && !hashPresence.every(Boolean)) return [];
   let totalBytes = 0;
-  const normalized = (Array.isArray(value) ? value : []).slice(0, MAX_MAILBOX_ATTACHMENTS)
+  const normalized = source
     .map((attachment) => {
       const filename = safeFilename(attachment?.filename || attachment?.name);
       const size = Number(attachment?.size);
@@ -65,11 +71,17 @@ function normalizeAttachmentMetadata(value) {
       if (!MAILBOX_ATTACHMENT_EXTENSIONS.has(extension)) return null;
       totalBytes += size;
       if (totalBytes > MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES) return null;
-      return {
+      const metadata = {
         filename,
         contentType: normalizeContentType(attachment?.contentType || attachment?.type, filename),
         size,
       };
+      if (Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256')) {
+        const sha256 = typeof attachment.sha256 === 'string' ? attachment.sha256 : '';
+        if (!MAILBOX_ATTACHMENT_SHA256_PATTERN.test(sha256)) return null;
+        metadata.sha256 = sha256;
+      }
+      return metadata;
     })
     .filter(Boolean);
   return totalBytes <= MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES ? normalized : [];
@@ -78,6 +90,7 @@ function normalizeAttachmentMetadata(value) {
 module.exports = {
   MAILBOX_ATTACHMENT_CONTENT_TYPE_BY_EXTENSION,
   MAILBOX_ATTACHMENT_EXTENSIONS,
+  MAILBOX_ATTACHMENT_SHA256_PATTERN,
   MAX_MAILBOX_ATTACHMENT_BYTES,
   MAX_MAILBOX_ATTACHMENTS,
   MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES,
