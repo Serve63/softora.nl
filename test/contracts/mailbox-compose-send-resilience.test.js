@@ -505,6 +505,84 @@ test('verlopen sendbewijs vóór provider ververst veilig proof en hergebruikt s
   assert.equal(marker.state, 'accepted');
 });
 
+test('bewezen non-refresh 401 403 en 429 wissen proof en herstellen handmatig via volledige preflight', async (t) => {
+  for (const { status, withAttachment, expectedState } of [
+    { status: 401, withAttachment: false, expectedState: 'armed' },
+    { status: 403, withAttachment: true, expectedState: 'staged' },
+    { status: 429, withAttachment: true, expectedState: 'staged' },
+  ]) {
+    await t.test(`HTTP ${status} ${expectedState}`, async () => {
+      const storage = new MemoryStorage();
+      const payload = basePayload({ idempotencyKey: `browser:manual-retry-${status}` });
+      const file = createProductionAttachment(`bewijs-${status}.pdf`, 'application/pdf', 4);
+      const attachments = withAttachment ? [file] : [];
+      const preflightPayloads = [];
+      let uploadCalls = 0;
+      let sendCalls = 0;
+      let providerEffects = 0;
+      const protocol = createProtocol({
+        storage,
+        now: () => 1_000,
+        fetch: async (url, request) => {
+          const requestPayload = parseRequest(request);
+          if (url.endsWith('/preflight')) {
+            preflightPayloads.push(requestPayload);
+            return response(200, { ok: true, result: preflightResult(requestPayload) });
+          }
+          sendCalls += 1;
+          if (sendCalls === 1) {
+            return response(status, {
+              ok: false,
+              code: 'MAILBOX_SEND_ROUTE_PRECONDITION_FAILED',
+              error: 'Mail verzenden mislukt',
+              detail: 'De route stopte aantoonbaar vóór providerdispatch.',
+              externalEffect: false,
+              failurePhase: 'pre-dispatch',
+            });
+          }
+          providerEffects += 1;
+          return response(200, { ok: true, result: acceptedSendResult(`manual-retry-${status}`) });
+        },
+      });
+      const uploadAttachments = async (selected) => {
+        uploadCalls += 1;
+        return selected.map((attachment, index) => ({
+          reference: `opaque-manual-retry-${status}-${index}`,
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          sha256: attachment.sha256,
+          referenceVersion: 2,
+          expiresAt: 1_801_000,
+        }));
+      };
+
+      await assert.rejects(protocol.execute({
+        payload,
+        attachments,
+        uploadAttachments,
+      }), (error) => error.code === 'MAILBOX_SEND_ROUTE_PRECONDITION_FAILED');
+      const rewound = resilienceModule.readMarker(storage, payload.idempotencyKey);
+      assert.equal(rewound.state, expectedState);
+      assert.equal(rewound.reconcileProof, null);
+      assert.equal(Object.prototype.hasOwnProperty.call(rewound, 'sendStartedAt'), false);
+      assert.equal(preflightPayloads.length, 1);
+      assert.equal('body' in preflightPayloads[0], true);
+      assert.equal(sendCalls, 1);
+      assert.equal(providerEffects, 0);
+
+      const recovered = await protocol.execute({ payload, attachments, uploadAttachments });
+      assert.equal(recovered.result.messageId, `<manual-retry-${status}@softora.nl>`);
+      assert.equal(preflightPayloads.length, 2);
+      assert.equal('body' in preflightPayloads[1], true);
+      assert.equal('attachmentsMetadata' in preflightPayloads[1], true);
+      assert.equal(sendCalls, 2);
+      assert.equal(providerEffects, 1);
+      assert.equal(uploadCalls, withAttachment ? 1 : 0);
+    });
+  }
+});
+
 test('alleen exact bewijs zonder identity of result mag een dispatching marker veilig terugzetten', async (t) => {
   const variants = [
     {

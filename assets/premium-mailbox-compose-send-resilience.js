@@ -821,7 +821,7 @@
               marker = patchMarker(storage, marker, {
                 state: staging.length ? 'staged' : 'armed',
                 sendStartedAt: undefined,
-                ...(shouldRefreshProof ? { reconcileProof: null } : {}),
+                reconcileProof: null,
               }, options);
               if (shouldRefreshProof) {
                 preDispatchProofRefreshes += 1;
