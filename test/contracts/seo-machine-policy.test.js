@@ -32,7 +32,7 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /blijft na het halen of verstrijken van die datum actief totdat Servé haar expliciet pauzeert/i);
   assert.match(policy, /70% verdedigen\/uitbouwen van bewezen clusters[\s\S]*20% aangrenzende commerciële experimenten[\s\S]*10% technische/i);
   assert.match(policy, /`npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat/i);
-  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=4`/i);
+  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=5`/i);
   assert.match(qualityGates, /deadlinebestendige `growthHorizon`/i);
   assert.ok(
     qualityGates.indexOf('`performance_recovery`, `quality_recovery`') >= 0,
@@ -48,6 +48,7 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.equal(packageJson.scripts['seo:visuals:check'], 'node scripts/check-seo-machine-visuals.js');
   assert.equal(packageJson.scripts['seo:keywords:check'], 'node scripts/check-seo-machine-keywords.js');
   assert.equal(packageJson.scripts['seo:selection:check'], 'node scripts/check-seo-machine-selection.js');
+  assert.equal(packageJson.scripts['seo:live-route:check'], 'node scripts/check-seo-machine-live-route.js');
   assert.equal(packageJson.scripts['seo:automation-state'], 'node scripts/seo-machine-automation-state.js');
   assert.equal(packageJson.scripts['seo:cadence:check'], 'node scripts/check-seo-machine-cadence.js');
 });
@@ -82,13 +83,20 @@ test('SEO machine keeps Ubersuggest advisory and requires natural keyword eviden
   assert.match(qualityGates, /seo:keywords:check` blokkeert/i);
 });
 
-test('SEO machine enforces GSC selection evidence and a finish-run receipt', () => {
+test('SEO machine enforces same-run selection, recovery and publication receipts', () => {
   const policy = readRepoFile('docs/growth/seo-machine-policy.md');
   const qualityGates = readRepoFile('docs/seo-machine-quality-gates.md');
 
   assert.match(policy, /`npm run seo:selection:check` vergelijkt[\s\S]*exacte top drie/i);
-  assert.match(policy, /`finish-run` bewaart het exacte resultaat en publieke effect/i);
+  assert.match(policy, /`recover-run` sluit[\s\S]*expliciet/i);
+  assert.match(policy, /`finish-run published` accepteert alleen dezelfde invocation/i);
+  assert.match(policy, /`cadence`[\s\S]*`selection`[\s\S]*`keywords`[\s\S]*`visuals`[\s\S]*`verify_critical`[\s\S]*`live_production`[\s\S]*`live_route`/i);
+  assert.match(policy, /`--record-run-gate --run-thread <task-id> --run-invocation-at <invocation-at>`/i);
   assert.match(policy, /`repair-thread-binding` behoudt[\s\S]*bestaande teller/i);
+  assert.match(policy, /`record-tool-smoke` bewaart per verplichte tool[\s\S]*`ok`\/`ok_empty`/i);
+  assert.match(policy, /`npm run seo:live-route:check` controleert na productiepariteit/i);
   assert.match(qualityGates, /`recent_material_change`[\s\S]*`lastChangedAt`[\s\S]*`recheckAt`/i);
   assert.match(qualityGates, /mcp__ubersuggest__keyword_suggestions[\s\S]*mcp__ubersuggest__serp_analysis/i);
+  assert.match(qualityGates, /Alleen toolnamen, vrije tekst of `validate_site` zijn geen dataproef/i);
+  assert.match(qualityGates, /dezelfde finale Git-tree[\s\S]*dezelfde live commit/i);
 });

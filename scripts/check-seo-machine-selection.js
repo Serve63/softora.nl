@@ -5,6 +5,10 @@ const {
   isSafeRelativePath,
   validateSelectionEvidence,
 } = require('../server/services/seo-machine-selection');
+const {
+  extractRunGateCliOptions,
+  recordAutomationRunGateFromCli,
+} = require('./seo-machine-automation-state');
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
@@ -30,11 +34,30 @@ function readJson(relativePath) {
 }
 
 function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv);
-  const result = validateSelectionEvidence(readJson(args.evidence), readJson(args.report));
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  const gateOptions = extractRunGateCliOptions(argv);
+  const args = parseArgs(gateOptions.remaining);
+  const evidence = readJson(args.evidence);
+  const report = readJson(args.report);
+  const result = validateSelectionEvidence(evidence, report);
+  let runGate = null;
+  if (result.status === 'ready') {
+    runGate = recordAutomationRunGateFromCli({
+      gateOptions,
+      gate: 'selection',
+      details: {
+        status: result.status,
+        sourceReportGeneratedAt: report.generatedAt,
+        selectedSource: result.summary.selectedSource,
+        selectedPath: result.summary.selectedPath,
+        prioritizedReviewed: result.summary.prioritizedReviewed,
+        highestOpportunity: result.summary.highestOpportunity,
+      },
+    });
+  }
+  const output = { ...result, runGate };
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   if (result.status !== 'ready') process.exitCode = 1;
-  return result;
+  return output;
 }
 
 if (require.main === module) {

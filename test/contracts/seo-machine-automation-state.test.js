@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -8,6 +9,7 @@ const {
   AUTOMATION_ID,
   AUTOMATION_NAME,
   AUTOMATION_RRULE,
+  REQUIRED_PUBLISHED_RUN_GATES,
   REQUIRED_UBERSUGGEST_TOOLS,
   ROTATION_BLOCK,
   RUN_LIFECYCLE_BLOCK,
@@ -17,8 +19,12 @@ const {
   finishAutomationRun,
   formatStateBlock,
   inspectAutomationState,
+  recordAutomationRunGate,
+  recordAutomationRunGateFromCli,
   recordUbersuggestRun,
+  recordUbersuggestDataSmoke,
   recordUbersuggestToolBinding,
+  recoverInterruptedRun,
   repairAutomationThreadBinding,
   rotateAutomationThread,
   runAutomationStateCli,
@@ -45,13 +51,28 @@ function createMemory(completedRunsInActiveThread = 6) {
   return memoryPath;
 }
 
+function createGitRepository() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-gate-git-'));
+  execFileSync('git', ['init', '-q'], { cwd: directory });
+  execFileSync('git', ['config', 'user.email', 'test@softora.nl'], { cwd: directory });
+  execFileSync('git', ['config', 'user.name', 'Softora test'], { cwd: directory });
+  fs.writeFileSync(path.join(directory, 'proof.txt'), 'ready\n');
+  execFileSync('git', ['add', 'proof.txt'], { cwd: directory });
+  execFileSync('git', ['commit', '-qm', 'test tree'], { cwd: directory });
+  return directory;
+}
+
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=4',
+    'SEO_MACHINE_PROMPT_VERSION=5',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
+    'Recover explicitly with npm run seo:automation-state -- recover-run.',
+    'Every final gate uses --record-run-gate.',
     'Run npm run seo:selection:check before implementation.',
+    'Run npm run seo:live-route:check after production.',
     'Close every outcome with npm run seo:automation-state -- finish-run.',
+    'Record setup evidence with npm run seo:automation-state -- record-tool-smoke.',
     'Require mcp__ubersuggest__keyword_suggestions, mcp__ubersuggest__google_suggestions, mcp__ubersuggest__keyword_overview and mcp__ubersuggest__serp_analysis.',
     'Select agent.browsers.get("edge") and require family=edge followed by profileName=Codex.',
     'Google Chrome is forbidden.',
@@ -60,6 +81,13 @@ function validAutomationPrompt() {
     'Never buy credits or use paid fallbacks.',
     'Never use Qwen.',
   ].join(' ');
+}
+
+function ubersuggestSmokeOutcomes() {
+  return Object.fromEntries(REQUIRED_UBERSUGGEST_TOOLS.map((tool) => [tool, {
+    status: tool.endsWith('keyword_suggestions') ? 'ok_empty' : 'ok',
+    resultCount: tool.endsWith('keyword_suggestions') ? 0 : 1,
+  }]));
 }
 
 function prepareOperationalState(memoryPath, threadId = 'thread-1') {
@@ -71,7 +99,37 @@ function prepareOperationalState(memoryPath, threadId = 'thread-1') {
     tools: REQUIRED_UBERSUGGEST_TOOLS.join(','),
     evidence: 'Setup task exposed all four required read-only Ubersuggest tools.',
   });
+  recordUbersuggestDataSmoke({
+    memoryPath,
+    threadId,
+    checkedAt: '2026-08-27T12:05:00.000Z',
+    tools: REQUIRED_UBERSUGGEST_TOOLS.join(','),
+    outcomes: ubersuggestSmokeOutcomes(),
+    evidence: 'All four tools returned a real Netherlands and Dutch read-only data response without fallback.',
+  });
   return memoryPath;
+}
+
+function recordPublishedGates(memoryPath, options = {}) {
+  const threadId = options.threadId || 'thread-1';
+  const invocationAt = options.invocationAt || '2026-08-28T08:15:00+02:00';
+  const checkedAt = options.checkedAt || '2026-08-28T09:00:00+02:00';
+  const treeSha = options.treeSha || '1'.repeat(40);
+  const liveCommit = options.liveCommit || 'abcdef1234567890';
+  const changedUrl = options.changedUrl || 'https://www.softora.nl/bedrijfssoftware-op-maat';
+  for (const gate of REQUIRED_PUBLISHED_RUN_GATES) {
+    recordAutomationRunGate({
+      memoryPath,
+      threadId,
+      invocationAt,
+      gate,
+      checkedAt,
+      details: { status: 'ready', gate },
+      treeSha: ['keywords', 'visuals', 'verify_critical', 'live_production', 'live_route'].includes(gate) ? treeSha : null,
+      liveCommit: ['live_production', 'live_route'].includes(gate) ? liveCommit : null,
+      changedUrl: gate === 'live_route' ? changedUrl : null,
+    });
+  }
 }
 
 function createCompletedRun15Memory() {
@@ -160,6 +218,7 @@ test('automation run start increments atomically and is idempotent for one invoc
 test('finish-run closes the active invocation with a durable live receipt', () => {
   const memoryPath = prepareOperationalState(createMemory());
   startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  recordPublishedGates(memoryPath);
   const receipt = finishAutomationRun({
     memoryPath,
     threadId: 'thread-1',
@@ -175,6 +234,8 @@ test('finish-run closes the active invocation with a durable live receipt', () =
   const inspected = inspectAutomationState(memoryPath);
 
   assert.equal(receipt.outcome, 'published');
+  assert.equal(receipt.completionGateStatus, 'ready');
+  assert.equal(Object.keys(receipt.gates).length, REQUIRED_PUBLISHED_RUN_GATES.length);
   assert.equal(inspected.lifecycle.activeRun, null);
   assert.equal(inspected.lifecycle.lastReceipt.liveCommit, 'abcdef1234567890');
   assert.equal(inspected.lifecycle.receipts.length, 1);
@@ -192,6 +253,108 @@ test('finish-run closes the active invocation with a durable live receipt', () =
   }).idempotent, true);
 });
 
+test('finish-run blocks a published claim until every same-run gate is ready on the live tree', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  recordPublishedGates(memoryPath);
+  const content = fs.readFileSync(memoryPath, 'utf8');
+  const lifecycle = inspectAutomationState(memoryPath).lifecycle;
+  delete lifecycle.activeRun.gates.selection;
+  fs.writeFileSync(memoryPath, content.replace(
+    formatStateBlock(RUN_LIFECYCLE_BLOCK, inspectAutomationState(memoryPath).lifecycle),
+    formatStateBlock(RUN_LIFECYCLE_BLOCK, lifecycle)
+  ));
+
+  assert.throws(() => finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt: '2026-08-28T08:15:00+02:00',
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'Publication should be blocked because the selection receipt is missing.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+  }), /PUBLISHED_GATES_INCOMPLETE.*selection/);
+});
+
+test('finish-run blocks tree drift between final validators and the live deployment', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  recordPublishedGates(memoryPath, { invocationAt });
+  recordAutomationRunGate({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    gate: 'keywords',
+    checkedAt: '2026-08-28T09:01:00+02:00',
+    details: { status: 'ready', gate: 'keywords', rerun: true },
+    treeSha: '2'.repeat(40),
+  });
+
+  assert.throws(() => finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'Publication should be blocked because keyword evidence belongs to another tree.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+  }), /PUBLISHED_GATES_INCOMPLETE.*keywords.*niet uitgevoerd op de live productietree/);
+});
+
+test('run-gate digest exposes a mutated stored result', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  recordAutomationRunGate({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    gate: 'selection',
+    checkedAt: '2026-08-28T08:30:00+02:00',
+    details: { status: 'ready', selectedPath: '/blog/echt-pad' },
+  });
+  const inspected = inspectAutomationState(memoryPath);
+  const content = fs.readFileSync(memoryPath, 'utf8');
+  inspected.lifecycle.activeRun.gates.selection.summary.selectedPath = '/blog/gemanipuleerd-pad';
+  fs.writeFileSync(memoryPath, content.replace(
+    formatStateBlock(RUN_LIFECYCLE_BLOCK, inspectAutomationState(memoryPath).lifecycle),
+    formatStateBlock(RUN_LIFECYCLE_BLOCK, inspected.lifecycle)
+  ));
+
+  assert.match(inspectAutomationState(memoryPath).lifecycleErrors.join(' '), /resultDigest wijkt af/);
+});
+
+test('tree-bound CLI receipts require the active invocation and a clean committed tree', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-27T09:15:00+02:00';
+  const cwd = createGitRepository();
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  const receipt = recordAutomationRunGateFromCli({
+    memoryPath,
+    cwd,
+    gateOptions: { enabled: true, threadId: 'thread-1', invocationAt },
+    gate: 'keywords',
+    details: { status: 'ready', checked: 12 },
+  });
+
+  assert.match(receipt.treeSha, /^[a-f0-9]{40}$/);
+  fs.writeFileSync(path.join(cwd, 'proof.txt'), 'dirty\n');
+  assert.throws(() => recordAutomationRunGateFromCli({
+    memoryPath,
+    cwd,
+    gateOptions: { enabled: true, threadId: 'thread-1', invocationAt },
+    gate: 'visuals',
+    details: { status: 'ready', checked: 12 },
+  }), /TREE_GATE_DIRTY/);
+});
+
 test('the next invocation exposes and seals an unfinished previous run as interrupted', () => {
   const memoryPath = prepareOperationalState(createMemory());
   startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
@@ -205,6 +368,60 @@ test('the next invocation exposes and seals an unfinished previous run as interr
   assert.equal(next.recoveredPreviousRun.outcome, 'interrupted');
   assert.equal(next.recoveredPreviousRun.publicEffect, 'unverified');
   assert.equal(inspectAutomationState(memoryPath).lifecycle.receipts[0].autoClosed, true);
+});
+
+test('recover-run explicitly closes an unfinished invocation before the next counter increment', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  const recovered = recoverInterruptedRun({
+    memoryPath,
+    threadId: 'thread-1',
+    recoveredAt: '2026-08-28T10:00:00+02:00',
+    evidence: 'Run stopped before finish-run; external effects were inspected and remain unverified.',
+  });
+  const inspected = inspectAutomationState(memoryPath);
+
+  assert.equal(recovered.outcome, 'interrupted');
+  assert.equal(recovered.publicEffect, 'unverified');
+  assert.equal(inspected.lifecycle.activeRun, null);
+  assert.equal(inspected.rotation.completedRunsInActiveThread, 7);
+  assert.equal(recoverInterruptedRun({
+    memoryPath,
+    threadId: 'thread-1',
+    recoveredAt: '2026-08-28T10:00:00+02:00',
+    evidence: 'Run stopped before finish-run; external effects were inspected and remain unverified.',
+  }).idempotent, true);
+  assert.throws(() => recoverInterruptedRun({
+    memoryPath,
+    threadId: 'thread-1',
+    recoveredAt: '2026-08-28T10:00:00+02:00',
+    evidence: 'Different recovery evidence must not be accepted as the same receipt.',
+  }), /NO_INTERRUPTED_RUN/);
+});
+
+test('finish-run retries fail closed when outcome evidence changes', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:00:00+02:00',
+    outcome: 'operations_p0',
+    publicEffect: 'none',
+    evidence: 'OAuth refresh failed before any public or external SEO effect.',
+  });
+
+  assert.throws(() => finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:00:00+02:00',
+    outcome: 'completed_no_publication',
+    publicEffect: 'none',
+    evidence: 'A changed retry must not rewrite the durable result.',
+  }), /FINISH_RECEIPT_MISMATCH/);
 });
 
 test('mid-batch connector repair preserves count and requires fresh tool-binding proof', () => {
@@ -347,6 +564,23 @@ test('automation installation audit proves one active heartbeat, matching task a
   assert.equal(audit.matchingAutomationCount, 1);
   assert.equal(audit.automation.targetThreadId, 'thread-1');
   assert.deepEqual(audit.automation.missingPromptMarkers, []);
+});
+
+test('automation installation audit rejects tool names without a real four-tool data smoke', () => {
+  const memoryPath = createMemory();
+  ensureAutomationState(memoryPath);
+  recordUbersuggestToolBinding({
+    memoryPath,
+    threadId: 'thread-1',
+    checkedAt: '2026-08-27T12:00:00.000Z',
+    tools: REQUIRED_UBERSUGGEST_TOOLS.join(','),
+    evidence: 'All four tool names are bound but no data call has run.',
+  });
+  const paths = createAutomationConfig(memoryPath);
+  const audit = auditAutomationInstallation({ memoryPath, ...paths });
+
+  assert.equal(audit.status, 'invalid');
+  assert.match(audit.errors.join(' '), /data-smoke is niet bewezen/);
 });
 
 test('start-run CLI fails before increment when the automation target drifts', () => {

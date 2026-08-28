@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 const { assertLiveProductionVersion } = require('./check-live-production-version');
+const {
+  extractRunGateCliOptions,
+  recordAutomationRunGateFromCli,
+} = require('./seo-machine-automation-state');
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_INTERVAL_MS = 15 * 1000;
@@ -53,11 +57,29 @@ async function waitForLiveProductionVersion(options = {}) {
 
 async function runCli() {
   try {
+    const gateOptions = extractRunGateCliOptions(process.argv.slice(2));
+    if (gateOptions.remaining.length) throw new Error(`Onbekende argumenten: ${gateOptions.remaining.join(' ')}`);
     const result = await waitForLiveProductionVersion();
     const refLabel = result.liveRef ? ` (${result.liveRef})` : '';
     console.log(
       `[live-production] www.softora.nl draait exact op origin/main na ${result.attempts} poging(en): ${result.liveSha}${refLabel}.`
     );
+    const runGate = recordAutomationRunGateFromCli({
+      gateOptions,
+      gate: 'live_production',
+      treeRef: result.liveSha,
+      liveCommit: result.liveSha,
+      details: {
+        status: 'ready',
+        expectedSha: result.expectedSha,
+        liveSha: result.liveSha,
+        liveRef: result.liveRef,
+        liveHost: result.liveHost,
+        method: result.method,
+        attempts: result.attempts,
+      },
+    });
+    if (runGate) console.log(`[live-production] run-gate=${runGate.resultDigest}`);
   } catch (error) {
     console.error(error.message || String(error));
     process.exit(1);
