@@ -6,7 +6,7 @@ const path = require('node:path');
 const repoRoot = path.resolve(__dirname, '../..');
 const migration = fs.readFileSync(path.join(
   repoRoot,
-  'supabase/migrations/20260827233202_mailbox_pre_dispatch_claim_fencing.sql'
+  'supabase/migrations/20260828115524_mailbox_pre_dispatch_claim_fencing.sql'
 ), 'utf8');
 
 const tableName = 'softora_mailbox_send_provenance';
