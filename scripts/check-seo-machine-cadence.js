@@ -29,6 +29,10 @@ const {
 const {
   getSeoMachinePublicationPlan,
 } = require('../server/services/seo-machine-publication-plan');
+const {
+  extractRunGateCliOptions,
+  recordAutomationRunGateFromCli,
+} = require('./seo-machine-automation-state');
 
 const DEFAULT_INDEXATION_REPORT_PATH = path.resolve(__dirname, '..', 'reports', 'seo-agent', 'indexation-latest.json');
 const DEFAULT_INDEXATION_MAX_AGE_MS = 30 * 60 * 1000;
@@ -110,6 +114,8 @@ async function runSeoMachineCadenceCheck(options = {}) {
 
 async function runCli() {
   try {
+    const gateOptions = extractRunGateCliOptions(process.argv.slice(2));
+    if (gateOptions.remaining.length) throw new Error(`Onbekende argumenten: ${gateOptions.remaining.join(' ')}`);
     const result = await runSeoMachineCadenceCheck();
     const cadence = result.cadence;
     const label = cadence.color === 'green' ? 'GREEN' : cadence.color === 'amber' ? 'AMBER' : 'RED';
@@ -137,6 +143,28 @@ async function runCli() {
         + `path=${cadence.nextCandidate.path}`
       );
     }
+    const runGate = cadence.exitCode === 0 || cadence.exitCode === 2
+      ? recordAutomationRunGateFromCli({
+        gateOptions,
+        gate: 'cadence',
+        details: {
+          state: cadence.state,
+          status: cadence.status,
+          action: cadence.action,
+          exitCode: cadence.exitCode,
+          newUrls: cadence.newUrls,
+          newUrlDeficit: cadence.newUrlDeficit,
+          minimumNewUrlsPerWeek: cadence.minimumNewUrlsPerWeek,
+          maximumNewUrlsPerWeek: cadence.maximumNewUrlsPerWeek,
+          nextCandidate: cadence.nextCandidate ? {
+            id: cadence.nextCandidate.id,
+            path: cadence.nextCandidate.path,
+            score: cadence.nextCandidate.score,
+          } : null,
+        },
+      })
+      : null;
+    if (runGate) console.log(`[seo-cadence] run-gate=${runGate.resultDigest}`);
     for (const reason of cadence.reasons || []) console.error(`[seo-cadence] ${cadence.state}: ${reason}`);
     process.exit(cadence.exitCode);
   } catch (error) {

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
 const RUN_LIFECYCLE_BLOCK = 'SEO_RUN_LIFECYCLE_STATE';
@@ -10,7 +12,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTOMATION_ID = 'softora-seo-actiemachine';
 const AUTOMATION_NAME = 'Softora SEO dagmachine';
 const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
-const AUTOMATION_PROMPT_VERSION = 4;
+const AUTOMATION_PROMPT_VERSION = 5;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
 ]);
@@ -19,6 +21,23 @@ const REQUIRED_UBERSUGGEST_TOOLS = Object.freeze([
   'mcp__ubersuggest__google_suggestions',
   'mcp__ubersuggest__keyword_overview',
   'mcp__ubersuggest__serp_analysis',
+]);
+const RUN_GATES = Object.freeze([
+  'cadence',
+  'selection',
+  'keywords',
+  'visuals',
+  'verify_critical',
+  'live_production',
+  'live_route',
+]);
+const REQUIRED_PUBLISHED_RUN_GATES = Object.freeze([...RUN_GATES]);
+const TREE_BOUND_RUN_GATES = Object.freeze([
+  'keywords',
+  'visuals',
+  'verify_critical',
+  'live_production',
+  'live_route',
 ]);
 const RUN_OUTCOMES = Object.freeze([
   'published', 'completed_no_publication', 'operations_p0', 'blocked', 'failed', 'interrupted',
@@ -30,12 +49,19 @@ const DEFAULT_MEMORY_PATH = path.join(
 const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=4/ }),
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=5/ }),
   Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
   Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
   Object.freeze({ label: 'finish_run_receipt', pattern: /seo:automation-state -- finish-run/i }),
+  Object.freeze({ label: 'explicit_run_recovery', pattern: /seo:automation-state -- recover-run/i }),
+  Object.freeze({ label: 'run_gate_receipts', pattern: /--record-run-gate/i }),
   Object.freeze({ label: 'selection_gate', pattern: /seo:selection:check/i }),
-  Object.freeze({ label: 'ubersuggest_tool_binding', pattern: /mcp__ubersuggest__keyword_suggestions[\s\S]*mcp__ubersuggest__serp_analysis/i }),
+  Object.freeze({ label: 'live_route_gate', pattern: /seo:live-route:check/i }),
+  Object.freeze({ label: 'ubersuggest_keyword_suggestions', pattern: /mcp__ubersuggest__keyword_suggestions/i }),
+  Object.freeze({ label: 'ubersuggest_google_suggestions', pattern: /mcp__ubersuggest__google_suggestions/i }),
+  Object.freeze({ label: 'ubersuggest_keyword_overview', pattern: /mcp__ubersuggest__keyword_overview/i }),
+  Object.freeze({ label: 'ubersuggest_serp_analysis', pattern: /mcp__ubersuggest__serp_analysis/i }),
+  Object.freeze({ label: 'ubersuggest_data_smoke', pattern: /seo:automation-state -- record-tool-smoke/i }),
   Object.freeze({ label: 'edge_family_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
   Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge[\s\S]*profileName=Codex/i }),
   Object.freeze({ label: 'chrome_prohibition', pattern: /Google Chrome is forbidden/i }),
@@ -157,6 +183,8 @@ function defaultUbersuggestState() {
     lastWeeklyDiscoveryAt: null, lastStatus: 'not_checked', lastRunDate: null,
     contentCallsUsed: 0, weeklyCallsUsed: 0, lastEvidencePath: null,
     boundThreadId: null, toolBindingCheckedAt: null, boundTools: [], toolBindingEvidence: null,
+    dataSmokeStatus: 'not_checked', dataSmokeThreadId: null, dataSmokeCheckedAt: null,
+    dataSmokeTools: [], dataSmokeOutcomes: {}, dataSmokeEvidence: null,
   };
 }
 function validDay(value) {
@@ -197,6 +225,39 @@ function validateUbersuggestState(state) {
   if (state.toolBindingEvidence !== null && String(state.toolBindingEvidence || '').trim().length < 8) {
     errors.push('toolBindingEvidence is te vaag.');
   }
+  if (!['not_checked', 'ready'].includes(String(state.dataSmokeStatus || ''))) {
+    errors.push('dataSmokeStatus is ongeldig.');
+  }
+  if (state.dataSmokeThreadId !== null && !String(state.dataSmokeThreadId || '').trim()) {
+    errors.push('dataSmokeThreadId is ongeldig.');
+  }
+  if (state.dataSmokeCheckedAt !== null && !validIso(state.dataSmokeCheckedAt)) {
+    errors.push('dataSmokeCheckedAt is ongeldig.');
+  }
+  if (!Array.isArray(state.dataSmokeTools) || state.dataSmokeTools.some((tool) => !String(tool || '').trim())) {
+    errors.push('dataSmokeTools is ongeldig.');
+  } else if (new Set(state.dataSmokeTools).size !== state.dataSmokeTools.length) {
+    errors.push('dataSmokeTools bevat dubbelen.');
+  }
+  if (!state.dataSmokeOutcomes || typeof state.dataSmokeOutcomes !== 'object' || Array.isArray(state.dataSmokeOutcomes)) {
+    errors.push('dataSmokeOutcomes is ongeldig.');
+  }
+  if (state.dataSmokeEvidence !== null && String(state.dataSmokeEvidence || '').trim().length < 8) {
+    errors.push('dataSmokeEvidence is te vaag.');
+  }
+  if (state.dataSmokeStatus === 'ready') {
+    const missingSmokeTools = REQUIRED_UBERSUGGEST_TOOLS.filter((tool) => !state.dataSmokeTools.includes(tool));
+    const missingOutcomes = REQUIRED_UBERSUGGEST_TOOLS.filter((tool) => {
+      const outcome = state.dataSmokeOutcomes?.[tool];
+      return !outcome
+        || !['ok', 'ok_empty'].includes(String(outcome.status || ''))
+        || !Number.isInteger(Number(outcome.resultCount))
+        || Number(outcome.resultCount) < 0;
+    });
+    if (!state.dataSmokeThreadId || !state.dataSmokeCheckedAt || missingSmokeTools.length || missingOutcomes.length) {
+      errors.push(`Een ready Ubersuggest data-smoke vereist task, datum en vier geldige tooluitkomsten; ontbrekend: ${missingOutcomes.join(', ') || 'geen'}.`);
+    }
+  }
   return errors;
 }
 
@@ -217,6 +278,78 @@ function validSoftoraUrl(value) {
   }
 }
 
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function digestRunGateDetails(details) {
+  return crypto.createHash('sha256').update(stableJson(details || {})).digest('hex');
+}
+
+function validateRunGateReceipt(receipt, activeRun, label = 'gate') {
+  const errors = [];
+  if (!receipt || typeof receipt !== 'object') return [`${label} ontbreekt.`];
+  if (!RUN_GATES.includes(String(receipt.gate || ''))) errors.push(`${label}.gate is ongeldig.`);
+  if (receipt.status !== 'ready') errors.push(`${label}.status moet ready zijn.`);
+  if (!validIso(receipt.checkedAt)) errors.push(`${label}.checkedAt is ongeldig.`);
+  if (activeRun && validIso(receipt.checkedAt) && new Date(receipt.checkedAt) < new Date(activeRun.startedAt)) {
+    errors.push(`${label} is ouder dan de actieve run.`);
+  }
+  if (activeRun && (receipt.threadId !== activeRun.threadId || receipt.invocationAt !== activeRun.invocationAt)) {
+    errors.push(`${label} hoort niet bij de actieve invocation.`);
+  }
+  if (!/^[a-f0-9]{64}$/.test(String(receipt.resultDigest || ''))) errors.push(`${label}.resultDigest is ongeldig.`);
+  if (!receipt.summary || typeof receipt.summary !== 'object' || Array.isArray(receipt.summary)) {
+    errors.push(`${label}.summary is ongeldig.`);
+  } else if (digestRunGateDetails(receipt.summary) !== receipt.resultDigest) {
+    errors.push(`${label}.resultDigest wijkt af van de opgeslagen uitkomst.`);
+  }
+  if (TREE_BOUND_RUN_GATES.includes(receipt.gate) && !/^[a-f0-9]{40}$/i.test(String(receipt.treeSha || ''))) {
+    errors.push(`${label}.treeSha ontbreekt of is ongeldig.`);
+  }
+  if (receipt.gate === 'live_production' && !/^[a-f0-9]{7,40}$/i.test(String(receipt.liveCommit || ''))) {
+    errors.push(`${label}.liveCommit ontbreekt.`);
+  }
+  if (receipt.gate === 'live_route') {
+    if (!/^[a-f0-9]{7,40}$/i.test(String(receipt.liveCommit || ''))) errors.push(`${label}.liveCommit ontbreekt.`);
+    if (!validSoftoraUrl(receipt.changedUrl)) errors.push(`${label}.changedUrl ontbreekt of is ongeldig.`);
+  }
+  return errors;
+}
+
+function validatePublishedRunGates(run, { liveCommit, changedUrl } = {}) {
+  const errors = [];
+  const gates = run?.gates && typeof run.gates === 'object' ? run.gates : {};
+  for (const gateName of REQUIRED_PUBLISHED_RUN_GATES) {
+    const receipt = gates[gateName];
+    errors.push(...validateRunGateReceipt(receipt, run, `gates.${gateName}`));
+  }
+  const liveGate = gates.live_production;
+  const routeGate = gates.live_route;
+  if (liveGate?.liveCommit && String(liveGate.liveCommit) !== String(liveCommit || '')) {
+    errors.push('gates.live_production wijkt af van --live-commit.');
+  }
+  if (routeGate?.liveCommit && String(routeGate.liveCommit) !== String(liveCommit || '')) {
+    errors.push('gates.live_route wijkt af van --live-commit.');
+  }
+  if (routeGate?.changedUrl && String(routeGate.changedUrl) !== String(changedUrl || '')) {
+    errors.push('gates.live_route wijkt af van --changed-url.');
+  }
+  const finalTreeSha = liveGate?.treeSha;
+  if (finalTreeSha) {
+    for (const gateName of TREE_BOUND_RUN_GATES) {
+      if (gates[gateName]?.treeSha && gates[gateName].treeSha !== finalTreeSha) {
+        errors.push(`gates.${gateName} is niet uitgevoerd op de live productietree.`);
+      }
+    }
+  }
+  return errors;
+}
+
 function validateRunIdentity(run, label = 'activeRun') {
   const errors = [];
   if (!run || typeof run !== 'object') return [`${label} is ongeldig.`];
@@ -225,6 +358,15 @@ function validateRunIdentity(run, label = 'activeRun') {
   if (!validIso(run.startedAt)) errors.push(`${label}.startedAt is ongeldig.`);
   if (!Number.isInteger(Number(run.runNumber)) || Number(run.runNumber) < 1 || Number(run.runNumber) > 15) {
     errors.push(`${label}.runNumber is ongeldig.`);
+  }
+  if (run.gateVersion !== undefined && Number(run.gateVersion) !== 1) errors.push(`${label}.gateVersion is ongeldig.`);
+  if (run.gates !== undefined && (!run.gates || typeof run.gates !== 'object' || Array.isArray(run.gates))) {
+    errors.push(`${label}.gates is ongeldig.`);
+  } else if (run.gates) {
+    for (const [gateName, gateReceipt] of Object.entries(run.gates)) {
+      if (gateName !== gateReceipt?.gate) errors.push(`${label}.gates.${gateName} heeft een afwijkende naam.`);
+      errors.push(...validateRunGateReceipt(gateReceipt, run, `${label}.gates.${gateName}`));
+    }
   }
   return errors;
 }
@@ -251,6 +393,12 @@ function validateRunReceipt(receipt, label = 'receipt') {
   }
   if (receipt?.publicEffect === 'live' && (!receipt.liveCommit || !receipt.changedUrl)) {
     errors.push(`${label} met live effect vereist liveCommit en changedUrl.`);
+  }
+  if (receipt?.outcome === 'published' && (!Number.isInteger(Number(receipt.prNumber)) || Number(receipt.prNumber) < 1)) {
+    errors.push(`${label} met published vereist een PR-nummer.`);
+  }
+  if (receipt?.outcome === 'published' && Number(receipt?.gateVersion) === 1) {
+    errors.push(...validatePublishedRunGates(receipt, receipt).map((error) => `${label}.${error}`));
   }
   if (receipt?.outcome === 'interrupted' && receipt?.publicEffect !== 'unverified') {
     errors.push(`${label} met interrupted vereist publicEffect=unverified.`);
@@ -369,6 +517,19 @@ function auditAutomationInstallation({
     if (missingUbersuggestTools.length) {
       errors.push(`Ubersuggest-toolbinding mist: ${missingUbersuggestTools.join(', ')}.`);
     }
+    const missingSmokeTools = REQUIRED_UBERSUGGEST_TOOLS.filter(
+      (toolName) => !state?.ubersuggest?.dataSmokeTools?.includes(toolName)
+    );
+    if (
+      state?.rotation?.activeThreadId
+      && (
+        state?.ubersuggest?.dataSmokeStatus !== 'ready'
+        || state?.ubersuggest?.dataSmokeThreadId !== state.rotation.activeThreadId
+        || missingSmokeTools.length
+      )
+    ) {
+      errors.push(`Ubersuggest data-smoke is niet bewezen voor de actieve task; ontbrekend: ${missingSmokeTools.join(', ') || 'status/task-bewijs'}.`);
+    }
     for (const marker of REQUIRED_PROMPT_MARKERS) {
       if (!marker.pattern.test(String(config.prompt || ''))) missingPromptMarkers.push(marker.label);
     }
@@ -439,6 +600,11 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
       const matchingReceipt = lifecycle.receipts.find(
         (receipt) => receipt.threadId === threadId && receipt.invocationAt === invocationAt
       );
+      const matchingActiveRun = lifecycle.activeRun?.threadId === threadId
+        && lifecycle.activeRun?.invocationAt === invocationAt;
+      if (!matchingReceipt && !matchingActiveRun) {
+        throw new Error('RUN_STATE_MISMATCH: rotatie verwijst naar een invocation zonder actieve run of receipt.');
+      }
       return {
         ...current,
         lifecycle: matchingReceipt ? 'finished' : 'running',
@@ -469,6 +635,7 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
     }
     const activeRun = {
       threadId: String(threadId), invocationAt, runNumber: completedRunsInActiveThread, startedAt: invocationAt,
+      gateVersion: 1, gates: {},
     };
     const nextLifecycle = {
       ...lifecycle,
@@ -482,6 +649,94 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
     nextContent = replaceStateBlock(nextContent, RUN_LIFECYCLE_BLOCK, nextLifecycle);
     writeMemoryAtomic(memoryPath, nextContent);
     return { ...next, lifecycle: 'running', activeRun, recoveredPreviousRun };
+  });
+}
+
+function recoverInterruptedRun({ memoryPath, threadId, recoveredAt, evidence }) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
+    const normalizedThreadId = String(threadId || '');
+    const normalizedEvidence = String(evidence || '').trim();
+    if (!lifecycle.activeRun) {
+      if (
+        lifecycle.lastReceipt?.outcome === 'interrupted'
+        && lifecycle.lastReceipt.threadId === normalizedThreadId
+        && lifecycle.lastReceipt.finishedAt === recoveredAt
+        && lifecycle.lastReceipt.evidence === normalizedEvidence
+      ) return { ...lifecycle.lastReceipt, idempotent: true };
+      throw new Error('NO_INTERRUPTED_RUN: er is geen open run om te herstellen.');
+    }
+    if (lifecycle.activeRun.threadId !== normalizedThreadId) throw new Error('RUN_IDENTITY_MISMATCH: verkeerde recovery-task.');
+    if (!validIso(recoveredAt) || new Date(recoveredAt) < new Date(lifecycle.activeRun.startedAt)) {
+      throw new Error('recoveredAt is ongeldig.');
+    }
+    const receipt = {
+      ...lifecycle.activeRun,
+      finishedAt: recoveredAt,
+      outcome: 'interrupted',
+      publicEffect: 'unverified',
+      evidence: normalizedEvidence,
+      prNumber: null,
+      liveCommit: null,
+      changedUrl: null,
+      autoClosed: true,
+    };
+    const receiptErrors = validateRunReceipt(receipt, 'recoveredRun');
+    if (receiptErrors.length) throw new Error(`Runherstel is ongeldig: ${receiptErrors.join(' ')}`);
+    const nextLifecycle = {
+      ...lifecycle,
+      activeRun: null,
+      lastReceipt: receipt,
+      receipts: [...lifecycle.receipts, receipt].slice(-30),
+    };
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, RUN_LIFECYCLE_BLOCK, nextLifecycle));
+    return receipt;
+  });
+}
+
+function recordAutomationRunGate({
+  memoryPath, threadId, invocationAt, gate, checkedAt, details = {},
+  treeSha = null, liveCommit = null, changedUrl = null,
+}) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const lifecycleErrors = validateRunLifecycleState(lifecycle);
+    if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
+    const activeRun = lifecycle.activeRun;
+    if (!activeRun) throw new Error('NO_ACTIVE_RUN: run-gate kan alleen binnen een actieve heartbeat worden geregistreerd.');
+    if (activeRun.threadId !== String(threadId || '') || activeRun.invocationAt !== invocationAt) {
+      throw new Error('RUN_IDENTITY_MISMATCH: run-gate hoort niet bij de actieve invocation.');
+    }
+    const receipt = {
+      gate: String(gate || ''),
+      status: 'ready',
+      checkedAt,
+      threadId: activeRun.threadId,
+      invocationAt: activeRun.invocationAt,
+      resultDigest: digestRunGateDetails(details),
+      treeSha: treeSha || null,
+      liveCommit: liveCommit || null,
+      changedUrl: changedUrl || null,
+      summary: details,
+    };
+    const errors = validateRunGateReceipt(receipt, activeRun);
+    if (errors.length) throw new Error(`Ongeldige run-gate receipt: ${errors.join(' ')}`);
+    const nextLifecycle = {
+      ...lifecycle,
+      activeRun: {
+        ...activeRun,
+        gateVersion: 1,
+        gates: { ...(activeRun.gates || {}), [receipt.gate]: receipt },
+      },
+    };
+    const nextErrors = validateRunLifecycleState(nextLifecycle);
+    if (nextErrors.length) throw new Error(`Nieuwe run-gatestaat is ongeldig: ${nextErrors.join(' ')}`);
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, RUN_LIFECYCLE_BLOCK, nextLifecycle));
+    return receipt;
   });
 }
 
@@ -500,7 +755,18 @@ function finishAutomationRun({
     const existingReceipt = lifecycle.receipts.find(
       (receipt) => receipt.threadId === threadId && receipt.invocationAt === invocationAt
     );
-    if (!lifecycle.activeRun && existingReceipt) return { ...existingReceipt, idempotent: true };
+    if (!lifecycle.activeRun && existingReceipt) {
+      const normalizedPrNumber = prNumber === null || prNumber === undefined || prNumber === '' ? null : Number(prNumber);
+      const matches = existingReceipt.finishedAt === finishedAt
+        && existingReceipt.outcome === outcome
+        && existingReceipt.publicEffect === publicEffect
+        && existingReceipt.evidence === String(evidence || '').trim()
+        && existingReceipt.prNumber === normalizedPrNumber
+        && existingReceipt.liveCommit === (liveCommit || null)
+        && existingReceipt.changedUrl === (changedUrl || null);
+      if (!matches) throw new Error('FINISH_RECEIPT_MISMATCH: deze invocation is al met andere uitkomst of bewijs afgesloten.');
+      return { ...existingReceipt, idempotent: true };
+    }
     if (!lifecycle.activeRun) throw new Error('NO_ACTIVE_RUN: er is geen open run om af te sluiten.');
     if (lifecycle.activeRun.threadId !== String(threadId || '') || lifecycle.activeRun.invocationAt !== invocationAt) {
       throw new Error('RUN_IDENTITY_MISMATCH: finish-run hoort niet bij de actieve invocation.');
@@ -509,6 +775,10 @@ function finishAutomationRun({
       throw new Error('RUN_ROTATION_MISMATCH: rotatie- en lifecyclestaat lopen uiteen.');
     }
     if (outcome === 'interrupted') throw new Error('interrupted is gereserveerd voor automatisch herstel bij een volgende invocation.');
+    if (outcome === 'published') {
+      const gateErrors = validatePublishedRunGates(lifecycle.activeRun, { liveCommit, changedUrl });
+      if (gateErrors.length) throw new Error(`PUBLISHED_GATES_INCOMPLETE: ${gateErrors.join(' ')}`);
+    }
     const receipt = {
       ...lifecycle.activeRun,
       finishedAt,
@@ -519,6 +789,7 @@ function finishAutomationRun({
       liveCommit: liveCommit || null,
       changedUrl: changedUrl || null,
       autoClosed: false,
+      completionGateStatus: outcome === 'published' ? 'ready' : 'not_required',
     };
     const receiptErrors = validateRunReceipt(receipt);
     if (receiptErrors.length) throw new Error(`Ongeldige finish-run receipt: ${receiptErrors.join(' ')}`);
@@ -587,6 +858,12 @@ function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedA
       toolBindingCheckedAt: null,
       boundTools: [],
       toolBindingEvidence: null,
+      dataSmokeStatus: 'not_checked',
+      dataSmokeThreadId: null,
+      dataSmokeCheckedAt: null,
+      dataSmokeTools: [],
+      dataSmokeOutcomes: {},
+      dataSmokeEvidence: null,
     };
     let nextContent = replaceStateBlock(content, ROTATION_BLOCK, next);
     nextContent = replaceStateBlock(nextContent, UBERSUGGEST_BLOCK, nextUbersuggest);
@@ -641,6 +918,12 @@ function repairAutomationThreadBinding({ memoryPath, fromThreadId, toThreadId, r
       toolBindingCheckedAt: null,
       boundTools: [],
       toolBindingEvidence: null,
+      dataSmokeStatus: 'not_checked',
+      dataSmokeThreadId: null,
+      dataSmokeCheckedAt: null,
+      dataSmokeTools: [],
+      dataSmokeOutcomes: {},
+      dataSmokeEvidence: null,
     };
     let nextContent = replaceStateBlock(content, ROTATION_BLOCK, next);
     nextContent = replaceStateBlock(nextContent, UBERSUGGEST_BLOCK, nextUbersuggest);
@@ -675,6 +958,118 @@ function recordUbersuggestToolBinding({ memoryPath, threadId, checkedAt, tools, 
     return next;
   });
 }
+
+function recordUbersuggestDataSmoke({ memoryPath, threadId, checkedAt, tools, outcomes, evidence }) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const rotation = parseStateBlock(content, ROTATION_BLOCK);
+    const rotationErrors = validateRotationState(rotation);
+    if (rotationErrors.length) throw new Error(`Ongeldige rotatiestaat: ${rotationErrors.join(' ')}`);
+    const current = { ...defaultUbersuggestState(), ...(parseStateBlock(content, UBERSUGGEST_BLOCK) || {}) };
+    const smokeTools = Array.from(new Set(String(tools || '').split(',').map((tool) => tool.trim()).filter(Boolean))).sort();
+    let smokeOutcomes;
+    try {
+      smokeOutcomes = typeof outcomes === 'string' ? JSON.parse(outcomes) : outcomes;
+    } catch (error) {
+      throw new Error(`Data-smoke outcomes-JSON is ongeldig: ${error.message}`);
+    }
+    const normalizedThreadId = String(threadId || '').trim();
+    if (rotation.activeThreadId !== normalizedThreadId || current.boundThreadId !== normalizedThreadId) {
+      throw new Error('Data-smoke hoort niet bij de actieve, gebonden automation-task.');
+    }
+    if (!validIso(checkedAt)) throw new Error('checkedAt is ongeldig.');
+    const missing = REQUIRED_UBERSUGGEST_TOOLS.filter((toolName) => !smokeTools.includes(toolName));
+    if (missing.length) throw new Error(`Data-smoke mist verplichte Ubersuggest-tools: ${missing.join(', ')}.`);
+    if (String(evidence || '').trim().length < 20) throw new Error('Data-smokebewijs is te vaag.');
+    const next = {
+      ...current,
+      lastAuthCheckAt: checkedAt,
+      lastStatus: 'ready',
+      dataSmokeStatus: 'ready',
+      dataSmokeThreadId: normalizedThreadId,
+      dataSmokeCheckedAt: checkedAt,
+      dataSmokeTools: smokeTools,
+      dataSmokeOutcomes: smokeOutcomes,
+      dataSmokeEvidence: String(evidence).trim(),
+    };
+    const errors = validateUbersuggestState(next);
+    if (errors.length) throw new Error(`Ongeldige Ubersuggest data-smoke: ${errors.join(' ')}`);
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, UBERSUGGEST_BLOCK, next));
+    return next;
+  });
+}
+
+function extractRunGateCliOptions(argv = []) {
+  const remaining = [];
+  const options = { enabled: false, threadId: null, invocationAt: null };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--record-run-gate') {
+      options.enabled = true;
+      continue;
+    }
+    if (arg === '--run-thread' || arg === '--run-invocation-at') {
+      const value = argv[index + 1];
+      if (!value) throw new Error(`${arg} mist een waarde.`);
+      if (arg === '--run-thread') options.threadId = value;
+      else options.invocationAt = value;
+      index += 1;
+      continue;
+    }
+    remaining.push(arg);
+  }
+  if (options.enabled && (!String(options.threadId || '').trim() || !validIso(options.invocationAt))) {
+    throw new Error('--record-run-gate vereist --run-thread en --run-invocation-at.');
+  }
+  if (!options.enabled && (options.threadId || options.invocationAt)) {
+    throw new Error('--run-thread/--run-invocation-at mogen alleen met --record-run-gate.');
+  }
+  return { ...options, remaining };
+}
+
+function resolveGitTreeSha(ref = 'HEAD', { cwd = path.resolve(__dirname, '..'), requireClean = false } = {}) {
+  if (requireClean) {
+    const status = spawnSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf8' });
+    if (status.status !== 0) throw new Error('Git-status kon niet worden gecontroleerd voor de run-gate.');
+    if (String(status.stdout || '').trim()) throw new Error('TREE_GATE_DIRTY: treegebonden run-gates vereisen een schone checkout.');
+  }
+  const result = spawnSync('git', ['rev-parse', `${ref}^{tree}`], { cwd, encoding: 'utf8' });
+  const treeSha = String(result.stdout || '').trim();
+  if (result.status !== 0 || !/^[a-f0-9]{40}$/i.test(treeSha)) {
+    throw new Error(`Git tree voor ${ref} kon niet betrouwbaar worden bepaald.`);
+  }
+  return treeSha;
+}
+
+function recordAutomationRunGateFromCli({
+  gateOptions,
+  gate,
+  details,
+  memoryPath = DEFAULT_MEMORY_PATH,
+  treeRef = null,
+  liveCommit = null,
+  changedUrl = null,
+  cwd = path.resolve(__dirname, '..'),
+}) {
+  if (!gateOptions?.enabled) return null;
+  const needsTree = TREE_BOUND_RUN_GATES.includes(gate);
+  const resolvedTreeRef = treeRef || (needsTree ? 'HEAD' : null);
+  const treeSha = resolvedTreeRef
+    ? resolveGitTreeSha(resolvedTreeRef, { cwd, requireClean: needsTree && resolvedTreeRef === 'HEAD' })
+    : null;
+  return recordAutomationRunGate({
+    memoryPath,
+    threadId: gateOptions.threadId,
+    invocationAt: gateOptions.invocationAt,
+    gate,
+    checkedAt: new Date().toISOString(),
+    details,
+    treeSha,
+    liveCommit,
+    changedUrl,
+  });
+}
+
 function recordUbersuggestRun({ memoryPath, status, runDate, contentCallsUsed = 0, weeklyCallsUsed = 0, evidencePath = null, authCheckedAt = null, weeklyDiscoveryAt = null }) {
   return withMemoryLock(memoryPath, () => {
     const content = fs.readFileSync(memoryPath, 'utf8');
@@ -730,6 +1125,9 @@ function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
     outcome: args.outcome, publicEffect: args['public-effect'], evidence: args.evidence,
     prNumber: args['pr-number'], liveCommit: args['live-commit'], changedUrl: args['changed-url'],
   });
+  else if (args.command === 'recover-run') result = recoverInterruptedRun({
+    memoryPath, threadId: args.thread, recoveredAt: args['recovered-at'], evidence: args.evidence,
+  });
   else if (args.command === 'rotate-thread') result = rotateAutomationThread({
     memoryPath, fromThreadId: args['from-thread'], toThreadId: args['to-thread'],
     rotatedAt: args['rotated-at'], evidence: args.evidence,
@@ -740,6 +1138,10 @@ function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
   });
   else if (args.command === 'record-tool-binding') result = recordUbersuggestToolBinding({
     memoryPath, threadId: args.thread, checkedAt: args['checked-at'], tools: args.tools, evidence: args.evidence,
+  });
+  else if (args.command === 'record-tool-smoke') result = recordUbersuggestDataSmoke({
+    memoryPath, threadId: args.thread, checkedAt: args['checked-at'], tools: args.tools,
+    outcomes: args['outcomes-json'], evidence: args.evidence,
   });
   else if (args.command === 'record-keywords') result = recordUbersuggestRun({
     memoryPath, status: args.status, runDate: args['run-date'], contentCallsUsed: args['content-calls'],
@@ -758,11 +1160,14 @@ if (require.main === module) {
 module.exports = {
   AUTOMATION_ID, AUTOMATION_NAME, AUTOMATION_PROMPT_VERSION, AUTOMATION_RRULE, DEFAULT_AUTOMATION_PATH, DEFAULT_AUTOMATIONS_ROOT,
   DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, PUBLIC_EFFECTS, REQUIRED_PROMPT_MARKERS, REQUIRED_UBERSUGGEST_TOOLS,
-  ROTATION_BLOCK, RUN_LIFECYCLE_BLOCK, RUN_OUTCOMES, UBERSUGGEST_BLOCK,
+  REQUIRED_PUBLISHED_RUN_GATES, ROTATION_BLOCK, RUN_GATES, RUN_LIFECYCLE_BLOCK, RUN_OUTCOMES,
+  TREE_BOUND_RUN_GATES, UBERSUGGEST_BLOCK,
   UBERSUGGEST_STATUSES, auditAutomationInstallation, defaultUbersuggestState, ensureAutomationState,
-  defaultRunLifecycleState, findSeoAutomationPaths, finishAutomationRun, formatStateBlock, inspectAutomationState,
-  isWeeklyDiscoveryDue, parseArgs, parseAutomationToml, parseStateBlock, recordUbersuggestRun,
-  recordUbersuggestToolBinding, repairAutomationThreadBinding, replaceStateBlock, rotateAutomationThread,
-  runAutomationStateCli, startAutomationRun, validateRotationState, validateRunLifecycleState,
-  validateRunReceipt, validateUbersuggestState,
+  defaultRunLifecycleState, digestRunGateDetails, extractRunGateCliOptions, findSeoAutomationPaths,
+  finishAutomationRun, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue, parseArgs,
+  parseAutomationToml, parseStateBlock, recordAutomationRunGate, recordAutomationRunGateFromCli,
+  recordUbersuggestDataSmoke, recordUbersuggestRun, recordUbersuggestToolBinding, recoverInterruptedRun,
+  repairAutomationThreadBinding, replaceStateBlock, resolveGitTreeSha, rotateAutomationThread,
+  runAutomationStateCli, startAutomationRun, validatePublishedRunGates, validateRotationState,
+  validateRunGateReceipt, validateRunLifecycleState, validateRunReceipt, validateUbersuggestState,
 };
