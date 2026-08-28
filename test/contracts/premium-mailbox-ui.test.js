@@ -214,10 +214,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
-  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260828a/);
+  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260828g/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
   assert.match(page, /assets\/premium-mailbox-compose-send-state\.js\?v=20260828d/);
-  assert.match(page, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828e/);
+  assert.match(page, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828h/);
   assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260826b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
@@ -231,8 +231,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
   assert.ok(page.indexOf('premium-browser-storage.js?v=20260828b') < page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c'));
   assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20260828d'));
-  assert.ok(page.indexOf('premium-mailbox-compose-send-state.js?v=20260828d') < page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260828e'));
-  assert.ok(page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260828e') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-send-state.js?v=20260828d') < page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260828h'));
+  assert.ok(page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260828h') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b'));
   assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b') < page.indexOf('premium-mailbox-compose-controller.js?v=20260828f'));
   assert.equal(typeof composeSendStateModule.selectMarker, 'function');
   assert.equal(typeof composeSendResilienceModule.create, 'function');
@@ -5428,7 +5428,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /assets\/premium-mailbox-compose-window\.js\?v=20260817c/);
   assert.match(pageSource, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-send-state\.js\?v=20260828d/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828e/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828h/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260828f/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);

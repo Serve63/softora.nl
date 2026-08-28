@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const {
   createMailboxReconcileRequiredError,
   mailboxAttachmentsMetadataEqual,
@@ -5,6 +6,10 @@ const {
 } = require('./mailbox-send-provenance-store');
 
 const MAILBOX_SEND_RECONCILE_PROOF_VERSION = 1;
+const MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_CONTEXT =
+  'softora-mailbox-send-reconcile-proof:v1';
+const MAILBOX_SEND_RECONCILE_PROOF_TTL_MS = 5 * 60 * 1000;
+const MAILBOX_SEND_RECONCILE_PROOF_CLOCK_SKEW_MS = 30 * 1000;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 function createMailboxReconcileProofError(message, code, status = 409) {
@@ -99,6 +104,86 @@ function createMailboxReconcileProof(intent, normalizeString) {
   }
 }
 
+function requiredProofSigningSecret(secret) {
+  const value = typeof secret === 'string' ? secret : String(secret || '');
+  if (value) return value;
+  throw createMailboxReconcileProofError(
+    'De server kan het veilige preflightbewijs tijdelijk niet ondertekenen.',
+    'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_UNAVAILABLE',
+    503
+  );
+}
+
+function normalizeProofEnvelope(proofInput, normalizeString) {
+  const proof = normalizeMailboxReconcileProof(proofInput, normalizeString);
+  const issuedAtMs = Number(proofInput?.issuedAtMs);
+  const expiresAtMs = Number(proofInput?.expiresAtMs);
+  if (!Number.isSafeInteger(issuedAtMs) || issuedAtMs <= 0
+    || !Number.isSafeInteger(expiresAtMs) || expiresAtMs <= issuedAtMs
+    || expiresAtMs - issuedAtMs > MAILBOX_SEND_RECONCILE_PROOF_TTL_MS) {
+    throw createMalformedProofError();
+  }
+  return { ...proof, issuedAtMs, expiresAtMs };
+}
+
+function createMailboxReconcileProofSignature(proofInput, secret, normalizeString) {
+  const proof = normalizeProofEnvelope(proofInput, normalizeString);
+  return crypto.createHmac('sha256', requiredProofSigningSecret(secret))
+    .update(`${MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_CONTEXT}\n${JSON.stringify(proof)}`)
+    .digest('hex');
+}
+
+function signMailboxReconcileProof(proofInput, secret, normalizeString, options = {}) {
+  const proof = normalizeMailboxReconcileProof(proofInput, normalizeString);
+  const issuedAtMs = Number.isSafeInteger(Number(options.nowMs))
+    ? Number(options.nowMs)
+    : Date.now();
+  const requestedTtlMs = Number(options.ttlMs);
+  const ttlMs = Number.isSafeInteger(requestedTtlMs) && requestedTtlMs > 0
+    ? Math.min(requestedTtlMs, MAILBOX_SEND_RECONCILE_PROOF_TTL_MS)
+    : MAILBOX_SEND_RECONCILE_PROOF_TTL_MS;
+  const envelope = {
+    ...proof,
+    issuedAtMs,
+    expiresAtMs: issuedAtMs + ttlMs,
+  };
+  return {
+    ...envelope,
+    signature: createMailboxReconcileProofSignature(envelope, secret, normalizeString),
+  };
+}
+
+function assertMailboxReconcileProofSignature(proofInput, secret, normalizeString, options = {}) {
+  const proof = normalizeProofEnvelope(proofInput, normalizeString);
+  const signature = typeof proofInput?.signature === 'string' ? proofInput.signature : '';
+  const expected = createMailboxReconcileProofSignature(proof, secret, normalizeString);
+  const signatureBuffer = SHA256_PATTERN.test(signature)
+    ? Buffer.from(signature, 'hex')
+    : Buffer.alloc(0);
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  if (signatureBuffer.length !== expectedBuffer.length
+    || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    throw createMailboxReconcileProofError(
+      'Het verzendbewijs is niet door deze serverpreflight ondertekend; er is niets verzonden.',
+      'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_INVALID'
+    );
+  }
+  const nowMs = Number.isSafeInteger(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  if (proof.issuedAtMs > nowMs + MAILBOX_SEND_RECONCILE_PROOF_CLOCK_SKEW_MS) {
+    throw createMailboxReconcileProofError(
+      'Het verzendbewijs komt uit de toekomst; voer de veilige preflight opnieuw uit.',
+      'MAILBOX_SEND_RECONCILE_PROOF_TIME_INVALID'
+    );
+  }
+  if (proof.expiresAtMs <= nowMs) {
+    throw createMailboxReconcileProofError(
+      'Het veilige preflightbewijs is verlopen; voer de mailcontrole opnieuw uit.',
+      'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED'
+    );
+  }
+  return proof;
+}
+
 function assertMailboxReconcileProofMatchesIntent(proofInput, intent, normalizeString) {
   const proof = normalizeMailboxReconcileProof(proofInput, normalizeString);
   const durableProof = createMailboxReconcileProof(intent, normalizeString);
@@ -123,9 +208,13 @@ function assertMailboxReconcileProofMatchesIntent(proofInput, intent, normalizeS
 }
 
 module.exports = {
+  MAILBOX_SEND_RECONCILE_PROOF_TTL_MS,
   MAILBOX_SEND_RECONCILE_PROOF_VERSION,
   assertMailboxReconcileProofMatchesIntent,
+  assertMailboxReconcileProofSignature,
   createMailboxReconcileProof,
   createMailboxReconcileProofError,
+  createMailboxReconcileProofSignature,
   normalizeMailboxReconcileProof,
+  signMailboxReconcileProof,
 };

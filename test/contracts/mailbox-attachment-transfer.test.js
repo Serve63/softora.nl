@@ -102,10 +102,12 @@ test('directe mailbox attachment staging houdt drie PNGs buiten de send-JSON en 
     logger: { warn() {} },
   });
   const binding = makeBinding();
-  const metadata = [1, 2, 3].map((index) => ({
-    filename: `screenshot-${index}.png`,
+  const contents = [1, 2, 3].map((index) => Buffer.from([index, 2, 3, 4]));
+  const metadata = contents.map((content, index) => ({
+    filename: `screenshot-${index + 1}.png`,
     contentType: 'image/png',
-    size: 4,
+    size: content.length,
+    sha256: sha256(content),
   }));
 
   const uploads = await service.createUploadPlan({ attachments: metadata, binding });
@@ -115,7 +117,7 @@ test('directe mailbox attachment staging houdt drie PNGs buiten de send-JSON en 
   assert.ok(uploads.every((upload) => !upload.reference.includes('prospect@example.nl')));
 
   uploads.forEach((upload, index) => {
-    fixture.objects.set(decodeReference(upload.reference).path, Buffer.from([index + 1, 2, 3, 4]));
+    fixture.objects.set(decodeReference(upload.reference).path, contents[index]);
   });
   const resolved = await service.downloadAttachments(uploads, binding);
   assert.deepEqual(resolved.map((attachment) => [...attachment.content]), [
@@ -139,18 +141,25 @@ test('attachment context mismatch en groottegrenzen falen voor opslag of send', 
     logger: { warn() {} },
   });
   const binding = makeBinding();
+  const content = Buffer.alloc(4, 1);
   const [upload] = await service.createUploadPlan({
-    attachments: [{ filename: 'screen.png', contentType: 'image/png', size: 4 }],
+    attachments: [{
+      filename: 'screen.png', contentType: 'image/png', size: content.length,
+      sha256: sha256(content),
+    }],
     binding,
   });
-  fixture.objects.set(decodeReference(upload.reference).path, Buffer.alloc(4, 1));
+  fixture.objects.set(decodeReference(upload.reference).path, content);
   await assert.rejects(
     service.downloadAttachments([upload], { ...binding, idempotencyKey: 'other-request' }),
     (error) => error.code === 'MAILBOX_ATTACHMENT_CONTEXT_MISMATCH' && error.status === 409
   );
   await assert.rejects(
     service.createUploadPlan({
-      attachments: [{ filename: 'too-large.png', contentType: 'image/png', size: 4 * 1024 * 1024 + 1 }],
+      attachments: [{
+        filename: 'too-large.png', contentType: 'image/png', size: 4 * 1024 * 1024 + 1,
+        sha256: 'a'.repeat(64),
+      }],
       binding,
     }),
     /maximaal 4 MB/
@@ -159,6 +168,7 @@ test('attachment context mismatch en groottegrenzen falen voor opslag of send', 
     service.createUploadPlan({
       attachments: Array.from({ length: 3 }, (_, index) => ({
         filename: `total-${index}.png`, contentType: 'image/png', size: 2 * 1024 * 1024,
+        sha256: String(index + 1).repeat(64),
       })),
       binding,
     }),
@@ -267,6 +277,10 @@ test('hashmetadata faalt gesloten op uppercase ongeldig gemengd swapped en ander
     }), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_INVALID');
   }
   await assert.rejects(service.createUploadPlan({
+    attachments: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }],
+    binding: makeBinding(),
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_REQUIRED' && error.status === 409);
+  await assert.rejects(service.createUploadPlan({
     attachments: [null],
     binding: makeBinding(),
   }), (error) => error.code === 'MAILBOX_ATTACHMENT_INVALID');
@@ -276,7 +290,7 @@ test('hashmetadata faalt gesloten op uppercase ongeldig gemengd swapped en ander
       { filename: 'b.pdf', contentType: 'application/pdf', size: 4 },
     ],
     binding: makeBinding(),
-  }), (error) => error.code === 'MAILBOX_ATTACHMENT_HASH_MODE_MISMATCH');
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_REQUIRED');
   assert.equal(fixture.calls.signed.length, 0, 'ongeldige hashmetadata mag geen upload-URL maken');
 
   const uploads = await service.createUploadPlan({
@@ -307,7 +321,10 @@ test('hashmetadata faalt gesloten op uppercase ongeldig gemengd swapped en ander
   for (const [label, payload, expectedCode] of [
     ['tekstversie', { ...canonicalPayload, v: '2' }, 'MAILBOX_ATTACHMENT_REFERENCE_INVALID'],
     ['v2-zonder-hash', (() => { const value = { ...canonicalPayload }; delete value.sha256; return value; })(), 'MAILBOX_ATTACHMENT_REFERENCE_HASH_INVALID'],
-    ['v1-met-hash', { ...canonicalPayload, v: 1 }, 'MAILBOX_ATTACHMENT_REFERENCE_HASH_INVALID'],
+    ['v2-met-legacypad', {
+      ...canonicalPayload, path: 'mailbox/legacy-batch/0-bewijs.pdf',
+    }, 'MAILBOX_ATTACHMENT_REFERENCE_INVALID'],
+    ['v1-met-hash', { ...canonicalPayload, v: 1 }, 'MAILBOX_ATTACHMENT_REFERENCE_INVALID'],
   ]) {
     await assert.rejects(
       Promise.resolve().then(() => service.inspectAttachments(
@@ -333,7 +350,7 @@ test('hashmetadata faalt gesloten op uppercase ongeldig gemengd swapped en ander
   assert.equal(fixture.calls.downloaded.length, 0, 'dubbele references mogen Storage niet bereiken');
 });
 
-test('legacy v1 en hashgebonden v2 mogen niet in één sendbatch worden gemengd', async () => {
+test('handmatig gesigneerde legacy-v1 faalt bij inspect en download vóór Storage maar blijft opruimbaar', async () => {
   const fixture = createStorageFixture();
   const service = createMailboxAttachmentService({
     getSupabaseClient: () => ({ storage: fixture.storage }),
@@ -342,23 +359,94 @@ test('legacy v1 en hashgebonden v2 mogen niet in één sendbatch worden gemengd'
     now: () => new Date('2026-08-27T20:15:00.000Z'),
     logger: { warn() {} },
   });
-  const [legacy] = await service.createUploadPlan({
-    attachments: [{ filename: 'legacy.pdf', contentType: 'application/pdf', size: 4 }],
-    binding: makeBinding(),
-  });
+  const binding = makeBinding();
+  const content = Buffer.alloc(4, 1);
   const [hashed] = await service.createUploadPlan({
     attachments: [{
-      filename: 'hashed.pdf', contentType: 'application/pdf', size: 4,
-      sha256: sha256(Buffer.alloc(4, 1)),
+      filename: 'hashed.pdf', contentType: 'application/pdf', size: content.length,
+      sha256: sha256(content),
     }],
-    binding: makeBinding(),
+    binding,
   });
-  assert.equal(legacy.referenceVersion, 1);
   assert.equal(hashed.referenceVersion, 2);
+  const v2Payload = decodeReference(hashed.reference);
+  const legacyPath = `mailbox/v2/${v2Payload.expiresAt}-legacy-batch/0-legacy.pdf`;
+  const legacyPayload = {
+    ...v2Payload,
+    v: 1,
+    path: legacyPath,
+    filename: 'legacy.pdf',
+    contentType: 'application/pdf',
+    size: content.length,
+    expiresAt: Date.parse('2026-08-27T19:00:00.000Z'),
+  };
+  delete legacyPayload.sha256;
+  const legacy = { reference: encodeReference(legacyPayload) };
+
   await assert.rejects(
-    Promise.resolve().then(() => service.inspectAttachments([legacy, hashed], makeBinding())),
-    (error) => error.code === 'MAILBOX_ATTACHMENT_HASH_MODE_MISMATCH'
+    Promise.resolve().then(() => service.inspectAttachments([legacy], binding)),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_REFERENCE_INVALID' && error.status === 409
   );
+  await assert.rejects(
+    service.downloadAttachments([legacy], binding),
+    (error) => error.code === 'MAILBOX_ATTACHMENT_REFERENCE_INVALID' && error.status === 409
+  );
+  assert.equal(fixture.calls.downloaded.length, 0);
+
+  let durableClaimCalls = 0;
+  let failPreDispatchCalls = 0;
+  let providerCalls = 0;
+  const sendMessage = createMailboxComposeSend({
+    outboundRecipientGuardStore: createAllowingSuppressionStore(),
+    getAccount: () => ({
+      email: 'serve@softora.nl', name: 'Servé Creusen', smtpConfigured: true,
+      smtpIdentityMatches: true, smtpHost: 'smtp.test', smtpPort: 587,
+      smtpUser: 'serve@softora.nl', smtpPass: 'secret',
+    }),
+    isValidEmail: () => true,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, max) => String(value || '').slice(0, max),
+    createTransport: () => ({ sendMail: async () => { providerCalls += 1; } }),
+    buildMailboxWebdesignSendParts: async () => null,
+    appendSentMessage: async () => true,
+    mailboxSendProvenanceStore: withMailboxPreDispatchProvenance({
+      async findByIdempotencyKey() { return null; },
+      async claimPreDispatch(input) {
+        durableClaimCalls += 1;
+        const intent = {
+          ...input,
+          status: 'prepared',
+          dispatchState: 'reserved',
+          transitionToken: 'legacy-v1-claim-token',
+          preDispatchClaimFingerprint: 'a'.repeat(64),
+          preDispatchFinalizedAt: '',
+        };
+        return { created: true, intent, claimToken: intent.transitionToken };
+      },
+      async failPreDispatch(handle) {
+        failPreDispatchCalls += 1;
+        return { ...handle.intent, status: 'failed', dispatchState: 'finished' };
+      },
+    }),
+    mailboxAttachmentService: service,
+  });
+  await assert.rejects(sendMessage({
+    accountEmail: binding.accountEmail,
+    to: binding.recipientEmail,
+    subject: 'Legacy-bijlage',
+    text: 'Deze mail mag niet worden verzonden.',
+    attachments: [legacy],
+    expectedAttachmentsMetadata: [{
+      filename: 'legacy.pdf', contentType: 'application/pdf', size: content.length,
+      sha256: sha256(content),
+    }],
+    threadProvenance: { ...binding, intentId: 'send:legacy-v1' },
+  }), (error) => error.code === 'MAILBOX_ATTACHMENT_REFERENCE_INVALID' && error.status === 409);
+  assert.equal(durableClaimCalls, 1);
+  assert.equal(failPreDispatchCalls, 1);
+  assert.equal(providerCalls, 0);
+  assert.deepEqual(fixture.calls.removed, [[legacyPath]]);
 });
 
 test('extensionbeleid canonicaliseert alle MIME-aliases en bewaart NFKC en lange extensies', () => {
@@ -806,12 +894,13 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
     getElementById: () => ({ innerHTML: '', value: '', hidden: false }),
   };
   compose.resetOptionalFields(documentRef);
-  const files = [1, 2, 3].map((index) => {
-    const file = new Blob([Buffer.from([index, index + 1, index + 2])], { type: 'image/png' });
-    Object.defineProperty(file, 'name', { value: `screen-${index}.png` });
-    return file;
-  });
+  const files = [1, 2, 3].map((index) => createBrowserFile(
+    `screen-${index}.png`,
+    'image/png',
+    [index, index + 1, index + 2]
+  ));
   assert.equal((await compose.addAttachments(files, documentRef)).ok, true);
+  const selected = withAttachmentDigests(compose.getAttachments());
   const calls = [];
   const uploads = files.map((file, index) => ({
     reference: `reference-${index}`,
@@ -819,15 +908,21 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
     filename: file.name,
     contentType: file.type,
     size: file.size,
+    sha256: file.testSha256,
+    referenceVersion: 2,
     expiresAt: Date.now() + 30 * 60 * 1000,
   }));
-  const refs = await compose.uploadAttachments(compose.getAttachments(), {
+  const refs = await compose.uploadAttachments(selected, {
     fetch: async (url, options) => {
       calls.push({ url, options });
       if (url === '/api/mailbox/attachments/upload-url') {
         const payload = JSON.parse(options.body);
         assert.equal(payload.attachments.length, 3);
         assert.equal(payload.attachments.some((item) => 'contentBase64' in item), false);
+        assert.deepEqual(
+          payload.attachments.map((item) => item.sha256),
+          files.map((file) => file.testSha256)
+        );
         return { ok: true, status: 200, json: async () => ({ ok: true, uploads }) };
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
@@ -835,6 +930,8 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
     payload: { account: 'serve@softora.nl', to: 'prospect@example.nl', subject: 'Screenshots' },
   });
   assert.deepEqual(refs.map((item) => item.reference), ['reference-0', 'reference-1', 'reference-2']);
+  assert.ok(refs.every((item, index) => item.sha256 === files[index].testSha256));
+  assert.ok(refs.every((item) => item.referenceVersion === 2));
   assert.ok(refs.every((item, index) => item.expiresAt === uploads[index].expiresAt));
   assert.ok(refs.every((item) => !Object.keys(item).includes('expiresAt')));
   assert.ok(refs.every((item) => !JSON.stringify(item).includes('expiresAt')));
@@ -851,9 +948,18 @@ function createAttachmentDocument() {
 }
 
 function createBrowserFile(name, type = 'image/png', bytes = [1, 2, 3]) {
-  const file = new Blob([Buffer.from(bytes)], { type });
+  const content = Buffer.from(bytes);
+  const file = new Blob([content], { type });
   Object.defineProperty(file, 'name', { value: name });
+  Object.defineProperty(file, 'testSha256', { value: sha256(content) });
   return file;
+}
+
+function withAttachmentDigests(attachments) {
+  return (Array.isArray(attachments) ? attachments : []).map((attachment) => ({
+    ...attachment,
+    sha256: attachment?.file?.testSha256,
+  }));
 }
 
 function createValidUpload(file, index = 0, overrides = {}) {
@@ -863,6 +969,8 @@ function createValidUpload(file, index = 0, overrides = {}) {
     filename: serverSafeFilename(file.name),
     contentType: file.type || 'application/octet-stream',
     size: file.size,
+    sha256: file.testSha256,
+    referenceVersion: 2,
     expiresAt: Date.now() + 30 * 60 * 1000,
     ...overrides,
   };
@@ -898,7 +1006,7 @@ test('tijdelijke plan- en PUT-fouten retryen eenmaal met now=0, zonder retryvert
   let putAttempts = 0;
   let sleepCalls = 0;
   const putUrls = [];
-  const references = await compose.uploadAttachments(compose.getAttachments(), {
+  const references = await compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
     now: () => 0,
     retryDelayMs: 0,
     sleep: async () => { sleepCalls += 1; },
@@ -937,7 +1045,7 @@ test('tijdelijke HTTP-statussen retryen plan en PUT exact eenmaal en behouden de
         const upload = createValidUpload(file);
         let planAttempts = 0;
         let putAttempts = 0;
-        const references = await compose.uploadAttachments(compose.getAttachments(), {
+        const references = await compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
           retryDelayMs: 0,
           fetch: async (url) => {
             if (url === '/api/mailbox/attachments/upload-url') {
@@ -986,7 +1094,7 @@ test('iedere definitieve 4xx stopt na één planrequest, ook als de body retryab
   for (const status of [400, 401, 403, 404, 405, 409, 410, 413, 415, 422, 451, 499]) {
     await t.test(`HTTP ${status}`, async () => {
       let attempts = 0;
-      await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+      await assert.rejects(compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
         retryDelayMs: 0,
         fetch: async () => {
           attempts += 1;
@@ -1014,7 +1122,7 @@ test('hangende HTTP-400-body wordt voor plan en PUT nooit gelezen of als timeout
     let planAttempts = 0;
     let putAttempts = 0;
     let bodyReads = 0;
-    await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+    await assert.rejects(compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
       planTimeoutMs: 5,
       stagingTimeoutMs: 50,
       retryDelayMs: 0,
@@ -1050,7 +1158,7 @@ test('hangende HTTP-400-body wordt voor plan en PUT nooit gelezen of als timeout
     let planAttempts = 0;
     let putAttempts = 0;
     let bodyReads = 0;
-    await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+    await assert.rejects(compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
       uploadTimeoutMs: 5,
       stagingTimeoutMs: 50,
       retryDelayMs: 0,
@@ -1093,7 +1201,7 @@ test('malformed HTTP-200-planbody retryt eenmaal en start daarna precies één P
   const upload = createValidUpload(file);
   let planAttempts = 0;
   let putAttempts = 0;
-  const references = await compose.uploadAttachments(compose.getAttachments(), {
+  const references = await compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
     retryDelayMs: 0,
     fetch: async (url) => {
       if (url === '/api/mailbox/attachments/upload-url') {
@@ -1134,6 +1242,12 @@ test('uploadplan valideert unieke references URLs HTTPS expiry contenttype besta
     'grootte is tekst': (uploads) => { uploads[0].size = String(uploads[0].size); },
     'grootte is fractioneel': (uploads) => { uploads[0].size = 1.5; },
     'grootte wijkt af': (uploads) => { uploads[0].size += 1; },
+    'SHA ontbreekt': (uploads) => { delete uploads[0].sha256; },
+    'SHA wijkt af': (uploads) => { uploads[0].sha256 = 'f'.repeat(64); },
+    'SHA is uppercase': (uploads) => { uploads[0].sha256 = uploads[0].sha256.toUpperCase(); },
+    'referenceversie ontbreekt': (uploads) => { delete uploads[0].referenceVersion; },
+    'referenceversie is legacy': (uploads) => { uploads[0].referenceVersion = 1; },
+    'referenceversie is tekst': (uploads) => { uploads[0].referenceVersion = '2'; },
   };
   for (const [label, mutate] of Object.entries(variants)) {
     await t.test(label, async () => {
@@ -1147,7 +1261,7 @@ test('uploadplan valideert unieke references URLs HTTPS expiry contenttype besta
       let planAttempts = 0;
       let putAttempts = 0;
       const cleanupRequests = [];
-      const references = await compose.uploadAttachments(compose.getAttachments(), {
+      const references = await compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
         now: () => 1_000,
         retryDelayMs: 0,
         fetch: async (url, request) => {
@@ -1185,7 +1299,7 @@ test('hangende planbody en verloren PUT-response worden afgebroken en begrensd h
     const file = createBrowserFile('plan-timeout.png');
     await compose.addAttachments([file], documentRef);
     const signals = [];
-    await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+    await assert.rejects(compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
       planTimeoutMs: 5,
       stagingTimeoutMs: 100,
       retryDelayMs: 0,
@@ -1206,7 +1320,7 @@ test('hangende planbody en verloren PUT-response worden afgebroken en begrensd h
     const upload = createValidUpload(file);
     const putSignals = [];
     let putAttempts = 0;
-    await compose.uploadAttachments(compose.getAttachments(), {
+    await compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
       uploadTimeoutMs: 5,
       stagingTimeoutMs: 100,
       retryDelayMs: 0,
@@ -1236,7 +1350,7 @@ test('gedeeltelijke upload ruimt alle references begrensd keepalive op zonder de
   const uploads = files.map((file, index) => createValidUpload(file, index));
   let failedPutAttempts = 0;
   const cleanupCalls = [];
-  await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+  await assert.rejects(compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
     retryDelayMs: 0,
     cleanupTimeoutMs: 5,
     fetch: async (url, request) => {
@@ -1285,7 +1399,7 @@ test('FormData-fallback uploadt hetzelfde File-object met het canonieke serverco
   await compose.addAttachments([file], documentRef);
   const upload = createValidUpload(file, 0, { contentType: 'application/pdf' });
   let putRequest = null;
-  await compose.uploadAttachments(compose.getAttachments(), {
+  await compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
     FormData: function BrokenFormData() { throw new Error('FormData ontbreekt'); },
     fetch: async (url, request) => {
       if (url === '/api/mailbox/attachments/upload-url') {
@@ -1310,7 +1424,7 @@ test('maximale batch deelt één absoluut stagingbudget over alle PUTs en retry'
   const uploads = files.map((file, index) => createValidUpload(file, index, { expiresAt: 1_800_000 }));
   let virtualNow = 1_000;
   const attempts = new Map();
-  await assert.rejects(compose.uploadAttachments(compose.getAttachments(), {
+  await assert.rejects(compose.uploadAttachments(withAttachmentDigests(compose.getAttachments()), {
     now: () => virtualNow,
     stagingTimeoutMs: 100,
     uploadTimeoutMs: 1_000,
@@ -1401,6 +1515,23 @@ test('v2 uploadplan bindt request, response en staged reference aan exact dezelf
 });
 
 test('aanwezige uppercase of ongeldige SHA-256 faalt vóór uploadplan en PUT in plaats van legacy fallback', async (t) => {
+  await t.test('ontbrekende property', async () => {
+    const file = createBrowserFile('bewijs.pdf', 'application/pdf', [1, 2, 3, 4]);
+    let networkCalls = 0;
+    await assert.rejects(compose.uploadAttachments([{
+      file,
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    }], {
+      fetch: async () => {
+        networkCalls += 1;
+        throw new Error('netwerk mag niet worden aangeroepen');
+      },
+      payload: { account: 'serve@softora.nl', to: 'prospect@example.nl' },
+    }), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_REQUIRED' && error.status === 409);
+    assert.equal(networkCalls, 0);
+  });
   for (const sha256Value of ['A'.repeat(64), 'not-a-sha', '', undefined]) {
     await t.test(String(sha256Value), async () => {
       const file = createBrowserFile('bewijs.pdf', 'application/pdf', [1, 2, 3, 4]);

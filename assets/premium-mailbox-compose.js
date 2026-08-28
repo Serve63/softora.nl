@@ -335,10 +335,8 @@
     const now = attachmentNow(options);
     return uploads.every((upload, index) => {
       const attachment = attachments[index];
-      const hasSha256 = Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256');
-      const expectedSha256 = hasSha256 ? String(attachment.sha256) : '';
-      if (hasSha256 && !ATTACHMENT_SHA256_PATTERN.test(expectedSha256)) return false;
-      const hashBound = hasSha256;
+      const expectedSha256 = typeof attachment?.sha256 === 'string' ? attachment.sha256 : '';
+      if (!ATTACHMENT_SHA256_PATTERN.test(expectedSha256)) return false;
       const rawReference = typeof upload?.reference === 'string' ? upload.reference : '';
       const rawSignedUrl = typeof upload?.signedUrl === 'string' ? upload.signedUrl : '';
       const reference = rawReference.trim();
@@ -359,9 +357,8 @@
         && size === Number(attachment?.size)
         && contentType === contentType.trim().toLowerCase()
         && isValidAttachmentContentType(contentType)
-        && (hashBound
-          ? upload?.sha256 === expectedSha256 && upload?.referenceVersion === 2
-          : upload?.sha256 === undefined && upload?.referenceVersion !== 2)
+        && upload?.sha256 === expectedSha256
+        && upload?.referenceVersion === 2
         && Number.isSafeInteger(expiresAt)
         && expiresAt > now
         && (batchExpiresAt === null || expiresAt === batchExpiresAt);
@@ -477,7 +474,14 @@
     if (!list.length) return [];
     for (const attachment of list) {
       const hasSha256 = Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256');
-      if (hasSha256 && !ATTACHMENT_SHA256_PATTERN.test(String(attachment.sha256))) {
+      if (!hasSha256) {
+        throw createAttachmentError({
+          code: 'MAILBOX_ATTACHMENT_SHA256_REQUIRED',
+          message: 'De bijlage mist het veilige bestandsbewijs; kies het bestand opnieuw.',
+          status: 409,
+        });
+      }
+      if (!ATTACHMENT_SHA256_PATTERN.test(String(attachment.sha256))) {
         throw createAttachmentError({
           code: 'MAILBOX_ATTACHMENT_SHA256_INVALID',
           message: 'De bijlage heeft geen geldig veilig bestandsbewijs; kies het bestand opnieuw.',
@@ -504,9 +508,7 @@
       filename: attachment.filename,
       contentType: attachment.contentType,
       size: attachment.size,
-      ...(Object.prototype.hasOwnProperty.call(attachment || {}, 'sha256')
-        ? { sha256: attachment.sha256 }
-        : {}),
+      sha256: attachment.sha256,
     }));
     const uploadPayload = { ...options.payload, attachments: metadata };
     const uploads = await requestAttachmentUploadPlan(fetchImpl, uploadPayload, list, operationOptions);
@@ -582,7 +584,8 @@
       return uploads.map(({ reference, filename, contentType, size, sha256, referenceVersion, expiresAt }) => {
         const stagedReference = {
           reference, filename, contentType, size,
-          ...(sha256 ? { sha256, referenceVersion } : {}),
+          sha256,
+          referenceVersion: 2,
         };
         Object.defineProperty(stagedReference, 'expiresAt', {
           configurable: false,

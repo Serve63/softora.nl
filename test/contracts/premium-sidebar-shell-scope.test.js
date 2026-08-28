@@ -757,24 +757,27 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-compose-no-drag aria-label="Sluiten"/);
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
+  const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20260828g');
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');
   const sendStateAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-state.js?v=20260828d');
-  const sendResilienceAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-resilience.js?v=20260828e');
+  const sendResilienceAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-resilience.js?v=20260828h');
   const acceptedSendAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-accepted-send.js?v=20260827b');
   const composeControllerAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-controller.js?v=20260828f');
+  assert.ok(composeAssetIndex >= 0, 'compose asset met actuele cachebuster ontbreekt');
   assert.ok(browserStorageAssetIndex >= 0, 'browser-storage asset ontbreekt');
   assert.ok(attachmentDigestAssetIndex >= 0, 'attachment-digest asset ontbreekt');
   assert.ok(sendStateAssetIndex >= 0, 'send-state asset ontbreekt');
   assert.ok(sendResilienceAssetIndex >= 0, 'send-resilience asset ontbreekt');
   assert.ok(acceptedSendAssetIndex >= 0, 'accepted-send asset ontbreekt');
+  assert.ok(composeAssetIndex < browserStorageAssetIndex, 'compose hoort vóór browser-storage te laden');
   assert.ok(browserStorageAssetIndex < attachmentDigestAssetIndex, 'browser-storage hoort vóór attachment-digest te laden');
   assert.ok(attachmentDigestAssetIndex < sendStateAssetIndex, 'attachment-digest hoort vóór send-state te laden');
   assert.ok(sendStateAssetIndex < sendResilienceAssetIndex, 'send-state hoort vóór send-resilience te laden');
   assert.ok(sendResilienceAssetIndex < composeControllerAssetIndex, 'send-resilience hoort vóór de controller te laden');
   assert.ok(acceptedSendAssetIndex < composeControllerAssetIndex, 'accepted-send state hoort vóór de controller te laden');
   assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-owner-session\.js\?v=20260826a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260818b"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260821a"><\/script><script src="assets\/premium-mailbox-detail-stability\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260826b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox-compose-window\.js\?v=20260817c"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260828b"><\/script><script src="assets\/premium-mailbox-attachment-digest\.js\?v=20260828c"><\/script><script src="assets\/premium-mailbox-compose-send-state\.js\?v=20260828d"><\/script><script src="assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828e"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260820a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260827a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260826a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox-compose-window\.js\?v=20260817c"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260828b"><\/script><script src="assets\/premium-mailbox-attachment-digest\.js\?v=20260828c"><\/script><script src="assets\/premium-mailbox-compose-send-state\.js\?v=20260828d"><\/script><script src="assets\/premium-mailbox-compose-send-resilience\.js\?v=20260828h"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260820a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260827a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260826a"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {

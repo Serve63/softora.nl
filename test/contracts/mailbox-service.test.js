@@ -552,24 +552,15 @@ test('mailbox service sends mail through selected account smtp', async () => {
       },
     }),
   });
-  const res = createResponseRecorder();
+  const result = await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Test',
+    text: 'Hallo',
+  });
 
-  await service.sendMessageResponse(
-    {
-      body: {
-        account: 'serve@softora.nl',
-        to: 'klant@example.nl',
-        subject: 'Test',
-        body: 'Hallo',
-      },
-    },
-    res
-  );
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.headers['x-softora-message-id'], res.body.result.messageId);
-  assert.equal(res.headers['x-softora-send-intent-id'], res.body.result.intentId);
+  assert.equal(result.messageId, 'm-1');
+  assert.ok(result.intentId);
   assert.equal(sent[0].config.auth.user, 'serve@softora.nl');
   assert.equal(sent[0].message.from, 'Servé Creusen <serve@softora.nl>');
   assert.equal(sent[0].message.to, 'klant@example.nl');
@@ -591,25 +582,20 @@ test('mailbox service verstuurt alleen expliciete CC, BCC en veilige composebijl
       },
     }),
   });
-  const res = createResponseRecorder();
+  await service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    cc: 'boekhouder@example.nl, collega@example.nl',
+    bcc: 'archief@example.nl',
+    subject: 'Documenten',
+    text: 'Hierbij de documenten.',
+    attachments: [{
+      filename: 'voorstel.pdf',
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from('veilig document').toString('base64'),
+    }],
+  });
 
-  await service.sendMessageResponse({
-    body: {
-      account: 'serve@softora.nl',
-      to: 'klant@example.nl',
-      cc: 'boekhouder@example.nl, collega@example.nl',
-      bcc: 'archief@example.nl',
-      subject: 'Documenten',
-      body: 'Hierbij de documenten.',
-      attachments: [{
-        filename: 'voorstel.pdf',
-        contentType: 'application/pdf',
-        contentBase64: Buffer.from('veilig document').toString('base64'),
-      }],
-    },
-  }, res);
-
-  assert.equal(res.statusCode, 200);
   assert.deepEqual(sent[0].cc, ['boekhouder@example.nl', 'collega@example.nl']);
   assert.deepEqual(sent[0].bcc, ['archief@example.nl']);
   assert.equal(sent[0].attachments.length, 1);
@@ -634,30 +620,24 @@ test('mailbox service blokkeert dubbele ontvangers en gevaarlijke composebijlage
       },
     }),
   });
-  const duplicateRes = createResponseRecorder();
-  await service.sendMessageResponse({
-    body: {
-      account: 'serve@softora.nl',
-      to: 'klant@example.nl',
-      cc: 'klant@example.nl',
-      subject: 'Dubbel',
-    },
-  }, duplicateRes);
-  assert.equal(duplicateRes.statusCode, 400);
+  await assert.rejects(service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    cc: 'klant@example.nl',
+    subject: 'Dubbel',
+    text: '',
+  }), (error) => error.status === 400);
 
-  const attachmentRes = createResponseRecorder();
-  await service.sendMessageResponse({
-    body: {
-      account: 'serve@softora.nl',
-      to: 'klant@example.nl',
-      subject: 'Onveilig',
-      attachments: [{
-        filename: 'factuur.exe',
-        contentBase64: Buffer.from('niet uitvoeren').toString('base64'),
-      }],
-    },
-  }, attachmentRes);
-  assert.equal(attachmentRes.statusCode, 400);
+  await assert.rejects(service.sendMessage({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Onveilig',
+    text: '',
+    attachments: [{
+      filename: 'factuur.exe',
+      contentBase64: Buffer.from('niet uitvoeren').toString('base64'),
+    }],
+  }), (error) => error.status === 400);
   assert.equal(sendCalls, 0);
 });
 
@@ -1234,22 +1214,13 @@ test('mailbox service sends Martijn mail with the full display name', async () =
       },
     }),
   });
-  const res = createResponseRecorder();
+  await service.sendMessage({
+    accountEmail: 'martijn@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Test',
+    text: 'Hallo',
+  });
 
-  await service.sendMessageResponse(
-    {
-      body: {
-        account: 'martijn@softora.nl',
-        to: 'klant@example.nl',
-        subject: 'Test',
-        body: 'Hallo',
-      },
-    },
-    res
-  );
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.ok, true);
   assert.equal(sent[0].config.auth.user, 'martijn@softora.nl');
   assert.equal(sent[0].message.from, 'Martijn van de Ven <martijn@softora.nl>');
 });

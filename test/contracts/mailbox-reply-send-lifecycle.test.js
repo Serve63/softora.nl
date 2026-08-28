@@ -17,13 +17,17 @@ const {
   createMailboxSendProvenanceStore,
 } = require('../../server/services/mailbox-send-provenance-store');
 const {
+  MAILBOX_SEND_RECONCILE_PROOF_TTL_MS,
   createMailboxReconcileProof,
+  normalizeMailboxReconcileProof,
+  signMailboxReconcileProof,
 } = require('../../server/services/mailbox-send-reconcile-proof');
 const { createInstantlyMailboxService } = require('../../server/services/instantly-mailbox');
 const { sendMailboxMessage } = require('../../server/services/mailbox-instantly-integration');
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 const normalizeString = (value) => String(value || '').trim();
+const HTTP_PROOF_SECRET = 'mailbox-http-proof-test-secret';
 const allowingSuppressionStore = {
   findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }),
 };
@@ -50,6 +54,507 @@ function responseRecorder() {
     json(body) { this.body = body; return this; },
   };
 }
+function assertSignedProofMatches(actual, expected) {
+  assert.deepEqual(
+    normalizeMailboxReconcileProof(actual, normalizeString),
+    normalizeMailboxReconcileProof(expected, normalizeString)
+  );
+  assert.match(actual.signature, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isSafeInteger(actual.issuedAtMs) && actual.issuedAtMs > 0);
+  assert.ok(actual.expiresAtMs > actual.issuedAtMs);
+  assert.ok(actual.expiresAtMs - actual.issuedAtMs <= MAILBOX_SEND_RECONCILE_PROOF_TTL_MS);
+}
+
+function createValidHttpReconcileProof({
+  provider = 'smtp',
+  mode = provider === 'instantly' ? 'reply' : 'new-message',
+  idempotencyKey = `browser:http-${provider}`,
+  attachmentsMetadata = [],
+  } = {}) {
+  const isReply = mode === 'reply';
+  return signMailboxReconcileProof({
+    version: 1,
+    idempotencyKey,
+    owner: 'serve',
+    accountEmail: provider === 'instantly'
+      ? 'servecreusen@websoftora.com'
+      : 'serve@softora.nl',
+    recipientEmail: 'prospect@example.nl',
+    provider,
+    mode,
+    conversationId: isReply ? `conversation:http-${provider}` : '',
+    replyTargetMessageId: isReply ? `<incoming-http-${provider}@example.nl>` : '',
+    references: isReply ? `<incoming-http-${provider}@example.nl>` : '',
+    providerThreadId: provider === 'instantly' ? `thread-http-${provider}` : '',
+    scopeFingerprint: `${provider}-${mode}-scope:${'a'.repeat(64)}`,
+    requestPayloadFingerprint: 'b'.repeat(64),
+    attachmentsMetadata,
+  }, HTTP_PROOF_SECRET, normalizeString);
+}
+
+function createBlockedHttpSendRuntime(counters) {
+  return createMailboxComposeRuntime({
+    attachmentSigningSecret: HTTP_PROOF_SECRET,
+    composeSendDependencies: {
+      outboundRecipientGuardStore: {
+        async findRecipientSuppressionConflict() {
+          counters.guard += 1;
+          return { ok: true, conflict: null };
+        },
+      },
+    },
+    getAccount: () => null,
+    instantlyMailboxService: {
+      async reply() { counters.provider += 1; },
+    },
+    mailboxComposeThreadContext: {
+      async resolve() {
+        counters.resolve += 1;
+        throw new Error('resolver mag niet starten');
+      },
+    },
+    mailboxSendProvenanceStore: {
+      preview() { counters.provenance += 1; return null; },
+      async reserve() { counters.provenance += 1; return { created: true, intent: {} }; },
+    },
+    normalizeEmail,
+    normalizeString,
+    logger: { error() {} },
+  });
+}
+
+function createBlockedAttachmentUploadRuntime(counters) {
+  return createMailboxComposeRuntime({
+    attachmentSigningSecret: HTTP_PROOF_SECRET,
+    mailboxAttachmentService: {
+      async createUploadPlan() {
+        counters.plan += 1;
+        return [];
+      },
+    },
+    mailboxComposeThreadContext: {
+      async resolve() {
+        counters.resolve += 1;
+        throw new Error('resolver mag niet starten');
+      },
+    },
+    mailboxSendProvenanceStore: {
+      preview() {
+        counters.provenance += 1;
+        return null;
+      },
+    },
+    normalizeEmail,
+    normalizeString,
+    logger: { error() {} },
+  });
+}
+
+test('HTTP-send vereist voor SMTP en Instantly een geldig reconcileProof vóór resolver, guards of provider', async (t) => {
+  for (const provider of ['smtp', 'instantly']) {
+    await t.test(provider, async () => {
+      for (const [label, proof, expectedCode] of [
+        ['ontbrekend', undefined, 'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED'],
+        ['null', null, 'MAILBOX_SEND_RECONCILE_PROOF_INVALID'],
+        ['malformed', { version: 1 }, 'MAILBOX_SEND_RECONCILE_PROOF_INVALID'],
+      ]) {
+        const counters = { resolve: 0, provenance: 0, guard: 0, provider: 0 };
+        const runtime = createBlockedHttpSendRuntime(counters);
+        const response = responseRecorder();
+        const body = {
+          account: provider === 'instantly' ? 'servecreusen@websoftora.com' : 'serve@softora.nl',
+          to: 'prospect@example.nl',
+          provider: provider === 'instantly' ? 'instantly' : '',
+          mode: provider === 'instantly' ? 'reply' : 'new-message',
+          idempotencyKey: `browser:${provider}-${label}`,
+          subject: 'Veilige controle',
+          body: 'Er wordt niets verzonden.',
+          attachments: [],
+          attachmentsMetadata: [],
+          ...(proof === undefined ? {} : { reconcileProof: proof }),
+        };
+        await runtime.sendMessageResponse({ body }, response);
+        assert.equal(response.statusCode, 409, label);
+        assert.equal(response.body.code, expectedCode, label);
+        assert.equal(response.body.externalEffect, false, label);
+        assert.equal(response.body.failurePhase, 'pre-dispatch', label);
+        assert.deepEqual(counters, { resolve: 0, provenance: 0, guard: 0, provider: 0 }, label);
+      }
+    });
+  }
+});
+
+test('HTTP-send weigert zelfgebouwde en verlopen preflightbewijzen vóór resolver of provider', async () => {
+  const unsignedProof = createValidHttpReconcileProof();
+  delete unsignedProof.signature;
+  const expiredProof = signMailboxReconcileProof(
+    createValidHttpReconcileProof(),
+    HTTP_PROOF_SECRET,
+    normalizeString,
+    {
+      nowMs: Date.now() - MAILBOX_SEND_RECONCILE_PROOF_TTL_MS - 2_000,
+      ttlMs: 1_000,
+    }
+  );
+  for (const [label, reconcileProof, expectedCode] of [
+    ['zelfgebouwd', unsignedProof, 'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_INVALID'],
+    ['verlopen', expiredProof, 'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED'],
+  ]) {
+    const counters = { resolve: 0, provenance: 0, guard: 0, provider: 0 };
+    const response = responseRecorder();
+    await createBlockedHttpSendRuntime(counters).sendMessageResponse({ body: {
+      account: reconcileProof.accountEmail,
+      to: reconcileProof.recipientEmail,
+      mode: reconcileProof.mode,
+      idempotencyKey: reconcileProof.idempotencyKey,
+      subject: 'Veilige controle',
+      body: 'Er wordt niets verzonden.',
+      attachments: [],
+      attachmentsMetadata: [],
+      reconcileProof,
+    } }, response);
+    assert.equal(response.statusCode, 409, label);
+    assert.equal(response.body.code, expectedCode, label);
+    assert.equal(response.body.externalEffect, false, label);
+    assert.equal(response.body.failurePhase, 'pre-dispatch', label);
+    assert.deepEqual(counters, { resolve: 0, provenance: 0, guard: 0, provider: 0 }, label);
+  }
+});
+
+test('attachment-uploadplan vereist een vers serverbewijs vóór resolver of Storage-plan', async () => {
+  const unsignedProof = createValidHttpReconcileProof({
+    attachmentsMetadata: [{
+      filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+      sha256: 'c'.repeat(64),
+    }],
+  });
+  delete unsignedProof.signature;
+  const forgedProof = createValidHttpReconcileProof({
+    attachmentsMetadata: unsignedProof.attachmentsMetadata,
+  });
+  forgedProof.signature = `${forgedProof.signature.slice(0, -1)}${forgedProof.signature.endsWith('0') ? '1' : '0'}`;
+  const expiredProof = signMailboxReconcileProof(
+    createValidHttpReconcileProof({ attachmentsMetadata: unsignedProof.attachmentsMetadata }),
+    HTTP_PROOF_SECRET,
+    normalizeString,
+    {
+      nowMs: Date.now() - MAILBOX_SEND_RECONCILE_PROOF_TTL_MS - 2_000,
+      ttlMs: 1_000,
+    }
+  );
+  for (const [label, reconcileProof, expectedCode] of [
+    ['ontbrekend', undefined, 'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED'],
+    ['zelfgebouwd', unsignedProof, 'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_INVALID'],
+    ['vervalst', forgedProof, 'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_INVALID'],
+    ['verlopen', expiredProof, 'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED'],
+  ]) {
+    const counters = { resolve: 0, provenance: 0, plan: 0 };
+    const response = responseRecorder();
+    const proof = reconcileProof || createValidHttpReconcileProof({
+      attachmentsMetadata: unsignedProof.attachmentsMetadata,
+    });
+    await createBlockedAttachmentUploadRuntime(counters).attachmentUploadResponse({ body: {
+      account: proof.accountEmail,
+      to: proof.recipientEmail,
+      mode: proof.mode,
+      idempotencyKey: proof.idempotencyKey,
+      subject: 'Veilige uploadcontrole',
+      body: 'Er wordt niets geüpload.',
+      attachmentsMetadata: proof.attachmentsMetadata,
+      attachments: proof.attachmentsMetadata,
+      ...(reconcileProof === undefined ? {} : { reconcileProof }),
+    } }, response);
+    assert.equal(response.statusCode, 409, label);
+    assert.equal(response.body.code, expectedCode, label);
+    assert.deepEqual(counters, { resolve: 0, provenance: 0, plan: 0 }, label);
+  }
+});
+
+test('HTTP-send accepteert uitsluitend staged attachment-references en nooit inline data', async (t) => {
+  const variants = [
+    ['geen array', { filename: 'bewijs.pdf', reference: 'signed-reference' }],
+    ['contentBase64', [{ filename: 'bewijs.pdf', contentBase64: 'dmVpbGln' }]],
+    ['data', [{ reference: 'signed-reference', data: 'dmVpbGln' }]],
+    ['content', [{ reference: 'signed-reference', content: { type: 'Buffer', data: [1] } }]],
+    ['reference ontbreekt', [{ filename: 'bewijs.pdf', size: 4 }]],
+    ['reference heeft witruimte', [{ reference: ' signed-reference' }]],
+  ];
+  for (const provider of ['smtp', 'instantly']) {
+    for (const [label, attachments] of variants) {
+      await t.test(`${provider}: ${label}`, async () => {
+        const counters = { resolve: 0, provenance: 0, guard: 0, provider: 0 };
+        const runtime = createBlockedHttpSendRuntime(counters);
+        const response = responseRecorder();
+        const reconcileProof = createValidHttpReconcileProof({ provider });
+        await runtime.sendMessageResponse({ body: {
+          account: reconcileProof.accountEmail,
+          to: reconcileProof.recipientEmail,
+          provider: provider === 'instantly' ? 'instantly' : '',
+          mode: reconcileProof.mode,
+          idempotencyKey: reconcileProof.idempotencyKey,
+          subject: 'Veilige controle',
+          body: 'Er wordt niets verzonden.',
+          attachments,
+          attachmentsMetadata: [],
+          reconcileProof,
+        } }, response);
+        assert.equal(response.statusCode, 400);
+        assert.equal(response.body.code, 'MAILBOX_ATTACHMENT_REFERENCE_INVALID');
+        assert.deepEqual(counters, { resolve: 0, provenance: 0, guard: 0, provider: 0 });
+      });
+    }
+  }
+});
+
+test('SMTP HTTP-flow gebruikt één vers serverpreflightbewijs en veroorzaakt bij replay maar één providercall', async () => {
+  const payload = {
+    account: 'serve@softora.nl', owner: 'serve', provider: '', mode: 'new-message',
+    idempotencyKey: 'browser:http-smtp-success', to: 'prospect@example.nl',
+    subject: 'Veilige SMTP-flow', body: 'Deze synthetische test verstuurt geen echte mail.',
+    cc: '', bcc: '', attachments: [], attachmentsMetadata: [],
+  };
+  const threadProvenance = {
+    intentId: 'send:http-smtp-success', idempotencyKey: payload.idempotencyKey,
+    owner: 'serve', senderName: 'Servé Creusen', accountEmail: payload.account,
+    recipientEmail: payload.to, provider: 'smtp', mode: 'new-message',
+    conversationId: 'conversation:http-smtp-success', replyTargetMessageId: '',
+    references: '', providerThreadId: '', messageId: '<planned-http-smtp@softora.nl>',
+  };
+  const previewStore = createMailboxSendProvenanceStore({ normalizeString });
+  const intents = new Map();
+  const provenanceStore = withMailboxPreDispatchProvenance({
+    preview: (input) => previewStore.preview(input),
+    async preflight(input) {
+      return {
+        intent: previewStore.preview(input),
+        conflict: intents.get(input.idempotencyKey) || null,
+      };
+    },
+    async findByIdempotencyKey(idempotencyKey) {
+      return intents.get(idempotencyKey) || null;
+    },
+    async reserve(input) {
+      const existing = intents.get(input.idempotencyKey);
+      if (existing) return { created: false, intent: existing };
+      const intent = {
+        ...previewStore.preview(input), status: 'prepared', dispatchState: 'reserved',
+        reconcileRequired: false, sentReconcileRequired: false,
+      };
+      intents.set(input.idempotencyKey, intent);
+      return { created: true, intent };
+    },
+    async startDispatch(intentId) {
+      const intent = Array.from(intents.values()).find((entry) => entry.intentId === intentId);
+      if (intent) intent.dispatchState = 'started';
+      return intent;
+    },
+    async accept(intentId, values) {
+      const intent = Array.from(intents.values()).find((entry) => entry.intentId === intentId);
+      const accepted = {
+        ...intent, ...values, status: 'accepted', dispatchState: 'finished',
+        reconcileRequired: false, sentReconcileRequired: false,
+      };
+      intents.set(accepted.idempotencyKey, accepted);
+      return accepted;
+    },
+    async fail(intentId) { return { intentId, status: 'failed', dispatchState: 'finished' }; },
+    async markUnknown(intentId) { return { intentId, status: 'unknown', dispatchState: 'started' }; },
+  });
+  let providerCalls = 0;
+  const runtime = createMailboxComposeRuntime({
+    attachmentSigningSecret: HTTP_PROOF_SECRET,
+    composeSendDependencies: {
+      outboundRecipientGuardStore: allowingSuppressionStore,
+      isValidEmail: () => true,
+      normalizeEmail,
+      normalizeString,
+      truncateText: (value, max) => String(value || '').slice(0, max),
+      getAccount: () => ({
+        email: payload.account, name: 'Servé Creusen', smtpConfigured: true,
+        smtpIdentityMatches: true, smtpHost: 'smtp.test', smtpPort: 587,
+        smtpSecure: false, smtpUser: payload.account, smtpPass: 'synthetic-secret',
+      }),
+      createTransport: () => ({
+        async sendMail() {
+          providerCalls += 1;
+          return { accepted: [payload.to], rejected: [], messageId: '<accepted-http-smtp@softora.nl>' };
+        },
+      }),
+      buildMailboxWebdesignSendParts: async () => null,
+      appendSentMessage: async () => true,
+    },
+    getAccount: () => null,
+    mailboxComposeThreadContext: { async resolve() { return threadProvenance; } },
+    mailboxSendProvenanceStore: provenanceStore,
+    normalizeEmail,
+    normalizeString,
+    logger: { error() {}, warn() {} },
+  });
+
+  const preflight = responseRecorder();
+  await runtime.preflightMessageResponse({ body: payload }, preflight);
+  assert.equal(preflight.statusCode, 200);
+  assert.equal(preflight.body.result.status, 'ready');
+  const reconcileProof = preflight.body.result.reconcileProof;
+  assert.match(reconcileProof.signature, /^[0-9a-f]{64}$/);
+  assert.ok(reconcileProof.expiresAtMs > reconcileProof.issuedAtMs);
+
+  const first = responseRecorder();
+  await runtime.sendMessageResponse({ body: { ...payload, reconcileProof } }, first);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.result.messageId, '<accepted-http-smtp@softora.nl>');
+  assert.equal(providerCalls, 1);
+
+  const replay = responseRecorder();
+  await runtime.sendMessageResponse({ body: { ...payload, reconcileProof } }, replay);
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.result.idempotentReplay, true);
+  assert.equal(providerCalls, 1);
+});
+
+
+test('HTTP-response onderscheidt functioneel een hookfout vóór provider van een fout ná providerstart', async (t) => {
+  async function runCase(label, { failHook = false, failProvider = false } = {}) {
+    const payload = {
+      account: 'serve@softora.nl', owner: 'serve', provider: '', mode: 'new-message',
+      idempotencyKey: `browser:http-effect-${label}`, to: 'prospect@example.nl',
+      subject: 'Functionele providergrens', body: 'Deze synthetische test verstuurt geen echte mail.',
+      cc: '', bcc: '', attachments: [], attachmentsMetadata: [],
+    };
+    const previewStore = createMailboxSendProvenanceStore({ normalizeString });
+    const intents = new Map();
+    const findIntent = (intentId) => Array.from(intents.values())
+      .find((entry) => entry.intentId === intentId);
+    const provenanceStore = withMailboxPreDispatchProvenance({
+      preview: (input) => previewStore.preview(input),
+      async preflight(input) {
+        return {
+          intent: previewStore.preview(input),
+          conflict: intents.get(input.idempotencyKey) || null,
+        };
+      },
+      async findByIdempotencyKey(idempotencyKey) {
+        return intents.get(idempotencyKey) || null;
+      },
+      async reserve(input) {
+        const existing = intents.get(input.idempotencyKey);
+        if (existing) return { created: false, intent: existing };
+        const intent = {
+          ...previewStore.preview(input), status: 'prepared', dispatchState: 'reserved',
+          reconcileRequired: false, sentReconcileRequired: false,
+        };
+        intents.set(input.idempotencyKey, intent);
+        return { created: true, intent };
+      },
+      async startDispatch(intentId) {
+        const intent = findIntent(intentId);
+        if (intent) intent.dispatchState = 'started';
+        return intent;
+      },
+      async accept(intentId, values) {
+        const current = findIntent(intentId);
+        const intent = { ...current, ...values, status: 'accepted', dispatchState: 'finished' };
+        if (intent.idempotencyKey) intents.set(intent.idempotencyKey, intent);
+        return intent;
+      },
+      async fail(intentId) {
+        const current = findIntent(intentId);
+        const intent = { ...current, status: 'failed', dispatchState: 'finished' };
+        if (intent.idempotencyKey) intents.set(intent.idempotencyKey, intent);
+        return intent;
+      },
+      async markUnknown(intentId) {
+        const current = findIntent(intentId);
+        const intent = {
+          ...current, status: 'unknown', dispatchState: 'started', reconcileRequired: true,
+        };
+        if (intent.idempotencyKey) intents.set(intent.idempotencyKey, intent);
+        return intent;
+      },
+    });
+    let hookCalls = 0;
+    let providerCalls = 0;
+    const runtime = createMailboxComposeRuntime({
+      attachmentSigningSecret: HTTP_PROOF_SECRET,
+      composeSendDependencies: {
+        outboundRecipientGuardStore: allowingSuppressionStore,
+        isValidEmail: () => true,
+        normalizeEmail,
+        normalizeString,
+        truncateText: (value, max) => String(value || '').slice(0, max),
+        getAccount: () => ({
+          email: payload.account, name: 'Servé Creusen', smtpConfigured: true,
+          smtpIdentityMatches: true, smtpHost: 'smtp.test', smtpPort: 587,
+          smtpSecure: false, smtpUser: payload.account, smtpPass: 'synthetic-secret',
+        }),
+        createTransport: () => ({
+          async sendMail() {
+            providerCalls += 1;
+            if (failProvider) {
+              throw Object.assign(new Error('providerresponse ging verloren'), { code: 'ECONNRESET' });
+            }
+            return { accepted: [payload.to], rejected: [], messageId: `<${label}@softora.nl>` };
+          },
+        }),
+        buildMailboxWebdesignSendParts: async () => null,
+        appendSentMessage: async () => true,
+      },
+      getAccount: () => null,
+      mailboxComposeThreadContext: {
+        async resolve({ body, accountEmail, recipientEmail }) {
+          return {
+            intentId: `send:${body.idempotencyKey}`,
+            idempotencyKey: body.idempotencyKey,
+            owner: 'serve', senderName: 'Servé Creusen', accountEmail,
+            recipientEmail, provider: 'smtp', mode: 'new-message', conversationId: '',
+            replyTargetMessageId: '', references: '', providerThreadId: '',
+            messageId: `<planned-${label}@softora.nl>`,
+          };
+        },
+      },
+      mailboxSendProvenanceStore: provenanceStore,
+      normalizeEmail,
+      normalizeString,
+      async onProviderDispatchStarting(event) {
+        hookCalls += 1;
+        assert.deepEqual(event, {
+          provider: 'smtp', intentId: `send:${payload.idempotencyKey}`,
+        });
+        if (failHook) {
+          throw Object.assign(new Error('providerstarthook faalde'), {
+            code: 'TEST_PROVIDER_START_HOOK_FAILED',
+          });
+        }
+      },
+      logger: { error() {}, warn() {} },
+    });
+    const preflight = responseRecorder();
+    await runtime.preflightMessageResponse({ body: payload }, preflight);
+    assert.equal(preflight.statusCode, 200);
+    const send = responseRecorder();
+    await runtime.sendMessageResponse({ body: {
+      ...payload,
+      reconcileProof: preflight.body.result.reconcileProof,
+    } }, send);
+    return { hookCalls, providerCalls, response: send };
+  }
+
+  await t.test('geïnjecteerde hook faalt vóór provider', async () => {
+    const result = await runCase('hook-failure', { failHook: true });
+    assert.equal(result.hookCalls, 1);
+    assert.equal(result.providerCalls, 0);
+    assert.equal(result.response.body.externalEffect, false);
+    assert.equal(result.response.body.failurePhase, 'pre-dispatch');
+  });
+
+  await t.test('provider faalt na succesvolle hook', async () => {
+    const result = await runCase('provider-failure', { failProvider: true });
+    assert.equal(result.hookCalls, 1);
+    assert.equal(result.providerCalls, 1);
+    assert.equal(Object.hasOwn(result.response.body, 'externalEffect'), false);
+    assert.equal(Object.hasOwn(result.response.body, 'failurePhase'), false);
+  });
+});
 
 function createInstantlyService(adapterCalls = [], onProviderCall = () => {}) {
   return {
@@ -332,6 +837,7 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
     async markUnknown(intentId) { return { intentId, status: 'unknown' }; },
   });
   const runtime = createMailboxComposeRuntime({
+    attachmentSigningSecret: HTTP_PROOF_SECRET,
     composeSendDependencies: { outboundRecipientGuardStore: allowingSuppressionStore }, getAccount: () => null, instantlyMailboxService,
     mailboxComposeThreadContext: resolver, mailboxSendProvenanceStore: provenanceStore,
     normalizeEmail, normalizeString,
@@ -364,7 +870,7 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
   assert.equal(readyAfterDurableMiss.statusCode, 200);
   assert.equal(readyAfterDurableMiss.body.result.status, 'ready');
   assert.equal(readyAfterDurableMiss.body.result.reservationReady, true);
-  assert.deepEqual(readyAfterDurableMiss.body.result.reconcileProof, payload.reconcileProof);
+  assertSignedProofMatches(readyAfterDurableMiss.body.result.reconcileProof, payload.reconcileProof);
 
   const mismatchedSend = responseRecorder();
   await runtime.sendMessageResponse({
@@ -377,7 +883,7 @@ test('captured MHCBE payload passes real preflight and selects only the exact mo
     },
   }, mismatchedSend);
   assert.equal(mismatchedSend.statusCode, 409);
-  assert.equal(mismatchedSend.body.code, 'MAILBOX_SEND_IDEMPOTENCY_PAYLOAD_MISMATCH');
+  assert.equal(mismatchedSend.body.code, 'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_INVALID');
   assert.equal(reservedInputs.length, 0);
   assert.equal(adapterCalls.length, 0);
   assert.deepEqual(providerEvents, []);
@@ -493,6 +999,7 @@ test('preflight classificeert accepted, processing en failed alleen na exact duu
   };
   function runtimeFor(conflict) {
     return createMailboxComposeRuntime({
+      attachmentSigningSecret: HTTP_PROOF_SECRET,
       composeSendDependencies: {},
       mailboxComposeThreadContext: { async resolve() { return threadProvenance; } },
       mailboxSendProvenanceStore: {
@@ -590,6 +1097,7 @@ test('gemarkeerde preflight reconcileert duurzaam zonder de verdwenen replybron 
 
   function runtimeFor(intent, counters = { resolver: 0 }) {
     return createMailboxComposeRuntime({
+      attachmentSigningSecret: HTTP_PROOF_SECRET,
       composeSendDependencies: {},
       mailboxComposeThreadContext: {
         async resolve() {
@@ -635,7 +1143,7 @@ test('gemarkeerde preflight reconcileert duurzaam zonder de verdwenen replybron 
       assert.equal(response.statusCode, 200);
       assert.equal(response.body.result.status, expected);
       assert.equal(response.body.result.reservationReady, false);
-      assert.deepEqual(response.body.result.reconcileProof, proof);
+      assertSignedProofMatches(response.body.result.reconcileProof, proof);
       assert.equal(counters.resolver, 0, 'de verdwenen mutable replybron mag niet worden gelezen');
       assert.equal(Boolean(response.body.result.acceptedResult), expected === 'accepted');
       if (expected === 'accepted') {
@@ -749,6 +1257,7 @@ test('gemarkeerde preflight reconcileert duurzaam zonder de verdwenen replybron 
     let resolverCalls = 0;
     const response = responseRecorder();
     const runtime = createMailboxComposeRuntime({
+      attachmentSigningSecret: HTTP_PROOF_SECRET,
       composeSendDependencies: {},
       mailboxComposeThreadContext: { async resolve() { resolverCalls += 1; } },
       mailboxSendProvenanceStore: { async findByIdempotencyKey() { return null; } },
@@ -1604,6 +2113,7 @@ test('Instantly aborts a committed start-response-timeout before provider throug
 
 test('mailbox send response hides raw Supabase cooldown details behind a safe retryable message', async () => {
   const runtime = createMailboxComposeRuntime({
+    attachmentSigningSecret: HTTP_PROOF_SECRET,
     composeSendDependencies: {},
     getAccount: () => null,
     instantlyMailboxService: null,
@@ -1623,10 +2133,14 @@ test('mailbox send response hides raw Supabase cooldown details behind a safe re
     logger: { error() {} },
   });
   const response = responseRecorder();
+  const reconcileProof = createValidHttpReconcileProof({
+    idempotencyKey: 'browser:safe-error',
+  });
 
   await runtime.sendMessageResponse({ body: {
     account: 'serve@softora.nl', to: 'prospect@example.nl', subject: 'Re: Website',
-    body: 'Dit concept moet blijven staan.', mode: 'reply', idempotencyKey: 'browser:safe-error',
+    body: 'Dit concept moet blijven staan.', mode: 'new-message', idempotencyKey: 'browser:safe-error',
+    attachments: [], attachmentsMetadata: [], reconcileProof,
   } }, response);
 
   assert.equal(response.statusCode, 503);
@@ -1636,6 +2150,8 @@ test('mailbox send response hides raw Supabase cooldown details behind a safe re
     error: 'Mail niet verzonden',
     detail: TEMPORARY_MAILBOX_SEND_MESSAGE,
     retryable: true,
+    externalEffect: false,
+    failurePhase: 'pre-dispatch',
   });
   assert.match(response.body.detail, /niet verzonden.*concept blijft staan.*probeer het opnieuw/i);
   assert.doesNotMatch(JSON.stringify(response.body), /Supabase|REST|504|cooldown|1500ms|23s/i);

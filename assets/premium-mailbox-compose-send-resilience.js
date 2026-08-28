@@ -37,6 +37,15 @@
     readMarker,
     selectMarker,
   } = sendState;
+  const PRE_DISPATCH_PROOF_REFRESH_CODES = new Set([
+    'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED',
+    'MAILBOX_SEND_RECONCILE_PROOF_INVALID',
+    'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_INVALID',
+    'MAILBOX_SEND_RECONCILE_PROOF_SIGNATURE_UNAVAILABLE',
+    'MAILBOX_SEND_RECONCILE_PROOF_TIME_INVALID',
+    'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED',
+    'MAILBOX_SEND_RECONCILE_PROOF_UNAVAILABLE',
+  ]);
   function markerAttachmentMetadata(marker) {
     const stored = normalizeAttachmentMetadata(marker?.attachmentsMetadata);
     const proof = marker?.reconcileProof && typeof marker.reconcileProof === 'object'
@@ -165,6 +174,12 @@
       && /^(smtp|instantly)-(reply|new-message)-scope:[0-9a-f]{64}$/.test(proof.scopeFingerprint)
       && typeof proof.requestPayloadFingerprint === 'string'
       && /^[0-9a-f]{64}$/.test(proof.requestPayloadFingerprint)
+      && Number.isSafeInteger(proof.issuedAtMs)
+      && Number.isSafeInteger(proof.expiresAtMs)
+      && proof.issuedAtMs > 0
+      && proof.expiresAtMs > proof.issuedAtMs
+      && typeof proof.signature === 'string'
+      && /^[0-9a-f]{64}$/.test(proof.signature)
       && proofMetadata !== null
       && attachmentMetadataEqual(proofMetadata, attachmentsMetadata);
     if (!valid) {
@@ -189,7 +204,38 @@
       scopeFingerprint: proof.scopeFingerprint,
       requestPayloadFingerprint: proof.requestPayloadFingerprint,
       attachmentsMetadata: proofMetadata,
+      issuedAtMs: proof.issuedAtMs,
+      expiresAtMs: proof.expiresAtMs,
+      signature: proof.signature,
     };
+  }
+  function canonicalReconcileProofContent(value, payload, attachmentsMetadata) {
+    const proof = value && typeof value === 'object' && !Array.isArray(value)
+      ? value : null;
+    const normalized = validateReconcileProof({
+      ...proof,
+      issuedAtMs: 1,
+      expiresAtMs: 2,
+      signature: '0'.repeat(64),
+    }, payload, attachmentsMetadata);
+    const {
+      issuedAtMs: _issuedAtMs,
+      expiresAtMs: _expiresAtMs,
+      signature: _signature,
+      ...content
+    } = normalized;
+    return content;
+  }
+  function reconcileProofContentEqual(left, right, payload, attachmentsMetadata) {
+    return JSON.stringify(canonicalReconcileProofContent(
+      left,
+      payload,
+      attachmentsMetadata
+    )) === JSON.stringify(canonicalReconcileProofContent(
+      right,
+      payload,
+      attachmentsMetadata
+    ));
   }
   function assertPreflightScope(result, payload) {
     const expected = expectedPreflightScope(payload);
@@ -231,6 +277,22 @@
         normalizeText(data?.detail || data?.error) || fallback,
         { status: Number(response?.status) || 500, retryable: data?.retryable === true }
       );
+  }
+  function serverProvedPreDispatchFailure(response, data) {
+    const status = Number(response?.status);
+    const hasDurableIdentityHeaders = [
+      'X-Softora-Send-Intent-Id',
+      'X-Softora-Message-Id',
+      'X-Softora-Provider-Message-Id',
+    ].some((name) => responseHeader(response, name));
+    return Number.isFinite(status)
+      && status >= 400
+      && status <= 599
+      && data?.ok === false
+      && data?.externalEffect === false
+      && data?.failurePhase === 'pre-dispatch'
+      && data?.result === undefined
+      && !hasDurableIdentityHeaders;
   }
   function boundedDeadline(value, fallback) {
     const numeric = Number(value);
@@ -380,7 +442,12 @@
       });
       const data = await parseJsonObject(response);
       if (!responseIsHttp200(response) || data?.ok !== true) {
-        throw responseError(response, data, 'Mail verzenden mislukt');
+        const error = responseError(response, data, 'Mail verzenden mislukt');
+        if (serverProvedPreDispatchFailure(response, data)) {
+          error.externalEffect = false;
+          error.failurePhase = 'pre-dispatch';
+        }
+        throw error;
       }
       const result = data?.result && typeof data.result === 'object' ? data.result : {};
       const durableIdentity = extractDurableIdentity(result, response);
@@ -615,6 +682,7 @@
             throw attachmentReselectError();
           }
           let failedRotations = 0;
+          let preDispatchProofRefreshes = 0;
           let mutablePreflightRequired = false;
           for (;;) {
             const attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
@@ -646,18 +714,31 @@
               continue;
             }
             mutablePreflightRequired = false;
-          if (
-            marker.reconcileProof
-            && JSON.stringify(marker.reconcileProof) !== JSON.stringify(preflight.reconcileProof)
-          ) {
-            throw createProtocolError(
-              'MAILBOX_SEND_RECONCILE_PROOF_MISMATCH',
-              'Het duurzame verzendbewijs is gewijzigd; er is niets opnieuw verzonden.'
-            );
-          }
-          if (!marker.reconcileProof) {
-            marker = patchMarker(storage, marker, { reconcileProof: preflight.reconcileProof }, options);
-          }
+            if (
+              marker.reconcileProof
+              && !reconcileProofContentEqual(
+                marker.reconcileProof,
+                preflight.reconcileProof,
+                attemptPayload,
+                effectiveAttachmentsMetadata
+              )
+            ) {
+              throw createProtocolError(
+                'MAILBOX_SEND_RECONCILE_PROOF_MISMATCH',
+                'De inhoud van het duurzame verzendbewijs is gewijzigd; er is niets opnieuw verzonden.'
+              );
+            }
+            if (
+              !marker.reconcileProof
+              || JSON.stringify(marker.reconcileProof) !== JSON.stringify(preflight.reconcileProof)
+            ) {
+              marker = patchMarker(
+                storage,
+                marker,
+                { reconcileProof: preflight.reconcileProof },
+                options
+              );
+            }
           if (preflight.status === 'accepted') {
             const durableIdentity = extractDurableIdentity(preflight.result.acceptedResult);
             try {
@@ -724,12 +805,32 @@
             staging,
             sendStartedAt: getNow(options),
           }, options);
-          const { response, data, result, durableIdentity } = await runSendRequest(
-            fetchImpl,
-            sendPayload,
-            serialize,
-            options
-          );
+          let sendExecution;
+          try {
+            sendExecution = await runSendRequest(
+              fetchImpl,
+              sendPayload,
+              serialize,
+              options
+            );
+          } catch (error) {
+            if (error?.externalEffect === false && error?.failurePhase === 'pre-dispatch') {
+              const shouldRefreshProof = PRE_DISPATCH_PROOF_REFRESH_CODES.has(
+                normalizeText(error?.code).toUpperCase()
+              ) && preDispatchProofRefreshes < 1;
+              marker = patchMarker(storage, marker, {
+                state: staging.length ? 'staged' : 'armed',
+                sendStartedAt: undefined,
+                reconcileProof: null,
+              }, options);
+              if (shouldRefreshProof) {
+                preDispatchProofRefreshes += 1;
+                continue;
+              }
+            }
+            throw error;
+          }
+          const { response, data, result, durableIdentity } = sendExecution;
           try {
             marker = patchMarker(storage, marker, { state: 'accepted', durableIdentity }, options);
           } catch (error) {

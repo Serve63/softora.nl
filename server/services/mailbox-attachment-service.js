@@ -212,7 +212,7 @@ function createMailboxAttachmentService(deps = {}) {
     throw lastError;
   }
 
-  function validateMetadata(attachment = {}) {
+  function validateMetadata(attachment = {}, options = {}) {
     const filename = safeFilename(attachment?.filename || attachment?.name);
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
     if (!filename || !MAILBOX_ATTACHMENT_EXTENSIONS.has(extension)) {
@@ -236,6 +236,12 @@ function createMailboxAttachmentService(deps = {}) {
         );
       }
       metadata.sha256 = sha256;
+    } else if (options.requireSha256 === true) {
+      throw createAttachmentError(
+        `De inhoudsvingerafdruk van bijlage "${filename}" ontbreekt; kies de bijlage opnieuw.`,
+        'MAILBOX_ATTACHMENT_SHA256_REQUIRED',
+        409
+      );
     }
     return metadata;
   }
@@ -266,13 +272,23 @@ function createMailboxAttachmentService(deps = {}) {
     }
   }
 
-  function validateReferencePayload(payload, binding, { allowExpired = false } = {}) {
+  function validateReferencePayload(payload, binding, {
+    allowExpired = false,
+    allowLegacy = false,
+  } = {}) {
     const referenceVersion = payload?.v;
     if (!payload || ![
       MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION,
       MAILBOX_ATTACHMENT_REFERENCE_VERSION,
     ].includes(referenceVersion) || payload.bucket !== bucket) {
       throw createAttachmentError('De bijlageverwijzing is ongeldig; kies de bijlage opnieuw.', 'MAILBOX_ATTACHMENT_REFERENCE_INVALID');
+    }
+    if (referenceVersion === MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION && !allowLegacy) {
+      throw createAttachmentError(
+        'Deze oude bijlageverwijzing kan niet meer worden verzonden; kies de bijlage opnieuw.',
+        'MAILBOX_ATTACHMENT_REFERENCE_INVALID',
+        409
+      );
     }
     if (!allowExpired && Number(payload.expiresAt) < now().getTime()) {
       throw createAttachmentError('De bijlage-upload is verlopen; kies de bijlage opnieuw.', 'MAILBOX_ATTACHMENT_REFERENCE_EXPIRED', 409);
@@ -284,7 +300,8 @@ function createMailboxAttachmentService(deps = {}) {
     const unsafePathSegment = storagePath.split('/').some((segment) => segment === '.' || segment === '..');
     const isLegacyPath = /^mailbox\/[a-z0-9-]+\/\d+-[^/]+$/i.test(storagePath);
     const isExpiringPath = /^mailbox\/v2\/\d{13}-[a-z0-9-]+\/\d+-[^/]+$/i.test(storagePath);
-    if ((!isLegacyPath && !isExpiringPath) || unsafePathSegment) {
+    if ((!isLegacyPath && !isExpiringPath) || unsafePathSegment
+      || (referenceVersion === MAILBOX_ATTACHMENT_REFERENCE_VERSION && !isExpiringPath)) {
       throw createAttachmentError('De bijlageverwijzing is ongeldig; kies de bijlage opnieuw.', 'MAILBOX_ATTACHMENT_REFERENCE_INVALID');
     }
     const metadata = validateMetadata(payload);
@@ -310,7 +327,7 @@ function createMailboxAttachmentService(deps = {}) {
     if (list.length > MAX_MAILBOX_ATTACHMENTS) {
       throw createAttachmentError(`Je kunt maximaal ${MAX_MAILBOX_ATTACHMENTS} bijlagen toevoegen.`);
     }
-    const metadata = list.map(validateMetadata);
+    const metadata = list.map((attachment) => validateMetadata(attachment, { requireSha256: true }));
     assertUniformHashMode(metadata);
     const totalBytes = metadata.reduce((total, item) => total + item.size, 0);
     if (totalBytes > MAX_MAILBOX_ATTACHMENTS_TOTAL_BYTES) {
@@ -339,17 +356,14 @@ function createMailboxAttachmentService(deps = {}) {
           return signedUpload;
         });
         createdPaths.push(path);
-        const referenceVersion = item.sha256
-          ? MAILBOX_ATTACHMENT_REFERENCE_VERSION
-          : MAILBOX_ATTACHMENT_LEGACY_REFERENCE_VERSION;
         const reference = signReference({
-          v: referenceVersion,
+          v: MAILBOX_ATTACHMENT_REFERENCE_VERSION,
           bucket,
           path,
           filename: item.filename,
           contentType: item.contentType,
           size: item.size,
-          ...(item.sha256 ? { sha256: item.sha256 } : {}),
+          sha256: item.sha256,
           bindingHash,
           expiresAt,
         }, signingSecret);
@@ -359,8 +373,8 @@ function createMailboxAttachmentService(deps = {}) {
           filename: item.filename,
           contentType: item.contentType,
           size: item.size,
-          ...(item.sha256 ? { sha256: item.sha256 } : {}),
-          referenceVersion,
+          sha256: item.sha256,
+          referenceVersion: MAILBOX_ATTACHMENT_REFERENCE_VERSION,
           expiresAt,
         });
       }
@@ -457,7 +471,7 @@ function createMailboxAttachmentService(deps = {}) {
     const payloads = list.map((attachment) => validateReferencePayload(
       verifyReference(attachment?.reference, signingSecret),
       binding,
-      { allowExpired: true }
+      { allowExpired: true, allowLegacy: true }
     ));
     await removePaths(payloads.map((payload) => payload.path));
     return { removed: payloads.length };
