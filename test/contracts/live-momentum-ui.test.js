@@ -31,14 +31,14 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<title>ATTACK, ATTACK, ATTACK\. \| Softora<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/winnen">/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
-  assert.match(html, /<meta name="theme-color" content="#f5f3ef" media="\(max-width: 900px\)">/);
+  assert.match(html, /<meta name="theme-color" content="#efe3e3" media="\(max-width: 900px\)">/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813b" defer><\/script>/);
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828b"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828c"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -73,6 +73,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /data-momentum-state="loading">Doelen laden…/);
   assert.match(html, /data-momentum-state="error">Laden of opslaan lukt nog niet\./);
   assert.match(html, /<body data-live-momentum-page data-momentum-mobile-view="today">/);
+  assert.match(html, /<body data-live-momentum-page data-momentum-mobile-view="today">\s*<div class="momentum-ios-statusbar-surface" aria-hidden="true"><\/div>/);
   assert.match(html, /<nav class="momentum-mobile-tabs" aria-label="Winnen overzicht">[\s\S]*data-momentum-mobile-view-target="today"[\s\S]*data-momentum-mobile-view-target="month"[\s\S]*data-momentum-mobile-view-target="endgame"/);
   assert.match(html, /class="momentum-mobile-score-ring" role="progressbar" aria-label="Momentumscore vandaag"[\s\S]*data-momentum-mobile-score>0%/);
   assert.match(html, /data-momentum-mobile-completed>0 \/ 0<\/strong> doelen voltooid/);
@@ -292,7 +293,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.status:focus-visible::before\s*\{[\s\S]*box-shadow:\s*0 0 0 3px rgba\(86, 196, 134, \.3\);/);
   assert.match(css, /@media \(max-width:\s*780px\)/);
   assert.match(mobileCss, /@media \(max-width:\s*900px\)[\s\S]*\.momentum-layout \.momentum-page\s*\{[\s\S]*width:\s*100% !important;/);
-  assert.match(mobileCss, /@media \(max-width:\s*900px\)\s*\{\s*html\s*\{\s*background-color:\s*#f5f3ef;/);
+  assert.match(mobileCss, /@media \(max-width:\s*900px\)\s*\{\s*html\s*\{\s*background-color:\s*#efe3e3;/);
+  assert.match(mobileCss, /@supports \(-webkit-touch-callout:\s*none\)\s*\{\s*\.momentum-ios-statusbar-surface\s*\{[^}]*display:\s*block;[^}]*position:\s*fixed;[^}]*z-index:\s*0;[^}]*top:\s*0;[^}]*width:\s*100%;[^}]*height:\s*32px;[^}]*background-color:\s*#efe3e3;[^}]*pointer-events:\s*none;/);
   assert.match(mobileCss, /--momentum-safe-start:\s*max\(16px, env\(safe-area-inset-left\)\);/);
   assert.match(mobileCss, /padding:\s*max\(12px, env\(safe-area-inset-top\)\) var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
   assert.match(mobileCss, /\.momentum-mobile-nav\s*\{\s*display:\s*none;/);

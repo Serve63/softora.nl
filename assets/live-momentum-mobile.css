@@ -1,10 +1,11 @@
-.momentum-mobile-nav, .momentum-mobile-tabs, .momentum-mobile-summary, .momentum-mobile-month-heading, .momentum-mobile-list-heading { display: none; }
+.momentum-ios-statusbar-surface, .momentum-mobile-nav, .momentum-mobile-tabs, .momentum-mobile-summary, .momentum-mobile-month-heading, .momentum-mobile-list-heading { display: none; }
 .momentum-persistence-status, .end-game-scroll-hint { display: none; }
 @media (max-width: 1200px) { .bar-chart-viewport { overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: none; }
 .bar-chart-viewport::-webkit-scrollbar { display: none; }
 }
-@media (max-width: 900px) { html { background-color: #f5f3ef; }
+@media (max-width: 900px) { html { background-color: #efe3e3; }
 body[data-live-momentum-page] { background: radial-gradient(circle at 92% 4%, rgba(165, 32, 85, .08), transparent 30%), #f5f3ef; }
+@supports (-webkit-touch-callout: none) { .momentum-ios-statusbar-surface { display: block; position: fixed; z-index: 0; top: 0; left: 0; width: 100%; height: 32px; background-color: #efe3e3; pointer-events: none; } }
 .momentum-layout .sidebar { display: none !important; }
 .momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: max(12px, env(safe-area-inset-top)) var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
 .momentum-art-quotes { display: none; }
