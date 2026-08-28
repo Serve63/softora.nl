@@ -229,6 +229,9 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.match(source, /Wat bepaalt de kosten\?/);
   assert.match(source, /Hoe lang duurt een eerste versie\?/);
   assert.match(source, /Hoe blijft klantdata bruikbaar\?/);
+  assert.match(source, /Blijft het knelpunt bij leads, offertes en klantopvolging/);
+  assert.match(source, /planning, uitvoering, klantportaal, projectdata of andere afdelingen/);
+  assert.match(source, /<a href="\/bedrijfssoftware-op-maat">bedrijfssoftware laat maken<\/a>/);
   assert.match(source, /CRM op maat of standaard CRM\?/);
   assert.match(source, /Wanneer kies je voor een CRM op maat\?/);
   assert.match(source, /Welke modules zijn logisch\?/);
@@ -253,6 +256,8 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
   assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
+  assert.equal(entry.lastmod, '2026-08-28');
+  assert.equal(entry.growthEventKind, 'other_growth_action');
 
   const graph = getStructuredDataGraph(source);
   const service = graph.find((item) => item['@type'] === 'Service');

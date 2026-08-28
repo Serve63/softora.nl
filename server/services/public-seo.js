@@ -109,8 +109,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'CRM op maat laten bouwen voor MKB',
     description:
       'Laat een maatwerk CRM bouwen voor sales pipeline, offertebeheer, klantportaal, dashboards en AI-opvolging. Voor MKB-teams die CRM willen laten maken.',
-    lastmod: '2026-07-04',
-    growthEventKind: 'substantial_refresh',
+    lastmod: '2026-08-28',
+    growthEventKind: 'other_growth_action',
     growthCluster: 'software-crm',
     kind: 'service',
     serviceName: 'CRM systeem op maat',

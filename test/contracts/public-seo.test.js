@@ -133,7 +133,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   );
   assert.match(
     sitemap,
-    /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>\s*<lastmod>2026-07-04<\/lastmod>/
+    /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>\s*<lastmod>2026-08-28<\/lastmod>/
   );
   assert.match(
     sitemap,

@@ -89,7 +89,7 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
     events.map((event) => [event.path, event.eventAt, event.publicationKind]),
     [
       ['/bedrijfssoftware-op-maat', '2026-08-06', 'substantial_refresh'],
-      ['/crm-systeem-op-maat', '2026-07-04', 'substantial_refresh'],
+      ['/crm-systeem-op-maat', '2026-08-28', 'other_growth_action'],
       ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
       ['/ai-telefonist', '2026-08-23', 'other_growth_action'],
     ]
