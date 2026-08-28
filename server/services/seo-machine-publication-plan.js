@@ -5,6 +5,7 @@ const {
   getSeoContentPublicationPlan,
 } = require('./seo-content');
 const { INDEXABLE_PUBLIC_SEO_PAGES } = require('./public-seo');
+const { resolvePublicationLane } = require('./seo-machine-publication-lanes');
 
 function publicationDayMs(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -20,6 +21,7 @@ function getPublicSeoGrowthEventPlan({ now = new Date() } = {}) {
       const eventMs = publicationDayMs(entry.lastmod);
       return {
         collection: entry.kind || 'public-page',
+        publicationLane: resolvePublicationLane({ collection: entry.kind || 'public-page' }),
         path: entry.path,
         title: entry.title,
         cluster: entry.growthCluster || entry.kind || 'public-page',
@@ -39,6 +41,7 @@ function getSeoContentGrowthEventPlan({ now = new Date() } = {}) {
       const eventMs = publicationDayMs(item.growthEventAt);
       return {
         collection: item.collection,
+        publicationLane: resolvePublicationLane(item),
         path: getSeoContentPathForItem(item),
         title: item.title,
         cluster: getSeoContentClusterForItem(item).key,
@@ -52,7 +55,10 @@ function getSeoContentGrowthEventPlan({ now = new Date() } = {}) {
 
 function getSeoMachinePublicationPlan({ now = new Date() } = {}) {
   return [
-    ...getSeoContentPublicationPlan({ now }),
+    ...getSeoContentPublicationPlan({ now }).map((item) => ({
+      ...item,
+      publicationLane: resolvePublicationLane(item),
+    })),
     ...getSeoContentGrowthEventPlan({ now }),
     ...getPublicSeoGrowthEventPlan({ now }),
   ].sort((a, b) => (

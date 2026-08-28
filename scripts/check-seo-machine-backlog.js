@@ -20,8 +20,10 @@ function runCli() {
     }
     console.log(
       `[seo-backlog] GREEN: ${result.summary.ready} ready, `
+      + `${result.summary.editorialReady} redactioneel, ${result.summary.moneyPageReady} money page, `
       + `${Math.round(result.summary.commercialShare * 100)}% commercieel, `
-      + `topkandidaat ${result.summary.topReady[0].id} (${result.summary.topReady[0].score}).`
+      + `top redactioneel ${result.summary.topReadyEditorial[0].id} `
+      + `(${result.summary.topReadyEditorial[0].score}).`
     );
   } catch (error) {
     console.error(`[seo-backlog] RED: ${error.message || String(error)}`);

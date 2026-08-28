@@ -1,12 +1,18 @@
 const { getSeoMachinePublicationPlan } = require('./seo-machine-publication-plan');
+const {
+  PUBLICATION_LANES,
+  resolvePublicationLane,
+} = require('./seo-machine-publication-lanes');
 
 const DEFAULT_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_HEALTH_PATH = '/api/health/baseline';
 const DEFAULT_SITEMAP_PATH = '/sitemap.xml';
 const DEFAULT_WINDOWS = Object.freeze([7, 28]);
 const DAILY_TARGET = 1;
-const WEEKLY_MINIMUM = 5;
+const WEEKLY_MINIMUM = 7;
 const WEEKLY_TARGET_MAXIMUM = 7;
+const WEEKLY_EDITORIAL_MINIMUM = 5;
+const WEEKLY_MONEY_PAGE_MAXIMUM = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PUBLICATION_KINDS = Object.freeze({
   NEW_URL: 'new_url',
@@ -168,6 +174,7 @@ function buildPublicationAudit({
   const xRobotsTag = String(response.headers.get('x-robots-tag') || '').toLowerCase();
   const contentType = String(response.headers.get('content-type') || '').toLowerCase();
   const publicationKind = resolvePublicationKind(item);
+  const publicationLane = resolvePublicationLane(item);
   const eventAt = resolvePublicationEventAt(item);
   const datePublished = extractDatePublished(html);
   const dateModified = extractDateModified(html);
@@ -194,6 +201,7 @@ function buildPublicationAudit({
     publishedAt: item.publishedAt,
     eventAt,
     publicationKind,
+    publicationLane,
     status: response.status,
     canonical,
     datePublished,
@@ -223,7 +231,20 @@ function buildWindowSummary(items, now, days) {
   const countKind = (kind) => qualifyingItems.filter((item) => (
     resolvePublicationKind(item) === kind
   )).length;
+  const newUrlItems = qualifyingItems.filter((item) => (
+    resolvePublicationKind(item) === PUBLICATION_KINDS.NEW_URL
+  ));
+  const countLane = (lane) => newUrlItems.filter((item) => (
+    resolvePublicationLane(item) === lane
+  )).length;
   const target = Math.round((days / 7) * WEEKLY_MINIMUM);
+  const editorialMinimum = Math.round((days / 7) * WEEKLY_EDITORIAL_MINIMUM);
+  const moneyPageMaximum = Math.round((days / 7) * WEEKLY_MONEY_PAGE_MAXIMUM);
+  const editorialNewUrls = countLane(PUBLICATION_LANES.EDITORIAL);
+  const moneyPageNewUrls = countLane(PUBLICATION_LANES.MONEY_PAGE);
+  const otherNewUrls = countLane(PUBLICATION_LANES.OTHER);
+  const unclassifiedNewUrls = countLane(PUBLICATION_LANES.UNCLASSIFIED);
+  const growthNewUrls = editorialNewUrls + moneyPageNewUrls;
   return {
     days,
     target,
@@ -231,9 +252,19 @@ function buildWindowSummary(items, now, days) {
     declared: cohort.length,
     qualifying: qualifyingItems.length,
     newUrls: countKind(PUBLICATION_KINDS.NEW_URL),
+    growthNewUrls,
+    editorialNewUrls,
+    moneyPageNewUrls,
+    otherNewUrls,
+    unclassifiedNewUrls,
+    editorialMinimum,
+    editorialDeficit: Math.max(0, editorialMinimum - editorialNewUrls),
+    moneyPageMaximum,
+    moneyPageCapacity: Math.max(0, moneyPageMaximum - moneyPageNewUrls),
+    moneyPageCapReached: moneyPageNewUrls >= moneyPageMaximum,
     substantialRefreshes: countKind(PUBLICATION_KINDS.SUBSTANTIAL_REFRESH),
     otherGrowthActions: countKind(PUBLICATION_KINDS.OTHER_GROWTH_ACTION),
-    deficit: Math.max(0, target - qualifyingItems.length),
+    deficit: Math.max(0, target - growthNewUrls),
     items: cohort,
   };
 }
@@ -305,6 +336,7 @@ async function collectLivePublicationLedger(options = {}) {
         publishedAt: item.publishedAt,
         eventAt: resolvePublicationEventAt(item),
         publicationKind: resolvePublicationKind(item),
+        publicationLane: resolvePublicationLane(item),
         status: 0,
         canonical: '',
         datePublished: '',
@@ -329,6 +361,13 @@ async function collectLivePublicationLedger(options = {}) {
     const failedBlockers = crawlBlockerChecks.filter((checkName) => !item.checks[checkName]);
     if (failedBlockers.length) {
       errors.push(`${item.path} heeft live publicatieblokkers: ${failedBlockers.join(', ')}.`);
+    }
+    if (
+      item.qualifies
+      && item.publicationKind === PUBLICATION_KINDS.NEW_URL
+      && item.publicationLane === PUBLICATION_LANES.UNCLASSIFIED
+    ) {
+      errors.push(`${item.path} heeft geen geclassificeerde publicatielane.`);
     }
   }
 
@@ -365,17 +404,36 @@ function evaluateCadence({ ledger, backlogResult, weeklyMinimum = WEEKLY_MINIMUM
   }
   const weeklyWindow = ledger.windows && ledger.windows['7'];
   const qualifying = Number((weeklyWindow && weeklyWindow.qualifying) || 0);
-  const deficit = Math.max(0, weeklyMinimum - qualifying);
+  const growthNewUrls = Number((weeklyWindow && weeklyWindow.growthNewUrls) || 0);
+  const editorialNewUrls = Number((weeklyWindow && weeklyWindow.editorialNewUrls) || 0);
+  const moneyPageNewUrls = Number((weeklyWindow && weeklyWindow.moneyPageNewUrls) || 0);
+  const deficit = Math.max(0, weeklyMinimum - growthNewUrls);
+  const editorialDeficit = Math.max(0, WEEKLY_EDITORIAL_MINIMUM - editorialNewUrls);
+  const moneyPageCapReached = moneyPageNewUrls >= WEEKLY_MONEY_PAGE_MAXIMUM;
+  const requiredPublicationLane = editorialDeficit > 0 || moneyPageCapReached
+    ? PUBLICATION_LANES.EDITORIAL
+    : null;
+  const nextCandidate = requiredPublicationLane === PUBLICATION_LANES.EDITORIAL
+    ? backlogResult.summary.topReadyEditorial?.[0]
+    : backlogResult.summary.topReady[0];
   if (deficit > 0) {
     return {
       status: 'content_required',
       color: 'red',
       exitCode: 2,
-      action: 'publish_highest_scoring_ready_candidate',
+      action: requiredPublicationLane === PUBLICATION_LANES.EDITORIAL
+        ? 'publish_highest_scoring_ready_editorial_candidate_with_supporting_optimization'
+        : 'publish_highest_scoring_ready_growth_candidate_with_supporting_optimization',
       qualifying,
+      growthNewUrls,
+      editorialNewUrls,
+      moneyPageNewUrls,
       weeklyMinimum,
       deficit,
-      nextCandidate: backlogResult.summary.topReady[0] || null,
+      editorialDeficit,
+      requiredPublicationLane,
+      moneyPageCapReached,
+      nextCandidate: nextCandidate || null,
       errors: [],
     };
   }
@@ -385,6 +443,9 @@ function evaluateCadence({ ledger, backlogResult, weeklyMinimum = WEEKLY_MINIMUM
     exitCode: 0,
     action: 'choose_highest_expected_qualified_impact',
     qualifying,
+    growthNewUrls,
+    editorialNewUrls,
+    moneyPageNewUrls,
     weeklyMinimum,
     deficit: 0,
     nextCandidate: backlogResult.summary.topReady[0] || null,
@@ -398,6 +459,8 @@ module.exports = {
   DEFAULT_WINDOWS,
   PUBLICATION_KINDS,
   WEEKLY_MINIMUM,
+  WEEKLY_EDITORIAL_MINIMUM,
+  WEEKLY_MONEY_PAGE_MAXIMUM,
   WEEKLY_TARGET_MAXIMUM,
   buildPublicationAudit,
   buildPublicationCandidates,

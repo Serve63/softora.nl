@@ -1,4 +1,5 @@
 const path = require('node:path');
+const { PUBLICATION_LANES } = require('./seo-machine-publication-lanes');
 
 const SELECTION_SCHEMA_VERSION = 1;
 const MIN_PRIORITIZED_REVIEWS = 3;
@@ -24,6 +25,14 @@ const ALLOWED_SKIP_REASONS = new Set([
   'external_merge_or_deploy_blocker',
 ]);
 const RECENCY_SKIP_REASONS = new Set(['recent_material_change', 'protect_proven_winner']);
+const ALLOWED_SUPPORTING_ACTION_TYPES = new Set([
+  'contextual_internal_link',
+  'existing_page_refresh',
+  'query_page_match',
+  'snippet_improvement',
+  'discovery_or_indexation_improvement',
+  'conversion_improvement',
+]);
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -48,7 +57,27 @@ function sameOpportunity(review, opportunity) {
     && normalizeComparable(review?.page) === normalizeComparable(opportunity?.page);
 }
 
-function validateSelectedAction(selected, errors) {
+function validateSupportingAction(selected, errors) {
+  const supportingAction = selected.supportingAction;
+  if (!supportingAction || typeof supportingAction !== 'object') {
+    errors.push('Een nieuwe URL vereist selected.supportingAction op een bestaande publieke pagina.');
+    return;
+  }
+  if (!ALLOWED_SUPPORTING_ACTION_TYPES.has(normalizeText(supportingAction.type))) {
+    errors.push('selected.supportingAction.type is ongeldig.');
+  }
+  if (!normalizeText(supportingAction.path).startsWith('/')) {
+    errors.push('selected.supportingAction.path moet een publieke Softora-route zijn.');
+  }
+  if (normalizeText(supportingAction.path) === normalizeText(selected.path)) {
+    errors.push('selected.supportingAction.path moet een bestaande andere pagina versterken.');
+  }
+  if (normalizeText(supportingAction.evidence).length < 20) {
+    errors.push('selected.supportingAction.evidence mist controleerbare onderbouwing.');
+  }
+}
+
+function validateSelectedAction(selected, evidence, errors) {
   if (!selected || typeof selected !== 'object') {
     errors.push('selected ontbreekt.');
     return;
@@ -63,6 +92,35 @@ function validateSelectedAction(selected, errors) {
   if (normalizeText(selected.selectionEvidence).length < 20) {
     errors.push('selected.selectionEvidence mist controleerbaar vergelijkingsbewijs.');
   }
+  if (normalizeText(selected.actionType) !== 'new_url') return;
+
+  const publicationLane = normalizeText(selected.publicationLane);
+  if (![PUBLICATION_LANES.EDITORIAL, PUBLICATION_LANES.MONEY_PAGE].includes(publicationLane)) {
+    errors.push('Een nieuwe URL vereist publicationLane editorial of money_page.');
+  }
+  const controlPlane = evidence.controlPlane || {};
+  if (
+    normalizeText(controlPlane.requiredPublicationLane)
+    && publicationLane !== normalizeText(controlPlane.requiredPublicationLane)
+  ) {
+    errors.push(`De cadence vereist publicationLane ${controlPlane.requiredPublicationLane}.`);
+  }
+  if (
+    Array.isArray(controlPlane.allowedPublicationLanes)
+    && !controlPlane.allowedPublicationLanes.includes(publicationLane)
+  ) {
+    errors.push(`publicationLane ${publicationLane} is niet toegestaan door de cadence.`);
+  }
+  if (
+    publicationLane === PUBLICATION_LANES.MONEY_PAGE
+    && (
+      controlPlane.moneyPageAllowed !== true
+      || Number(controlPlane.moneyPageNewUrls) >= Number(controlPlane.maximumMoneyPageNewUrlsPerWeek)
+    )
+  ) {
+    errors.push('De rollende geldpagina-cap laat deze nieuwe money page niet toe.');
+  }
+  validateSupportingAction(selected, errors);
 }
 
 function validateSkipEvidence(review, evidence, errors) {
@@ -117,7 +175,7 @@ function validateSelectionEvidence(evidence = {}, report = {}) {
     errors.push('sourceReport.path moet een veilig relatief repopad zijn.');
   }
   if (!normalizeText(evidence.machineState)) errors.push('machineState ontbreekt.');
-  validateSelectedAction(evidence.selected, errors);
+  validateSelectedAction(evidence.selected, evidence, errors);
 
   const reviews = Array.isArray(evidence.prioritizedReview) ? evidence.prioritizedReview : [];
   const requiredReviewCount = Math.min(MIN_PRIORITIZED_REVIEWS, prioritized.length);
@@ -174,6 +232,11 @@ function validateSelectionEvidence(evidence = {}, report = {}) {
     summary: {
       selectedSource: normalizeText(evidence?.selected?.source) || null,
       selectedPath: normalizeText(evidence?.selected?.path) || null,
+      selectedPublicationLane: normalizeText(evidence?.selected?.publicationLane) || null,
+      supportingAction: evidence?.selected?.supportingAction ? {
+        type: normalizeText(evidence.selected.supportingAction.type) || null,
+        path: normalizeText(evidence.selected.supportingAction.path) || null,
+      } : null,
       prioritizedAvailable: prioritized.length,
       prioritizedReviewed: Math.min(reviews.length, requiredReviewCount),
       highestOpportunity: prioritized[0] ? {
@@ -189,6 +252,7 @@ function validateSelectionEvidence(evidence = {}, report = {}) {
 
 module.exports = {
   ALLOWED_SKIP_REASONS,
+  ALLOWED_SUPPORTING_ACTION_TYPES,
   MIN_PRIORITIZED_REVIEWS,
   SELECTION_SCHEMA_VERSION,
   isSafeRelativePath,
