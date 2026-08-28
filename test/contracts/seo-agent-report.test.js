@@ -70,6 +70,48 @@ test('seo agent report client uses OAuth refresh token and Search Console endpoi
   assert.equal(calls[1].options.headers.Authorization, 'Bearer access-token');
 });
 
+test('seo agent refreshes one stale configured token once across concurrent requests', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    const request = { url: String(url), authorization: options.headers?.Authorization || null };
+    calls.push(request);
+    if (request.url.includes('oauth2.googleapis.com/token')) {
+      return jsonResponse({ access_token: 'fresh-token', expires_in: 3600 });
+    }
+    if (request.url.includes('/urlInspection/index:inspect')) {
+      if (request.authorization === 'Bearer stale-token') {
+        return jsonResponse({ error: { message: 'Invalid Credentials' } }, 401);
+      }
+      if (request.authorization === 'Bearer fresh-token') {
+        return jsonResponse({
+          inspectionResult: { indexStatusResult: { verdict: 'PASS', coverageState: 'Submitted and indexed' } },
+        });
+      }
+    }
+    throw new Error(`Unexpected request ${request.url} ${request.authorization}`);
+  };
+  const client = createSearchConsoleClient({
+    fetchImpl,
+    config: {
+      siteUrl: 'sc-domain:softora.nl',
+      accessToken: 'stale-token',
+      clientId: 'client',
+      clientSecret: 'secret',
+      refreshToken: 'refresh',
+    },
+  });
+
+  const inspections = await Promise.all([
+    client.inspectUrl('https://www.softora.nl/website-laten-maken'),
+    client.inspectUrl('https://www.softora.nl/crm-systeem-op-maat'),
+  ]);
+
+  assert.equal(inspections.length, 2);
+  assert.equal(calls.filter((call) => call.url.includes('oauth2.googleapis.com/token')).length, 1);
+  assert.equal(calls.filter((call) => call.authorization === 'Bearer stale-token').length, 2);
+  assert.equal(calls.filter((call) => call.authorization === 'Bearer fresh-token').length, 2);
+});
+
 test('seo agent snapshot queries current and previous pages, queries, page-query rows and sitemaps', async () => {
   const calls = [];
   const client = {

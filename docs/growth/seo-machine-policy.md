@@ -37,7 +37,7 @@ De automation blijft na het halen of verstrijken van die datum actief totdat Ser
 - Vergelijk 7, 28 en 90 dagen voor non-branded verkeer, money pages en queryclusters.
 - Beoordeel welke experimenten voldoende data hebben en plan het volgende cluster.
 - Bewaak nieuwe URL's en refreshes apart. Een substantiële refresh, interne-linkactie of designverbetering mag de minimumvloer voor echt nieuwe URL's nooit invullen.
-- Houd per rollende 7 dagen minimaal 1 nieuwe URL in `data_degraded`, `indexation_recovery`, `quality_recovery` en `performance_recovery`, 3 in `growth` en 5 in `scale`, binnen de maxima uit de control-plane-tabel.
+- Houd per rollende 7 dagen minimaal 1 nieuwe URL in `data_degraded`, `indexation_recovery` en `quality_recovery`, minimaal 3 in `performance_recovery` en `growth`, en 5 in `scale`, binnen de maxima uit de control-plane-tabel.
 - Als de vloer is gemist, publiceert de eerstvolgende veilige run de hoogst scorende unieke backlogkandidaat. Alleen een echte operationele P0, aantoonbare cannibalisatie van alle veilige kandidaten of een externe merge/deployblokkade mag dit tegenhouden.
 - Houd minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs vooruit in `docs/growth/seo-machine-backlog.json`, verdeeld over de commerciële clusters. Dit versieerbare JSON-register is de enige backlogbron; de automation memory bewaart alleen runhistorie, experimenten en beslissingen.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
@@ -68,7 +68,7 @@ De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. A
 | `operations_p0` | Live-versie, crawlbaarheid, sitemap, backlog of verplichte tooling blokkeert veilige uitvoering | Alleen de blocker repareren | 0 | 0 |
 | `data_degraded` | GSC- of URL Inspection-data ontbreekt of is onvoldoende betrouwbaar | Meting repareren en alleen eerder bewijsdekte veilige verbetering uitvoeren | 1 | 2 |
 | `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Een bewijsdekte nieuwe ingang behouden; vooral discovery, canonicals, consolidatie en contextuele links verbeteren | 1 | 2 |
-| `performance_recovery` | Minimaal vijf D28-URL's zijn reviewbaar en minder dan 40% krijgt non-branded impressies, of de cohort heeft minstens 100 impressies zonder klik | Een bewijsdekte nieuwe ingang behouden; vooral query/pagina-match, snippets, interne routes en consolidatie verbeteren | 1 | 2 |
+| `performance_recovery` | Minimaal vijf D28-URL's zijn reviewbaar en minder dan 40% krijgt non-branded impressies, of de cohort heeft minstens 100 impressies zonder klik | Publiceer om de dag een sterke nieuwe ingang en gebruik de overige runs vooral voor query/pagina-match, snippets, interne routes en consolidatie | 3 | 5 |
 | `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Een bewijsdekte nieuwe ingang behouden; vooral unieke informatiewinst toevoegen of overlap consolideren | 1 | 2 |
 | `growth` | Techniek en herstelpoorten zijn groen | Hoogste verwachte gekwalificeerde impact kiezen | 3 | 5 |
 | `scale` | Minimaal vijf reviewbare URL's, minstens 80% D14/D28-indexatie, minstens 60% D28-dekking met non-branded impressies, ten minste een non-branded klik en groene kwaliteit | Gecontroleerd opschalen | 5 | 7 |
@@ -76,6 +76,8 @@ De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. A
 Deze percentages zijn interne operationele veiligheidsgrenzen, geen door Google gepubliceerde rankingfactoren. Iedere niet-geindexeerde nieuwe URL krijgt een bewijsstatus `already_indexed`, `requested`, `quota_blocked`, `browser_blocked` of `failed` in de automation memory. Een status anders dan `already_indexed` of `requested` blijft openstaan voor de volgende run. Vraag niet opnieuw aan zonder materiele wijziging of gedocumenteerd vervolgvenster.
 
 Meetbare D28-uitkomstzwakte heeft na data- en indexatieherstel voorrang op generieke corpuskwaliteitsschuld. Daardoor kan een blijvend hoge historische templatescore niet eindeloos verbergen dat reviewbare pagina's geen relevante non-branded zichtbaarheid of klikken krijgen. Kandidaat-, claim-, overlap- en visualpoorten blijven wel harde publicatiepoorten: `performance_recovery` is nooit toestemming om zwakke of overlappende content te publiceren.
+
+`performance_recovery` is geen publicatiestop. Zolang indexatie, overlap, claims en kandidaten groen zijn, houdt de machine met 3 tot 5 nieuwe URL's per rollende week voldoende zoekoppervlak en topical coverage in beweging; de resterende dagelijkse runs herstellen bestaande query/pagina-matches en interne routes.
 
 `npm run seo:publications:report` rapporteert daarom afzonderlijk `newUrls`, `substantialRefreshes` en `otherGrowthActions`. Alleen `newUrls` verlaagt de nieuwe-URL-achterstand. Zodra `newUrlDeficit` groter is dan nul, overschrijft `publish_new_url_from_highest_scoring_safe_ready_candidate` de normale herstelactie voor die run.
 

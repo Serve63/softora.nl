@@ -19,7 +19,8 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /Onderhoud aan een oude PR[\s\S]*tellen niet als publieke groeilevering/i);
   assert.match(policy, /cooldown geldt alleen voor dezelfde URL/i);
   assert.match(policy, /nieuwe URL's en refreshes apart/i);
-  assert.match(policy, /minimaal 1 nieuwe URL in `data_degraded`[\s\S]*`indexation_recovery`[\s\S]*`quality_recovery`[\s\S]*`performance_recovery`[\s\S]*3 in `growth`[\s\S]*5 in `scale`/i);
+  assert.match(policy, /minimaal 1 nieuwe URL in `data_degraded`[\s\S]*`indexation_recovery`[\s\S]*`quality_recovery`[\s\S]*minimaal 3 in `performance_recovery` en `growth`[\s\S]*5 in `scale`/i);
+  assert.match(policy, /`performance_recovery` is geen publicatiestop[\s\S]*3 tot 5 nieuwe URL's per rollende week/i);
   assert.match(policy, /`newUrls`[\s\S]*`substantialRefreshes`[\s\S]*`otherGrowthActions`/i);
   assert.match(policy, /Alleen `newUrls` verlaagt de nieuwe-URL-achterstand/i);
   assert.match(policy, /`indexation_recovery`/i);

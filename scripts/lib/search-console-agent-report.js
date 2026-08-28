@@ -162,12 +162,24 @@ function createSearchConsoleClient(options = {}) {
   };
   const fetchImpl = options.fetchImpl || fetch;
   let tokenCache = null;
+  let refreshPromise = null;
+  let configuredAccessTokenEnabled = Boolean(normalizeString(config.accessToken));
 
-  async function resolveAccessToken() {
-    if (normalizeString(config.accessToken)) return normalizeString(config.accessToken);
-    if (tokenCache && tokenCache.expiresAtMs - 60000 > Date.now()) return tokenCache.accessToken;
+  function hasRefreshCredentials() {
+    return Boolean(
+      normalizeString(config.clientId)
+      && normalizeString(config.clientSecret)
+      && normalizeString(config.refreshToken)
+    );
+  }
 
-    const missing = getMissingSearchConsoleConfig(config);
+  async function refreshAccessToken() {
+    if (refreshPromise) return refreshPromise;
+    const missing = [
+      !normalizeString(config.clientId) ? 'GSC_CLIENT_ID' : null,
+      !normalizeString(config.clientSecret) ? 'GSC_CLIENT_SECRET' : null,
+      !normalizeString(config.refreshToken) ? 'GSC_REFRESH_TOKEN' : null,
+    ].filter(Boolean);
     if (missing.length > 0) {
       const error = new Error(`Search Console OAuth ontbreekt: ${missing.join(', ')}`);
       error.code = 'GSC_CONFIG_MISSING';
@@ -175,40 +187,79 @@ function createSearchConsoleClient(options = {}) {
       throw error;
     }
 
-    const response = await fetchImpl(config.tokenUrl || GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        refresh_token: config.refreshToken,
-        grant_type: 'refresh_token',
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.access_token) {
-      const error = new Error(`Search Console OAuth token mislukt (${response.status})`);
-      error.status = response.status;
-      error.data = data;
-      throw error;
-    }
+    refreshPromise = (async () => {
+      const response = await fetchImpl(config.tokenUrl || GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          refresh_token: config.refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.access_token) {
+        const error = new Error(`Search Console OAuth token mislukt (${response.status})`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
 
-    tokenCache = {
-      accessToken: normalizeString(data.access_token),
-      expiresAtMs: Date.now() + Math.max(300, toFiniteNumber(data.expires_in, 3600)) * 1000,
-    };
-    return tokenCache.accessToken;
+      tokenCache = {
+        accessToken: normalizeString(data.access_token),
+        expiresAtMs: Date.now() + Math.max(300, toFiniteNumber(data.expires_in, 3600)) * 1000,
+      };
+      return tokenCache.accessToken;
+    })();
+
+    try {
+      return await refreshPromise;
+    } finally {
+      refreshPromise = null;
+    }
+  }
+
+  async function resolveAccessToken(options = {}) {
+    if (!options.forceRefresh && configuredAccessTokenEnabled) return normalizeString(config.accessToken);
+    if (tokenCache && tokenCache.expiresAtMs - 60000 > Date.now()) return tokenCache.accessToken;
+    return refreshAccessToken();
+  }
+
+  async function fetchWithOAuthRetry(url, requestOptions = {}) {
+    const initialToken = await resolveAccessToken();
+    const request = (token) => fetchImpl(url, {
+      ...requestOptions,
+      headers: {
+        ...(requestOptions.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const response = await request(initialToken);
+    if (response.status !== 401 || !hasRefreshCredentials()) return response;
+
+    configuredAccessTokenEnabled = false;
+    let retryToken = null;
+    if (
+      tokenCache
+      && tokenCache.expiresAtMs - 60000 > Date.now()
+      && tokenCache.accessToken !== initialToken
+    ) {
+      retryToken = tokenCache.accessToken;
+    } else {
+      if (tokenCache && tokenCache.accessToken === initialToken) tokenCache = null;
+      retryToken = await resolveAccessToken({ forceRefresh: true });
+    }
+    return request(retryToken);
   }
 
   async function requestJson(path, requestOptions = {}) {
-    const token = await resolveAccessToken();
-    const response = await fetchImpl(`${config.apiBaseUrl || SEARCH_CONSOLE_API_BASE}${path}`, {
+    const response = await fetchWithOAuthRetry(`${config.apiBaseUrl || SEARCH_CONSOLE_API_BASE}${path}`, {
       ...requestOptions,
       headers: {
         Accept: 'application/json',
         ...(requestOptions.body ? { 'Content-Type': 'application/json' } : {}),
         ...(requestOptions.headers || {}),
-        Authorization: `Bearer ${token}`,
       },
     });
     const data = await response.json().catch(() => ({}));
@@ -248,15 +299,13 @@ function createSearchConsoleClient(options = {}) {
   }
 
   async function inspectUrl(inspectionUrl, siteUrl = config.siteUrl || DEFAULT_SITE_URL) {
-    const token = await resolveAccessToken();
-    const response = await fetchImpl(
+    const response = await fetchWithOAuthRetry(
       `${config.inspectionApiBaseUrl || SEARCH_CONSOLE_INSPECTION_API_BASE}/urlInspection/index:inspect`,
       {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           inspectionUrl: normalizeString(inspectionUrl),
