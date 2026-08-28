@@ -115,6 +115,7 @@ body[data-momentum-mobile-view="endgame"] .end-game-mission-complete svg { width
 body[data-momentum-mobile-view="endgame"] .end-game-mission-complete strong { font-size: .9rem; }
 body[data-momentum-mobile-view="endgame"] .end-game-mission-actions { left: 92px; flex-direction: row; gap: 6px; padding: 12px 10px; border-radius: 0 18px 18px 0; }
 body[data-momentum-mobile-view="endgame"] .end-game-mission-actions button { flex: 1; min-height: 44px; padding: 6px; font-size: .72rem; }
+body[data-live-momentum-page] .momentum-mobile-month-heading, body[data-live-momentum-page] .end-game-heading, body[data-live-momentum-page] .end-game-scroll-hint, body[data-live-momentum-page] .end-game-goals { display: none !important; }
 .icon-picker-backdrop { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); overscroll-behavior: contain; }
 .icon-picker { max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); padding: 16px; overscroll-behavior: contain; }
 .icon-picker-close { flex: 0 0 44px; width: 44px; height: 44px; touch-action: manipulation; }

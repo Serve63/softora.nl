@@ -38,7 +38,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828c"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828d"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -317,6 +317,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-card-slot,[\s\S]*min-height:\s*96px;[\s\S]*touch-action:\s*pan-y;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-card-number\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;[\s\S]*touch-action:\s*none;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-heading\s*\{[\s\S]*margin:\s*42px 0 0;/);
+  assert.match(mobileCss, /body\[data-live-momentum-page\] \.momentum-mobile-month-heading,\s*body\[data-live-momentum-page\] \.end-game-heading,\s*body\[data-live-momentum-page\] \.end-game-scroll-hint,\s*body\[data-live-momentum-page\] \.end-game-goals\s*\{\s*display:\s*none !important;/);
   assert.match(mobileCss, /body\[data-live-momentum-page\] \.chart-card,\s*body\[data-momentum-mobile-view="month"\] \.chart-card\s*\{[\s\S]*display:\s*block;/);
   assert.match(mobileCss, /body\[data-live-momentum-page\] \.habit-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 68px;/);
   assert.match(mobileCss, /body\[data-live-momentum-page\] \.momentum-hero\s*\{\s*display:\s*block;/);
