@@ -135,7 +135,7 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /<h1 id="momentum-access-title">Toegangscode<\/h1>/);
   assert.match(html, /data-momentum-access-dots/);
   assert.equal((html.match(/data-momentum-access-digit=/g) || []).length, 10);
-  assert.match(html, /live-momentum-access\.css\?v=20260818c/);
+  assert.match(html, /live-momentum-access\.css\?v=20260828a/);
   assert.match(html, /settings-module-routes\.js\?v=20260818b/);
   assert.match(html, /settings-module-back\.js\?v=20260814b/);
   assert.equal((html.match(/data-settings-module-back-host/g) || []).length, 1);
@@ -150,6 +150,9 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.doesNotMatch(css, /momentum-access-art|ATTACK, ATTACK, ATTACK|THE END GAME IS TO WIN/i);
   assert.match(css, /width:\s*min\(100%,\s*390px\)/);
   assert.match(css, /height:\s*52px/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*body\[data-live-momentum-access-page\][\s\S]*\.sidebar\[data-static-sidebar="1"\][\s\S]*display:\s*none !important/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.momentum-access-page[\s\S]*width:\s*100% !important[\s\S]*margin-left:\s*0 !important/);
+  assert.doesNotMatch(css.slice(0, css.indexOf('@media (max-width: 900px)')), /momentum-access-layout[\s\S]*display:\s*none/);
   assert.match(js, /fetch\('\/api\/live-momentum\/access'/);
   assert.match(js, /credentials:\s*'same-origin'/);
   assert.match(js, /window\.location\.replace\('\/winnen'\)/);

@@ -219,6 +219,26 @@ input {
   75% { transform: translateX(-3px); }
 }
 
+@media (max-width: 900px) {
+  html body[data-live-momentum-access-page] .momentum-access-layout .sidebar,
+  html body[data-live-momentum-access-page] .momentum-access-layout .sidebar[data-static-sidebar="1"] {
+    display: none !important;
+  }
+
+  html body[data-live-momentum-access-page] .momentum-access-layout {
+    display: block !important;
+    width: 100% !important;
+    min-height: 100dvh !important;
+  }
+
+  html body[data-live-momentum-access-page] .dashboard-layout[data-sidebar-shell="canonical"] > .momentum-access-page {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 100dvh !important;
+    margin-left: 0 !important;
+  }
+}
+
 @media (max-width: 520px) {
   .dashboard-layout[data-sidebar-shell="canonical"] > .momentum-access-page {
     align-items: center;
