@@ -122,14 +122,19 @@ async function runCli() {
     console.log(
       `[seo-cadence] ${label}: state=${cadence.state} status=${cadence.status} action=${cadence.action} `
       + `qualifying7d=${cadence.qualifying ?? 'n/a'} newUrls7d=${cadence.newUrls ?? 'n/a'} `
+      + `growthNewUrls7d=${cadence.growthNewUrls ?? 'n/a'} editorialNewUrls7d=${cadence.editorialNewUrls ?? 'n/a'} `
+      + `moneyPageNewUrls7d=${cadence.moneyPageNewUrls ?? 'n/a'} `
       + `refreshes7d=${cadence.substantialRefreshes ?? 'n/a'} otherActions7d=${cadence.otherGrowthActions ?? 'n/a'} `
       + `deficit=${cadence.deficit ?? 'n/a'}`
     );
     console.log(
       `[seo-cadence] indexation=${cadence.reviewable?.indexed ?? 'n/a'}/${cadence.reviewable?.inspected ?? 'n/a'} `
       + `requestEvidenceDue=${cadence.requestEvidenceDue ?? 'n/a'} `
-      + `newUrlFloor7d=${cadence.minimumNewUrlsPerWeek} newUrlDeficit=${cadence.newUrlDeficit} `
-      + `maxNewUrls7d=${cadence.maximumNewUrlsPerWeek}`
+      + `newUrlTarget7d=${cadence.minimumNewUrlsPerWeek} newUrlDeficit=${cadence.newUrlDeficit} `
+      + `editorialMinimum7d=${cadence.minimumEditorialNewUrlsPerWeek} `
+      + `editorialDeficit=${cadence.editorialNewUrlDeficit} `
+      + `moneyPageMaximum7d=${cadence.maximumMoneyPageNewUrlsPerWeek} `
+      + `moneyPageCapacity=${cadence.moneyPageCapacity} requiredLane=${cadence.requiredPublicationLane || 'either'}`
     );
     console.log(
       `[seo-cadence] performance=${result.performance.status} `
@@ -140,7 +145,7 @@ async function runCli() {
     if (cadence.nextCandidate) {
       console.log(
         `[seo-cadence] next=${cadence.nextCandidate.id} score=${cadence.nextCandidate.score} `
-        + `path=${cadence.nextCandidate.path}`
+        + `path=${cadence.nextCandidate.path} lane=${cadence.nextCandidate.publicationLane || 'unclassified'}`
       );
     }
     const runGate = cadence.exitCode === 0 || cadence.exitCode === 2
@@ -153,13 +158,23 @@ async function runCli() {
           action: cadence.action,
           exitCode: cadence.exitCode,
           newUrls: cadence.newUrls,
+          growthNewUrls: cadence.growthNewUrls,
+          editorialNewUrls: cadence.editorialNewUrls,
+          moneyPageNewUrls: cadence.moneyPageNewUrls,
           newUrlDeficit: cadence.newUrlDeficit,
+          editorialNewUrlDeficit: cadence.editorialNewUrlDeficit,
           minimumNewUrlsPerWeek: cadence.minimumNewUrlsPerWeek,
-          maximumNewUrlsPerWeek: cadence.maximumNewUrlsPerWeek,
+          minimumEditorialNewUrlsPerWeek: cadence.minimumEditorialNewUrlsPerWeek,
+          maximumMoneyPageNewUrlsPerWeek: cadence.maximumMoneyPageNewUrlsPerWeek,
+          moneyPageAllowed: cadence.moneyPageAllowed,
+          requiredPublicationLane: cadence.requiredPublicationLane,
+          supportingOptimizationRequired: cadence.supportingOptimizationRequired,
+          companionAction: cadence.companionAction,
           nextCandidate: cadence.nextCandidate ? {
             id: cadence.nextCandidate.id,
             path: cadence.nextCandidate.path,
             score: cadence.nextCandidate.score,
+            publicationLane: cadence.nextCandidate.publicationLane,
           } : null,
         },
       })

@@ -49,6 +49,8 @@ function main(argv = process.argv.slice(2)) {
         sourceReportGeneratedAt: report.generatedAt,
         selectedSource: result.summary.selectedSource,
         selectedPath: result.summary.selectedPath,
+        selectedPublicationLane: result.summary.selectedPublicationLane,
+        supportingAction: result.summary.supportingAction,
         prioritizedReviewed: result.summary.prioritizedReviewed,
         highestOpportunity: result.summary.highestOpportunity,
       },

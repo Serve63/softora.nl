@@ -5,10 +5,15 @@ const {
   SEO_CONTENT_COLLECTIONS,
   getSeoContentPublicationPlan,
 } = require('./seo-content');
+const {
+  PUBLICATION_LANES,
+  resolvePublicationLane,
+} = require('./seo-machine-publication-lanes');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const DEFAULT_BACKLOG_PATH = path.join(REPO_ROOT, 'docs/growth/seo-machine-backlog.json');
 const MINIMUM_READY_ITEMS = 15;
+const MINIMUM_EDITORIAL_READY_ITEMS = 7;
 const MINIMUM_COMMERCIAL_SHARE = 0.7;
 const READY_STATUS = 'ready';
 const ALLOWED_STATUSES = new Set(['ready', 'selected', 'shipped', 'hold', 'rejected']);
@@ -246,10 +251,22 @@ function validateSeoMachineBacklog(backlog, options = {}) {
   });
 
   const readyItems = items.filter((item) => item && item.status === READY_STATUS);
+  const editorialReadyItems = readyItems.filter((item) => (
+    resolvePublicationLane(item) === PUBLICATION_LANES.EDITORIAL
+  ));
+  const moneyPageReadyItems = readyItems.filter((item) => (
+    resolvePublicationLane(item) === PUBLICATION_LANES.MONEY_PAGE
+  ));
   const commercialReadyItems = readyItems.filter((item) => COMMERCIAL_INTENT_CLASSES.has(item.intentClass));
   const commercialShare = readyItems.length ? commercialReadyItems.length / readyItems.length : 0;
   if (readyItems.length < MINIMUM_READY_ITEMS) {
     errors.push(`Backlog heeft ${readyItems.length} ready items; minimaal ${MINIMUM_READY_ITEMS} vereist.`);
+  }
+  if (editorialReadyItems.length < MINIMUM_EDITORIAL_READY_ITEMS) {
+    errors.push(
+      `Backlog heeft ${editorialReadyItems.length} ready redactionele items; minimaal `
+      + `${MINIMUM_EDITORIAL_READY_ITEMS} vereist voor de dagelijkse publicatielane.`
+    );
   }
   if (commercialShare < MINIMUM_COMMERCIAL_SHARE) {
     errors.push(
@@ -260,20 +277,33 @@ function validateSeoMachineBacklog(backlog, options = {}) {
   const sortedReadyItems = [...readyItems].sort((a, b) => {
     return Number(b.weightedScore || 0) - Number(a.weightedScore || 0) || String(a.id).localeCompare(String(b.id));
   });
+  const summarizeCandidate = (item) => ({
+    id: item.id,
+    path: item.path,
+    score: item.weightedScore,
+    primaryQuery: item.primaryQuery,
+    contentType: item.contentType,
+    publicationLane: resolvePublicationLane(item),
+  });
   return {
     ok: errors.length === 0,
     errors,
     summary: {
       total: items.length,
       ready: readyItems.length,
+      editorialReady: editorialReadyItems.length,
+      moneyPageReady: moneyPageReadyItems.length,
       commercialReady: commercialReadyItems.length,
       commercialShare: roundScore(commercialShare),
-      topReady: sortedReadyItems.slice(0, 5).map((item) => ({
-        id: item.id,
-        path: item.path,
-        score: item.weightedScore,
-        primaryQuery: item.primaryQuery,
-      })),
+      topReady: sortedReadyItems.slice(0, 5).map(summarizeCandidate),
+      topReadyEditorial: sortedReadyItems
+        .filter((item) => resolvePublicationLane(item) === PUBLICATION_LANES.EDITORIAL)
+        .slice(0, 5)
+        .map(summarizeCandidate),
+      topReadyMoneyPages: sortedReadyItems
+        .filter((item) => resolvePublicationLane(item) === PUBLICATION_LANES.MONEY_PAGE)
+        .slice(0, 5)
+        .map(summarizeCandidate),
     },
   };
 }
@@ -292,6 +322,7 @@ module.exports = {
   COMMERCIAL_INTENT_CLASSES,
   DEFAULT_BACKLOG_PATH,
   MINIMUM_COMMERCIAL_SHARE,
+  MINIMUM_EDITORIAL_READY_ITEMS,
   MINIMUM_READY_ITEMS,
   SCORE_FORMULA,
   assertSeoMachineBacklog,

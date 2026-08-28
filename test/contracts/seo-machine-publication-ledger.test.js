@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  buildWindowSummary,
   collectLivePublicationLedger,
   evaluateCadence,
   extractCanonicalHref,
@@ -94,6 +95,7 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
       ['/ai-telefonist', '2026-08-23', 'other_growth_action'],
     ]
   );
+  assert.equal(events.every((event) => event.publicationLane === 'money_page'), true);
 });
 
 test('content growth actions have an explicit machine-readable event plan', () => {
@@ -181,6 +183,10 @@ test('content growth actions have an explicit machine-readable event plan', () =
       ],
     ]
   );
+  assert.equal(
+    events.find((event) => event.path === '/kennisbank/wat-is-interne-linkstructuur').publicationLane,
+    'editorial'
+  );
 });
 
 test('new content appears once when it also records an explicit new-url event', () => {
@@ -190,6 +196,7 @@ test('new content appears once when it also records an explicit new-url event', 
   assert.equal(events.length, 1);
   assert.equal(events[0].publicationKind, 'new_url');
   assert.equal(events[0].eventAt, '2026-08-18');
+  assert.equal(events[0].publicationLane, 'editorial');
 });
 
 test('website-migratiepublicatie staat eenmaal als nieuwe URL in het machineplan', () => {
@@ -200,6 +207,7 @@ test('website-migratiepublicatie staat eenmaal als nieuwe URL in het machineplan
   assert.equal(events[0].publicationKind, 'new_url');
   assert.equal(events[0].eventAt, '2026-08-26');
   assert.equal(events[0].status, 'live');
+  assert.equal(events[0].publicationLane, 'editorial');
 });
 
 test('live publication ledger counts only verified public indexable URLs', async () => {
@@ -252,16 +260,41 @@ test('live publication ledger counts only verified public indexable URLs', async
   assert.equal(ledger.windows['7'].declared, 4);
   assert.equal(ledger.windows['7'].qualifying, 3);
   assert.equal(ledger.windows['7'].newUrls, 1);
+  assert.equal(ledger.windows['7'].growthNewUrls, 1);
+  assert.equal(ledger.windows['7'].editorialNewUrls, 1);
+  assert.equal(ledger.windows['7'].moneyPageNewUrls, 0);
+  assert.equal(ledger.windows['7'].otherNewUrls, 0);
+  assert.equal(ledger.windows['7'].unclassifiedNewUrls, 0);
   assert.equal(ledger.windows['7'].substantialRefreshes, 1);
   assert.equal(ledger.windows['7'].otherGrowthActions, 1);
-  assert.equal(ledger.windows['7'].deficit, 2);
+  assert.equal(ledger.windows['7'].deficit, 6);
   const byPath = new Map(ledger.windows['7'].items.map((item) => [item.path, item]));
   assert.equal(byPath.get('/blog/good').qualifies, true);
+  assert.equal(byPath.get('/blog/good').publicationLane, 'editorial');
   assert.equal(byPath.get('/blog/noindex').checks.indexable, false);
   assert.equal(byPath.get('/blog/refreshed').publicationKind, 'substantial_refresh');
   assert.equal(byPath.get('/blog/refreshed').dateModified, '2026-07-14');
   assert.equal(byPath.get('/ai-telefonist').publicationKind, 'other_growth_action');
   assert.equal(byPath.get('/ai-telefonist').dateModified, '2026-07-17');
+});
+
+test('window summary separates editorial and money-page URLs and exposes the cap', () => {
+  const summary = buildWindowSummary([
+    { eventAt: '2026-08-27', publicationKind: 'new_url', publicationLane: 'editorial', qualifies: true },
+    { eventAt: '2026-08-26', publicationKind: 'new_url', publicationLane: 'editorial', qualifies: true },
+    { eventAt: '2026-08-25', publicationKind: 'new_url', publicationLane: 'money_page', qualifies: true },
+    { eventAt: '2026-08-24', publicationKind: 'new_url', publicationLane: 'money_page', qualifies: true },
+    { eventAt: '2026-08-23', publicationKind: 'substantial_refresh', publicationLane: 'editorial', qualifies: true },
+  ], new Date('2026-08-28T12:00:00.000Z'), 7);
+
+  assert.equal(summary.newUrls, 4);
+  assert.equal(summary.growthNewUrls, 4);
+  assert.equal(summary.editorialNewUrls, 2);
+  assert.equal(summary.moneyPageNewUrls, 2);
+  assert.equal(summary.moneyPageMaximum, 2);
+  assert.equal(summary.moneyPageCapReached, true);
+  assert.equal(summary.editorialDeficit, 3);
+  assert.equal(summary.deficit, 3);
 });
 
 test('cadence gate returns red exit code two when content is required', () => {
@@ -271,19 +304,23 @@ test('cadence gate returns red exit code two when content is required', () => {
       errors: [],
       summary: {
         topReady: [{ id: 'candidate-1', path: '/blog/candidate-1', score: 4.5 }],
+        topReadyEditorial: [{ id: 'candidate-1', path: '/blog/candidate-1', score: 4.5 }],
       },
     },
     ledger: {
       status: 'ready',
       errors: [],
-      windows: { '7': { qualifying: 2 } },
+      windows: {
+        '7': { qualifying: 2, growthNewUrls: 2, editorialNewUrls: 2, moneyPageNewUrls: 0 },
+      },
     },
   });
 
   assert.equal(result.status, 'content_required');
   assert.equal(result.color, 'red');
   assert.equal(result.exitCode, 2);
-  assert.equal(result.deficit, 3);
+  assert.equal(result.deficit, 5);
+  assert.equal(result.requiredPublicationLane, 'editorial');
   assert.equal(result.nextCandidate.id, 'candidate-1');
 });
 

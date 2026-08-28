@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  MINIMUM_EDITORIAL_READY_ITEMS,
   MINIMUM_READY_ITEMS,
   calculateSeoCandidateScore,
   loadSeoMachineBacklog,
@@ -17,8 +18,24 @@ test('versioned SEO backlog has at least fifteen valid publication-ready briefs'
 
   assert.equal(result.ok, true, result.errors.join('\n'));
   assert.equal(result.summary.ready >= MINIMUM_READY_ITEMS, true);
+  assert.equal(result.summary.editorialReady >= MINIMUM_EDITORIAL_READY_ITEMS, true);
   assert.equal(result.summary.commercialShare >= 0.7, true);
   assert.equal(result.summary.topReady.length, 5);
+  assert.equal(result.summary.topReadyEditorial.length, 5);
+  assert.equal(result.summary.topReadyEditorial.every((item) => item.publicationLane === 'editorial'), true);
+});
+
+test('SEO backlog validator preserves seven ready editorial candidates', () => {
+  const backlog = clone(loadSeoMachineBacklog());
+  const readyItems = backlog.items.filter((item) => item.status === 'ready');
+  for (const item of readyItems.slice(0, readyItems.length - (MINIMUM_EDITORIAL_READY_ITEMS - 1))) {
+    item.contentType = 'branches';
+  }
+
+  const result = validateSeoMachineBacklog(backlog);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /ready redactionele items/i);
 });
 
 test('SEO backlog validator blocks readiness and weighted-score drift', () => {

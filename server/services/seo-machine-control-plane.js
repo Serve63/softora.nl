@@ -1,16 +1,20 @@
-const DEFAULT_WEEKLY_MINIMUM = 5;
+const { PUBLICATION_LANES } = require('./seo-machine-publication-lanes');
+
+const DEFAULT_WEEKLY_MINIMUM = 7;
 const MINIMUM_REVIEWABLE_INDEXATION_SAMPLE = 5;
 const INDEXATION_RECOVERY_THRESHOLD = 0.6;
 const SCALE_INDEXATION_THRESHOLD = 0.8;
-const NEW_URL_LIMITS = Object.freeze({
-  operations_p0: Object.freeze({ minimum: 0, maximum: 0 }),
-  data_degraded: Object.freeze({ minimum: 1, maximum: 2 }),
-  indexation_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
-  quality_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
-  performance_recovery: Object.freeze({ minimum: 3, maximum: 5 }),
-  growth: Object.freeze({ minimum: 3, maximum: 5 }),
-  scale: Object.freeze({ minimum: 5, maximum: 7 }),
+const PUBLICATION_LANE_LIMITS = Object.freeze({
+  weeklyGrowthUrlTarget: 7,
+  weeklyEditorialMinimum: 5,
+  weeklyMoneyPageMaximum: 2,
 });
+const REQUIRED_SUPPORTING_ACTIONS = Object.freeze([
+  'full_preflight_and_measurement_checks',
+  'indexation_and_discovery_review',
+  'contextual_internal_links',
+  'evidence_backed_existing_page_optimization',
+]);
 
 function toNumber(value, fallback = 0) {
   const number = Number(value);
@@ -28,27 +32,81 @@ function buildReviewableIndexation(summary = {}) {
   };
 }
 
-function applyNewUrlFloor(stateResult, shared = {}) {
-  const limits = NEW_URL_LIMITS[stateResult.state] || NEW_URL_LIMITS.growth;
-  const newUrlDeficit = Math.max(0, limits.minimum - toNumber(shared.newUrls));
-  const newUrlRequired = stateResult.state !== 'operations_p0' && newUrlDeficit > 0;
+function highestScoringCandidate(candidates = []) {
+  return [...candidates].filter(Boolean).sort((a, b) => (
+    toNumber(b.score) - toNumber(a.score) || String(a.id || '').localeCompare(String(b.id || ''))
+  ))[0] || null;
+}
+
+function selectNextNewUrlCandidate(backlogSummary = {}, requiredPublicationLane, moneyPageAllowed) {
+  const editorial = backlogSummary.topReadyEditorial?.[0] || null;
+  if (requiredPublicationLane === PUBLICATION_LANES.EDITORIAL) return editorial;
+  const moneyPage = moneyPageAllowed ? backlogSummary.topReadyMoneyPages?.[0] : null;
+  return highestScoringCandidate([editorial, moneyPage]);
+}
+
+function applyDailyPublicationPolicy(stateResult, shared = {}, backlogSummary = {}) {
+  const operationsP0 = stateResult.state === 'operations_p0';
+  const weeklyGrowthUrlTarget = operationsP0 ? 0 : PUBLICATION_LANE_LIMITS.weeklyGrowthUrlTarget;
+  const weeklyEditorialMinimum = operationsP0 ? 0 : PUBLICATION_LANE_LIMITS.weeklyEditorialMinimum;
+  const weeklyMoneyPageMaximum = operationsP0 ? 0 : PUBLICATION_LANE_LIMITS.weeklyMoneyPageMaximum;
+  const growthNewUrls = toNumber(shared.growthNewUrls, toNumber(shared.newUrls));
+  const editorialNewUrls = toNumber(shared.editorialNewUrls);
+  const moneyPageNewUrls = toNumber(shared.moneyPageNewUrls);
+  const newUrlDeficit = Math.max(0, weeklyGrowthUrlTarget - growthNewUrls);
+  const editorialNewUrlDeficit = Math.max(0, weeklyEditorialMinimum - editorialNewUrls);
+  const moneyPageCapacity = Math.max(0, weeklyMoneyPageMaximum - moneyPageNewUrls);
+  const moneyPageAllowed = !operationsP0 && moneyPageCapacity > 0;
+  const newUrlRequired = !operationsP0 && newUrlDeficit > 0;
+  const requiredPublicationLane = newUrlRequired && (
+    editorialNewUrlDeficit > 0 || !moneyPageAllowed
+  ) ? PUBLICATION_LANES.EDITORIAL : null;
+  const nextCandidate = newUrlRequired
+    ? selectNextNewUrlCandidate(backlogSummary, requiredPublicationLane, moneyPageAllowed)
+    : (stateResult.nextCandidate || backlogSummary.topReady?.[0] || null);
+  const publicationAction = requiredPublicationLane === PUBLICATION_LANES.EDITORIAL
+    ? 'publish_highest_scoring_safe_ready_editorial_candidate_with_supporting_optimization'
+    : 'publish_highest_scoring_safe_ready_growth_candidate_with_supporting_optimization';
   return {
     ...shared,
     ...stateResult,
-    minimumNewUrlsPerWeek: limits.minimum,
-    maximumNewUrlsPerWeek: limits.maximum,
+    growthNewUrls,
+    editorialNewUrls,
+    moneyPageNewUrls,
+    minimumNewUrlsPerWeek: weeklyGrowthUrlTarget,
+    maximumNewUrlsPerWeek: null,
+    minimumEditorialNewUrlsPerWeek: weeklyEditorialMinimum,
+    maximumMoneyPageNewUrlsPerWeek: weeklyMoneyPageMaximum,
     newUrlDeficit,
+    editorialNewUrlDeficit,
+    moneyPageCapacity,
+    moneyPageCapReached: !operationsP0 && moneyPageCapacity === 0,
+    moneyPageAllowed,
     newUrlRequired,
+    requiredPublicationLane,
+    allowedPublicationLanes: operationsP0
+      ? []
+      : [PUBLICATION_LANES.EDITORIAL, ...(moneyPageAllowed ? [PUBLICATION_LANES.MONEY_PAGE] : [])],
+    supportingOptimizationRequired: !operationsP0,
+    requiredSupportingActions: operationsP0 ? [] : [...REQUIRED_SUPPORTING_ACTIONS],
+    companionAction: !operationsP0 ? stateResult.action : null,
+    nextCandidate,
     status: newUrlRequired ? 'growth_action_required' : stateResult.status,
     color: newUrlRequired ? 'amber' : stateResult.color,
     exitCode: newUrlRequired ? 2 : stateResult.exitCode,
     action: newUrlRequired
-      ? 'publish_new_url_from_highest_scoring_safe_ready_candidate'
+      ? publicationAction
       : stateResult.action,
     reasons: newUrlRequired
       ? [
         ...(stateResult.reasons || []),
-        `Nieuwe-URL-vloer mist ${newUrlDeficit}: ${toNumber(shared.newUrls)}/${limits.minimum} live in 7 dagen.`,
+        `Dagelijkse nieuwe-URL-lane mist ${newUrlDeficit}: ${growthNewUrls}/${weeklyGrowthUrlTarget} live in 7 dagen.`,
+        ...(editorialNewUrlDeficit > 0
+          ? [`Redactionele ondergrens mist ${editorialNewUrlDeficit}: ${editorialNewUrls}/${weeklyEditorialMinimum}.`]
+          : []),
+        ...(moneyPageAllowed ? [] : [
+          `Geldpagina-cap bereikt: ${moneyPageNewUrls}/${weeklyMoneyPageMaximum} live in 7 dagen.`,
+        ]),
       ]
       : (stateResult.reasons || []),
   };
@@ -70,7 +128,7 @@ function evaluateSeoMachineState({
     operationErrors.push(...((ledger && ledger.errors) || ['Live publicatieledger ontbreekt.']));
   }
   if (operationErrors.length) {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'operations_p0',
       status: 'p0',
       color: 'red',
@@ -79,7 +137,7 @@ function evaluateSeoMachineState({
       publicActionRequired: false,
       reasons: operationErrors,
       nextCandidate: null,
-    });
+    }, {}, backlogResult && backlogResult.summary);
   }
 
   const weeklyWindow = ledger.windows && ledger.windows['7'];
@@ -88,6 +146,14 @@ function evaluateSeoMachineState({
     weeklyWindow && weeklyWindow.newUrls,
     qualifying
   );
+  const editorialNewUrls = toNumber(weeklyWindow && weeklyWindow.editorialNewUrls);
+  const moneyPageNewUrls = toNumber(weeklyWindow && weeklyWindow.moneyPageNewUrls);
+  const growthNewUrls = toNumber(
+    weeklyWindow && weeklyWindow.growthNewUrls,
+    editorialNewUrls + moneyPageNewUrls || newUrls
+  );
+  const otherNewUrls = toNumber(weeklyWindow && weeklyWindow.otherNewUrls);
+  const unclassifiedNewUrls = toNumber(weeklyWindow && weeklyWindow.unclassifiedNewUrls);
   const substantialRefreshes = toNumber(weeklyWindow && weeklyWindow.substantialRefreshes);
   const otherGrowthActions = toNumber(weeklyWindow && weeklyWindow.otherGrowthActions);
   const deficit = Math.max(0, weeklyMinimum - qualifying);
@@ -97,6 +163,11 @@ function evaluateSeoMachineState({
   const shared = {
     qualifying,
     newUrls,
+    growthNewUrls,
+    editorialNewUrls,
+    moneyPageNewUrls,
+    otherNewUrls,
+    unclassifiedNewUrls,
     substantialRefreshes,
     otherGrowthActions,
     weeklyMinimum,
@@ -108,7 +179,7 @@ function evaluateSeoMachineState({
   };
 
   if (!indexation || !['ready', 'partial'].includes(indexation.status)) {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'data_degraded',
       status: 'growth_action_required',
       color: 'amber',
@@ -116,11 +187,11 @@ function evaluateSeoMachineState({
       action: 'repair_measurement_and_ship_only_evidence_backed_safe_improvement',
       publicActionRequired: true,
       reasons: (indexation && indexation.errors) || ['URL Inspection-data ontbreekt.'],
-    }, shared);
+    }, shared, backlogResult.summary);
   }
 
   if (!performance || performance.status === 'data_degraded') {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'data_degraded',
       status: 'growth_action_required',
       color: 'amber',
@@ -128,14 +199,14 @@ function evaluateSeoMachineState({
       action: 'repair_measurement_and_ship_only_evidence_backed_safe_improvement',
       publicActionRequired: true,
       reasons: (performance && performance.reasons) || ['Non-branded GSC-paginadata voor publicatiecohorten ontbreekt.'],
-    }, shared);
+    }, shared, backlogResult.summary);
   }
 
   if (
     reviewable.inspected >= MINIMUM_REVIEWABLE_INDEXATION_SAMPLE
     && reviewable.rate < INDEXATION_RECOVERY_THRESHOLD
   ) {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'indexation_recovery',
       status: 'growth_action_required',
       color: 'amber',
@@ -143,11 +214,11 @@ function evaluateSeoMachineState({
       action: 'improve_discovery_quality_internal_links_or_consolidate',
       publicActionRequired: true,
       reasons: [`Reviewbare D14/D28-indexatie is ${reviewable.indexed}/${reviewable.inspected}.`],
-    }, shared);
+    }, shared, backlogResult.summary);
   }
 
   if (performance.status === 'performance_recovery') {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'performance_recovery',
       status: 'growth_action_required',
       color: 'amber',
@@ -155,11 +226,11 @@ function evaluateSeoMachineState({
       action: 'improve_query_page_match_snippets_internal_routes_or_consolidate',
       publicActionRequired: true,
       reasons: performance.reasons || ['De D28-publicatiecohort levert onvoldoende non-branded zoeksignalen.'],
-    }, shared);
+    }, shared, backlogResult.summary);
   }
 
   if (quality && quality.status === 'quality_recovery') {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'quality_recovery',
       status: 'growth_action_required',
       color: 'amber',
@@ -167,11 +238,11 @@ function evaluateSeoMachineState({
       action: 'replace_template_content_with_unique_information_or_consolidate',
       publicActionRequired: true,
       reasons: quality.reasons || ['Contentoriginaliteit is onvoldoende.'],
-    }, shared);
+    }, shared, backlogResult.summary);
   }
 
   if (deficit > 0) {
-    return applyNewUrlFloor({
+    return applyDailyPublicationPolicy({
       state: 'growth',
       status: 'growth_action_required',
       color: 'amber',
@@ -179,13 +250,13 @@ function evaluateSeoMachineState({
       action: 'publish_highest_expected_qualified_value_candidate',
       publicActionRequired: true,
       reasons: [`Publicatielevering loopt ${deficit} achter op het gezonde groeiritme.`],
-    }, shared);
+    }, shared, backlogResult.summary);
   }
 
   const canScale = reviewable.inspected >= MINIMUM_REVIEWABLE_INDEXATION_SAMPLE
     && reviewable.rate >= SCALE_INDEXATION_THRESHOLD
     && performance.status === 'scale_ready';
-  return applyNewUrlFloor({
+  return applyDailyPublicationPolicy({
     state: canScale ? 'scale' : 'growth',
     status: 'on_track',
     color: 'green',
@@ -193,15 +264,17 @@ function evaluateSeoMachineState({
     action: 'choose_highest_expected_qualified_impact',
     publicActionRequired: true,
     reasons: [],
-  }, shared);
+  }, shared, backlogResult.summary);
 }
 
 module.exports = {
   DEFAULT_WEEKLY_MINIMUM,
   INDEXATION_RECOVERY_THRESHOLD,
   MINIMUM_REVIEWABLE_INDEXATION_SAMPLE,
-  NEW_URL_LIMITS,
+  PUBLICATION_LANE_LIMITS,
+  REQUIRED_SUPPORTING_ACTIONS,
   SCALE_INDEXATION_THRESHOLD,
   buildReviewableIndexation,
   evaluateSeoMachineState,
+  selectNextNewUrlCandidate,
 };
