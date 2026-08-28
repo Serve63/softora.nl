@@ -5,15 +5,15 @@
 }
 @media (max-width: 900px) { body[data-live-momentum-page] { background: radial-gradient(circle at 92% 4%, rgba(165, 32, 85, .08), transparent 30%), #f5f3ef; }
 .momentum-layout .sidebar { display: none !important; }
-.momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: 0 var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
+.momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: max(12px, env(safe-area-inset-top)) var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
 .momentum-art-quotes { display: none; }
-.momentum-mobile-nav { position: relative; z-index: 8; display: flex; min-height: calc(62px + env(safe-area-inset-top)); margin: 0 calc(-1 * var(--momentum-safe-end)); padding: env(safe-area-inset-top) var(--momentum-safe-end) 0 var(--momentum-safe-start); align-items: center; border-bottom: 1px solid rgba(26, 26, 46, .07); background: rgba(248, 247, 244, .94); backdrop-filter: blur(18px); }
+.momentum-mobile-nav { display: none; }
 .momentum-mobile-logo { display: flex; min-height: 44px; align-items: center; color: #a52055; font-family: var(--font-display); font-size: 1.28rem; font-weight: 700; line-height: 1; text-decoration: none; text-transform: uppercase; }
 .momentum-persistence-status { position: relative; z-index: 8; min-height: 0; margin: 9px 0 -2px; color: var(--muted); font-size: 11px; font-weight: 650; line-height: 1.35; text-align: center; }
 .momentum-persistence-status span { display: none; }
 body[data-momentum-persistence="loading"] .momentum-persistence-status, body[data-momentum-persistence="pending"] .momentum-persistence-status, body[data-momentum-persistence="saving"] .momentum-persistence-status, body[data-momentum-persistence="error"] .momentum-persistence-status, body[data-momentum-persistence="loading"] .momentum-persistence-status [data-momentum-state="loading"], body[data-momentum-persistence="pending"] .momentum-persistence-status [data-momentum-state="pending"], body[data-momentum-persistence="saving"] .momentum-persistence-status [data-momentum-state="saving"], body[data-momentum-persistence="error"] .momentum-persistence-status [data-momentum-state="error"] { display: block; }
 body[data-momentum-persistence="error"] .momentum-persistence-status { color: #b93630; }
-.momentum-mobile-tabs { position: sticky; z-index: 7; top: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 12px -4px 20px; padding: 4px; border: 1px solid rgba(26, 26, 46, .075); border-radius: 16px; background: rgba(240, 238, 233, .9); box-shadow: 0 8px 24px rgba(26, 26, 46, .05); backdrop-filter: blur(18px); }
+.momentum-mobile-tabs, [data-settings-module-back-host], .momentum-history-trigger, .momentum-video-trigger { display: none !important; }
 .momentum-mobile-tabs button { min-height: 42px; padding: 0 10px; border: 0; border-radius: 12px; background: transparent; color: #767887; font-size: 13px; font-weight: 700; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .momentum-mobile-tabs button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 3px 12px rgba(26, 26, 46, .09); }
 .momentum-mobile-tabs button:focus-visible { outline: 3px solid rgba(46, 204, 113, .3); outline-offset: 1px; }
@@ -42,17 +42,17 @@ body[data-momentum-persistence="error"] .momentum-persistence-status { color: #b
 .momentum-mobile-list-heading h2, .momentum-mobile-month-heading h2 { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.35rem; line-height: 1; text-transform: uppercase; }
 .momentum-mobile-month-heading p { margin: 0; color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; text-align: right; }
 body[data-momentum-mobile-view="today"] .chart-card, body[data-momentum-mobile-view="today"] .momentum-mobile-month-heading, body[data-momentum-mobile-view="today"] .end-game-heading, body[data-momentum-mobile-view="today"] .end-game-scroll-hint, body[data-momentum-mobile-view="today"] .end-game-goals, body[data-momentum-mobile-view="month"] .momentum-head, body[data-momentum-mobile-view="month"] .momentum-mobile-summary, body[data-momentum-mobile-view="month"] .momentum-mobile-list-heading, body[data-momentum-mobile-view="month"] .end-game-heading, body[data-momentum-mobile-view="month"] .end-game-scroll-hint, body[data-momentum-mobile-view="month"] .end-game-goals, body[data-momentum-mobile-view="endgame"] .momentum-hero, body[data-momentum-mobile-view="endgame"] .momentum-mobile-list-heading, body[data-momentum-mobile-view="endgame"] .habit-board { display: none; }
-body[data-momentum-mobile-view="month"] .momentum-mobile-month-heading { display: block; padding: 4px 2px 11px; }
-body[data-momentum-mobile-view="month"] .momentum-mobile-month-heading p { max-width: 31em; margin-top: 7px; font-size: 12px; text-align: left; }
-body[data-momentum-mobile-view="month"] .chart-card { --chart-max-height: 142px; --chart-total-height: 194px; display: block; margin: 0 -2px; padding: 16px 0 12px 44px; overflow: hidden; border: 1px solid rgba(26, 26, 46, .075); border-radius: 20px; background: rgba(255, 255, 255, .66); }
-body[data-momentum-mobile-view="month"] .chart-card::after { position: absolute; z-index: 3; top: 98px; right: 12px; padding: 0 0 2px .42rem; transform: translateY(-100%); background: #faf9f6; color: var(--muted); content: "GEMIDDELDE"; font-family: var(--font-display); font-size: 10px; font-weight: 600; line-height: 1; pointer-events: none; }
-body[data-momentum-mobile-view="month"] .chart-scale { top: calc(16px + var(--chart-total-height) - var(--chart-max-height) - var(--chart-axis-height)); bottom: calc(12px + var(--chart-axis-height)); left: 9px; width: 30px; font-size: 10px; }
-body[data-momentum-mobile-view="month"] .bar-chart-viewport { overflow-x: auto; overscroll-behavior-inline: contain; scroll-behavior: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-body[data-momentum-mobile-view="month"] .bar-chart { grid-template-columns: repeat(var(--day-count, 31), 32px); gap: 7px; min-width: max-content; }
-body[data-momentum-mobile-view="month"] .bar-chart::after { display: none; }
-body[data-momentum-mobile-view="month"] .bar { width: 22px; }
-body[data-momentum-mobile-view="month"] .bar.is-today { scroll-snap-align: center; scroll-snap-stop: always; }
-body[data-momentum-mobile-view="month"] .bar-label, body[data-momentum-mobile-view="month"] .day-label { font-size: 10px; }
+body[data-live-momentum-page] .momentum-mobile-month-heading, body[data-momentum-mobile-view="month"] .momentum-mobile-month-heading { display: block; padding: 24px 2px 11px; }
+body[data-live-momentum-page] .momentum-mobile-month-heading p, body[data-momentum-mobile-view="month"] .momentum-mobile-month-heading p { max-width: 31em; margin-top: 7px; font-size: 12px; text-align: left; }
+body[data-live-momentum-page] .chart-card, body[data-momentum-mobile-view="month"] .chart-card { --chart-max-height: 142px; --chart-total-height: 194px; display: block; margin: 0 -2px; padding: 16px 0 12px 44px; overflow: hidden; border: 1px solid rgba(26, 26, 46, .075); border-radius: 20px; background: rgba(255, 255, 255, .66); }
+body[data-live-momentum-page] .chart-card::after, body[data-momentum-mobile-view="month"] .chart-card::after { position: absolute; z-index: 3; top: 98px; right: 12px; padding: 0 0 2px .42rem; transform: translateY(-100%); background: #faf9f6; color: var(--muted); content: "GEMIDDELDE"; font-family: var(--font-display); font-size: 10px; font-weight: 600; line-height: 1; pointer-events: none; }
+body[data-live-momentum-page] .chart-scale, body[data-momentum-mobile-view="month"] .chart-scale { top: calc(16px + var(--chart-total-height) - var(--chart-max-height) - var(--chart-axis-height)); bottom: calc(12px + var(--chart-axis-height)); left: 9px; width: 30px; font-size: 10px; }
+body[data-live-momentum-page] .bar-chart-viewport, body[data-momentum-mobile-view="month"] .bar-chart-viewport { overflow-x: auto; overscroll-behavior-inline: contain; scroll-behavior: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+body[data-live-momentum-page] .bar-chart, body[data-momentum-mobile-view="month"] .bar-chart { grid-template-columns: repeat(var(--day-count, 31), 32px); gap: 7px; min-width: max-content; }
+body[data-live-momentum-page] .bar-chart::after, body[data-momentum-mobile-view="month"] .bar-chart::after { display: none; }
+body[data-live-momentum-page] .bar, body[data-momentum-mobile-view="month"] .bar { width: 22px; }
+body[data-live-momentum-page] .bar.is-today, body[data-momentum-mobile-view="month"] .bar.is-today { scroll-snap-align: center; scroll-snap-stop: always; }
+body[data-live-momentum-page] .bar-label, body[data-live-momentum-page] .day-label, body[data-momentum-mobile-view="month"] .bar-label, body[data-momentum-mobile-view="month"] .day-label { font-size: 10px; }
 body[data-momentum-mobile-view="today"] .habit-board { margin-top: 0; overflow: visible; }
 body[data-momentum-mobile-view="today"] .habit-grid { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) 68px; column-gap: 0; row-gap: 10px; border: 0; }
 body[data-momentum-mobile-view="today"] .habit-grid > * { display: none; }
@@ -62,6 +62,17 @@ body[data-momentum-mobile-view="today"] .habit-name:has(.add-goal) { padding-lef
 body[data-momentum-mobile-view="today"] .status.is-today { position: relative; z-index: 1; align-items: center; justify-content: center; border-right: 1px solid rgba(26, 26, 46, .075) !important; border-bottom: 1px solid rgba(26, 26, 46, .075) !important; border-left: 0 !important; border-radius: 0 17px 17px 0; }
 body[data-momentum-mobile-view="today"] .status.is-today::after { position: absolute; right: 100%; width: 1px; height: 34px; background: rgba(26, 26, 46, .07); content: ""; }
 body[data-momentum-mobile-view="today"] .status::before { width: 30px; height: 30px; }
+body[data-live-momentum-page] .momentum-hero { display: block; }
+body[data-live-momentum-page] .momentum-mobile-list-heading { display: flex; }
+body[data-live-momentum-page] .habit-board { display: block; margin-top: 0; overflow: visible; }
+body[data-live-momentum-page] .habit-grid { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) 68px; column-gap: 0; row-gap: 10px; border: 0; }
+body[data-live-momentum-page] .habit-grid > * { display: none; }
+body[data-live-momentum-page] .habit-grid > .habit-name, body[data-live-momentum-page] .habit-grid > .status.is-today { display: flex; min-height: 66px; border: 1px solid rgba(26, 26, 46, .075); background: rgba(255, 255, 255, .86); box-shadow: 0 8px 22px rgba(26, 26, 46, .045); }
+body[data-live-momentum-page] .habit-name { position: relative; left: auto; z-index: 1; gap: 8px; padding: 8px 8px 8px 10px; border-right: 0 !important; border-radius: 17px 0 0 17px; }
+body[data-live-momentum-page] .habit-name:has(.add-goal) { padding-left: 46px; }
+body[data-live-momentum-page] .status.is-today { position: relative; z-index: 1; align-items: center; justify-content: center; border-right: 1px solid rgba(26, 26, 46, .075) !important; border-bottom: 1px solid rgba(26, 26, 46, .075) !important; border-left: 0 !important; border-radius: 0 17px 17px 0; }
+body[data-live-momentum-page] .status.is-today::after { position: absolute; right: 100%; width: 1px; height: 34px; background: rgba(26, 26, 46, .07); content: ""; }
+body[data-live-momentum-page] .status::before { width: 30px; height: 30px; }
 .goal-icon-button, .goal-drag-handle, .add-goal { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .goal-icon-button, .goal-drag-handle { width: 44px; min-width: 44px; height: 44px; }
 .goal-drag-handle { padding: 8px; }

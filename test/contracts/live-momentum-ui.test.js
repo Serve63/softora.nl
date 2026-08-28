@@ -37,7 +37,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260815a"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -57,7 +57,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-day-hold\.js\?v=20260825a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260825a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260825a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260828a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-focus-mode\.js\?v=20260813a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
   assert.ok(html.indexOf('live-momentum-day-hold.css') > html.indexOf('live-momentum-mobile.css'));
@@ -292,8 +292,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /@media \(max-width:\s*780px\)/);
   assert.match(mobileCss, /@media \(max-width:\s*900px\)[\s\S]*\.momentum-layout \.momentum-page\s*\{[\s\S]*width:\s*100% !important;/);
   assert.match(mobileCss, /--momentum-safe-start:\s*max\(16px, env\(safe-area-inset-left\)\);/);
-  assert.match(mobileCss, /padding:\s*0 var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
-  assert.match(mobileCss, /\.momentum-mobile-tabs\s*\{[\s\S]*position:\s*sticky;[\s\S]*grid-template-columns:\s*repeat\(3, 1fr\);/);
+  assert.match(mobileCss, /padding:\s*max\(12px, env\(safe-area-inset-top\)\) var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
+  assert.match(mobileCss, /\.momentum-mobile-nav\s*\{\s*display:\s*none;/);
+  assert.match(mobileCss, /\.momentum-mobile-tabs,\s*\[data-settings-module-back-host\],\s*\.momentum-history-trigger,\s*\.momentum-video-trigger\s*\{\s*display:\s*none !important;/);
   assert.match(mobileCss, /\.momentum-mobile-tabs button\[aria-pressed="true"\]\s*\{[\s\S]*background:\s*#fff;/);
   assert.doesNotMatch(mobileCss, /momentum-mobile-links|momentum-mobile-summary-copy button/);
   assert.match(mobileCss, /\.momentum-mobile-score-ring\s*\{[\s\S]*background:\s*conic-gradient\(#42d981 var\(--momentum-mobile-score, 0deg\)/);
@@ -310,6 +311,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-goal-track\s*\{[\s\S]*display:\s*grid;[\s\S]*width:\s*100%;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-card-slot,[\s\S]*min-height:\s*96px;[\s\S]*touch-action:\s*pan-y;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-card-number\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;[\s\S]*touch-action:\s*none;/);
+  assert.match(mobileCss, /body\[data-live-momentum-page\] \.chart-card,\s*body\[data-momentum-mobile-view="month"\] \.chart-card\s*\{[\s\S]*display:\s*block;/);
+  assert.match(mobileCss, /body\[data-live-momentum-page\] \.habit-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 68px;/);
+  assert.match(mobileCss, /body\[data-live-momentum-page\] \.momentum-hero\s*\{\s*display:\s*block;/);
   assert.match(mobileCss, /\.icon-picker\s*\{[\s\S]*max-height:\s*calc\(100dvh/);
   assert.match(mobileCss, /\.icon-picker-close\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/);
   assert.match(mobileCss, /\.icon-picker-search\s*\{[\s\S]*height:\s*48px;[\s\S]*font-size:\s*16px;/);
@@ -354,7 +358,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /cell\.setAttribute\('tabindex', day > TODAY \|\| held \? '-1' : '0'\);/);
   assert.match(js, /window\.addEventListener\('focus', \(\) => \{[\s\S]*refreshToday\(\);[\s\S]*retryStateHydrationNow\(\);/);
   assert.match(mobileJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
-  assert.match(mobileJs, /function setView\(view\)[\s\S]*page\.dataset\.momentumMobileView = nextView;/);
+  assert.match(mobileJs, /function setView\(view\)[\s\S]*const nextView = mobileQuery\.matches \? 'endgame' : requestedView;[\s\S]*page\.dataset\.momentumMobileView = nextView;/);
   assert.match(mobileJs, /querySelectorAll\('\.status\.is-today'\)/);
   assert.match(mobileJs, /const noData = todayCells\.some\(\(cell\) => cell\.classList\.contains\('is-on-hold'\)\)/);
   assert.match(mobileJs, /scoreValue\.textContent = noData \? '—' : `\$\{score\}%`/);
@@ -362,6 +366,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(mobileJs, /scoreRing\?\.style\.setProperty\('--momentum-mobile-score', `\$\{score \* 3\.6\}deg`\);/);
   assert.match(mobileJs, /new MutationObserver\(syncSummary\)/);
   assert.match(mobileJs, /if \(!mobileQuery\.matches\) \{[\s\S]*removeAttribute\('aria-hidden'\)/);
+  assert.match(mobileJs, /Object\.values\(sections\)\.forEach\(\(section\) => section\?\.removeAttribute\('aria-hidden'\)\);\s*focusMonthOnToday\(\);/);
   assert.doesNotMatch(mobileJs, /momentum-mobile-open-month|openMonthButton/);
   assert.doesNotMatch(js, /today:\s*13/);
   assert.match(js, /const TOTAL_DAYS = DAYS\.length;/);

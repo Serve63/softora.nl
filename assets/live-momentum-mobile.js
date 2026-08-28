@@ -71,20 +71,13 @@
       Object.values(sections).forEach((section) => section?.removeAttribute('aria-hidden'));
       return;
     }
-    const showDaily = view === 'today';
-    const showMonth = view === 'month';
-    const showEndGame = view === 'endgame';
-    sections.hero?.setAttribute('aria-hidden', showEndGame ? 'true' : 'false');
-    sections.habits?.setAttribute('aria-hidden', showEndGame ? 'true' : 'false');
-    sections.listHeading?.setAttribute('aria-hidden', showDaily ? 'false' : 'true');
-    sections.endGameHeading?.setAttribute('aria-hidden', showEndGame ? 'false' : 'true');
-    sections.endGameHint?.setAttribute('aria-hidden', showEndGame ? 'false' : 'true');
-    sections.endGameGoals?.setAttribute('aria-hidden', showEndGame ? 'false' : 'true');
-    if (showMonth) focusMonthOnToday();
+    Object.values(sections).forEach((section) => section?.removeAttribute('aria-hidden'));
+    focusMonthOnToday();
   }
 
   function setView(view) {
-    const nextView = ['today', 'month', 'endgame'].includes(view) ? view : 'today';
+    const requestedView = ['today', 'month', 'endgame'].includes(view) ? view : 'today';
+    const nextView = mobileQuery.matches ? 'endgame' : requestedView;
     page.dataset.momentumMobileView = nextView;
     viewButtons.forEach((button) => {
       const active = button.dataset.momentumMobileViewTarget === nextView;
