@@ -4,6 +4,38 @@ const rateLimit = require('express-rate-limit');
 
 const PERMISSIONS_POLICY_HEADER =
   'accelerometer=(), autoplay=(self), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()';
+const MAILBOX_SEND_PRE_RUNTIME_JSON_DECORATED = Symbol('mailboxSendPreRuntimeJsonDecorated');
+const MAILBOX_SEND_EXPRESS_ROUTE_PATTERN = /^\/api\/mailbox\/send\/?$/i;
+
+function installMailboxSendPreRuntimeJsonDecorator(req, res, pathname) {
+  if (String(req?.method || '').trim().toUpperCase() !== 'POST') return;
+  if (!MAILBOX_SEND_EXPRESS_ROUTE_PATTERN.test(String(pathname || ''))) return;
+  if (!res || typeof res.json !== 'function') return;
+  if (res[MAILBOX_SEND_PRE_RUNTIME_JSON_DECORATED]) return;
+
+  const originalJson = res.json;
+  res[MAILBOX_SEND_PRE_RUNTIME_JSON_DECORATED] = true;
+  res.json = function mailboxSendPreRuntimeJson(payload) {
+    const response = this && typeof this === 'object' ? this : res;
+    const statusCode = Number(response.statusCode);
+    const runtimeEntered = response.locals?.mailboxSendRuntimeEntered === true;
+    const isJsonErrorObject = (
+      Number.isFinite(statusCode) &&
+      statusCode >= 400 &&
+      payload !== null &&
+      typeof payload === 'object' &&
+      !Array.isArray(payload)
+    );
+    if (!runtimeEntered && isJsonErrorObject) {
+      return originalJson.call(response, {
+        ...payload,
+        externalEffect: false,
+        failurePhase: 'pre-dispatch',
+      });
+    }
+    return originalJson.call(response, payload);
+  };
+}
 
 function applyAppMiddleware(app, deps = {}) {
   const {
@@ -196,10 +228,11 @@ function applyAppMiddleware(app, deps = {}) {
   });
 
   app.use((req, res, next) => {
+    const pathname = getRequestPathname(req);
+    installMailboxSendPreRuntimeJsonDecorator(req, res, pathname);
     if (typeof res.setHeader === 'function') {
       res.setHeader('Permissions-Policy', PERMISSIONS_POLICY_HEADER);
     }
-    const pathname = getRequestPathname(req);
     if (req.method === 'POST' && pathname === '/api/website-preview-library') {
       return jsonBodyParserPreviewLibrary(req, res, next);
     }
