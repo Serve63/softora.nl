@@ -114,7 +114,12 @@ function basePayload(overrides = {}) {
 function preflightResult(payload, status = 'ready', overrides = {}) {
   const suppliedProof = payload.reconcileProof && typeof payload.reconcileProof === 'object'
     ? payload.reconcileProof : null;
-  const reconcileProof = suppliedProof || {
+  const reconcileProof = suppliedProof ? {
+    ...suppliedProof,
+    issuedAtMs: suppliedProof.issuedAtMs || 1,
+    expiresAtMs: suppliedProof.expiresAtMs || 300_001,
+    signature: suppliedProof.signature || 'c'.repeat(64),
+  } : {
     version: 1,
     idempotencyKey: payload.idempotencyKey,
     owner: payload.owner,
@@ -129,6 +134,9 @@ function preflightResult(payload, status = 'ready', overrides = {}) {
     scopeFingerprint: `${payload.provider || 'smtp'}-${payload.mode}-scope:${'a'.repeat(64)}`,
     requestPayloadFingerprint: 'b'.repeat(64),
     attachmentsMetadata: payload.attachmentsMetadata || [],
+    issuedAtMs: 1,
+    expiresAtMs: 300_001,
+    signature: 'c'.repeat(64),
   };
   return {
     preflight: true,
@@ -158,6 +166,18 @@ function preflightResult(payload, status = 'ready', overrides = {}) {
   };
 }
 
+function rotateProofEnvelope(result, sequence) {
+  return {
+    ...result,
+    reconcileProof: {
+      ...result.reconcileProof,
+      issuedAtMs: 1_000 + sequence,
+      expiresAtMs: 301_000 + sequence,
+      signature: sequence.toString(16).padStart(64, '0'),
+    },
+  };
+}
+
 function parseRequest(request) {
   return JSON.parse(request.body);
 }
@@ -168,6 +188,17 @@ function mutableProofRequiredResponse() {
     code: 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED',
     error: 'Mailcontrole mislukt',
     detail: 'De verzend-ID is nog niet duurzaam geregistreerd; bewijs eerst opnieuw de actuele replybron.',
+  });
+}
+
+function provenPreDispatchFailure(code, detail = 'De server stopte aantoonbaar vóór verzending.') {
+  return response(409, {
+    ok: false,
+    code,
+    error: 'Mail verzenden mislukt',
+    detail,
+    externalEffect: false,
+    failurePhase: 'pre-dispatch',
   });
 }
 
@@ -405,6 +436,269 @@ test('verloren sendresponse en reload gebruiken dezelfde marker en preflighten v
   assert.deepEqual(Object.keys(payloads[2]).sort(), ['idempotencyKey', 'reconcileProof']);
   assert.equal('body' in payloads[2], false);
   assert.equal('attachments' in payloads[2], false);
+});
+
+test('verlopen sendbewijs vóór provider ververst veilig proof en hergebruikt staging met exact één extern effect', async () => {
+  const storage = new MemoryStorage();
+  const file = createProductionAttachment('bewijs.pdf', 'application/pdf', 4);
+  let preflightCalls = 0;
+  let sendRequests = 0;
+  let providerEffects = 0;
+  let uploadCalls = 0;
+  const proofSignatures = [];
+  let refreshedPreDispatchMarker = null;
+  const protocol = createProtocol({
+    storage,
+    now: () => 1_000,
+    fetch: async (url, request) => {
+      const payload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        preflightCalls += 1;
+        assert.equal('body' in payload, true);
+        if (preflightCalls === 2) {
+          refreshedPreDispatchMarker = resilienceModule.readMarker(
+            storage,
+            payload.idempotencyKey
+          );
+        }
+        const result = rotateProofEnvelope(preflightResult(payload), preflightCalls);
+        proofSignatures.push(result.reconcileProof.signature);
+        return response(200, { ok: true, result });
+      }
+      sendRequests += 1;
+      if (sendRequests === 1) {
+        return provenPreDispatchFailure(
+          'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED',
+          'Het veilige preflightbewijs is verlopen; voer de mailcontrole opnieuw uit.'
+        );
+      }
+      providerEffects += 1;
+      return response(200, { ok: true, result: acceptedSendResult('proof-refreshed') });
+    },
+  });
+  const sent = await protocol.execute({
+    payload: basePayload({ idempotencyKey: 'browser:proof-expired-before-provider' }),
+    attachments: [file],
+    uploadAttachments: async (attachments) => {
+      uploadCalls += 1;
+      return [{
+        reference: 'opaque-proof-refresh', filename: file.filename,
+        contentType: file.contentType, size: file.size,
+        sha256: attachments[0].sha256, referenceVersion: 2,
+        expiresAt: 60 * 60 * 1000,
+      }];
+    },
+  });
+  assert.equal(sent.result.messageId, '<proof-refreshed@softora.nl>');
+  assert.equal(preflightCalls, 2);
+  assert.equal(sendRequests, 2);
+  assert.equal(providerEffects, 1);
+  assert.equal(uploadCalls, 1);
+  assert.notEqual(proofSignatures[0], proofSignatures[1]);
+  assert.equal(refreshedPreDispatchMarker.state, 'staged');
+  assert.equal(refreshedPreDispatchMarker.reconcileProof, null);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(refreshedPreDispatchMarker, 'sendStartedAt'),
+    false
+  );
+  const marker = resilienceModule.readMarker(storage, sent.idempotencyKey);
+  assert.equal(marker.state, 'accepted');
+});
+
+test('alleen exact bewijs zonder identity of result mag een dispatching marker veilig terugzetten', async (t) => {
+  const variants = [
+    {
+      label: 'durable identityheader',
+      headers: { 'X-Softora-Send-Intent-Id': 'send:already-started' },
+    },
+    {
+      label: 'durable resultbody',
+      result: { intentId: 'send:already-started', messageId: '<already-started@softora.nl>' },
+    },
+    { label: 'failurePhase ontbreekt', omitFailurePhase: true },
+    { label: 'failurePhase is niet exact', failurePhase: 'provider-dispatch' },
+    { label: 'externalEffect ontbreekt', omitExternalEffect: true },
+  ];
+  for (const variant of variants) {
+    await t.test(variant.label, async () => {
+      const storage = new MemoryStorage();
+      let preflightCalls = 0;
+      let sendCalls = 0;
+      const protocol = createProtocol({
+        storage,
+        fetch: async (url, request) => {
+          const payload = parseRequest(request);
+          if (url.endsWith('/preflight')) {
+            preflightCalls += 1;
+            return response(200, { ok: true, result: preflightResult(payload) });
+          }
+          sendCalls += 1;
+          const failure = {
+            ok: false,
+            code: 'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED',
+            error: 'Mail verzenden mislukt',
+            detail: 'De provideruitkomst is niet bewezen.',
+            ...(variant.omitExternalEffect ? {} : { externalEffect: false }),
+            ...(variant.omitFailurePhase
+              ? {}
+              : { failurePhase: variant.failurePhase || 'pre-dispatch' }),
+            ...(variant.result === undefined ? {} : { result: variant.result }),
+          };
+          return response(409, failure, variant.headers);
+        },
+      });
+      await assert.rejects(protocol.execute({
+        payload: basePayload({ idempotencyKey: `browser:no-rewind-${variant.label}` }),
+        attachments: [],
+      }), (error) => error.code === 'MAILBOX_SEND_RECONCILE_PROOF_EXPIRED');
+      const [marker] = resilienceModule.listMarkers(storage);
+      assert.equal(marker.state, 'dispatching');
+      assert.ok(marker.reconcileProof);
+      assert.ok(Number.isSafeInteger(marker.sendStartedAt));
+      assert.equal(preflightCalls, 1);
+      assert.equal(sendCalls, 1);
+    });
+  }
+});
+
+test('tabsluiting na bewezen pre-providerstop bewaart een herlaadbare pre-dispatchmarker', async () => {
+  const storage = new MemoryStorage();
+  let phase = 'first-preflight';
+  let providerEffects = 0;
+  const firstTab = createProtocol({
+    storage,
+    fetch: async (url, request) => {
+      const payload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        if (phase === 'first-preflight') {
+          phase = 'expired-send';
+          return response(200, { ok: true, result: preflightResult(payload) });
+        }
+        throw new Error('tab gesloten vóór de vernieuwde preflightresponse');
+      }
+      assert.equal(phase, 'expired-send');
+      phase = 'refresh-lost';
+      return provenPreDispatchFailure('MAILBOX_SEND_RECONCILE_PROOF_EXPIRED');
+    },
+  });
+  await assert.rejects(firstTab.execute({
+    payload: basePayload({ idempotencyKey: 'browser:proof-expired-reload' }),
+    attachments: [],
+  }), /tab gesloten/);
+  const safeMarker = resilienceModule.readMarker(storage, 'browser:proof-expired-reload');
+  assert.equal(safeMarker.state, 'armed');
+  assert.equal(safeMarker.reconcileProof, null);
+  assert.equal(Object.prototype.hasOwnProperty.call(safeMarker, 'sendStartedAt'), false);
+
+  const reloaded = await createProtocol({
+    storage,
+    fetch: async (url, request) => {
+      const payload = parseRequest(request);
+      if (url.endsWith('/preflight')) {
+        assert.equal('body' in payload, true);
+        return response(200, { ok: true, result: preflightResult(payload) });
+      }
+      providerEffects += 1;
+      return response(200, { ok: true, result: acceptedSendResult('proof-reload') });
+    },
+  }).execute({
+    payload: basePayload({ idempotencyKey: 'browser:proof-expired-reload' }),
+    attachments: [],
+  });
+  assert.equal(reloaded.result.messageId, '<proof-reload@softora.nl>');
+  assert.equal(providerEffects, 1);
+});
+
+test('reload accepteert uitsluitend een vernieuwde proof-envelope en houdt het bij één providercall', async () => {
+  const storage = new MemoryStorage();
+  const locks = createLockManager();
+  let accepted = false;
+  let providerCalls = 0;
+  let preflightSequence = 0;
+  const fetch = async (url, request) => {
+    const payload = parseRequest(request);
+    if (url.endsWith('/preflight')) {
+      preflightSequence += 1;
+      const result = preflightResult(payload, accepted ? 'accepted' : 'ready');
+      return response(200, {
+        ok: true,
+        result: rotateProofEnvelope(result, preflightSequence),
+      });
+    }
+    providerCalls += 1;
+    accepted = true;
+    throw Object.assign(new Error('provider accepteerde maar response ging verloren'), {
+      code: 'ECONNRESET',
+    });
+  };
+
+  await assert.rejects(createProtocol({ storage, locks, fetch }).execute({
+    payload: basePayload({ idempotencyKey: 'browser:rotating-envelope' }),
+    attachments: [],
+  }), /response ging verloren/);
+  const firstProof = resilienceModule.readMarker(
+    storage,
+    'browser:rotating-envelope'
+  ).reconcileProof;
+
+  const recovered = await createProtocol({ storage, locks, fetch }).execute({
+    payload: basePayload({ idempotencyKey: 'browser:after-envelope-reload' }),
+    attachments: [],
+  });
+  const recoveredMarker = resilienceModule.readMarker(
+    storage,
+    'browser:rotating-envelope'
+  );
+  assert.equal(recovered.recoveredByPreflight, true);
+  assert.equal(providerCalls, 1);
+  assert.equal(recoveredMarker.state, 'accepted');
+  assert.notEqual(recoveredMarker.reconcileProof.signature, firstProof.signature);
+  assert.equal(recoveredMarker.reconcileProof.issuedAtMs, 1_002);
+  assert.equal(recoveredMarker.reconcileProof.expiresAtMs, 301_002);
+});
+
+test('reload weigert gewijzigde proofinhoud of context ondanks een geldig gevormde envelope', async (t) => {
+  for (const [label, mutate, expectedCode] of [
+    [
+      'payloadfingerprint',
+      (proof) => { proof.requestPayloadFingerprint = 'd'.repeat(64); },
+      'MAILBOX_SEND_RECONCILE_PROOF_MISMATCH',
+    ],
+    [
+      'gesprekscontext',
+      (proof) => { proof.conversationId = 'Conversation:Other'; },
+      'MAILBOX_SEND_RECONCILE_PROOF_INVALID',
+    ],
+  ]) {
+    await t.test(label, async () => {
+      const storage = new MemoryStorage();
+      const payload = basePayload({ idempotencyKey: `browser:proof-change-${label}` });
+      await seedMarker({ storage, payload, state: 'dispatching', sendStartedAt: 10 });
+      let sendCalls = 0;
+      const protocol = createProtocol({
+        storage,
+        fetch: async (url, request) => {
+          const requestPayload = parseRequest(request);
+          if (!url.endsWith('/preflight')) {
+            sendCalls += 1;
+            throw new Error('send mag niet starten');
+          }
+          const result = rotateProofEnvelope(
+            preflightResult(requestPayload, 'accepted'),
+            20
+          );
+          mutate(result.reconcileProof);
+          return response(200, { ok: true, result });
+        },
+      });
+      await assert.rejects(protocol.execute({
+        payload: basePayload({ idempotencyKey: `browser:reload-${label}` }),
+        attachments: [],
+      }), (error) => error.code === expectedCode);
+      assert.equal(sendCalls, 0);
+      assert.equal(resilienceModule.readMarker(storage, payload.idempotencyKey).state, 'dispatching');
+    });
+  }
 });
 
 test('twee tabbladen delen de volledige Web Lock-flow en starten extern maar één send', async () => {
@@ -722,6 +1016,14 @@ test('malformed preflightvarianten stoppen allemaal vóór upload en send', asyn
     },
     'requesthash met hoofdletterhex': (result) => {
       result.reconcileProof.requestPayloadFingerprint = 'B'.repeat(64);
+    },
+    'issued-at ontbreekt': (result) => { delete result.reconcileProof.issuedAtMs; },
+    'expiry is niet later': (result) => {
+      result.reconcileProof.expiresAtMs = result.reconcileProof.issuedAtMs;
+    },
+    'serverhandtekening ontbreekt': (result) => { delete result.reconcileProof.signature; },
+    'serverhandtekening heeft hoofdletters': (result) => {
+      result.reconcileProof.signature = result.reconcileProof.signature.toUpperCase();
     },
     'references met case-drift': (result) => {
       result.reconcileProof.references = '<root.case@example.nl> <inbound.case@example.nl>';
@@ -1447,7 +1749,7 @@ test('uploadplan- en PUT-timeout vóór send herstellen via row-missing naar exa
   }
 });
 
-test('controller houdt één immutable draft door preflight upload send en accepted kaart en sluit geen nieuwe composer', async () => {
+test('controller bewaart een exacte https-link plus echte attachmentfile door preflight upload send en accepted kaart', async () => {
   const storage = new MemoryStorage();
   const locks = createLockManager();
   const overlayClasses = new Set();
@@ -1479,6 +1781,7 @@ test('controller houdt één immutable draft door preflight upload send en accep
   const mails = new Map([[initialMail.id, initialMail], [nextMail.id, nextMail]]);
   const acceptedRecords = [];
   const requestBodies = [];
+  const exactBody = 'Bekijk https://www.softora.nl/webdesign/voorbeeld?cid=kvk-12345678&sender=serve#voorstel';
   let selectedAttachments = [];
   let releaseUpload;
   let uploadStartedResolve;
@@ -1559,7 +1862,7 @@ test('controller houdt één immutable draft door preflight upload send en accep
   });
 
   controller.newMessage(initialMail);
-  fields['c-body'].value = 'Oorspronkelijke body';
+  fields['c-body'].value = exactBody;
   fields['c-cc'].value = 'cc@example.nl';
   selectedAttachments = [createProductionAttachment('bewijs.pdf', 'application/pdf', 4)];
   const sending = controller.send();
@@ -1575,16 +1878,19 @@ test('controller houdt één immutable draft door preflight upload send en accep
   await sending;
 
   assert.equal(requestBodies[0].url, '/api/mailbox/send/preflight');
-  assert.equal(requestBodies[0].payload.body, 'Oorspronkelijke body');
-  assert.equal(uploadPayload.body, 'Oorspronkelijke body');
+  assert.equal(requestBodies[0].payload.body, exactBody);
+  assert.equal(uploadPayload.body, exactBody);
   assert.deepEqual(uploadPayload.reconcileProof, readyProof);
-  assert.equal(sendPayload.body, 'Oorspronkelijke body');
+  assert.equal(sendPayload.body, exactBody);
   assert.equal(sendPayload.to, 'first@example.nl');
   assert.equal(sendPayload.subject, 'Eerste onderwerp');
   assert.deepEqual(sendPayload.reconcileProof, readyProof);
   assert.equal(sendPayload.attachments[0].reference, 'opaque-0');
+  assert.equal(sendPayload.attachments[0].filename, 'bewijs.pdf');
+  assert.match(sendPayload.attachments[0].sha256, /^[0-9a-f]{64}$/);
+  assert.equal(sendPayload.attachments[0].referenceVersion, 2);
   assert.equal(acceptedRecords.length, 1);
-  assert.equal(acceptedRecords[0].message.body, 'Oorspronkelijke body');
+  assert.equal(acceptedRecords[0].message.body, exactBody);
   assert.equal(acceptedRecords[0].message.to, 'first@example.nl');
   assert.equal(fields['c-to'].value, 'second@example.nl');
   assert.equal(fields['c-subject'].value, 'Tweede onderwerp');

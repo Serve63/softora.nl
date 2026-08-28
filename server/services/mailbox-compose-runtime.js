@@ -10,9 +10,11 @@ const {
 } = require('./mailbox-send-provenance-store');
 const {
   assertMailboxReconcileProofMatchesIntent,
+  assertMailboxReconcileProofSignature,
   createMailboxReconcileProof,
   createMailboxReconcileProofError,
   normalizeMailboxReconcileProof,
+  signMailboxReconcileProof,
 } = require('./mailbox-send-reconcile-proof');
 
 const TEMPORARY_MAILBOX_SEND_MESSAGE =
@@ -63,6 +65,34 @@ function createPreflightAttachmentEvidenceError() {
   );
   cause.code = 'MAILBOX_SEND_ATTACHMENT_EVIDENCE_MISSING';
   return createMailboxReconcileRequiredError(cause);
+}
+
+function createHttpAttachmentReferenceError() {
+  const error = new Error(
+    'Bijlagen moeten eerst veilig worden geüpload; kies de bijlage opnieuw.'
+  );
+  error.status = 400;
+  error.code = 'MAILBOX_ATTACHMENT_REFERENCE_INVALID';
+  return error;
+}
+
+function assertHttpStagedAttachmentReferences(body = {}) {
+  if (body.attachments === undefined) return;
+  if (!Array.isArray(body.attachments)) throw createHttpAttachmentReferenceError();
+  const allowedKeys = new Set([
+    'reference', 'filename', 'contentType', 'size', 'sha256', 'referenceVersion',
+  ]);
+  for (const attachment of body.attachments) {
+    if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) {
+      throw createHttpAttachmentReferenceError();
+    }
+    const rawReference = typeof attachment.reference === 'string' ? attachment.reference : '';
+    const reference = rawReference.trim();
+    if (!reference || rawReference !== reference
+      || Object.keys(attachment).some((key) => !allowedKeys.has(key))) {
+      throw createHttpAttachmentReferenceError();
+    }
+  }
 }
 
 function assertPreflightRetryContext(intent, provenance, normalizeEmail, normalizeString) {
@@ -292,9 +322,25 @@ function createMailboxComposeRuntime(dependencies = {}) {
   }
 
   async function sendMessageResponse(req, res) {
+    let externalEffectPossible = false;
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const { canonicalBody, threadProvenance } = await prepareMessage(body);
+      if (body.reconcileProof === undefined) {
+        throw createMailboxReconcileProofError(
+          'De daadwerkelijke verzending mist het verplichte preflightbewijs; er is niets verzonden.',
+          'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED'
+        );
+      }
+      const reconcileProof = assertMailboxReconcileProofSignature(
+        body.reconcileProof,
+        attachmentSigningSecret,
+        normalizeString
+      );
+      assertHttpStagedAttachmentReferences(body);
+      const { canonicalBody, threadProvenance } = await prepareMessage({
+        ...body,
+        reconcileProof,
+      });
       const result = await sendMailboxMessage({
         body: canonicalBody,
         instantlyMailboxService,
@@ -303,7 +349,10 @@ function createMailboxComposeRuntime(dependencies = {}) {
         threadProvenance,
         mailboxSendProvenanceStore,
         outboundRecipientGuardStore: composeSendDependencies?.outboundRecipientGuardStore,
-        onProviderDispatchStarting,
+        onProviderDispatchStarting: async (event) => {
+          await onProviderDispatchStarting?.(event);
+          externalEffectPossible = true;
+        },
       });
       setAcceptedSendIdentityHeaders(res, result);
       return res.status(200).json({ ok: true, result });
@@ -316,6 +365,10 @@ function createMailboxComposeRuntime(dependencies = {}) {
           error: 'Mail niet verzonden',
           detail: TEMPORARY_MAILBOX_SEND_MESSAGE,
           retryable: true,
+          ...(!externalEffectPossible ? {
+            externalEffect: false,
+            failurePhase: 'pre-dispatch',
+          } : {}),
         });
       }
       return res.status(error.status || 500).json({
@@ -323,6 +376,10 @@ function createMailboxComposeRuntime(dependencies = {}) {
         code: normalizeString(error?.code) || 'MAILBOX_SEND_FAILED',
         error: 'Mail verzenden mislukt',
         detail: String(error?.message || 'Onbekende fout'),
+        ...(!externalEffectPossible ? {
+          externalEffect: false,
+          failurePhase: 'pre-dispatch',
+        } : {}),
       });
     }
   }
@@ -349,7 +406,21 @@ function createMailboxComposeRuntime(dependencies = {}) {
         throw error;
       }
       const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const { threadProvenance } = await prepareMessage(body);
+      if (body.reconcileProof === undefined) {
+        throw createMailboxReconcileProofError(
+          'De bijlage-upload mist het verplichte preflightbewijs; er is niets geüpload.',
+          'MAILBOX_SEND_RECONCILE_PROOF_REQUIRED'
+        );
+      }
+      const reconcileProof = assertMailboxReconcileProofSignature(
+        body.reconcileProof,
+        attachmentSigningSecret,
+        normalizeString
+      );
+      const { threadProvenance } = await prepareMessage({
+        ...body,
+        reconcileProof,
+      });
       const uploads = await resolvedMailboxAttachmentService.createUploadPlan({
         attachments: body.attachments,
         binding: threadProvenance,
@@ -533,6 +604,11 @@ function createMailboxComposeRuntime(dependencies = {}) {
             durableIntent,
             normalizeString
           );
+          const signedReconcileProof = signMailboxReconcileProof(
+            reconcileProof,
+            attachmentSigningSecret,
+            normalizeString
+          );
           const classified = classifyPreflightConflict(
             durableIntent,
             reconcileProof.attachmentsMetadata
@@ -554,7 +630,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
               conversationId: reconcileProof.conversationId,
               replyTargetMessageId: reconcileProof.replyTargetMessageId,
               providerThreadId: reconcileProof.providerThreadId,
-              reconcileProof,
+              reconcileProof: signedReconcileProof,
               reservationReady: false,
               reservationConflictStatus: normalizeString(durableIntent.status),
             },
@@ -594,6 +670,13 @@ function createMailboxComposeRuntime(dependencies = {}) {
       if (retryStatus === 'accepted' && acceptedResult) {
         setAcceptedSendIdentityHeaders(res, acceptedResult);
       }
+      const signedReconcileProof = reconcileProof
+        ? signMailboxReconcileProof(
+            reconcileProof,
+            attachmentSigningSecret,
+            normalizeString
+          )
+        : null;
       return res.status(200).json({
         ok: true,
         result: {
@@ -608,7 +691,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
           conversationId: threadProvenance.conversationId,
           replyTargetMessageId: threadProvenance.replyTargetMessageId,
           providerThreadId: threadProvenance.providerThreadId,
-          ...(reconcileProof ? { reconcileProof } : {}),
+          ...(signedReconcileProof ? { reconcileProof: signedReconcileProof } : {}),
           reservationReady: Boolean(
             reservationCheck?.intent?.sendIdentityKey
             && reservationCheck?.intent?.sendScopeKey

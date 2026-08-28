@@ -76,6 +76,9 @@ function readyResult(value) {
     scopeFingerprint: `smtp-reply-scope:${'a'.repeat(64)}`,
     requestPayloadFingerprint: 'b'.repeat(64),
     attachmentsMetadata: value.attachmentsMetadata,
+    issuedAtMs: 1,
+    expiresAtMs: 300_001,
+    signature: 'c'.repeat(64),
   };
   return {
     preflight: true, status: 'ready', externalEffect: false,

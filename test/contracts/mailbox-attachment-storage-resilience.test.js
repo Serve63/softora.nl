@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const {
   MAILBOX_ATTACHMENT_STORAGE_PREFIX,
@@ -28,6 +29,10 @@ function makeBinding(overrides = {}) {
 
 function decodeReference(reference) {
   return JSON.parse(Buffer.from(String(reference).split('.')[0], 'base64url').toString('utf8'));
+}
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
 }
 
 function createStorageFixture() {
@@ -93,7 +98,10 @@ test('attachment storage omzeilt de gedeelde cooldown en herstelt begrensd van √
   });
 
   const [upload] = await service.createUploadPlan({
-    attachments: [{ filename: 'bewijs.pdf', contentType: 'text/plain', size: 4 }],
+    attachments: [{
+      filename: 'bewijs.pdf', contentType: 'text/plain', size: 4,
+      sha256: sha256(Buffer.alloc(4, 1)),
+    }],
     binding: makeBinding(),
   });
 
@@ -138,8 +146,8 @@ test('gedeeltelijk uploadplan ruimt alle eerder uitgegeven paden op en lekt geen
   await assert.rejects(
     service.createUploadPlan({
       attachments: [
-        { filename: 'eerste.png', size: 4 },
-        { filename: 'tweede.png', size: 4 },
+        { filename: 'eerste.png', size: 4, sha256: sha256(Buffer.alloc(4, 1)) },
+        { filename: 'tweede.png', size: 4, sha256: sha256(Buffer.alloc(4, 2)) },
       ],
       binding: makeBinding(),
     }),
@@ -192,8 +200,11 @@ test('zichtbare bestandsnamen blijven intact terwijl Storage exact dezelfde URL-
   });
   const binding = makeBinding();
 
+  const contents = filenames.map((_filename, index) => Buffer.from([index + 1, 2, 3, 4]));
   const uploads = await service.createUploadPlan({
-    attachments: filenames.map((filename) => ({ filename, size: 4 })),
+    attachments: filenames.map((filename, index) => ({
+      filename, size: 4, sha256: sha256(contents[index]),
+    })),
     binding,
   });
   assert.deepEqual(uploads.map((upload) => upload.filename), filenames);
@@ -201,7 +212,7 @@ test('zichtbare bestandsnamen blijven intact terwijl Storage exact dezelfde URL-
   signedPaths.forEach((path, index) => {
     assert.match(path, new RegExp(`/\\d{1,2}-[a-f0-9]{24}\\.pdf$`));
     assert.doesNotMatch(path, /[#?%\s\u0080-\uFFFF]/);
-    objects.set(path, Buffer.from([index + 1, 2, 3, 4]));
+    objects.set(path, contents[index]);
   });
 
   const resolved = await service.downloadAttachments(uploads, binding);
@@ -235,7 +246,7 @@ test('attachment storage stopt na twee tijdelijke fouten en retryt definitieve 4
   });
   await assert.rejects(
     transientService.createUploadPlan({
-      attachments: [{ filename: 'bewijs.pdf', size: 4 }],
+      attachments: [{ filename: 'bewijs.pdf', size: 4, sha256: sha256(Buffer.alloc(4, 1)) }],
       binding: makeBinding(),
     }),
     (error) => {
@@ -268,7 +279,7 @@ test('attachment storage stopt na twee tijdelijke fouten en retryt definitieve 4
       });
       await assert.rejects(
         service.createUploadPlan({
-          attachments: [{ filename: 'bewijs.pdf', size: 4 }],
+          attachments: [{ filename: 'bewijs.pdf', size: 4, sha256: sha256(Buffer.alloc(4, 1)) }],
           binding: makeBinding(),
         }),
         (error) => error.code === 'MAILBOX_ATTACHMENT_STORAGE_FAILED'
@@ -305,7 +316,7 @@ test('attachment storage stopt na twee tijdelijke fouten en retryt definitieve 4
       });
       await assert.rejects(
         service.createUploadPlan({
-          attachments: [{ filename: 'bewijs.pdf', size: 4 }],
+          attachments: [{ filename: 'bewijs.pdf', size: 4, sha256: sha256(Buffer.alloc(4, 1)) }],
           binding: makeBinding(),
         }),
         (error) => error.code === 'MAILBOX_ATTACHMENT_STORAGE_FAILED'
@@ -343,7 +354,7 @@ test('service-deadline begrenst zowel een hangende Storage-call als een hangende
   });
   await assert.rejects(
     stalledPlanService.createUploadPlan({
-      attachments: [{ filename: 'hang.pdf', size: 4 }],
+      attachments: [{ filename: 'hang.pdf', size: 4, sha256: sha256(Buffer.alloc(4, 1)) }],
       binding: makeBinding(),
     }),
     (error) => error.code === 'MAILBOX_ATTACHMENT_STORAGE_TIMEOUT'
@@ -362,7 +373,7 @@ test('service-deadline begrenst zowel een hangende Storage-call als een hangende
   });
   const binding = makeBinding();
   const [upload] = await planService.createUploadPlan({
-    attachments: [{ filename: 'body.pdf', size: 4 }],
+    attachments: [{ filename: 'body.pdf', size: 4, sha256: sha256(Buffer.alloc(4, 1)) }],
     binding,
   });
   let downloadAttempts = 0;
@@ -431,7 +442,10 @@ test('download, cleanup en verlopen references blijven begrensd, retrybaar en ac
   });
   const binding = makeBinding();
   const [upload] = await service.createUploadPlan({
-    attachments: [{ filename: 'design..final.pdf', contentType: 'text/plain', size: 4 }],
+    attachments: [{
+      filename: 'design..final.pdf', contentType: 'text/plain', size: 4,
+      sha256: sha256(Buffer.from([1, 2, 3, 4])),
+    }],
     binding,
   });
   assert.equal(upload.filename, 'design.final.pdf');
@@ -459,7 +473,9 @@ test('alle Serv√©/Martijn-, provider-, ontvanger- en threadmismatches falen v√≥√
   });
   const binding = makeBinding({ providerAccountEmail: 'serve-provider@example.nl' });
   const [upload] = await service.createUploadPlan({
-    attachments: [{ filename: 'bewijs.pdf', size: 4 }],
+    attachments: [{
+      filename: 'bewijs.pdf', size: 4, sha256: sha256(Buffer.alloc(4, 1)),
+    }],
     binding,
   });
   fixture.objects.set(decodeReference(upload.reference).path, Buffer.alloc(4, 1));
