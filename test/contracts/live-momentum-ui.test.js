@@ -31,13 +31,14 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<title>ATTACK, ATTACK, ATTACK\. \| Softora<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/winnen">/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
+  assert.match(html, /<meta name="theme-color" content="#f5f3ef" media="\(max-width: 900px\)">/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813b" defer><\/script>/);
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828a"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828b"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -291,10 +292,12 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.status:focus-visible::before\s*\{[\s\S]*box-shadow:\s*0 0 0 3px rgba\(86, 196, 134, \.3\);/);
   assert.match(css, /@media \(max-width:\s*780px\)/);
   assert.match(mobileCss, /@media \(max-width:\s*900px\)[\s\S]*\.momentum-layout \.momentum-page\s*\{[\s\S]*width:\s*100% !important;/);
+  assert.match(mobileCss, /@media \(max-width:\s*900px\)\s*\{\s*html\s*\{\s*background-color:\s*#f5f3ef;/);
   assert.match(mobileCss, /--momentum-safe-start:\s*max\(16px, env\(safe-area-inset-left\)\);/);
   assert.match(mobileCss, /padding:\s*max\(12px, env\(safe-area-inset-top\)\) var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
   assert.match(mobileCss, /\.momentum-mobile-nav\s*\{\s*display:\s*none;/);
   assert.match(mobileCss, /\.momentum-mobile-tabs,\s*\[data-settings-module-back-host\],\s*\.momentum-history-trigger,\s*\.momentum-video-trigger\s*\{\s*display:\s*none !important;/);
+  assert.match(mobileCss, /\.momentum-mobile-summary\s*\{\s*display:\s*none;\s*\}/);
   assert.match(mobileCss, /\.momentum-mobile-tabs button\[aria-pressed="true"\]\s*\{[\s\S]*background:\s*#fff;/);
   assert.doesNotMatch(mobileCss, /momentum-mobile-links|momentum-mobile-summary-copy button/);
   assert.match(mobileCss, /\.momentum-mobile-score-ring\s*\{[\s\S]*background:\s*conic-gradient\(#42d981 var\(--momentum-mobile-score, 0deg\)/);
@@ -311,6 +314,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-goal-track\s*\{[\s\S]*display:\s*grid;[\s\S]*width:\s*100%;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-card-slot,[\s\S]*min-height:\s*96px;[\s\S]*touch-action:\s*pan-y;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-card-number\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;[\s\S]*touch-action:\s*none;/);
+  assert.match(mobileCss, /body\[data-momentum-mobile-view="endgame"\] \.end-game-heading\s*\{[\s\S]*margin:\s*42px 0 0;/);
   assert.match(mobileCss, /body\[data-live-momentum-page\] \.chart-card,\s*body\[data-momentum-mobile-view="month"\] \.chart-card\s*\{[\s\S]*display:\s*block;/);
   assert.match(mobileCss, /body\[data-live-momentum-page\] \.habit-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 68px;/);
   assert.match(mobileCss, /body\[data-live-momentum-page\] \.momentum-hero\s*\{\s*display:\s*block;/);

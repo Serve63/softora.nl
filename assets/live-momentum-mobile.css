@@ -3,7 +3,8 @@
 @media (max-width: 1200px) { .bar-chart-viewport { overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: none; }
 .bar-chart-viewport::-webkit-scrollbar { display: none; }
 }
-@media (max-width: 900px) { body[data-live-momentum-page] { background: radial-gradient(circle at 92% 4%, rgba(165, 32, 85, .08), transparent 30%), #f5f3ef; }
+@media (max-width: 900px) { html { background-color: #f5f3ef; }
+body[data-live-momentum-page] { background: radial-gradient(circle at 92% 4%, rgba(165, 32, 85, .08), transparent 30%), #f5f3ef; }
 .momentum-layout .sidebar { display: none !important; }
 .momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: max(12px, env(safe-area-inset-top)) var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
 .momentum-art-quotes { display: none; }
@@ -21,7 +22,7 @@ body[data-momentum-persistence="error"] .momentum-persistence-status { color: #b
 .momentum-head h1 { max-width: none; margin-bottom: .32rem; font-size: clamp(1.42rem, 6.2vw, 1.78rem); line-height: .98; white-space: nowrap; }
 .momentum-head p { font-size: .8rem; }
 .momentum-video-trigger { width: 46px; height: 46px; border-radius: 15px; background: #fff; box-shadow: 0 10px 28px rgba(26, 26, 46, .09); }
-.momentum-mobile-summary { display: block; padding: 18px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .1); border-radius: 24px; background: radial-gradient(circle at 88% 10%, rgba(46, 204, 113, .24), transparent 33%), linear-gradient(145deg, #202235, #12131f 72%); box-shadow: 0 20px 50px rgba(22, 23, 35, .19); color: #fff; }
+.momentum-mobile-summary { display: none; }
 .momentum-mobile-summary-topline, .momentum-mobile-summary-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .momentum-mobile-summary-topline { color: rgba(255, 255, 255, .62); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .momentum-mobile-summary-topline [data-momentum-mobile-date]::first-letter { text-transform: uppercase; }
@@ -88,7 +89,7 @@ body[data-momentum-mobile-view="month"] .habit-name { gap: 4px; min-height: 48px
 body[data-momentum-mobile-view="month"] .habit-label { font-size: 13px; }
 body[data-momentum-mobile-view="month"] .habit-day.is-today { scroll-margin-inline-start: 44px; scroll-snap-align: start; scroll-snap-stop: always; }
 body[data-momentum-mobile-view="month"] .status::before { width: 22px; height: 22px; }
-body[data-momentum-mobile-view="endgame"] .end-game-heading { display: block; width: 100%; margin: 7px 0 0; }
+body[data-momentum-mobile-view="endgame"] .end-game-heading { display: block; width: 100%; margin: 42px 0 0; }
 body[data-momentum-mobile-view="endgame"] .end-game-title, body[data-momentum-mobile-view="endgame"] .end-game-heading .end-game-title { margin: 0; font-size: 1.7rem; line-height: 1; text-align: left; }
 body[data-momentum-mobile-view="endgame"] .end-game-title::before { display: block; margin-bottom: 5px; color: #a52055; content: "JOUW ROUTE"; font-family: var(--font-sans); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
 body[data-momentum-mobile-view="endgame"] .end-game-progress { height: 7px; margin-top: 14px; background: rgba(26, 26, 46, .08); }
