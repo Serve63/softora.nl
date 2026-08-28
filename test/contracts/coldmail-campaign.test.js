@@ -13,6 +13,9 @@ const {
   buildChunkedStatePatch,
   readChunkedStateValue,
 } = require('../../server/services/data-ops-serialization');
+const {
+  withMailboxPreDispatchProvenance,
+} = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -280,6 +283,40 @@ function createService(overrides = {}) {
     },
   ]).map(withCheckedMockupMeta);
   const outboundGuardCalls = [];
+  const provenanceRows = new Map();
+  const defaultMailboxSendProvenanceStore = {
+    findByIdempotencyKey: async (key) => provenanceRows.get(key) || null,
+    reserve: async (input) => {
+      const existing = provenanceRows.get(input.idempotencyKey);
+      if (existing) return { created: false, intent: existing };
+      const intent = { ...input, status: 'prepared', dispatchState: 'reserved' };
+      provenanceRows.set(input.idempotencyKey, intent);
+      return { created: true, intent };
+    },
+    startDispatch: async (intentId) => {
+      const intent = provenanceRows.get(intentId);
+      if (intent) Object.assign(intent, { dispatchState: 'started' });
+      return intent;
+    },
+    accept: async (intentId, values = {}) => {
+      const intent = provenanceRows.get(intentId) || { intentId, idempotencyKey: intentId };
+      Object.assign(intent, values, { status: 'accepted', dispatchState: 'finished' });
+      provenanceRows.set(intentId, intent);
+      return intent;
+    },
+    fail: async (intentId, error) => {
+      const intent = provenanceRows.get(intentId) || { intentId, idempotencyKey: intentId };
+      Object.assign(intent, { status: 'failed', dispatchState: 'finished', error });
+      provenanceRows.set(intentId, intent);
+      return intent;
+    },
+    markUnknown: async (intentId, error, values = {}) => {
+      const intent = provenanceRows.get(intentId) || { intentId, idempotencyKey: intentId };
+      Object.assign(intent, values, { status: 'unknown', dispatchState: 'started', error });
+      provenanceRows.set(intentId, intent);
+      return intent;
+    },
+  };
   const defaultOutboundRecipientGuardStore = {
     findRecipientConflict: async () => null,
     findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }),
@@ -357,7 +394,11 @@ function createService(overrides = {}) {
           ...(overrides.outboundRecipientGuardStore || {}),
         },
     dataOpsStore,
-    mailboxSendProvenanceStore: overrides.mailboxSendProvenanceStore,
+    mailboxSendProvenanceStore: overrides.mailboxSendProvenanceStore === null
+      ? null
+      : withMailboxPreDispatchProvenance(
+        overrides.mailboxSendProvenanceStore || defaultMailboxSendProvenanceStore
+      ),
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -10635,20 +10676,14 @@ test('coldmail campaign voltooit de Sent-kopie als provenance en herstelmarkerin
   let releaseAppend;
   let appendStartedResolve;
   const appendStarted = new Promise((resolve) => { appendStartedResolve = resolve; });
-  const provenanceRow = {
-    intentId: 'coldmail:recipient-provenance-outage',
-    accountEmail: 'serve@softora.nl',
-    recipientEmail: 'info@provenance-outage.example',
-    status: 'prepared',
-    messageId: '',
-  };
+  let provenanceRow = null;
   const persistenceTimeout = Object.assign(new Error('Supabase provenance timeout'), {
     code: 'ETIMEDOUT',
   });
   const { service } = createService({
     rows: [{
       id: 'provenance-outage-row', bedrijf: 'Provenance Outage BV', naam: 'Provenance Outage BV',
-      email: provenanceRow.recipientEmail, website: 'https://provenance-outage.example',
+      email: 'info@provenance-outage.example', website: 'https://provenance-outage.example',
       status: 'prospect', mail: true,
     }],
     outboundRecipientGuardStore: {
@@ -10669,8 +10704,15 @@ test('coldmail campaign voltooit de Sent-kopie als provenance en herstelmarkerin
       },
     },
     mailboxSendProvenanceStore: {
-      reserve: async () => {
+      reserve: async (input) => {
         calls.push('provenance:reserve');
+        provenanceRow = {
+          intentId: input.intentId,
+          accountEmail: input.accountEmail,
+          recipientEmail: input.recipientEmail,
+          status: 'prepared',
+          messageId: '',
+        };
         return { created: true, intent: provenanceRow };
       },
       startDispatch: async () => calls.push('provenance:start'),
@@ -10757,7 +10799,7 @@ test('coldmail campaign releases the central reservation when SMTP fails before 
         return { ok: true };
       },
     },
-    sendMailError: '535 Authentication failed',
+    sendMailError: Object.assign(new Error('535 Authentication failed'), { responseCode: 535 }),
   });
 
   await assert.rejects(
@@ -10777,6 +10819,57 @@ test('coldmail campaign releases the central reservation when SMTP fails before 
   assert.equal(sentMessages.length, 0);
   assert.deepEqual(calls.map((call) => call.type), ['reserve', 'release']);
   assert.equal(calls[1].reservationId, 'reservation-smtp-fails');
+});
+
+test('coldmail guard-responseverlies gebruikt de vooraf bekende reservation-ID en faalt zichtbaar bij releaseverlies', async (t) => {
+  for (const releaseSucceeds of [true, false]) {
+    await t.test(releaseSucceeds ? 'release bevestigd' : 'release niet bevestigd', async () => {
+      const calls = [];
+      let providerCalls = 0;
+      let expectedReservationId = '';
+      const reserveError = Object.assign(new Error('guard committeerde maar response ging verloren'), {
+        code: 'ETIMEDOUT',
+      });
+      const { service } = createService({
+        rows: [{
+          id: `guard-response-loss-${releaseSucceeds}`, bedrijf: 'Guard Response BV',
+          naam: 'Guard Response BV', email: `info@guard-response-${releaseSucceeds}.example`,
+          website: 'https://guard-response.example', status: 'prospect', mail: true,
+        }],
+        outboundRecipientGuardStore: {
+          findRecipientConflict: async () => null,
+          reserveRecipients: async (_items, options) => {
+            expectedReservationId = options.reservationId;
+            calls.push(`reserve:${expectedReservationId}`);
+            throw reserveError;
+          },
+          releaseReservation: async (reservationId) => {
+            calls.push(`release:${reservationId}`);
+            return { ok: releaseSucceeds };
+          },
+        },
+        onSendMail: async () => { providerCalls += 1; },
+      });
+
+      await assert.rejects(() => service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }), (error) => {
+        if (releaseSucceeds) return error.code === 'SMTP_SEND_FAILED';
+        return error.code === 'COLDMAIL_SAFETY_PAUSED'
+          && error.failedItems.some((item) => item.code === 'COLDMAIL_OUTBOUND_GUARD_RELEASE_FAILED');
+      });
+
+      assert.match(expectedReservationId, /^coldmail-send-/);
+      assert.deepEqual(calls, [
+        `reserve:${expectedReservationId}`,
+        `release:${expectedReservationId}`,
+      ]);
+      assert.equal(providerCalls, 0);
+    });
+  }
 });
 
 test('coldmail campaign houdt guards vast en markeert provenance unknown bij ambigu SMTP-resultaat', async () => {
@@ -10885,10 +10978,14 @@ test('coldmail campaign geeft alle guards vrij bij provenance reserve- of start-
       assert.equal(sentMessages.length, 0);
       assert.equal(calls.includes('smtp'), false);
       assert.equal(calls.includes('provenance:unknown'), false);
-      assert.deepEqual(calls.filter((call) => call.startsWith('guard:release:')).sort(), [
-        'guard:release:recipient-reservation',
-        'guard:release:sender-reservation',
-      ]);
+      assert.deepEqual(calls.filter((call) => call.startsWith('guard:release:')).sort(),
+        failingStep === 'reserve' ? [] : [
+          'guard:release:recipient-reservation',
+          'guard:release:sender-reservation',
+        ]);
+      if (failingStep === 'reserve') {
+        assert.equal(calls.some((call) => call.startsWith('guard:reserve:')), false);
+      }
       if (failingStep === 'start') assert.equal(calls.includes('provenance:fail'), true);
     });
   }
@@ -11857,7 +11954,7 @@ test('coldmail campaign refuses unconnected sender addresses', async () => {
 
 test('coldmail campaign reports SMTP failure when every selected mail fails', async () => {
   const { service, sentMessages, getSavedState } = createService({
-    sendMailError: '535 Authentication failed',
+    sendMailError: Object.assign(new Error('535 Authentication failed'), { responseCode: 535 }),
   });
 
   await assert.rejects(
@@ -11903,7 +12000,10 @@ test('coldmail campaign records a safety pause when the provider rate-limits sen
   );
 
   assert.equal(getSendGuardState().entries[0].count, 0);
-  assert.match(getSendGuardState().entries[0].safetyPauseReason, /too many recipients/);
+  assert.equal(
+    getSendGuardState().entries[0].safetyPauseReason,
+    'provider_send_reconcile_required'
+  );
 
   await assert.rejects(
     () =>

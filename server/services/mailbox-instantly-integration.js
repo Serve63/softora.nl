@@ -3,7 +3,7 @@ const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const {
   createMailboxReconcileRequiredError,
   createMailboxRequestPayloadFingerprint,
-  isAmbiguousMailboxProviderError,
+  isDefinitiveMailboxProviderRejection,
   normalizeMailboxAttachmentsMetadata,
 } = require('./mailbox-send-provenance-store');
 const {
@@ -518,6 +518,7 @@ async function sendMailboxMessage({
   threadProvenance,
   mailboxSendProvenanceStore,
   outboundRecipientGuardStore,
+  onProviderDispatchStarting,
 }) {
   if (normalizeString(body.provider).toLowerCase() !== 'instantly') {
     return sendMessage({
@@ -528,10 +529,9 @@ async function sendMailboxMessage({
       subject: body.subject,
       text: body.body || body.text || '',
       attachments: body.attachments,
-      expectedAttachmentsMetadata: body.reconcileProof === undefined
-        ? undefined
-        : body.attachmentsMetadata,
+      expectedAttachmentsMetadata: body.attachmentsMetadata,
       threadProvenance,
+      onProviderDispatchStarting,
     });
   }
   if (threadProvenance?.mode !== 'reply') {
@@ -541,7 +541,8 @@ async function sendMailboxMessage({
     throw error;
   }
   const requiredProvenanceMethods = [
-    'findByIdempotencyKey', 'reserve', 'startDispatch', 'accept', 'fail', 'markUnknown',
+    'claimPreDispatch', 'failPreDispatch', 'finalizeClaim', 'findByIdempotencyKey',
+    'startDispatch', 'accept', 'fail', 'markUnknown',
   ];
   if (!mailboxSendProvenanceStore || requiredProvenanceMethods.some(
     (method) => typeof mailboxSendProvenanceStore[method] !== 'function'
@@ -551,27 +552,7 @@ async function sendMailboxMessage({
     error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
     throw error;
   }
-  const existing = await mailboxSendProvenanceStore.findByIdempotencyKey(
-    threadProvenance.idempotencyKey
-  );
-  const earlyReplay = resolveInstantlyExistingIntent(
-    existing,
-    threadProvenance,
-    body,
-    normalizeString
-  );
-  if (earlyReplay) return earlyReplay;
-
-  const recipientEmails = [body.to, body.cc, body.bcc]
-    .flatMap((value) => Array.isArray(value) ? value : String(value || '').split(/[;,]/))
-    .map((value) => normalizeString(value).toLowerCase())
-    .filter(Boolean);
-  await assertOutboundRecipientsNotSuppressed({
-    outboundRecipientGuardStore,
-    identities: recipientEmails.map((recipientEmail) => ({ recipientEmail })),
-    channel: 'instantly-mailbox-reply',
-  });
-  const reservation = await mailboxSendProvenanceStore.reserve({
+  const claimInput = {
     ...threadProvenance,
     accountEmail: body.account,
     recipientEmail: body.to,
@@ -581,17 +562,85 @@ async function sendMailboxMessage({
     requestBody: body.body || body.text || '',
     cc: body.cc,
     bcc: body.bcc,
+    attachments: [],
     attachmentsMetadata: [],
-  });
-  if (!reservation.created) {
+  };
+  const preDispatchClaim = await mailboxSendProvenanceStore.claimPreDispatch(claimInput);
+  if (!preDispatchClaim.created) {
     return resolveInstantlyExistingIntent(
-      reservation.intent,
+      preDispatchClaim.intent,
       threadProvenance,
       body,
       normalizeString
     );
   }
-  await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
+  const recipientEmails = [body.to, body.cc, body.bcc]
+    .flatMap((value) => Array.isArray(value) ? value : String(value || '').split(/[;,]/))
+    .map((value) => normalizeString(value).toLowerCase())
+    .filter(Boolean);
+  let finalClaim = null;
+  let startedDispatchIntent = null;
+  let providerDispatchStarted = false;
+  async function abortBeforeProvider(error) {
+    const committedStartIntent = error?.code === 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED'
+      && error?.intent?.intentId === threadProvenance.intentId
+      && error?.intent?.dispatchState === 'started'
+      ? error.intent
+      : null;
+    const abortHandle = committedStartIntent
+      ? { intent: committedStartIntent, finalToken: committedStartIntent.transitionToken }
+      : startedDispatchIntent?.intentId
+        ? { intent: startedDispatchIntent, finalToken: startedDispatchIntent.transitionToken }
+        : finalClaim || preDispatchClaim;
+    let failedPreDispatch = false;
+    try {
+      const failed = await mailboxSendProvenanceStore.failPreDispatch(abortHandle, error);
+      failedPreDispatch = failed?.status === 'failed' && failed?.dispatchState === 'finished';
+    } catch (claimError) {
+      const recovered = await mailboxSendProvenanceStore.findByIdempotencyKey(
+        threadProvenance.idempotencyKey
+      ).catch(() => null);
+      failedPreDispatch = recovered?.intentId === threadProvenance.intentId
+        && recovered?.status === 'failed'
+        && recovered?.dispatchState === 'finished';
+      if (!failedPreDispatch) {
+        const reconcileError = createMailboxReconcileRequiredError(claimError);
+        reconcileError.preDispatchError = error;
+        throw reconcileError;
+      }
+    }
+    if (!failedPreDispatch) {
+      const persistenceError = new Error(
+        'De veilige Instantly-stop vóór providerdispatch kon niet duurzaam worden bevestigd.'
+      );
+      persistenceError.code = 'MAILBOX_SEND_PRE_DISPATCH_FAIL_UNCONFIRMED';
+      const reconcileError = createMailboxReconcileRequiredError(persistenceError);
+      reconcileError.preDispatchError = error;
+      throw reconcileError;
+    }
+  }
+  try {
+    finalClaim = await mailboxSendProvenanceStore.finalizeClaim(
+      preDispatchClaim,
+      claimInput
+    );
+    await assertOutboundRecipientsNotSuppressed({
+      outboundRecipientGuardStore,
+      identities: recipientEmails.map((recipientEmail) => ({ recipientEmail })),
+      channel: 'instantly-mailbox-reply',
+    });
+    startedDispatchIntent = await mailboxSendProvenanceStore.startDispatch(finalClaim);
+    if (startedDispatchIntent?.intentId !== threadProvenance.intentId
+      || startedDispatchIntent?.dispatchState !== 'started') {
+      const error = new Error('De Instantly-providerstart kon niet duurzaam worden bevestigd.');
+      error.code = 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED';
+      error.status = 503;
+      throw error;
+    }
+  } catch (error) {
+    await abortBeforeProvider(error);
+    throw error;
+  }
   let result;
   try {
     result = await instantlyMailboxService.reply({
@@ -605,9 +654,22 @@ async function sendMailboxMessage({
       subject: body.subject,
       text: body.body || body.text || '',
       attachments: body.attachments,
+      onProviderDispatchStarting: async () => {
+        if (typeof onProviderDispatchStarting === 'function') {
+          await onProviderDispatchStarting({
+            provider: 'instantly',
+            intentId: threadProvenance.intentId,
+          });
+        }
+        providerDispatchStarted = true;
+      },
     });
   } catch (error) {
-    if (isAmbiguousMailboxProviderError(error)) {
+    if (!providerDispatchStarted) {
+      await abortBeforeProvider(error);
+      throw error;
+    }
+    if (!isDefinitiveMailboxProviderRejection(error)) {
       await mailboxSendProvenanceStore.markUnknown(threadProvenance.intentId, error, { sentReconcileRequired: true })
         .catch(() => null);
       throw createMailboxReconcileRequiredError(error);

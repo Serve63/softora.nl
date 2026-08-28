@@ -1,7 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const { createMailboxComposeSend } = require('../../server/services/mailbox-compose-send');
+const {
+  withMailboxPreDispatchProvenance,
+} = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
 
 const MIB = 1024 * 1024;
 
@@ -41,12 +45,14 @@ function createHarness(options = {}) {
     filename: `manual-${index}.png`,
     contentType: 'image/png',
     size,
+    sha256: crypto.createHash('sha256').update(Buffer.alloc(size, 2)).digest('hex'),
   }));
   const resolvedManualAttachments = manualSizes.map((size, index) => ({
     filename: `manual-${index}.png`,
     content: Buffer.alloc(size, 2),
     contentType: 'image/png',
     contentDisposition: 'attachment',
+    sha256: attachmentInputs[index].sha256,
   }));
   const webdesignParts = Array.isArray(options.webdesignAttachments) ? {
     text: 'Bekijk het webdesign in deze mail.',
@@ -64,12 +70,15 @@ function createHarness(options = {}) {
     cleanup: [],
     confirm: [],
     fail: [],
+    finalize: [],
     markUnknown: [],
     outboundReserve: [],
+    providerStart: [],
     provenanceReserve: [],
     smtp: [],
     startDispatch: [],
     suppression: [],
+    events: [],
   };
   const provenanceStore = {
     async findByIdempotencyKey() {
@@ -81,6 +90,19 @@ function createHarness(options = {}) {
     },
     async startDispatch(intentId) {
       calls.startDispatch.push(intentId);
+    },
+    async finalizeClaim(handle, input) {
+      calls.finalize.push(input);
+      const intent = {
+        ...handle.intent,
+        ...input,
+        status: 'prepared',
+        dispatchState: 'reserved',
+        transitionToken: 'test-final-token',
+        preDispatchClaimFingerprint: 'a'.repeat(64),
+        preDispatchFinalizedAt: '2026-08-26T15:44:59.000Z',
+      };
+      return { intent, finalToken: intent.transitionToken };
     },
     async accept(intentId, values) {
       calls.accept.push({ intentId, values });
@@ -113,6 +135,7 @@ function createHarness(options = {}) {
     truncateText: (value, max) => String(value || '').slice(0, max),
     createTransport: () => ({
       async sendMail(mail) {
+        calls.events.push('provider');
         calls.smtp.push(mail);
         return options.providerInfo || {
           messageId: '<accepted-provider-result@softora.nl>',
@@ -134,7 +157,7 @@ function createHarness(options = {}) {
       return true;
     },
     webdesignEmailTemplateVersion: 'test-webdesign-template',
-    mailboxSendProvenanceStore: provenanceStore,
+    mailboxSendProvenanceStore: withMailboxPreDispatchProvenance(provenanceStore),
     outboundRecipientGuardStore: {
       async findRecipientSuppressionConflict(identities, settings) {
         calls.suppression.push({ identities, settings });
@@ -147,6 +170,7 @@ function createHarness(options = {}) {
           filename: attachment.filename,
           contentType: attachment.contentType,
           size: attachment.content.length,
+          sha256: crypto.createHash('sha256').update(attachment.content).digest('hex'),
         }));
       },
       async downloadAttachments() {
@@ -156,6 +180,10 @@ function createHarness(options = {}) {
         calls.cleanup.push({ references, binding });
       },
     },
+    onProviderDispatchStarting: options.onProviderDispatchStarting || (async (event) => {
+      calls.providerStart.push(event);
+      calls.events.push('callback');
+    }),
     logger: { error() {}, warn() {} },
     now: () => new Date('2026-08-26T15:45:00.000Z'),
   });
@@ -171,6 +199,12 @@ function createHarness(options = {}) {
         subject: 'Bijlagecontrole',
         text: 'Hierbij mijn bericht.',
         attachments: attachmentInputs,
+        expectedAttachmentsMetadata: attachmentInputs.map((attachment) => ({
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          sha256: attachment.sha256,
+        })),
         threadProvenance: threadProvenance(),
         ...overrides,
       });
@@ -249,11 +283,14 @@ test('automatische en handmatige bijlagen worden samen op maximaal vijf MIME-par
   assert.equal(harness.calls.cleanup.length, 1);
   assert.equal(harness.calls.suppression.length, 0);
   assert.equal(harness.calls.outboundReserve.length, 0);
-  assert.equal(harness.calls.provenanceReserve.length, 0);
+  assert.equal(harness.calls.provenanceReserve.length, 1, 'de stop wordt eerst duurzaam geclaimd');
+  assert.equal(harness.calls.finalize.length, 0);
+  assert.equal(harness.calls.fail.length, 1);
+  assert.equal(harness.calls.providerStart.length, 0);
   assert.equal(harness.calls.smtp.length, 0);
 });
 
-test('gecombineerde bijlagen begrenzen zowel ieder Buffer als het totaal vóór side-effects', async (t) => {
+test('gecombineerde bijlagen begrenzen zowel ieder Buffer als het totaal vóór externe side-effects', async (t) => {
   await t.test('automatische bijlage boven 4 MiB', async () => {
     const harness = createHarness({
       manualSizes: [1],
@@ -265,7 +302,10 @@ test('gecombineerde bijlagen begrenzen zowel ieder Buffer als het totaal vóór 
       return true;
     });
     assert.equal(harness.calls.cleanup.length, 1);
-    assert.equal(harness.calls.provenanceReserve.length, 0);
+    assert.equal(harness.calls.provenanceReserve.length, 1);
+    assert.equal(harness.calls.finalize.length, 0);
+    assert.equal(harness.calls.fail.length, 1);
+    assert.equal(harness.calls.providerStart.length, 0);
     assert.equal(harness.calls.smtp.length, 0);
   });
 
@@ -280,7 +320,10 @@ test('gecombineerde bijlagen begrenzen zowel ieder Buffer als het totaal vóór 
       return true;
     });
     assert.equal(harness.calls.cleanup.length, 1);
-    assert.equal(harness.calls.provenanceReserve.length, 0);
+    assert.equal(harness.calls.provenanceReserve.length, 1);
+    assert.equal(harness.calls.finalize.length, 0);
+    assert.equal(harness.calls.fail.length, 1);
+    assert.equal(harness.calls.providerStart.length, 0);
     assert.equal(harness.calls.smtp.length, 0);
   });
 });
@@ -312,11 +355,36 @@ test('exacte gecombineerde grens bewaart CID-bytes en accepteert TO hoofdlettero
     harness.calls.smtp[0].attachments.slice(0, 2).map((attachment) => attachment.cid),
     ['webdesign@softora', 'mockup@softora']
   );
-  assert.strictEqual(harness.calls.provenanceReserve[0].attachments, harness.calls.smtp[0].attachments);
+  assert.strictEqual(harness.calls.finalize[0].attachments, harness.calls.smtp[0].attachments);
   assert.strictEqual(harness.calls.append[0].mail.attachments, harness.calls.smtp[0].attachments);
   assert.equal(harness.calls.confirm.length, 1);
+  assert.deepEqual(harness.calls.providerStart, [{
+    provider: 'smtp', intentId: 'send:provider-acceptance',
+  }]);
+  assert.deepEqual(harness.calls.events, ['callback', 'provider']);
   assert.equal(harness.calls.accept.length, 1);
   assert.equal(harness.calls.markUnknown.length, 0);
   assert.equal(harness.calls.fail.length, 0);
+  assert.equal(harness.calls.cleanup.length, 1);
+});
+
+test('SMTP callbackfout stopt na durable start maar vóór iedere providercall', async () => {
+  const callbackError = Object.assign(new Error('router kon providerstart niet markeren'), {
+    code: 'TEST_PROVIDER_START_CALLBACK_FAILED',
+  });
+  const callbackCalls = [];
+  const harness = createHarness({
+    manualSizes: [32],
+    async onProviderDispatchStarting(event) {
+      callbackCalls.push(event);
+      throw callbackError;
+    },
+  });
+
+  await assert.rejects(harness.send(), (error) => error === callbackError);
+  assert.deepEqual(callbackCalls, [{ provider: 'smtp', intentId: 'send:provider-acceptance' }]);
+  assert.equal(harness.calls.startDispatch.length, 1);
+  assert.equal(harness.calls.smtp.length, 0);
+  assert.equal(harness.calls.fail.length, 1);
   assert.equal(harness.calls.cleanup.length, 1);
 });

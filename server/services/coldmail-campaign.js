@@ -1414,6 +1414,7 @@ function createColdmailCampaignService(deps = {}) {
         senderEmail,
         source: 'softora-coldmail-pre-send',
         actor,
+        reservationId: normalizeString(context.reservationId),
         status: 'reserved',
         permanent: true,
         payload: {
@@ -1444,19 +1445,17 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function releaseSupabaseOutboundRecipientReservation(reservation, context = {}) {
-    const reservationId = normalizeString(reservation && reservation.reservationId);
-    if (!reservationId || !outboundRecipientGuardStore || typeof outboundRecipientGuardStore.releaseReservation !== 'function') {
-      return;
-    }
-    try {
-      await outboundRecipientGuardStore.releaseReservation(reservationId);
-    } catch (error) {
-      logger.warn('[OutboundRecipientGuard][coldmail-release]', {
-        reservationId,
-        recipientEmail: normalizeEmailAddress(context && context.to),
-        error: error && error.message ? error.message : error,
-      });
-    }
+    const reservationId = normalizeString(reservation?.reservationId || context.reservationId); if (!reservationId) return;
+    const createReleaseError = (cause) => Object.assign(
+      new Error('Centrale outbound duplicate-guard kon niet veilig worden vrijgegeven.'), {
+        code: 'COLDMAIL_OUTBOUND_GUARD_RELEASE_FAILED', status: 503, cause,
+      }
+    );
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.releaseReservation !== 'function') throw createReleaseError();
+    let result;
+    try { result = await outboundRecipientGuardStore.releaseReservation(reservationId); }
+    catch (error) { throw createReleaseError(error); }
+    if (!result || result.ok !== true) throw createReleaseError();
   }
 
   function buildColdmailSenderCooldownIdentity(senderEmail) {
@@ -8702,34 +8701,35 @@ function createColdmailCampaignService(deps = {}) {
           });
         }
         const shouldReserveGuards = !isTestRecipientRow(row, to);
-        const senderCooldownReservation = shouldReserveGuards
-          ? await reserveSupabaseColdmailSenderCooldown(senderEmail, input, actor)
-          : null;
-        let outboundReservation = null;
-        try {
-          outboundReservation = shouldReserveGuards
-            ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor, {
-                subject, reference, durationDays: input.durationDays, specialAction: effectiveSpecialAction,
-              })
-            : null;
-        } catch (error) {
-          await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
-          throw error;
-        }
-        if (outboundReservation && outboundReservation.conflict) {
-          await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
-          failed.push(outboundReservation.conflict);
-          continue;
-        }
+        const sendReservationId = shouldReserveGuards ? `coldmail-send-${createColdmailTrackingId()}` : '';
+        let senderCooldownReservation = null, outboundReservation = null, outboundReservationAttempted = false;
         const delivery = await coldmailSendDurability.dispatch({
           provenanceInput: shouldReserveGuards ? {
-            reservationId: outboundReservation && outboundReservation.reservationId,
+            reservationId: sendReservationId,
             accountEmail: senderEmail, recipientEmail: to, subject, body: text,
             bcc: auditBcc, attachments,
           } : null,
+          beforeStartDispatch: async () => {
+            if (!shouldReserveGuards) return;
+            senderCooldownReservation = await reserveSupabaseColdmailSenderCooldown(senderEmail, input, actor);
+            outboundReservationAttempted = true;
+            outboundReservation = await reserveSupabaseOutboundRecipientForColdmail(
+              item, senderEmail, actor, { reservationId: sendReservationId, subject, reference,
+                durationDays: input.durationDays, specialAction: effectiveSpecialAction }
+            );
+            const conflict = outboundReservation?.conflict;
+            if (!conflict) return;
+            const conflictError = new Error(normalizeString(conflict.error)
+              || 'Ontvanger is al veilig gereserveerd en wordt niet opnieuw gemaild.');
+            Object.assign(conflictError, { code: normalizeString(conflict.code)
+              || 'COLDMAIL_RECIPIENT_RECENTLY_SENT', reason: normalizeString(conflict.reason),
+              coldmailFailure: conflict });
+            throw conflictError;
+          },
           recipientEmail: to, normalizeEmailAddress, sendProvider: () => transporter.sendMail(mail),
           onSafeFailure: () => Promise.all([
-            releaseSupabaseOutboundRecipientReservation(outboundReservation, { to }),
+            releaseSupabaseOutboundRecipientReservation(outboundReservation,
+              { to, reservationId: outboundReservationAttempted ? sendReservationId : '' }),
             releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to }),
           ]),
         });
@@ -8776,7 +8776,7 @@ function createColdmailCampaignService(deps = {}) {
         sentItem.sentCopySaved = await sentCopyPromise;
         sent.push(sentItem);
       } catch (error) {
-        failed.push({
+        failed.push(error?.coldmailFailure || {
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
@@ -8786,7 +8786,7 @@ function createColdmailCampaignService(deps = {}) {
         });
         const errorCode = normalizeString(error && error.code);
         const guardConfirmFailed = errorCode === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
-        const guardPreflightFailed = /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(errorCode);
+        const guardPreflightFailed = /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED|RELEASE_FAILED)$/i.test(errorCode);
         const postSmtpPersistenceFailed = errorCode === 'COLDMAIL_POST_SMTP_PERSISTENCE_FAILED';
         const safetyReason = guardConfirmFailed
           ? 'central_outbound_guard_confirm_failed'
@@ -8819,7 +8819,7 @@ function createColdmailCampaignService(deps = {}) {
       const firstFailure = pickFailureMessage(failed, selectedRows);
       const recipientGuardFailure = failed.every((item) => isColdmailRecipientGuardFailure(item));
       const outboundGuardFailure = failed.every((item) =>
-        /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED|CONFIRM_FAILED)$/i.test(normalizeString(item && item.code))
+        /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED|RELEASE_FAILED|CONFIRM_FAILED)$/i.test(normalizeString(item && item.code))
       );
       const senderCooldownFailure = failed.every((item) =>
         normalizeString(item && item.code) === 'COLDMAIL_SENDER_COOLDOWN_ACTIVE'

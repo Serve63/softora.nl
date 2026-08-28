@@ -1277,7 +1277,7 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  const { confirm: confirmMailboxWebdesignOutboundRecipient,
+  const { confirm: confirmMailboxWebdesignOutboundRecipient, release: releaseMailboxWebdesignOutboundRecipient,
     reserve: reserveMailboxWebdesignOutboundRecipient } = createMailboxWebdesignOutboundGuard({
     buildError: buildMailboxWebdesignGuardError, normalizeEmail, normalizeString, outboundRecipientGuardStore,
   });
@@ -2106,12 +2106,12 @@ function createMailboxService(deps = {}) {
     composeSendDependencies: {
       getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
       buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
-      confirmMailboxWebdesignOutboundRecipient, appendSentMessage, createImapClient, nodemailer,
+      confirmMailboxWebdesignOutboundRecipient, releaseMailboxWebdesignOutboundRecipient, appendSentMessage, createImapClient, nodemailer,
       webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
       outboundRecipientGuardStore,
     },
     getAccount, instantlyMailboxService, mailboxComposeThreadContext,
-    getSupabaseClient, attachmentSigningSecret: env.PREMIUM_SESSION_SECRET || '', mailboxSendProvenanceStore, mailboxAttachmentService: deps.mailboxAttachmentService, normalizeEmail, normalizeString, logger,
+    getSupabaseClient, attachmentSigningSecret: env.PREMIUM_SESSION_SECRET || '', mailboxSendProvenanceStore, mailboxAttachmentService: deps.mailboxAttachmentService, normalizeEmail, normalizeString, onProviderDispatchStarting: deps.onProviderDispatchStarting, logger,
   });
 
   function cleanPromptText(value, maxLength = 6000) {

@@ -5,10 +5,33 @@ const {
   createMailboxAttachmentsMetadataFromContent,
   createMailboxRequestPayloadFingerprint,
   createMailboxSendProvenanceStore,
+  isDefinitiveMailboxProviderRejection,
   mailboxAttachmentsMetadataEqual,
   normalizeMailboxAttachmentsMetadata,
 } = require('../../server/services/mailbox-send-provenance-store');
 const { createSupabaseStateStore } = require('../../server/services/supabase-state');
+
+test('providerclassifier vereist echt providerbewijs voor een definitieve afwijzing', () => {
+  assert.equal(isDefinitiveMailboxProviderRejection(
+    Object.assign(new Error('lokale validatie gaf 400'), { status: 400 })
+  ), false);
+  assert.equal(isDefinitiveMailboxProviderRejection(
+    Object.assign(new SyntaxError('lokale JSON-parsefout'), { status: 422 })
+  ), false);
+  assert.equal(isDefinitiveMailboxProviderRejection(
+    Object.assign(new Error('SMTP mailbox unavailable'), { responseCode: 550 })
+  ), true);
+  assert.equal(isDefinitiveMailboxProviderRejection(Object.assign(new Error('provider rejected'), {
+    mailboxProviderResponseReceived: true,
+    providerStatus: 422,
+  })), true);
+  for (const providerStatus of [408, 409, 425, 429, 503]) {
+    assert.equal(isDefinitiveMailboxProviderRejection(Object.assign(new Error('onzekere providerstatus'), {
+      mailboxProviderResponseReceived: true,
+      providerStatus,
+    })), false);
+  }
+});
 
 function createFakeSupabase(options = {}) {
   const rows = [];
@@ -70,6 +93,72 @@ function createFakeSupabase(options = {}) {
         if (!outcome || outcome.commit !== false) rows.push(claimRow);
         if (outcome?.error) return { data: null, error: outcome.error };
         return { data: [{ ...claimRow }], error: null };
+      }
+      const expireReserved = name === 'softora_expire_mailbox_reserved_dispatch';
+      const expireStarted = name === 'softora_expire_mailbox_started_dispatch';
+      if (expireReserved || expireStarted) {
+        const sameNullableTimestamp = (left, right) => {
+          if (left == null || left === '') return right == null || right === '';
+          if (right == null || right === '') return false;
+          return Date.parse(String(left)) === Date.parse(String(right));
+        };
+        const validFence = row
+          && row.status === 'prepared'
+          && row.dispatch_state === (expireStarted ? 'started' : 'reserved')
+          && row.transition_token === args.p_expected_transition_token
+          && Date.parse(String(row.dispatch_lease_expires_at || '')) === expectedLeaseMs
+          && Date.parse(String(row.updated_at || '')) === expectedUpdatedMs
+          && (row.pre_dispatch_claim_fingerprint ?? null)
+            === (args.p_expected_claim_fingerprint ?? null)
+          && sameNullableTimestamp(
+            row.pre_dispatch_finalized_at,
+            args.p_expected_finalized_at
+          )
+          && (!expireStarted || (
+            sameNullableTimestamp(row.dispatch_started_at, args.p_expected_dispatch_started_at)
+            && row.dispatch_started_at != null
+          ))
+          && Number.isFinite(expectedLeaseMs)
+          && Number.isFinite(dbNowMs)
+          && expectedLeaseMs <= dbNowMs
+          && String(args.p_next_transition_token || '').length > 0
+          && args.p_next_transition_token !== args.p_expected_transition_token;
+        if (!validFence) return { data: [], error: null };
+
+        const patch = expireStarted ? {
+          status: 'unknown',
+          dispatch_state: 'started',
+          dispatch_lease_expires_at: null,
+          reconcile_required: true,
+          sent_reconcile_required: true,
+          error_text: 'De dispatchlease is verlopen; de provideruitkomst moet eerst worden gereconcilieerd.',
+          transition_token: args.p_next_transition_token,
+          updated_at: dbNow.toISOString(),
+        } : {
+          status: 'failed',
+          dispatch_state: 'finished',
+          dispatch_lease_expires_at: null,
+          reconcile_required: false,
+          sent_reconcile_required: false,
+          error_text: 'De pre-dispatchreservering verliep voordat de provider werd gestart.',
+          transition_token: args.p_next_transition_token,
+          updated_at: dbNow.toISOString(),
+        };
+        client.updateCalls += 1;
+        const hook = typeof options.onRpc === 'function' ? options.onRpc : options.onUpdate;
+        const outcome = typeof hook === 'function'
+          ? await hook({
+              call: client.updateCalls,
+              name,
+              args: { ...args },
+              patch: { ...patch },
+              row: { ...row },
+            })
+          : null;
+        if (outcome?.concurrentPatch) Object.assign(row, outcome.concurrentPatch);
+        if (!outcome || outcome.commit !== false) Object.assign(row, patch);
+        if (outcome?.error) return { data: null, error: outcome.error };
+        return { data: [{ ...row }], error: null };
       }
       const commonFence = row
         && row.status === 'prepared'
@@ -694,6 +783,111 @@ test('reserve recovers its exact committed UUID after a response-timeout and sta
   assert.equal(client.rows[0].dispatch_state, 'started');
 });
 
+test('pre-dispatchclaim accepteert alleen lege metadata of lowercase SHA-256 per bijlage', async (t) => {
+  const basePayload = {
+    intentId: 'send:attachment-sha-guard', idempotencyKey: 'browser:attachment-sha-guard',
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:attachment-sha-guard', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht',
+  };
+  const expectRejectedMetadata = async (attachmentsMetadata) => {
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      retryDelayMs: 0,
+    });
+    await assert.rejects(
+      () => store.claimPreDispatch({ ...basePayload, attachmentsMetadata }),
+      (error) => error.code === 'MAILBOX_SEND_PRE_DISPATCH_ATTACHMENT_CONTEXT_REQUIRED'
+    );
+    assert.equal(client.rpcCalls.length, 0, 'ongeldige metadata mag de claim-RPC niet bereiken');
+    assert.equal(client.rows.length, 0);
+  };
+
+  await t.test('legacy metadata zonder hash faalt gesloten', () => expectRejectedMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }]));
+  await t.test('uppercase hash faalt gesloten', () => expectRejectedMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'A'.repeat(64),
+  }]));
+  await t.test('gemengde metadata met ontbrekende hash faalt gesloten', () => expectRejectedMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }, {
+    filename: 'uitleg.txt', contentType: 'text/plain', size: 4,
+  }]));
+
+  await t.test('lege metadata blijft geldig', async () => {
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      retryDelayMs: 0,
+    });
+    const claim = await store.claimPreDispatch({ ...basePayload, attachmentsMetadata: [] });
+    assert.equal(claim.created, true);
+    assert.deepEqual(claim.intent.attachmentsMetadata, []);
+  });
+
+  await t.test('ruwe attachmentbytes genereren een lowercase SHA-256 en slagen', async () => {
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      retryDelayMs: 0,
+    });
+    const content = Buffer.from('exacte bewijsbytes', 'utf8');
+    const claim = await store.claimPreDispatch({
+      ...basePayload,
+      intentId: 'send:attachment-raw-bytes',
+      idempotencyKey: 'browser:attachment-raw-bytes',
+      conversationId: 'draft:attachment-raw-bytes',
+      attachments: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', content }],
+    });
+    assert.equal(claim.created, true);
+    assert.match(claim.intent.attachmentsMetadata[0].sha256, /^[0-9a-f]{64}$/);
+    assert.equal(
+      claim.intent.attachmentsMetadata[0].sha256,
+      require('crypto').createHash('sha256').update(content).digest('hex')
+    );
+  });
+});
+
+test('legacy string-start gebruikt null-filters en kan geen onafgeronde claim starten', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:legacy-start-must-not-start-claim',
+    idempotencyKey: 'browser:legacy-start-must-not-start-claim',
+    owner: 'martijn', accountEmail: 'martijn@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:legacy-start-must-not-start-claim', provider: 'smtp',
+    senderName: 'Martijn van de Ven', subject: 'Vraag', body: 'Exact bericht',
+    attachmentsMetadata: [],
+  };
+  const claim = await store.claimPreDispatch(payload);
+  const updatesBeforeUnsafeStart = client.updateCalls;
+
+  await assert.rejects(
+    () => store.startDispatch(claim.intent.intentId),
+    (error) => error.code === 'PGRST116'
+  );
+
+  assert.equal(client.updateCalls, updatesBeforeUnsafeStart, 'een onafgeronde claim mag nul updates winnen');
+  assert.equal(client.rpcCalls.length, 1, 'alleen de claim-RPC mag zijn aangeroepen');
+  assert.equal(claim.intent.dispatchState, 'reserved');
+  assert.equal(client.rows[0].dispatch_state, 'reserved');
+  assert.ok(client.filterCalls.some((filter) => (
+    filter.kind === 'is' && filter.key === 'pre_dispatch_claim_fingerprint' && filter.value === null
+  )));
+  assert.ok(client.filterCalls.some((filter) => (
+    filter.kind === 'is' && filter.key === 'pre_dispatch_finalized_at' && filter.value === null
+  )));
+});
+
 test('reserve retries the same UUID only after read-back proves the first insert did not commit', async () => {
   let firstInsert = true;
   const attemptedTokens = [];
@@ -729,11 +923,12 @@ test('reserve retries the same UUID only after read-back proves the first insert
   assert.equal(reservation.intent.transitionToken, attemptedTokens[0]);
 });
 
-test('a committed reserve with failed response and failed read-backs is safely renewed after its lease', async () => {
+test('a committed claim with failed response/read-backs expires to failed and never authorizes dispatch', async () => {
   let currentTime = new Date('2026-08-24T13:47:00.000Z');
   let firstInsert = true;
   const readTimeout = () => Object.assign(new Error('reservation read-back timed out'), { code: 'ETIMEDOUT' });
   const client = createFakeSupabase({
+    rpcNow: () => currentTime,
     onInsert: () => {
       if (!firstInsert) return null;
       firstInsert = false;
@@ -748,7 +943,6 @@ test('a committed reserve with failed response and failed read-backs is safely r
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
     now: () => currentTime,
-    reservationLeaseMs: 30_000,
     retryDelayMs: 0,
   });
   const original = {
@@ -758,25 +952,22 @@ test('a committed reserve with failed response and failed read-backs is safely r
     subject: 'Vraag', body: 'Bericht',
   };
 
-  await assert.rejects(() => store.reserve(original), (error) => error.code === 'ETIMEDOUT');
+  await assert.rejects(() => store.claimPreDispatch({
+    ...original, attachmentsMetadata: [],
+  }), (error) => error.code === 'ETIMEDOUT');
   const abandonedToken = client.rows[0].transition_token;
   assert.equal(client.rows[0].dispatch_state, 'reserved');
-  currentTime = new Date('2026-08-24T13:47:31.000Z');
+  currentTime = new Date('2026-08-24T14:02:01.000Z');
   const retry = { ...original, intentId: 'send:renewed-after-lost-readback' };
-  let providerDispatches = 0;
 
-  const renewed = await store.reserve(retry);
-  if (renewed.created) {
-    await store.startDispatch(retry.intentId);
-    providerDispatches += 1;
-  }
+  const renewed = await store.claimPreDispatch({ ...retry, attachmentsMetadata: [] });
 
-  assert.equal(renewed.created, true);
-  assert.equal(renewed.intent.intentId, retry.intentId);
+  assert.equal(renewed.created, false);
+  assert.equal(renewed.intent.intentId, original.intentId);
+  assert.equal(renewed.intent.status, 'failed');
   assert.notEqual(renewed.intent.transitionToken, abandonedToken);
   assert.equal(client.rows.length, 1);
-  assert.equal(providerDispatches, 1);
-  assert.equal(client.rows[0].dispatch_state, 'started');
+  assert.equal(client.rows[0].dispatch_state, 'finished');
 });
 
 test('an expired reserved row with another idempotency key is failed before a new row is inserted', async () => {
@@ -931,9 +1122,9 @@ test('concurrent same-key claims with distinct intent IDs expose one final token
   assert.equal(client.rows[0].dispatch_state, 'started');
 });
 
-test('legacy reserved rows with a null lease age out only after the bounded reservation TTL', async () => {
+test('legacy reserved rows with a null DB lease stay fail-closed instead of using app-clock expiry', async () => {
   let currentTime = new Date('2026-08-24T13:50:00.000Z');
-  const client = createFakeSupabase();
+  const client = createFakeSupabase({ rpcNow: () => currentTime });
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
@@ -957,11 +1148,13 @@ test('legacy reserved rows with a null lease age out only after the bounded rese
   assert.equal(client.rows[0].intent_id, original.intentId);
 
   currentTime = new Date('2026-08-24T13:50:31.000Z');
-  const renewed = await store.reserve({ ...original, intentId: 'send:legacy-renewed' });
+  const blocked = await store.reserve({ ...original, intentId: 'send:legacy-renewed' });
 
-  assert.equal(renewed.created, true);
-  assert.equal(renewed.intent.intentId, 'send:legacy-renewed');
-  assert.match(renewed.intent.transitionToken, /^[0-9a-f-]{36}$/);
+  assert.equal(blocked.created, false);
+  assert.equal(blocked.intent.intentId, original.intentId);
+  assert.equal(blocked.intent.status, 'prepared');
+  assert.equal(blocked.intent.dispatchState, 'reserved');
+  assert.equal(client.rows.length, 1);
 });
 
 test('two identical concurrent reserve-and-start flows expose exactly one provider winner', async () => {
@@ -1584,74 +1777,209 @@ test('databaseklok blijft leidend voor finalize en start bij extreme app-clock s
   assert.equal(client.rpcCalls.length, 3);
 });
 
-test('pre-dispatchclaim accepteert alleen lege metadata of lowercase SHA-256 per bijlage', async (t) => {
-  const basePayload = {
-    intentId: 'send:attachment-sha-guard', idempotencyKey: 'browser:attachment-sha-guard',
+test('appklok plus 24 uur kan actieve reserved en started DB-leases niet laten verlopen', async (t) => {
+  await t.test('reserved', async () => {
+    let dbTime = new Date('2026-08-27T18:20:00.000Z');
+    const client = createFakeSupabase({ rpcNow: () => dbTime });
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      now: () => new Date('2026-08-28T18:20:00.000Z'),
+      retryDelayMs: 0,
+    });
+    const payload = {
+      intentId: 'send:active-db-reserved', idempotencyKey: 'browser:active-db-reserved',
+      owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+      mode: 'new-message', conversationId: 'draft:active-db-reserved', provider: 'smtp',
+      senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+    };
+    await store.claimPreDispatch(payload);
+    dbTime = new Date('2026-08-27T18:21:00.000Z');
+
+    const reconciled = await store.reconcilePreflight(payload.idempotencyKey);
+
+    assert.equal(reconciled.status, 'prepared');
+    assert.equal(reconciled.dispatchState, 'reserved');
+    assert.equal(client.rows[0].transition_token, reconciled.transitionToken);
+    assert.equal(client.updateCalls, 0);
+  });
+
+  await t.test('started', async () => {
+    let dbTime = new Date('2026-08-27T18:30:00.000Z');
+    const client = createFakeSupabase({ rpcNow: () => dbTime });
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      now: () => new Date('2026-08-28T18:30:00.000Z'),
+      retryDelayMs: 0,
+    });
+    const payload = {
+      intentId: 'send:active-db-started', idempotencyKey: 'browser:active-db-started',
+      owner: 'martijn', accountEmail: 'martijn@softora.nl', recipientEmail: 'lead@example.nl',
+      mode: 'new-message', conversationId: 'draft:active-db-started', provider: 'smtp',
+      senderName: 'Martijn van de Ven', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+    };
+    const claim = await store.claimPreDispatch(payload);
+    dbTime = new Date('2026-08-27T18:30:01.000Z');
+    const finalized = await store.finalizeClaim(claim, payload);
+    dbTime = new Date('2026-08-27T18:30:02.000Z');
+    const started = await store.startDispatch(finalized);
+    dbTime = new Date('2026-08-27T18:31:00.000Z');
+
+    const repeated = await store.reserve({
+      ...payload,
+      intentId: 'send:active-db-started-retry',
+      idempotencyKey: 'browser:active-db-started-retry',
+    });
+
+    assert.equal(repeated.created, false);
+    assert.equal(repeated.intent.status, 'prepared');
+    assert.equal(repeated.intent.dispatchState, 'started');
+    assert.equal(repeated.intent.transitionToken, started.transitionToken);
+  });
+});
+
+test('expiry-RPC fences geven bij stale waarden nul rijen en slechts één concurrente winnaar', async () => {
+  let dbTime = new Date('2026-08-27T18:40:00.000Z');
+  const client = createFakeSupabase({ rpcNow: () => dbTime });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:reserved-expiry-fences', idempotencyKey: 'browser:reserved-expiry-fences',
     owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
-    mode: 'new-message', conversationId: 'draft:attachment-sha-guard', provider: 'smtp',
-    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht',
+    mode: 'new-message', conversationId: 'draft:reserved-expiry-fences', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
   };
-  const expectRejectedMetadata = async (attachmentsMetadata) => {
-    const client = createFakeSupabase();
-    const store = createMailboxSendProvenanceStore({
-      isSupabaseConfigured: () => true,
-      getSupabaseClient: () => client,
-      retryDelayMs: 0,
-    });
-    await assert.rejects(
-      () => store.claimPreDispatch({ ...basePayload, attachmentsMetadata }),
-      (error) => error.code === 'MAILBOX_SEND_PRE_DISPATCH_ATTACHMENT_CONTEXT_REQUIRED'
-    );
-    assert.equal(client.rpcCalls.length, 0, 'ongeldige metadata mag de claim-RPC niet bereiken');
-    assert.equal(client.rows.length, 0);
+  const claim = await store.claimPreDispatch(payload);
+  dbTime = new Date('2026-08-27T18:40:01.000Z');
+  await store.finalizeClaim(claim, payload);
+  const row = client.rows[0];
+  dbTime = new Date(Date.parse(row.dispatch_lease_expires_at) + 1);
+  const valid = {
+    p_intent_id: row.intent_id,
+    p_expected_transition_token: row.transition_token,
+    p_expected_dispatch_lease_expires_at: row.dispatch_lease_expires_at,
+    p_expected_updated_at: row.updated_at,
+    p_expected_claim_fingerprint: row.pre_dispatch_claim_fingerprint,
+    p_expected_finalized_at: row.pre_dispatch_finalized_at,
+    p_next_transition_token: '00000000-0000-4000-8000-000000000301',
   };
-
-  await t.test('legacy metadata zonder hash faalt gesloten', () => expectRejectedMetadata([{
-    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
-  }]));
-  await t.test('uppercase hash faalt gesloten', () => expectRejectedMetadata([{
-    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'A'.repeat(64),
-  }]));
-  await t.test('gemengde metadata met ontbrekende hash faalt gesloten', () => expectRejectedMetadata([{
-    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
-  }, {
-    filename: 'uitleg.txt', contentType: 'text/plain', size: 4,
-  }]));
-
-  await t.test('lege metadata blijft geldig', async () => {
-    const client = createFakeSupabase();
-    const store = createMailboxSendProvenanceStore({
-      isSupabaseConfigured: () => true,
-      getSupabaseClient: () => client,
-      retryDelayMs: 0,
+  const staleCases = [
+    { p_expected_transition_token: '00000000-0000-4000-8000-000000000399' },
+    { p_expected_dispatch_lease_expires_at: '2026-08-27T18:00:00.000Z' },
+    { p_expected_updated_at: '2026-08-27T18:00:00.000Z' },
+    { p_expected_claim_fingerprint: 'f'.repeat(64) },
+    { p_expected_finalized_at: '2026-08-27T18:00:00.000Z' },
+  ];
+  for (const changed of staleCases) {
+    const result = await client.rpc('softora_expire_mailbox_reserved_dispatch', {
+      ...valid,
+      ...changed,
     });
-    const claim = await store.claimPreDispatch({ ...basePayload, attachmentsMetadata: [] });
-    assert.equal(claim.created, true);
-    assert.deepEqual(claim.intent.attachmentsMetadata, []);
+    assert.deepEqual(result.data, []);
+    assert.equal(row.status, 'prepared');
+  }
+
+  const concurrent = await Promise.all([
+    client.rpc('softora_expire_mailbox_reserved_dispatch', valid),
+    client.rpc('softora_expire_mailbox_reserved_dispatch', valid),
+  ]);
+  assert.deepEqual(concurrent.map((result) => result.data.length).sort(), [0, 1]);
+  assert.equal(row.status, 'failed');
+  assert.equal(row.transition_token, valid.p_next_transition_token);
+});
+
+test('started expiry weigert een stale dispatch_started_at fence', async () => {
+  let dbTime = new Date('2026-08-27T18:50:00.000Z');
+  const client = createFakeSupabase({ rpcNow: () => dbTime });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:started-expiry-fence', idempotencyKey: 'browser:started-expiry-fence',
+    owner: 'martijn', accountEmail: 'martijn@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:started-expiry-fence', provider: 'smtp',
+    senderName: 'Martijn van de Ven', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+  };
+  const claim = await store.claimPreDispatch(payload);
+  dbTime = new Date('2026-08-27T18:50:01.000Z');
+  const finalized = await store.finalizeClaim(claim, payload);
+  dbTime = new Date('2026-08-27T18:50:02.000Z');
+  await store.startDispatch(finalized, 30_000);
+  const row = client.rows[0];
+  dbTime = new Date(Date.parse(row.dispatch_lease_expires_at) + 1);
+
+  const result = await client.rpc('softora_expire_mailbox_started_dispatch', {
+    p_intent_id: row.intent_id,
+    p_expected_transition_token: row.transition_token,
+    p_expected_dispatch_lease_expires_at: row.dispatch_lease_expires_at,
+    p_expected_updated_at: row.updated_at,
+    p_expected_claim_fingerprint: row.pre_dispatch_claim_fingerprint,
+    p_expected_finalized_at: row.pre_dispatch_finalized_at,
+    p_expected_dispatch_started_at: '2026-08-27T18:00:00.000Z',
+    p_next_transition_token: '00000000-0000-4000-8000-000000000302',
   });
 
-  await t.test('ruwe attachmentbytes genereren een lowercase SHA-256 en slagen', async () => {
-    const client = createFakeSupabase();
-    const store = createMailboxSendProvenanceStore({
-      isSupabaseConfigured: () => true,
-      getSupabaseClient: () => client,
-      retryDelayMs: 0,
-    });
-    const content = Buffer.from('exacte bewijsbytes', 'utf8');
-    const claim = await store.claimPreDispatch({
-      ...basePayload,
-      intentId: 'send:attachment-raw-bytes',
-      idempotencyKey: 'browser:attachment-raw-bytes',
-      conversationId: 'draft:attachment-raw-bytes',
-      attachments: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', content }],
-    });
-    assert.equal(claim.created, true);
-    assert.match(claim.intent.attachmentsMetadata[0].sha256, /^[0-9a-f]{64}$/);
-    assert.equal(
-      claim.intent.attachmentsMetadata[0].sha256,
-      require('crypto').createHash('sha256').update(content).digest('hex')
-    );
+  assert.deepEqual(result.data, []);
+  assert.equal(row.status, 'prepared');
+  assert.equal(row.dispatch_state, 'started');
+});
+
+test('lost started-expiry response herstelt uitsluitend via eigen token en exacte unknown-eindstaat', async () => {
+  let dbTime = new Date('2026-08-27T19:00:00.000Z');
+  let loseExpiryResponse = true;
+  const expiryToken = '00000000-0000-4000-8000-000000000304';
+  const tokens = [
+    '00000000-0000-4000-8000-000000000301',
+    '00000000-0000-4000-8000-000000000302',
+    '00000000-0000-4000-8000-000000000303',
+    expiryToken,
+  ];
+  const client = createFakeSupabase({
+    rpcNow: () => dbTime,
+    onRpc: ({ name }) => {
+      if (name !== 'softora_expire_mailbox_started_dispatch' || !loseExpiryResponse) return null;
+      loseExpiryResponse = false;
+      return {
+        commit: true,
+        error: Object.assign(new Error('expiry commit response lost'), { code: 'ETIMEDOUT' }),
+      };
+    },
   });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    createTransitionToken: () => tokens.shift(),
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:lost-started-expiry', idempotencyKey: 'browser:lost-started-expiry',
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:lost-started-expiry', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+  };
+  const claim = await store.claimPreDispatch(payload);
+  dbTime = new Date('2026-08-27T19:00:01.000Z');
+  const finalized = await store.finalizeClaim(claim, payload);
+  dbTime = new Date('2026-08-27T19:00:02.000Z');
+  await store.startDispatch(finalized, 30_000);
+  dbTime = new Date('2026-08-27T19:00:33.000Z');
+
+  const reconciled = await store.reconcilePreflight(payload.idempotencyKey);
+
+  assert.equal(reconciled.status, 'unknown');
+  assert.equal(reconciled.dispatchState, 'started');
+  assert.equal(reconciled.reconcileRequired, true);
+  assert.equal(reconciled.sentReconcileRequired, true);
+  assert.equal(reconciled.transitionToken, expiryToken);
+  assert.equal(client.rpcCalls.filter(
+    ({ name }) => name === 'softora_expire_mailbox_started_dispatch'
+  ).length, 1);
 });
 
 test('legacy startDispatch(intentId) blijft compatibel naast de gefencete handle-route', async () => {
@@ -1679,29 +2007,6 @@ test('legacy startDispatch(intentId) blijft compatibel naast de gefencete handle
   assert.equal(started.dispatchLeaseExpiresAt, '2026-08-27T19:10:45.000Z');
   assert.equal(client.rpcCalls.length, 0);
   assert.equal(client.updateCalls, 1);
-
-  const claim = await store.claimPreDispatch({
-    ...payload,
-    intentId: 'send:legacy-start-must-not-start-claim',
-    idempotencyKey: 'browser:legacy-start-must-not-start-claim',
-    conversationId: 'draft:legacy-start-must-not-start-claim',
-    attachmentsMetadata: [],
-  });
-  const updatesBeforeUnsafeStart = client.updateCalls;
-  await assert.rejects(
-    () => store.startDispatch(claim.intent.intentId),
-    (error) => error.code === 'PGRST116'
-  );
-  assert.equal(client.updateCalls, updatesBeforeUnsafeStart, 'een onafgeronde claim mag nul updates winnen');
-  assert.equal(client.rpcCalls.length, 1, 'alleen de claim-RPC mag zijn aangeroepen');
-  assert.equal(claim.intent.dispatchState, 'reserved');
-  assert.equal(client.rows[1].dispatch_state, 'reserved');
-  assert.ok(client.filterCalls.some((filter) => (
-    filter.kind === 'is' && filter.key === 'pre_dispatch_claim_fingerprint' && filter.value === null
-  )));
-  assert.ok(client.filterCalls.some((filter) => (
-    filter.kind === 'is' && filter.key === 'pre_dispatch_finalized_at' && filter.value === null
-  )));
 });
 
 test('faseovergangen weigeren tokenhergebruik vóór iedere database- of providerautorisatie', async (t) => {

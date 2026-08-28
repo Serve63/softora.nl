@@ -223,6 +223,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
     attachmentSigningSecret = '',
     normalizeEmail,
     normalizeString,
+    onProviderDispatchStarting,
     logger = console,
   } = dependencies;
   const resolvedMailboxAttachmentService = mailboxAttachmentService || createMailboxAttachmentService({
@@ -234,6 +235,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
     ...composeSendDependencies,
     mailboxSendProvenanceStore,
     mailboxAttachmentService: resolvedMailboxAttachmentService,
+    onProviderDispatchStarting,
     logger,
   });
   const truncateComposeText = typeof composeSendDependencies?.truncateText === 'function'
@@ -301,6 +303,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
         threadProvenance,
         mailboxSendProvenanceStore,
         outboundRecipientGuardStore: composeSendDependencies?.outboundRecipientGuardStore,
+        onProviderDispatchStarting,
       });
       setAcceptedSendIdentityHeaders(res, result);
       return res.status(200).json({ ok: true, result });
