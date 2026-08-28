@@ -143,7 +143,10 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/attachments/cleanup', requireAdmin, (req, res) =>
     coordinator.attachmentCleanupResponse(req, res)
   );
-  app.post('/api/mailbox/send', requireAdmin, (req, res) => coordinator.sendMessageResponse(req, res));
+  app.post('/api/mailbox/send', requireAdmin, (req, res) => {
+    res.locals.mailboxSendRuntimeEntered = true;
+    return coordinator.sendMessageResponse(req, res);
+  });
   app.post('/api/mailbox/rewrite', requireAdmin, (req, res) =>
     coordinator.rewriteDraftResponse(req, res)
   );
