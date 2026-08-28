@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  createMailboxAttachmentsMetadataFromContent,
   createMailboxRequestPayloadFingerprint,
   createMailboxSendProvenanceStore,
   mailboxAttachmentsMetadataEqual,
@@ -15,19 +16,166 @@ function createFakeSupabase(options = {}) {
     rows,
     insertCalls: 0,
     readCalls: 0,
+    rpcCalls: [],
     updateCalls: 0,
+    filterCalls: [],
+    async rpc(name, args = {}) {
+      client.rpcCalls.push({ name, args: { ...args } });
+      const row = rows.find((candidate) => candidate.intent_id === args.p_intent_id);
+      const expectedLeaseMs = Date.parse(String(args.p_expected_dispatch_lease_expires_at || ''));
+      const expectedUpdatedMs = Date.parse(String(args.p_expected_updated_at || ''));
+      const requestedClaimUpdatedMs = Date.parse(String(args.p_row?.updated_at || ''));
+      const configuredRpcNow = typeof options.rpcNow === 'function'
+        ? options.rpcNow({ name, args: { ...args }, row: row ? { ...row } : null })
+        : options.rpcNow;
+      const dbNow = configuredRpcNow
+        ? new Date(configuredRpcNow)
+        : new Date(Number.isFinite(expectedUpdatedMs)
+          ? expectedUpdatedMs + 1
+          : Number.isFinite(requestedClaimUpdatedMs) ? requestedClaimUpdatedMs : Date.now());
+      const dbNowMs = dbNow.getTime();
+      const claim = name === 'softora_claim_mailbox_pre_dispatch';
+      if (claim) {
+        const leaseMs = Number(args.p_lease_ms);
+        const claimRow = {
+          ...(args.p_row || {}),
+          transition_token: args.p_transition_token,
+          dispatch_lease_expires_at: new Date(dbNowMs + leaseMs).toISOString(),
+          created_at: dbNow.toISOString(),
+          updated_at: dbNow.toISOString(),
+        };
+        const active = (candidate) => ['prepared', 'unknown', 'accepted'].includes(candidate.status);
+        const conflict = rows.some((candidate) => (
+          candidate.intent_id === claimRow.intent_id
+          || candidate.idempotency_key === claimRow.idempotency_key
+          || (active(candidate) && candidate.send_identity_key === claimRow.send_identity_key)
+          || (claimRow.mode === 'new-message' && ['prepared', 'unknown'].includes(candidate.status)
+            && candidate.send_scope_key === claimRow.send_scope_key)
+        ));
+        const valid = Number.isFinite(dbNowMs)
+          && leaseMs >= 900_000 && leaseMs <= 3_600_000
+          && /^[0-9a-f]{64}$/.test(String(claimRow.pre_dispatch_claim_fingerprint || ''))
+          && String(args.p_transition_token || '').length > 0;
+        if (!valid || conflict) return { data: [], error: null };
+        client.insertCalls += 1;
+        const hook = typeof options.onRpc === 'function' ? options.onRpc : options.onInsert;
+        const outcome = typeof hook === 'function'
+          ? await hook({
+              call: client.insertCalls,
+              name,
+              args: { ...args },
+              row: { ...claimRow },
+            })
+          : null;
+        if (!outcome || outcome.commit !== false) rows.push(claimRow);
+        if (outcome?.error) return { data: null, error: outcome.error };
+        return { data: [{ ...claimRow }], error: null };
+      }
+      const commonFence = row
+        && row.status === 'prepared'
+        && row.dispatch_state === 'reserved'
+        && row.transition_token === args.p_expected_transition_token
+        && Date.parse(String(row.dispatch_lease_expires_at || '')) === expectedLeaseMs
+        && Date.parse(String(row.updated_at || '')) === expectedUpdatedMs
+        && row.pre_dispatch_claim_fingerprint === args.p_expected_claim_fingerprint
+        && Number.isFinite(expectedLeaseMs)
+        && Number.isFinite(dbNowMs)
+        && expectedLeaseMs > dbNowMs;
+      const finalize = name === 'softora_finalize_mailbox_pre_dispatch_claim';
+      const start = name === 'softora_start_mailbox_pre_dispatch';
+      const phaseFence = finalize
+        ? row?.pre_dispatch_finalized_at == null
+          && Number(args.p_lease_ms) >= 900_000
+          && Number(args.p_lease_ms) <= 3_600_000
+        : start
+          ? Date.parse(String(row?.pre_dispatch_finalized_at || ''))
+              === Date.parse(String(args.p_expected_finalized_at || ''))
+            && Number(args.p_lease_ms) >= 30_000
+            && Number(args.p_lease_ms) <= 900_000
+          : false;
+      if (!commonFence || !phaseFence) return { data: [], error: null };
+
+      const patch = finalize ? {
+        send_identity_key: args.p_send_identity_key,
+        send_scope_key: args.p_send_scope_key,
+        payload_fingerprint: args.p_payload_fingerprint,
+        attachments_fingerprint: args.p_attachments_fingerprint,
+        request_payload_fingerprint: args.p_request_payload_fingerprint,
+        attachments_metadata: args.p_attachments_metadata,
+        sent_message_id: args.p_sent_message_id,
+        sender_name: args.p_sender_name,
+        subject: args.p_subject,
+        body_text: args.p_body_text,
+        cc_text: args.p_cc_text,
+        bcc_text: args.p_bcc_text,
+        pre_dispatch_finalized_at: dbNow.toISOString(),
+        dispatch_lease_expires_at: new Date(dbNowMs + Number(args.p_lease_ms)).toISOString(),
+        error_text: null,
+        transition_token: args.p_next_transition_token,
+        updated_at: dbNow.toISOString(),
+      } : {
+        dispatch_state: 'started',
+        dispatch_started_at: dbNow.toISOString(),
+        dispatch_lease_expires_at: new Date(dbNowMs + Number(args.p_lease_ms)).toISOString(),
+        transition_token: args.p_next_transition_token,
+        updated_at: dbNow.toISOString(),
+      };
+      client.updateCalls += 1;
+      const hook = typeof options.onRpc === 'function' ? options.onRpc : options.onUpdate;
+      const outcome = typeof hook === 'function'
+        ? await hook({
+            call: client.updateCalls,
+            name,
+            args: { ...args },
+            patch: { ...patch },
+            row: { ...row },
+          })
+        : null;
+      if (outcome?.concurrentPatch) Object.assign(row, outcome.concurrentPatch);
+      if (!outcome || outcome.commit !== false) Object.assign(row, patch);
+      if (outcome?.error) return { data: null, error: outcome.error };
+      return { data: [{ ...row }], error: null };
+    },
     from() {
       const state = { action: 'select', filters: [], patch: null, inserted: null };
-      const matching = () => rows.filter((row) => state.filters.every(([key, value, kind]) => (
-        kind === 'in' ? value.includes(row[key]) : row[key] === value
-      )));
+      const exactValue = (left, right) => (
+        left === right
+        || (left && right && typeof left === 'object' && typeof right === 'object'
+          && JSON.stringify(left) === JSON.stringify(right))
+      );
+      const matching = () => rows.filter((row) => state.filters.every(([key, value, kind]) => {
+        if (kind === 'in') return value.includes(row[key]);
+        if (kind === 'gt') {
+          const actualMs = Date.parse(String(row[key] || ''));
+          const expectedMs = Date.parse(String(value || ''));
+          return Number.isFinite(actualMs) && Number.isFinite(expectedMs) && actualMs > expectedMs;
+        }
+        return exactValue(row[key], value);
+      }));
       const query = {
         select() { return query; },
         insert(row) { state.action = 'insert'; state.inserted = { ...row }; return query; },
         update(patch) { state.action = 'update'; state.patch = { ...patch }; return query; },
-        eq(key, value) { state.filters.push([key, value, 'eq']); return query; },
-        in(key, value) { state.filters.push([key, value, 'in']); return query; },
-        is(key, value) { state.filters.push([key, value, 'eq']); return query; },
+        eq(key, value) {
+          client.filterCalls.push({ key, value, kind: 'eq' });
+          state.filters.push([key, value, 'eq']);
+          return query;
+        },
+        in(key, value) {
+          client.filterCalls.push({ key, value, kind: 'in' });
+          state.filters.push([key, value, 'in']);
+          return query;
+        },
+        gt(key, value) {
+          client.filterCalls.push({ key, value, kind: 'gt' });
+          state.filters.push([key, value, 'gt']);
+          return query;
+        },
+        is(key, value) {
+          client.filterCalls.push({ key, value, kind: 'is' });
+          state.filters.push([key, value, 'eq']);
+          return query;
+        },
         order() { return query; },
         limit(limit) {
           return Promise.resolve({ data: matching().slice(0, limit), error: null });
@@ -98,6 +246,19 @@ function createFakeSupabase(options = {}) {
     },
   };
   return client;
+}
+
+async function claimAndFinalize(store, payload) {
+  const input = {
+    ...payload,
+    attachmentsMetadata: payload.attachmentsMetadata === undefined
+      ? []
+      : payload.attachmentsMetadata,
+  };
+  const claim = await store.claimPreDispatch(input);
+  if (!claim.created) return claim;
+  const finalized = await store.finalizeClaim(claim, input);
+  return { ...finalized, created: true, claim };
 }
 
 test('mailbox send provenance survives acceptance and prevents an idempotent resend', async () => {
@@ -518,10 +679,10 @@ test('reserve recovers its exact committed UUID after a response-timeout and sta
   };
   let providerDispatches = 0;
 
-  const reservation = await store.reserve(payload);
+  const reservation = await claimAndFinalize(store, payload);
   const committedReservationToken = client.rows[0].transition_token;
   if (reservation.created) {
-    await store.startDispatch(reservation.intent.intentId);
+    await store.startDispatch(reservation);
     providerDispatches += 1;
   }
 
@@ -620,7 +781,7 @@ test('a committed reserve with failed response and failed read-backs is safely r
 
 test('an expired reserved row with another idempotency key is failed before a new row is inserted', async () => {
   let currentTime = new Date('2026-08-24T13:48:00.000Z');
-  const client = createFakeSupabase();
+  const client = createFakeSupabase({ rpcNow: () => currentTime });
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
@@ -653,7 +814,7 @@ test('an expired reserved row with another idempotency key is failed before a ne
 
 test('preflight reconciliation releases an expired reserved intent through exact CAS', async () => {
   let currentTime = new Date('2026-08-24T13:48:00.000Z');
-  const client = createFakeSupabase();
+  const client = createFakeSupabase({ rpcNow: () => currentTime });
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
@@ -700,6 +861,7 @@ test('expired-reservation reconciliation rereads started and accepted CAS races 
       let currentTime = new Date('2026-08-24T13:49:00.000Z');
       let injectRace = true;
       const client = createFakeSupabase({
+        rpcNow: () => currentTime,
         onUpdate: ({ patch }) => {
           if (patch.status !== 'failed' || !injectRace) return null;
           injectRace = false;
@@ -737,14 +899,12 @@ test('expired-reservation reconciliation rereads started and accepted CAS races 
   }
 });
 
-test('concurrent same-key reclaim exposes one renewed reservation and one provider dispatch', async () => {
-  let currentTime = new Date('2026-08-24T13:49:00.000Z');
+test('concurrent same-key claims with distinct intent IDs expose one final token and provider winner', async () => {
   const client = createFakeSupabase();
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
-    now: () => currentTime,
-    reservationLeaseMs: 30_000,
+    now: () => new Date('2026-08-24T13:49:00.000Z'),
     retryDelayMs: 0,
   });
   const original = {
@@ -753,14 +913,12 @@ test('concurrent same-key reclaim exposes one renewed reservation and one provid
     conversationId: 'draft:reclaim-stable', provider: 'smtp', senderName: 'Servé Creusen',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(original);
-  currentTime = new Date('2026-08-24T13:49:31.000Z');
   let providerDispatches = 0;
   const flow = async (suffix) => {
     const input = { ...original, intentId: `send:reclaim-${suffix}` };
-    const reservation = await store.reserve(input);
+    const reservation = await claimAndFinalize(store, input);
     if (!reservation.created) return reservation;
-    await store.startDispatch(input.intentId);
+    await store.startDispatch(reservation);
     providerDispatches += 1;
     return reservation;
   };
@@ -812,6 +970,9 @@ test('two identical concurrent reserve-and-start flows expose exactly one provid
     '00000000-0000-4000-8000-000000000071',
     '00000000-0000-4000-8000-000000000072',
     '00000000-0000-4000-8000-000000000073',
+    '00000000-0000-4000-8000-000000000074',
+    '00000000-0000-4000-8000-000000000075',
+    '00000000-0000-4000-8000-000000000076',
   ];
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
@@ -828,9 +989,9 @@ test('two identical concurrent reserve-and-start flows expose exactly one provid
   };
   let providerDispatches = 0;
   const flow = async () => {
-    const reservation = await store.reserve(payload);
+    const reservation = await claimAndFinalize(store, payload);
     if (!reservation.created) return reservation;
-    await store.startDispatch(reservation.intent.intentId);
+    await store.startDispatch(reservation);
     providerDispatches += 1;
     return reservation;
   };
@@ -977,8 +1138,8 @@ test('definitieve fail-transitie propageert een opslagfout in plaats van vals su
     conversationId: 'draft:fail-persist', provider: 'smtp', senderName: 'Servé Creusen',
     subject: 'Vraag', body: 'Bericht', attachmentsMetadata: [],
   };
-  await store.reserve(payload);
-  await store.startDispatch(payload.intentId);
+  const finalized = await claimAndFinalize(store, payload);
+  await store.startDispatch(finalized);
   await assert.rejects(() => store.fail(payload.intentId, new Error('SMTP 550')), (error) => (
     error.code === '42501' && /fail update geweigerd/.test(error.message)
   ));
@@ -1019,8 +1180,8 @@ test('dispatch state records success and ambiguous provider outcome without allo
     conversationId: 'draft:lead', provider: 'smtp', senderName: 'Servé Creusen',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(payload);
-  await store.startDispatch(payload.intentId);
+  const finalized = await claimAndFinalize(store, payload);
+  await store.startDispatch(finalized);
   const unknown = await store.markUnknown(payload.intentId, new Error('timeout'), { sentReconcileRequired: true });
   assert.equal(unknown.status, 'unknown');
   assert.equal(unknown.dispatchState, 'started');
@@ -1035,8 +1196,8 @@ test('dispatch state records success and ambiguous provider outcome without allo
   assert.equal(accepted.reconcileRequired, false);
 });
 
-test('conditional transitions recover exact commit-success response-timeouts without blind mutation retries', async () => {
-  const timedOutTransitions = new Set(['started', 'accepted']);
+test('a committed start with a lost response stays pre-provider and aborts through the rotated started fence', async () => {
+  const timedOutTransitions = new Set(['started']);
   const timeout = () => Object.assign(new Error('commit succeeded but response timed out'), {
     code: 'ETIMEDOUT',
   });
@@ -1059,24 +1220,124 @@ test('conditional transitions recover exact commit-success response-timeouts wit
     conversationId: 'draft:commit-timeout', provider: 'smtp', senderName: 'Servé Creusen',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(payload);
+  const finalized = await claimAndFinalize(store, payload);
+  const updatesAfterFinalize = client.updateCalls;
 
-  const started = await store.startDispatch(payload.intentId);
-  assert.equal(started.dispatchState, 'started');
-  assert.match(started.transitionToken, /^[0-9a-f-]{36}$/);
-  assert.equal(client.updateCalls, 1, 'een gecommitteerde start-timeout mag geen tweede PATCH doen');
-
-  const accepted = await store.accept(payload.intentId, {
-    messageId: '<commit-timeout@example.nl>',
-    acceptedAt: '2026-08-24T14:01:00.000Z',
+  let startError = null;
+  await assert.rejects(store.startDispatch(finalized), (error) => {
+    startError = error;
+    return error.code === 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED'
+      && error.intent?.dispatchState === 'started'
+      && error.intent?.transitionToken !== finalized.finalToken;
   });
-  assert.equal(accepted.status, 'accepted');
-  assert.equal(accepted.messageId, '<commit-timeout@example.nl>');
-  assert.notEqual(accepted.transitionToken, started.transitionToken);
-  assert.equal(client.updateCalls, 2, 'ook accepted read-back herstelt zonder blinde PATCH-retry');
+  assert.equal(
+    client.updateCalls,
+    updatesAfterFinalize + 1,
+    'een gecommitteerde start-timeout mag geen tweede PATCH doen'
+  );
+
+  const failed = await store.failPreDispatch({
+    intent: startError.intent,
+    finalToken: startError.intent.transitionToken,
+  }, startError);
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.dispatchState, 'finished');
+  assert.notEqual(failed.transitionToken, startError.intent.transitionToken);
+  assert.equal(
+    client.updateCalls,
+    updatesAfterFinalize + 2,
+    'de bewezen pre-providerstart wordt exact eenmaal naar failed geaborteerd'
+  );
 });
 
-test('conditional transition retries only after read-back proves the original source state still holds', async () => {
+test('started abort-CAS rejects a stale dispatch_started_at fence and preserves the live start', async () => {
+  let loseStartResponse = true;
+  const client = createFakeSupabase({
+    onRpc: ({ name }) => {
+      if (name === 'softora_start_mailbox_pre_dispatch' && loseStartResponse) {
+        loseStartResponse = false;
+        return {
+          commit: true,
+          error: Object.assign(new Error('start response verloren'), { code: 'ETIMEDOUT' }),
+        };
+      }
+      return null;
+    },
+  });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-08-24T14:03:00.000Z'),
+    retryDelayMs: 0,
+    logger: { error() {} },
+  });
+  const payload = {
+    intentId: 'send:stale-started-at', idempotencyKey: 'browser:stale-started-at', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'new-message',
+    conversationId: 'draft:stale-started-at', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Vraag', body: 'Bericht',
+  };
+  const finalized = await claimAndFinalize(store, payload);
+  let startError = null;
+  await assert.rejects(store.startDispatch(finalized), (error) => {
+    startError = error;
+    return error.code === 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED';
+  });
+  client.rows[0].dispatch_started_at = '2026-08-24T14:03:59.000Z';
+
+  await assert.rejects(store.failPreDispatch({
+    intent: startError.intent,
+    finalToken: startError.intent.transitionToken,
+  }, startError), (error) => error.code === 'PGRST116');
+  assert.equal(client.rows[0].status, 'prepared');
+  assert.equal(client.rows[0].dispatch_state, 'started');
+  assert.equal(client.rows[0].dispatch_started_at, '2026-08-24T14:03:59.000Z');
+});
+
+test('accepted transition recovers its exact commit-success response-timeout without a blind retry', async () => {
+  let acceptedTimedOut = true;
+  const timeout = () => Object.assign(new Error('accepted commit succeeded but response timed out'), {
+    code: 'ETIMEDOUT',
+  });
+  const client = createFakeSupabase({
+    onUpdate: ({ patch }) => {
+      if (patch.status === 'accepted' && acceptedTimedOut) {
+        acceptedTimedOut = false;
+        return { commit: true, error: timeout() };
+      }
+      return null;
+    },
+  });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-08-24T14:05:00.000Z'),
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:accepted-commit-timeout', idempotencyKey: 'browser:accepted-commit-timeout',
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:accepted-commit-timeout', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Bericht',
+  };
+  const finalized = await claimAndFinalize(store, payload);
+  const started = await store.startDispatch(finalized);
+  const updatesAfterStart = client.updateCalls;
+  const accepted = await store.accept(payload.intentId, {
+    messageId: '<accepted-commit-timeout@example.nl>',
+    acceptedAt: '2026-08-24T14:06:00.000Z',
+  });
+  assert.equal(accepted.status, 'accepted');
+  assert.equal(accepted.messageId, '<accepted-commit-timeout@example.nl>');
+  assert.notEqual(accepted.transitionToken, started.transitionToken);
+  assert.equal(
+    client.updateCalls,
+    updatesAfterStart + 1,
+    'ook accepted read-back herstelt zonder blinde PATCH-retry'
+  );
+});
+
+test('start timeout before commit stays fail-closed and never performs a second start RPC', async () => {
   let firstStartAttempt = true;
   const client = createFakeSupabase({
     onUpdate: ({ patch }) => {
@@ -1102,13 +1363,14 @@ test('conditional transition retries only after read-back proves the original so
     conversationId: 'draft:read-confirmed-retry', provider: 'smtp', senderName: 'Martijn van de Ven',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(payload);
+  const finalized = await claimAndFinalize(store, payload);
+  const updatesAfterFinalize = client.updateCalls;
 
-  const started = await store.startDispatch(payload.intentId);
-
-  assert.equal(started.dispatchState, 'started');
-  assert.equal(client.updateCalls, 2);
-  assert.equal(client.rows[0].transition_token, started.transitionToken);
+  await assert.rejects(store.startDispatch(finalized), (error) => error.code === 'ETIMEDOUT');
+  assert.equal(client.updateCalls, updatesAfterFinalize + 1);
+  assert.equal(client.rpcCalls.filter(({ name }) => name === 'softora_start_mailbox_pre_dispatch').length, 1);
+  assert.equal(client.rows[0].dispatch_state, 'reserved');
+  assert.equal(client.rows[0].transition_token, finalized.finalToken);
 });
 
 test('two concurrent starts with the same clock expose exactly one dispatch winner', async () => {
@@ -1117,6 +1379,7 @@ test('two concurrent starts with the same clock expose exactly one dispatch winn
     '00000000-0000-4000-8000-000000000060',
     '00000000-0000-4000-8000-000000000061',
     '00000000-0000-4000-8000-000000000062',
+    '00000000-0000-4000-8000-000000000063',
   ];
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
@@ -1131,10 +1394,10 @@ test('two concurrent starts with the same clock expose exactly one dispatch winn
     conversationId: 'draft:concurrent-start', provider: 'smtp', senderName: 'Servé Creusen',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(payload);
+  const finalized = await claimAndFinalize(store, payload);
   let providerDispatches = 0;
   const dispatch = async () => {
-    const started = await store.startDispatch(payload.intentId);
+    const started = await store.startDispatch(finalized);
     providerDispatches += 1;
     return started;
   };
@@ -1153,7 +1416,7 @@ test('two concurrent starts with the same clock expose exactly one dispatch winn
 
 test('an expired started lease becomes explicit reconciliation and is never reopened for resend', async () => {
   let currentTime = new Date('2026-08-24T15:00:00.000Z');
-  const client = createFakeSupabase();
+  const client = createFakeSupabase({ rpcNow: () => currentTime });
   const store = createMailboxSendProvenanceStore({
     isSupabaseConfigured: () => true,
     getSupabaseClient: () => client,
@@ -1166,8 +1429,8 @@ test('an expired started lease becomes explicit reconciliation and is never reop
     conversationId: 'draft:expired-start', provider: 'smtp', senderName: 'Martijn van de Ven',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(payload);
-  await store.startDispatch(payload.intentId, 30_000);
+  const finalized = await claimAndFinalize(store, payload);
+  await store.startDispatch(finalized, 30_000);
   currentTime = new Date('2026-08-24T15:01:00.000Z');
 
   const repeated = await store.reserve({
@@ -1189,6 +1452,7 @@ test('accepted terminal evidence safely wins a race against expired-lease reconc
   let currentTime = new Date('2026-08-24T15:10:00.000Z');
   let injectAcceptedRace = true;
   const client = createFakeSupabase({
+    rpcNow: () => currentTime,
     onUpdate: ({ patch }) => {
       if (patch.status !== 'unknown' || !injectAcceptedRace) return null;
       injectAcceptedRace = false;
@@ -1220,8 +1484,8 @@ test('accepted terminal evidence safely wins a race against expired-lease reconc
     conversationId: 'draft:expiry-accept-race', provider: 'smtp', senderName: 'Servé Creusen',
     subject: 'Vraag', body: 'Bericht',
   };
-  await store.reserve(payload);
-  await store.startDispatch(payload.intentId, 30_000);
+  const finalized = await claimAndFinalize(store, payload);
+  await store.startDispatch(finalized, 30_000);
   currentTime = new Date('2026-08-24T15:11:00.000Z');
 
   const repeated = await store.reserve(payload);
@@ -1244,4 +1508,425 @@ test('missing canonical sender values fail before any provenance insert', async 
     recipientEmail: 'lead@example.nl', mode: 'new-message', provider: 'smtp', subject: 'Vraag', body: 'Body',
   }), (error) => error.code === 'MAILBOX_SEND_PROVENANCE_INVALID');
   assert.equal(client.rows.length, 0);
+});
+
+test('claim en finalize herstellen gecommitteerde response-timeouts zonder dubbele providerwinnaar', async () => {
+  let finalizeResponseLost = true;
+  const timeout = () => Object.assign(new Error('commit bevestigd maar response verloren'), {
+    code: 'ETIMEDOUT',
+  });
+  const client = createFakeSupabase({
+    onInsert: () => ({ commit: true, error: timeout() }),
+    onUpdate: ({ patch }) => {
+      if (patch.pre_dispatch_finalized_at && finalizeResponseLost) {
+        finalizeResponseLost = false;
+        return { commit: true, error: timeout() };
+      }
+      return null;
+    },
+  });
+  const tokens = [
+    '00000000-0000-4000-8000-000000000101',
+    '00000000-0000-4000-8000-000000000102',
+    '00000000-0000-4000-8000-000000000103',
+  ];
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    createTransitionToken: () => tokens.shift(),
+    now: () => new Date('2026-08-27T18:00:00.000Z'),
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:claim-response-timeout', idempotencyKey: 'browser:claim-response-timeout',
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:claim-response-timeout', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+  };
+
+  const claim = await store.claimPreDispatch(payload);
+  const finalized = await store.finalizeClaim(claim, payload);
+  let providerWinners = 0;
+  await store.startDispatch(finalized);
+  providerWinners += 1;
+
+  assert.equal(claim.created, true);
+  assert.equal(client.insertCalls, 1, 'claim-timeout mag geen tweede INSERT starten');
+  assert.equal(client.updateCalls, 2, 'finalize-timeout herstelt via read-back vóór één start-CAS');
+  assert.equal(providerWinners, 1);
+  assert.equal(client.rows[0].dispatch_state, 'started');
+  assert.equal(client.rows[0].transition_token, '00000000-0000-4000-8000-000000000103');
+});
+
+test('databaseklok blijft leidend voor finalize en start bij extreme app-clock skew', async () => {
+  let rpcTick = 0;
+  const client = createFakeSupabase({
+    rpcNow: () => new Date(Date.parse('2026-08-27T18:10:00.000Z') + (rpcTick += 1) * 1000),
+  });
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2099-08-27T18:10:00.000Z'),
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:database-clock-skew', idempotencyKey: 'browser:database-clock-skew',
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:database-clock-skew', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+  };
+
+  const finalized = await claimAndFinalize(store, payload);
+  const started = await store.startDispatch(finalized);
+
+  assert.equal(started.dispatchState, 'started');
+  assert.ok(Date.parse(started.dispatchLeaseExpiresAt) < Date.parse('2099-01-01T00:00:00.000Z'));
+  assert.equal(client.rpcCalls.length, 3);
+});
+
+test('pre-dispatchclaim accepteert alleen lege metadata of lowercase SHA-256 per bijlage', async (t) => {
+  const basePayload = {
+    intentId: 'send:attachment-sha-guard', idempotencyKey: 'browser:attachment-sha-guard',
+    owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:attachment-sha-guard', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Vraag', body: 'Exact bericht',
+  };
+  const expectRejectedMetadata = async (attachmentsMetadata) => {
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      retryDelayMs: 0,
+    });
+    await assert.rejects(
+      () => store.claimPreDispatch({ ...basePayload, attachmentsMetadata }),
+      (error) => error.code === 'MAILBOX_SEND_PRE_DISPATCH_ATTACHMENT_CONTEXT_REQUIRED'
+    );
+    assert.equal(client.rpcCalls.length, 0, 'ongeldige metadata mag de claim-RPC niet bereiken');
+    assert.equal(client.rows.length, 0);
+  };
+
+  await t.test('legacy metadata zonder hash faalt gesloten', () => expectRejectedMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
+  }]));
+  await t.test('uppercase hash faalt gesloten', () => expectRejectedMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'A'.repeat(64),
+  }]));
+  await t.test('gemengde metadata met ontbrekende hash faalt gesloten', () => expectRejectedMetadata([{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }, {
+    filename: 'uitleg.txt', contentType: 'text/plain', size: 4,
+  }]));
+
+  await t.test('lege metadata blijft geldig', async () => {
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      retryDelayMs: 0,
+    });
+    const claim = await store.claimPreDispatch({ ...basePayload, attachmentsMetadata: [] });
+    assert.equal(claim.created, true);
+    assert.deepEqual(claim.intent.attachmentsMetadata, []);
+  });
+
+  await t.test('ruwe attachmentbytes genereren een lowercase SHA-256 en slagen', async () => {
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      retryDelayMs: 0,
+    });
+    const content = Buffer.from('exacte bewijsbytes', 'utf8');
+    const claim = await store.claimPreDispatch({
+      ...basePayload,
+      intentId: 'send:attachment-raw-bytes',
+      idempotencyKey: 'browser:attachment-raw-bytes',
+      conversationId: 'draft:attachment-raw-bytes',
+      attachments: [{ filename: 'bewijs.pdf', contentType: 'application/pdf', content }],
+    });
+    assert.equal(claim.created, true);
+    assert.match(claim.intent.attachmentsMetadata[0].sha256, /^[0-9a-f]{64}$/);
+    assert.equal(
+      claim.intent.attachmentsMetadata[0].sha256,
+      require('crypto').createHash('sha256').update(content).digest('hex')
+    );
+  });
+});
+
+test('legacy startDispatch(intentId) blijft compatibel naast de gefencete handle-route', async () => {
+  const client = createFakeSupabase();
+  const startedAt = new Date('2026-08-27T19:10:00.000Z');
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => startedAt,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:legacy-start-adapter', idempotencyKey: 'browser:legacy-start-adapter',
+    owner: 'martijn', accountEmail: 'martijn@softora.nl', recipientEmail: 'lead@example.nl',
+    mode: 'new-message', conversationId: 'draft:legacy-start-adapter', provider: 'smtp',
+    senderName: 'Martijn van de Ven', subject: 'Vraag', body: 'Exact bericht',
+  };
+  await store.reserve(payload);
+
+  const started = await store.startDispatch(payload.intentId, 45_000);
+
+  assert.equal(started.status, 'prepared');
+  assert.equal(started.dispatchState, 'started');
+  assert.equal(started.dispatchStartedAt, startedAt.toISOString());
+  assert.equal(started.dispatchLeaseExpiresAt, '2026-08-27T19:10:45.000Z');
+  assert.equal(client.rpcCalls.length, 0);
+  assert.equal(client.updateCalls, 1);
+
+  const claim = await store.claimPreDispatch({
+    ...payload,
+    intentId: 'send:legacy-start-must-not-start-claim',
+    idempotencyKey: 'browser:legacy-start-must-not-start-claim',
+    conversationId: 'draft:legacy-start-must-not-start-claim',
+    attachmentsMetadata: [],
+  });
+  const updatesBeforeUnsafeStart = client.updateCalls;
+  await assert.rejects(
+    () => store.startDispatch(claim.intent.intentId),
+    (error) => error.code === 'PGRST116'
+  );
+  assert.equal(client.updateCalls, updatesBeforeUnsafeStart, 'een onafgeronde claim mag nul updates winnen');
+  assert.equal(client.rpcCalls.length, 1, 'alleen de claim-RPC mag zijn aangeroepen');
+  assert.equal(claim.intent.dispatchState, 'reserved');
+  assert.equal(client.rows[1].dispatch_state, 'reserved');
+  assert.ok(client.filterCalls.some((filter) => (
+    filter.kind === 'is' && filter.key === 'pre_dispatch_claim_fingerprint' && filter.value === null
+  )));
+  assert.ok(client.filterCalls.some((filter) => (
+    filter.kind === 'is' && filter.key === 'pre_dispatch_finalized_at' && filter.value === null
+  )));
+});
+
+test('faseovergangen weigeren tokenhergebruik vóór iedere database- of providerautorisatie', async (t) => {
+  const tokenA = '00000000-0000-4000-8000-000000000201';
+  const tokenB = '00000000-0000-4000-8000-000000000202';
+  const payload = {
+    intentId: 'send:token-reuse', idempotencyKey: 'browser:token-reuse', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'new-message',
+    conversationId: 'draft:token-reuse', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Vraag', body: 'Exact bericht', attachmentsMetadata: [],
+  };
+
+  await t.test('claim naar finalize', async () => {
+    const tokens = [tokenA, tokenA];
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      createTransitionToken: () => tokens.shift(),
+      retryDelayMs: 0,
+    });
+    const claim = await store.claimPreDispatch(payload);
+    await assert.rejects(store.finalizeClaim(claim, payload), (error) => (
+      error.code === 'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED'
+      && /fasetoken niet roteerde/.test(error.message)
+    ));
+    assert.equal(client.rpcCalls.length, 1);
+    assert.equal(client.rows[0].pre_dispatch_finalized_at, null);
+  });
+
+  await t.test('finalize naar start', async () => {
+    const tokens = [tokenA, tokenB, tokenB];
+    const client = createFakeSupabase();
+    const store = createMailboxSendProvenanceStore({
+      isSupabaseConfigured: () => true,
+      getSupabaseClient: () => client,
+      createTransitionToken: () => tokens.shift(),
+      retryDelayMs: 0,
+    });
+    const finalized = await claimAndFinalize(store, {
+      ...payload,
+      intentId: 'send:start-token-reuse',
+      idempotencyKey: 'browser:start-token-reuse',
+      conversationId: 'draft:start-token-reuse',
+    });
+    await assert.rejects(store.startDispatch(finalized), (error) => (
+      error.code === 'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED'
+      && /fasetoken niet roteerde/.test(error.message)
+    ));
+    assert.equal(client.rpcCalls.length, 2, 'alleen claim en finalize mogen de database bereiken');
+    assert.equal(client.rows[0].dispatch_state, 'reserved');
+  });
+});
+
+test('claimtoken bindt account thread requestpayload en attachmentbytes vóór iedere finalisatie', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const metadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+  }];
+  const payload = {
+    intentId: 'send:claim-tamper', idempotencyKey: 'browser:claim-tamper', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'reply',
+    conversationId: 'conversation:claim-tamper', replyTargetMessageId: '<incoming@example.nl>',
+    references: '<root@example.nl> <incoming@example.nl>', provider: 'smtp',
+    senderName: 'Servé Creusen', subject: 'Re: Vraag', body: 'Exact antwoord',
+    requestBody: 'Exact antwoord', attachmentsMetadata: metadata,
+  };
+  const claim = await store.claimPreDispatch(payload);
+  const cases = [
+    ['verkeerd token', { ...claim, claimToken: '00000000-0000-4000-8000-ffffffffffff' }, payload],
+    ['account in handle', {
+      ...claim, intent: { ...claim.intent, accountEmail: 'martijn@softora.nl' },
+    }, payload],
+    ['account in input', claim, { ...payload, owner: 'martijn', accountEmail: 'martijn@softora.nl' }],
+    ['thread', claim, { ...payload, conversationId: 'conversation:ander' }],
+    ['references', claim, { ...payload, references: '<ander@example.nl>' }],
+    ['requestbody', claim, { ...payload, body: 'Gewijzigd', requestBody: 'Gewijzigd' }],
+    ['attachmenthash', claim, {
+      ...payload,
+      attachmentsMetadata: [{ ...metadata[0], sha256: 'b'.repeat(64) }],
+    }],
+  ];
+
+  for (const [label, handle, changedInput] of cases) {
+    await assert.rejects(
+      () => store.finalizeClaim(handle, changedInput),
+      (error) => ['MAILBOX_SEND_PRE_DISPATCH_CLAIM_MISMATCH', 'MAILBOX_SEND_PRE_DISPATCH_FINALIZE_MISMATCH']
+        .includes(error.code),
+      label
+    );
+  }
+  assert.equal(client.updateCalls, 0, 'geen enkele tampercase mag de durable claim muteren');
+  assert.equal(client.rows[0].dispatch_state, 'reserved');
+  assert.equal(client.rows[0].pre_dispatch_finalized_at, null);
+});
+
+test('cross-account en stale tokens kunnen geen finalisatie start of fail-transitie winnen', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const serve = {
+    intentId: 'send:serve-token', idempotencyKey: 'browser:serve-token', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'serve-lead@example.nl', mode: 'new-message',
+    conversationId: 'draft:serve-token', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Vraag', body: 'Serve', attachmentsMetadata: [],
+  };
+  const martijn = {
+    ...serve,
+    intentId: 'send:martijn-token', idempotencyKey: 'browser:martijn-token', owner: 'martijn',
+    accountEmail: 'martijn@softora.nl', recipientEmail: 'martijn-lead@example.nl',
+    conversationId: 'draft:martijn-token', senderName: 'Martijn van de Ven', body: 'Martijn',
+  };
+  const serveClaim = await store.claimPreDispatch(serve);
+  const martijnClaim = await store.claimPreDispatch(martijn);
+
+  await assert.rejects(() => store.finalizeClaim({
+    ...serveClaim,
+    claimToken: martijnClaim.claimToken,
+  }, serve), (error) => error.code === 'MAILBOX_SEND_PRE_DISPATCH_CLAIM_MISMATCH');
+
+  const finalized = await store.finalizeClaim(serveClaim, serve);
+  await assert.rejects(
+    () => store.startDispatch(serveClaim),
+    (error) => error.code === 'MAILBOX_SEND_FINAL_TOKEN_REQUIRED'
+  );
+  await assert.rejects(
+    () => store.startDispatch({ ...finalized, finalToken: serveClaim.claimToken }),
+    (error) => error.code === 'MAILBOX_SEND_FINAL_TOKEN_REQUIRED'
+  );
+  await assert.rejects(
+    () => store.failPreDispatch(serveClaim, new Error('stale crash')),
+    (error) => error.code === 'PGRST116'
+  );
+
+  assert.equal(client.rows.find((row) => row.intent_id === serve.intentId).dispatch_state, 'reserved');
+  assert.ok(client.rows.find((row) => row.intent_id === serve.intentId).pre_dispatch_finalized_at);
+  assert.equal(client.rows.find((row) => row.intent_id === martijn.intentId).pre_dispatch_finalized_at, null);
+});
+
+test('crash vóór provider wordt exact failed en kan daarna niet alsnog dispatchen', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:pre-provider-crash', idempotencyKey: 'browser:pre-provider-crash', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'new-message',
+    conversationId: 'draft:pre-provider-crash', provider: 'smtp', senderName: 'Servé Creusen',
+    subject: 'Vraag', body: 'Bericht', attachmentsMetadata: [],
+  };
+  const claim = await store.claimPreDispatch(payload);
+  const finalized = await store.finalizeClaim(claim, payload);
+  const failed = await store.failPreDispatch(finalized, new Error('guard crash vóór SMTP'));
+
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.dispatchState, 'finished');
+  assert.match(failed.error, /guard crash vóór SMTP/);
+  await assert.rejects(
+    () => store.startDispatch(finalized),
+    (error) => error.code === 'PGRST116'
+  );
+  assert.equal(client.rows[0].status, 'failed');
+  assert.equal(client.rows[0].dispatch_state, 'finished');
+});
+
+test('Buffer en Base64 met gelijke naam type en grootte blijven op echte bytes onderscheiden', () => {
+  const shared = { filename: 'bewijs.pdf', contentType: 'application/pdf' };
+  const bufferMetadata = createMailboxAttachmentsMetadataFromContent([{
+    ...shared, content: Buffer.from([1, 2, 3, 4]),
+  }]);
+  const base64Metadata = createMailboxAttachmentsMetadataFromContent([{
+    ...shared, contentBase64: Buffer.from([4, 3, 2, 1]).toString('base64'),
+  }]);
+
+  assert.deepEqual(bufferMetadata.map(({ filename, contentType, size }) => ({ filename, contentType, size })),
+    base64Metadata.map(({ filename, contentType, size }) => ({ filename, contentType, size })));
+  assert.notEqual(bufferMetadata[0].sha256, base64Metadata[0].sha256);
+});
+
+test('lange body references en JSON metadata blijven buiten de compacte PostgREST CAS-fence', async () => {
+  const client = createFakeSupabase();
+  const store = createMailboxSendProvenanceStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    retryDelayMs: 0,
+  });
+  const payload = {
+    intentId: 'send:compact-cas', idempotencyKey: 'browser:compact-cas', owner: 'serve',
+    accountEmail: 'serve@softora.nl', recipientEmail: 'lead@example.nl', mode: 'reply',
+    conversationId: 'conversation:compact-cas', replyTargetMessageId: '<incoming@example.nl>',
+    references: `<root@example.nl> ${'x'.repeat(120_000)} <incoming@example.nl>`,
+    provider: 'smtp', senderName: 'Servé Creusen', subject: 'Re: Lange mail',
+    body: 'b'.repeat(200_000), requestBody: 'b'.repeat(200_000),
+    attachmentsMetadata: [{
+      filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'c'.repeat(64),
+    }],
+  };
+  const claim = await store.claimPreDispatch(payload);
+  const beforeFinalize = client.filterCalls.length;
+  const finalized = await store.finalizeClaim(claim, payload);
+  const finalizeFilters = client.filterCalls.slice(beforeFinalize);
+  const beforeStart = client.filterCalls.length;
+  await store.startDispatch(finalized);
+  const startFilters = client.filterCalls.slice(beforeStart);
+  const allowedKeys = new Set([
+    'intent_id', 'status', 'dispatch_state', 'transition_token', 'dispatch_lease_expires_at',
+    'updated_at', 'pre_dispatch_claim_fingerprint', 'pre_dispatch_finalized_at',
+  ]);
+
+  for (const filter of [...finalizeFilters, ...startFilters]) {
+    assert.equal(allowedKeys.has(filter.key), true, `onverwachte CAS-filter ${filter.key}`);
+    assert.ok(JSON.stringify(filter.value).length < 200, `${filter.key} bevatte een grote payloadwaarde`);
+  }
+  assert.equal([...finalizeFilters, ...startFilters].some((filter) => (
+    ['body_text', 'references_text', 'attachments_metadata'].includes(filter.key)
+  )), false);
+  assert.equal(client.rows[0].dispatch_state, 'started');
 });

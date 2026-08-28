@@ -2,12 +2,19 @@ const crypto = require('crypto');
 const {
   normalizeAttachmentMetadata,
 } = require('./mailbox-attachment-policy');
+const {
+  MAILBOX_SEND_PRE_DISPATCH_CLAIM_LEASE_MS,
+  createMailboxSendPreDispatchClaim,
+} = require('./mailbox-send-pre-dispatch-claim');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
 const MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS = 8_000;
 const MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS = 2;
 const MAILBOX_SEND_RESERVATION_LEASE_MS = 30_000;
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC =
   'softora_list_accepted_mailbox_send_provenance_by_message_ids';
+const MAILBOX_FINALIZE_PRE_DISPATCH_RPC = 'softora_finalize_mailbox_pre_dispatch_claim';
+const MAILBOX_START_PRE_DISPATCH_RPC = 'softora_start_mailbox_pre_dispatch';
+const MAILBOX_CLAIM_PRE_DISPATCH_RPC = 'softora_claim_mailbox_pre_dispatch';
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ACCOUNTS = 20;
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS = 200;
 const MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS = 2000;
@@ -78,9 +85,7 @@ function createMailboxPayloadFingerprint(input = {}, normalizeString = (value) =
 
 function createMailboxAttachmentsFingerprint(attachments = []) {
   const normalized = (Array.isArray(attachments) ? attachments : []).map((attachment) => {
-    const content = Buffer.isBuffer(attachment?.content)
-      ? attachment.content
-      : Buffer.from(String(attachment?.content || attachment?.contentBase64 || ''), 'base64');
+    const content = mailboxAttachmentContentBuffer(attachment);
     return createCanonicalMailboxHash([
       String(attachment?.filename || attachment?.name || '').trim(),
       String(attachment?.contentType || '').trim().toLowerCase(),
@@ -89,6 +94,50 @@ function createMailboxAttachmentsFingerprint(attachments = []) {
     ]);
   });
   return normalized.length ? createCanonicalMailboxHash(normalized) : '';
+}
+
+function mailboxAttachmentContentBuffer(attachment = {}) {
+  if (Buffer.isBuffer(attachment.content)) return attachment.content;
+  if (attachment.content instanceof Uint8Array) return Buffer.from(attachment.content);
+  const encodedValue = attachment.contentBase64 === undefined
+    ? attachment.data
+    : attachment.contentBase64;
+  if (encodedValue !== undefined && encodedValue !== null) {
+    const encoded = String(encodedValue)
+      .replace(/^data:[^;,]+;base64,/i, '')
+      .replace(/\s+/g, '');
+    return Buffer.from(encoded, 'base64');
+  }
+  if (typeof attachment.content === 'string') {
+    return String(attachment.encoding || '').trim().toLowerCase() === 'base64'
+      ? Buffer.from(attachment.content.replace(/\s+/g, ''), 'base64')
+      : Buffer.from(attachment.content, 'utf8');
+  }
+  return Buffer.alloc(0);
+}
+
+function createMailboxAttachmentsMetadataFromContent(attachments = []) {
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (list.some((attachment) => String(attachment?.reference || '').trim())) return null;
+  const metadata = list.map((attachment) => {
+    const content = mailboxAttachmentContentBuffer(attachment);
+    return {
+      filename: String(attachment?.filename || attachment?.name || '').trim(),
+      contentType: String(attachment?.contentType || attachment?.type || '').trim().toLowerCase(),
+      size: content.length,
+      sha256: crypto.createHash('sha256').update(content).digest('hex'),
+    };
+  });
+  const normalized = normalizeMailboxAttachmentsMetadata(metadata);
+  return normalized && normalized.length === list.length ? normalized : null;
+}
+
+function createMailboxClaimAttachmentsFingerprint(attachmentsMetadata = []) {
+  const normalized = normalizeMailboxAttachmentsMetadata(attachmentsMetadata);
+  if (normalized === null) return '';
+  return normalized.length
+    ? `claim:${createCanonicalMailboxHash([JSON.stringify(normalized)])}`
+    : '';
 }
 
 function createMailboxRequestPayloadFingerprint(input = {}, normalizeString = (value) => String(value || '').trim()) {
@@ -152,6 +201,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
     sleep = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
     createTransitionToken = () => crypto.randomUUID(),
     reservationLeaseMs = MAILBOX_SEND_RESERVATION_LEASE_MS,
+    preDispatchClaimLeaseMs = MAILBOX_SEND_PRE_DISPATCH_CLAIM_LEASE_MS,
   } = deps;
   const normalizeEmail = (value) => normalizeString(value).toLowerCase();
   const normalizeMessageId = (value) => normalizeString(value)
@@ -218,6 +268,8 @@ function createMailboxSendProvenanceStore(deps = {}) {
       acceptedAt: normalizeString(row.accepted_at), createdAt: normalizeString(row.created_at),
       updatedAt: normalizeString(row.updated_at),
       transitionToken: normalizeString(row.transition_token),
+      preDispatchClaimFingerprint: normalizeString(row.pre_dispatch_claim_fingerprint).toLowerCase(),
+      preDispatchFinalizedAt: normalizeString(row.pre_dispatch_finalized_at),
     };
   }
 
@@ -247,7 +299,10 @@ function createMailboxSendProvenanceStore(deps = {}) {
       cc_text: normalizeString(input.cc) || null, bcc_text: normalizeString(input.bcc) || null,
       status: 'prepared', dispatch_state: 'reserved', dispatch_started_at: null,
       dispatch_lease_expires_at: null, reconcile_required: false, sent_reconcile_required: false,
-      error_text: null, transition_token: null, updated_at: now().toISOString(),
+      error_text: null, transition_token: null,
+      pre_dispatch_claim_fingerprint: normalizeString(input.preDispatchClaimFingerprint) || null,
+      pre_dispatch_finalized_at: normalizeString(input.preDispatchFinalizedAt) || null,
+      updated_at: now().toISOString(),
     };
   }
 
@@ -310,6 +365,15 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return Math.max(5_000, Math.min(120_000, Number(reservationLeaseMs) || MAILBOX_SEND_RESERVATION_LEASE_MS));
   }
 
+  function createRequiredTransitionToken(label) {
+    const token = normalizeString(createTransitionToken());
+    if (token) return token;
+    const error = new Error(`Threadregistratie kon niet als ${label} worden voorbereid.`);
+    error.status = 503;
+    error.code = 'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED';
+    throw error;
+  }
+
   function isExpiredReservedDispatch(intent) {
     return isExpiredMailboxReservedDispatch(intent, {
       normalizeString,
@@ -326,21 +390,42 @@ function createMailboxSendProvenanceStore(deps = {}) {
       'requestPayloadFingerprint',
       'owner', 'accountEmail', 'recipientEmail', 'mode', 'conversationId', 'replyTargetMessageId',
       'references', 'provider', 'providerThreadId', 'senderName', 'subject', 'body', 'cc', 'bcc',
+      'preDispatchClaimFingerprint', 'preDispatchFinalizedAt',
     ];
     if (exactIntent) fields.push('intentId', 'messageId');
     return fields.every((field) => intent[field] === expected[field])
       && mailboxAttachmentsMetadataEqual(intent.attachmentsMetadata, expected.attachmentsMetadata);
   }
 
+  const exactReservedFenceColumns = Object.freeze([
+    ['transition_token', 'transitionToken', true],
+    ['dispatch_lease_expires_at', 'dispatchLeaseExpiresAt', true],
+    ['updated_at', 'updatedAt', true],
+    ['pre_dispatch_claim_fingerprint', 'preDispatchClaimFingerprint', true],
+    ['pre_dispatch_finalized_at', 'preDispatchFinalizedAt', true],
+  ]);
+
   function exactReservedCasFilters(intent) {
     const equals = {};
     const nulls = [];
-    if (normalizeString(intent.transitionToken)) equals.transition_token = intent.transitionToken;
-    else nulls.push('transition_token');
-    if (normalizeString(intent.dispatchLeaseExpiresAt)) equals.dispatch_lease_expires_at = intent.dispatchLeaseExpiresAt;
-    else nulls.push('dispatch_lease_expires_at');
-    if (normalizeString(intent.updatedAt)) equals.updated_at = intent.updatedAt;
+    for (const [column, field, nullable] of exactReservedFenceColumns) {
+      const value = intent?.[field];
+      const missing = value === null || value === undefined
+        || (typeof value === 'string' && !normalizeString(value));
+      if (nullable && missing) nulls.push(column);
+      else equals[column] = value;
+    }
     return { statuses: ['prepared'], dispatchState: 'reserved', equals, nulls };
+  }
+
+  function exactStartedCasFilters(intent) {
+    const filters = exactReservedCasFilters(intent);
+    const startedAt = intent?.dispatchStartedAt;
+    const missingStartedAt = startedAt === null || startedAt === undefined
+      || (typeof startedAt === 'string' && !normalizeString(startedAt));
+    if (missingStartedAt) filters.nulls.push('dispatch_started_at');
+    else filters.equals.dispatch_started_at = startedAt;
+    return { ...filters, dispatchState: 'started' };
   }
 
   async function reconcileExpiredStartedDispatch(intent) {
@@ -417,34 +502,49 @@ function createMailboxSendProvenanceStore(deps = {}) {
     }
   }
 
-  async function reserve(input = {}) {
-    const row = buildPreparedRow(input);
+  async function reservePreparedRow(row, options = {}) {
     assertPreparedRow(row);
-    const reservationToken = normalizeString(createTransitionToken());
-    if (!reservationToken) {
-      const error = new Error('Threadregistratie kon niet worden voorbereid.');
-      error.status = 503;
-      error.code = 'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED';
-      throw error;
-    }
+    const reservationToken = createRequiredTransitionToken('gereserveerd');
+    const databaseClockClaim = options.databaseClockClaim === true;
+    const leaseMs = Number(options.leaseMs) || getReservationLeaseMs();
     row.transition_token = reservationToken;
     const reservedAt = now();
     row.updated_at = reservedAt.toISOString();
-    row.dispatch_lease_expires_at = new Date(reservedAt.getTime() + getReservationLeaseMs()).toISOString();
+    row.dispatch_lease_expires_at = new Date(
+      reservedAt.getTime() + leaseMs
+    ).toISOString();
 
     function isExactCommittedReservation(intent) {
+      const updatedAtMs = Date.parse(normalizeString(intent?.updatedAt));
+      const createdAtMs = Date.parse(normalizeString(intent?.createdAt));
+      const leaseExpiresAtMs = Date.parse(normalizeString(intent?.dispatchLeaseExpiresAt));
+      const exactLease = databaseClockClaim
+        ? Number.isFinite(updatedAtMs) && Number.isFinite(createdAtMs)
+          && Number.isFinite(leaseExpiresAtMs) && updatedAtMs === createdAtMs
+          && leaseExpiresAtMs - updatedAtMs === leaseMs
+        : sameTimestamp(intent?.dispatchLeaseExpiresAt, row.dispatch_lease_expires_at);
       return intent?.status === 'prepared' && intent?.dispatchState === 'reserved'
         && intent?.transitionToken === reservationToken
-        && sameTimestamp(intent?.dispatchLeaseExpiresAt, row.dispatch_lease_expires_at)
+        && exactLease
         && matchesReservationPayload(intent, row, { exactIntent: true });
     }
 
     let lastError = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = await runCriticalQuery((client) => client.from(MAILBOX_SEND_PROVENANCE_TABLE)
-          .insert(row).select('*').single(), { maxAttempts: 1 });
-        if (result.data) return { created: true, intent: normalizeRow(result.data) };
+        const result = await runCriticalQuery((client) => databaseClockClaim
+          ? client.rpc(MAILBOX_CLAIM_PRE_DISPATCH_RPC, {
+              p_row: row,
+              p_transition_token: reservationToken,
+              p_lease_ms: leaseMs,
+            })
+          : client.from(MAILBOX_SEND_PROVENANCE_TABLE).insert(row).select('*').single(),
+        { maxAttempts: 1 });
+        const insertedRow = databaseClockClaim ? firstRpcRow(result.data) : result.data;
+        if (insertedRow) {
+          const intent = normalizeRow(insertedRow);
+          if (isExactCommittedReservation(intent)) return { created: true, intent };
+        }
         lastError = new Error('Threadregistratie kon niet worden voorbereid.');
       } catch (queryError) {
         lastError = queryError;
@@ -461,6 +561,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
         throw error;
       }
       if (existing && isExpiredReservedDispatch(existing)) {
+        if (options.renewExpired === false) return { created: false, intent: existing };
         const recovered = await recoverExpiredReserved(existing, row, reservationToken);
         if (recovered.created === true) return { created: true, intent: recovered.intent };
         if (recovered.released === true && attempt === 0) continue;
@@ -483,6 +584,11 @@ function createMailboxSendProvenanceStore(deps = {}) {
     throw error;
   }
 
+  const reserve = (input = {}) => reservePreparedRow(buildPreparedRow(input), {
+    leaseMs: getReservationLeaseMs(),
+    renewExpired: true,
+  });
+
   function sameTimestamp(left, right) {
     if (!normalizeString(left) && !normalizeString(right)) return true;
     const leftMs = Date.parse(normalizeString(left));
@@ -492,6 +598,31 @@ function createMailboxSendProvenanceStore(deps = {}) {
 
   function transitionFieldMatches(intent, column, expected) {
     if (column === 'intent_id') return intent?.intentId === normalizeString(expected);
+    if (column === 'idempotency_key') return intent?.idempotencyKey === normalizeString(expected);
+    if (column === 'send_identity_key') return intent?.sendIdentityKey === normalizeString(expected);
+    if (column === 'send_scope_key') return intent?.sendScopeKey === normalizeString(expected);
+    if (column === 'payload_fingerprint') return intent?.payloadFingerprint === normalizeString(expected);
+    if (column === 'attachments_fingerprint') return intent?.attachmentsFingerprint === normalizeString(expected);
+    if (column === 'request_payload_fingerprint') {
+      return intent?.requestPayloadFingerprint === normalizeString(expected);
+    }
+    if (column === 'attachments_metadata') {
+      return mailboxAttachmentsMetadataEqual(intent?.attachmentsMetadata, expected);
+    }
+    if (column === 'owner') return intent?.owner === normalizeString(expected).toLowerCase();
+    if (column === 'account_email') return intent?.accountEmail === normalizeEmail(expected);
+    if (column === 'recipient_email') return intent?.recipientEmail === normalizeEmail(expected);
+    if (column === 'mode') return intent?.mode === normalizeString(expected).toLowerCase();
+    if (column === 'conversation_id') return intent?.conversationId === normalizeString(expected);
+    if (column === 'reply_target_message_id') return intent?.replyTargetMessageId === normalizeString(expected);
+    if (column === 'references_text') return intent?.references === normalizeString(expected);
+    if (column === 'provider') return intent?.provider === normalizeString(expected).toLowerCase();
+    if (column === 'provider_thread_id') return intent?.providerThreadId === normalizeString(expected);
+    if (column === 'sender_name') return intent?.senderName === normalizeString(expected);
+    if (column === 'subject') return intent?.subject === normalizeString(expected);
+    if (column === 'body_text') return intent?.body === normalizeString(expected);
+    if (column === 'cc_text') return intent?.cc === normalizeString(expected);
+    if (column === 'bcc_text') return intent?.bcc === normalizeString(expected);
     if (column === 'status') return intent?.status === normalizeString(expected).toLowerCase();
     if (column === 'dispatch_state') return intent?.dispatchState === normalizeString(expected).toLowerCase();
     if (column === 'dispatch_started_at') return sameTimestamp(intent?.dispatchStartedAt, expected);
@@ -505,6 +636,10 @@ function createMailboxSendProvenanceStore(deps = {}) {
     if (column === 'error_text') return intent?.error === normalizeString(expected);
     if (column === 'transition_token') return intent?.transitionToken === normalizeString(expected);
     if (column === 'updated_at') return sameTimestamp(intent?.updatedAt, expected);
+    if (column === 'pre_dispatch_claim_fingerprint') {
+      return intent?.preDispatchClaimFingerprint === normalizeString(expected).toLowerCase();
+    }
+    if (column === 'pre_dispatch_finalized_at') return sameTimestamp(intent?.preDispatchFinalizedAt, expected);
     return false;
   }
 
@@ -620,13 +755,171 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return releaseExpiredReserved(existing);
   }
 
-  const startDispatch = (intentId, leaseMs = 120_000) => {
-    const startedAt = now();
-    return updateIntent(intentId, {
-      dispatch_state: 'started', dispatch_started_at: startedAt.toISOString(),
-      dispatch_lease_expires_at: new Date(startedAt.getTime() + Math.max(30_000, Number(leaseMs) || 120_000)).toISOString(),
-    }, 'gestart', { statuses: ['prepared'], dispatchState: 'reserved' });
-  };
+  function firstRpcRow(data) {
+    if (Array.isArray(data)) return data[0] || null;
+    return data && typeof data === 'object' ? data : null;
+  }
+
+  function finalTransitionMatches(intent, sourceIntent, finalIntent, transitionToken) {
+    if (!intent || intent.status !== 'prepared' || intent.dispatchState !== 'reserved'
+      || intent.transitionToken !== transitionToken
+      || intent.transitionToken === sourceIntent.transitionToken
+      || !intent.preDispatchFinalizedAt
+      || intent.preDispatchClaimFingerprint !== sourceIntent.preDispatchClaimFingerprint) return false;
+    const exactFields = [
+      'sendIdentityKey', 'sendScopeKey', 'payloadFingerprint', 'attachmentsFingerprint',
+      'requestPayloadFingerprint', 'messageId', 'senderName', 'subject', 'body', 'cc', 'bcc',
+    ];
+    return exactFields.every((field) => intent[field] === finalIntent[field])
+      && mailboxAttachmentsMetadataEqual(intent.attachmentsMetadata, finalIntent.attachmentsMetadata);
+  }
+
+  function startedTransitionMatches(intent, sourceIntent, transitionToken) {
+    const startedAtMs = Date.parse(normalizeString(intent?.dispatchStartedAt));
+    const leaseExpiresAtMs = Date.parse(normalizeString(intent?.dispatchLeaseExpiresAt));
+    const updatedAtMs = Date.parse(normalizeString(intent?.updatedAt));
+    return intent?.status === 'prepared'
+      && intent?.dispatchState === 'started'
+      && intent?.transitionToken === transitionToken
+      && intent?.transitionToken !== sourceIntent?.transitionToken
+      && intent?.preDispatchClaimFingerprint === sourceIntent?.preDispatchClaimFingerprint
+      && sameTimestamp(intent?.preDispatchFinalizedAt, sourceIntent?.preDispatchFinalizedAt)
+      && Number.isFinite(startedAtMs)
+      && Number.isFinite(leaseExpiresAtMs)
+      && Number.isFinite(updatedAtMs)
+      && startedAtMs === updatedAtMs
+      && leaseExpiresAtMs > startedAtMs;
+  }
+
+  async function finalizePreDispatchClaimAtomically(sourceIntent, finalIntent, options = {}) {
+    const transitionToken = normalizeString(options.transitionToken);
+    if (!transitionToken || transitionToken === normalizeString(sourceIntent?.transitionToken)) {
+      throw createUpdateError(null, 'definitief voorbereid');
+    }
+    const leaseMs = Math.max(
+      900_000,
+      Math.min(3_600_000, Number(options.leaseMs) || MAILBOX_SEND_PRE_DISPATCH_CLAIM_LEASE_MS)
+    );
+    const args = {
+      p_intent_id: sourceIntent.intentId,
+      p_expected_transition_token: sourceIntent.transitionToken,
+      p_expected_dispatch_lease_expires_at: sourceIntent.dispatchLeaseExpiresAt,
+      p_expected_updated_at: sourceIntent.updatedAt,
+      p_expected_claim_fingerprint: sourceIntent.preDispatchClaimFingerprint,
+      p_next_transition_token: transitionToken,
+      p_lease_ms: leaseMs,
+      p_send_identity_key: finalIntent.sendIdentityKey,
+      p_send_scope_key: finalIntent.sendScopeKey,
+      p_payload_fingerprint: finalIntent.payloadFingerprint,
+      p_attachments_fingerprint: finalIntent.attachmentsFingerprint,
+      p_request_payload_fingerprint: finalIntent.requestPayloadFingerprint,
+      p_attachments_metadata: finalIntent.attachmentsMetadata,
+      p_sent_message_id: finalIntent.messageId || null,
+      p_sender_name: finalIntent.senderName || null,
+      p_subject: finalIntent.subject,
+      p_body_text: finalIntent.body,
+      p_cc_text: finalIntent.cc || null,
+      p_bcc_text: finalIntent.bcc || null,
+    };
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = await runCriticalQuery(
+          (client) => client.rpc(MAILBOX_FINALIZE_PRE_DISPATCH_RPC, args),
+          { maxAttempts: 1 }
+        );
+        const row = firstRpcRow(result.data);
+        if (row) {
+          const intent = normalizeRow(row);
+          if (finalTransitionMatches(intent, sourceIntent, finalIntent, transitionToken)) return intent;
+        }
+        lastError = Object.assign(
+          new Error('De definitieve pre-dispatchclaim verloor de databaselease.'),
+          { code: 'PGRST116', status: 409 }
+        );
+      } catch (error) {
+        lastError = error;
+      }
+      let current = null;
+      try {
+        current = await findByIntentId(sourceIntent.intentId);
+      } catch (readError) {
+        const error = createUpdateError(lastError, 'definitief voorbereid');
+        error.recoveryError = readError;
+        throw error;
+      }
+      if (finalTransitionMatches(current, sourceIntent, finalIntent, transitionToken)) return current;
+      if (attempt === 0 && isTransientMailboxProvenanceError(lastError)
+        && matchesTransitionFilters(current, exactReservedCasFilters(sourceIntent))) {
+        const delayMs = Math.max(0, Math.min(250, Number(retryDelayMs) || 0));
+        if (delayMs) await sleep(delayMs);
+        continue;
+      }
+      throw createUpdateError(lastError, 'definitief voorbereid');
+    }
+    throw createUpdateError(lastError, 'definitief voorbereid');
+  }
+
+  async function startPreDispatchAtomically(sourceIntent, options = {}) {
+    const transitionToken = normalizeString(options.transitionToken);
+    if (!transitionToken || transitionToken === normalizeString(sourceIntent?.transitionToken)) {
+      throw createUpdateError(null, 'gestart');
+    }
+    const leaseMs = Math.max(30_000, Math.min(900_000, Number(options.leaseMs) || 120_000));
+    const args = {
+      p_intent_id: sourceIntent.intentId,
+      p_expected_transition_token: sourceIntent.transitionToken,
+      p_expected_dispatch_lease_expires_at: sourceIntent.dispatchLeaseExpiresAt,
+      p_expected_updated_at: sourceIntent.updatedAt,
+      p_expected_claim_fingerprint: sourceIntent.preDispatchClaimFingerprint,
+      p_expected_finalized_at: sourceIntent.preDispatchFinalizedAt,
+      p_next_transition_token: transitionToken,
+      p_lease_ms: leaseMs,
+    };
+    let transitionError = null;
+    try {
+      const result = await runCriticalQuery(
+        (client) => client.rpc(MAILBOX_START_PRE_DISPATCH_RPC, args),
+        { maxAttempts: 1 }
+      );
+      const row = firstRpcRow(result.data);
+      if (row) {
+        const intent = normalizeRow(row);
+        if (startedTransitionMatches(intent, sourceIntent, transitionToken)) return intent;
+      }
+      transitionError = Object.assign(
+        new Error('De providerstart verloor de databaselease.'),
+        { code: 'PGRST116', status: 409 }
+      );
+    } catch (error) {
+      transitionError = error;
+    }
+
+    let current = null;
+    try {
+      current = await findByIntentId(sourceIntent.intentId);
+    } catch (readError) {
+      const error = createUpdateError(transitionError, 'gestart');
+      error.recoveryError = readError;
+      throw error;
+    }
+    const committedWithoutResponse = startedTransitionMatches(
+      current,
+      sourceIntent,
+      transitionToken
+    );
+    if (committedWithoutResponse) {
+      const error = new Error(
+        'De database legde de providerstart vast maar het antwoord ging verloren; verzending vereist reconciliatie.'
+      );
+      error.status = 409;
+      error.code = 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED';
+      error.intent = current;
+      error.cause = transitionError;
+      throw error;
+    }
+    throw createUpdateError(transitionError, 'gestart');
+  }
 
   const accept = (intentId, values = {}) => {
     const messageId = normalizeString(values.messageId);
@@ -779,10 +1072,41 @@ function createMailboxSendProvenanceStore(deps = {}) {
     }
   }
 
+  const {
+    claimPreDispatch,
+    failPreDispatch,
+    finalizeClaim,
+    startDispatch,
+  } = createMailboxSendPreDispatchClaim({
+    assertPreparedRow,
+    buildPreparedRow,
+    createAttachmentsMetadataFromContent: createMailboxAttachmentsMetadataFromContent,
+    createCanonicalHash: createCanonicalMailboxHash,
+    createClaimAttachmentsFingerprint: createMailboxClaimAttachmentsFingerprint,
+    createRequestPayloadFingerprint: createMailboxRequestPayloadFingerprint,
+    createTransitionToken,
+    exactReservedCasFilters,
+    exactStartedCasFilters,
+    finalizePreDispatchClaimAtomically,
+    mailboxAttachmentsMetadataEqual,
+    normalizeAttachmentsMetadata: normalizeMailboxAttachmentsMetadata,
+    normalizeRow,
+    normalizeString,
+    now,
+    preDispatchClaimLeaseMs,
+    reservePreparedRow,
+    startPreDispatchAtomically,
+    updateIntent,
+    logger,
+  });
+
   return {
     accept,
+    claimPreDispatch,
     fail,
+    failPreDispatch,
     findByIdempotencyKey,
+    finalizeClaim,
     isExpiredReservedDispatch,
     isAvailable: () => Boolean(getClient()),
     listAcceptedMessages,
@@ -801,9 +1125,13 @@ module.exports = {
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS,
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS,
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC,
+  MAILBOX_FINALIZE_PRE_DISPATCH_RPC,
+  MAILBOX_START_PRE_DISPATCH_RPC,
   MAILBOX_SEND_PROVENANCE_TABLE,
   MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS,
+  MAILBOX_SEND_PRE_DISPATCH_CLAIM_LEASE_MS,
   MAILBOX_SEND_RESERVATION_LEASE_MS,
+  createMailboxAttachmentsMetadataFromContent,
   createMailboxAttachmentsFingerprint,
   createMailboxPayloadFingerprint,
   createMailboxRequestPayloadFingerprint,
