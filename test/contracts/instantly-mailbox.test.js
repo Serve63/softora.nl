@@ -1651,6 +1651,73 @@ test('reply uses the exact stored account/thread and rejects cross-owner, recipi
   assert.equal(store.rows.some((message) => message.providerMessageId === 'sent-reply-1'), true);
 });
 
+test('reply roept providerstartcallback na validatie en direct vóór de Instantly POST aan', async () => {
+  const events = [];
+  let callbackEvent = null;
+  const { service, store, requests } = buildService({
+    fetchJsonWithTimeout: async (_url, options) => {
+      events.push('provider-post');
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          id: 'sent-after-start-callback',
+          thread_id: 'thread-serve',
+          body: { text: JSON.parse(options.body).body.text },
+          timestamp_created: '2026-07-25T12:00:00.000Z',
+        },
+      };
+    },
+  });
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+
+  await service.reply({
+    owner: 'serve',
+    accountEmail: 'serve-sender@example.com',
+    providerMessageId: 'incoming-serve-1',
+    providerThreadId: 'thread-serve',
+    to: 'prospect@example.org',
+    subject: 'Re: Kleine vraag',
+    text: 'Antwoord met providerstartbewijs.',
+    async onProviderDispatchStarting(event) {
+      callbackEvent = event;
+      events.push('callback');
+    },
+  });
+
+  assert.deepEqual(events, ['callback', 'provider-post']);
+  assert.deepEqual(callbackEvent, {
+    provider: 'instantly',
+    accountEmail: 'serve-sender@example.com',
+    providerMessageId: 'incoming-serve-1',
+    providerThreadId: 'thread-serve',
+    recipientEmail: 'prospect@example.org',
+  });
+  assert.equal(requests.filter((request) => request.url.endsWith('/emails/reply')).length, 1);
+});
+
+test('reply voert exact nul Instantly POST-calls uit wanneer de providerstartcallback faalt', async () => {
+  const callbackError = Object.assign(new Error('durable providerstart kon niet worden bevestigd'), {
+    code: 'TEST_PROVIDER_START_FAILED',
+  });
+  const { service, store, requests } = buildService();
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+
+  await assert.rejects(service.reply({
+    owner: 'serve',
+    accountEmail: 'serve-sender@example.com',
+    providerMessageId: 'incoming-serve-1',
+    providerThreadId: 'thread-serve',
+    to: 'prospect@example.org',
+    subject: 'Re: Kleine vraag',
+    text: 'Dit antwoord mag de provider niet bereiken.',
+    async onProviderDispatchStarting() {
+      throw callbackError;
+    },
+  }), (error) => error === callbackError);
+
+  assert.equal(requests.length, 0);
+});
+
 test('reply reports unavailable provenance instead of a false owner mismatch during index failure', async () => {
   const store = createStore();
   store.getProviderMessage = async () => {

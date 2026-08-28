@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const {
+  withMailboxPreDispatchProvenance,
+} = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
 const crypto = require('node:crypto');
 
 const compose = require('../../assets/premium-mailbox-compose');
@@ -388,6 +391,9 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
   let providerCalls = 0;
   let cleanupCalls = 0;
   let reservedAttachments = null;
+  const expectedMetadata = [0, 1, 2].map((index) => ({
+    filename: `screen-${index}.png`, contentType: 'image/png', size: 2,
+  }));
   const sendMessage = createMailboxComposeSend({
     outboundRecipientGuardStore: createAllowingSuppressionStore(),
     getAccount: () => ({
@@ -408,7 +414,7 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
     }),
     buildMailboxWebdesignSendParts: async () => null,
     appendSentMessage: async () => true,
-    mailboxSendProvenanceStore: {
+    mailboxSendProvenanceStore: withMailboxPreDispatchProvenance({
       findByIdempotencyKey: async () => null,
       reserve: async (input) => {
         reservedAttachments = input.attachments;
@@ -417,11 +423,9 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
       startDispatch: async () => {},
       accept: async (intentId, values) => ({ intentId, status: 'accepted', messageId: values.messageId }),
       fail: async () => null,
-    },
+    }),
     mailboxAttachmentService: {
-      inspectAttachments: () => [0, 1, 2].map((index) => ({
-        filename: `screen-${index}.png`, contentType: 'image/png', size: 2,
-      })),
+      inspectAttachments: () => expectedMetadata,
       downloadAttachments: async () => [1, 2, 3].map((_, index) => ({
         filename: `screen-${index}.png`, contentType: 'image/png', content: Buffer.from([index * 2 + 1, index * 2 + 2]), contentDisposition: 'attachment',
       })),
@@ -438,6 +442,7 @@ test('compose send resolveert signed references naar echte MIME-bytes en roept d
       { reference: 'signed-2', filename: 'screen-1.png', contentType: 'image/png', size: 2 },
       { reference: 'signed-3', filename: 'screen-2.png', contentType: 'image/png', size: 2 },
     ],
+    expectedAttachmentsMetadata: expectedMetadata,
     threadProvenance: {
       intentId: 'send:attachment-test', idempotencyKey: 'attachment-test', owner: 'serve', accountEmail: 'serve@softora.nl',
       recipientEmail: 'prospect@example.nl', senderName: 'Servé Creusen', mode: 'new-message', conversationId: '',
@@ -515,13 +520,13 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
     truncateText: (value, max) => String(value || '').slice(0, max),
     createTransport: () => ({ sendMail: async () => { providerCalls += 1; } }),
     buildMailboxWebdesignSendParts: async () => null,
-    mailboxSendProvenanceStore: {
+    mailboxSendProvenanceStore: withMailboxPreDispatchProvenance({
       findByIdempotencyKey: async () => acceptedIntent,
       reserve: async () => {
         reserveCalls += 1;
         throw new Error('accepted replay mag niet opnieuw reserveren');
       },
-    },
+    }),
     mailboxAttachmentService: {
       inspectAttachments: (attachmentInputs) => [{
         filename: 'bewijs.pdf',
@@ -566,6 +571,7 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
       contentType: 'text/plain',
       size: 999,
     }],
+    expectedAttachmentsMetadata: acceptedIntent.attachmentsMetadata,
     threadProvenance,
   });
 
@@ -594,6 +600,9 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
         attachments: [{
           reference: 'different-content', filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4,
         }],
+        expectedAttachmentsMetadata: [{
+          filename: 'bewijs.pdf', contentType: 'application/pdf', size: 3,
+        }],
       },
     },
   ];
@@ -611,6 +620,7 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
         contentType: 'application/pdf',
         size: 4,
       }],
+      expectedAttachmentsMetadata: acceptedIntent.attachmentsMetadata,
       threadProvenance,
       ...overrides,
     }), (error) => {
@@ -666,6 +676,7 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
         contentType: 'application/pdf',
         size: 4,
       }],
+      expectedAttachmentsMetadata: acceptedIntent.attachmentsMetadata,
       threadProvenance: { ...threadProvenance, ...mismatch.provenance },
     }), (error) => {
       assert.equal(error.code, 'MAILBOX_SEND_IDEMPOTENCY_CONTEXT_MISMATCH', mismatch.label);
@@ -679,7 +690,7 @@ test('accepted attachment-replay gebruikt HMAC-metadata zonder Storage en eist e
   assert.equal(cleanupCalls, 1, 'alleen de geldige replay ruimt de stagingreference op');
 });
 
-test('ongeldige signed attachment wordt vóór provenance/provider afgewezen', async () => {
+test('ongeldige signed attachment wordt na vroege claim vóór provider afgewezen', async () => {
   let providerCalls = 0;
   let reserveCalls = 0;
   const sendMessage = createMailboxComposeSend({
@@ -692,21 +703,24 @@ test('ongeldige signed attachment wordt vóór provenance/provider afgewezen', a
     createTransport: () => ({ sendMail: async () => { providerCalls += 1; } }),
     buildMailboxWebdesignSendParts: async () => null,
     appendSentMessage: async () => true,
-    mailboxSendProvenanceStore: {
+    mailboxSendProvenanceStore: withMailboxPreDispatchProvenance({
       findByIdempotencyKey: async () => null,
       reserve: async () => { reserveCalls += 1; return { created: true, intent: {} }; },
-    },
+    }),
     mailboxAttachmentService: {
-      inspectAttachments: () => { throw Object.assign(new Error('bad reference'), { code: 'MAILBOX_ATTACHMENT_REFERENCE_INVALID', status: 400 }); },
-      downloadAttachments: async () => { throw new Error('Storage mag niet starten na ongeldige reference'); },
+      inspectAttachments: () => [],
+      downloadAttachments: async () => { throw Object.assign(new Error('bad reference'), { code: 'MAILBOX_ATTACHMENT_REFERENCE_INVALID', status: 400 }); },
     },
   });
   await assert.rejects(sendMessage({
     accountEmail: 'serve@softora.nl', to: 'prospect@example.nl', subject: 'x', text: 'y', attachments: [{ reference: 'bad' }],
+    expectedAttachmentsMetadata: [{
+      filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
+    }],
     threadProvenance: { intentId: 'send:bad', idempotencyKey: 'bad', owner: 'serve', accountEmail: 'serve@softora.nl', recipientEmail: 'prospect@example.nl', mode: 'new-message', provider: 'smtp' },
   }), /bad reference/);
   assert.equal(providerCalls, 0);
-  assert.equal(reserveCalls, 0);
+  assert.equal(reserveCalls, 1);
 });
 
 test('clientfouten blijven menselijk en send-payload wordt vóór de platformlimiet begrensd', () => {

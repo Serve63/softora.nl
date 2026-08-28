@@ -391,7 +391,7 @@ function createInstantlyMailboxService(deps = {}) {
         detail || `Instantly gaf HTTP ${status}.`,
         status === 429 ? 'INSTANTLY_RATE_LIMITED' : 'INSTANTLY_API_FAILED',
         status === 429 ? 429 : 502,
-        { providerStatus: status }
+        { mailboxProviderResponseReceived: true, providerStatus: status }
       );
     }
     return data;
@@ -1003,6 +1003,7 @@ function createInstantlyMailboxService(deps = {}) {
     cc,
     bcc,
     attachments,
+    onProviderDispatchStarting,
   } = {}) {
     const selectedOwner = assertOwner(owner);
     assertConfigured();
@@ -1041,7 +1042,7 @@ function createInstantlyMailboxService(deps = {}) {
     }
     const ccAddresses = normalizeRecipientInput(cc, 'CC');
     const bccAddresses = normalizeRecipientInput(bcc, 'BCC');
-    const response = await apiRequest('emails/reply', {
+    const providerRequest = {
       method: 'POST',
       body: {
         eaccount: account,
@@ -1051,7 +1052,17 @@ function createInstantlyMailboxService(deps = {}) {
         cc_address_email_list: ccAddresses.join(','),
         bcc_address_email_list: bccAddresses.join(','),
       },
-    });
+    };
+    if (typeof onProviderDispatchStarting === 'function') {
+      await onProviderDispatchStarting({
+        provider: 'instantly',
+        accountEmail: account,
+        providerMessageId: stored.providerMessageId,
+        providerThreadId: stored.providerThreadId,
+        recipientEmail: expectedRecipient,
+      });
+    }
+    const response = await apiRequest('emails/reply', providerRequest);
     const rawSent = response?.email || response?.data || response;
     return finalizeInstantlyAcceptedReply({
       rawSent, stored, account, owner: selectedOwner,

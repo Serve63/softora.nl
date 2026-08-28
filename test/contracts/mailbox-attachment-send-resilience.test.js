@@ -1,11 +1,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const { createMailboxComposeSend } = require('../../server/services/mailbox-compose-send');
 const {
   createMailboxPayloadFingerprint,
   createMailboxRequestPayloadFingerprint,
 } = require('../../server/services/mailbox-send-provenance-store');
+const {
+  withMailboxPreDispatchProvenance,
+} = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
 
 function threadProvenance(overrides = {}) {
   return {
@@ -53,7 +57,7 @@ function acceptedIntent(overrides = {}) {
 }
 
 function dependencies(overrides = {}) {
-  return {
+  const result = {
     getAccount: () => ({
       email: 'serve@softora.nl', name: 'Servé Creusen', smtpConfigured: true,
       smtpIdentityMatches: true, smtpHost: 'smtp.example.test', smtpPort: 465,
@@ -73,6 +77,10 @@ function dependencies(overrides = {}) {
     logger: { warn() {}, error() {} },
     ...overrides,
   };
+  result.mailboxSendProvenanceStore = withMailboxPreDispatchProvenance(
+    overrides.mailboxSendProvenanceStore
+  );
+  return result;
 }
 
 function input(overrides = {}) {
@@ -176,9 +184,13 @@ test('legacy accepted attachmentsMetadata null faalt gesloten en wordt nooit als
   assert.equal(providerCalls, 0);
 });
 
-test('proof-gebonden signed references wijken nooit af vóór download, reserve of provider', async (t) => {
-  const expected = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
-  for (const [label, inspected, expectedMetadata, inspectError] of [
+test('proof-gebonden signed references worden na claim bytevast gecontroleerd vóór guards of provider', async (t) => {
+  const bytes = Buffer.from([1, 2, 3, 4]);
+  const expected = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: bytes.length,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+  }];
+  for (const [label, downloadedMetadata, expectedMetadata, downloadError] of [
     ['swapped reference', [{ filename: 'ander.pdf', contentType: 'application/pdf', size: 4 }], expected, null],
     ['filename', [{ filename: 'gewijzigd.pdf', contentType: 'application/pdf', size: 4 }], expected, null],
     ['content type', [{ filename: 'bewijs.png', contentType: 'image/png', size: 4 }], expected, null],
@@ -189,31 +201,44 @@ test('proof-gebonden signed references wijken nooit af vóór download, reserve 
     })],
   ]) {
     await t.test(label, async () => {
-      const calls = { inspect: 0, download: 0, find: 0, builder: 0, reserve: 0, provider: 0 };
+      const calls = {
+        inspect: 0, download: 0, find: 0, builder: 0, reserve: 0, provider: 0, cleanup: 0,
+      };
       const send = createMailboxComposeSend(dependencies({
         buildMailboxWebdesignSendParts: async () => { calls.builder += 1; return null; },
         createTransport: () => ({ sendMail: async () => { calls.provider += 1; } }),
         mailboxSendProvenanceStore: {
           findByIdempotencyKey: async () => { calls.find += 1; return null; },
-          reserve: async () => { calls.reserve += 1; throw new Error('reserve mag niet starten'); },
+          reserve: async (values) => {
+            calls.reserve += 1;
+            return { created: true, intent: values };
+          },
         },
         mailboxAttachmentService: {
           inspectAttachments() {
             calls.inspect += 1;
-            if (inspectError) throw inspectError;
-            return inspected;
+            throw new Error('inspect mag niet tussen claim en download worden gebruikt');
           },
-          downloadAttachments: async () => { calls.download += 1; return []; },
+          async downloadAttachments() {
+            calls.download += 1;
+            if (downloadError) throw downloadError;
+            return downloadedMetadata.map((metadata) => ({
+              ...metadata,
+              content: metadata.size === 4 ? bytes : Buffer.from([1, 2, 3, 4, 5]),
+              contentDisposition: 'attachment',
+            }));
+          },
+          cleanupAttachments: async () => { calls.cleanup += 1; },
         },
       }));
       await assert.rejects(send(input({
         attachments: [{ reference: `signed-${label}` }],
         expectedAttachmentsMetadata: expectedMetadata,
-      })), (error) => inspectError
-        ? error.code === inspectError.code
+      })), (error) => downloadError
+        ? error.code === downloadError.code
         : error.code === 'MAILBOX_ATTACHMENT_METADATA_MISMATCH');
       assert.deepEqual(calls, {
-        inspect: 1, download: 0, find: 0, builder: 0, reserve: 0, provider: 0,
+        inspect: 0, download: 1, find: 1, builder: 1, reserve: 1, provider: 0, cleanup: 1,
       });
     });
   }
@@ -223,7 +248,10 @@ test('v2 bytehash-mismatch stopt na download maar vóór suppression, reserve en
   const metadata = [{
     filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4, sha256: 'a'.repeat(64),
   }];
-  const calls = { inspect: 0, find: 0, builder: 0, download: 0, suppression: 0, reserve: 0, provider: 0 };
+  const calls = {
+    inspect: 0, find: 0, builder: 0, download: 0, suppression: 0,
+    reserve: 0, provider: 0, cleanup: 0,
+  };
   const send = createMailboxComposeSend(dependencies({
     buildMailboxWebdesignSendParts: async () => { calls.builder += 1; return null; },
     createTransport: () => ({ sendMail: async () => { calls.provider += 1; } }),
@@ -235,7 +263,10 @@ test('v2 bytehash-mismatch stopt na download maar vóór suppression, reserve en
     },
     mailboxSendProvenanceStore: {
       findByIdempotencyKey: async () => { calls.find += 1; return null; },
-      reserve: async () => { calls.reserve += 1; throw new Error('reserve mag niet starten'); },
+      reserve: async (values) => {
+        calls.reserve += 1;
+        return { created: true, intent: values };
+      },
     },
     mailboxAttachmentService: {
       inspectAttachments() { calls.inspect += 1; return metadata; },
@@ -245,6 +276,7 @@ test('v2 bytehash-mismatch stopt na download maar vóór suppression, reserve en
           code: 'MAILBOX_ATTACHMENT_SHA256_MISMATCH', status: 409,
         });
       },
+      cleanupAttachments: async () => { calls.cleanup += 1; },
     },
   }));
 
@@ -253,14 +285,18 @@ test('v2 bytehash-mismatch stopt na download maar vóór suppression, reserve en
     expectedAttachmentsMetadata: metadata,
   })), (error) => error.code === 'MAILBOX_ATTACHMENT_SHA256_MISMATCH' && error.status === 409);
   assert.deepEqual(calls, {
-    inspect: 1, find: 2, builder: 1, download: 1,
-    suppression: 0, reserve: 0, provider: 0,
+    inspect: 0, find: 1, builder: 1, download: 1,
+    suppression: 0, reserve: 1, provider: 0, cleanup: 1,
   });
 });
 
 test('definitieve SMTP 550 plus mislukte fail-persist houdt dezelfde staging en blokkeert iedere retry-providercall', async () => {
-  const metadata = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
-  const resolved = [{ ...metadata[0], content: Buffer.from([1, 2, 3, 4]), contentDisposition: 'attachment' }];
+  const content = Buffer.from([1, 2, 3, 4]);
+  const metadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: content.length,
+    sha256: crypto.createHash('sha256').update(content).digest('hex'),
+  }];
+  const resolved = [{ ...metadata[0], content, contentDisposition: 'attachment' }];
   let intent = null;
   let providerCalls = 0;
   let downloadCalls = 0;
@@ -291,7 +327,9 @@ test('definitieve SMTP 550 plus mislukte fail-persist houdt dezelfde staging en 
       cleanupAttachments: async () => { cleanupCalls += 1; },
     },
   }));
-  const sendInput = input({ attachments: [{ reference: 'same-staged-reference' }] });
+  const sendInput = input({
+    attachments: [{ reference: 'same-staged-reference' }], expectedAttachmentsMetadata: metadata,
+  });
 
   await assert.rejects(send(sendInput), (error) => (
     error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED'
@@ -311,8 +349,12 @@ test('definitieve SMTP 550 plus mislukte fail-persist houdt dezelfde staging en 
 });
 
 test('tijdelijke Nodemailer ECONNECTION wordt unknown en een retry start nooit een tweede provider', async () => {
-  const metadata = [{ filename: 'bewijs.pdf', contentType: 'application/pdf', size: 4 }];
-  const resolved = [{ ...metadata[0], content: Buffer.from([1, 2, 3, 4]), contentDisposition: 'attachment' }];
+  const content = Buffer.from([1, 2, 3, 4]);
+  const metadata = [{
+    filename: 'bewijs.pdf', contentType: 'application/pdf', size: content.length,
+    sha256: crypto.createHash('sha256').update(content).digest('hex'),
+  }];
+  const resolved = [{ ...metadata[0], content, contentDisposition: 'attachment' }];
   let intent = null;
   let providerCalls = 0;
   let downloadCalls = 0;
@@ -352,7 +394,9 @@ test('tijdelijke Nodemailer ECONNECTION wordt unknown en een retry start nooit e
       cleanupAttachments: async () => { cleanupCalls += 1; },
     },
   }));
-  const sendInput = input({ attachments: [{ reference: 'same-econnection-staging' }] });
+  const sendInput = input({
+    attachments: [{ reference: 'same-econnection-staging' }], expectedAttachmentsMetadata: metadata,
+  });
 
   await assert.rejects(send(sendInput), (error) => (
     error.code === 'MAILBOX_SEND_RECONCILE_REQUIRED' && error.cause?.code === 'ECONNECTION'
@@ -369,7 +413,7 @@ test('tijdelijke Nodemailer ECONNECTION wordt unknown en een retry start nooit e
   assert.equal(cleanupCalls, 0);
 });
 
-test('legacy reserved expiry bereikt alleen na de gedeelde bounded lease het reserve-herstelpad', async () => {
+test('legacy reserved expiry wordt duurzaam gesloten en dezelfde verzend-ID wordt nooit hergebruikt', async () => {
   const nowValue = new Date('2026-08-27T16:00:00.000Z');
   function legacyIntent(updatedAt) {
     return {
@@ -396,8 +440,17 @@ test('legacy reserved expiry bereikt alleen na de gedeelde bounded lease het res
       }),
       mailboxSendProvenanceStore: {
         findByIdempotencyKey: async () => existingIntent,
-        async reserve(values) {
+        claimPreDispatch: async () => {
           reserveCalls += 1;
+          const expired = Date.parse(existingIntent.updatedAt) + 30_000 <= nowValue.getTime();
+          return {
+            created: false,
+            intent: expired
+              ? { ...existingIntent, status: 'failed', dispatchState: 'finished' }
+              : existingIntent,
+          };
+        },
+        async reserve(values) {
           return { created: true, intent: { ...values, status: 'prepared', dispatchState: 'reserved' } };
         },
         startDispatch: async () => {},
@@ -412,10 +465,10 @@ test('legacy reserved expiry bereikt alleen na de gedeelde bounded lease het res
   }
 
   const expired = harness(legacyIntent('2026-08-27T15:59:29.000Z'));
-  await expired.send(input());
-  assert.deepEqual(expired.counts(), { reserveCalls: 1, providerCalls: 1, builderCalls: 1 });
+  await assert.rejects(expired.send(input()), (error) => error.code === 'MAILBOX_SEND_PREVIOUSLY_FAILED');
+  assert.deepEqual(expired.counts(), { reserveCalls: 1, providerCalls: 0, builderCalls: 0 });
 
   const active = harness(legacyIntent('2026-08-27T15:59:31.000Z'));
   await assert.rejects(active.send(input()), (error) => error.code === 'MAILBOX_SEND_ALREADY_PROCESSING');
-  assert.deepEqual(active.counts(), { reserveCalls: 0, providerCalls: 0, builderCalls: 0 });
+  assert.deepEqual(active.counts(), { reserveCalls: 1, providerCalls: 0, builderCalls: 0 });
 });

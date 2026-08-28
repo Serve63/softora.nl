@@ -24,6 +24,9 @@ const {
 const {
   createMailboxSyncLegacyStore,
 } = require('../testlib/mailbox-sync-legacy');
+const {
+  withMailboxPreDispatchProvenance,
+} = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -37,7 +40,7 @@ function createMailboxService(deps = {}) {
   )
     ? deps.outboundRecipientGuardStore
     : { findRecipientSuppressionConflict: async () => ({ ok: true, conflict: null }) };
-  const mailboxSendProvenanceStore = deps.mailboxSendProvenanceStore || {
+  const rawMailboxSendProvenanceStore = deps.mailboxSendProvenanceStore || {
     findByIdempotencyKey: async () => null,
     reserve: async (payload) => {
       const existing = intents.get(payload.idempotencyKey);
@@ -55,6 +58,9 @@ function createMailboxService(deps = {}) {
     fail: async () => null,
     listAcceptedMessages: async () => [],
   };
+  const mailboxSendProvenanceStore = withMailboxPreDispatchProvenance(
+    rawMailboxSendProvenanceStore
+  );
   const mailboxComposeThreadContext = deps.mailboxComposeThreadContext || {
     resolveReplyIdentity: async ({ body = {}, accountEmail, provider, mode }) => {
       const resolvedAccount = body.replyIdentity?.accountEmail || body.context?.accountEmail || accountEmail;
@@ -212,6 +218,10 @@ function createOutboundGuardStore(calls = [], overrides = {}) {
       if (overrides.confirmError) throw overrides.confirmError;
       if (overrides.confirmResult) return overrides.confirmResult;
       return { ok: true, count: 4 };
+    },
+    releaseReservation: async (reservationId) => {
+      calls.push({ type: 'release', reservationId });
+      return { ok: true };
     },
   };
 }
@@ -919,8 +929,8 @@ test('mailbox service blocks manual webdesign sends before SMTP when the central
   );
 
   assert.equal(sent.length, 0);
-  assert.equal(guardCalls.length, 1);
-  assert.equal(guardCalls[0].type, 'reserve');
+  assert.deepEqual(guardCalls.map((call) => call.type), ['reserve', 'release']);
+  assert.equal(guardCalls[1].reservationId, guardCalls[0].options.reservationId);
 });
 
 test('mailbox service guards webdesign sends even when the copy uses preview wording', async () => {
@@ -981,8 +991,7 @@ test('mailbox service guards webdesign sends even when the copy uses preview wor
   );
 
   assert.equal(sent.length, 0);
-  assert.equal(guardCalls.length, 1);
-  assert.equal(guardCalls[0].type, 'reserve');
+  assert.deepEqual(guardCalls.map((call) => call.type), ['reserve', 'release']);
   assert.equal(guardCalls[0].items[0].recipientEmail, 'info@previewcopy.example');
   assert.equal(guardCalls[0].items[0].recipientDomain, 'previewcopy.example');
 });

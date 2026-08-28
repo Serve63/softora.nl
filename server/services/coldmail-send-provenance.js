@@ -2,10 +2,13 @@
 
 const {
   createMailboxReconcileRequiredError,
-  isAmbiguousMailboxProviderError,
+  isDefinitiveMailboxProviderRejection,
 } = require('./mailbox-send-provenance-store');
 const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-reconciliation');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const COLDMAIL_GENERIC_SERVE_SENDERS = new Set([
+  'info@softora.nl', 'zakelijk@softora.nl', 'ruben@softora.nl',
+]);
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -13,6 +16,11 @@ function normalizeText(value) {
 
 function normalizeEmail(value) {
   return normalizeText(value).toLowerCase();
+}
+
+function getColdmailOwner(email) {
+  return getOutboundSenderIdentity(email)?.profileKey
+    || (COLDMAIL_GENERIC_SERVE_SENDERS.has(normalizeEmail(email)) ? 'serve' : '');
 }
 
 function createMismatchError(message) {
@@ -24,13 +32,13 @@ function createMismatchError(message) {
 function createColdmailSendProvenance(deps = {}) {
   const {
     store = null,
-    getOwner = (email) => getOutboundSenderIdentity(email)?.profileKey || '',
+    getOwner = getColdmailOwner,
     getSenderName = (email) => getOutboundSenderIdentity(email)?.name || email,
     logger = console,
   } = deps;
 
   async function reserve(input = {}) {
-    if (!store) return null;
+    if (!store) throw createMismatchError('Duurzame coldmail-sendprovenance is niet beschikbaar.');
     const reservationId = normalizeText(input.reservationId);
     const accountEmail = normalizeEmail(input.accountEmail);
     const recipientEmail = normalizeEmail(input.recipientEmail);
@@ -39,7 +47,7 @@ function createColdmailSendProvenance(deps = {}) {
       throw createMismatchError('Coldmail-send mist een exacte reservering, eigenaar of mailboxidentiteit.');
     }
     const intentId = `coldmail:${reservationId}`;
-    const reservation = await store.reserve({
+    const provenanceInput = {
       intentId,
       idempotencyKey: intentId,
       owner,
@@ -54,22 +62,42 @@ function createColdmailSendProvenance(deps = {}) {
       cc: normalizeText(input.cc),
       bcc: normalizeText(input.bcc),
       attachments: Array.isArray(input.attachments) ? input.attachments : [],
-    });
-    if (!reservation.created) {
+    };
+    if (typeof store.claimPreDispatch !== 'function'
+      || typeof store.finalizeClaim !== 'function'
+      || typeof store.failPreDispatch !== 'function') {
+      throw createMismatchError('Coldmail-send mist de duurzame pre-dispatchclaim.');
+    }
+    const claim = await store.claimPreDispatch(provenanceInput);
+    if (!claim.created) {
       throw createMismatchError('Coldmail-sendprovenance bestond al vóór deze providerdispatch.');
     }
-    return { intentId, accountEmail, recipientEmail };
+    let finalClaim;
+    try {
+      finalClaim = await store.finalizeClaim(claim, provenanceInput);
+    } catch (error) {
+      await store.failPreDispatch(claim, error).catch((claimError) => {
+        logger.error('[ColdmailSendProvenance][FailPreDispatch]', claimError?.message || claimError);
+      });
+      throw error;
+    }
+    return { intentId, accountEmail, recipientEmail, preDispatchHandle: finalClaim };
   }
 
   async function startDispatch(intent) {
-    const intentId = normalizeText(intent && intent.intentId);
-    if (intentId && store && typeof store.startDispatch === 'function') await store.startDispatch(intentId);
+    const handle = intent && intent.preDispatchHandle;
+    if (handle && store && typeof store.startDispatch === 'function') {
+      await store.startDispatch(handle);
+    } else if (intent) {
+      throw createMismatchError('Coldmail-providerdispatch mist het definitieve claimtoken.');
+    }
     return intent;
   }
 
   async function fail(intent, errorValue, options = {}) {
     const intentId = normalizeText(intent && intent.intentId);
-    const ambiguous = options.providerDispatchStarted === true && isAmbiguousMailboxProviderError(errorValue);
+    const ambiguous = options.providerDispatchStarted === true
+      && !isDefinitiveMailboxProviderRejection(errorValue);
     if (ambiguous) {
       if (intentId && store && typeof store.markUnknown === 'function') {
         try {
@@ -84,9 +112,42 @@ function createColdmailSendProvenance(deps = {}) {
       return { ambiguous: false, error: errorValue };
     }
     try {
-      await store.fail(intentId, errorValue);
+      if (options.providerDispatchStarted !== true && intent?.preDispatchHandle
+        && typeof store.failPreDispatch === 'function') {
+        const committedStartIntent = errorValue?.code === 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED'
+          && normalizeText(errorValue?.intent?.intentId) === intentId
+          && normalizeText(errorValue?.intent?.dispatchState).toLowerCase() === 'started'
+          ? errorValue.intent
+          : null;
+        const abortHandle = committedStartIntent
+          ? { intent: committedStartIntent, finalToken: committedStartIntent.transitionToken }
+          : intent.preDispatchHandle;
+        const failed = await store.failPreDispatch(abortHandle, errorValue);
+        if (failed?.status !== 'failed' || failed?.dispatchState !== 'finished') {
+          throw createMismatchError('Coldmail-stop vóór providerdispatch kon niet duurzaam worden bevestigd.');
+        }
+      } else {
+        const failed = await store.fail(intentId, errorValue);
+        if (failed?.status !== 'failed' || failed?.dispatchState !== 'finished') {
+          throw createMismatchError('Coldmail-providerfout kon niet duurzaam worden afgesloten.');
+        }
+      }
     } catch (error) {
       logger.error('[ColdmailSendProvenance][Fail]', error?.message || error);
+      if (options.providerDispatchStarted === true) {
+        return { ambiguous: true, error: createMailboxReconcileRequiredError(error) };
+      }
+      if (options.providerDispatchStarted !== true && intent?.preDispatchHandle) {
+        const existing = typeof store.findByIdempotencyKey === 'function'
+          ? await store.findByIdempotencyKey(intentId).catch(() => null)
+          : null;
+        const safelyFailed = existing?.intentId === intentId
+          && existing?.status === 'failed'
+          && existing?.dispatchState === 'finished';
+        if (!safelyFailed) {
+          return { ambiguous: true, error: createMailboxReconcileRequiredError(error) };
+        }
+      }
     }
     return { ambiguous: false, error: errorValue };
   }
@@ -175,7 +236,7 @@ function createColdmailSendDurability(deps = {}) {
     store = null,
     outboundRecipientGuardStore = null,
     dataOpsStore = null,
-    getOwner = (email) => getOutboundSenderIdentity(email)?.profileKey || '',
+    getOwner = getColdmailOwner,
     getSenderName = (email) => getOutboundSenderIdentity(email)?.name || email,
     getSenderEmails = () => [],
     runPersistenceStep = async (_label, action) => action(),
@@ -208,6 +269,9 @@ function createColdmailSendDurability(deps = {}) {
       intent = options.provenanceInput
         ? await provenance.reserve(options.provenanceInput)
         : null;
+      if (typeof options.beforeStartDispatch === 'function') {
+        await options.beforeStartDispatch({ intent });
+      }
       await provenance.startDispatch(intent);
       providerDispatchStarted = true;
       const info = await options.sendProvider();
@@ -219,7 +283,11 @@ function createColdmailSendDurability(deps = {}) {
         : [];
       const recipientEmail = normalizeAddress(options.recipientEmail);
       if (rejected.includes(recipientEmail) || (Array.isArray(info && info.accepted) && !accepted.length)) {
-        throw new Error('SMTP accepteerde de ontvanger niet.');
+        const rejection = new Error('SMTP accepteerde de ontvanger niet.');
+        rejection.code = 'SMTP_RECIPIENT_REJECTED';
+        rejection.mailboxProviderResponseReceived = true;
+        rejection.mailboxDefinitiveProviderRejection = true;
+        throw rejection;
       }
       return { accepted, info, intent, rejected };
     } catch (error) {

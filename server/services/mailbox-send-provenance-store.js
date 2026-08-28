@@ -6,6 +6,11 @@ const {
   MAILBOX_SEND_PRE_DISPATCH_CLAIM_LEASE_MS,
   createMailboxSendPreDispatchClaim,
 } = require('./mailbox-send-pre-dispatch-claim');
+const {
+  MAILBOX_EXPIRE_RESERVED_PRE_DISPATCH_RPC,
+  MAILBOX_EXPIRE_STARTED_PRE_DISPATCH_RPC,
+  createMailboxSendProvenanceExpiry,
+} = require('./mailbox-send-provenance-expiry');
 const MAILBOX_SEND_PROVENANCE_TABLE = 'softora_mailbox_send_provenance';
 const MAILBOX_SEND_PROVENANCE_CLIENT_TIMEOUT_MS = 8_000;
 const MAILBOX_SEND_PROVENANCE_MAX_ATTEMPTS = 2;
@@ -167,6 +172,21 @@ function isAmbiguousMailboxProviderError(error) {
   return ['ETIMEDOUT', 'ESOCKET', 'ECONNECTION', 'ECONNRESET', 'ECONNABORTED', 'EPIPE'].includes(code)
     || status === 429
     || status >= 500;
+}
+
+function isDefinitiveMailboxProviderRejection(error) {
+  const smtpResponseCode = Number(error?.responseCode);
+  if (Number.isInteger(smtpResponseCode)
+    && smtpResponseCode >= 500 && smtpResponseCode < 600) return true;
+
+  if (error?.mailboxProviderResponseReceived !== true) return false;
+  if (error?.mailboxDefinitiveProviderRejection === true) return true;
+
+  const providerStatus = Number(error?.providerStatus);
+  return Number.isInteger(providerStatus)
+    && providerStatus >= 400
+    && providerStatus < 500
+    && ![408, 409, 425, 429].includes(providerStatus);
 }
 
 function isTransientMailboxProvenanceError(error) {
@@ -355,12 +375,6 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return result.data ? normalizeRow(result.data) : null;
   }
 
-  function isExpiredStartedDispatch(intent) {
-    const leaseExpiresAtMs = Date.parse(normalizeString(intent?.dispatchLeaseExpiresAt));
-    return intent?.status === 'prepared' && intent?.dispatchState === 'started'
-      && Number.isFinite(leaseExpiresAtMs) && leaseExpiresAtMs <= now().getTime();
-  }
-
   function getReservationLeaseMs() {
     return Math.max(5_000, Math.min(120_000, Number(reservationLeaseMs) || MAILBOX_SEND_RESERVATION_LEASE_MS));
   }
@@ -428,14 +442,18 @@ function createMailboxSendProvenanceStore(deps = {}) {
     return { ...filters, dispatchState: 'started' };
   }
 
-  async function reconcileExpiredStartedDispatch(intent) {
-    if (!isExpiredStartedDispatch(intent)) return intent;
-    const error = new Error('De dispatchlease is verlopen; de provideruitkomst moet eerst worden gereconcilieerd.');
-    error.code = 'MAILBOX_SEND_DISPATCH_LEASE_EXPIRED';
-    return markUnknown(intent.intentId, error, {
-      sentReconcileRequired: true, expectedDispatchLeaseExpiresAt: intent.dispatchLeaseExpiresAt,
-    });
-  }
+  const {
+    reconcileExpiredReservedDispatch,
+    reconcileExpiredStartedDispatch,
+  } = createMailboxSendProvenanceExpiry({
+    createRequiredTransitionToken,
+    createUpdateError,
+    findByIntentId,
+    firstRpcRow,
+    normalizeRow,
+    runCriticalQuery,
+    sameTimestamp,
+  });
 
   async function findReservationConflict(row) {
     const byIdempotency = await findByIdempotencyKey(row.idempotency_key);
@@ -481,25 +499,8 @@ function createMailboxSendProvenanceStore(deps = {}) {
       throw error;
     }
     existing = await reconcileExpiredStartedDispatch(existing);
-    if (!isExpiredReservedDispatch(existing)) return existing;
-    try {
-      return (await releaseExpiredReserved(existing)).intent;
-    } catch (error) {
-      let current = null;
-      try {
-        current = await findByIdempotencyKey(normalizedKey);
-      } catch (readError) {
-        error.recoveryError = readError;
-        throw error;
-      }
-      if (!current) {
-        const reconcileError = createMailboxReconcileRequiredError(error);
-        reconcileError.code = 'MAILBOX_SEND_RECONCILE_REQUIRED';
-        throw reconcileError;
-      }
-      if (matchesTransitionFilters(current, exactReservedCasFilters(existing))) throw error;
-      return reconcileExpiredStartedDispatch(current);
-    }
+    existing = await reconcileExpiredReservedDispatch(existing);
+    return reconcileExpiredStartedDispatch(existing);
   }
 
   async function reservePreparedRow(row, options = {}) {
@@ -560,12 +561,13 @@ function createMailboxSendProvenanceStore(deps = {}) {
         error.recoveryError = readError;
         throw error;
       }
-      if (existing && isExpiredReservedDispatch(existing)) {
-        if (options.renewExpired === false) return { created: false, intent: existing };
-        const recovered = await recoverExpiredReserved(existing, row, reservationToken);
-        if (recovered.created === true) return { created: true, intent: recovered.intent };
-        if (recovered.released === true && attempt === 0) continue;
-        if (recovered.intent) return { created: false, intent: recovered.intent };
+      if (existing?.status === 'prepared' && existing?.dispatchState === 'reserved') {
+        const sameIdempotencyKey = existing.idempotencyKey === normalizeString(row.idempotency_key);
+        const reconciled = await reconcileExpiredReservedDispatch(existing);
+        if (sameIdempotencyKey) return { created: false, intent: reconciled };
+        if (reconciled?.status === 'failed' && reconciled?.dispatchState === 'finished'
+          && attempt === 0) continue;
+        return { created: false, intent: reconciled };
       }
       if (existing) return { created: false, intent: existing };
       if (attempt === 0 && isTransientMailboxProvenanceError(lastError)) {
@@ -711,48 +713,6 @@ function createMailboxSendProvenanceStore(deps = {}) {
       throw createUpdateError(lastError, label);
     }
     throw createUpdateError(lastError, label);
-  }
-
-  async function renewExpiredReserved(existing, row, reservationToken) {
-    if (existing.idempotencyKey !== normalizeString(row.idempotency_key)
-      || !matchesReservationPayload(existing, row)) return { created: false, intent: existing };
-    try {
-      const renewed = await updateIntent(existing.intentId, {
-        intent_id: row.intent_id,
-        sent_message_id: row.sent_message_id,
-        status: 'prepared', dispatch_state: 'reserved',
-        dispatch_started_at: null,
-        dispatch_lease_expires_at: row.dispatch_lease_expires_at,
-        reconcile_required: false, sent_reconcile_required: false,
-        error_text: null,
-      }, 'opnieuw gereserveerd', exactReservedCasFilters(existing), {
-        transitionToken: reservationToken, readbackIntentId: row.intent_id,
-      });
-      const created = renewed.transitionToken === reservationToken
-        && renewed.intentId === normalizeString(row.intent_id);
-      return { created, intent: renewed };
-    } catch (error) {
-      const current = await findByIdempotencyKey(row.idempotency_key).catch(() => null);
-      if (current) return { created: false, intent: current };
-      throw error;
-    }
-  }
-
-  async function releaseExpiredReserved(existing) {
-    const released = await updateIntent(existing.intentId, {
-      status: 'failed', dispatch_state: 'finished', dispatch_lease_expires_at: null,
-      error_text: 'De pre-dispatchreservering verliep voordat de provider werd gestart.',
-    }, 'veilig vrijgegeven', exactReservedCasFilters(existing), {
-      isAlreadyApplied: (intent) => intent?.status === 'failed' && intent?.dispatchState === 'finished',
-    });
-    return { released: released?.status === 'failed', intent: released };
-  }
-
-  async function recoverExpiredReserved(existing, row, reservationToken) {
-    if (!isExpiredReservedDispatch(existing)) return { created: false, intent: existing };
-    if (existing.idempotencyKey === normalizeString(row.idempotency_key))
-      return renewExpiredReserved(existing, row, reservationToken);
-    return releaseExpiredReserved(existing);
   }
 
   function firstRpcRow(data) {
@@ -1125,6 +1085,8 @@ module.exports = {
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_IDS,
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_MAX_ROWS,
   MAILBOX_ACCEPTED_PROVENANCE_EVIDENCE_RPC,
+  MAILBOX_EXPIRE_RESERVED_PRE_DISPATCH_RPC,
+  MAILBOX_EXPIRE_STARTED_PRE_DISPATCH_RPC,
   MAILBOX_FINALIZE_PRE_DISPATCH_RPC,
   MAILBOX_START_PRE_DISPATCH_RPC,
   MAILBOX_SEND_PROVENANCE_TABLE,
@@ -1140,6 +1102,7 @@ module.exports = {
   createMailboxSendScopeKey,
   createMailboxReconcileRequiredError,
   isAmbiguousMailboxProviderError,
+  isDefinitiveMailboxProviderRejection,
   isExpiredMailboxReservedDispatch,
   isTransientMailboxProvenanceError,
   mailboxAttachmentsMetadataEqual,

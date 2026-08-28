@@ -10,6 +10,9 @@ const {
   buildAcceptedProvenanceMessage,
 } = require('../../server/services/mailbox-campaign-replies');
 const { createMailboxDiscoveryRepository } = require('../../server/repositories/mailbox-discovery');
+const {
+  withMailboxPreDispatchProvenance,
+} = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
 
 const atomicVisibilityMigration = fs.readFileSync(path.resolve(
   __dirname,
@@ -1589,7 +1592,7 @@ test('coldmailprovenance reserveert vóór dispatch en accepteert alleen exact S
     async fail(intentId, error) { calls.push(['fail', intentId, error.message]); },
   };
   const provenance = createColdmailSendProvenance({
-    store,
+    store: withMailboxPreDispatchProvenance(store),
     getOwner: (accountEmail) => accountEmail === 'serve@softora.nl' ? 'serve' : '',
     getSenderName: () => 'Servé Creusen',
     logger: { error() {} },

@@ -3,12 +3,11 @@ const {
   renderMailboxComposeEmailHtml,
 } = require('./mailbox-compose-email-renderer');
 const {
-  createMailboxAttachmentsFingerprint,
+  createMailboxAttachmentsMetadataFromContent,
   createMailboxPayloadFingerprint,
   createMailboxRequestPayloadFingerprint,
   createMailboxReconcileRequiredError,
-  isAmbiguousMailboxProviderError,
-  isExpiredMailboxReservedDispatch,
+  isDefinitiveMailboxProviderRejection,
   mailboxAttachmentsMetadataEqual,
   normalizeMailboxAttachmentsMetadata,
 } = require('./mailbox-send-provenance-store');
@@ -40,6 +39,7 @@ function createMailboxComposeSend(deps = {}) {
     buildMailboxWebdesignSendParts,
     reserveMailboxWebdesignOutboundRecipient,
     confirmMailboxWebdesignOutboundRecipient,
+    releaseMailboxWebdesignOutboundRecipient,
     appendSentMessage,
     createImapClient,
     nodemailer,
@@ -47,6 +47,7 @@ function createMailboxComposeSend(deps = {}) {
     mailboxSendProvenanceStore,
     outboundRecipientGuardStore,
     mailboxAttachmentService,
+    onProviderDispatchStarting: defaultOnProviderDispatchStarting,
     logger = console,
     now = () => new Date(),
   } = deps;
@@ -364,6 +365,7 @@ function createMailboxComposeSend(deps = {}) {
     attachments,
     expectedAttachmentsMetadata,
     threadProvenance,
+    onProviderDispatchStarting = defaultOnProviderDispatchStarting,
   }) {
     let stagedAttachmentCleanupStarted = false;
     async function cleanupStagedAttachments() {
@@ -406,8 +408,14 @@ function createMailboxComposeSend(deps = {}) {
       error.status = 400;
       throw error;
     }
+    const requiredProvenanceMethods = [
+      'claimPreDispatch', 'failPreDispatch', 'finalizeClaim', 'findByIdempotencyKey',
+      'startDispatch', 'accept', 'fail', 'markUnknown',
+    ];
     if (!threadProvenance || !mailboxSendProvenanceStore
-      || typeof mailboxSendProvenanceStore.findByIdempotencyKey !== 'function') {
+      || requiredProvenanceMethods.some(
+        (method) => typeof mailboxSendProvenanceStore[method] !== 'function'
+      )) {
       const error = new Error('De duurzame threadcontext ontbreekt; verzending is veilig gestopt.');
       error.status = 503;
       error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
@@ -433,49 +441,16 @@ function createMailboxComposeSend(deps = {}) {
       throw error;
     }
 
-    let explicitAttachments = null;
-    let explicitAttachmentMetadata = null;
-    if (referenceCount > 0) {
-      if (!mailboxAttachmentService || typeof mailboxAttachmentService.inspectAttachments !== 'function') {
-        const error = new Error('Bijlagen zijn tijdelijk niet beschikbaar; probeer het opnieuw.');
-        error.status = 503;
-        error.code = 'MAILBOX_ATTACHMENT_STORAGE_UNAVAILABLE';
-        throw error;
-      }
-      explicitAttachmentMetadata = normalizeMailboxAttachmentsMetadata(
-        await mailboxAttachmentService.inspectAttachments(
-          attachmentInputs,
-          threadProvenance,
-          { allowExpired: true }
-        )
-      );
-    } else {
-      explicitAttachments = await normalizeComposeAttachments(attachmentInputs, threadProvenance);
-      explicitAttachmentMetadata = normalizeMailboxAttachmentsMetadata(
-        explicitAttachments.map((attachment) => ({
-          filename: normalizeString(attachment?.filename),
-          contentType: truncateText(normalizeString(attachment?.contentType), 120),
-          size: Buffer.isBuffer(attachment?.content) ? attachment.content.length : 0,
-        }))
-      );
-    }
-    if (explicitAttachmentMetadata === null) {
+    const claimAttachmentMetadata = expectedAttachmentsMetadata === undefined
+      ? createMailboxAttachmentsMetadataFromContent(attachmentInputs)
+      : normalizeMailboxAttachmentsMetadata(expectedAttachmentsMetadata);
+    if (claimAttachmentMetadata === null) {
       const error = new Error('De bijlagemetadata kon niet veilig worden vastgesteld.');
-      error.status = 400;
-      error.code = 'MAILBOX_ATTACHMENT_METADATA_INVALID';
+      error.status = referenceCount > 0 ? 409 : 400;
+      error.code = referenceCount > 0
+        ? 'MAILBOX_SEND_PRE_DISPATCH_ATTACHMENT_CONTEXT_REQUIRED'
+        : 'MAILBOX_ATTACHMENT_METADATA_INVALID';
       throw error;
-    }
-    if (expectedAttachmentsMetadata !== undefined) {
-      const expectedMetadata = normalizeMailboxAttachmentsMetadata(expectedAttachmentsMetadata);
-      if (expectedMetadata === null
-        || !mailboxAttachmentsMetadataEqual(explicitAttachmentMetadata, expectedMetadata)) {
-        const error = new Error(
-          'De gekozen bijlagen wijken af van het vooraf bewezen verzendbewijs; kies de bijlagen opnieuw.'
-        );
-        error.status = 409;
-        error.code = 'MAILBOX_ATTACHMENT_METADATA_MISMATCH';
-        throw error;
-      }
     }
 
     const requestPayload = {
@@ -484,7 +459,7 @@ function createMailboxComposeSend(deps = {}) {
       requestBody: normalizedText,
       cc: normalizedCcText,
       bcc: normalizedBccText,
-      attachmentsMetadata: explicitAttachmentMetadata,
+      attachmentsMetadata: claimAttachmentMetadata,
     };
     function processingError() {
       const error = new Error('Deze verzending wordt al veilig verwerkt; wacht op bevestiging voordat je opnieuw probeert.');
@@ -505,15 +480,6 @@ function createMailboxComposeSend(deps = {}) {
       cause.intentId = intent?.intentId;
       return createMailboxReconcileRequiredError(cause);
     }
-    function preparedReservationExpired(intent) {
-      if (typeof mailboxSendProvenanceStore.isExpiredReservedDispatch === 'function') {
-        return mailboxSendProvenanceStore.isExpiredReservedDispatch(intent);
-      }
-      return isExpiredMailboxReservedDispatch(intent, {
-        normalizeString,
-        nowMs: now().getTime(),
-      });
-    }
     async function handleExistingIntent(intent) {
       if (!intent) return null;
       assertAcceptedReplayContext(intent, threadProvenance, account.email, normalizedTo);
@@ -530,60 +496,139 @@ function createMailboxComposeSend(deps = {}) {
         || (intent.status === 'prepared' && intent.dispatchState === 'started')) {
         throw uncertainDispatchError(intent);
       }
-      if (preparedReservationExpired(intent)) return null;
       throw processingError();
     }
 
-    async function findExistingIntent() {
-      try {
-        return await mailboxSendProvenanceStore.findByIdempotencyKey(
-          threadProvenance.idempotencyKey
-        );
-      } catch (error) {
-        error.status = Number(error.status) || 503;
-        error.code = normalizeString(error.code) || 'MAILBOX_SEND_PROVENANCE_READ_FAILED';
-        throw error;
-      }
-    }
-
-    const existingIntent = await findExistingIntent();
-    const earlyReplay = await handleExistingIntent(existingIntent);
-    if (earlyReplay) return earlyReplay;
-
-    const webdesignParts = await buildMailboxWebdesignSendParts({
+    const claimInput = {
+      ...threadProvenance,
       accountEmail: account.email,
-      to: normalizedTo,
+      recipientEmail: normalizedTo,
+      senderName: account.name || account.email,
       subject: cleanSubject,
-      text: normalizedText,
-    });
-    if (explicitAttachments === null) {
+      body: normalizedText,
+      requestBody: normalizedText,
+      cc: normalizedCcText,
+      bcc: normalizedBccText,
+      attachments: attachmentInputs,
+      attachmentsMetadata: claimAttachmentMetadata,
+    };
+    const preDispatchClaim = await mailboxSendProvenanceStore.claimPreDispatch(claimInput);
+    if (!preDispatchClaim.created) {
+      const replay = await handleExistingIntent(preDispatchClaim.intent);
+      if (replay) return replay;
+      throw processingError();
+    }
+
+    let finalClaim = null, startedDispatchIntent = null, outboundReservation = null;
+    let outboundReservationAttempted = false, outboundReservationId = '';
+    async function releaseWebdesignReservation() {
+      if (!outboundReservationAttempted) return;
+      if (typeof releaseMailboxWebdesignOutboundRecipient !== 'function') {
+        const releaseError = new Error('De permanente webdesignreservering kan niet veilig worden vrijgegeven.');
+        releaseError.code = 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_RELEASE_FAILED';
+        releaseError.status = 503;
+        throw releaseError;
+      }
+      await releaseMailboxWebdesignOutboundRecipient(
+        outboundReservation?.reservationId || outboundReservationId
+      );
+    }
+    async function abortBeforeProvider(error, abortHandle) {
+      let failedPreDispatch = false;
+      let preDispatchPersistenceError = null;
       try {
-        explicitAttachments = await normalizeComposeAttachments(attachmentInputs, threadProvenance);
+        const failed = await mailboxSendProvenanceStore.failPreDispatch(abortHandle, error);
+        failedPreDispatch = failed?.status === 'failed' && failed?.dispatchState === 'finished';
+      } catch (claimError) {
+        try {
+          const recovered = await mailboxSendProvenanceStore.findByIdempotencyKey(
+            threadProvenance.idempotencyKey
+          );
+          failedPreDispatch = recovered?.intentId === threadProvenance.intentId
+            && recovered?.status === 'failed'
+            && recovered?.dispatchState === 'finished';
+        } catch (readError) {
+          claimError.recoveryError = readError;
+        }
+        if (!failedPreDispatch) preDispatchPersistenceError = claimError;
+      }
+      if (!failedPreDispatch && !preDispatchPersistenceError) {
+        preDispatchPersistenceError = new Error(
+          'De veilige stop vóór providerdispatch kon niet duurzaam worden bevestigd.'
+        );
+        preDispatchPersistenceError.code = 'MAILBOX_SEND_PRE_DISPATCH_FAIL_UNCONFIRMED';
+      }
+      let releaseError = null;
+      try {
+        if (failedPreDispatch) await releaseWebdesignReservation();
+      } catch (errorValue) {
+        releaseError = errorValue;
+      } finally {
+        await cleanupStagedAttachments();
+      }
+      if (preDispatchPersistenceError || releaseError) {
+        const reconcileError = createMailboxReconcileRequiredError(
+          preDispatchPersistenceError || releaseError
+        );
+        reconcileError.preDispatchError = error;
+        throw reconcileError;
+      }
+    }
+    async function runPreProviderStep(action) {
+      try {
+        return await action();
       } catch (error) {
-        const acceptedAfterStorageFailure = await findExistingIntent();
-        const replayAfterStorageFailure = await handleExistingIntent(acceptedAfterStorageFailure);
-        if (replayAfterStorageFailure) return replayAfterStorageFailure;
+        const committedStartIntent = error?.code === 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED'
+          && error?.intent?.intentId === threadProvenance.intentId
+          && error?.intent?.dispatchState === 'started'
+          ? error.intent
+          : null;
+        const abortHandle = committedStartIntent
+          ? { intent: committedStartIntent, finalToken: committedStartIntent.transitionToken }
+          : startedDispatchIntent?.intentId
+            ? { intent: startedDispatchIntent, finalToken: startedDispatchIntent.transitionToken }
+            : finalClaim || preDispatchClaim;
+        await abortBeforeProvider(error, abortHandle);
         throw error;
       }
     }
+
+    const webdesignParts = await runPreProviderStep(() => buildMailboxWebdesignSendParts({
+        accountEmail: account.email,
+        to: normalizedTo,
+        subject: cleanSubject,
+        text: normalizedText,
+      }));
+    const explicitAttachments = await runPreProviderStep(() => normalizeComposeAttachments(
+        attachmentInputs,
+        threadProvenance
+      ));
+    const downloadedAttachmentMetadata = createMailboxAttachmentsMetadataFromContent(explicitAttachments);
+    const legacyReferenceMetadata = referenceCount > 0 && explicitAttachments.length > 0
+      && explicitAttachments.every((attachment) => !normalizeString(attachment?.sha256));
+    const explicitAttachmentMetadata = legacyReferenceMetadata && downloadedAttachmentMetadata
+      ? downloadedAttachmentMetadata.map((metadata) => ({
+          filename: metadata.filename, contentType: metadata.contentType, size: metadata.size,
+        }))
+      : downloadedAttachmentMetadata;
+    await runPreProviderStep(async () => {
+      if (explicitAttachmentMetadata === null || !mailboxAttachmentsMetadataEqual(
+        explicitAttachmentMetadata, claimAttachmentMetadata
+      )) {
+        const error = new Error(
+          'De gekozen bijlagen wijken af van het vooraf bewezen verzendbewijs; kies de bijlagen opnieuw.'
+        );
+        error.status = 409;
+        error.code = 'MAILBOX_ATTACHMENT_METADATA_MISMATCH';
+        throw error;
+      }
+    });
     const outboundAttachments = [
       ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
       ...explicitAttachments,
     ];
-    try {
+    await runPreProviderStep(async () => {
       assertCombinedAttachmentLimits(outboundAttachments);
-    } catch (error) {
-      await cleanupStagedAttachments();
-      throw error;
-    }
-    await assertOutboundRecipientsNotSuppressed({
-      outboundRecipientGuardStore,
-      identities: [
-        { ...(webdesignParts?.outboundIdentity || {}), recipientEmail: normalizedTo },
-        ...normalizedCc.map((recipientEmail) => ({ recipientEmail })),
-        ...normalizedBcc.map((recipientEmail) => ({ recipientEmail })),
-      ],
-      channel: 'softora-mailbox',
     });
     const mail = {
       from: account.name ? `${account.name} <${account.email}>` : account.email,
@@ -609,44 +654,61 @@ function createMailboxComposeSend(deps = {}) {
       'X-Softora-Reply-Target-Message-Id': threadProvenance.replyTargetMessageId || '',
     };
     if (outboundAttachments.length) mail.attachments = outboundAttachments;
-    const outboundReservation = webdesignParts
-      ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
+    finalClaim = await runPreProviderStep(() => mailboxSendProvenanceStore.finalizeClaim(
+      preDispatchClaim,
+      {
+        ...claimInput,
+        body: webdesignParts?.text || normalizedText,
+        requestBody: normalizedText,
+        attachments: outboundAttachments,
+        attachmentsMetadata: claimAttachmentMetadata,
+      }
+    ));
+    await runPreProviderStep(() => assertOutboundRecipientsNotSuppressed({
+        outboundRecipientGuardStore,
+        identities: [
+          { ...(webdesignParts?.outboundIdentity || {}), recipientEmail: normalizedTo },
+          ...normalizedCc.map((recipientEmail) => ({ recipientEmail })),
+          ...normalizedBcc.map((recipientEmail) => ({ recipientEmail })),
+        ],
+        channel: 'softora-mailbox',
+      }));
+    outboundReservationId = webdesignParts ? `mailbox-webdesign-${threadProvenance.intentId}` : '';
+    outboundReservationAttempted = Boolean(webdesignParts);
+    outboundReservation = webdesignParts
+      ? await runPreProviderStep(() => reserveMailboxWebdesignOutboundRecipient(
+        webdesignParts.outboundIdentity,
+        {
           accountEmail: account.email,
+          reservationId: outboundReservationId,
           subject: cleanSubject,
-        })
+        }
+      ))
       : null;
-    const provenanceReservation = await mailboxSendProvenanceStore.reserve({
-      ...threadProvenance,
-      accountEmail: account.email,
-      recipientEmail: normalizedTo,
-      senderName: account.name || account.email,
-      subject: cleanSubject,
-      body: webdesignParts?.text || normalizedText,
-      requestBody: normalizedText,
-      cc: normalizedCcText,
-      bcc: normalizedBccText,
-      attachments: outboundAttachments,
-      attachmentsMetadata: explicitAttachmentMetadata,
+    startedDispatchIntent = await runPreProviderStep(async () => {
+      const intent = await mailboxSendProvenanceStore.startDispatch(finalClaim);
+      if (intent?.intentId === threadProvenance.intentId && intent?.dispatchState === 'started') return intent;
+      const error = new Error('De providerstart kon niet duurzaam worden bevestigd.');
+      error.code = 'MAILBOX_SEND_DISPATCH_START_UNCONFIRMED';
+      error.status = 503;
+      throw error;
     });
-    if (!provenanceReservation.created) {
-      const replay = await handleExistingIntent(provenanceReservation.intent);
-      if (replay) return replay;
-      throw processingError();
-    }
-    if (typeof mailboxSendProvenanceStore.startDispatch === 'function') {
-      await mailboxSendProvenanceStore.startDispatch(threadProvenance.intentId);
-    }
-    const transporter = createTransport({
-      host: account.smtpHost,
-      port: account.smtpPort,
-      secure: account.smtpSecure,
-      auth: { user: account.smtpUser, pass: account.smtpPass },
-    });
+    const transporter = await runPreProviderStep(() => createTransport({
+        host: account.smtpHost,
+        port: account.smtpPort,
+        secure: account.smtpSecure,
+        auth: { user: account.smtpUser, pass: account.smtpPass },
+      }));
+    await runPreProviderStep(() => (
+      typeof onProviderDispatchStarting === 'function'
+        ? onProviderDispatchStarting({ provider: 'smtp', intentId: threadProvenance.intentId })
+        : undefined
+    ));
     let info;
     try {
       info = await transporter.sendMail(mail);
     } catch (error) {
-      if (isAmbiguousMailboxProviderError(error)) {
+      if (!isDefinitiveMailboxProviderRejection(error)) {
         if (typeof mailboxSendProvenanceStore.markUnknown === 'function') {
           await mailboxSendProvenanceStore.markUnknown(
             threadProvenance.intentId,
@@ -660,7 +722,8 @@ function createMailboxComposeSend(deps = {}) {
       }
       try {
         const failedIntent = await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
-        if (!failedIntent || failedIntent.status !== 'failed') {
+        if (!failedIntent || failedIntent.status !== 'failed'
+          || failedIntent.dispatchState !== 'finished') {
           const persistenceError = new Error('De definitieve providerfout kon niet duurzaam worden vastgelegd.');
           persistenceError.code = 'MAILBOX_SEND_PROVENANCE_FAIL_UNCONFIRMED';
           throw persistenceError;
@@ -668,6 +731,14 @@ function createMailboxComposeSend(deps = {}) {
       } catch (provenanceError) {
         logger.error('[MailboxSendProvenance][FailAfterProviderRejection]', provenanceError?.message || provenanceError);
         const reconcileError = createMailboxReconcileRequiredError(provenanceError);
+        reconcileError.providerError = error;
+        throw reconcileError;
+      }
+      try {
+        await releaseWebdesignReservation();
+      } catch (releaseError) {
+        await cleanupStagedAttachments();
+        const reconcileError = createMailboxReconcileRequiredError(releaseError);
         reconcileError.providerError = error;
         throw reconcileError;
       }
