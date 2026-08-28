@@ -7,7 +7,7 @@ const NEW_URL_LIMITS = Object.freeze({
   data_degraded: Object.freeze({ minimum: 1, maximum: 2 }),
   indexation_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
   quality_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
-  performance_recovery: Object.freeze({ minimum: 1, maximum: 2 }),
+  performance_recovery: Object.freeze({ minimum: 3, maximum: 5 }),
   growth: Object.freeze({ minimum: 3, maximum: 5 }),
   scale: Object.freeze({ minimum: 5, maximum: 7 }),
 });

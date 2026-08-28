@@ -101,7 +101,7 @@ test('control plane recovers weak D28 non-brand outcomes before scaling output',
     ledger: {
       status: 'ready',
       errors: [],
-      windows: { '7': { qualifying: 5, newUrls: 1, substantialRefreshes: 4, otherGrowthActions: 0 } },
+      windows: { '7': { qualifying: 5, newUrls: 2, substantialRefreshes: 3, otherGrowthActions: 0 } },
     },
     performance: {
       status: 'performance_recovery',
@@ -110,7 +110,29 @@ test('control plane recovers weak D28 non-brand outcomes before scaling output',
     },
   }));
   assert.equal(state.state, 'performance_recovery');
-  assert.equal(state.minimumNewUrlsPerWeek, 1);
+  assert.equal(state.minimumNewUrlsPerWeek, 3);
+  assert.equal(state.maximumNewUrlsPerWeek, 5);
+  assert.equal(state.newUrlDeficit, 1);
+  assert.equal(state.newUrlRequired, true);
+  assert.equal(state.action, 'publish_new_url_from_highest_scoring_safe_ready_candidate');
+});
+
+test('performance recovery resumes query-page repairs once three new URLs are live', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': { qualifying: 5, newUrls: 3, substantialRefreshes: 2, otherGrowthActions: 0 } },
+    },
+    performance: {
+      status: 'performance_recovery',
+      reasons: ['slechts 1/5 URLs met impressies'],
+      summary: { reviewed: 5, impressing: 1, clicking: 0, impressions: 120, clicks: 0 },
+    },
+  }));
+  assert.equal(state.state, 'performance_recovery');
+  assert.equal(state.minimumNewUrlsPerWeek, 3);
+  assert.equal(state.maximumNewUrlsPerWeek, 5);
   assert.equal(state.newUrlRequired, false);
   assert.equal(state.action, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
 });
