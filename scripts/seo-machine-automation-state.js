@@ -12,7 +12,8 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTOMATION_ID = 'softora-seo-actiemachine';
 const AUTOMATION_NAME = 'Softora SEO dagmachine';
 const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
-const AUTOMATION_PROMPT_VERSION = 5;
+const AUTOMATION_PROMPT_VERSION = 6;
+const RUN_GATE_VERSION = 2;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
 ]);
@@ -24,6 +25,7 @@ const REQUIRED_UBERSUGGEST_TOOLS = Object.freeze([
 ]);
 const RUN_GATES = Object.freeze([
   'cadence',
+  'reviews',
   'selection',
   'keywords',
   'visuals',
@@ -32,6 +34,10 @@ const RUN_GATES = Object.freeze([
   'live_route',
 ]);
 const REQUIRED_PUBLISHED_RUN_GATES = Object.freeze([...RUN_GATES]);
+const REQUIRED_PUBLISHED_RUN_GATES_BY_VERSION = Object.freeze({
+  1: Object.freeze(RUN_GATES.filter((gate) => gate !== 'reviews')),
+  2: REQUIRED_PUBLISHED_RUN_GATES,
+});
 const TREE_BOUND_RUN_GATES = Object.freeze([
   'keywords',
   'visuals',
@@ -49,26 +55,44 @@ const DEFAULT_MEMORY_PATH = path.join(
 const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=5/ }),
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=6/ }),
   Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
   Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
   Object.freeze({ label: 'finish_run_receipt', pattern: /seo:automation-state -- finish-run/i }),
   Object.freeze({ label: 'explicit_run_recovery', pattern: /seo:automation-state -- recover-run/i }),
   Object.freeze({ label: 'run_gate_receipts', pattern: /--record-run-gate/i }),
   Object.freeze({ label: 'selection_gate', pattern: /seo:selection:check/i }),
+  Object.freeze({ label: 'reviews_gate', pattern: /seo:reviews:check/i }),
+  Object.freeze({
+    label: 'review_evidence_metrics_schema',
+    pattern: /metrics object with nonBrandedClicks, nonBrandedImpressions, averagePosition and baselineComparison/i,
+  }),
+  Object.freeze({ label: 'fresh_gsc_evidence_window', pattern: /30-minute fresh GSC window/i }),
+  Object.freeze({
+    label: 'canonical_ready_selection_binding',
+    pattern: /new_url must not exist there yet and must exactly match a ready path/i,
+  }),
   Object.freeze({ label: 'live_route_gate', pattern: /seo:live-route:check/i }),
   Object.freeze({ label: 'ubersuggest_keyword_suggestions', pattern: /mcp__ubersuggest__keyword_suggestions/i }),
   Object.freeze({ label: 'ubersuggest_google_suggestions', pattern: /mcp__ubersuggest__google_suggestions/i }),
   Object.freeze({ label: 'ubersuggest_keyword_overview', pattern: /mcp__ubersuggest__keyword_overview/i }),
   Object.freeze({ label: 'ubersuggest_serp_analysis', pattern: /mcp__ubersuggest__serp_analysis/i }),
   Object.freeze({ label: 'ubersuggest_data_smoke', pattern: /seo:automation-state -- record-tool-smoke/i }),
-  Object.freeze({ label: 'edge_family_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
-  Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge[\s\S]*profileName=Codex/i }),
-  Object.freeze({ label: 'chrome_prohibition', pattern: /Google Chrome is forbidden/i }),
+  Object.freeze({ label: 'iab_browser_binding', pattern: /agent\.browsers\.get\(["']iab["']\)/i }),
+  Object.freeze({ label: 'iab_browser_identity', pattern: /built-in ChatGPT\/Codex browser binding/i }),
+  Object.freeze({ label: 'private_browser_prohibition', pattern: /Google Chrome and Microsoft Edge are forbidden/i }),
+  Object.freeze({ label: 'browser_fallback_prohibition', pattern: /no generic browser fallback/i }),
   Object.freeze({ label: 'evergreen_continuation', pattern: /remains ACTIVE until Serve explicitly pauses/i }),
   Object.freeze({ label: 'post_deadline_rule', pattern: /After 31 December 2026/i }),
   Object.freeze({ label: 'cost_stop', pattern: /Never buy credits/i }),
   Object.freeze({ label: 'qwen_stop', pattern: /Never use Qwen/i }),
+]);
+const FORBIDDEN_PROMPT_MARKERS = Object.freeze([
+  Object.freeze({ label: 'edge_browser_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
+  Object.freeze({ label: 'chrome_browser_binding', pattern: /agent\.browsers\.get\(["']chrome["']\)/i }),
+  Object.freeze({ label: 'extension_browser_binding', pattern: /agent\.browsers\.get\(["']extension["']\)/i }),
+  Object.freeze({ label: 'generic_browser_binding', pattern: /agent\.browsers\.(?:getDefault|getForUrl)\s*\(/i }),
+  Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge/i }),
 ]);
 
 function parseTomlString(content, key) {
@@ -278,6 +302,18 @@ function validSoftoraUrl(value) {
   }
 }
 
+function normalizeSoftoraPath(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw, 'https://www.softora.nl');
+    if (!['softora.nl', 'www.softora.nl'].includes(parsed.hostname) || parsed.search || parsed.hash) return '';
+    return parsed.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return '';
+  }
+}
+
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -324,7 +360,10 @@ function validateRunGateReceipt(receipt, activeRun, label = 'gate') {
 function validatePublishedRunGates(run, { liveCommit, changedUrl } = {}) {
   const errors = [];
   const gates = run?.gates && typeof run.gates === 'object' ? run.gates : {};
-  for (const gateName of REQUIRED_PUBLISHED_RUN_GATES) {
+  const gateVersion = Number(run?.gateVersion || 1);
+  const requiredGates = REQUIRED_PUBLISHED_RUN_GATES_BY_VERSION[gateVersion]
+    || REQUIRED_PUBLISHED_RUN_GATES;
+  for (const gateName of requiredGates) {
     const receipt = gates[gateName];
     errors.push(...validateRunGateReceipt(receipt, run, `gates.${gateName}`));
   }
@@ -338,6 +377,49 @@ function validatePublishedRunGates(run, { liveCommit, changedUrl } = {}) {
   }
   if (routeGate?.changedUrl && String(routeGate.changedUrl) !== String(changedUrl || '')) {
     errors.push('gates.live_route wijkt af van --changed-url.');
+  }
+  if (gateVersion >= 2) {
+    const selectionSummary = gates.selection?.summary || {};
+    const routeSummary = gates.live_route?.summary?.summary || gates.live_route?.summary || {};
+    const selectedPath = normalizeSoftoraPath(selectionSummary.selectedPath);
+    const liveRoutePath = normalizeSoftoraPath(routeGate?.changedUrl || routeSummary.url || changedUrl);
+    if (!selectedPath) {
+      errors.push('gates.selection.selectedPath ontbreekt of is ongeldig.');
+    } else if (!liveRoutePath || selectedPath !== liveRoutePath) {
+      errors.push(`gates.selection.selectedPath ${selectedPath} wijkt af van de live route ${liveRoutePath || '(ongeldig)'}.`);
+    }
+    const selectedActionType = String(selectionSummary.selectedActionType || '').trim();
+    if (!['new_url', 'substantial_refresh', 'other_growth_action'].includes(selectedActionType)) {
+      errors.push('gates.selection.selectedActionType ontbreekt of is ongeldig.');
+    }
+    const selectedSupportingAction = selectionSummary.supportingAction || null;
+    const liveSupportingAction = routeSummary.supportingAction || null;
+    if (!selectedSupportingAction) {
+      errors.push('gates.selection.supportingAction ontbreekt voor de geselecteerde groei-actie.');
+    }
+    if (selectedSupportingAction) {
+      const selectedProof = {
+        type: String(selectedSupportingAction.type || '').trim(),
+        path: normalizeSoftoraPath(selectedSupportingAction.path),
+        verification: {
+          kind: String(selectedSupportingAction.verification?.kind || '').trim(),
+          value: String(selectedSupportingAction.verification?.value || '').trim() || null,
+        },
+      };
+      const liveProof = liveSupportingAction ? {
+        type: String(liveSupportingAction.type || '').trim(),
+        path: normalizeSoftoraPath(liveSupportingAction.path),
+        verification: {
+          kind: String(liveSupportingAction.verification?.kind || '').trim(),
+          value: String(liveSupportingAction.verification?.value || '').trim() || null,
+        },
+      } : null;
+      if (!liveSupportingAction || liveSupportingAction.verified !== true) {
+        errors.push('gates.live_route mist groen supportingAction-bewijs.');
+      } else if (stableJson(selectedProof) !== stableJson(liveProof)) {
+        errors.push('gates.live_route supportingAction wijkt af van de selectie.');
+      }
+    }
   }
   const finalTreeSha = liveGate?.treeSha;
   if (finalTreeSha) {
@@ -359,7 +441,9 @@ function validateRunIdentity(run, label = 'activeRun') {
   if (!Number.isInteger(Number(run.runNumber)) || Number(run.runNumber) < 1 || Number(run.runNumber) > 15) {
     errors.push(`${label}.runNumber is ongeldig.`);
   }
-  if (run.gateVersion !== undefined && Number(run.gateVersion) !== 1) errors.push(`${label}.gateVersion is ongeldig.`);
+  if (run.gateVersion !== undefined && ![1, 2].includes(Number(run.gateVersion))) {
+    errors.push(`${label}.gateVersion is ongeldig.`);
+  }
   if (run.gates !== undefined && (!run.gates || typeof run.gates !== 'object' || Array.isArray(run.gates))) {
     errors.push(`${label}.gates is ongeldig.`);
   } else if (run.gates) {
@@ -397,7 +481,7 @@ function validateRunReceipt(receipt, label = 'receipt') {
   if (receipt?.outcome === 'published' && (!Number.isInteger(Number(receipt.prNumber)) || Number(receipt.prNumber) < 1)) {
     errors.push(`${label} met published vereist een PR-nummer.`);
   }
-  if (receipt?.outcome === 'published' && Number(receipt?.gateVersion) === 1) {
+  if (receipt?.outcome === 'published' && [1, 2].includes(Number(receipt?.gateVersion))) {
     errors.push(...validatePublishedRunGates(receipt, receipt).map((error) => `${label}.${error}`));
   }
   if (receipt?.outcome === 'interrupted' && receipt?.publicEffect !== 'unverified') {
@@ -496,6 +580,7 @@ function auditAutomationInstallation({
   }
 
   const missingPromptMarkers = [];
+  const forbiddenPromptMarkers = [];
   if (config) {
     if (config.version !== 1) errors.push('Automation version moet 1 zijn.');
     if (config.id !== AUTOMATION_ID) errors.push(`Automation id moet ${AUTOMATION_ID} zijn.`);
@@ -533,8 +618,14 @@ function auditAutomationInstallation({
     for (const marker of REQUIRED_PROMPT_MARKERS) {
       if (!marker.pattern.test(String(config.prompt || ''))) missingPromptMarkers.push(marker.label);
     }
+    for (const marker of FORBIDDEN_PROMPT_MARKERS) {
+      if (marker.pattern.test(String(config.prompt || ''))) forbiddenPromptMarkers.push(marker.label);
+    }
     if (missingPromptMarkers.length) {
       errors.push(`Automationprompt mist verplichte controles: ${missingPromptMarkers.join(', ')}.`);
+    }
+    if (forbiddenPromptMarkers.length) {
+      errors.push(`Automationprompt bevat een verboden browserroute: ${forbiddenPromptMarkers.join(', ')}.`);
     }
   }
 
@@ -550,6 +641,7 @@ function auditAutomationInstallation({
       rrule: config.rrule,
       targetThreadId: config.targetThreadId,
       missingPromptMarkers,
+      forbiddenPromptMarkers,
     } : null,
     matchingAutomationCount: matchingAutomationPaths.length,
     matchingAutomationPaths,
@@ -612,43 +704,30 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
         idempotent: true,
       };
     }
+    if (lifecycle.activeRun) {
+      throw new Error(
+        `ACTIVE_RUN_REQUIRES_RECOVERY: invocation ${lifecycle.activeRun.invocationAt} staat nog open; inspecteer externe effecten en gebruik recover-run.`
+      );
+    }
     if (Number(current.completedRunsInActiveThread) >= 15) throw new Error('ROTATION_REQUIRED: deze task heeft al 15 heartbeat-runs verwerkt.');
     const completedRunsInActiveThread = Number(current.completedRunsInActiveThread) + 1;
     const next = { ...current, completedRunsInActiveThread, lastInvocationAt: invocationAt, rotationStatus: completedRunsInActiveThread === 15 ? 'rotation_due' : 'active' };
-    const receipts = [...lifecycle.receipts];
-    let recoveredPreviousRun = null;
-    if (lifecycle.activeRun) {
-      recoveredPreviousRun = {
-        ...lifecycle.activeRun,
-        finishedAt: invocationAt,
-        outcome: 'interrupted',
-        publicEffect: 'unverified',
-        evidence: 'Next invocation started before finish-run; previous external effects require reconciliation.',
-        prNumber: null,
-        liveCommit: null,
-        changedUrl: null,
-        autoClosed: true,
-      };
-      const receiptErrors = validateRunReceipt(recoveredPreviousRun, 'recoveredPreviousRun');
-      if (receiptErrors.length) throw new Error(`Vorige run kan niet veilig worden afgesloten: ${receiptErrors.join(' ')}`);
-      receipts.push(recoveredPreviousRun);
-    }
     const activeRun = {
       threadId: String(threadId), invocationAt, runNumber: completedRunsInActiveThread, startedAt: invocationAt,
-      gateVersion: 1, gates: {},
+      gateVersion: RUN_GATE_VERSION, gates: {},
     };
     const nextLifecycle = {
       ...lifecycle,
       activeRun,
-      lastReceipt: recoveredPreviousRun || lifecycle.lastReceipt,
-      receipts: receipts.slice(-30),
+      lastReceipt: lifecycle.lastReceipt,
+      receipts: lifecycle.receipts.slice(-30),
     };
     const nextLifecycleErrors = validateRunLifecycleState(nextLifecycle);
     if (nextLifecycleErrors.length) throw new Error(`Nieuwe run-lifecyclestaat is ongeldig: ${nextLifecycleErrors.join(' ')}`);
     let nextContent = replaceStateBlock(content, ROTATION_BLOCK, next);
     nextContent = replaceStateBlock(nextContent, RUN_LIFECYCLE_BLOCK, nextLifecycle);
     writeMemoryAtomic(memoryPath, nextContent);
-    return { ...next, lifecycle: 'running', activeRun, recoveredPreviousRun };
+    return { ...next, lifecycle: 'running', activeRun };
   });
 }
 
@@ -729,7 +808,7 @@ function recordAutomationRunGate({
       ...lifecycle,
       activeRun: {
         ...activeRun,
-        gateVersion: 1,
+        gateVersion: Number(activeRun.gateVersion) || RUN_GATE_VERSION,
         gates: { ...(activeRun.gates || {}), [receipt.gate]: receipt },
       },
     };
@@ -774,7 +853,7 @@ function finishAutomationRun({
     if (rotation.activeThreadId !== threadId || rotation.lastInvocationAt !== invocationAt) {
       throw new Error('RUN_ROTATION_MISMATCH: rotatie- en lifecyclestaat lopen uiteen.');
     }
-    if (outcome === 'interrupted') throw new Error('interrupted is gereserveerd voor automatisch herstel bij een volgende invocation.');
+    if (outcome === 'interrupted') throw new Error('interrupted is gereserveerd voor expliciet recover-run-herstel.');
     if (outcome === 'published') {
       const gateErrors = validatePublishedRunGates(lifecycle.activeRun, { liveCommit, changedUrl });
       if (gateErrors.length) throw new Error(`PUBLISHED_GATES_INCOMPLETE: ${gateErrors.join(' ')}`);
@@ -1159,8 +1238,9 @@ if (require.main === module) {
 }
 module.exports = {
   AUTOMATION_ID, AUTOMATION_NAME, AUTOMATION_PROMPT_VERSION, AUTOMATION_RRULE, DEFAULT_AUTOMATION_PATH, DEFAULT_AUTOMATIONS_ROOT,
-  DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, PUBLIC_EFFECTS, REQUIRED_PROMPT_MARKERS, REQUIRED_UBERSUGGEST_TOOLS,
-  REQUIRED_PUBLISHED_RUN_GATES, ROTATION_BLOCK, RUN_GATES, RUN_LIFECYCLE_BLOCK, RUN_OUTCOMES,
+  DEFAULT_MAX_RUNS_PER_THREAD, DEFAULT_MEMORY_PATH, FORBIDDEN_PROMPT_MARKERS, PUBLIC_EFFECTS,
+  REQUIRED_PROMPT_MARKERS, REQUIRED_UBERSUGGEST_TOOLS, REQUIRED_PUBLISHED_RUN_GATES,
+  ROTATION_BLOCK, RUN_GATE_VERSION, RUN_GATES, RUN_LIFECYCLE_BLOCK, RUN_OUTCOMES,
   TREE_BOUND_RUN_GATES, UBERSUGGEST_BLOCK,
   UBERSUGGEST_STATUSES, auditAutomationInstallation, defaultUbersuggestState, ensureAutomationState,
   defaultRunLifecycleState, digestRunGateDetails, extractRunGateCliOptions, findSeoAutomationPaths,

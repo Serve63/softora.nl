@@ -1,4 +1,5 @@
 const { PUBLICATION_LANES } = require('./seo-machine-publication-lanes');
+const { validatePublicationWindowPolicy } = require('./seo-machine-publication-ledger');
 
 const DEFAULT_WEEKLY_MINIMUM = 7;
 const MINIMUM_REVIEWABLE_INDEXATION_SAMPLE = 5;
@@ -74,7 +75,7 @@ function applyDailyPublicationPolicy(stateResult, shared = {}, backlogSummary = 
     editorialNewUrls,
     moneyPageNewUrls,
     minimumNewUrlsPerWeek: weeklyGrowthUrlTarget,
-    maximumNewUrlsPerWeek: null,
+    maximumNewUrlsPerWeek: weeklyGrowthUrlTarget,
     minimumEditorialNewUrlsPerWeek: weeklyEditorialMinimum,
     maximumMoneyPageNewUrlsPerWeek: weeklyMoneyPageMaximum,
     newUrlDeficit,
@@ -177,6 +178,25 @@ function evaluateSeoMachineState({
     nextCandidate,
     performance,
   };
+  const publicationPolicyErrors = validatePublicationWindowPolicy({
+    days: 7,
+    growthNewUrls,
+    moneyPageNewUrls,
+    moneyPageMaximum: PUBLICATION_LANE_LIMITS.weeklyMoneyPageMaximum,
+    targetMaximum: PUBLICATION_LANE_LIMITS.weeklyGrowthUrlTarget,
+  });
+  if (publicationPolicyErrors.length) {
+    return applyDailyPublicationPolicy({
+      state: 'operations_p0',
+      status: 'p0',
+      color: 'red',
+      exitCode: 1,
+      action: 'repair_publication_policy_breach',
+      publicActionRequired: false,
+      reasons: publicationPolicyErrors,
+      nextCandidate: null,
+    }, shared, backlogResult.summary);
+  }
 
   if (!indexation || !['ready', 'partial'].includes(indexation.status)) {
     return applyDailyPublicationPolicy({

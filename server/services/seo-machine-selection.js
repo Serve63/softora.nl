@@ -3,6 +3,8 @@ const { PUBLICATION_LANES } = require('./seo-machine-publication-lanes');
 
 const SELECTION_SCHEMA_VERSION = 1;
 const MIN_PRIORITIZED_REVIEWS = 3;
+const SELECTION_REPORT_MAX_AGE_MS = 30 * 60 * 1000;
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 const ALLOWED_SOURCES = new Set([
   'gsc_prioritized',
   'canonical_backlog',
@@ -12,6 +14,7 @@ const ALLOWED_SOURCES = new Set([
   'technical_finding',
 ]);
 const ALLOWED_DECISIONS = new Set(['selected', 'skipped']);
+const ALLOWED_ACTION_TYPES = new Set(['new_url', 'substantial_refresh', 'other_growth_action']);
 const ALLOWED_SKIP_REASONS = new Set([
   'binding_new_url_floor',
   'recent_material_change',
@@ -33,6 +36,21 @@ const ALLOWED_SUPPORTING_ACTION_TYPES = new Set([
   'discovery_or_indexation_improvement',
   'conversion_improvement',
 ]);
+const ALLOWED_SUPPORTING_VERIFICATION_KINDS = new Set([
+  'link_to_selected_url',
+  'link_present',
+  'text_present',
+  'title_equals',
+  'meta_description_equals',
+]);
+const SUPPORTING_VERIFICATION_BY_ACTION = Object.freeze({
+  contextual_internal_link: new Set(['link_to_selected_url']),
+  existing_page_refresh: new Set(['link_present', 'text_present', 'title_equals', 'meta_description_equals']),
+  query_page_match: new Set(['link_present', 'text_present', 'title_equals', 'meta_description_equals']),
+  snippet_improvement: new Set(['title_equals', 'meta_description_equals']),
+  discovery_or_indexation_improvement: new Set(['link_to_selected_url', 'link_present', 'text_present']),
+  conversion_improvement: new Set(['link_present', 'text_present']),
+});
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -57,34 +75,89 @@ function sameOpportunity(review, opportunity) {
     && normalizeComparable(review?.page) === normalizeComparable(opportunity?.page);
 }
 
-function validateSupportingAction(selected, errors) {
+function normalizePublicPath(value) {
+  const raw = normalizeText(value);
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '';
+  try {
+    const parsed = new URL(raw, 'https://www.softora.nl');
+    if (parsed.origin !== 'https://www.softora.nl' || parsed.search || parsed.hash) return '';
+    return parsed.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return '';
+  }
+}
+
+function normalizeKnownPublicPaths(value) {
+  if (!(value instanceof Set) && !Array.isArray(value)) return null;
+  return new Set([...value].map(normalizePublicPath).filter(Boolean));
+}
+
+function validateSupportingVerification(supportingAction, errors) {
+  const verification = supportingAction.verification;
+  if (!verification || typeof verification !== 'object' || Array.isArray(verification)) {
+    errors.push('selected.supportingAction.verification ontbreekt.');
+    return;
+  }
+  const kind = normalizeText(verification.kind);
+  if (!ALLOWED_SUPPORTING_VERIFICATION_KINDS.has(kind)) {
+    errors.push('selected.supportingAction.verification.kind is ongeldig.');
+    return;
+  }
+  const allowedKinds = SUPPORTING_VERIFICATION_BY_ACTION[normalizeText(supportingAction.type)];
+  if (allowedKinds && !allowedKinds.has(kind)) {
+    errors.push(`selected.supportingAction.verification.kind ${kind} past niet bij type ${supportingAction.type}.`);
+  }
+  if (kind === 'link_to_selected_url') return;
+  const value = normalizeText(verification.value);
+  if (kind === 'link_present' && !normalizePublicPath(value)) {
+    errors.push('selected.supportingAction.verification.value moet voor link_present een publieke Softora-route zijn.');
+  } else if (kind === 'text_present' && value.length < 12) {
+    errors.push('selected.supportingAction.verification.value is te vaag voor text_present.');
+  } else if (kind === 'title_equals' && value.length < 10) {
+    errors.push('selected.supportingAction.verification.value is te kort voor title_equals.');
+  } else if (kind === 'meta_description_equals' && value.length < 30) {
+    errors.push('selected.supportingAction.verification.value is te kort voor meta_description_equals.');
+  }
+}
+
+function validateSupportingAction(selected, errors, options = {}) {
   const supportingAction = selected.supportingAction;
   if (!supportingAction || typeof supportingAction !== 'object') {
-    errors.push('Een nieuwe URL vereist selected.supportingAction op een bestaande publieke pagina.');
+    errors.push('selected.supportingAction op een bestaande publieke pagina ontbreekt.');
     return;
   }
   if (!ALLOWED_SUPPORTING_ACTION_TYPES.has(normalizeText(supportingAction.type))) {
     errors.push('selected.supportingAction.type is ongeldig.');
   }
-  if (!normalizeText(supportingAction.path).startsWith('/')) {
+  const supportingPath = normalizePublicPath(supportingAction.path);
+  if (!supportingPath) {
     errors.push('selected.supportingAction.path moet een publieke Softora-route zijn.');
   }
-  if (normalizeText(supportingAction.path) === normalizeText(selected.path)) {
+  if (supportingPath && supportingPath === normalizePublicPath(selected.path)) {
     errors.push('selected.supportingAction.path moet een bestaande andere pagina versterken.');
+  }
+  const knownPublicPaths = normalizeKnownPublicPaths(options.knownPublicPaths);
+  if (!knownPublicPaths) {
+    errors.push('De canonieke publieke inventaris ontbreekt; supportingAction kan niet veilig worden gevalideerd.');
+  } else if (supportingPath && !knownPublicPaths.has(supportingPath)) {
+    errors.push(`selected.supportingAction.path staat niet in de canonieke publieke inventaris: ${supportingPath}.`);
   }
   if (normalizeText(supportingAction.evidence).length < 20) {
     errors.push('selected.supportingAction.evidence mist controleerbare onderbouwing.');
   }
+  validateSupportingVerification(supportingAction, errors);
 }
 
-function validateSelectedAction(selected, evidence, errors) {
+function validateSelectedAction(selected, evidence, errors, options = {}) {
   if (!selected || typeof selected !== 'object') {
     errors.push('selected ontbreekt.');
     return;
   }
   if (!ALLOWED_SOURCES.has(normalizeText(selected.source))) errors.push('selected.source is ongeldig.');
-  if (!normalizeText(selected.path)) errors.push('selected.path ontbreekt.');
-  if (!normalizeText(selected.actionType)) errors.push('selected.actionType ontbreekt.');
+  const selectedPath = normalizePublicPath(selected.path);
+  if (!selectedPath) errors.push('selected.path moet een publieke Softora-route zijn.');
+  const actionType = normalizeText(selected.actionType);
+  if (!ALLOWED_ACTION_TYPES.has(actionType)) errors.push('selected.actionType is ongeldig.');
   if (normalizeText(selected.buyerTask).length < 12) errors.push('selected.buyerTask is te vaag.');
   if (normalizeText(selected.expectedQualifiedImpact).length < 20) {
     errors.push('selected.expectedQualifiedImpact mist concrete kwalificatie-impact.');
@@ -92,7 +165,25 @@ function validateSelectedAction(selected, evidence, errors) {
   if (normalizeText(selected.selectionEvidence).length < 20) {
     errors.push('selected.selectionEvidence mist controleerbaar vergelijkingsbewijs.');
   }
-  if (normalizeText(selected.actionType) !== 'new_url') return;
+  validateSupportingAction(selected, errors, options);
+  const knownPublicPaths = normalizeKnownPublicPaths(options.knownPublicPaths);
+  const readyBacklogPaths = normalizeKnownPublicPaths(options.readyBacklogPaths);
+  if (actionType !== 'new_url') {
+    if (!knownPublicPaths) {
+      errors.push('De canonieke publieke inventaris ontbreekt; selected.path kan niet veilig worden gevalideerd.');
+    } else if (selectedPath && !knownPublicPaths.has(selectedPath)) {
+      errors.push(`selected.path staat niet in de canonieke publieke inventaris: ${selectedPath}.`);
+    }
+    return;
+  }
+  if (knownPublicPaths && selectedPath && knownPublicPaths.has(selectedPath)) {
+    errors.push(`Een new_url bestaat al in de canonieke publieke inventaris: ${selectedPath}.`);
+  }
+  if (!readyBacklogPaths) {
+    errors.push('De canonieke ready backlog ontbreekt; new_url kan niet veilig worden gevalideerd.');
+  } else if (selectedPath && !readyBacklogPaths.has(selectedPath)) {
+    errors.push(`selected.path is geen ready kandidaat in de canonieke backlog: ${selectedPath}.`);
+  }
 
   const publicationLane = normalizeText(selected.publicationLane);
   if (![PUBLICATION_LANES.EDITORIAL, PUBLICATION_LANES.MONEY_PAGE].includes(publicationLane)) {
@@ -120,7 +211,6 @@ function validateSelectedAction(selected, evidence, errors) {
   ) {
     errors.push('De rollende geldpagina-cap laat deze nieuwe money page niet toe.');
   }
-  validateSupportingAction(selected, errors);
 }
 
 function validateSkipEvidence(review, evidence, errors) {
@@ -159,23 +249,47 @@ function validateSkipEvidence(review, evidence, errors) {
   }
 }
 
-function validateSelectionEvidence(evidence = {}, report = {}) {
+function validateSelectionEvidence(evidence = {}, report = {}, options = {}) {
   const errors = [];
   const warnings = [];
   const prioritized = Array.isArray(report?.queries?.prioritized) ? report.queries.prioritized : [];
+  const now = options.now instanceof Date ? options.now : new Date(options.now || Date.now());
+  const nowTime = now.getTime();
+  const evidenceTime = new Date(evidence.generatedAt).getTime();
+  const reportTime = new Date(report.generatedAt).getTime();
 
   if (Number(evidence.schemaVersion) !== SELECTION_SCHEMA_VERSION) errors.push('schemaVersion moet 1 zijn.');
   if (!isValidDateTime(evidence.generatedAt)) errors.push('generatedAt ontbreekt of is ongeldig.');
+  if (
+    isValidDateTime(evidence.generatedAt)
+    && (evidenceTime > nowTime + CLOCK_SKEW_MS || nowTime - evidenceTime > SELECTION_REPORT_MAX_AGE_MS)
+  ) {
+    errors.push('generatedAt valt buiten het verse selectievenster van 30 minuten.');
+  }
   if (report.status !== 'ready') errors.push('Het gekoppelde GSC-rapport is niet ready.');
   if (!isValidDateTime(report.generatedAt)) errors.push('Het gekoppelde GSC-rapport mist generatedAt.');
+  if (
+    isValidDateTime(report.generatedAt)
+    && (reportTime > nowTime + CLOCK_SKEW_MS || nowTime - reportTime > SELECTION_REPORT_MAX_AGE_MS)
+  ) {
+    errors.push('Het gekoppelde GSC-rapport is ouder dan 30 minuten of ligt in de toekomst.');
+  }
+  if (isValidDateTime(evidence.generatedAt) && isValidDateTime(report.generatedAt) && evidenceTime < reportTime) {
+    errors.push('generatedAt van het selectiebewijs ligt voor het gekoppelde GSC-rapport.');
+  }
   if (normalizeText(evidence?.sourceReport?.generatedAt) !== normalizeText(report.generatedAt)) {
     errors.push('sourceReport.generatedAt wijkt af van het actuele GSC-rapport.');
   }
   if (!isSafeRelativePath(evidence?.sourceReport?.path)) {
     errors.push('sourceReport.path moet een veilig relatief repopad zijn.');
+  } else if (
+    options.reportPath
+    && normalizeText(evidence.sourceReport.path) !== normalizeText(options.reportPath)
+  ) {
+    errors.push('sourceReport.path wijkt af van het werkelijk ingelezen GSC-rapport.');
   }
   if (!normalizeText(evidence.machineState)) errors.push('machineState ontbreekt.');
-  validateSelectedAction(evidence.selected, evidence, errors);
+  validateSelectedAction(evidence.selected, evidence, errors, options);
 
   const reviews = Array.isArray(evidence.prioritizedReview) ? evidence.prioritizedReview : [];
   const requiredReviewCount = Math.min(MIN_PRIORITIZED_REVIEWS, prioritized.length);
@@ -235,7 +349,11 @@ function validateSelectionEvidence(evidence = {}, report = {}) {
       selectedPublicationLane: normalizeText(evidence?.selected?.publicationLane) || null,
       supportingAction: evidence?.selected?.supportingAction ? {
         type: normalizeText(evidence.selected.supportingAction.type) || null,
-        path: normalizeText(evidence.selected.supportingAction.path) || null,
+        path: normalizePublicPath(evidence.selected.supportingAction.path) || null,
+        verification: evidence.selected.supportingAction.verification ? {
+          kind: normalizeText(evidence.selected.supportingAction.verification.kind) || null,
+          value: normalizeText(evidence.selected.supportingAction.verification.value) || null,
+        } : null,
       } : null,
       prioritizedAvailable: prioritized.length,
       prioritizedReviewed: Math.min(reviews.length, requiredReviewCount),
@@ -251,10 +369,14 @@ function validateSelectionEvidence(evidence = {}, report = {}) {
 }
 
 module.exports = {
+  ALLOWED_ACTION_TYPES,
   ALLOWED_SKIP_REASONS,
   ALLOWED_SUPPORTING_ACTION_TYPES,
+  ALLOWED_SUPPORTING_VERIFICATION_KINDS,
   MIN_PRIORITIZED_REVIEWS,
+  SELECTION_REPORT_MAX_AGE_MS,
   SELECTION_SCHEMA_VERSION,
   isSafeRelativePath,
+  normalizePublicPath,
   validateSelectionEvidence,
 };

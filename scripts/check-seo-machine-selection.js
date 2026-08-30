@@ -5,6 +5,12 @@ const {
   isSafeRelativePath,
   validateSelectionEvidence,
 } = require('../server/services/seo-machine-selection');
+const { getIndexablePublicSeoPages } = require('../server/services/public-seo');
+const { getSeoContentPublicPaths } = require('../server/services/seo-content');
+const {
+  assertSeoMachineBacklog,
+  loadSeoMachineBacklog,
+} = require('../server/services/seo-machine-backlog');
 const {
   extractRunGateCliOptions,
   recordAutomationRunGateFromCli,
@@ -33,12 +39,30 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
 }
 
+function getKnownPublicPaths() {
+  return new Set([
+    ...getIndexablePublicSeoPages().map((entry) => entry.path),
+    ...getSeoContentPublicPaths(),
+  ]);
+}
+
+function getReadyBacklogPaths() {
+  const backlog = loadSeoMachineBacklog();
+  assertSeoMachineBacklog(backlog);
+  return new Set(backlog.items.filter((item) => item.status === 'ready').map((item) => item.path));
+}
+
 function main(argv = process.argv.slice(2)) {
   const gateOptions = extractRunGateCliOptions(argv);
   const args = parseArgs(gateOptions.remaining);
   const evidence = readJson(args.evidence);
   const report = readJson(args.report);
-  const result = validateSelectionEvidence(evidence, report);
+  const result = validateSelectionEvidence(evidence, report, {
+    knownPublicPaths: getKnownPublicPaths(),
+    readyBacklogPaths: getReadyBacklogPaths(),
+    reportPath: args.report,
+    now: new Date(),
+  });
   let runGate = null;
   if (result.status === 'ready') {
     runGate = recordAutomationRunGateFromCli({
@@ -49,6 +73,7 @@ function main(argv = process.argv.slice(2)) {
         sourceReportGeneratedAt: report.generatedAt,
         selectedSource: result.summary.selectedSource,
         selectedPath: result.summary.selectedPath,
+        selectedActionType: String(evidence?.selected?.actionType || '').trim() || null,
         selectedPublicationLane: result.summary.selectedPublicationLane,
         supportingAction: result.summary.supportingAction,
         prioritizedReviewed: result.summary.prioritizedReviewed,
@@ -69,4 +94,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { main, parseArgs };
+module.exports = { getKnownPublicPaths, getReadyBacklogPaths, main, parseArgs };
