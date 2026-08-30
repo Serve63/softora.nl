@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-26",
+  "updatedAt": "2026-08-30",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1707,7 +1707,9 @@
     },
     {
       "id": "website-brief-017",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-30",
+      "shippedPath": "/blog/website-briefing-maken-mkb",
       "path": "/blog/website-briefing-maken-mkb",
       "contentType": "blog",
       "cluster": "websites",
@@ -1719,10 +1721,16 @@
       "clusterRole": "Opdrachtvoorbereiding vóór leveranciers- en offertekeuze",
       "demandEvidence": [
         {
-          "type": "serp-and-cluster-gap",
-          "source": "Nederlandse SERP en Softora websitecontentinventaris",
-          "observedAt": "2026-07-18",
-          "detail": "Actuele websitegidsen vragen kopers vooraf doelen, doelgroep, pagina's, content en budget te beschrijven; Softora heeft een offertecheck maar nog geen volledige briefingroute vóór de aanvraag."
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP en Ubersuggest read-only voor website briefing maken",
+          "observedAt": "2026-08-30",
+          "detail": "Actuele Nederlandse resultaten behandelen stappenplannen en templates met doelen, doelgroep, pagina's, content, functies, planning en budget. De provider gaf geen meetbaar volume maar wel Nederlandse autocompletevarianten; nul is niet als geen vraag geïnterpreteerd."
+        },
+        {
+          "type": "binding-control-plane",
+          "source": "Softora cadence, backlog en GSC-rapport van run 11/15",
+          "observedAt": "2026-08-30",
+          "detail": "De rollende zevendaagse lane stond op 2/7 nieuwe URL's en 2/5 redactionele URL's; website-brief-017 was de hoogste veilige ready editorial kandidaat en vult een afzonderlijke koperstaak vóór offertevergelijking."
         }
       ],
       "competitorPatterns": [
@@ -1731,14 +1739,14 @@
         "Bureau-intakes die vooral eigen verkoopprocessen ondersteunen"
       ],
       "overlap": {
-        "checkedAt": "2026-07-18",
+        "checkedAt": "2026-08-30",
         "closestPaths": [
           "/blog/website-offerte-vergelijken",
           "/blog/website-laten-maken-mkb-paginas",
           "/blog/website-laten-maken-kosten-2026"
         ],
         "decision": "distinct",
-        "rationale": "De briefingpagina helpt vóór offerteaanvragen doelen, doelgroep, content, functies en acceptatie vastleggen; de offertegids beoordeelt ontvangen voorstellen en de andere pagina's behandelen alleen structuur of kosten."
+        "rationale": "De briefingpagina helpt vóór offerteaanvragen doelen, doelgroep, content, functies, eigenaars en acceptatie als beslisregister vastleggen; de offertegids beoordeelt ontvangen voorstellen, de paginagids kiest inhoudsrollen en de kostengids begroot scope."
       },
       "scores": {
         "businessFit": 5,
@@ -1782,11 +1790,10 @@
         ],
         "structuredData": [
           "Article",
-          "FAQPage",
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Controleer SERP-overlap met offertecheck en schrijf de briefing als invulbaar denkmodel zonder calculator of downloadtool."
+      "nextAction": "Beoordeel op 2026-09-13, 2026-09-27 en 2026-10-25 indexatie, relevante niet-merkgebonden ontdekking en navigatie naar /website-laten-maken; bescherm de unieke briefingtaak tegen overlap met offertevergelijking."
     },
     {
       "id": "crm-adoption-018",
@@ -2406,6 +2413,94 @@
         ]
       },
       "nextAction": "Herbevestig actuele buyer questions en ontwerp een platformneutrale monitoringskaart waarin automatische signalen nooit het menselijke kwaliteits- of pauzebesluit vervangen."
+    },
+    {
+      "id": "website-content-handoff-029",
+      "status": "ready",
+      "path": "/blog/website-content-aanleveren-mkb",
+      "contentType": "blog",
+      "cluster": "websites",
+      "primaryQuery": "content aanleveren website",
+      "intent": "Teksten, beelden, bewijs en paginagegevens compleet en controleerbaar aanleveren voordat de websitebouw start",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Contentoverdracht ná briefing en offerteakkoord maar vóór ontwerp, bouw en paginavulling",
+      "demandEvidence": [
+        {
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP voor website content aanleveren en website aanleveren checklist",
+          "observedAt": "2026-08-30",
+          "detail": "Actuele resultaten gebruiken teksten, afbeeldingen, paginalijst, merkbestanden, contactgegevens, formulieren, rechten en veilige toegang als concrete aanlevertaak. De resultaten lopen vaak door elkaar met briefing of livegang en missen een leveranciersneutraal overdrachtsdossier per pagina."
+        },
+        {
+          "type": "cluster-gap",
+          "source": "Softora websitecontentinventaris na publicatie van de briefingroute",
+          "observedAt": "2026-08-30",
+          "detail": "Softora dekt nu opdrachtbriefing, offertevergelijking, pagina-inventaris, kosten, migratie en acceptatie, maar nog niet de post-akkoord overdracht van definitieve content, bewijs, rechten, status, eigenaar en acceptatie per pagina."
+        }
+      ],
+      "competitorPatterns": [
+        "Een algemene uploadlijst zonder pagina-eigenaar, status of inhoudelijke acceptatie",
+        "Briefing en definitieve contentaanlevering als dezelfde fase behandelen",
+        "Teksten en beelden per e-mail verzamelen zonder bron, recht, versie of veilige toegangsroute"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-30",
+        "closestPaths": [
+          "/blog/website-briefing-maken-mkb",
+          "/blog/website-laten-maken-mkb-paginas",
+          "/blog/website-offerte-vergelijken"
+        ],
+        "decision": "distinct",
+        "rationale": "De briefing bepaalt vóór offertes wat gebouwd moet worden, de paginagids bepaalt welke inhoudsrollen nodig zijn en de offertegids kiest een voorstel. Deze kandidaat begint pas na akkoord en is eigenaar van de definitieve contentoverdracht: bestand, bron, recht, versie, pagina, eigenaar, status en acceptatie."
+      },
+      "scores": {
+        "businessFit": 4,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 3.9,
+      "brief": {
+        "title": "Websitecontent aanleveren: overdrachtschecklist voor het MKB",
+        "metaDescription": "Lever teksten, beelden, bewijs, rechten en paginagegevens aan met een eigenaar, status, versie en acceptatie per websitepagina.",
+        "h1": "Hoe lever je content goed aan voor een nieuwe website?",
+        "outline": [
+          "Scheid definitieve contentoverdracht van briefing en feedback",
+          "Maak per pagina een bron-, status- en eigenaarsregister",
+          "Lever beelden, merkbestanden en gebruiksrechten controleerbaar aan",
+          "Verzamel formulieren, bewijs en veilige toegangsbehoeften zonder geheimen te delen",
+          "Accepteer content vóór bouw en voer latere wijzigingen via versiebeheer terug"
+        ],
+        "buyerQuestions": [
+          "Welke teksten en bestanden heeft een webbureau nodig?",
+          "Hoe voorkom je dat verouderde of onbewezen content live gaat?",
+          "Wie controleert per pagina of de aanlevering compleet en goedgekeurd is?"
+        ],
+        "incomingLinks": [
+          "/blog/website-briefing-maken-mkb",
+          "/blog/website-laten-maken-mkb-paginas"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/kennisbank/website-migratie-zonder-seo-verlies"
+        ],
+        "conversionPath": "Van een compleet contentoverdrachtsdossier naar een afgebakend websitegesprek zonder verborgen aanlever- en correctiewerk.",
+        "claimRisk": "Geen vaste doorlooptijd, foutloze overdracht, ranking of conversie beloven; geen geheimen in documenten verzamelen en rechten of privacy niet als juridisch advies behandelen.",
+        "visualConcepts": [
+          "Contentbibliotheek per pagina met bron, versie, eigenaar, recht en acceptatiestempel",
+          "Overdrachtsroute van goedgekeurde tekst en beeld via ontwerp en bouw naar livecontrole met herstelbak"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig Nederlandse vraagvormen en bouw een controleerbaar overdrachtsdossier per pagina zonder uploadtool, juridisch advies of aannames over complete klantcontent."
     }
   ]
 }

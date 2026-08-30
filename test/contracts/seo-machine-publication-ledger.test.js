@@ -178,7 +178,7 @@ test('content growth actions have an explicit machine-readable event plan', () =
       ],
       [
         '/blog/website-offerte-vergelijken',
-        '2026-08-28',
+        '2026-08-30',
         'other_growth_action',
         'scheduled',
       ],
@@ -209,6 +209,24 @@ test('website-migratiepublicatie staat eenmaal als nieuwe URL in het machineplan
   assert.equal(events[0].eventAt, '2026-08-26');
   assert.equal(events[0].status, 'live');
   assert.equal(events[0].publicationLane, 'editorial');
+});
+
+test('websitebriefing en ondersteunende offerte-optimalisatie blijven aparte gebeurtenissen', () => {
+  const events = getSeoMachinePublicationPlan({ now: new Date('2026-08-30T16:00:00.000Z') })
+    .filter((event) => [
+      '/blog/website-briefing-maken-mkb',
+      '/blog/website-offerte-vergelijken',
+    ].includes(event.path) && event.eventAt === '2026-08-30');
+
+  assert.deepEqual(events.map((event) => [
+    event.path,
+    event.publicationKind,
+    event.eventAt,
+    event.publicationLane,
+  ]), [
+    ['/blog/website-briefing-maken-mkb', 'new_url', '2026-08-30', 'editorial'],
+    ['/blog/website-offerte-vergelijken', 'other_growth_action', '2026-08-30', 'editorial'],
+  ]);
 });
 
 test('live publication ledger counts only verified public indexable URLs', async () => {

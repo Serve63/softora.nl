@@ -7,9 +7,9 @@ const WEBSITE_PROPOSAL_CONTENT_ITEM = Object.freeze({
   category: 'Websites',
   intent: 'Koopintentie',
   publishedAt: '2026-07-18',
-  updatedAt: '2026-08-28',
+  updatedAt: '2026-08-30',
   growthEventKind: 'other_growth_action',
-  growthEventAt: '2026-08-28',
+  growthEventAt: '2026-08-30',
   image: Object.freeze({
     src: '/assets/seo-content/website-offerte-vergelijkingsmatrix-softora.jpg',
     alt: 'Vergelijkingsmatrix voor websiteoffertes met controlepunten voor strategie, pagina’s, content, SEO, techniek en beheer.',
@@ -31,8 +31,13 @@ const WEBSITE_PROPOSAL_CONTENT_ITEM = Object.freeze({
       paragraphs: Object.freeze([
         Object.freeze({
           text:
-            'Offertes zijn pas vergelijkbaar wanneer iedere aanbieder dezelfde opdracht heeft ontvangen. Leg daarom eerst vast voor welke doelgroepen je de website laat maken, welke diensten prioriteit krijgen en welke acties bezoekers moeten kunnen uitvoeren. Denk aan bellen, WhatsApp, een formulier invullen, een afspraak aanvragen of gericht doorklikken naar een dienst.',
+            'Offertes zijn pas vergelijkbaar wanneer iedere aanbieder dezelfde opdracht heeft ontvangen. Maak daarom eerst een websitebriefing met doelgroepen, paginataken, bewijs, functies, eigenaars en acceptatie. Leg daarna vast welke diensten prioriteit krijgen en welke acties bezoekers moeten kunnen uitvoeren. Denk aan bellen, WhatsApp, een formulier invullen, een afspraak aanvragen of gericht doorklikken naar een dienst wanneer je een website laat maken.',
           links: Object.freeze([
+            Object.freeze({
+              anchor: 'websitebriefing',
+              href: '/blog/website-briefing-maken-mkb',
+              availableFrom: '2026-08-30',
+            }),
             Object.freeze({ anchor: 'website laat maken', href: '/website-laten-maken' }),
           ]),
         }),
@@ -83,6 +88,11 @@ const WEBSITE_PROPOSAL_CONTENT_ITEM = Object.freeze({
   ]),
   relatedLinks: Object.freeze([
     Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+    Object.freeze({
+      label: 'Websitebriefing maken',
+      href: '/blog/website-briefing-maken-mkb',
+      availableFrom: '2026-08-30',
+    }),
     Object.freeze({ label: 'Websitekosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
     Object.freeze({ label: 'Website laten maken of zelf maken', href: '/vergelijkingen/website-laten-maken-vs-zelf-maken' }),
     Object.freeze({ label: 'Welke pagina’s heeft een MKB-website nodig?', href: '/blog/website-laten-maken-mkb-paginas' }),
