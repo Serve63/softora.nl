@@ -8,6 +8,7 @@ const {
   extractCanonicalHref,
   extractSitemapLocations,
   isPublicationInWindow,
+  validatePublicationWindowPolicy,
 } = require('../../server/services/seo-machine-publication-ledger');
 const {
   getSeoContentGrowthEventPlan,
@@ -297,6 +298,26 @@ test('window summary separates editorial and money-page URLs and exposes the cap
   assert.equal(summary.deficit, 3);
 });
 
+test('ledger policy rejects money-page and daily growth URL cap breaches', () => {
+  assert.deepEqual(validatePublicationWindowPolicy({
+    days: 7,
+    growthNewUrls: 7,
+    editorialNewUrls: 4,
+    moneyPageNewUrls: 3,
+    moneyPageMaximum: 2,
+    targetMaximum: 7,
+  }), ['Rollende 7-daagse geldpagina-cap is overschreden: 3/2.']);
+
+  assert.deepEqual(validatePublicationWindowPolicy({
+    days: 7,
+    growthNewUrls: 8,
+    editorialNewUrls: 6,
+    moneyPageNewUrls: 2,
+    moneyPageMaximum: 2,
+    targetMaximum: 7,
+  }), ['Rollende 7-daagse groei-URL-cap is overschreden: 8/7.']);
+});
+
 test('cadence gate returns red exit code two when content is required', () => {
   const result = evaluateCadence({
     backlogResult: {
@@ -333,4 +354,30 @@ test('cadence gate reserves exit code one for an operational P0', () => {
   assert.equal(result.status, 'p0');
   assert.equal(result.exitCode, 1);
   assert.deepEqual(result.errors, ['invalid backlog', 'live mismatch']);
+});
+
+test('cadence gate treats an observed cap breach as operations P0', () => {
+  const result = evaluateCadence({
+    backlogResult: {
+      ok: true,
+      errors: [],
+      summary: { topReady: [], topReadyEditorial: [] },
+    },
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: {
+        '7': {
+          qualifying: 7,
+          growthNewUrls: 7,
+          editorialNewUrls: 4,
+          moneyPageNewUrls: 3,
+        },
+      },
+    },
+  });
+
+  assert.equal(result.status, 'p0');
+  assert.equal(result.exitCode, 1);
+  assert.match(result.errors.join(' '), /geldpagina-cap.*3\/2/i);
 });

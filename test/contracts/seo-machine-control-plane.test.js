@@ -204,7 +204,46 @@ test('supporting checks and existing-page optimization stay required on safe run
     'contextual_internal_links',
     'evidence_backed_existing_page_optimization',
   ]);
-  assert.equal(state.maximumNewUrlsPerWeek, null);
+  assert.equal(state.maximumNewUrlsPerWeek, 7);
+});
+
+test('control plane fails closed when a ready ledger already breached the money-page cap', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': ledgerWindow({
+        growthNewUrls: 7,
+        editorialNewUrls: 2,
+        moneyPageNewUrls: 5,
+      }) },
+    },
+  }));
+
+  assert.equal(state.state, 'operations_p0');
+  assert.equal(state.exitCode, 1);
+  assert.equal(state.newUrlRequired, false);
+  assert.match(state.reasons.join(' '), /geldpagina-cap.*5\/2/i);
+});
+
+test('control plane fails closed when more than one growth URL per daily heartbeat is observed', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': ledgerWindow({
+        qualifying: 8,
+        newUrls: 8,
+        growthNewUrls: 8,
+        editorialNewUrls: 6,
+        moneyPageNewUrls: 2,
+      }) },
+    },
+  }));
+
+  assert.equal(state.state, 'operations_p0');
+  assert.equal(state.exitCode, 1);
+  assert.match(state.reasons.join(' '), /groei-URL.*8\/7/i);
 });
 
 test('control plane refuses scale without positive D28 non-brand evidence', () => {

@@ -33,6 +33,7 @@
     "seo:indexation:report": "node scripts/seo-machine-indexation-report.js",
     "seo:visuals:check": "node scripts/check-seo-machine-visuals.js",
     "seo:keywords:check": "node scripts/check-seo-machine-keywords.js",
+    "seo:reviews:check": "node scripts/check-seo-machine-reviews.js",
     "seo:selection:check": "node scripts/check-seo-machine-selection.js",
     "seo:live-route:check": "node scripts/check-seo-machine-live-route.js",
     "seo:automation-state": "node scripts/seo-machine-automation-state.js",

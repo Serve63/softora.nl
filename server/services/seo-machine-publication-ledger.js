@@ -269,6 +269,26 @@ function buildWindowSummary(items, now, days) {
   };
 }
 
+function validatePublicationWindowPolicy(summary = {}) {
+  const errors = [];
+  const days = Number(summary.days) || 7;
+  const moneyPageNewUrls = Number(summary.moneyPageNewUrls) || 0;
+  const moneyPageMaximum = Number.isFinite(Number(summary.moneyPageMaximum))
+    ? Number(summary.moneyPageMaximum)
+    : Math.round((days / 7) * WEEKLY_MONEY_PAGE_MAXIMUM);
+  const growthNewUrls = Number(summary.growthNewUrls) || 0;
+  const targetMaximum = Number.isFinite(Number(summary.targetMaximum))
+    ? Number(summary.targetMaximum)
+    : Math.round((days / 7) * WEEKLY_TARGET_MAXIMUM);
+  if (moneyPageNewUrls > moneyPageMaximum) {
+    errors.push(`Rollende ${days}-daagse geldpagina-cap is overschreden: ${moneyPageNewUrls}/${moneyPageMaximum}.`);
+  }
+  if (growthNewUrls > targetMaximum) {
+    errors.push(`Rollende ${days}-daagse groei-URL-cap is overschreden: ${growthNewUrls}/${targetMaximum}.`);
+  }
+  return errors;
+}
+
 async function collectLivePublicationLedger(options = {}) {
   const fetchImpl = options.fetchImpl || global.fetch;
   if (typeof fetchImpl !== 'function') throw new Error('Een fetch-implementatie is vereist.');
@@ -374,6 +394,9 @@ async function collectLivePublicationLedger(options = {}) {
   const windowSummaries = Object.fromEntries(
     windows.map((days) => [String(days), buildWindowSummary(items, now, days)])
   );
+  for (const summary of Object.values(windowSummaries)) {
+    errors.push(...validatePublicationWindowPolicy(summary));
+  }
   return {
     status: errors.length ? 'p0' : 'ready',
     generatedAt: now.toISOString(),
@@ -407,6 +430,22 @@ function evaluateCadence({ ledger, backlogResult, weeklyMinimum = WEEKLY_MINIMUM
   const growthNewUrls = Number((weeklyWindow && weeklyWindow.growthNewUrls) || 0);
   const editorialNewUrls = Number((weeklyWindow && weeklyWindow.editorialNewUrls) || 0);
   const moneyPageNewUrls = Number((weeklyWindow && weeklyWindow.moneyPageNewUrls) || 0);
+  const policyErrors = validatePublicationWindowPolicy({
+    days: 7,
+    growthNewUrls,
+    moneyPageNewUrls,
+    moneyPageMaximum: WEEKLY_MONEY_PAGE_MAXIMUM,
+    targetMaximum: WEEKLY_TARGET_MAXIMUM,
+  });
+  if (policyErrors.length) {
+    return {
+      status: 'p0',
+      color: 'red',
+      exitCode: 1,
+      action: 'repair_publication_policy_breach',
+      errors: policyErrors,
+    };
+  }
   const deficit = Math.max(0, weeklyMinimum - growthNewUrls);
   const editorialDeficit = Math.max(0, WEEKLY_EDITORIAL_MINIMUM - editorialNewUrls);
   const moneyPageCapReached = moneyPageNewUrls >= WEEKLY_MONEY_PAGE_MAXIMUM;
@@ -474,6 +513,7 @@ module.exports = {
   extractSitemapLocations,
   hasVisiblePublishedDate,
   isPublicationInWindow,
+  validatePublicationWindowPolicy,
   normalizeCanonical,
   normalizePublicPath,
   resolveHealthCommit,

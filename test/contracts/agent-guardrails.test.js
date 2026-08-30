@@ -618,6 +618,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['seo:indexation:report'], 'node scripts/seo-machine-indexation-report.js');
   assert.equal(packageJson.scripts['seo:visuals:check'], 'node scripts/check-seo-machine-visuals.js');
   assert.equal(packageJson.scripts['seo:keywords:check'], 'node scripts/check-seo-machine-keywords.js');
+  assert.equal(packageJson.scripts['seo:reviews:check'], 'node scripts/check-seo-machine-reviews.js');
   assert.equal(packageJson.scripts['seo:selection:check'], 'node scripts/check-seo-machine-selection.js');
   assert.equal(packageJson.scripts['seo:live-route:check'], 'node scripts/check-seo-machine-live-route.js');
   assert.equal(packageJson.scripts['seo:automation-state'], 'node scripts/seo-machine-automation-state.js');

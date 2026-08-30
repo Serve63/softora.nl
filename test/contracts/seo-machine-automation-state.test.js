@@ -64,18 +64,22 @@ function createGitRepository() {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=5',
+    'SEO_MACHINE_PROMPT_VERSION=6',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
     'Recover explicitly with npm run seo:automation-state -- recover-run.',
     'Every final gate uses --record-run-gate.',
     'Run npm run seo:selection:check before implementation.',
+    'Run npm run seo:reviews:check before implementation.',
+    'Use a metrics object with nonBrandedClicks, nonBrandedImpressions, averagePosition and baselineComparison.',
+    'Keep both evidence gates inside a 30-minute fresh GSC window.',
+    'new_url must not exist there yet and must exactly match a ready path.',
     'Run npm run seo:live-route:check after production.',
     'Close every outcome with npm run seo:automation-state -- finish-run.',
     'Record setup evidence with npm run seo:automation-state -- record-tool-smoke.',
     'Require mcp__ubersuggest__keyword_suggestions, mcp__ubersuggest__google_suggestions, mcp__ubersuggest__keyword_overview and mcp__ubersuggest__serp_analysis.',
-    'Select agent.browsers.get("edge") and require family=edge followed by profileName=Codex.',
-    'Google Chrome is forbidden.',
+    'Select agent.browsers.get("iab") and use only the returned built-in ChatGPT/Codex browser binding.',
+    'Google Chrome and Microsoft Edge are forbidden, with no generic browser fallback.',
     'This automation remains ACTIVE until Serve explicitly pauses.',
     'After 31 December 2026, continue on rolling evidence.',
     'Never buy credits or use paid fallbacks.',
@@ -117,14 +121,45 @@ function recordPublishedGates(memoryPath, options = {}) {
   const treeSha = options.treeSha || '1'.repeat(40);
   const liveCommit = options.liveCommit || 'abcdef1234567890';
   const changedUrl = options.changedUrl || 'https://www.softora.nl/bedrijfssoftware-op-maat';
+  const selectedPath = options.selectedPath || new URL(changedUrl).pathname;
+  const selectedActionType = options.selectedActionType || 'substantial_refresh';
+  const defaultSupportingAction = {
+    type: 'contextual_internal_link',
+    path: '/kennisbank/bestaande-route',
+    verification: { kind: 'link_to_selected_url', value: null },
+  };
+  const supportingAction = Object.prototype.hasOwnProperty.call(options, 'supportingAction')
+    ? options.supportingAction
+    : defaultSupportingAction;
+  const routeSupportingAction = Object.prototype.hasOwnProperty.call(options, 'routeSupportingAction')
+    ? options.routeSupportingAction
+    : { ...supportingAction, verified: true };
   for (const gate of REQUIRED_PUBLISHED_RUN_GATES) {
+    let details = { status: 'ready', gate };
+    if (gate === 'selection') {
+      details = {
+        status: 'ready',
+        selectedPath,
+        selectedActionType,
+        supportingAction,
+      };
+    }
+    if (gate === 'live_route') {
+      details = {
+        status: 'ready',
+        summary: {
+          url: changedUrl,
+          supportingAction: routeSupportingAction,
+        },
+      };
+    }
     recordAutomationRunGate({
       memoryPath,
       threadId,
       invocationAt,
       gate,
       checkedAt,
-      details: { status: 'ready', gate },
+      details,
       treeSha: ['keywords', 'visuals', 'verify_critical', 'live_production', 'live_route'].includes(gate) ? treeSha : null,
       liveCommit: ['live_production', 'live_route'].includes(gate) ? liveCommit : null,
       changedUrl: gate === 'live_route' ? changedUrl : null,
@@ -308,6 +343,113 @@ test('finish-run blocks tree drift between final validators and the live deploym
   }), /PUBLISHED_GATES_INCOMPLETE.*keywords.*niet uitgevoerd op de live productietree/);
 });
 
+test('finish-run binds the selected path to the exact live route', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  recordPublishedGates(memoryPath, {
+    invocationAt,
+    selectedPath: '/blog/selectie-a',
+    changedUrl: 'https://www.softora.nl/blog/live-b',
+  });
+
+  assert.throws(() => finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'Publication must bind the selected URL to the exact route checked in production.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/blog/live-b',
+  }), /PUBLISHED_GATES_INCOMPLETE.*selectedPath.*live route/i);
+});
+
+test('finish-run rejects an invalid selected action type even with green route evidence', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  recordPublishedGates(memoryPath, { invocationAt, selectedActionType: 'invented_action' });
+
+  assert.throws(() => finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'Publication must retain a canonical selected action type through final closure.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+  }), /PUBLISHED_GATES_INCOMPLETE.*selectedActionType/i);
+});
+
+test('finish-run requires live proof for every selected supporting optimization', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  const supportingAction = {
+    type: 'contextual_internal_link',
+    path: '/kennisbank/bestaande-route',
+    verification: { kind: 'link_to_selected_url', value: null },
+  };
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  recordPublishedGates(memoryPath, {
+    invocationAt,
+    selectedPath: '/blog/nieuwe-route',
+    selectedActionType: 'substantial_refresh',
+    supportingAction,
+    routeSupportingAction: null,
+    changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
+  });
+
+  assert.throws(() => finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'Publication must prove the selected supporting optimization on the live site.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
+  }), /PUBLISHED_GATES_INCOMPLETE.*supportingAction/i);
+
+  recordAutomationRunGate({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    gate: 'live_route',
+    checkedAt: '2026-08-28T09:02:00+02:00',
+    details: {
+      status: 'ready',
+      summary: {
+        url: 'https://www.softora.nl/blog/nieuwe-route',
+        supportingAction: { ...supportingAction, verified: true },
+      },
+    },
+    treeSha: '1'.repeat(40),
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
+  });
+  const receipt = finishAutomationRun({
+    memoryPath,
+    threadId: 'thread-1',
+    invocationAt,
+    finishedAt: '2026-08-28T09:05:00+02:00',
+    outcome: 'published',
+    publicEffect: 'live',
+    evidence: 'Publication proves the selected supporting optimization on the live site.',
+    prNumber: 1808,
+    liveCommit: 'abcdef1234567890',
+    changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
+  });
+  assert.equal(receipt.outcome, 'published');
+});
+
 test('run-gate digest exposes a mutated stored result', () => {
   const memoryPath = prepareOperationalState(createMemory());
   const invocationAt = '2026-08-28T08:15:00+02:00';
@@ -355,19 +497,19 @@ test('tree-bound CLI receipts require the active invocation and a clean committe
   }), /TREE_GATE_DIRTY/);
 });
 
-test('the next invocation exposes and seals an unfinished previous run as interrupted', () => {
+test('the next invocation fails closed until the unfinished previous run is recovered explicitly', () => {
   const memoryPath = prepareOperationalState(createMemory());
   startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
-  const next = startAutomationRun({
+  assert.throws(() => startAutomationRun({
     memoryPath,
     threadId: 'thread-1',
     invocationAt: '2026-08-29T08:15:00+02:00',
-  });
+  }), /ACTIVE_RUN_REQUIRES_RECOVERY/);
 
-  assert.equal(next.completedRunsInActiveThread, 8);
-  assert.equal(next.recoveredPreviousRun.outcome, 'interrupted');
-  assert.equal(next.recoveredPreviousRun.publicEffect, 'unverified');
-  assert.equal(inspectAutomationState(memoryPath).lifecycle.receipts[0].autoClosed, true);
+  const inspected = inspectAutomationState(memoryPath);
+  assert.equal(inspected.rotation.completedRunsInActiveThread, 7);
+  assert.equal(inspected.lifecycle.receipts.length, 0);
+  assert.equal(inspected.lifecycle.activeRun.invocationAt, '2026-08-28T08:15:00+02:00');
 });
 
 test('recover-run explicitly closes an unfinished invocation before the next counter increment', () => {
@@ -564,6 +706,17 @@ test('automation installation audit proves one active heartbeat, matching task a
   assert.equal(audit.matchingAutomationCount, 1);
   assert.equal(audit.automation.targetThreadId, 'thread-1');
   assert.deepEqual(audit.automation.missingPromptMarkers, []);
+});
+
+test('automation installation audit rejects an Edge route even when IAB markers are present', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const paths = createAutomationConfig(memoryPath, {
+    prompt: `${validAutomationPrompt()} Legacy fallback agent.browsers.get("edge") family=edge.`,
+  });
+  const audit = auditAutomationInstallation({ memoryPath, ...paths });
+
+  assert.equal(audit.status, 'invalid');
+  assert.match(audit.errors.join(' '), /verboden browserroute/i);
 });
 
 test('automation installation audit rejects tool names without a real four-tool data smoke', () => {

@@ -116,11 +116,151 @@ function expectedContentImages(item) {
     .filter((image) => image.src);
 }
 
+function normalizePathname(value) {
+  const raw = String(value || '').trim();
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '';
+  try {
+    const parsed = new URL(raw, 'https://www.softora.nl');
+    if (!SOFTORA_HOSTS.has(parsed.hostname) || parsed.search || parsed.hash) return '';
+    return parsed.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return '';
+  }
+}
+
+function collectInternalAnchorPaths(document, baseUrl) {
+  return new Set(findTags(document, 'a').flatMap((node) => {
+    const href = String(node.attribs?.href || '').trim();
+    if (!href) return [];
+    try {
+      const parsed = new URL(href, baseUrl);
+      if (!SOFTORA_HOSTS.has(parsed.hostname)) return [];
+      return [parsed.pathname.replace(/\/+$/, '') || '/'];
+    } catch {
+      return [];
+    }
+  }));
+}
+
+async function verifySupportingAction({
+  supportingAction,
+  selectedUrl,
+  origin,
+  sitemapLocations,
+  fetchImpl,
+} = {}) {
+  if (!supportingAction) return { errors: [], summary: null };
+  const errors = [];
+  const type = String(supportingAction.type || '').trim();
+  const supportingPath = normalizePathname(supportingAction.path);
+  const selectedPath = new URL(selectedUrl).pathname.replace(/\/+$/, '') || '/';
+  const verification = supportingAction.verification;
+  const verificationKind = String(verification?.kind || '').trim();
+  const verificationValue = String(verification?.value || '').trim();
+  if (!type) errors.push('supportingAction.type ontbreekt.');
+  if (!supportingPath) errors.push('supportingAction.path is ongeldig.');
+  if (supportingPath && supportingPath === selectedPath) {
+    errors.push('supportingAction.path mag niet gelijk zijn aan de gewijzigde URL.');
+  }
+  if (!verification || typeof verification !== 'object' || !verificationKind) {
+    errors.push('supportingAction.verification ontbreekt.');
+  } else if (verificationKind === 'link_present' && !normalizePathname(verificationValue)) {
+    errors.push('supportingAction link_present-bewijs mist een geldige Softora-route.');
+  } else if (verificationKind === 'text_present' && verificationValue.length < 12) {
+    errors.push('supportingAction text_present-bewijs is te vaag.');
+  } else if (verificationKind === 'title_equals' && verificationValue.length < 10) {
+    errors.push('supportingAction title_equals-bewijs is te kort.');
+  } else if (verificationKind === 'meta_description_equals' && verificationValue.length < 30) {
+    errors.push('supportingAction meta_description_equals-bewijs is te kort.');
+  }
+  if (!supportingPath || errors.length) {
+    return {
+      errors,
+      summary: {
+        type: type || null,
+        path: supportingPath || null,
+        verification: verificationKind ? { kind: verificationKind, value: verificationValue || null } : null,
+        verified: false,
+      },
+    };
+  }
+
+  const supportingUrl = new URL(supportingPath, origin).toString();
+  let html = '';
+  let routeStatus = null;
+  try {
+    const response = await fetchChecked(fetchImpl, supportingUrl);
+    routeStatus = response.status;
+    if (response.status !== 200) errors.push(`supportingAction route gaf HTTP ${response.status}.`);
+    if (response.url && normalizePublicUrl(response.url) !== normalizePublicUrl(supportingUrl)) {
+      errors.push('supportingAction route redirect naar een andere eind-URL.');
+    }
+    if (!String(response.headers.get('content-type') || '').toLowerCase().includes('text/html')) {
+      errors.push('supportingAction route is geen HTML-response.');
+    }
+    html = await response.text();
+  } catch (error) {
+    errors.push(`supportingAction route kon niet worden gelezen: ${error.message || String(error)}`);
+  }
+
+  const document = parseDocument(html);
+  const canonical = findCanonical(document);
+  try {
+    if (!canonical || normalizePublicUrl(new URL(canonical, supportingUrl).toString()) !== normalizePublicUrl(supportingUrl)) {
+      errors.push('supportingAction canonical is niet self-referential.');
+    }
+  } catch {
+    errors.push('supportingAction canonical is ongeldig.');
+  }
+  const robots = findMetaContent(document, 'name', 'robots').toLowerCase();
+  if (!robots || robots.includes('noindex')) errors.push('supportingAction route is niet indexeerbaar.');
+  if (!sitemapLocations.has(normalizePublicUrl(supportingUrl))) {
+    errors.push('supportingAction route ontbreekt in sitemap.xml.');
+  }
+
+  const internalLinks = collectInternalAnchorPaths(document, supportingUrl);
+  const visibleText = DomUtils.textContent(document).replace(/\s+/g, ' ').trim();
+  const title = DomUtils.textContent(findTags(document, 'title')[0] || '').trim();
+  const description = findMetaContent(document, 'name', 'description').trim();
+  if (verificationKind === 'link_to_selected_url' && !internalLinks.has(selectedPath)) {
+    errors.push(`supportingAction mist de live interne link naar ${selectedPath}.`);
+  } else if (verificationKind === 'link_present') {
+    const expectedPath = normalizePathname(verificationValue);
+    if (!expectedPath || !internalLinks.has(expectedPath)) {
+      errors.push(`supportingAction mist de verwachte interne link ${verificationValue || '(leeg)'}.`);
+    }
+  } else if (verificationKind === 'text_present' && !visibleText.toLowerCase().includes(verificationValue.toLowerCase())) {
+    errors.push('supportingAction mist de verwachte zichtbare tekst.');
+  } else if (verificationKind === 'title_equals' && title !== verificationValue) {
+    errors.push('supportingAction title wijkt af van het selectiebewijs.');
+  } else if (verificationKind === 'meta_description_equals' && description !== verificationValue) {
+    errors.push('supportingAction meta description wijkt af van het selectiebewijs.');
+  } else if (![
+    'link_to_selected_url', 'link_present', 'text_present', 'title_equals', 'meta_description_equals',
+  ].includes(verificationKind)) {
+    errors.push(`supportingAction verification.kind is ongeldig: ${verificationKind || '(leeg)'}.`);
+  }
+
+  return {
+    errors,
+    summary: {
+      type,
+      path: supportingPath,
+      verification: { kind: verificationKind, value: verificationValue || null },
+      verified: errors.length === 0,
+      routeStatus,
+      canonical: canonical || null,
+      sitemap: sitemapLocations.has(normalizePublicUrl(supportingUrl)),
+    },
+  };
+}
+
 async function runSeoMachineLiveRouteCheck({
   url,
   liveCommit,
   fetchImpl = global.fetch,
   contentItems,
+  supportingAction = null,
 } = {}) {
   const errors = [];
   let target;
@@ -204,6 +344,15 @@ async function runSeoMachineLiveRouteCheck({
     try { return normalizePublicUrl(location); } catch { return null; }
   }).filter(Boolean));
   if (!normalizedSitemapLocations.has(canonicalTarget)) errors.push('changed URL ontbreekt in sitemap.xml.');
+
+  const supportingResult = await verifySupportingAction({
+    supportingAction,
+    selectedUrl: canonicalTarget,
+    origin,
+    sitemapLocations: normalizedSitemapLocations,
+    fetchImpl,
+  });
+  errors.push(...supportingResult.errors);
 
   const anchorNodes = findTags(document, 'a');
   const anchors = anchorNodes.map((node) => String(node.attribs?.href || '').trim()).filter(Boolean);
@@ -326,6 +475,7 @@ async function runSeoMachineLiveRouteCheck({
       imageObject: item ? !errors.some((error) => /ImageObject/.test(error)) : null,
       ogImageDimensions: item ? !errors.some((error) => /og:image/.test(error)) : null,
       whatsappLinks: anchors.filter((href) => href.includes('wa.me/')).length,
+      supportingAction: supportingResult.summary,
     },
   };
 }
@@ -335,7 +485,9 @@ module.exports = {
   expectedContentImages,
   findCanonical,
   normalizePublicUrl,
+  normalizePathname,
   parseJsonLd,
   resolveContentItem,
   runSeoMachineLiveRouteCheck,
+  verifySupportingAction,
 };
