@@ -236,7 +236,13 @@ function applyAppMiddleware(app, deps = {}) {
     if (req.method === 'POST' && pathname === '/api/website-preview-library') {
       return jsonBodyParserPreviewLibrary(req, res, next);
     }
-    if (req.method === 'POST' && pathname === '/api/whatsapp/webhook') {
+    if (
+      req.method === 'POST' &&
+      (
+        pathname === '/api/whatsapp/webhook' ||
+        pathname.startsWith('/api/whatsapp/provider-webhook/')
+      )
+    ) {
       return jsonBodyParserWhatsAppHistory(req, res, next);
     }
     if (
