@@ -597,13 +597,13 @@ test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inko
   assert.equal(item.image.src, '/assets/seo-content/website-offerte-vergelijkingsmatrix-softora.jpg');
   assert.equal(item.secondaryImage.src, '/assets/seo-content/website-offerte-oplevering-toegang-softora.jpg');
   assert.equal(item.growthEventKind, 'other_growth_action');
-  assert.equal(item.growthEventAt, '2026-08-28');
+  assert.equal(item.growthEventAt, '2026-08-30');
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
   assert.match(html, /width="1600" height="1000" loading="lazy"/);
-  assert.match(html, /je de <a href="\/website-laten-maken">website laat maken<\/a>/);
+  assert.match(html, /wanneer je een <a href="\/website-laten-maken">website laat maken<\/a>/);
   assert.match(html, /headings, <a href="\/kennisbank\/wat-is-interne-linkstructuur">interne links<\/a>/);
-  assert.match(html, /"dateModified":"2026-08-28"/);
+  assert.match(html, /"dateModified":"2026-08-30"/);
   assert.match(costHtml, /href="\/blog\/website-offerte-vergelijken"/);
   assert.match(comparisonHtml, /href="\/blog\/website-offerte-vergelijken"/);
 });
@@ -1716,6 +1716,65 @@ test('website-migratiegids maakt URL-besluiten, livebewijs en herstel controleer
     .find((entry) => entry.path === '/kennisbank/website-migratie-zonder-seo-verlies');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/website-leads-analytics-softora.jpg',
+  ]);
+});
+
+test('websitebriefing maakt opdracht, eigenaarschap en acceptatie vóór offertevergelijking controleerbaar', () => {
+  const now = new Date('2026-08-30T16:00:00.000Z');
+  const item = getSeoContentItem('blog', 'website-briefing-maken-mkb', { now });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const proposalHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'website-offerte-vergelijken', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-08-30');
+  assert.equal(item.updatedAt, '2026-08-30');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/website-laten-maken');
+  assert.equal(item.sources.length, 3);
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.keywordEvidence.locale.locId, 2528);
+  assert.equal(item.keywordEvidence.locale.language, 'Dutch');
+  assert.ok(item.informationGain.includes('briefingregister'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualBrief.hero.visualFamily, 'corkboard-briefing-evidence-wall');
+  assert.equal(item.visualBrief.support.visualFamily, 'aubergine-linocut-briefing-route');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+
+  const heroPath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  const supportPath = path.join(repoRoot, item.secondaryImage.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(heroPath), { width: 1672, height: 941 });
+  assert.deepEqual(readJpegDimensions(supportPath), { width: 1672, height: 941 });
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/website-briefing-maken-mkb">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1672">/);
+  assert.match(html, /<meta property="og:image:height" content="941">/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/website-briefing-maken-mkb-hero\.jpg"/);
+  assert.match(html, /"datePublished":"2026-08-30"/);
+  assert.match(html, /"dateModified":"2026-08-30"/);
+  assert.match(html, /maak een beslisregister, geen verlanglijst/);
+  assert.match(html, /Kopieer deze minimale briefingstructuur/);
+  assert.match(html, /href="\/website-laten-maken">website laat maken<\/a>/);
+  assert.match(html, /href="\/blog\/website-offerte-vergelijken">checklist voor websiteoffertes<\/a>/);
+  assert.match(html, /href="\/kennisbank\/website-migratie-zonder-seo-verlies">website migreren<\/a>/);
+  assert.match(html, /https:\/\/wa\.me\/31643262792/);
+  assert.match(proposalHtml, /href="\/blog\/website-briefing-maken-mkb">websitebriefing<\/a>/);
+  assert.doesNotMatch(html, /garandeert conversie|garandeert ranking|gegarandeerde doorlooptijd|AI beslist zelfstandig/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/website-briefing-maken-mkb');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/website-briefing-maken-mkb-hero.jpg',
+    '/assets/seo-content/website-briefing-maken-mkb-route.jpg',
   ]);
 });
 
