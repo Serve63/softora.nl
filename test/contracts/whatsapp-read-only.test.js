@@ -11,6 +11,7 @@ const ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
 const APP_SECRET = 'test-whatsapp-app-secret';
 const VERIFY_TOKEN = 'test-whatsapp-verify-token';
 const READ_TOKEN = 'test-whatsapp-read-token';
+const PROVIDER_WEBHOOK_TOKEN = 'provider-webhook-token-with-at-least-43-characters';
 
 function createMemorySupabase() {
   const tables = {
@@ -182,7 +183,7 @@ function createMemorySupabase() {
   return { client: { from, rpc }, tables, rpcCalls };
 }
 
-function createService(memory, now = new Date('2026-08-13T09:00:00.000Z')) {
+function createService(memory, now = new Date('2026-08-13T09:00:00.000Z'), config = {}) {
   return createWhatsAppReadOnlyService({
     config: {
       appSecret: APP_SECRET,
@@ -190,6 +191,7 @@ function createService(memory, now = new Date('2026-08-13T09:00:00.000Z')) {
       encryptionKey: ENCRYPTION_KEY,
       readToken: READ_TOKEN,
       ownerKey: 'serve',
+      ...config,
     },
     getSupabaseClient: () => memory.client,
     now: () => new Date(now),
@@ -268,8 +270,49 @@ test('WhatsApp webhook challenge and HMAC verification fail closed', () => {
   const { rawBody, signature } = signedPayload(samplePayload());
   assert.equal(service.verifyWebhookSignature(rawBody, signature), true);
   assert.equal(service.verifyWebhookSignature(rawBody, 'sha256=wrong'), false);
+  assert.equal(service.isProviderWebhookAuthorized(PROVIDER_WEBHOOK_TOKEN), false);
   assert.equal(service.isReadAuthorized(READ_TOKEN), true);
   assert.equal(service.isReadAuthorized('wrong'), false);
+});
+
+test('WhatsApp provider override accepts only a strong matching path token', async () => {
+  const memory = createMemorySupabase();
+  const service = createService(memory, new Date('2026-08-13T09:00:00.000Z'), {
+    appSecret: '',
+    providerWebhookToken: PROVIDER_WEBHOOK_TOKEN,
+  });
+  const payload = samplePayload();
+  const rawBody = Buffer.from(JSON.stringify(payload));
+
+  assert.equal(service.isProviderWebhookAuthorized(PROVIDER_WEBHOOK_TOKEN), true);
+  assert.equal(service.isProviderWebhookAuthorized('wrong'), false);
+  await assert.rejects(
+    service.acceptWebhook({ rawBody, payload, providerToken: 'wrong' }),
+    (error) => error.code === 'WHATSAPP_WEBHOOK_SIGNATURE_INVALID'
+  );
+  await service.acceptWebhook({ rawBody, payload, providerToken: PROVIDER_WEBHOOK_TOKEN });
+  assert.equal(memory.tables.softora_whatsapp_webhook_events.length, 1);
+  assert.equal((await service.getStatus()).configured, true);
+
+  const weakService = createService(createMemorySupabase(), new Date('2026-08-13T09:00:00.000Z'), {
+    appSecret: '',
+    providerWebhookToken: 'too-short',
+  });
+  assert.equal(weakService.isProviderWebhookAuthorized('too-short'), false);
+  const invalidCharacterToken = `${'a'.repeat(42)}$`;
+  const invalidCharacterService = createService(
+    createMemorySupabase(),
+    new Date('2026-08-13T09:00:00.000Z'),
+    { appSecret: '', providerWebhookToken: invalidCharacterToken }
+  );
+  assert.equal(invalidCharacterService.isProviderWebhookAuthorized(invalidCharacterToken), false);
+  const oversizedToken = 'a'.repeat(181);
+  const oversizedService = createService(
+    createMemorySupabase(),
+    new Date('2026-08-13T09:00:00.000Z'),
+    { appSecret: '', providerWebhookToken: oversizedToken }
+  );
+  assert.equal(oversizedService.isProviderWebhookAuthorized(oversizedToken), false);
 });
 
 test('WhatsApp webhook is stored encrypted, processed idempotently, and readable by contact', async () => {
@@ -436,17 +479,25 @@ async function runHandlers(handlers, req, res) {
 
 test('WhatsApp HTTP routes expose only read/status plus verified ingest and worker', async () => {
   const app = createRouteApp();
+  const acceptedWebhooks = [];
   const service = {
     isReadAuthorized: (token) => token === READ_TOKEN,
+    isProviderWebhookAuthorized: (token) => token === PROVIDER_WEBHOOK_TOKEN,
     verifyChallenge: ({ token, challenge }) => token === VERIFY_TOKEN ? challenge : null,
-    acceptWebhook: async () => ({ ok: true, accepted: true }),
+    acceptWebhook: async (request) => {
+      acceptedWebhooks.push(request);
+      return { ok: true, accepted: true };
+    },
     processWebhookQueue: async () => ({ ok: true, processed: 0 }),
     getStatus: async () => ({ connected: true }),
     readMessages: async () => ({ count: 1, messages: [{ id: 'one' }] }),
   };
   registerWhatsAppReadOnlyRoutes(app, { service, cronSecret: 'cron-secret' });
 
-  assert.deepEqual([...app.routes.post.keys()], ['/api/whatsapp/webhook']);
+  assert.deepEqual([...app.routes.post.keys()], [
+    '/api/whatsapp/webhook',
+    '/api/whatsapp/provider-webhook/:providerToken',
+  ]);
   assert.equal(app.routes.post.has('/api/whatsapp/send'), false);
   assert.equal(app.routes.post.has('/api/whatsapp/delete'), false);
 
@@ -465,6 +516,31 @@ test('WhatsApp HTTP routes expose only read/status plus verified ingest and work
   assert.equal(authorized.statusCode, 200);
   assert.equal(authorized.body.count, 1);
   assert.equal(authorized.headers['Cache-Control'], 'private, no-store');
+
+  const rejectedProviderChallenge = createResponse();
+  await runHandlers(app.routes.get.get('/api/whatsapp/provider-webhook/:providerToken'), {
+    params: { providerToken: 'wrong' },
+    query: { 'hub.mode': 'subscribe', 'hub.verify_token': VERIFY_TOKEN, 'hub.challenge': '123' },
+  }, rejectedProviderChallenge);
+  assert.equal(rejectedProviderChallenge.statusCode, 403);
+
+  const acceptedProviderChallenge = createResponse();
+  await runHandlers(app.routes.get.get('/api/whatsapp/provider-webhook/:providerToken'), {
+    params: { providerToken: PROVIDER_WEBHOOK_TOKEN },
+    query: { 'hub.mode': 'subscribe', 'hub.verify_token': VERIFY_TOKEN, 'hub.challenge': '123' },
+  }, acceptedProviderChallenge);
+  assert.equal(acceptedProviderChallenge.statusCode, 200);
+  assert.equal(acceptedProviderChallenge.body, '123');
+
+  const acceptedProviderWebhook = createResponse();
+  await runHandlers(app.routes.post.get('/api/whatsapp/provider-webhook/:providerToken'), {
+    params: { providerToken: PROVIDER_WEBHOOK_TOKEN },
+    body: samplePayload(),
+    rawBody: Buffer.from('{}'),
+    get: () => '',
+  }, acceptedProviderWebhook);
+  assert.equal(acceptedProviderWebhook.statusCode, 202);
+  assert.equal(acceptedWebhooks[0].providerToken, PROVIDER_WEBHOOK_TOKEN);
 });
 
 test('WhatsApp webhook returns retryable status for storage failures', async () => {
@@ -473,6 +549,7 @@ test('WhatsApp webhook returns retryable status for storage failures', async () 
     cronSecret: 'cron-secret',
     service: {
       isReadAuthorized: () => false,
+      isProviderWebhookAuthorized: () => false,
       verifyChallenge: () => null,
       acceptWebhook: async () => {
         const error = new Error('database unavailable');
@@ -497,6 +574,10 @@ test('WhatsApp migration and wiring remain least privilege and send-free', () =>
   const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20260813090439_add_whatsapp_read_only_archive.sql'), 'utf8');
   const routes = fs.readFileSync(path.join(root, 'server/routes/whatsapp-read-only.js'), 'utf8');
   const featureRuntime = fs.readFileSync(path.join(root, 'server/services/feature-routes-runtime.js'), 'utf8');
+  const featureComposition = fs.readFileSync(
+    path.join(root, 'server/services/server-app-runtime-feature-composition-builders.js'),
+    'utf8'
+  );
   const middlewareRuntime = fs.readFileSync(path.join(root, 'server/services/app-middleware-runtime.js'), 'utf8');
   assert.match(migration, /enable row level security/g);
   assert.match(migration, /revoke all on table public\.softora_whatsapp_messages from public, anon, authenticated/);
@@ -506,6 +587,8 @@ test('WhatsApp migration and wiring remain least privilege and send-free', () =>
   assert.doesNotMatch(routes, /\/api\/whatsapp\/(send|delete|reply)/);
   assert.match(middlewareRuntime, /jsonBodyParserWhatsAppHistory/);
   assert.match(middlewareRuntime, /pathname === '\/api\/whatsapp\/webhook'/);
+  assert.match(middlewareRuntime, /pathname\.startsWith\('\/api\/whatsapp\/provider-webhook\/'\)/);
+  assert.match(featureComposition, /providerWebhookToken: env\.WHATSAPP_PROVIDER_WEBHOOK_TOKEN/);
   assert.ok(
     featureRuntime.indexOf('registerWhatsAppReadOnlyRoutes(app') < featureRuntime.indexOf('createPremiumRouteRuntime({'),
     'Meta webhook and bearer-protected read routes must be registered before generic premium auth'

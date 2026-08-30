@@ -42,7 +42,13 @@ function registerWhatsAppReadOnlyRoutes(app, deps = {}) {
     return next();
   }
 
-  app.get('/api/whatsapp/webhook', (req, res) => {
+  function verifyChallenge(req, res, requireProviderToken = false) {
+    if (
+      requireProviderToken &&
+      !service.isProviderWebhookAuthorized(String(req.params?.providerToken || ''))
+    ) {
+      return res.status(403).send('Verification failed');
+    }
     const challenge = service.verifyChallenge({
       mode: String(req.query?.['hub.mode'] || ''),
       token: String(req.query?.['hub.verify_token'] || ''),
@@ -50,14 +56,15 @@ function registerWhatsAppReadOnlyRoutes(app, deps = {}) {
     });
     if (challenge === null) return res.status(403).send('Verification failed');
     return res.status(200).send(challenge);
-  });
+  }
 
-  app.post('/api/whatsapp/webhook', async (req, res) => {
+  async function acceptWebhook(req, res, providerToken = '') {
     try {
       const result = await service.acceptWebhook({
         rawBody: req.rawBody,
         payload: req.body,
         signature: headerValue(req, 'x-hub-signature-256'),
+        providerToken,
       });
       return res.status(202).json(result);
     } catch (error) {
@@ -68,6 +75,22 @@ function registerWhatsAppReadOnlyRoutes(app, deps = {}) {
           : 503;
       return res.status(status).json(safeError(error));
     }
+  }
+
+  app.get('/api/whatsapp/webhook', (req, res) => {
+    return verifyChallenge(req, res);
+  });
+
+  app.post('/api/whatsapp/webhook', async (req, res) => {
+    return acceptWebhook(req, res);
+  });
+
+  app.get('/api/whatsapp/provider-webhook/:providerToken', (req, res) => {
+    return verifyChallenge(req, res, true);
+  });
+
+  app.post('/api/whatsapp/provider-webhook/:providerToken', async (req, res) => {
+    return acceptWebhook(req, res, String(req.params?.providerToken || ''));
   });
 
   app.get('/api/whatsapp/webhook-worker', async (req, res) => {

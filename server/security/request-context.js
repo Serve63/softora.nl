@@ -21,6 +21,7 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/retell/functions/agenda/availability',
 ]);
 const SAME_ORIGIN_PROTECTION_EXEMPT_PREFIXES = Object.freeze([
+  '/api/whatsapp/provider-webhook/',
   '/api/retell/functions/agenda/',
   '/retell/functions/agenda/',
 ]);

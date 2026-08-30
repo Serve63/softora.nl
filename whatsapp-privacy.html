@@ -60,7 +60,7 @@
     <section class="archive-section">
       <h2>4. Security and access</h2>
       <ul>
-        <li>Meta webhook signatures are verified before events are accepted.</li>
+        <li>Direct Meta webhooks require a valid Meta signature. If an approved provider routes Meta events directly to Softora and cannot share its app secret, a separate high-entropy provider callback address is required and can be rotated independently.</li>
         <li>Message bodies, contact details and stored webhook payloads are encrypted at rest.</li>
         <li>Search uses keyed, non-plaintext indexes.</li>
         <li>Archive endpoints require a private access token and do not use browser caching.</li>

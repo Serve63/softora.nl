@@ -16,6 +16,8 @@ test('Softora Read Archive publishes an honest purpose-limited privacy policy', 
   assert.match(page, /Group conversations are not synchronized/);
   assert.match(page, /at most six months/);
   assert.match(page, /encrypted at rest/);
+  assert.match(page, /Direct Meta webhooks require a valid Meta signature/);
+  assert.match(page, /high-entropy provider callback address/);
   assert.match(page, /does not sell WhatsApp data/);
   assert.match(page, /normally within 30 days/);
   assert.match(page, /serve@softora\.nl/);

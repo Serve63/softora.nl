@@ -6,6 +6,7 @@ const MESSAGE_TABLE = 'softora_whatsapp_messages';
 const CONTACT_TABLE = 'softora_whatsapp_contacts';
 const SYNC_TABLE = 'softora_whatsapp_sync_state';
 const MAX_MESSAGE_CONTENT_LENGTH = 24_000;
+const MIN_PROVIDER_WEBHOOK_TOKEN_LENGTH = 43;
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -54,6 +55,7 @@ function createWhatsAppReadOnlyService(deps = {}) {
   const randomBytes = deps.randomBytes || crypto.randomBytes;
   const appSecret = normalizeText(config.appSecret);
   const verifyToken = normalizeText(config.verifyToken);
+  const providerWebhookToken = normalizeText(config.providerWebhookToken);
   const encryptionSecret = normalizeText(config.encryptionKey);
   const readToken = normalizeText(config.readToken);
   const ownerKey = normalizeText(config.ownerKey) || OWNER_KEY;
@@ -141,6 +143,18 @@ function createWhatsAppReadOnlyService(deps = {}) {
     if (!appSecret || !Buffer.isBuffer(rawBody) || !signature) return false;
     const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
     return safeEqual(expected, signature);
+  }
+
+  function hasValidProviderWebhookToken() {
+    return Boolean(
+      providerWebhookToken.length >= MIN_PROVIDER_WEBHOOK_TOKEN_LENGTH &&
+      providerWebhookToken.length <= 180 &&
+      /^[a-z0-9_-]+$/i.test(providerWebhookToken)
+    );
+  }
+
+  function isProviderWebhookAuthorized(token) {
+    return hasValidProviderWebhookToken() && safeEqual(token, providerWebhookToken);
   }
 
   function verifyChallenge({ mode, token, challenge }) {
@@ -329,8 +343,11 @@ function createWhatsAppReadOnlyService(deps = {}) {
     };
   }
 
-  async function acceptWebhook({ rawBody, signature, payload }) {
-    if (!verifyWebhookSignature(rawBody, signature)) {
+  async function acceptWebhook({ rawBody, signature, providerToken, payload }) {
+    if (
+      !verifyWebhookSignature(rawBody, signature) &&
+      !isProviderWebhookAuthorized(providerToken)
+    ) {
       const error = new Error('Ongeldige WhatsApp-webhookhandtekening.');
       error.code = 'WHATSAPP_WEBHOOK_SIGNATURE_INVALID';
       throw error;
@@ -426,7 +443,12 @@ function createWhatsAppReadOnlyService(deps = {}) {
     const { data, error } = await db().from(SYNC_TABLE).select('*').eq('owner_key', ownerKey).maybeSingle();
     if (error) throw error;
     return {
-      configured: Boolean(appSecret && verifyToken && encryptionSecret && readToken),
+      configured: Boolean(
+        (appSecret || hasValidProviderWebhookToken()) &&
+        verifyToken &&
+        encryptionSecret &&
+        readToken
+      ),
       connected: Boolean(data?.phone_number_key && data?.last_webhook_at),
       historyPhase: data?.history_phase ?? null,
       historyProgress: data?.history_progress ?? null,
@@ -500,6 +522,7 @@ function createWhatsAppReadOnlyService(deps = {}) {
     acceptWebhook,
     getStatus,
     isReadAuthorized,
+    isProviderWebhookAuthorized,
     processWebhookQueue,
     readMessages,
     verifyChallenge,

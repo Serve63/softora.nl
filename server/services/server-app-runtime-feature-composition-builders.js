@@ -555,6 +555,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         config: {
           appSecret: env.WHATSAPP_APP_SECRET || '',
           verifyToken: env.WHATSAPP_VERIFY_TOKEN || '',
+          providerWebhookToken: env.WHATSAPP_PROVIDER_WEBHOOK_TOKEN || '',
           encryptionKey: env.WHATSAPP_ENCRYPTION_KEY || '',
           readToken: env.WHATSAPP_READ_TOKEN || '',
           ownerKey: env.WHATSAPP_OWNER_KEY || 'serve',
