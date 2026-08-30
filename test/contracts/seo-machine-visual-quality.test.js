@@ -55,7 +55,7 @@ function buildValidFutureBlog(overrides = {}) {
   };
 }
 
-test('recente Softora-beelden worden als meetbare herstelachterstand herkend', async () => {
+test('recente Softora-beelden blijven na visuele rotatie onder de gelijkenisdrempel', async () => {
   const report = await buildVisualQualityReport({
     items: SEO_CONTENT_ITEMS,
     repoRoot,
@@ -63,9 +63,9 @@ test('recente Softora-beelden worden als meetbare herstelachterstand herkend', a
 
   assert.equal(report.status, 'ready');
   assert.ok(report.candidateCount >= 1);
-  assert.equal(report.legacyDebt.status, 'quality_recovery');
-  assert.ok(report.legacyDebt.similarPairCount > 0);
-  assert.ok(report.legacyDebt.nearestPairs[0].combined >= 0.85);
+  assert.equal(report.legacyDebt.status, 'healthy');
+  assert.equal(report.legacyDebt.similarPairCount, 0);
+  assert.deepEqual(report.legacyDebt.nearestPairs, []);
 });
 
 test('visual quality version 2 vereist twee verschillende en bruikbare beeldrollen', () => {
