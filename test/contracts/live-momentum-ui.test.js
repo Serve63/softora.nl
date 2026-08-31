@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260901a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260901b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -510,6 +510,12 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'silence-controle', title: 'Silence controle', imageId: 'silence-controle' \}/);
   assert.doesNotMatch(endGameCardsJs, /Ik luister, zeg niets en ga geen discussie aan\./);
   assert.match(endGameCardsJs, /\{ id: 'funnel-sites-live', title: 'Funnel Sites Live', imageId: 'softora-apple-kwaliteit-software' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'vijf-dagen-streak', title: '5 dagen streak', imageId: 'dertig-dagen-streak' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'tien-dagen-streak', title: '10 dagen streak', imageId: 'dertig-dagen-streak' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'twintig-dagen-streak', title: '20 dagen streak', imageId: 'dertig-dagen-streak' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'vijftig-dagen-streak', title: '50 dagen streak', imageId: 'dertig-dagen-streak' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'honderd-dagen-streak', title: '100 dagen streak', imageId: 'dertig-dagen-streak' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'driehonderdvijfenzestig-dagen-streak', title: '365 dagen streak', imageId: 'dertig-dagen-streak' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -543,6 +549,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     "Ruben's wereldkaart", 'Professionele fotoshoot', 'Persoonlijke handtekening',
     'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
     'Sertraline vrij', 'Gratis opleiding via gemeente', 'Silence controle', 'Funnel Sites Live',
+    '5 dagen streak', '10 dagen streak', '20 dagen streak', '50 dagen streak', '100 dagen streak', '365 dagen streak',
     'Lijpe Instagram feed', '3 posts · 6 slides', 'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
     'Huis van €1 miljoen+ kopen', '2028...', '2035...', 'Oktober 2024…'
@@ -895,6 +902,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'funnel-sites-live');
   const cardIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
+  const firstStreakIndex = catalog.findIndex((card) => card.id === 'vijf-dagen-streak');
   const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
   const missionNumber = catalog
     .slice(0, cardIndex + 1)
@@ -907,7 +915,8 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
     imageId: 'softora-apple-kwaliteit-software'
   }]);
   assert.equal(missionNumber, 68);
-  assert.equal(cardIndex, checkpointIndex - 1);
+  assert.equal(cardIndex, firstStreakIndex - 1);
+  assert.equal(firstStreakIndex, checkpointIndex - 6);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'funnel-sites-live')
@@ -928,4 +937,51 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   })));
   assert.deepEqual(completedReload['funnel-sites-live'], { completed: true, deleted: false });
   assert.deepEqual(completedReload['silence-controle'], initial['silence-controle']);
+});
+
+test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame state', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const expected = [
+    { id: 'vijf-dagen-streak', title: '5 dagen streak', imageId: 'dertig-dagen-streak' },
+    { id: 'tien-dagen-streak', title: '10 dagen streak', imageId: 'dertig-dagen-streak' },
+    { id: 'twintig-dagen-streak', title: '20 dagen streak', imageId: 'dertig-dagen-streak' },
+    { id: 'vijftig-dagen-streak', title: '50 dagen streak', imageId: 'dertig-dagen-streak' },
+    { id: 'honderd-dagen-streak', title: '100 dagen streak', imageId: 'dertig-dagen-streak' },
+    { id: 'driehonderdvijfenzestig-dagen-streak', title: '365 dagen streak', imageId: 'dertig-dagen-streak' }
+  ];
+  const ids = expected.map((card) => card.id);
+  const funnelSitesIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
+  const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
+
+  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex), expected);
+  assert.deepEqual(expected.map((card) => (
+    catalog.slice(0, catalog.findIndex((item) => item.id === card.id) + 1)
+      .filter((item) => !['origin', 'checkpoint', 'destination'].includes(item.type))
+      .length
+  )), [69, 70, 71, 72, 73, 74]);
+
+  const oldPersistedOrder = catalog
+    .filter((card) => !ids.includes(card.id))
+    .map((card) => card.id);
+  const migrated = JSON.parse(JSON.stringify(api.normalizeState({
+    'funnel-sites-live': { completed: true, deleted: false },
+    __order: oldPersistedOrder
+  })));
+  const migratedCheckpointIndex = migrated.__order.indexOf('checkpoint-2028');
+
+  assert.deepEqual(migrated['funnel-sites-live'], { completed: true, deleted: false });
+  assert.deepEqual(migrated.__order.filter((id) => oldPersistedOrder.includes(id)), oldPersistedOrder);
+  assert.deepEqual(migrated.__order.slice(migratedCheckpointIndex - ids.length, migratedCheckpointIndex), ids);
+  ids.forEach((id) => {
+    assert.deepEqual(migrated[id], { completed: false, deleted: false });
+    assert.equal(migrated.__order.filter((orderedId) => orderedId === id).length, 1);
+  });
+
+  const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...migrated,
+    'honderd-dagen-streak': { completed: true, deleted: false }
+  })));
+  assert.deepEqual(completedReload['honderd-dagen-streak'], { completed: true, deleted: false });
+  assert.deepEqual(completedReload['funnel-sites-live'], migrated['funnel-sites-live']);
 });
