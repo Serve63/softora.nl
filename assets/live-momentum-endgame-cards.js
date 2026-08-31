@@ -36,6 +36,8 @@
     { id: 'gezondheidscenter', title: 'Gezondheidscenter' },
     { id: 'serves-gezondheidsdossier', title: "Servé's gezondheidsdossier" },
     { id: 'ruben-zet-toto', title: 'Ruben zet toto' },
+    { id: 'kantoor-a-af', title: 'Kantoor A af' },
+    { id: 'kantoor-b-af', title: 'Kantoor B af' },
     { id: 'world-watcher', title: "Ruben's World Watcher" },
     { id: 'rubens-vakantieradar', title: "Ruben's vakantieradar" },
     { id: 'transfermarkt', title: 'Ruben Romano' },
