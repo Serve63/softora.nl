@@ -162,6 +162,258 @@ test('selectMarker weigert een onopgeloste context met andere inhoud of bijlagen
   );
 });
 
+test('selectMarker vervangt op verzoek alleen een aantoonbaar pre-dispatch scopeconflict', () => {
+  const storage = new MemoryStorage();
+  const existing = state.compareAndSwapMarker(storage, markerInput({
+    state: 'staged',
+    staging: [{ reference: 'oude-tijdelijke-referentie' }],
+    reconcileProof: { version: 1 },
+  }), null, {
+    now: () => 10,
+    randomUUID: () => 'cas-existing',
+  });
+  const tokens = ['cas-retired', 'cas-successor'];
+
+  const selected = state.selectMarker(
+    storage,
+    'browser:fresh-click',
+    'c'.repeat(64),
+    existing.localScopeFingerprint,
+    [],
+    {
+      now: () => 20,
+      randomUUID: () => tokens.shift(),
+      replaceProvenPreDispatch: true,
+    }
+  );
+
+  assert.equal(selected.idempotencyKey, 'browser:fresh-click');
+  assert.equal(selected.state, 'armed');
+  const retired = state.readMarker(storage, existing.idempotencyKey);
+  assert.equal(retired.state, 'failed');
+  assert.deepEqual(retired.staging, []);
+  assert.equal(retired.reconcileProof, null);
+});
+
+test('selectMarker roteert een expliciete pre-dispatch key met gewijzigde inhoud naar een verse key', () => {
+  const storage = new MemoryStorage();
+  const existing = state.compareAndSwapMarker(storage, markerInput(), null, {
+    now: () => 10,
+    randomUUID: () => 'cas-existing',
+  });
+  const tokens = ['cas-retired', 'fresh-key', 'cas-successor'];
+
+  const selected = state.selectMarker(
+    storage,
+    existing.idempotencyKey,
+    'c'.repeat(64),
+    existing.localScopeFingerprint,
+    [],
+    {
+      now: () => 20,
+      randomUUID: () => tokens.shift(),
+      replaceProvenPreDispatch: true,
+    }
+  );
+
+  assert.equal(selected.idempotencyKey, 'browser:fresh-key');
+  assert.equal(state.readMarker(storage, existing.idempotencyKey).state, 'failed');
+});
+
+test('selectMarker vervangt nooit dispatching processing of een marker met sendStartedAt', () => {
+  for (const [label, marker] of [
+    ['dispatching', markerInput({ state: 'dispatching', sendStartedAt: 9 })],
+    ['processing', markerInput({ state: 'processing', sendStartedAt: 9 })],
+    ['armed met send-start', markerInput({ state: 'armed', sendStartedAt: 9 })],
+    ['armed met duurzame identiteit', markerInput({
+      state: 'armed',
+      durableIdentity: { intentId: 'send:uncertain', messageId: '<uncertain@softora.nl>' },
+    })],
+  ]) {
+    const storage = new MemoryStorage();
+    const existing = state.compareAndSwapMarker(storage, marker, null, {
+      now: () => 10,
+      randomUUID: () => `cas-${label}`,
+    });
+    assert.throws(
+      () => state.selectMarker(
+        storage,
+        'browser:fresh-click',
+        'c'.repeat(64),
+        existing.localScopeFingerprint,
+        [],
+        {
+          now: () => 20,
+          randomUUID: () => 'mag-niet-worden-gebruikt',
+          replaceProvenPreDispatch: true,
+        }
+      ),
+      (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT',
+      label
+    );
+    assert.equal(state.readMarker(storage, existing.idempotencyKey).state, marker.state, label);
+  }
+});
+
+test('veilige exacte mismatch blijft ongemuteerd zolang een tweede poging onzeker is', () => {
+  const storage = new MemoryStorage();
+  const safe = state.compareAndSwapMarker(storage, markerInput({
+    idempotencyKey: 'browser:exact-old-content',
+    payloadFingerprint: 'a'.repeat(64),
+    state: 'armed',
+  }), null, {
+    now: () => 10,
+    randomUUID: () => 'cas-safe',
+  });
+  const unsafe = state.compareAndSwapMarker(storage, markerInput({
+    idempotencyKey: 'browser:uncertain-other-content',
+    payloadFingerprint: 'd'.repeat(64),
+    state: 'dispatching',
+    sendStartedAt: 9,
+  }), null, {
+    now: () => 10,
+    randomUUID: () => 'cas-unsafe',
+  });
+
+  const selectCurrent = (randomUUID) => state.selectMarker(
+    storage,
+    safe.idempotencyKey,
+    'c'.repeat(64),
+    safe.localScopeFingerprint,
+    [],
+    {
+      now: () => 20,
+      randomUUID,
+      replaceProvenPreDispatch: true,
+    }
+  );
+  assert.throws(
+    () => selectCurrent(() => 'mag-niet-worden-gebruikt'),
+    (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT'
+  );
+  assert.equal(state.readMarker(storage, safe.idempotencyKey).state, 'armed');
+  assert.equal(state.readMarker(storage, unsafe.idempotencyKey).state, 'dispatching');
+
+  state.patchMarker(storage, unsafe, { state: 'accepted' }, {
+    now: () => 15,
+    randomUUID: () => 'cas-resolved',
+  });
+  const tokens = ['cas-retired', 'fresh-after-resolve', 'cas-successor'];
+  const selected = selectCurrent(() => tokens.shift());
+  assert.equal(selected.idempotencyKey, 'browser:fresh-after-resolve');
+  assert.equal(state.readMarker(storage, safe.idempotencyKey).state, 'failed');
+  assert.equal(state.readMarker(storage, unsafe.idempotencyKey).state, 'accepted');
+});
+
+test('failed marker met duurzame identiteit roteert nooit naar nieuwe inhoud', () => {
+  const storage = new MemoryStorage();
+  const existing = state.compareAndSwapMarker(storage, markerInput({
+    state: 'failed',
+    durableIdentity: { intentId: 'send:failed-uncertain', messageId: '<failed@softora.nl>' },
+  }), null, {
+    now: () => 10,
+    randomUUID: () => 'cas-existing',
+  });
+
+  assert.throws(
+    () => state.selectMarker(
+      storage,
+      existing.idempotencyKey,
+      'c'.repeat(64),
+      existing.localScopeFingerprint,
+      [],
+      {
+        now: () => 20,
+        randomUUID: () => 'mag-niet-worden-gebruikt',
+        replaceProvenPreDispatch: true,
+      }
+    ),
+    (error) => error.code === 'MAILBOX_SEND_DURABLE_STATE_PAYLOAD_MISMATCH'
+  );
+  const unchanged = state.readMarker(storage, existing.idempotencyKey);
+  assert.equal(unchanged.state, 'failed');
+  assert.equal(unchanged.casToken, existing.casToken);
+  assert.equal(unchanged.durableIdentity.intentId, 'send:failed-uncertain');
+});
+
+test('een expliciete of payloadgelijke marker omzeilt nooit een tweede onzekere poging', () => {
+  for (const requestedKey of ['browser:exact-current', '']) {
+    const storage = new MemoryStorage();
+    state.compareAndSwapMarker(storage, markerInput({
+      idempotencyKey: 'browser:exact-current',
+      payloadFingerprint: 'c'.repeat(64),
+      state: 'armed',
+    }), null, {
+      now: () => 10,
+      randomUUID: () => 'cas-current',
+    });
+    state.compareAndSwapMarker(storage, markerInput({
+      idempotencyKey: 'browser:uncertain-other-content',
+      payloadFingerprint: 'd'.repeat(64),
+      state: 'dispatching',
+      sendStartedAt: 9,
+    }), null, {
+      now: () => 10,
+      randomUUID: () => 'cas-uncertain',
+    });
+
+    assert.throws(
+      () => state.selectMarker(
+        storage,
+        requestedKey,
+        'c'.repeat(64),
+        'b'.repeat(64),
+        [],
+        {
+          now: () => 20,
+          randomUUID: () => 'mag-niet-worden-gebruikt',
+          replaceProvenPreDispatch: true,
+        }
+      ),
+      (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT',
+      requestedKey || 'payload match'
+    );
+    assert.equal(
+      state.readMarker(storage, 'browser:uncertain-other-content').state,
+      'dispatching'
+    );
+  }
+});
+
+test('een expliciete marker omzeilt nooit een dubbele onopgeloste payload', () => {
+  const storage = new MemoryStorage();
+  for (const [idempotencyKey, stateName, sendStartedAt] of [
+    ['browser:exact-current', 'armed', undefined],
+    ['browser:duplicate-current', 'processing', 9],
+  ]) {
+    state.compareAndSwapMarker(storage, markerInput({
+      idempotencyKey,
+      payloadFingerprint: 'c'.repeat(64),
+      state: stateName,
+      ...(sendStartedAt === undefined ? {} : { sendStartedAt }),
+    }), null, {
+      now: () => 10,
+      randomUUID: () => `cas-${idempotencyKey}`,
+    });
+  }
+
+  assert.throws(
+    () => state.selectMarker(
+      storage,
+      'browser:exact-current',
+      'c'.repeat(64),
+      'b'.repeat(64),
+      [],
+      {
+        now: () => 20,
+        randomUUID: () => 'mag-niet-worden-gebruikt',
+        replaceProvenPreDispatch: true,
+      }
+    ),
+    (error) => error.code === 'MAILBOX_SEND_DURABLE_STATE_AMBIGUOUS'
+  );
+});
+
 test('selectMarker gebruikt de expliciet meegegeven storage ook bij een nieuwe marker', () => {
   const storage = new MemoryStorage();
   const created = state.selectMarker(

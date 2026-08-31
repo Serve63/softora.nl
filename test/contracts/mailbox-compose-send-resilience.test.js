@@ -242,7 +242,7 @@ async function seedMarker(options = {}) {
     updatedAt: 1,
     staging: options.staging || [],
     attachmentsMetadata,
-    durableIdentity: null,
+    durableIdentity: options.durableIdentity ?? null,
     reconcileProof,
     ...(options.sendStartedAt === undefined ? {} : { sendStartedAt: options.sendStartedAt }),
   }, null, { now: () => 1, randomUUID: createRandomUUID('seed') });
@@ -440,6 +440,164 @@ test('real Instantly reply accepts the exact provider message as reply proof bef
     '/api/mailbox/send',
   ]);
   assert.equal(calls[1].payload.reconcileProof.references, 'provider-message-42');
+});
+
+test('oude pre-dispatch poging met andere tekst wordt veilig gepensioneerd vóór de actuele send', async () => {
+  const storage = new MemoryStorage();
+  const stalePayload = basePayload({
+    idempotencyKey: 'browser:stale-before-proof-fix',
+    body: 'Oude inhoud uit de aantoonbaar ongestarte poging.',
+  });
+  await seedMarker({ storage, payload: stalePayload, state: 'armed' });
+  const currentPayload = basePayload({
+    idempotencyKey: 'browser:fresh-click',
+    body: 'Actuele inhoud die één keer verzonden moet worden.',
+  });
+  const calls = [];
+  let selectedKey = '';
+  const protocol = createProtocol({
+    storage,
+    now: () => 1_000,
+    fetch: async (url, request) => {
+      const requestPayload = parseRequest(request);
+      calls.push({ url, payload: requestPayload });
+      if (url.endsWith('/preflight')) {
+        return response(200, { ok: true, result: preflightResult(requestPayload) });
+      }
+      return response(200, { ok: true, result: acceptedSendResult('fresh-after-stale') });
+    },
+  });
+
+  await protocol.execute({
+    payload: currentPayload,
+    attachments: [],
+    onIdempotencyKey(value) { selectedKey = value; },
+  });
+
+  assert.equal(selectedKey, currentPayload.idempotencyKey);
+  assert.deepEqual(calls.map((call) => call.url), [
+    '/api/mailbox/send/preflight',
+    '/api/mailbox/send',
+  ]);
+  assert.equal(calls[0].payload.body, currentPayload.body);
+  assert.equal(calls[1].payload.body, currentPayload.body);
+  assert.equal(
+    resilienceModule.readMarker(storage, stalePayload.idempotencyKey).state,
+    'failed'
+  );
+  assert.equal(
+    resilienceModule.readMarker(storage, currentPayload.idempotencyKey).state,
+    'accepted'
+  );
+});
+
+test('andere inhoud omzeilt nooit een dispatching poging in dezelfde mailcontext', async () => {
+  const storage = new MemoryStorage();
+  const dispatchingPayload = basePayload({
+    idempotencyKey: 'browser:possible-external-effect',
+    body: 'Inhoud waarvan de providerstatus eerst moet worden verzoend.',
+  });
+  await seedMarker({
+    storage,
+    payload: dispatchingPayload,
+    state: 'dispatching',
+    sendStartedAt: 900,
+  });
+  let networkCalls = 0;
+  const protocol = createProtocol({
+    storage,
+    fetch: async () => {
+      networkCalls += 1;
+      throw new Error('netwerk mag niet starten');
+    },
+  });
+
+  await assert.rejects(protocol.execute({
+    payload: basePayload({
+      idempotencyKey: 'browser:new-content-must-stop',
+      body: 'Andere inhoud mag nooit langs de onzekere dispatch heen.',
+    }),
+    attachments: [],
+  }), (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
+
+  assert.equal(networkCalls, 0);
+  assert.equal(
+    resilienceModule.readMarker(storage, dispatchingPayload.idempotencyKey).state,
+    'dispatching'
+  );
+});
+
+test('duurzame identiteit houdt zelfs een armed marker fail-closed vóór elk netwerkrequest', async () => {
+  const storage = new MemoryStorage();
+  const uncertainPayload = basePayload({
+    idempotencyKey: 'browser:identity-without-send-start',
+    body: 'Oude inhoud met een tegenstrijdige duurzame identiteit.',
+  });
+  await seedMarker({
+    storage,
+    payload: uncertainPayload,
+    state: 'armed',
+    durableIdentity: {
+      intentId: 'send:uncertain-durable',
+      messageId: '<uncertain-durable@softora.nl>',
+    },
+  });
+  let networkCalls = 0;
+  const protocol = createProtocol({
+    storage,
+    fetch: async () => {
+      networkCalls += 1;
+      throw new Error('netwerk mag niet starten');
+    },
+  });
+
+  await assert.rejects(protocol.execute({
+    payload: basePayload({
+      idempotencyKey: 'browser:new-content-after-identity',
+      body: 'Nieuwe inhoud moet stoppen zolang de duurzame identiteit bestaat.',
+    }),
+    attachments: [],
+  }), (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
+
+  assert.equal(networkCalls, 0);
+  const stored = resilienceModule.readMarker(storage, uncertainPayload.idempotencyKey);
+  assert.equal(stored.state, 'armed');
+  assert.equal(stored.durableIdentity.intentId, 'send:uncertain-durable');
+});
+
+test('zelfde payload met duurzame identiteit mag proof-only nooit naar mutable send promoveren', async () => {
+  const storage = new MemoryStorage();
+  const payload = basePayload({ idempotencyKey: 'browser:identity-proof-only' });
+  const seeded = await seedMarker({
+    storage,
+    payload,
+    state: 'armed',
+    durableIdentity: {
+      intentId: 'send:identity-proof-only',
+      messageId: '<identity-proof-only@softora.nl>',
+    },
+  });
+  const calls = [];
+  const protocol = createProtocol({
+    storage,
+    fetch: async (url, request) => {
+      calls.push({ url, payload: parseRequest(request) });
+      if (url.endsWith('/preflight')) return mutableProofRequiredResponse();
+      throw new Error('send mag niet starten');
+    },
+  });
+
+  await assert.rejects(
+    protocol.execute({ payload, attachments: [] }),
+    (error) => error.code === 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED'
+  );
+
+  assert.deepEqual(calls.map((call) => call.url), ['/api/mailbox/send/preflight']);
+  assert.deepEqual(Object.keys(calls[0].payload).sort(), ['idempotencyKey', 'reconcileProof']);
+  const unchanged = resilienceModule.readMarker(storage, payload.idempotencyKey);
+  assert.equal(unchanged.state, 'armed');
+  assert.equal(unchanged.casToken, seeded.casToken);
+  assert.equal(unchanged.durableIdentity.intentId, 'send:identity-proof-only');
 });
 
 test('marker is verified by write/readback before preflight, upload and send', async () => {
