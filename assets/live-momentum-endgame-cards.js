@@ -73,6 +73,7 @@
       missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
       imageId: 'silence-controle'
     },
+    { id: 'funnel-sites-live', title: 'Funnel Sites Live', imageId: 'softora-apple-kwaliteit-software' },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
     { id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' },
     { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
