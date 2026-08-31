@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -429,11 +429,15 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /endGameCards\.needsMigration\(parsed\.endGameCards\)/);
   assert.match(endGameCardsJs, /const CARD_CATALOG = \[/);
   assert.match(endGameCardsJs, /normalized\.__order = normalizeOrder\(value\?\.__order\)/);
+  assert.match(endGameCardsJs, /function getDisplayOrder\(value\)/);
+  assert.match(endGameCardsJs, /groupByCompletion\(through2028, normalized\)/);
+  assert.match(endGameCardsJs, /groupByCompletion\(through2035, normalized\)/);
   assert.match(endGameCardsJs, /__order:\s*\[\.\.\.state\.__order\]/);
   assert.match(endGameCardsJs, /onOrderChange\(visibleOrder\)/);
   assert.match(endGameCardsJs, /function createMissionNumber\(number\)/);
   assert.match(endGameCardsJs, /label\.className = 'end-game-card-number'/);
   assert.match(endGameCardsJs, /if \(!isFixed\) slot\.append\(createMissionNumber\(missionNumber\)\)/);
+  assert.match(endGameCardsJs, /if \(slot\.classList\.contains\('end-game-card-slot--checkpoint'\)\) missionNumber \+= 1/);
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /updateMissionNumbers\(track\)/);
   assert.match(endGameCardsJs, /function updateProgress\(\)/);
@@ -441,16 +445,20 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /progressElement\.style\.setProperty\('--end-game-progress', `\$\{percentage\}%`\)/);
   assert.match(endGameCardsJs, /progressElement\.setAttribute\('aria-valuenow', String\(percentage\)\)/);
   assert.match(endGameCardsJs, /`\$\{completedCards\} van \$\{missionCards\.length\} missies afgerond`/);
+  assert.match(endGameCardsJs, /getDisplayOrder\(state\)\.forEach\(\(cardId\) =>/);
   assert.match(endGameCardsJs, /track\.replaceChildren\(fragment\);\s*updateProgress\(\);/);
+  assert.match(endGameCardsJs, /function arrangeVisibleCards\(\)/);
+  assert.match(endGameCardsJs, /track\.append\(fragment\);\s*updateMissionNumbers\(track\);/);
   assert.match(endGameCardsJs, /function syncCardElement\(cardElement, cardId\)/);
   assert.match(endGameCardsJs, /article\?\.classList\.toggle\('is-completed', cardState\.completed\)/);
-  assert.match(endGameCardsJs, /cardElement\?\.remove\(\);\s*updateMissionNumbers\(track\);/);
+  assert.match(endGameCardsJs, /cardElement\?\.remove\(\);/);
   const updateCardSource = endGameCardsJs.slice(
     endGameCardsJs.indexOf('function updateCard(cardId, patch)'),
     endGameCardsJs.indexOf("track.addEventListener('click'")
   );
   assert.doesNotMatch(updateCardSource, /render\(state\)/);
   assert.match(updateCardSource, /syncCardElement\(cardElement, cardId\)/);
+  assert.match(updateCardSource, /arrangeVisibleCards\(\)/);
   assert.match(updateCardSource, /updateProgress\(\);\s*onStateChange\(\);/);
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
@@ -671,6 +679,43 @@ test('live momentum Supabase-scope is alleen voor Full Acces accounts', () => {
 
   assert.match(scopeConfig, /'premium_live_momentum'/);
   assert.match(scopeConfig, /ADMIN_ONLY_UI_STATE_SCOPES/);
+});
+
+test('afgeronde eindspelmissies staan stabiel vooraan en keren na ongedaan maken terug naar hun basisvolgorde', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const persisted = JSON.parse(JSON.stringify(api.normalizeState({
+    'prp-behandeling': { completed: true, deleted: false },
+    'boekhouding-naar-boven': { completed: true, deleted: false },
+    'ketting-armband': { completed: true, deleted: true },
+    'eigen-boot-2035': { completed: true, deleted: false },
+    __order: [
+      'eigen-automaat-rijden',
+      'prp-behandeling',
+      'boekhouding-naar-boven',
+      'sertraline-vrij',
+      'eigen-boot-2035',
+      'range-rover-sport-2035'
+    ]
+  })));
+  const storedOrder = [...persisted.__order];
+  const displayOrder = api.getDisplayOrder(persisted);
+  const checkpointIndex = displayOrder.indexOf('checkpoint-2028');
+
+  assert.equal(displayOrder[0], 'oktober-2024');
+  assert.deepEqual(displayOrder.slice(1, 3), ['prp-behandeling', 'boekhouding-naar-boven']);
+  assert.equal(displayOrder.includes('ketting-armband'), false);
+  assert.equal(displayOrder[checkpointIndex + 1], 'eigen-boot-2035');
+  assert.equal(displayOrder.at(-1), '2035');
+  assert.deepEqual(persisted.__order, storedOrder);
+
+  const resetDisplayOrder = api.getDisplayOrder({
+    ...persisted,
+    'boekhouding-naar-boven': { completed: false, deleted: false }
+  });
+  assert.equal(
+    resetDisplayOrder.indexOf('boekhouding-naar-boven'),
+    resetDisplayOrder.indexOf('eigen-automaat-rijden') + 1
+  );
 });
 
 test('de zeven kantooruitbreidingen zijn unieke missies met een eigen visuele laag', () => {

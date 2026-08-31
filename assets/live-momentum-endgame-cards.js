@@ -120,6 +120,27 @@
     return normalized;
   }
 
+  function groupByCompletion(cardIds, value) {
+    const visibleCardIds = cardIds.filter((cardId) => !value[cardId]?.deleted);
+    return visibleCardIds
+      .filter((cardId) => value[cardId]?.completed)
+      .concat(visibleCardIds.filter((cardId) => !value[cardId]?.completed));
+  }
+
+  function getDisplayOrder(value) {
+    const normalized = normalizeState(value);
+    const checkpointIndex = normalized.__order.indexOf(CHECKPOINT_CARD_ID);
+    const through2028 = normalized.__order.slice(1, checkpointIndex);
+    const through2035 = normalized.__order.slice(checkpointIndex + 1, -1);
+    return [
+      ORIGIN_CARD_ID,
+      ...groupByCompletion(through2028, normalized),
+      CHECKPOINT_CARD_ID,
+      ...groupByCompletion(through2035, normalized),
+      DESTINATION_CARD_ID
+    ];
+  }
+
   function createTargetIcon() {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -285,6 +306,7 @@
   function updateMissionNumbers(track) {
     let missionNumber = 0;
     track.querySelectorAll('[data-end-game-card-id]').forEach((slot) => {
+      if (slot.classList.contains('end-game-card-slot--checkpoint')) missionNumber += 1;
       if (slot.dataset.endGameCardFixed === 'true') return;
       missionNumber += 1;
       const number = slot.querySelector('.end-game-card-number');
@@ -302,13 +324,25 @@
       scrollContainer: track.closest('.end-game-goals'),
       isReady,
       onOrderChange(visibleOrder) {
-        updateMissionNumbers(track);
         const visibleIds = new Set(visibleOrder);
         const hiddenOrder = state.__order.filter((id) => !visibleIds.has(id));
         state = { ...state, __order: normalizeOrder(visibleOrder.concat(hiddenOrder)) };
+        arrangeVisibleCards();
         onStateChange();
       }
     });
+
+    function arrangeVisibleCards() {
+      const cardElements = new Map(Array.from(track.querySelectorAll('[data-end-game-card-id]'))
+        .map((element) => [element.dataset.endGameCardId, element]));
+      const fragment = document.createDocumentFragment();
+      getDisplayOrder(state).forEach((cardId) => {
+        const cardElement = cardElements.get(cardId);
+        if (cardElement) fragment.append(cardElement);
+      });
+      track.append(fragment);
+      updateMissionNumbers(track);
+    }
 
     function updateProgress() {
       const missionCards = CARD_CATALOG.filter((card) => (
@@ -327,7 +361,7 @@
       state = normalizeState(value);
       const fragment = document.createDocumentFragment();
       let missionNumber = 0;
-      state.__order.forEach((cardId) => {
+      getDisplayOrder(state).forEach((cardId) => {
         const card = CARD_CATALOG.find((item) => item.id === cardId);
         if (!card) return;
         if (state[card.id].deleted) return;
@@ -391,10 +425,10 @@
       const cardElement = findCardElement(cardId);
       if (state[cardId].deleted) {
         cardElement?.remove();
-        updateMissionNumbers(track);
       } else {
         syncCardElement(cardElement, cardId);
       }
+      arrangeVisibleCards();
       updateProgress();
       onStateChange();
     }
@@ -458,7 +492,7 @@
     };
   }
 
-  const api = { CARD_CATALOG, createController, normalizeState };
+  const api = { CARD_CATALOG, createController, getDisplayOrder, normalizeState };
   if (typeof window !== 'undefined') window.SoftoraMomentumEndGameCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
