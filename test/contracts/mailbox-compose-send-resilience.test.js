@@ -4,6 +4,12 @@ const assert = require('node:assert/strict');
 const attachmentDigestModule = require('../../assets/premium-mailbox-attachment-digest');
 const resilienceModule = require('../../assets/premium-mailbox-compose-send-resilience');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
+const { createMailboxComposeThreadContext } = require('../../server/services/mailbox-compose-thread-context');
+const { createMailboxSendProvenanceStore } = require('../../server/services/mailbox-send-provenance-store');
+const {
+  createMailboxReconcileProof,
+  signMailboxReconcileProof,
+} = require('../../server/services/mailbox-send-reconcile-proof');
 
 class MemoryStorage {
   constructor(options = {}) {
@@ -255,6 +261,186 @@ function createProtocol(options = {}) {
     logger: { warn() {} },
   });
 }
+
+test('real SMTP reply accepts the server-canonical References chain before dispatch', async () => {
+  const original = basePayload();
+  const payload = {
+    ...original,
+    context: {
+      ...original.context,
+      references: '<Root.Case@Example.nl>',
+    },
+  };
+  const threadContext = createMailboxComposeThreadContext({
+    mailboxIndexStore: {
+      async getMessageForReplyProof() {
+        return {
+          accountEmail: payload.account,
+          email: payload.to,
+          replyTo: payload.to,
+          messageId: payload.context.messageId,
+          inReplyTo: '',
+          references: payload.context.references,
+        };
+      },
+    },
+    getOwnerIdentity: () => ({ profileKey: 'serve', name: 'Servé Creusen' }),
+    randomUUID: createRandomUUID('server-proof'),
+  });
+  const threadProvenance = await threadContext.resolve({
+    body: payload,
+    accountEmail: payload.account,
+    recipientEmail: payload.to,
+    provider: 'smtp',
+  });
+  assert.equal(
+    threadProvenance.references,
+    '<Root.Case@Example.nl> <Inbound.Case@Example.nl>'
+  );
+
+  const provenanceStore = createMailboxSendProvenanceStore({
+    now: () => new Date(1_000),
+    logger: { error() {} },
+  });
+  const intent = provenanceStore.preview({
+    ...threadProvenance,
+    recipientEmail: payload.to,
+    subject: payload.subject,
+    body: payload.body,
+    requestBody: payload.body,
+    cc: payload.cc,
+    bcc: payload.bcc,
+    attachments: [],
+    attachmentsMetadata: [],
+  });
+  const serverProof = signMailboxReconcileProof(
+    createMailboxReconcileProof(intent),
+    'test-only-proof-secret',
+    undefined,
+    { nowMs: 1_000 }
+  );
+  const calls = [];
+  const protocol = createProtocol({
+    now: () => 1_000,
+    fetch: async (url, request) => {
+      const requestPayload = parseRequest(request);
+      calls.push({ url, payload: requestPayload });
+      if (url.endsWith('/preflight')) {
+        return response(200, {
+          ok: true,
+          result: preflightResult({ ...requestPayload, reconcileProof: serverProof }),
+        });
+      }
+      return response(200, {
+        ok: true,
+        result: acceptedSendResult('server-canonical-references'),
+      });
+    },
+  });
+
+  await protocol.execute({ payload, attachments: [] });
+
+  assert.deepEqual(calls.map((call) => call.url), [
+    '/api/mailbox/send/preflight',
+    '/api/mailbox/send',
+  ]);
+  assert.equal(
+    calls[1].payload.reconcileProof.references,
+    '<Root.Case@Example.nl> <Inbound.Case@Example.nl>'
+  );
+});
+
+test('real Instantly reply accepts the exact provider message as reply proof before dispatch', async () => {
+  const payload = {
+    ...basePayload(),
+    account: 'campaign@softora.nl',
+    provider: 'instantly',
+    context: {
+      conversationId: 'instantly:conversation:42',
+      provider: 'instantly',
+      providerAccountEmail: 'campaign@softora.nl',
+      providerMessageId: 'provider-message-42',
+      providerThreadId: 'provider-thread-42',
+    },
+    replyIdentity: {
+      version: 1,
+      provider: 'instantly',
+      owner: 'serve',
+      accountEmail: 'campaign@softora.nl',
+      providerAccountEmail: 'campaign@softora.nl',
+      providerMessageId: 'provider-message-42',
+      providerThreadId: 'provider-thread-42',
+      conversationId: 'instantly:conversation:42',
+    },
+  };
+  const threadContext = createMailboxComposeThreadContext({
+    instantlyMailboxService: {
+      getConfiguredAccounts() {
+        return [{ email: payload.account }];
+      },
+      async assertStoredMessageOwnership() {
+        return { email: payload.to };
+      },
+    },
+    randomUUID: createRandomUUID('instantly-server-proof'),
+  });
+  const threadProvenance = await threadContext.resolve({
+    body: payload,
+    accountEmail: payload.account,
+    recipientEmail: payload.to,
+    provider: 'instantly',
+  });
+  assert.equal(threadProvenance.replyTargetMessageId, 'provider-message-42');
+  assert.equal(threadProvenance.references, 'provider-message-42');
+
+  const provenanceStore = createMailboxSendProvenanceStore({
+    now: () => new Date(1_000),
+    logger: { error() {} },
+  });
+  const intent = provenanceStore.preview({
+    ...threadProvenance,
+    recipientEmail: payload.to,
+    subject: payload.subject,
+    body: payload.body,
+    requestBody: payload.body,
+    cc: payload.cc,
+    bcc: payload.bcc,
+    attachments: [],
+    attachmentsMetadata: [],
+  });
+  const serverProof = signMailboxReconcileProof(
+    createMailboxReconcileProof(intent),
+    'test-only-proof-secret',
+    undefined,
+    { nowMs: 1_000 }
+  );
+  const calls = [];
+  const protocol = createProtocol({
+    now: () => 1_000,
+    fetch: async (url, request) => {
+      const requestPayload = parseRequest(request);
+      calls.push({ url, payload: requestPayload });
+      if (url.endsWith('/preflight')) {
+        return response(200, {
+          ok: true,
+          result: preflightResult({ ...requestPayload, reconcileProof: serverProof }),
+        });
+      }
+      return response(200, {
+        ok: true,
+        result: acceptedSendResult('instantly-provider-references'),
+      });
+    },
+  });
+
+  await protocol.execute({ payload, attachments: [] });
+
+  assert.deepEqual(calls.map((call) => call.url), [
+    '/api/mailbox/send/preflight',
+    '/api/mailbox/send',
+  ]);
+  assert.equal(calls[1].payload.reconcileProof.references, 'provider-message-42');
+});
 
 test('marker is verified by write/readback before preflight, upload and send', async () => {
   const storage = new MemoryStorage();
@@ -1105,6 +1291,15 @@ test('malformed preflightvarianten stoppen allemaal vóór upload en send', asyn
     },
     'references met case-drift': (result) => {
       result.reconcileProof.references = '<root.case@example.nl> <inbound.case@example.nl>';
+    },
+    'references mist exact replydoel': (result) => {
+      result.reconcileProof.references = '<Root.Case@Example.nl>';
+    },
+    'references heeft onbekende voorloper': (result) => {
+      result.reconcileProof.references = '<Other@Example.nl> <Root.Case@Example.nl> <Inbound.Case@Example.nl>';
+    },
+    'references heeft element na replydoel': (result) => {
+      result.reconcileProof.references = '<Root.Case@Example.nl> <Inbound.Case@Example.nl> <Other@Example.nl>';
     },
     'accepted zonder identiteit': (result) => {
       result.status = 'accepted'; result.reservationReady = false; result.acceptedResult = {};

@@ -150,6 +150,69 @@ function createBlockedAttachmentUploadRuntime(counters) {
   });
 }
 
+test('preflight geeft nooit HTTP 200 ready zonder exact ondertekend verzendbewijs', async () => {
+  const runtime = createMailboxComposeRuntime({
+    attachmentSigningSecret: HTTP_PROOF_SECRET,
+    composeSendDependencies: {},
+    mailboxComposeThreadContext: {
+      async resolve({ body, accountEmail, recipientEmail }) {
+        return {
+          intentId: 'send:missing-proof-contract',
+          idempotencyKey: body.idempotencyKey,
+          accountEmail,
+          recipientEmail,
+          owner: 'serve',
+          senderName: 'Servé Creusen',
+          mode: 'new-message',
+          conversationId: '',
+          messageId: '<missing-proof-contract@softora.nl>',
+          provider: 'smtp',
+          providerThreadId: '',
+          replyTargetMessageId: '',
+          references: '',
+        };
+      },
+    },
+    mailboxSendProvenanceStore: {
+      async preflight(input) {
+        return {
+          intent: {
+            ...input,
+            sendIdentityKey: 'new-message:synthetic',
+            sendScopeKey: '',
+            requestPayloadFingerprint: 'b'.repeat(64),
+            attachmentsMetadata: [],
+          },
+          conflict: null,
+        };
+      },
+    },
+    normalizeEmail,
+    normalizeString,
+    logger: { error() {} },
+  });
+  const response = responseRecorder();
+
+  await runtime.preflightMessageResponse({ body: {
+    account: 'serve@softora.nl',
+    owner: 'serve',
+    mode: 'new-message',
+    idempotencyKey: 'browser:missing-proof-contract',
+    context: {},
+    to: 'prospect@example.nl',
+    cc: '',
+    bcc: '',
+    subject: 'Veilige proofcontrole',
+    body: 'Deze mail wordt niet verzonden.',
+    attachmentsMetadata: [],
+  } }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.code, 'MAILBOX_SEND_RECONCILE_PROOF_UNAVAILABLE');
+  assert.equal(Object.hasOwn(response.body, 'result'), false);
+});
+
 test('HTTP-send vereist voor SMTP en Instantly een geldig reconcileProof vóór resolver, guards of provider', async (t) => {
   for (const provider of ['smtp', 'instantly']) {
     await t.test(provider, async () => {
