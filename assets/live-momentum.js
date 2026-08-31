@@ -310,7 +310,7 @@
       void writeState(writeOptions);
     }, delay);
   }
-  function markStateChanged() {
+  function markStateChanged(options = {}) {
     if (!stateReady) {
       return;
     }
@@ -319,7 +319,7 @@
     saveRetryCount = 0;
     setPersistenceState('pending');
     historyState.publish(stateReady);
-    scheduleStateWrite();
+    if (options.immediate === true) flushStateWrite(); else scheduleStateWrite();
   }
   function flushStateWrite() {
     if (!stateReady || !stateDirty) {

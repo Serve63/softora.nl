@@ -67,12 +67,7 @@
     { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'sertraline-vrij', title: 'Sertraline vrij' },
     { id: 'gratis-opleiding-via-gemeente', title: 'Gratis opleiding via gemeente', imageId: 'jurisalem-af' },
-    {
-      id: 'silence-controle',
-      title: 'Silence controle',
-      missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
-      imageId: 'silence-controle'
-    },
+    { id: 'silence-controle', title: 'Silence controle', imageId: 'silence-controle' },
     { id: 'funnel-sites-live', title: 'Funnel Sites Live', imageId: 'softora-apple-kwaliteit-software' },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
     { id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' },
@@ -372,7 +367,7 @@
       onOrderChange(visibleOrder) {
         state = { ...state, __order: mergeVisibleOrderWithHidden(state, visibleOrder) };
         arrangeVisibleCards();
-        onStateChange();
+        onStateChange({ immediate: true });
       }
     });
 
