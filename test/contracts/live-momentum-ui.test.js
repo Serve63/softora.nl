@@ -11,7 +11,7 @@ const endGameCardFiles = [
   'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
   'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png', 'gezondheidscenter.png',
   'haartransplantatie.png', 'huis-miljoen-plus.png', 'israel-bezoeken.png',
-  'jaarlijkse-instagram-post.png', 'jurisalem-af.png', 'kantoorpand-in-haaren.png', 'ketting-armband.png',
+  'jaarlijkse-instagram-post.png', 'jurisalem-af.png', 'kantoor-a-af.png', 'kantoor-b-af.png', 'kantoorpand-in-haaren.png', 'ketting-armband.png',
   'leuke-vriendin.png', 'lijpe-instagram-feed.png', 'maatpak.png', 'nieuwe-fiets.png', 'nieuwe-whoop.png', 'oktober-2024.png',
   'persoonlijke-handtekening.png', 'professionele-fotoshoot.png', 'prp-behandeling.png',
   'range-rover-sport.png', 'rolex-datejust.png', 'ruben-zet-toto.png', 'rubens-company.png',
@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260821a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -478,6 +478,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*'\+5KG Spiermassa'/);
   assert.match(endGameCardsJs, /title:\s*"Servé's gezondheidsdossier"/);
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
+  assert.match(endGameCardsJs, /\{ id: 'kantoor-a-af', title: 'Kantoor A af' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'kantoor-b-af', title: 'Kantoor B af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'world-watcher', title: "Ruben's World Watcher" \}/);
   assert.match(endGameCardsJs, /\{ id: 'rubens-vakantieradar', title: "Ruben's vakantieradar" \}/);
   assert.match(endGameCardsJs, /\{ id: 'wereldkaart-bezochte-landen-2028', title: "Ruben's wereldkaart", timeframe: 2028, imageId: 'wereldkaart-bezochte-landen' \}/);
@@ -515,7 +517,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Eigen kantoor', 'TV-scherm aan muur op kantoor', 'Prikbord op kantoor', 'Kapstok op kantoor', 'Zelfde bureau als Martijn',
     'Kantoor aangekleed met planten', 'Verfvlekken weg', 'Boekhouding verplaatst naar boven', 'Kantoorpand in Haaren',
     'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
-    "Servé's gezondheidsdossier", 'Ruben zet toto', "Ruben's World Watcher", "Ruben's vakantieradar", 'Ruben Romano',
+    "Servé's gezondheidsdossier", 'Ruben zet toto', 'Kantoor A af', 'Kantoor B af', "Ruben's World Watcher", "Ruben's vakantieradar", 'Ruben Romano',
     'Ruben’s Company', 'Ruben’s Trading System', 'Jurisalem af', 'Gewenst lang kapsel', 'Gewenste kledingkast',
     'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
@@ -699,6 +701,32 @@ test('de zeven kantooruitbreidingen zijn unieke missies met een eigen visuele la
   });
 });
 
+test('Kantoor A en Kantoor B worden in die volgorde toegevoegd zonder bestaande voortgang te wijzigen', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const expected = [
+    { id: 'kantoor-a-af', title: 'Kantoor A af' },
+    { id: 'kantoor-b-af', title: 'Kantoor B af' }
+  ];
+  const ids = expected.map((card) => card.id);
+  const rubenCardIndex = catalog.findIndex((card) => card.id === 'ruben-zet-toto');
+
+  assert.deepEqual(catalog.slice(rubenCardIndex + 1, rubenCardIndex + 3), expected);
+
+  const oldPersistedOrder = catalog
+    .filter((card) => !ids.includes(card.id))
+    .map((card) => card.id);
+  const normalized = JSON.parse(JSON.stringify(api.normalizeState({
+    __order: oldPersistedOrder,
+    'ruben-zet-toto': { completed: true, deleted: false }
+  })));
+  const checkpointIndex = normalized.__order.indexOf('checkpoint-2028');
+
+  assert.deepEqual(normalized.__order.slice(checkpointIndex - 2, checkpointIndex), ids);
+  assert.deepEqual(normalized['ruben-zet-toto'], { completed: true, deleted: false });
+  ids.forEach((id) => assert.deepEqual(normalized[id], { completed: false, deleted: false }));
+});
+
 test('de nieuwe medicatie- en opleidingstegels migreren zonder bestaande voortgang te wijzigen', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
@@ -732,7 +760,7 @@ test('de nieuwe medicatie- en opleidingstegels migreren zonder bestaande voortga
   });
 });
 
-test('Silence controle is een unieke missie 65 met geïsoleerde duurzame state', () => {
+test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
@@ -749,7 +777,7 @@ test('Silence controle is een unieke missie 65 met geïsoleerde duurzame state',
     missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
     imageId: 'silence-controle'
   }]);
-  assert.equal(missionNumber, 65);
+  assert.equal(missionNumber, 67);
   assert.equal(cardIndex, checkpointIndex - 1);
 
   const oldPersistedOrder = catalog
