@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -499,6 +499,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'impactbox-draaiend', title: 'Impactbox draaiend', imageId: 'softora-apple-kwaliteit-software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'vitalora-draaiend', title: 'Vitalora draaiend', imageId: 'vitalora-draaiend' \}/);
   assert.match(endGameCardsJs, /id: 'silence-controle',[\s\S]*?title: 'Silence controle',[\s\S]*?missionText: 'Ik luister, zeg niets en ga geen discussie aan\.',[\s\S]*?imageId: 'silence-controle'/);
+  assert.match(endGameCardsJs, /\{ id: 'funnel-sites-live', title: 'Funnel Sites Live', imageId: 'softora-apple-kwaliteit-software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -531,7 +532,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
     "Ruben's wereldkaart", 'Professionele fotoshoot', 'Persoonlijke handtekening',
     'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
-    'Sertraline vrij', 'Gratis opleiding via gemeente', 'Silence controle',
+    'Sertraline vrij', 'Gratis opleiding via gemeente', 'Silence controle', 'Funnel Sites Live',
     'Lijpe Instagram feed', '3 posts · 6 slides', 'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
     'Huis van €1 miljoen+ kopen', '2028...', '2035...', 'Oktober 2024…'
@@ -810,7 +811,7 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
   const cardIndex = catalog.findIndex((card) => card.id === 'silence-controle');
-  const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
+  const funnelSitesIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
   const missionNumber = catalog
     .slice(0, cardIndex + 1)
     .filter((card) => !['origin', 'checkpoint', 'destination'].includes(card.type))
@@ -823,7 +824,7 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
     imageId: 'silence-controle'
   }]);
   assert.equal(missionNumber, 67);
-  assert.equal(cardIndex, checkpointIndex - 1);
+  assert.equal(cardIndex, funnelSitesIndex - 1);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'silence-controle')
@@ -850,4 +851,44 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
   })));
   assert.deepEqual(resetReload['silence-controle'], { completed: false, deleted: false });
   assert.deepEqual(resetReload['softora-gpt-af'], completedReload['softora-gpt-af']);
+});
+
+test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voortgang te wijzigen', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const cardMatches = catalog.filter((card) => card.id === 'funnel-sites-live');
+  const cardIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
+  const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
+  const missionNumber = catalog
+    .slice(0, cardIndex + 1)
+    .filter((card) => !['origin', 'checkpoint', 'destination'].includes(card.type))
+    .length;
+
+  assert.deepEqual(cardMatches, [{
+    id: 'funnel-sites-live',
+    title: 'Funnel Sites Live',
+    imageId: 'softora-apple-kwaliteit-software'
+  }]);
+  assert.equal(missionNumber, 68);
+  assert.equal(cardIndex, checkpointIndex - 1);
+
+  const oldPersistedOrder = catalog
+    .filter((card) => card.id !== 'funnel-sites-live')
+    .map((card) => card.id);
+  const initial = JSON.parse(JSON.stringify(api.normalizeState({
+    'silence-controle': { completed: true, deleted: false },
+    __order: oldPersistedOrder
+  })));
+
+  assert.deepEqual(initial['funnel-sites-live'], { completed: false, deleted: false });
+  assert.deepEqual(initial['silence-controle'], { completed: true, deleted: false });
+  assert.equal(initial.__order.filter((id) => id === 'funnel-sites-live').length, 1);
+  assert.equal(initial.__order.indexOf('funnel-sites-live'), initial.__order.indexOf('checkpoint-2028') - 1);
+
+  const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...initial,
+    'funnel-sites-live': { completed: true, deleted: false }
+  })));
+  assert.deepEqual(completedReload['funnel-sites-live'], { completed: true, deleted: false });
+  assert.deepEqual(completedReload['silence-controle'], initial['silence-controle']);
 });
