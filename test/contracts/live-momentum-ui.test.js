@@ -51,8 +51,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831c" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -430,10 +430,12 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /const CARD_CATALOG = \[/);
   assert.match(endGameCardsJs, /normalized\.__order = normalizeOrder\(value\?\.__order\)/);
   assert.match(endGameCardsJs, /function getDisplayOrder\(value\)/);
+  assert.match(endGameCardsJs, /function mergeVisibleOrderWithHidden\(value, visibleOrder\)/);
   assert.match(endGameCardsJs, /groupByCompletion\(through2028, normalized\)/);
   assert.match(endGameCardsJs, /groupByCompletion\(through2035, normalized\)/);
   assert.match(endGameCardsJs, /__order:\s*\[\.\.\.state\.__order\]/);
   assert.match(endGameCardsJs, /onOrderChange\(visibleOrder\)/);
+  assert.match(endGameCardsJs, /__order: mergeVisibleOrderWithHidden\(state, visibleOrder\)/);
   assert.match(endGameCardsJs, /function createMissionNumber\(number\)/);
   assert.match(endGameCardsJs, /label\.className = 'end-game-card-number'/);
   assert.match(endGameCardsJs, /if \(!isFixed\) slot\.append\(createMissionNumber\(missionNumber\)\)/);
@@ -551,6 +553,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameInteractionsJs, /card\.dataset\.endGameCardFixed === 'true'/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointermove'/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointerup', finishDrag\)/);
+  assert.match(endGameInteractionsJs, /card\.dataset\.endGameCardFixed !== 'true' \|\| card\.classList\.contains\('end-game-card-slot--checkpoint'\)/);
+  assert.match(endGameInteractionsJs, /const crossesCheckpoint = nextCard\?\.classList\.contains\('end-game-card-slot--checkpoint'\) === true/);
   assert.match(endGameInteractionsJs, /onOrderChange\(getVisibleCardIds\(\)\)/);
   assert.match(endGameInteractionsJs, /direction < 0[\s\S]*current > WHEEL_EDGE_EPSILON[\s\S]*current < maximum - WHEEL_EDGE_EPSILON/);
   assert.match(endGameInteractionsJs, /if \(!canMove\)[\s\S]*scrollContainer\.scrollLeft = direction < 0 \? 0 : maximum/);
@@ -717,6 +721,31 @@ test('afgeronde eindspelmissies staan stabiel vooraan en keren na ongedaan maken
     resetDisplayOrder.indexOf('boekhouding-naar-boven'),
     resetDisplayOrder.indexOf('eigen-automaat-rijden') + 1
   );
+});
+
+test('missies kunnen duurzaam over het 2028-checkpoint worden verplaatst', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const initial = JSON.parse(JSON.stringify(api.normalizeState({
+    'silence-controle': { completed: false, deleted: true }
+  })));
+  const visibleOrder = initial.__order.filter((id) => id !== 'silence-controle' && id !== 'kantoor-a-af');
+  const checkpointIndex = visibleOrder.indexOf('checkpoint-2028');
+  visibleOrder.splice(checkpointIndex + 1, 0, 'kantoor-a-af');
+
+  const movedOrder = api.mergeVisibleOrderWithHidden(initial, visibleOrder);
+  const movedCheckpointIndex = movedOrder.indexOf('checkpoint-2028');
+  assert.ok(movedOrder.indexOf('kantoor-a-af') > movedCheckpointIndex);
+  assert.ok(movedOrder.indexOf('silence-controle') < movedCheckpointIndex);
+
+  const reloaded = JSON.parse(JSON.stringify(api.normalizeState({
+    ...initial,
+    __order: movedOrder
+  })));
+  assert.ok(reloaded.__order.indexOf('kantoor-a-af') > reloaded.__order.indexOf('checkpoint-2028'));
+  assert.deepEqual(reloaded['silence-controle'], { completed: false, deleted: true });
+
+  const displayOrder = api.getDisplayOrder(reloaded);
+  assert.ok(displayOrder.indexOf('kantoor-a-af') > displayOrder.indexOf('checkpoint-2028'));
 });
 
 test('de zeven kantooruitbreidingen zijn unieke missies met een eigen visuele laag', () => {

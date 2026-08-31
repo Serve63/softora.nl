@@ -96,14 +96,35 @@
   function normalizeOrder(value) {
     const validIds = new Set(DEFAULT_CARD_ORDER);
     const requestedOrder = Array.from(new Set((Array.isArray(value) ? value : [])
-      .filter((id) => validIds.has(id) && !FIXED_CARD_IDS.includes(id))));
+      .filter((id) => validIds.has(id) && ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(id))));
+    const requestedCheckpointIndex = requestedOrder.indexOf(CHECKPOINT_CARD_ID);
+    const requestedMissionOrder = requestedOrder.filter((id) => !FIXED_CARD_IDS.includes(id));
     const remainingOrder = DEFAULT_CARD_ORDER.filter((id) => (
-      !FIXED_CARD_IDS.includes(id) && !requestedOrder.includes(id)
+      !FIXED_CARD_IDS.includes(id) && !requestedMissionOrder.includes(id)
     ));
-    const missionOrder = requestedOrder.concat(remainingOrder);
-    const through2028 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe !== 2035);
-    const through2035 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe === 2035);
-    return [ORIGIN_CARD_ID, ...through2028, CHECKPOINT_CARD_ID, ...through2035, DESTINATION_CARD_ID];
+    if (requestedCheckpointIndex < 0) {
+      const missionOrder = requestedMissionOrder.concat(remainingOrder);
+      const through2028 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe !== 2035);
+      const through2035 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe === 2035);
+      return [ORIGIN_CARD_ID, ...through2028, CHECKPOINT_CARD_ID, ...through2035, DESTINATION_CARD_ID];
+    }
+    const requestedThrough2028 = requestedOrder
+      .slice(0, requestedCheckpointIndex)
+      .filter((id) => !FIXED_CARD_IDS.includes(id));
+    const requestedThrough2035 = requestedOrder
+      .slice(requestedCheckpointIndex + 1)
+      .filter((id) => !FIXED_CARD_IDS.includes(id));
+    const missingThrough2028 = remainingOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe !== 2035);
+    const missingThrough2035 = remainingOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe === 2035);
+    return [
+      ORIGIN_CARD_ID,
+      ...requestedThrough2028,
+      ...missingThrough2028,
+      CHECKPOINT_CARD_ID,
+      ...requestedThrough2035,
+      ...missingThrough2035,
+      DESTINATION_CARD_ID
+    ];
   }
 
   function normalizeCardState(value) {
@@ -140,6 +161,30 @@
       ...groupByCompletion(through2035, normalized),
       DESTINATION_CARD_ID
     ];
+  }
+
+  function mergeVisibleOrderWithHidden(value, visibleOrder) {
+    const normalized = normalizeState(value);
+    const visibleIds = new Set(visibleOrder);
+    const currentCheckpointIndex = normalized.__order.indexOf(CHECKPOINT_CARD_ID);
+    const visibleCheckpointIndex = visibleOrder.indexOf(CHECKPOINT_CARD_ID);
+    if (visibleCheckpointIndex < 0) {
+      const hiddenOrder = normalized.__order.filter((id) => !visibleIds.has(id));
+      return normalizeOrder(visibleOrder.concat(hiddenOrder));
+    }
+    const hiddenThrough2028 = normalized.__order
+      .slice(1, currentCheckpointIndex)
+      .filter((id) => !visibleIds.has(id));
+    const hiddenThrough2035 = normalized.__order
+      .slice(currentCheckpointIndex + 1, -1)
+      .filter((id) => !visibleIds.has(id));
+    return normalizeOrder([
+      ...visibleOrder.slice(0, visibleCheckpointIndex),
+      ...hiddenThrough2028,
+      CHECKPOINT_CARD_ID,
+      ...visibleOrder.slice(visibleCheckpointIndex + 1),
+      ...hiddenThrough2035
+    ]);
   }
 
   function createTargetIcon() {
@@ -325,9 +370,7 @@
       scrollContainer: track.closest('.end-game-goals'),
       isReady,
       onOrderChange(visibleOrder) {
-        const visibleIds = new Set(visibleOrder);
-        const hiddenOrder = state.__order.filter((id) => !visibleIds.has(id));
-        state = { ...state, __order: normalizeOrder(visibleOrder.concat(hiddenOrder)) };
+        state = { ...state, __order: mergeVisibleOrderWithHidden(state, visibleOrder) };
         arrangeVisibleCards();
         onStateChange();
       }
@@ -493,7 +536,7 @@
     };
   }
 
-  const api = { CARD_CATALOG, createController, getDisplayOrder, normalizeState };
+  const api = { CARD_CATALOG, createController, getDisplayOrder, mergeVisibleOrderWithHidden, normalizeState };
   if (typeof window !== 'undefined') window.SoftoraMomentumEndGameCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
