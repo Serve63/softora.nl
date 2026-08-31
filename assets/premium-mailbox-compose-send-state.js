@@ -413,6 +413,22 @@
     return compareAndSwapMarker(storage, { ...marker, ...patch }, marker.casToken, options);
   }
 
+  function markerIsProvenPreDispatch(marker) {
+    return PROVEN_PRE_DISPATCH_STATES.has(normalizeText(marker?.state))
+      && !Object.prototype.hasOwnProperty.call(marker || {}, 'sendStartedAt')
+      && marker?.durableIdentity == null;
+  }
+
+  function retireProvenPreDispatchMarker(storage, marker, options = {}) {
+    return patchMarker(storage, marker, {
+      state: 'failed',
+      staging: [],
+      durableIdentity: null,
+      reconcileProof: null,
+      sendStartedAt: undefined,
+    }, options);
+  }
+
   function selectMarker(
     storage,
     requestedKey,
@@ -422,17 +438,25 @@
     options = {}
   ) {
     const requested = normalizeText(requestedKey);
-    if (requested) {
-      const exact = readMarker(storage, requested);
-      if (exact) {
-        if (exact.payloadFingerprint !== payloadFingerprint) {
-          throw createProtocolError(
-            'MAILBOX_SEND_DURABLE_STATE_PAYLOAD_MISMATCH',
-            'De verzendgegevens wijken af van de veilige eerdere poging; de mail is niet verzonden.'
-          );
-        }
-        return exact;
-      }
+    const replaceProvenPreDispatch = options.replaceProvenPreDispatch === true;
+    let requestedCanBeCreated = Boolean(requested);
+    let exact = requested ? readMarker(storage, requested) : null;
+    const exactPayloadMismatch = Boolean(
+      exact && exact.payloadFingerprint !== payloadFingerprint
+    );
+    const exactCanRotate = Boolean(
+      exactPayloadMismatch
+      && replaceProvenPreDispatch
+      && (
+        (exact.state === 'failed' && exact.durableIdentity == null)
+        || markerIsProvenPreDispatch(exact)
+      )
+    );
+    if (exactPayloadMismatch && !exactCanRotate) {
+      throw createProtocolError(
+        'MAILBOX_SEND_DURABLE_STATE_PAYLOAD_MISMATCH',
+        'De verzendgegevens wijken af van de veilige eerdere poging; de mail is niet verzonden.'
+      );
     }
     const markers = listMarkers(storage);
     const matches = markers.filter((marker) => marker.payloadFingerprint === payloadFingerprint);
@@ -443,23 +467,46 @@
         'Meerdere onopgeloste verzendpogingen passen bij deze mail; er is niets opnieuw verzonden.'
       );
     }
-    if (unresolved.length === 1) return unresolved[0];
     const unresolvedScopeConflicts = markers.filter((marker) => (
       UNRESOLVED_STATES.has(marker.state)
       && marker.localScopeFingerprint === localScopeFingerprint
       && marker.payloadFingerprint !== payloadFingerprint
     ));
     if (unresolvedScopeConflicts.length) {
-      throw createProtocolError(
-        'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT',
-        'Voor deze mailcontext bestaat nog een onopgeloste verzending met andere inhoud of bijlagen; er is niets opnieuw verzonden.'
-      );
+      const allProvenPreDispatch = unresolvedScopeConflicts.every(markerIsProvenPreDispatch);
+      if (!replaceProvenPreDispatch || !allProvenPreDispatch) {
+        throw createProtocolError(
+          'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT',
+          'Voor deze mailcontext bestaat nog een onopgeloste verzending met andere inhoud of bijlagen; er is niets opnieuw verzonden.'
+        );
+      }
     }
+    unresolvedScopeConflicts.forEach((marker) => {
+      retireProvenPreDispatchMarker(storage, marker, options);
+    });
+    if (exactPayloadMismatch) {
+      if (exact.state !== 'failed' && !unresolvedScopeConflicts.some((marker) => (
+        marker.idempotencyKey === exact.idempotencyKey
+      ))) {
+        retireProvenPreDispatchMarker(storage, exact, options);
+      }
+      exact = null;
+      requestedCanBeCreated = false;
+    }
+    if (requested) {
+      if (exact) {
+        if (exact.state === 'accepted' || UNRESOLVED_STATES.has(exact.state)) return exact;
+      }
+    }
+    if (unresolved.length === 1) return unresolved[0];
     const recentAccepted = matches
       .filter((marker) => marker.state === 'accepted')
       .sort((left, right) => Number(right.updatedAt) - Number(left.updatedAt));
     if (recentAccepted.length) return recentAccepted[0];
-    const idempotencyKey = requested || `browser:${getRandomToken(options)}`;
+    if (exact) return exact;
+    const idempotencyKey = requestedCanBeCreated
+      ? requested
+      : `browser:${getRandomToken(options)}`;
     return createMarker(
       idempotencyKey,
       payloadFingerprint,

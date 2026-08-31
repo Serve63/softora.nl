@@ -607,7 +607,8 @@
   }
   function markerIsProvenPreDispatch(marker) {
     return PROVEN_PRE_DISPATCH_STATES.has(normalizeText(marker?.state))
-      && !Object.prototype.hasOwnProperty.call(marker || {}, 'sendStartedAt');
+      && !Object.prototype.hasOwnProperty.call(marker || {}, 'sendStartedAt')
+      && marker?.durableIdentity == null;
   }
   function attachmentReselectError() {
     return createProtocolError(
@@ -716,7 +717,7 @@
               payloadFingerprint,
               localScopeFingerprint,
               attachmentsMetadata,
-              options
+              { ...options, replaceProvenPreDispatch: true }
             );
           }
           input.onIdempotencyKey?.(marker.idempotencyKey);
