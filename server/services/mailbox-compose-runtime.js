@@ -661,10 +661,18 @@ function createMailboxComposeRuntime(dependencies = {}) {
         reconcileProof = createMailboxReconcileProof(conflict, normalizeString);
       } else {
         try {
-          reconcileProof = createMailboxReconcileProof(reservationCheck?.intent, normalizeString);
-        } catch (error) {
-          if (body.reconcileProof !== undefined) throw error;
-          reconcileProof = null;
+          reconcileProof = createMailboxReconcileProof(
+            reservationCheck?.intent,
+            normalizeString
+          );
+        } catch (cause) {
+          const proofError = createMailboxReconcileProofError(
+            'De server kon geen exact, duurzaam verzendbewijs maken; er is niets verzonden.',
+            'MAILBOX_SEND_RECONCILE_PROOF_UNAVAILABLE',
+            503
+          );
+          proofError.cause = cause;
+          throw proofError;
         }
       }
       if (retryStatus === 'accepted' && acceptedResult) {
@@ -677,6 +685,13 @@ function createMailboxComposeRuntime(dependencies = {}) {
             normalizeString
           )
         : null;
+      if (!signedReconcileProof) {
+        throw createMailboxReconcileProofError(
+          'De server kon geen exact, duurzaam verzendbewijs maken; er is niets verzonden.',
+          'MAILBOX_SEND_RECONCILE_PROOF_UNAVAILABLE',
+          503
+        );
+      }
       return res.status(200).json({
         ok: true,
         result: {
@@ -691,7 +706,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
           conversationId: threadProvenance.conversationId,
           replyTargetMessageId: threadProvenance.replyTargetMessageId,
           providerThreadId: threadProvenance.providerThreadId,
-          ...(signedReconcileProof ? { reconcileProof: signedReconcileProof } : {}),
+          reconcileProof: signedReconcileProof,
           reservationReady: Boolean(
             reservationCheck?.intent?.sendIdentityKey
             && reservationCheck?.intent?.sendScopeKey

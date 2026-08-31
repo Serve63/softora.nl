@@ -130,17 +130,60 @@
     ) return null;
     return { intentId: intent.value, messageId: message.value, providerMessageId: provider.value };
   }
+  function normalizeMessageId(value) {
+    const text = normalizeText(value);
+    if (!text) return '';
+    if (text.startsWith('<') && text.endsWith('>') && /^[^<>\s]+$/.test(text.slice(1, -1))) {
+      return text;
+    }
+    const token = text.replace(/[<>\s]/g, '');
+    return token ? `<${token}>` : '';
+  }
+  function parseReferenceTokens(value) {
+    const source = Array.isArray(value) ? value.join(' ') : normalizeText(value);
+    return Array.from(new Set(
+      (source.match(/<[^<>\s]+>/g) || []).map(normalizeMessageId).filter(Boolean)
+    ));
+  }
+  function reconcileReferencesMatch(proofReferences, expected) {
+    if (typeof proofReferences !== 'string') return false;
+    if (expected.mode !== 'reply') return proofReferences === '';
+    if (expected.provider === 'instantly') {
+      return Boolean(expected.replyTargetMessageId)
+        && proofReferences === expected.replyTargetMessageId;
+    }
+    const replyTargetMessageId = normalizeMessageId(expected.replyTargetMessageId);
+    const proofTokens = parseReferenceTokens(proofReferences);
+    if (
+      !replyTargetMessageId
+      || proofReferences !== proofTokens.join(' ')
+      || proofTokens[proofTokens.length - 1] !== replyTargetMessageId
+    ) return false;
+    const expectedTokens = parseReferenceTokens(expected.references);
+    const targetIndex = expectedTokens.indexOf(replyTargetMessageId);
+    if (targetIndex >= 0 && targetIndex !== expectedTokens.length - 1) return false;
+    const expectedAncestors = expectedTokens.filter((token) => token !== replyTargetMessageId);
+    return expectedAncestors.every((token, index) => proofTokens[index] === token);
+  }
   function expectedPreflightScope(payload) {
     const context = payload?.context && typeof payload.context === 'object' ? payload.context : {};
     const replyIdentity = payload?.replyIdentity && typeof payload.replyIdentity === 'object'
       ? payload.replyIdentity : {};
+    const provider = normalize(payload?.provider || replyIdentity.provider) || 'smtp';
+    const replyTargetMessageId = provider === 'instantly'
+      ? normalizeText(
+          payload?.providerMessageId
+          || replyIdentity.providerMessageId
+          || context.providerMessageId
+        )
+      : normalizeMessageId(replyIdentity.sourceMessageId || context.messageId);
     return {
       owner: normalize(payload?.owner),
       accountEmail: normalize(payload?.account),
-      provider: normalize(payload?.provider) || 'smtp',
+      provider,
       mode: normalize(payload?.mode),
       conversationId: normalizeText(replyIdentity.conversationId || context.conversationId),
-      replyTargetMessageId: normalizeText(replyIdentity.sourceMessageId || context.messageId),
+      replyTargetMessageId,
       references: normalizeText(context.references),
       providerThreadId: normalizeText(
         payload?.providerThreadId || replyIdentity.providerThreadId || ''
@@ -167,8 +210,7 @@
       && normalizeText(proof.conversationId) === expected.conversationId
       && normalizeText(proof.replyTargetMessageId) === expected.replyTargetMessageId
       && normalizeText(proof.providerThreadId) === expected.providerThreadId
-      && typeof proof.references === 'string'
-      && proof.references === expected.references
+      && reconcileReferencesMatch(proof.references, expected)
       && typeof proof.scopeFingerprint === 'string'
       && proof.scopeFingerprint.startsWith(expectedScopePrefix)
       && /^(smtp|instantly)-(reply|new-message)-scope:[0-9a-f]{64}$/.test(proof.scopeFingerprint)
