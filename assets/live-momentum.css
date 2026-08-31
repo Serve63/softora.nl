@@ -85,7 +85,7 @@ button {
 .chart-card {
   --chart-max-height: 164px;
   --chart-axis-height: 26px;
-  --chart-total-height: 218px;
+  --chart-total-height: 218px; --chart-average-label-lane: 4.8rem; --chart-average-label-clearance: 1.25rem;
   position: relative;
   padding: 1.2rem 0 1rem 3.7rem;
 }
@@ -112,15 +112,13 @@ button {
 .chart-scale span:nth-child(4) { top: 75%; }
 .chart-scale span:nth-child(5) { top: 100%; }
 .bar-chart {
-  --average-score: .65;
-  --average-line-y: 57.4px;
-  display: grid;
+  --average-line-y: 57.4px; display: grid;
   position: relative;
-  grid-template-columns: repeat(var(--day-count, 31), minmax(18px, 1fr));
+  grid-template-columns: repeat(var(--day-count, 31), minmax(0, 1fr));
   align-items: end;
   gap: clamp(5px, .55vw, 10px);
   min-height: var(--chart-total-height);
-  padding-right: 4px;
+  padding-right: calc(var(--chart-average-label-lane) + var(--chart-average-label-clearance) + 4px);
 }
 .bar-chart::before,
 .bar-chart::after {
@@ -133,7 +131,7 @@ button {
 }
 .bar-chart::before {
   z-index: 0;
-  right: 4px;
+  right: calc(var(--chart-average-label-lane) + 4px);
   left: 0;
   border-top: 2px dotted rgba(96, 98, 114, .52);
   content: "";
@@ -141,6 +139,7 @@ button {
 .bar-chart::after {
   z-index: 2;
   right: 4px;
+  box-sizing: border-box; width: var(--chart-average-label-lane);
   padding: 0 0 2px .45rem;
   transform: translateY(-100%);
   background: var(--page-bg);
@@ -150,7 +149,7 @@ button {
   font-size: .7rem;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1;
+  line-height: 1; text-align: right;
 }
 .bar-wrap {
   position: relative;
@@ -158,7 +157,7 @@ button {
   display: grid;
   grid-template-rows: var(--chart-max-height) var(--chart-axis-height);
   place-items: end center;
-  min-width: 18px;
+  min-width: 0;
 }
 .bar {
   display: block;

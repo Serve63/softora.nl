@@ -36,9 +36,9 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260813b" defer><\/script>/);
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260815a"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260901a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260828d"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260901a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -52,12 +52,12 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260831d" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260901a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-day-hold\.js\?v=20260825a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260825a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260901a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260828a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-focus-mode\.js\?v=20260813a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
@@ -180,17 +180,23 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.deepEqual([...new Set(letterSpacingValues)], ['0']);
   assert.doesNotMatch(css, /purple/i);
   assert.doesNotMatch(css, /88366b|74265c|91436f|7f426b/i);
-  assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--day-count, 31\),/);
-  assert.match(css, /\.bar-chart\s*\{[\s\S]*--average-score:\s*\.65;[\s\S]*--average-line-y:\s*57\.4px;[\s\S]*position:\s*relative;/);
+  assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--day-count, 31\), minmax\(0, 1fr\)\);/);
+  assert.match(css, /\.bar-chart\s*\{[\s\S]*--average-line-y:\s*57\.4px;[\s\S]*position:\s*relative;/);
   assert.match(css, /\.bar-chart::before,\s*\.bar-chart::after\s*\{[\s\S]*var\(--chart-total-height\) - var\(--chart-max-height\) - var\(--chart-axis-height\)[\s\S]*\+ var\(--average-line-y\)[\s\S]*pointer-events:\s*none;/);
-  assert.match(css, /\.bar-chart::before\s*\{[\s\S]*border-top:\s*2px dotted rgba\(96, 98, 114, \.52\);/);
-  assert.match(css, /\.bar-chart::after\s*\{[\s\S]*content:\s*"AVARAGE";[\s\S]*font-family:\s*var\(--font-display\);/);
+  assert.match(css, /\.chart-card\s*\{[\s\S]*--chart-average-label-lane:\s*4\.8rem;[\s\S]*--chart-average-label-clearance:\s*1\.25rem;/);
+  assert.match(css, /\.bar-chart\s*\{[\s\S]*padding-right:\s*calc\(var\(--chart-average-label-lane\) \+ var\(--chart-average-label-clearance\) \+ 4px\);/);
+  assert.match(css, /\.bar-chart::before\s*\{[\s\S]*right:\s*calc\(var\(--chart-average-label-lane\) \+ 4px\);[\s\S]*border-top:\s*2px dotted rgba\(96, 98, 114, \.52\);/);
+  assert.match(css, /\.bar-chart::after\s*\{[\s\S]*width:\s*var\(--chart-average-label-lane\);[\s\S]*content:\s*"AVARAGE";[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*text-align:\s*right;/);
   assert.match(css, /\.bar-wrap\s*\{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
+  assert.match(css, /\.bar-wrap\s*\{[\s\S]*min-width:\s*0;/);
   assert.match(css, /\.chart-card\s*\{[\s\S]*--chart-max-height:\s*164px;[\s\S]*--chart-axis-height:\s*26px;[\s\S]*--chart-total-height:\s*218px;/);
   assert.match(css, /\.chart-scale\s*\{[\s\S]*top:\s*calc\(1\.2rem \+ var\(--chart-total-height\) - var\(--chart-max-height\) - var\(--chart-axis-height\)\);[\s\S]*bottom:\s*calc\(1rem \+ var\(--chart-axis-height\)\);/);
   assert.match(css, /\.chart-scale span\s*\{[\s\S]*position:\s*absolute;[\s\S]*transform:\s*translateY\(-50%\);/);
   assert.match(css, /\.chart-scale span:nth-child\(1\)\s*\{\s*top:\s*0;\s*\}[\s\S]*nth-child\(2\)\s*\{\s*top:\s*25%;\s*\}[\s\S]*nth-child\(3\)\s*\{\s*top:\s*50%;\s*\}[\s\S]*nth-child\(4\)\s*\{\s*top:\s*75%;\s*\}[\s\S]*nth-child\(5\)\s*\{\s*top:\s*100%;\s*\}/);
   assert.match(css, /\.bar-wrap\s*\{[\s\S]*grid-template-rows:\s*var\(--chart-max-height\) var\(--chart-axis-height\);/);
+  assert.match(mobileCss, /body\[data-live-momentum-page\] \.chart-card,[\s\S]*--chart-average-label-lane:\s*0px;[\s\S]*--chart-average-label-clearance:\s*0px;/);
+  assert.match(mobileCss, /body\[data-live-momentum-page\] \.chart-card::after,[\s\S]*top:\s*10px;[\s\S]*content:\s*"GEMIDDELDE";/);
+  assert.doesNotMatch(mobileCss, /\.chart-card::after[^}]*top:\s*98px/);
   assert.doesNotMatch(css, /chart-switch|is-line-mode|\.line-(?:stage|grid|segment|point|day-axis)/);
   assert.match(css, /\.habit-grid\s*\{[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(190px, 12vw\) repeat\(var\(--day-count, 31\), minmax\(32px, 1fr\)\);[\s\S]*min-width:\s*min\(100%, 1320px\);/);
   assert.match(dayHoldCss, /\.habit-day\.is-on-hold,[\s\S]*\.status\.is-on-hold\s*\{[\s\S]*repeating-linear-gradient/);
@@ -436,6 +442,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /__order:\s*\[\.\.\.state\.__order\]/);
   assert.match(endGameCardsJs, /onOrderChange\(visibleOrder\)/);
   assert.match(endGameCardsJs, /__order: mergeVisibleOrderWithHidden\(state, visibleOrder\)/);
+  assert.match(endGameCardsJs, /onStateChange\(\{ immediate: true \}\)/);
   assert.match(endGameCardsJs, /function createMissionNumber\(number\)/);
   assert.match(endGameCardsJs, /label\.className = 'end-game-card-number'/);
   assert.match(endGameCardsJs, /if \(!isFixed\) slot\.append\(createMissionNumber\(missionNumber\)\)/);
@@ -500,7 +507,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'softora-gpt-af', title: 'Softora GPT af', imageId: 'softora-apple-kwaliteit-software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'impactbox-draaiend', title: 'Impactbox draaiend', imageId: 'softora-apple-kwaliteit-software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'vitalora-draaiend', title: 'Vitalora draaiend', imageId: 'vitalora-draaiend' \}/);
-  assert.match(endGameCardsJs, /id: 'silence-controle',[\s\S]*?title: 'Silence controle',[\s\S]*?missionText: 'Ik luister, zeg niets en ga geen discussie aan\.',[\s\S]*?imageId: 'silence-controle'/);
+  assert.match(endGameCardsJs, /\{ id: 'silence-controle', title: 'Silence controle', imageId: 'silence-controle' \}/);
+  assert.doesNotMatch(endGameCardsJs, /Ik luister, zeg niets en ga geen discussie aan\./);
   assert.match(endGameCardsJs, /\{ id: 'funnel-sites-live', title: 'Funnel Sites Live', imageId: 'softora-apple-kwaliteit-software' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
@@ -669,8 +677,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.doesNotMatch(js, /catch \(error\) \{[\s\S]{0,250}stateReady = true/);
   assert.match(js, /function parseStoredState\(rawValue, options = \{\}\)/);
   assert.match(js, /function scheduleStateWrite\(options = \{\}\)/);
-  assert.match(js, /function markStateChanged\(\)/);
+  assert.match(js, /function markStateChanged\(options = \{\}\)/);
   assert.match(js, /function flushStateWrite\(\)/);
+  assert.match(js, /function markStateChanged\(options = \{\}\)[\s\S]*if \(options\.immediate === true\) flushStateWrite\(\); else scheduleStateWrite\(\);/);
   assert.match(js, /label\.addEventListener\('input',[\s\S]*markStateChanged\(\)/);
   assert.match(js, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*clearStateLoadRetry\(\);[\s\S]*flushStateWrite\(\);/);
   assert.match(js, /queuedKeepalive = true/);
@@ -849,7 +858,6 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
   assert.deepEqual(cardMatches, [{
     id: 'silence-controle',
     title: 'Silence controle',
-    missionText: 'Ik luister, zeg niets en ga geen discussie aan.',
     imageId: 'silence-controle'
   }]);
   assert.equal(missionNumber, 67);
