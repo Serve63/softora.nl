@@ -1357,7 +1357,6 @@
             gap: 10px;
             margin-bottom: 14px;
         }
-
         .contact-icon {
             width: 28px;
             height: 28px;
@@ -1369,27 +1368,25 @@
             justify-content: center;
             flex-shrink: 0;
             margin-top: 1px;
+            color: #9b2355;
         }
-
         .contact-icon svg {
             width: 13px;
             height: 13px;
-            color: #9b2355;
             stroke: currentColor;
         }
-
         .contact-text {
             font-family: 'Inter', sans-serif;
             font-size: 13px;
             color: var(--text-secondary);
             line-height: 1.5;
         }
-
-        .contact-text a[href^="tel"] {
-            color: inherit;
-            text-decoration: none;
+        .contact-text a {
+            color: #9b2355;
+            text-decoration: underline;
+            text-underline-offset: 3px;
         }
-
+        .contact-text a:hover, .contact-text a:focus-visible { color: var(--text-primary); }
         .contact-text strong {
             display: block;
             font-size: 11px;
@@ -3438,13 +3435,13 @@
                     <div class="contact-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
                     <div class="contact-text"><strong>Vestiging</strong>Oisterwijk, Nederland</div>
                 </div>
+                <div class="contact-item"><span class="contact-icon" aria-hidden="true">→</span><div class="contact-text"><strong>Contact</strong><a href="/contact" aria-label="Open het contactformulier">Open het contactformulier</a></div></div>
             </div>
         </div>
-
         <div class="footer-bottom">
             <div class="footer-copy">© 2026 <span>Softora.nl</span> - Alle rechten voorbehouden</div>
             <div class="footer-legal" data-softora-public-seo="internal-links">
-                <a href="/contact">Projectintake</a><a href="/privacybeleid">Privacybeleid</a><button type="button" data-cookie-settings>Cookie-instellingen</button>
+                <a href="/privacybeleid">Privacybeleid</a><button type="button" data-cookie-settings>Cookie-instellingen</button>
                 <a href="/algemene-voorwaarden">Algemene voorwaarden</a><a href="/diensten">Diensten</a><a href="/website-laten-maken">Website laten maken</a>
                 <a href="/blog">Artikelen</a><a href="/kennisbank">Kennisbank</a><a href="/over-softora">Over Softora.nl</a><a href="/personeel-login">Personeel</a>
             </div>
