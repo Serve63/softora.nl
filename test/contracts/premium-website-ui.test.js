@@ -263,6 +263,10 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.doesNotMatch(source, /Wij bouwen professionele, snelle websites voor het MKB\./);
   assert.match(
     source,
+    /<div class="footer-brand">[\s\S]*<p class="footer-tagline">Wij bouwen professionele, snelle websites voor bedrijven\. Van ontwerp tot onderhoud - alles onder een dak\.<\/p>\s*<a class="footer-personnel-link" href="\/personeel-login">Personeel<\/a>/s
+  );
+  assert.match(
+    source,
     /<div class="footer-col-title">Contact<\/div>[\s\S]*<strong>Telefoon<\/strong>[\s\S]*<strong>Vestiging<\/strong>[\s\S]*<strong>Contact<\/strong><a href="\/contact" aria-label="Open het contactformulier">Open het contactformulier<\/a>/s
   );
   assert.doesNotMatch(source, /<div class="footer-legal"[^>]*>[\s\S]*href="\/contact"/s);
@@ -279,8 +283,14 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
 test('premium website houdt de personeel-link zichtbaar in de footer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
+  const personnelStyle = source.match(/\.footer-personnel-link\s*\{([^}]*)\}/)?.[1] || '';
 
-  assert.match(source, /<a href="\/personeel-login">Personeel<\/a>/);
+  assert.match(source, /<a class="footer-personnel-link" href="\/personeel-login">Personeel<\/a>/);
+  assert.match(personnelStyle, /display:\s*inline-flex;/);
+  assert.match(personnelStyle, /border:\s*1px solid #e2ddd6;/);
+  assert.match(personnelStyle, /color:\s*var\(--text-primary\);/);
+  assert.equal((source.match(/href="\/personeel-login"/g) || []).length, 1);
+  assert.doesNotMatch(source, /<div class="footer-legal"[^>]*>[\s\S]*href="\/personeel-login"/s);
   assert.doesNotMatch(source, /href="\/premium-personeel-login\?logout=1"/);
   assert.doesNotMatch(
     source,
