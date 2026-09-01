@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260901b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260901c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -516,6 +516,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'vijftig-dagen-streak', title: '50 dagen streak', imageId: 'dertig-dagen-streak' \}/);
   assert.match(endGameCardsJs, /\{ id: 'honderd-dagen-streak', title: '100 dagen streak', imageId: 'dertig-dagen-streak' \}/);
   assert.match(endGameCardsJs, /\{ id: 'driehonderdvijfenzestig-dagen-streak', title: '365 dagen streak', imageId: 'dertig-dagen-streak' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'loondienst', title: 'Loondienst', imageId: 'bestaanszekerheid-bedrijf' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -916,7 +917,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   }]);
   assert.equal(missionNumber, 68);
   assert.equal(cardIndex, firstStreakIndex - 1);
-  assert.equal(firstStreakIndex, checkpointIndex - 6);
+  assert.equal(firstStreakIndex, checkpointIndex - 7);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'funnel-sites-live')
@@ -954,7 +955,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
   const funnelSitesIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
   const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
 
-  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex), expected);
+  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 1), expected);
   assert.deepEqual(expected.map((card) => (
     catalog.slice(0, catalog.findIndex((item) => item.id === card.id) + 1)
       .filter((item) => !['origin', 'checkpoint', 'destination'].includes(item.type))
@@ -984,4 +985,51 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
   })));
   assert.deepEqual(completedReload['honderd-dagen-streak'], { completed: true, deleted: false });
   assert.deepEqual(completedReload['funnel-sites-live'], migrated['funnel-sites-live']);
+});
+
+test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame state', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const cardMatches = catalog.filter((card) => card.id === 'loondienst');
+  const cardIndex = catalog.findIndex((card) => card.id === 'loondienst');
+  const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
+  const missionNumber = catalog
+    .slice(0, cardIndex + 1)
+    .filter((card) => !['origin', 'checkpoint', 'destination'].includes(card.type))
+    .length;
+
+  assert.deepEqual(cardMatches, [{
+    id: 'loondienst',
+    title: 'Loondienst',
+    imageId: 'bestaanszekerheid-bedrijf'
+  }]);
+  assert.equal(missionNumber, 75);
+  assert.equal(cardIndex, checkpointIndex - 1);
+
+  const oldPersistedOrder = catalog
+    .filter((card) => card.id !== 'loondienst')
+    .map((card) => card.id);
+  const migrated = JSON.parse(JSON.stringify(api.normalizeState({
+    'honderd-dagen-streak': { completed: true, deleted: false },
+    __order: oldPersistedOrder
+  })));
+
+  assert.deepEqual(migrated['loondienst'], { completed: false, deleted: false });
+  assert.deepEqual(migrated['honderd-dagen-streak'], { completed: true, deleted: false });
+  assert.equal(migrated.__order.filter((id) => id === 'loondienst').length, 1);
+  assert.equal(migrated.__order.indexOf('loondienst'), migrated.__order.indexOf('checkpoint-2028') - 1);
+
+  const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...migrated,
+    loondienst: { completed: true, deleted: false }
+  })));
+  assert.deepEqual(completedReload.loondienst, { completed: true, deleted: false });
+  assert.deepEqual(completedReload['honderd-dagen-streak'], migrated['honderd-dagen-streak']);
+
+  const deletedReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...completedReload,
+    loondienst: { completed: false, deleted: true }
+  })));
+  assert.deepEqual(deletedReload.loondienst, { completed: false, deleted: true });
+  assert.equal(deletedReload.__order.filter((id) => id === 'loondienst').length, 1);
 });
