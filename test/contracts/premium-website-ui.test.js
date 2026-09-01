@@ -3,21 +3,24 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat we bouwen', () => {
+test('premium website over-ons paneel gebruikt de prestatiekop en een mensvrije studiofoto', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
   assert.ok(
-    source.includes('/assets/home-over-softora-brabant-energie-20260901.jpg?v=20260901a'),
-    'Goedgekeurde Brabantse buitenfoto moet in de pagina staan'
+    source.includes('/assets/home-over-softora-creative-studio-20260901.jpg?v=20260901a'),
+    'De mensvrije creatieve studiofoto moet in de pagina staan'
   );
+  assert.doesNotMatch(source, /home-over-softora-brabant-energie-20260901\.jpg/);
   assert.doesNotMatch(source, /home-over-softora-founders-20260901\.jpg/);
   assert.doesNotMatch(source, /home-over-office-meeting-ai\.jpg/);
   assert.match(
     source,
-    /<img src="\/assets\/home-over-softora-brabant-energie-20260901\.jpg\?v=20260901a" alt="Twee professionals lopen pratend door een zonnige straat in Oisterwijk" width="1254" height="1254"/
+    /<img src="\/assets\/home-over-softora-creative-studio-20260901\.jpg\?v=20260901a" alt="Lege creatieve studio met laptop, baksteen en bordeaux accenten" width="1254" height="1254"/
   );
+  assert.match(source, /GEBOUWD MET AANDACHT\.<br>GEMAAKT OM TE PRESTEREN\./);
+  assert.doesNotMatch(source, /Geen Standaard<br>Bureau Aanpak\./);
   assert.match(source, /Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.doesNotMatch(source, /Vanuit Tilburg werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.match(
@@ -283,6 +286,11 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr;/s);
   assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden<\/div>/);
+  assert.match(
+    source,
+    /\.footer-bottom\s*\{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-start;[\s\S]*gap:\s*10px;/s
+  );
+  assert.match(source, /\.footer-legal\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/s);
   assert.match(
     source,
     /<a href="https:\/\/wa\.me\/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic">Start Project<\/a>/
