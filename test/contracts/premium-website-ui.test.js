@@ -9,13 +9,14 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
   assert.ok(
-    source.includes('/assets/home-over-softora-founders-20260901.jpg?v=20260901a'),
-    'Goedgekeurde foto van de Softora-oprichters moet in de pagina staan'
+    source.includes('/assets/home-over-softora-brabant-energie-20260901.jpg?v=20260901a'),
+    'Goedgekeurde Brabantse buitenfoto moet in de pagina staan'
   );
+  assert.doesNotMatch(source, /home-over-softora-founders-20260901\.jpg/);
   assert.doesNotMatch(source, /home-over-office-meeting-ai\.jpg/);
   assert.match(
     source,
-    /<img src="\/assets\/home-over-softora-founders-20260901\.jpg\?v=20260901a" alt="Softora-oprichters Servé Creusen en Martijn van de Ven wandelen samen buiten" width="1254" height="1254"/
+    /<img src="\/assets\/home-over-softora-brabant-energie-20260901\.jpg\?v=20260901a" alt="Twee professionals lopen pratend door een zonnige straat in Oisterwijk" width="1254" height="1254"/
   );
   assert.match(source, /Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.doesNotMatch(source, /Vanuit Tilburg werken wij voor ambitieuze bedrijven door heel Nederland\./);
@@ -276,6 +277,9 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   );
   assert.doesNotMatch(source, /<div class="footer-legal"[^>]*>[\s\S]*href="\/contact"/s);
   assert.doesNotMatch(source, />Projectintake<\/a>/);
+  assert.doesNotMatch(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);
+  assert.doesNotMatch(source, /<a href="\/diensten">Diensten<\/a>/);
+  assert.doesNotMatch(source, /<a href="\/website-laten-maken">Website laten maken<\/a>/);
   assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr;/s);
   assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden<\/div>/);
@@ -460,7 +464,7 @@ test('premium homepage heeft een werkende cookie melding', () => {
   assert.match(source, /Met jouw akkoord laden we Google Ads-meting om te zien welke advertentie tot contact leidt/);
   assert.match(source, /data-cookie-choice="declined"[\s\S]*Weigeren<\/button>/);
   assert.match(source, /data-cookie-choice="accepted"[\s\S]*Akkoord<\/button>/);
-  assert.match(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);
+  assert.doesNotMatch(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);
   assert.match(source, /softora_cookie_consent/);
   assert.match(source, /document\.cookie = "softora_cookie_consent="/);
   assert.match(source, /setupCookieConsent\(\);/);
