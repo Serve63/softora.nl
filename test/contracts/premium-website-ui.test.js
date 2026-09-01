@@ -9,8 +9,13 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
   assert.ok(
-    source.includes('/assets/home-over-office-meeting-ai.jpg?v=20260511a'),
-    'Nieuwe AI-gegenereerde bureau-aanpak foto moet in de pagina staan'
+    source.includes('/assets/home-over-softora-founders-20260901.jpg?v=20260901a'),
+    'Goedgekeurde foto van de Softora-oprichters moet in de pagina staan'
+  );
+  assert.doesNotMatch(source, /home-over-office-meeting-ai\.jpg/);
+  assert.match(
+    source,
+    /<img src="\/assets\/home-over-softora-founders-20260901\.jpg\?v=20260901a" alt="Softora-oprichters Servé Creusen en Martijn van de Ven wandelen samen buiten" width="1254" height="1254"/
   );
   assert.match(source, /Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland\./);
   assert.doesNotMatch(source, /Vanuit Tilburg werken wij voor ambitieuze bedrijven door heel Nederland\./);
