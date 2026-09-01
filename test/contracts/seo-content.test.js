@@ -1778,6 +1778,64 @@ test('websitebriefing maakt opdracht, eigenaarschap en acceptatie vóór offerte
   ]);
 });
 
+test('website-onderhoudsgids scheidt gepland beheer, incidenten en doorontwikkeling', () => {
+  const now = new Date('2026-09-01T08:00:00.000Z');
+  const item = getSeoContentItem('blog', 'website-onderhoud-kosten-mkb', { now });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const costGuideHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'website-laten-maken-kosten-2026', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-09-01');
+  assert.equal(item.updatedAt, '2026-09-01');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/website-laten-maken');
+  assert.equal(item.sources.length, 3);
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.keywordEvidence.locale.locId, 2528);
+  assert.equal(item.keywordEvidence.locale.language, 'Dutch');
+  assert.ok(item.informationGain.includes('drie gescheiden kostensporen'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualBrief.hero.visualFamily, 'indigo-maintenance-cabinet-still-life');
+  assert.equal(item.visualBrief.support.visualFamily, 'petrol-paper-cut-three-lane-map');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+
+  const heroPath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  const supportPath = path.join(repoRoot, item.secondaryImage.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(heroPath), { width: 1672, height: 941 });
+  assert.deepEqual(readJpegDimensions(supportPath), { width: 1672, height: 941 });
+  assert.ok(fs.statSync(heroPath).size < 500 * 1024);
+  assert.ok(fs.statSync(supportPath).size < 500 * 1024);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/website-onderhoud-kosten-mkb">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/website-onderhoud-kosten-mkb-hero\.jpg"/);
+  assert.match(html, /"datePublished":"2026-09-01"/);
+  assert.match(html, /Houd gepland beheer, incidentherstel en nieuwe wensen in drie aparte sporen/);
+  assert.match(html, /Vergelijk voorstellen met dezelfde negen regels/);
+  assert.match(html, /href="\/website-laten-maken">website laat maken<\/a>/);
+  assert.match(html, /href="\/blog\/website-offerte-vergelijken">websiteoffertes te vergelijken<\/a>/);
+  assert.match(html, /href="\/vergelijkingen\/website-laten-maken-vs-zelf-maken">zelf maken en laten maken<\/a>/);
+  assert.match(html, /https:\/\/wa\.me\/31643262792/);
+  assert.match(costGuideHtml, /href="\/blog\/website-onderhoud-kosten-mkb">website onderhoud na livegang<\/a>/);
+  assert.doesNotMatch(html, /hackvrij|altijd online|gegarandeerde ranking|vaste prijs voor ieder bedrijf|AI beslist zelfstandig/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/website-onderhoud-kosten-mkb');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/website-onderhoud-kosten-mkb-hero.jpg',
+    '/assets/seo-content/website-onderhoud-kosten-mkb-scope.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-30",
+  "updatedAt": "2026-09-01",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1974,7 +1974,9 @@
     },
     {
       "id": "website-maintenance-020",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-09-01",
+      "shippedPath": "/blog/website-onderhoud-kosten-mkb",
       "path": "/blog/website-onderhoud-kosten-mkb",
       "contentType": "blog",
       "cluster": "websites",
@@ -2501,6 +2503,94 @@
         ]
       },
       "nextAction": "Herbevestig Nederlandse vraagvormen en bouw een controleerbaar overdrachtsdossier per pagina zonder uploadtool, juridisch advies of aannames over complete klantcontent."
+    },
+    {
+      "id": "website-accessibility-acceptance-030",
+      "status": "ready",
+      "path": "/kennisbank/website-toegankelijkheid-testen-mkb",
+      "contentType": "kennisbank",
+      "cluster": "websites",
+      "primaryQuery": "website toegankelijkheid testen",
+      "intent": "Toegankelijkheidsproblemen vóór oplevering met automatische en menselijke controles aantoonbaar beoordelen",
+      "intentClass": "risk",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Acceptatiegids voor toetsenbord, structuur, formulieren, contrast, tekstalternatieven en menselijke beoordeling vóór livegang",
+      "demandEvidence": [
+        {
+          "type": "primary-source-and-serp-gap",
+          "source": "W3C WAI Evaluating Web Accessibility en Nederlandse SERP voor website toegankelijkheid testen",
+          "observedAt": "2026-09-01",
+          "detail": "W3C adviseert vroeg en doorlopend evalueren en stelt expliciet dat geen automatische tool alleen toegankelijkheid kan vaststellen. Nederlandse resultaten behandelen vaak losse scans of publieke-sectorverklaringen; er is ruimte voor een claim-safe MKB-acceptatieset die automatische checks met toetsenbordroutes en menselijke beoordeling combineert."
+        },
+        {
+          "type": "cluster-gap",
+          "source": "Softora websitecontentinventaris na onderhouds- en briefingpublicaties",
+          "observedAt": "2026-09-01",
+          "detail": "Softora benoemt toegankelijkheid in briefing en offertevergelijking, maar heeft geen afzonderlijke leveranciersneutrale gids die testscope, scenario, bewijs, herstelbesluit en hertest vóór websiteoplevering vastlegt."
+        }
+      ],
+      "competitorPatterns": [
+        "Een automatische scan als volledig toegankelijkheidsbewijs presenteren",
+        "Alleen losse criteria noemen zonder representatieve routes, formulieren en fouttoestanden te testen",
+        "Een complianceclaim doen zonder scope, beoordelaar, datum, bevindingen en herstelbewijs"
+      ],
+      "overlap": {
+        "checkedAt": "2026-09-01",
+        "closestPaths": [
+          "/blog/website-briefing-maken-mkb",
+          "/blog/website-offerte-vergelijken",
+          "/kennisbank/wat-is-een-conversiegerichte-website"
+        ],
+        "decision": "distinct",
+        "rationale": "De briefing maakt toegankelijkheid onderdeel van de opdracht, de offertegids vergelijkt leveranciersbewijs en de conversiegids behandelt een brede bezoekersroute. Deze kandidaat bezit uitsluitend de acceptatieset: testscope, automatische signalen, menselijke toetsenbord- en schermlezerbeoordeling, foutbewijs, herstel en hertest vóór livegang."
+      },
+      "scores": {
+        "businessFit": 4,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 3.9,
+      "brief": {
+        "title": "Website toegankelijkheid testen vóór livegang",
+        "metaDescription": "Test toetsenbordroutes, structuur, formulieren, contrast en tekstalternatieven met automatische signalen én menselijke beoordeling vóór oplevering.",
+        "h1": "Hoe test je de toegankelijkheid van een website?",
+        "outline": [
+          "Bepaal representatieve pagina's, routes en fouttoestanden",
+          "Gebruik automatische controles als signaal, niet als eindbewijs",
+          "Test toetsenbord, focus, structuur, formulieren en tekstalternatieven handmatig",
+          "Leg bevinding, impact, eigenaar, herstel en hertest vast",
+          "Laat een bevoegde mens de acceptatie en eventuele specialistische toets besluiten"
+        ],
+        "buyerQuestions": [
+          "Welke toegankelijkheidscontroles kan een tool uitvoeren?",
+          "Welke websiteonderdelen moet je handmatig testen?",
+          "Welk bewijs hoort bij toegankelijkheidsacceptatie vóór livegang?"
+        ],
+        "incomingLinks": [
+          "/blog/website-briefing-maken-mkb",
+          "/blog/website-offerte-vergelijken"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/kennisbank/wat-is-een-conversiegerichte-website"
+        ],
+        "conversionPath": "Van een controleerbare toegankelijkheidsacceptatieset naar een website-scopegesprek met menselijke beoordeling, herstel en hertest.",
+        "claimRisk": "Geen volledige toegankelijkheid, wettelijke compliance of afwezigheid van barrières beloven; benoem steekproef, toolbeperkingen, menselijke expertise en specialistisch advies waar nodig.",
+        "visualConcepts": [
+          "Acceptatiewerktafel met toetsenbordroute, kopstructuur, formulierfout en tekstalternatief als afzonderlijke bewijsstukken",
+          "Herstellus van automatische signalering en menselijke beoordeling naar eigenaar, correctie en hertest"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig Nederlandse buyer questions en werk een claim-safe testset uit waarin automatische tooling nooit de menselijke toegankelijkheidsbeoordeling vervangt."
     }
   ]
 }

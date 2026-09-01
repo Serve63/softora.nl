@@ -257,7 +257,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     category: 'Websites',
     intent: 'Koopintentie',
     publishedAt: '2026-05-19',
-    updatedAt: '2026-05-19',
+    updatedAt: '2026-09-01',
     readTime: '7 min',
     summary:
       'De prijs van een website wordt vooral bepaald door strategie, ontwerp, techniek, content, koppelingen en hoeveel groei de site moet ondersteunen.',
@@ -279,7 +279,17 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Goedkoper starten, slim uitbreiden',
         paragraphs: Object.freeze([
-          'Voor SEO is het vaak slimmer om de basis eerst strak neer te zetten en daarna gericht uit te bouwen. Begin met sterke dienstenpagina’s, heldere interne links en een structuur waarin toekomstige artikelen logisch passen.',
+          Object.freeze({
+            text:
+              'Voor SEO is het vaak slimmer om de basis eerst strak neer te zetten en daarna gericht uit te bouwen. Begin met sterke dienstenpagina’s, heldere interne links en een structuur waarin toekomstige artikelen logisch passen. Leg naast de bouwinvestering ook vast wat website onderhoud na livegang omvat, zodat hosting, updates, monitoring en wijzigingswerk niet pas na de keuze als onvergelijkbare extra kosten verschijnen.',
+            links: Object.freeze([
+              Object.freeze({
+                anchor: 'website onderhoud na livegang',
+                href: '/blog/website-onderhoud-kosten-mkb',
+                availableFrom: '2026-09-01',
+              }),
+            ]),
+          }),
           'Daarna kun je blogs, kennisbankartikelen, branchepagina’s en tools toevoegen zonder dat de site rommelig wordt. Zo groeit de website mee zonder dat je later alles opnieuw hoeft te bouwen.',
         ]),
       }),
