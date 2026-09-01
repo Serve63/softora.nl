@@ -1288,36 +1288,29 @@
             margin-bottom: 28px;
         }
 
-        .footer-socials {
-            display: flex;
-            gap: 10px;
-        }
-
-        .social-btn {
-            width: 36px;
-            height: 36px;
+        .footer-personnel-link {
+            min-height: 38px;
+            padding: 8px 16px;
             border-radius: 6px;
             border: 1px solid #e2ddd6;
             background: #fff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            color: #999;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
             cursor: pointer;
             transition: all 0.15s;
             text-decoration: none;
         }
-
-        .social-btn:hover {
+        .footer-personnel-link:hover,
+        .footer-personnel-link:focus-visible {
             border-color: #9b2355;
             color: #9b2355;
             background: rgba(155, 35, 85, 0.04);
-        }
-
-        .social-btn svg {
-            width: 15px;
-            height: 15px;
-            stroke: currentColor;
         }
 
         .footer-col-title {
@@ -2392,7 +2385,7 @@
             }
 
             .footer-tagline {
-                margin-bottom: 0;
+                margin-bottom: 16px;
                 font-size: 0.94rem;
                 line-height: 1.7;
             }
@@ -2917,7 +2910,7 @@
             padding-right: 1rem;
         }
 
-        .social-btn,
+        .footer-personnel-link,
         .contact-icon {
             background: rgba(255, 255, 255, 0.76);
             border-color: rgba(139, 34, 82, 0.12);
@@ -3413,6 +3406,7 @@
             <div class="footer-brand">
                 <div class="footer-logo">SOFTORA.NL</div>
                 <p class="footer-tagline">Wij bouwen professionele, snelle websites voor bedrijven. Van ontwerp tot onderhoud - alles onder een dak.</p>
+                <a class="footer-personnel-link" href="/personeel-login">Personeel</a>
             </div>
 
             <div class="footer-col">
@@ -3443,7 +3437,7 @@
             <div class="footer-legal" data-softora-public-seo="internal-links">
                 <a href="/privacybeleid">Privacybeleid</a><button type="button" data-cookie-settings>Cookie-instellingen</button>
                 <a href="/algemene-voorwaarden">Algemene voorwaarden</a><a href="/diensten">Diensten</a><a href="/website-laten-maken">Website laten maken</a>
-                <a href="/blog">Artikelen</a><a href="/kennisbank">Kennisbank</a><a href="/over-softora">Over Softora.nl</a><a href="/personeel-login">Personeel</a>
+                <a href="/blog">Artikelen</a><a href="/kennisbank">Kennisbank</a><a href="/over-softora">Over Softora.nl</a>
             </div>
         </div>
     </footer>
