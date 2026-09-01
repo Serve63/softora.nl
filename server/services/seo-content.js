@@ -279,17 +279,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Goedkoper starten, slim uitbreiden',
         paragraphs: Object.freeze([
-          Object.freeze({
-            text:
-              'Voor SEO is het vaak slimmer om de basis eerst strak neer te zetten en daarna gericht uit te bouwen. Begin met sterke dienstenpagina’s, heldere interne links en een structuur waarin toekomstige artikelen logisch passen. Leg naast de bouwinvestering ook vast wat website onderhoud na livegang omvat, zodat hosting, updates, monitoring en wijzigingswerk niet pas na de keuze als onvergelijkbare extra kosten verschijnen.',
-            links: Object.freeze([
-              Object.freeze({
-                anchor: 'website onderhoud na livegang',
-                href: '/blog/website-onderhoud-kosten-mkb',
-                availableFrom: '2026-09-01',
-              }),
-            ]),
-          }),
+          Object.freeze({ text: 'Voor SEO is het vaak slimmer om de basis eerst strak neer te zetten en daarna gericht uit te bouwen. Begin met sterke dienstenpagina’s, heldere interne links en een structuur waarin toekomstige artikelen logisch passen. Leg naast de bouwinvestering ook vast wat website onderhoud na livegang omvat, zodat hosting, updates, monitoring en wijzigingswerk niet pas na de keuze als onvergelijkbare extra kosten verschijnen.', links: Object.freeze([Object.freeze({ anchor: 'website onderhoud na livegang', href: '/blog/website-onderhoud-kosten-mkb', availableFrom: '2026-09-01' })]) }),
           'Daarna kun je blogs, kennisbankartikelen, branchepagina’s en tools toevoegen zonder dat de site rommelig wordt. Zo groeit de website mee zonder dat je later alles opnieuw hoeft te bouwen.',
         ]),
       }),
