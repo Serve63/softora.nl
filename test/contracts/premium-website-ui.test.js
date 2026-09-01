@@ -261,6 +261,12 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   );
   assert.match(source, /Wij bouwen professionele, snelle websites voor bedrijven\. Van ontwerp tot onderhoud - alles onder een dak\./);
   assert.doesNotMatch(source, /Wij bouwen professionele, snelle websites voor het MKB\./);
+  assert.match(
+    source,
+    /<div class="footer-col-title">Contact<\/div>[\s\S]*<strong>Telefoon<\/strong>[\s\S]*<strong>Vestiging<\/strong>[\s\S]*<strong>Contact<\/strong><a href="\/contact" aria-label="Open het contactformulier">Open het contactformulier<\/a>/s
+  );
+  assert.doesNotMatch(source, /<div class="footer-legal"[^>]*>[\s\S]*href="\/contact"/s);
+  assert.doesNotMatch(source, />Projectintake<\/a>/);
   assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr;/s);
   assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden<\/div>/);
