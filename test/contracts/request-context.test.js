@@ -135,6 +135,15 @@ test('request security context exempts safe methods and webhook paths', () => {
   const getReq = createRequest({ method: 'GET', originalUrl: '/api/custom-action' });
   const webhookReq = createRequest({ method: 'POST', originalUrl: '/api/retell/webhook' });
   const whatsappWebhookReq = createRequest({ method: 'POST', originalUrl: '/api/whatsapp/webhook' });
+  const ycloudWebhookReq = createRequest({
+    method: 'POST',
+    originalUrl: '/api/whatsapp/ycloud-webhook?delivery=one',
+    headers: {
+      origin: 'https://webhooks.ycloud.example',
+      'sec-fetch-site': 'cross-site',
+      'content-type': 'application/json',
+    },
+  });
   const whatsappProviderWebhookReq = createRequest({
     method: 'POST',
     originalUrl: '/api/whatsapp/provider-webhook/redacted-provider-token',
@@ -175,6 +184,7 @@ test('request security context exempts safe methods and webhook paths', () => {
   assert.equal(context.isSameOriginApiRequest(getReq), true);
   assert.equal(context.isSameOriginApiRequest(webhookReq), true);
   assert.equal(context.isSameOriginApiRequest(whatsappWebhookReq), true);
+  assert.equal(context.getStateChangingApiProtectionDecision(ycloudWebhookReq).reason, 'exempt_path');
   assert.equal(context.isSameOriginApiRequest(whatsappProviderWebhookReq), true);
   assert.equal(context.isSameOriginApiRequest(retellFunctionReq), true);
   assert.equal(context.isSameOriginApiRequest(coldmailUnsubscribeReq), true);
@@ -183,6 +193,34 @@ test('request security context exempts safe methods and webhook paths', () => {
   assert.equal(context.isSameOriginApiRequest(kvkSnapshotSyncReq), true);
   assert.equal(context.isSameOriginApiRequest(mountedRetellAvailabilityReq), true);
   assert.equal(context.isSameOriginApiRequest(namespacedRetellAvailabilityReq), true);
+});
+
+test('request security context exempts only the exact YCloud webhook pathname', () => {
+  const context = createRequestSecurityContext({
+    enforceSameOriginRequests: true,
+    getEffectivePublicBaseUrl: () => 'https://app.softora.nl',
+  });
+  const foreignHeaders = {
+    origin: 'https://webhooks.ycloud.example',
+    host: 'app.softora.nl',
+    'x-forwarded-proto': 'https',
+    'sec-fetch-site': 'cross-site',
+    'content-type': 'application/json',
+  };
+
+  for (const originalUrl of [
+    '/api/whatsapp/ycloud-webhook/extra',
+    '/api/whatsapp/ycloud-webhook-evil',
+    '/api/whatsapp/not-ycloud-webhook',
+  ]) {
+    const decision = context.getStateChangingApiProtectionDecision(createRequest({
+      method: 'POST',
+      originalUrl,
+      headers: foreignHeaders,
+    }));
+    assert.equal(decision.allowed, false, originalUrl);
+    assert.equal(decision.reason, 'fetch_metadata_cross_site_blocked', originalUrl);
+  }
 });
 
 test('request security context blocks cross-site fetch metadata before same-origin checks', () => {

@@ -5,6 +5,7 @@ const {
   createPremiumApiAccessGuard,
   createPremiumAuthStateManager,
 } = require('../../server/security/premium-auth');
+const { getRequestPathname } = require('../../server/security/request-context');
 
 function normalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
@@ -537,7 +538,7 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     truncateText,
     normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
     premiumUsersStore: createPremiumUsersStoreStub(),
-    getRequestPathname: (req) => req.originalUrl || req.path || '/',
+    getRequestPathname,
   });
 
   assert.equal(manager.getSafePremiumRedirectPath('https://evil.example'), '/premium-personeel-dashboard');
@@ -592,6 +593,21 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
   assert.equal(
     manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/instantly/webhook' }),
     true
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({
+      method: 'POST',
+      originalUrl: '/api/whatsapp/ycloud-webhook?delivery=one',
+    }),
+    true
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/whatsapp/ycloud-webhook' }),
+    false
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/whatsapp/ycloud-webhook/extra' }),
+    false
   );
   assert.equal(
     manager.isPremiumPublicApiRequest({

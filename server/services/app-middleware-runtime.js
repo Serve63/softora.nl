@@ -240,6 +240,7 @@ function applyAppMiddleware(app, deps = {}) {
       req.method === 'POST' &&
       (
         pathname === '/api/whatsapp/webhook' ||
+        pathname === '/api/whatsapp/ycloud-webhook' ||
         pathname.startsWith('/api/whatsapp/provider-webhook/')
       )
     ) {

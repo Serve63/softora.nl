@@ -276,6 +276,39 @@ test('app middleware geeft audio-notitie uploads een grotere JSON-limiet', async
   assert.equal(selectedLimits.at(-1), '34mb');
 });
 
+test('app middleware gives only the exact YCloud POST webhook the WhatsApp history parser', async () => {
+  const app = createAppRecorder();
+  const parserCalls = [];
+
+  applyAppMiddleware(
+    app,
+    createDeps({
+      express: {
+        json: (options = {}) => (req, res, next) => {
+          const rawBody = Buffer.from('{"type":"whatsapp.smb.history"}');
+          parserCalls.push({ limit: options.limit, path: req.path });
+          options.verify?.(req, res, rawBody);
+          next();
+        },
+      },
+    })
+  );
+
+  const bodyParserSelector = app.uses[2][0];
+  const exactRequest = { method: 'POST', path: '/api/whatsapp/ycloud-webhook' };
+  await new Promise((resolve) => bodyParserSelector(exactRequest, {}, resolve));
+  assert.equal(parserCalls.at(-1).limit, '18mb');
+  assert.deepEqual(exactRequest.rawBody, Buffer.from('{"type":"whatsapp.smb.history"}'));
+
+  for (const req of [
+    { method: 'GET', path: '/api/whatsapp/ycloud-webhook' },
+    { method: 'POST', path: '/api/whatsapp/ycloud-webhook/extra' },
+  ]) {
+    await new Promise((resolve) => bodyParserSelector(req, {}, resolve));
+    assert.equal(parserCalls.at(-1).limit, '8mb', `${req.method} ${req.path}`);
+  }
+});
+
 test('app middleware emits the declared permissions policy header', async () => {
   const app = createAppRecorder();
   const headers = {};
