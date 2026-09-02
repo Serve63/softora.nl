@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-09-01",
+  "updatedAt": "2026-09-02",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -515,7 +515,9 @@
     },
     {
       "id": "ai-cost-006",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-09-02",
+      "shippedPath": "/blog/ai-automatisering-kosten-mkb",
       "path": "/blog/ai-automatisering-kosten-mkb",
       "contentType": "blog",
       "cluster": "ai-automatisering",
@@ -2591,6 +2593,94 @@
         ]
       },
       "nextAction": "Herbevestig Nederlandse buyer questions en werk een claim-safe testset uit waarin automatische tooling nooit de menselijke toegankelijkheidsbeoordeling vervangt."
+    },
+    {
+      "id": "ai-automation-offer-031",
+      "status": "ready",
+      "path": "/blog/ai-automatisering-offerte-vergelijken",
+      "contentType": "blog",
+      "cluster": "ai-automatisering",
+      "primaryQuery": "ai automatisering offerte vergelijken",
+      "intent": "Leveranciersvoorstellen voor één AI-procesroute op gelijke scope, gebruikseenheden en acceptatie vergelijken",
+      "intentClass": "comparison",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/ai-automatisering",
+      "clusterRole": "Inkoop- en bewijsvergelijking ná kostenoriëntatie en vóór leverancierskeuze voor één begrensde AI-automatisering",
+      "demandEvidence": [
+        {
+          "type": "current-serp-and-buyer-language",
+          "source": "Nederlandse SERP voor AI automatisering offerte vergelijken MKB",
+          "observedAt": "2026-09-02",
+          "detail": "Actuele resultaten bieden vooral toolvergelijkingen, bureaudiensten, scans en ROI-claims. Er ontbreekt een leveranciersneutrale MKB-matrix die dezelfde procesroute, gegevensgrenzen, gebruikseenheden, menselijke beslisrechten en acceptatiebewijzen in offertes naast elkaar zet."
+        },
+        {
+          "type": "primary-source-and-cluster-gap",
+          "source": "Actuele n8n- en Make-prijspagina's plus Softora AI-contentinventaris",
+          "observedAt": "2026-09-02",
+          "detail": "n8n prijst op volledige workflow-executies en Make op moduleacties als credits. De nieuwe Softora-kostengids maakt die budgeteenheden zichtbaar, maar bezit niet de afzonderlijke leverancierskeuze rond scope, rechten, overdracht, herstel en opleveringsbewijs."
+        }
+      ],
+      "competitorPatterns": [
+        "Toolabonnementen vergelijken zonder het implementatie- en interne werk voor dezelfde bedrijfsroute gelijk te zetten",
+        "Een demo of ROI-calculator als leveranciersbewijs gebruiken zonder foutscenario, bronherleidbaarheid of acceptatie",
+        "Prijs, gebruik, beheer, gegevensverwerking en overdraagbaarheid in één pakketnaam verbergen"
+      ],
+      "overlap": {
+        "checkedAt": "2026-09-02",
+        "closestPaths": [
+          "/blog/ai-automatisering-kosten-mkb",
+          "/blog/maatwerk-software-offerte-beoordelen",
+          "/blog/ai-automatisering-mkb-waar-beginnen"
+        ],
+        "decision": "distinct",
+        "rationale": "De kostengids bouwt het budgetregister, de software-offertegids behandelt algemene maatwerkoplevering en de startgids kiest het proces. Deze kandidaat bezit uitsluitend de AI-specifieke leveranciersvergelijking op één gedeelde route, gebruiksscenario's, model- en gegevensgrenzen, menselijke controle, beheer en acceptatiebewijs."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.2,
+      "brief": {
+        "title": "AI-automatisering offertes vergelijken voor het MKB",
+        "metaDescription": "Vergelijk AI-automatiseringsvoorstellen op dezelfde procesroute, data, gebruikseenheden, menselijke controle, beheer en acceptatiebewijs.",
+        "h1": "Hoe vergelijk je offertes voor AI automatisering?",
+        "outline": [
+          "Geef iedere leverancier dezelfde proces- en volumekaart",
+          "Scheid implementatie, extern gebruik, intern werk en beheer",
+          "Vergelijk gegevensroutes, modelgrenzen en menselijke beslisrechten",
+          "Vraag bewijs voor fouten, herstel, logging en overdracht",
+          "Laat acceptatiescenario's de keuze bepalen in plaats van een demo"
+        ],
+        "buyerQuestions": [
+          "Welke onderdelen moeten in een offerte voor AI automatisering staan?",
+          "Hoe vergelijk je workflow- en modelkosten met verschillende meeteenheden?",
+          "Welk opleverings- en beheerbewijs moet een leverancier geven?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-automatisering-kosten-mkb",
+          "/blog/maatwerk-software-offerte-beoordelen"
+        ],
+        "outgoingLinks": [
+          "/ai-automatisering",
+          "/kennisbank/wat-is-procesautomatisering"
+        ],
+        "conversionPath": "Van een gelijkgezette AI-offertematrix naar een procesgesprek over één controleerbare automatiseringsroute.",
+        "claimRisk": "Geen leverancier rangschikken zonder actueel controleerbaar bewijs; geen ROI, veiligheid, foutloosheid, prijs of compliance beloven.",
+        "visualConcepts": [
+          "Twee leveranciersvoorstellen op één gedeelde proces- en bewijskaart zonder merknamen of bedragen",
+          "Acceptatiepoort die data, modelgebruik, menselijke controle, herstel en overdracht als losse bewijsstukken toetst"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig AI-specifieke offertevragen en ontwerp een leveranciersneutrale vergelijkingsmatrix zonder toolranking, ROI-belofte of oncontroleerbare beveiligingsclaim."
     }
   ]
 }
