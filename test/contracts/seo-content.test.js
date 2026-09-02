@@ -1499,7 +1499,7 @@ test('AI-telefonist acceptatiegids scheidt gesprek, audio, actie, overdracht en 
 });
 
 test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs toetsbaar', () => {
-  const now = new Date('2026-08-20T12:00:00.000Z');
+  const now = new Date('2026-09-02T12:00:00.000Z');
   const item = getSeoContentItem('kennisbank', 'wat-is-procesautomatisering', { now });
   const html = buildSeoContentArticleHtml(item, {
     siteOrigin: 'https://www.softora.nl',
@@ -1514,7 +1514,7 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   );
 
   assert.equal(item.qualityVersion, 2);
-  assert.equal(item.updatedAt, '2026-08-20');
+  assert.equal(item.updatedAt, '2026-09-02');
   assert.equal(item.growthEventKind, 'substantial_refresh');
   assert.equal(item.targetMoneyPage, '/ai-automatisering');
   assert.ok(item.informationGain.includes('negendelige proceskaart'));
@@ -1542,7 +1542,7 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="900">/);
   assert.match(html, /"datePublished":"2026-06-24"/);
-  assert.match(html, /"dateModified":"2026-08-20"/);
+  assert.match(html, /"dateModified":"2026-09-02"/);
   assert.match(html, /Vul een proceskaart met negen vaste velden/);
   assert.match(html, /Ontwerp de fout- en herstelroute vóór de succesroute live gaat/);
   assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
@@ -1833,6 +1833,68 @@ test('website-onderhoudsgids scheidt gepland beheer, incidenten en doorontwikkel
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/website-onderhoud-kosten-mkb-hero.jpg',
     '/assets/seo-content/website-onderhoud-kosten-mkb-scope.jpg',
+  ]);
+});
+
+test('AI-automatiseringskostengids scheidt bouw, gebruik, menselijk werk en beheer', () => {
+  const now = new Date('2026-09-02T12:00:00.000Z');
+  const item = getSeoContentItem('blog', 'ai-automatisering-kosten-mkb', { now });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const processHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('kennisbank', 'wat-is-procesautomatisering', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-09-02');
+  assert.equal(item.updatedAt, '2026-09-02');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/ai-automatisering');
+  assert.equal(item.sources.length, 3);
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.keywordEvidence.locale.locId, 2528);
+  assert.equal(item.keywordEvidence.locale.language, 'Dutch');
+  assert.ok(item.informationGain.includes('vijflaags AI-budgetregister'));
+  assert.ok(item.wordCount >= 1800);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualBrief.hero.visualFamily, 'midnight-brass-ai-cost-balance');
+  assert.equal(item.visualBrief.support.visualFamily, 'burnt-orange-cut-paper-cost-loops');
+  assert.equal(item.visualBrief.hero.visualType, 'object-study');
+  assert.equal(item.visualBrief.support.visualType, 'process-diagram');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+
+  const heroPath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  const supportPath = path.join(repoRoot, item.secondaryImage.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(heroPath), { width: 1600, height: 900 });
+  assert.deepEqual(readJpegDimensions(supportPath), { width: 1600, height: 900 });
+  assert.ok(fs.statSync(heroPath).size < 500 * 1024);
+  assert.ok(fs.statSync(supportPath).size < 500 * 1024);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-automatisering-kosten-mkb">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="900">/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-kosten-componenten-softora\.jpg"/);
+  assert.match(html, /"datePublished":"2026-09-02"/);
+  assert.match(html, /Maak een budgetregister met vijf gescheiden lagen/);
+  assert.match(html, /Reken met drie volumescenario’s en echte gebruikslogs/);
+  assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-procesautomatisering">kennisbankgids over procesautomatisering<\/a>/);
+  assert.match(html, /href="\/blog\/maatwerk-software-offerte-beoordelen">gids over een maatwerksoftware-offerte<\/a>/);
+  assert.match(html, /https:\/\/wa\.me\/31643262792/);
+  assert.match(processHtml, /href="\/blog\/ai-automatisering-kosten-mkb">kosten van een eerste AI-automatisering<\/a>/);
+  assert.doesNotMatch(html, /gegarandeerde besparing|vaste ROI van|iedere onderneming betaalt|AI beslist zelfstandig|wij upgraden automatisch/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/ai-automatisering-kosten-mkb');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/ai-automatisering-kosten-componenten-softora.jpg',
+    '/assets/seo-content/ai-automatisering-kostenlagen-softora.jpg',
   ]);
 });
 

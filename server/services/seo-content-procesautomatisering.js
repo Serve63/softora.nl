@@ -36,7 +36,7 @@ const PROCESS_AUTOMATION_CONTENT_ITEM = Object.freeze({
   growthEventKind: 'substantial_refresh',
   growthEventAt: '2026-08-20',
   publishedAt: '2026-06-24',
-  updatedAt: '2026-08-20',
+  updatedAt: '2026-09-02',
   visualQualityVersion: 2,
   visualBrief: Object.freeze({
     hero: Object.freeze({
@@ -169,6 +169,16 @@ const PROCESS_AUTOMATION_CONTENT_ITEM = Object.freeze({
       heading: 'Gebruik de proceskaart om oplossing en offerte te vergelijken',
       paragraphs: Object.freeze([
         'Geef iedere leverancier dezelfde proceskaart en scenario’s. Laat per onderdeel aangeven wat standaard, configureerbaar, via een bestaande koppeling of als maatwerk wordt geleverd. Vraag ook wie na oplevering regels, toegang, foutcategorieën en dashboards kan beheren; welke externe diensten nodig zijn; hoe gegevens kunnen worden geëxporteerd; en welk acceptatiebewijs bij de oplevering hoort. Zo vergelijk je oplossingen op dezelfde zakelijke route in plaats van op een lijst losse functies.',
+        Object.freeze({
+          text:
+            'Begroot daarna de kosten van een eerste AI-automatisering met dezelfde proceskaart. Scheid afbakening en realisatie van workflow-executies, moduleacties, modelgebruik, menselijke beoordeling en beheer. Zo wordt een offerteverschil herleidbaar naar volume, verantwoordelijkheid of bewijs in plaats van naar een onvergelijkbare pakketnaam.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'kosten van een eerste AI-automatisering',
+              href: '/blog/ai-automatisering-kosten-mkb',
+            }),
+          ]),
+        }),
         Object.freeze({
           text:
             'Softora kan één terugkerend proces samen met het team afbakenen, de proceskaart en foutpaden uitwerken en daarna bepalen of vaste automatisering, een begrensde AI-laag, een integratie of maatwerk past. De bredere gids over AI-processen automatiseren zonder controle te verliezen helpt bij de invoeringsgrenzen. Neem voor een eerste gesprek één echte route, een representatieve uitzondering en het systeem waarin de uitkomst moet landen mee.',
