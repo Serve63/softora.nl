@@ -556,16 +556,12 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
       fileName: 'premium-bedrijfssoftware.html',
       terms: [
         'bedrijfssoftware laten maken',
-        'bedrijfsapplicatie',
-        'dashboard laten ontwikkelen',
-        'dashboard laten maken',
-        'klantportaal',
-        'klantportaal laten maken',
-        'crm offerte systeem',
-        'automatisch offerte systeem',
         'bedrijfssoftware op maat',
+        'maatwerksoftware',
+        'minder handwerk',
+        'meer overzicht',
         'kosten',
-        'doorlooptijd',
+        'koppelingen',
       ],
     },
     {
@@ -587,15 +583,19 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
   }
 });
 
-test('bedrijfssoftware money page geeft kopers een concrete scope- en acceptatiecheck', () => {
+test('bedrijfssoftware money page maakt het knelpunt en de eerste oplossing concreet', () => {
   const source = fs.readFileSync(path.join(root, 'premium-bedrijfssoftware.html'), 'utf8');
 
   assert.match(source, /<title>Bedrijfssoftware laten maken: aanpak voor MKB \| Softora<\/title>/);
-  assert.match(source, /1\. Begrens het kernproces/);
-  assert.match(source, /2\. Schrijf rollen en uitzonderingen uit/);
-  assert.match(source, /3\. Wijs databronnen en eigenaarschap aan/);
-  assert.match(source, /4\. Spreek acceptatie en beheer af/);
-  assert.match(source, /inclusief fout- en herstelgevallen/);
+  assert.match(source, /administratieve taken en repetitieve taken/);
+  assert.match(source, /tijd krijgt voor wat echt telt/);
+  assert.match(source, /Je schakelt steeds tussen verschillende systemen/);
+  assert.match(source, /We bepalen waar tijd verloren gaat of fouten ontstaan/);
+  assert.match(source, /bouwen daarvoor een eerste werkende oplossing/);
+  assert.match(source, /De mensen die ermee werken gebruiken de oplossing/);
+  assert.match(source, /We brengen je werkproces en systemen in kaart/);
+  assert.match(source, /We bepalen welke knelpunten er zijn/);
+  assert.match(source, /De oplossing wordt in de praktijk getest/);
 });
 
 test('voicesoftware page owns its internal links inside the page content', () => {

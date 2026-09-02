@@ -110,7 +110,7 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.ok(entry.relatedLinks.includes('/pakketten'));
 });
 
-test('bedrijfssoftware money page is focused on CRM, workflows and automation', () => {
+test('bedrijfssoftware money page maakt tijdverlies en de maatwerkoplossing concreet', () => {
   const source = readPage('premium-bedrijfssoftware.html');
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
 
@@ -123,56 +123,63 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(source, /Bedrijfssoftware <em>op maat<\/em><\/span> <br>laten maken/);
-  assert.match(source, /CRM en klantportaal/);
-  assert.match(source, /Dashboard laten ontwikkelen/);
-  assert.match(source, /CRM offerte systeem/);
-  assert.match(source, /Interne workflowtools/);
-  assert.match(source, /AI automatisering/);
-  assert.match(source, /Welke bedrijfssoftware heb je nodig\?/);
-  assert.match(source, /Klantportaal laten maken/);
-  assert.match(source, /Automatisch offerte systeem/);
-  assert.match(source, /offerte automatisering/);
-  assert.match(source, /1\. Begrens het kernproces/);
-  assert.match(source, /2\. Schrijf rollen en uitzonderingen uit/);
-  assert.match(source, /3\. Wijs databronnen en eigenaarschap aan/);
-  assert.match(source, /4\. Spreek acceptatie en beheer af/);
-  assert.match(source, /inclusief fout- en herstelgevallen/);
-  assert.match(source, /Eerst scherpe scope, daarna pas bouwen/);
-  assert.match(source, /Wat bepaalt de kosten\?/);
-  assert.match(source, /Bedrijfsapplicatie, CRM of dashboard\?/);
-  assert.match(source, /Bedrijfsapplicatie laten maken/);
-  assert.match(source, /CRM op maat of bedrijfssoftware\?/);
-  assert.match(source, /Dashboard laten ontwikkelen/);
-  assert.match(source, /Automatisch offerte systeem/);
-  assert.match(source, /Bedrijfssoftware laten maken begint bij één kernproces/);
-  assert.match(source, /Als leads blijven liggen/);
-  assert.match(source, /Als management overzicht mist/);
-  assert.match(source, /Als offertes te veel handwerk vragen/);
-  assert.match(source, /Wanneer bedrijfssoftware laten maken slim wordt/);
-  assert.match(source, /Dubbele invoer remt groei/);
-  assert.match(source, /Uitzonderingen passen niet/);
-  assert.match(source, /Koppelingen en veiligheid/);
-  assert.match(source, /Rollen en rechten/);
-  assert.match(source, /Veelgestelde vragen over bedrijfssoftware/);
-  assert.match(source, /Wat kost bedrijfssoftware laten maken\?/);
-  assert.match(source, /Hoe lang duurt bedrijfssoftware op maat bouwen\?/);
-  assert.match(source, /Kun je ook een dashboard, klantportaal of offertesysteem laten maken\?/);
-  assert.match(source, /Kan bedrijfssoftware koppelen met bestaande systemen\?/);
-  assert.match(source, /Wanneer is maatwerk bedrijfssoftware beter dan standaard software\?/);
-  assert.match(source, /Waar begin je met bedrijfssoftware laten maken\?/);
+  assert.match(source, /Bedrijfssoftware op maat die <em>voor je werkt\.<\/em>/);
+  assert.match(source, /administratieve taken en repetitieve taken/);
+  assert.match(source, /tijd krijgt voor wat echt telt/);
+  assert.match(source, /Meer tijd/);
+  assert.match(source, /Minder handmatig werk/);
+  assert.match(source, /Meer rust en overzicht/);
+  assert.match(source, /class="proof proof-values"/);
+  assert.match(source, /class="button button-phone" href="tel:\+31643262792"/);
+  assert.match(source, />Contact<\/a>/);
+  assert.match(source, /\.hero:after\{/);
+  assert.match(source, /background-size:auto,28px 28px/);
+  assert.match(source, /Werk dat simpel zou moeten zijn, voelt onnodig omslachtig/);
+  assert.match(source, /Je voert dezelfde gegevens meerdere keren in/);
+  assert.match(source, /Je houdt open taken zelf bij/);
+  assert.match(source, /Je schakelt steeds tussen verschillende systemen/);
+  assert.match(source, /Je controleert handmatig of alles goed gaat/);
+  assert.match(source, /Niet alles tegelijk\. Eerst één proces slimmer maken/);
+  assert.match(source, /class="approach-layout"/);
+  assert.match(source, /We brengen je werkproces en systemen in kaart/);
+  assert.match(source, /We bepalen welke knelpunten er zijn/);
+  assert.match(source, /De oplossing wordt in de praktijk getest/);
+  assert.doesNotMatch(source, /We beginnen niet met een standaardpakket of een lange lijst functies/);
+  assert.match(source, /Tijd voor wat echt telt/);
+  assert.match(source, /Minder repetitief werk/);
+  assert.match(source, /Meer rust en overzicht/);
+  assert.match(source, /Meer tijd om te ondernemen/);
+  assert.match(source, /softora-time-that-matters\.webp/);
+  assert.doesNotMatch(source, /Wanneer is maatwerksoftware interessant\?/);
+  assert.doesNotMatch(source, /id="voor-wie"/);
+  assert.match(source, /Samen kijken welke taken slimmer en makkelijker kunnen/);
+  assert.match(source, /Plan een gesprek/);
+  assert.match(source, /Wat kost maatwerksoftware\?/);
+  assert.match(source, /Moet ik al precies weten wat ik nodig heb\?/);
+  assert.match(source, /Kunnen bestaande systemen gekoppeld worden\?/);
+  assert.match(source, /Waar beginnen we\?/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
   assert.match(source, /href="\/maatwerk-platform"/);
   assert.match(source, /href="\/ai-automatisering"/);
-  assert.match(source, /href="\/kennisbank\/wat-is-een-crm-systeem"/);
-  assert.match(source, /href="\/kennisbank\/wat-is-een-klantportaal"/);
   assert.match(source, /href="\/kennisbank\/wat-is-offerte-automatisering"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
-  assert.match(source, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software"/);
+  assert.match(source, /href="\/blog\/bedrijfssoftware-laten-maken-kosten"/);
+  assert.match(source, /href="\/blog\/maatwerk-software-offerte-beoordelen"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
-  assert.ok(countVisibleWords(source) >= 950, 'Bedrijfssoftware money page mist buyer-intent diepte.');
+  assert.match(source, /\.problem-cards\{grid-template-columns:repeat\(2,1fr\)\}/);
+  assert.match(source, /\.cards,\.problem-cards,\.faq-grid\{grid-template-columns:1fr\}/);
+  assert.match(source, /min-height:44px/);
+  assert.match(source, /@media\(prefers-reduced-motion:reduce\)/);
+  assert.doesNotMatch(source, /class="strip/);
+  assert.doesNotMatch(source, /Je bent ondernemer\. Geen menselijke koppeling\./);
   assert.doesNotMatch(source, /Website Tool|AI Website Generator/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
+  assert.ok(source.indexOf('Herken je deze situaties?') < source.indexOf('Zo pakken we het aan'));
+  assert.ok(source.indexOf('Zo pakken we het aan') < source.indexOf('Dit levert het op'));
+  assert.ok(source.indexOf('Dit levert het op') < source.indexOf('Samen kijken wat makkelijker kan'));
+  assert.ok(source.indexOf('Samen kijken wat makkelijker kan') < source.indexOf('Veelgestelde vragen'));
+  assert.match(source, /data-step="01">Herken je deze situaties\?<\/div>/);
+  assert.match(source, /data-step="04">Samen kijken wat makkelijker kan<\/div>/);
 
   assert.equal(entry.title, 'Bedrijfssoftware laten maken: aanpak voor MKB');
   assert.match(entry.description, /kernproces, de eerste versie, rollen, koppelingen en acceptatie/);
@@ -191,12 +198,10 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.deepEqual(
     faq.mainEntity.map((question) => question.name),
     [
-      'Wat kost bedrijfssoftware laten maken?',
-      'Hoe lang duurt bedrijfssoftware op maat bouwen?',
-      'Kun je ook een dashboard, klantportaal of offertesysteem laten maken?',
-      'Kan bedrijfssoftware koppelen met bestaande systemen?',
-      'Wanneer is maatwerk bedrijfssoftware beter dan standaard software?',
-      'Waar begin je met bedrijfssoftware laten maken?',
+      'Wat kost maatwerksoftware?',
+      'Moet ik al precies weten wat ik nodig heb?',
+      'Kunnen bestaande systemen gekoppeld worden?',
+      'Waar beginnen we?',
     ]
   );
   assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/bedrijfssoftware-op-maat#breadcrumb');
