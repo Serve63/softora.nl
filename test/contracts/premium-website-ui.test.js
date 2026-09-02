@@ -181,7 +181,8 @@ test('premium website hero story gebruikt korte usp regels', () => {
 
 test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const serviceCardStylesPath = path.join(__dirname, '../../assets/home-service-card-links.css');
+  const source = `${fs.readFileSync(filePath, 'utf8')}\n${fs.readFileSync(serviceCardStylesPath, 'utf8')}`;
 
   assert.match(source, /<h2 style="text-align: center;">Wat heb jij nodig\?<\/h2>/);
   assert.doesNotMatch(source, /<h2 style="text-align: center;">Wat We Voor Je Bouwen<\/h2>/);
@@ -220,10 +221,12 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="card-number">04<\/div>\s*<h3>Chatbot<\/h3>\s*<p>Bezoekers willen antwoord nu — niet morgen\. Een slimme chatbot die vragen afhandelt, leads vastlegt en 24\/7 voor je klaarstaat\.<\/p>/
   );
-  assert.match(
-    source,
-    /<div\s+class="tilt-card fade-up chatbot-trigger"[\s\S]*data-chatbot-trigger[\s\S]*style="transition-delay: 0\.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;"[\s\S]*<div class="card-number">04<\/div>/
-  );
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/website-laten-maken"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/voicesoftware-op-maat"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/chatbot-laten-maken"/);
+  assert.match(source, /class="service-card-link-icon" aria-hidden="true"/);
+  assert.match(source, /\.tilt-card:focus-visible\s*\{[\s\S]*outline:/);
   assert.match(
     source,
     /\.tilt-card::before\s*\{[\s\S]*inset:\s*-26px;[\s\S]*background-image:[\s\S]*rgba\(9,\s*10,\s*18,\s*0\.36\)[\s\S]*linear-gradient\(90deg,[\s\S]*rgba\(9,\s*10,\s*18,\s*0\.5\)[\s\S]*var\(--service-card-photo/
