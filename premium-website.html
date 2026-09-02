@@ -2705,50 +2705,6 @@
             max-width: 42rem;
         }
 
-        #diensten .diensten-product-grid {
-            gap: 1.4rem;
-        }
-
-        .tilt-card {
-            min-height: 100%;
-            padding: 2rem 1.9rem;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.11);
-            border-top: 1px solid rgba(255, 255, 255, 0.16);
-            box-shadow: 0 18px 44px rgba(15, 17, 28, 0.14), inset 18px 0 34px rgba(9, 10, 18, 0.34), inset -18px 0 34px rgba(9, 10, 18, 0.42);
-            clip-path: none; isolation: isolate;
-            background-color: #0f1018; background-image: linear-gradient(180deg, rgba(9, 10, 18, 0.38) 0%, rgba(9, 10, 18, 0.5) 42%, rgba(8, 8, 14, 0.72) 100%), linear-gradient(145deg, rgba(var(--card-accent-rgb, 139,34,82), 0.24) 0%, rgba(255, 255, 255, 0) 58%); background-position: center, center; background-repeat: no-repeat; background-size: cover, cover;
-        }
-        #diensten .diensten-product-grid .tilt-card:nth-child(1) { --service-card-photo: url('/assets/home-service-websites-ai.jpg?v=20260511b'); --service-card-position: 44% 46%; }
-        #diensten .diensten-product-grid .tilt-card:nth-child(2) { --service-card-photo: url('/assets/home-service-software-ai.jpg?v=20260511b'); --service-card-position: 46% 48%; }
-        #diensten .diensten-product-grid .tilt-card:nth-child(3) { --service-card-photo: url('/assets/home-service-voice-ai.jpg?v=20260511b'); --service-card-position: 48% 50%; }
-        #diensten .diensten-product-grid .tilt-card:nth-child(4) { --service-card-photo: url('/assets/home-service-chatbot-ai.jpg?v=20260511b'); --service-card-position: 58% 50%; }
-        .tilt-card::before {
-            inset: -26px; background-image: linear-gradient(180deg, rgba(9, 10, 18, 0.36) 0%, rgba(9, 10, 18, 0.48) 42%, rgba(8, 8, 14, 0.7) 100%), linear-gradient(90deg, rgba(9, 10, 18, 0.5) 0%, rgba(9, 10, 18, 0.18) 18%, rgba(9, 10, 18, 0.18) 82%, rgba(9, 10, 18, 0.54) 100%), var(--service-card-photo); background-position: center, center, var(--service-card-position, center); background-repeat: no-repeat; background-size: cover, cover, cover; opacity: 1; z-index: 0;
-        }
-        .tilt-card::after {
-            content: '';
-            position: absolute;
-            left: 2rem;
-            right: 2rem;
-            bottom: 1.05rem;
-            height: 1px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(207, 79, 132, 0.42), rgba(255, 255, 255, 0));
-            opacity: 0.55; z-index: 0;
-        }
-        .card-content {
-            display: flex;
-            flex-direction: column;
-            min-height: 100%; position: relative; z-index: 1;
-        }
-        .card-number { color: rgba(255, 255, 255, 0.18); }
-        .tilt-card:hover .card-number { color: rgba(255, 255, 255, 0.26); }
-        .tilt-card h3 {
-            color: #fff; font-size: 1.7rem; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.34);
-        }
-
-        .tilt-card p { margin-top: auto; padding-top: 1rem; color: rgba(255, 255, 255, 0.84); font-size: 0.98rem; line-height: 1.7; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.34); }
-
         .image-text-frame {
             gap: clamp(1.6rem, 3vw, 2.5rem);
             align-items: stretch;
@@ -3109,6 +3065,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/assets/home-service-card-links.css?v=20260902a">
 </head>
 <body>
     <div class="ios-statusbar-fill" aria-hidden="true"></div>
@@ -3174,37 +3131,41 @@
             </div>
 
             <div class="diensten-product-grid">
-                <div class="tilt-card fade-up" data-tilt style="--card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
+                <a class="tilt-card fade-up" data-tilt href="/website-laten-maken" style="--card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
                     <div class="card-content">
                         <div class="card-number">01</div>
                         <h3>Website's</h3>
                         <p>Je hebt één kans om een eerste indruk te maken. Wij bouwen websites die niet alleen mooi zijn — maar die ook écht iets doen voor je business.</p>
+                        <span class="service-card-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17 17 7"></path><path d="M7 7h10v10"></path></svg></span>
                     </div>
-                </div>
+                </a>
 
-                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.1s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
+                <a class="tilt-card fade-up" data-tilt href="/bedrijfssoftware-op-maat" style="transition-delay: 0.1s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
                     <div class="card-content">
                         <div class="card-number">02</div>
                         <h3>Bedrijfssoftware</h3>
                         <p>Excel is geen systeem. Bedrijfssoftware wel. Op maat gebouwde software die past bij hoe jouw bedrijf écht werkt.</p>
+                        <span class="service-card-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17 17 7"></path><path d="M7 7h10v10"></path></svg></span>
                     </div>
-                </div>
+                </a>
 
-                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.2s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
+                <a class="tilt-card fade-up" data-tilt href="/voicesoftware-op-maat" style="transition-delay: 0.2s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
                     <div class="card-content">
                         <div class="card-number">03</div>
                         <h3>Voicesoftware</h3>
                         <p>Nooit meer een gemiste oproep. Nooit meer een gemiste kans. Onze AI-agents nemen op, kwalificeren en werken — dag en nacht.</p>
+                        <span class="service-card-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17 17 7"></path><path d="M7 7h10v10"></path></svg></span>
                     </div>
-                </div>
+                </a>
 
-                <div class="tilt-card fade-up chatbot-trigger" data-tilt data-chatbot-trigger role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" aria-controls="softora-chatbot" style="transition-delay: 0.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
+                <a class="tilt-card fade-up" data-tilt href="/chatbot-laten-maken" style="transition-delay: 0.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
                     <div class="card-content">
                         <div class="card-number">04</div>
                         <h3>Chatbot</h3>
                         <p>Bezoekers willen antwoord nu — niet morgen. Een slimme chatbot die vragen afhandelt, leads vastlegt en 24/7 voor je klaarstaat.</p>
+                        <span class="service-card-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17 17 7"></path><path d="M7 7h10v10"></path></svg></span>
                     </div>
-                </div>
+                </a>
             </div>
         </div>
     </section>

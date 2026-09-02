@@ -7,14 +7,15 @@ const homepagePath = path.join(__dirname, '../../premium-website.html');
 const scriptPath = path.join(__dirname, '../../assets/premium-website-chatbot.js');
 const stylesheetPath = path.join(__dirname, '../../assets/premium-website-chatbot.css');
 
-test('homepage chatbotkaart opent een toegankelijke chat-popup', () => {
+test('homepage chatbotkaart opent de verdiepende chatbotpagina', () => {
   const source = fs.readFileSync(homepagePath, 'utf8');
   const script = fs.readFileSync(scriptPath, 'utf8');
 
   assert.match(
     source,
-    /class="tilt-card fade-up chatbot-trigger"[\s\S]*data-chatbot-trigger[\s\S]*role="button"[\s\S]*aria-haspopup="dialog"[\s\S]*aria-controls="softora-chatbot"/
+    /<a class="tilt-card fade-up"[^>]*href="\/chatbot-laten-maken"[^>]*>[\s\S]*?<h3>Chatbot<\/h3>/
   );
+  assert.doesNotMatch(source, /class="tilt-card fade-up chatbot-trigger"/);
   assert.match(script, /document\.body\.insertAdjacentHTML\(/);
   assert.match(script, /class="softora-chatbot"[\s\S]*id="softora-chatbot"[\s\S]*role="dialog"[\s\S]*aria-modal="true"[\s\S]*hidden>/);
   assert.match(script, /id="softora-chatbot-title">Waar kan ik je mee helpen\?<\/h2>/);
