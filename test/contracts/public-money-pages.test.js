@@ -130,7 +130,7 @@ test('bedrijfssoftware money page maakt tijdverlies en de maatwerkoplossing conc
   assert.match(source, /Minder handmatig werk/);
   assert.match(source, /Meer rust en overzicht/);
   assert.match(source, /class="proof proof-values"/);
-  assert.match(source, /class="button button-phone" href="tel:\+31643262792"/);
+  assert.match(source, /class="button button-phone" href="https:\/\/wa\.me\/31643262792"/);
   assert.match(source, />Contact<\/a>/);
   assert.match(source, /\.hero:after\{/);
   assert.match(source, /background-size:auto,28px 28px/);
@@ -150,6 +150,10 @@ test('bedrijfssoftware money page maakt tijdverlies en de maatwerkoplossing conc
   assert.match(source, /Meer rust en overzicht/);
   assert.match(source, /Meer tijd om te ondernemen/);
   assert.match(source, /softora-time-that-matters\.webp/);
+  assert.match(source, /<nav id="navbar">/);
+  assert.match(source, /class="nav-start-btn"[^>]*>Start Project<\/a>/);
+  assert.match(source, /<footer id="contact" class="footer">/);
+  assert.match(source, /class="footer-personnel-link" href="\/personeel-login">Personeel<\/a>/);
   assert.doesNotMatch(source, /Wanneer is maatwerksoftware interessant\?/);
   assert.doesNotMatch(source, /id="voor-wie"/);
   assert.match(source, /Samen kijken welke taken slimmer en makkelijker kunnen/);

@@ -228,14 +228,15 @@ test('legacy public hero line breaks keep readable text spacing', () => {
   }
 });
 
-test('legacy public service heroes use route-relevant realistic assets', () => {
+test('public service heroes use route-relevant realistic assets', () => {
   const bedrijfssoftware = readFile('premium-bedrijfssoftware.html');
   const voicesoftware = readFile('premium-voicesoftware.html');
-  const legacyHeroBackground = /\.hero::before\s*\{[\s\S]*?background:\s*url\('([^']+)'\)[^;]*;/;
+  const bedrijfssoftwareHero = /<section class="hero">[\s\S]*?<img src="([^"]+)"[^>]*alt="Bedrijfsproces en maatwerksoftware in beeld"/;
+  const voicesoftwareHero = /\.hero::before\s*\{[\s\S]*?background:\s*url\('([^']+)'\)[^;]*;/;
 
   assert.match(
     bedrijfssoftware,
-    /\.hero::before\s*\{[\s\S]*background:\s*url\('\/assets\/softora-crm-workflow\.jpg'\) center center \/ cover no-repeat;/s,
+    /<section class="hero">[\s\S]*?<img src="\/assets\/softora-crm-workflow\.jpg"[^>]*alt="Bedrijfsproces en maatwerksoftware in beeld"/,
     'Bedrijfssoftware hero moet een concrete CRM/workflow-foto gebruiken in plaats van een generiek dashboard'
   );
   assert.match(
@@ -244,8 +245,8 @@ test('legacy public service heroes use route-relevant realistic assets', () => {
     'Voicesoftware hero moet een voice/telefonie-foto gebruiken in plaats van een generiek dashboard'
   );
   assert.notStrictEqual(
-    bedrijfssoftware.match(legacyHeroBackground)?.[1],
-    voicesoftware.match(legacyHeroBackground)?.[1],
+    bedrijfssoftware.match(bedrijfssoftwareHero)?.[1],
+    voicesoftware.match(voicesoftwareHero)?.[1],
     'Oudere servicepagina’s mogen niet opnieuw dezelfde generieke hero-foto delen'
   );
 });
