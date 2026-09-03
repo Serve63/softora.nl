@@ -95,6 +95,163 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^2<script>/);
 });
 
+test('dashboard bootstrap toont direct dezelfde jaaromzet en actuele maandinkomsten als de client', () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-09-03T12:00:00.000Z'),
+  });
+  const payload = {
+    ok: true,
+    source: 'dashboard-customers',
+    customers: [
+      {
+        id: 'oude-klant',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        datum: '2025-11-10',
+        websiteBedrag: 300,
+        onderhoudPerMaand: 50,
+      },
+      {
+        id: 'nieuwe-klant',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        datum: '2026-07-03',
+        websiteBedrag: 200,
+        onderhoudPerMaand: 25,
+      },
+    ],
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_custom_orders_premium_v1: '[]' },
+    },
+  };
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac725');
+  assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac525');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '\u20ac75');
+  assert.match(
+    replacements.SOFTORA_DASHBOARD_REVENUE_CHART,
+    /data-chart-index="0"[^>]*title="€50"/
+  );
+  assert.match(
+    replacements.SOFTORA_DASHBOARD_REVENUE_CHART,
+    /data-chart-index="6"[^>]*title="€275"/
+  );
+});
+
+test('dashboard bootstrap gebruikt gekoppelde betaaldata als een klantdatum ontbreekt', () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-09-03T12:00:00.000Z'),
+  });
+  const payload = {
+    ok: true,
+    source: 'dashboard-customers',
+    customers: [
+      {
+        id: 'oude-klant-zonder-datum',
+        naam: 'Alfa Holding',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        datum: '',
+        websiteBedrag: 200,
+        onderhoudPerMaand: 25,
+      },
+      {
+        id: 'toekomstige-klant-zonder-datum',
+        naam: 'Zenith Groep',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        datum: '',
+        websiteBedrag: 999,
+        onderhoudPerMaand: 999,
+      },
+    ],
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: {
+        softora_custom_orders_premium_v1: JSON.stringify([
+          { id: 1, amount: 200, clientName: 'Alfa Holding', status: 'betaald', paidAt: '2026-07-03' },
+          { id: 2, amount: 999, clientName: 'Zenith Groep', status: 'betaald', paidAt: '2026-10-03' },
+        ]),
+      },
+    },
+  };
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac275');
+  assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac75');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '\u20ac25');
+  assert.match(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /data-chart-index="6"[^>]*title="€225"/);
+  assert.doesNotMatch(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /€999/);
+});
+
+test('dashboard bootstrap kiest net als de client de nieuwste betaalde opdracht bij ontbrekende datum', () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-09-03T12:00:00.000Z'),
+  });
+  const payload = {
+    ok: true,
+    source: 'dashboard-customers',
+    customers: [{
+      id: 'klant-zonder-datum',
+      naam: 'Contactpersoon',
+      telefoon: '06 12 34 56 78',
+      databaseStatus: 'klant',
+      status: 'Betaald',
+      datum: '',
+      websiteBedrag: 200,
+      onderhoudPerMaand: 25,
+    }],
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: {
+        softora_custom_orders_premium_v1: JSON.stringify([
+          { id: 1, amount: 200, clientName: 'Oude opdracht', contactPhone: '0612345678', status: 'betaald', paidAt: '2026-07-03' },
+          { id: 2, amount: 200, clientName: 'Nieuwe opdracht', contactPhone: '0612345678', status: 'betaald', paidAt: '2026-10-03' },
+        ]),
+        softora_order_runtime_premium_v1: JSON.stringify({
+          1: { updatedAt: 100 },
+          2: { updatedAt: 200 },
+        }),
+      },
+    },
+  };
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac0');
+  assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac0');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '\u20ac0');
+});
+
+test('dashboard bootstrap toont geen tussenbedrag als betaaldata voor een ongedateerde klant ontbreken', () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-09-03T12:00:00.000Z'),
+  });
+  const replacements = service.buildDashboardHtmlReplacements({
+    ok: true,
+    source: 'dashboard-customers',
+    customers: [{
+      id: 'ongedateerde-klant',
+      naam: 'Wacht op opdrachtdata',
+      databaseStatus: 'klant',
+      status: 'Betaald',
+      datum: '',
+      websiteBedrag: 900,
+      onderhoudPerMaand: 100,
+    }],
+    activeOrdersState: { source: 'bootstrap-timeout', values: {} },
+  });
+
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
+  assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '--');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
+  assert.match(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /title="--"/);
+});
+
 test('dashboard bootstrap toont actuele maandinkomsten en geen opgeteld jaaronderhoud', () => {
   const service = createCustomersPageBootstrapService({
     now: () => new Date('2026-09-03T12:00:00.000Z'),

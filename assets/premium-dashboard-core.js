@@ -42,11 +42,45 @@ function getExplicitRevenueDate(value) {
         return Number.isNaN(date.getTime()) ? null : date;
     }
 
+function getDashboardAmsterdamDateParts(value) {
+        const raw = normalizeDashboardString(value);
+        const plainDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (plainDateMatch) {
+            return {
+                year: Number(plainDateMatch[1]),
+                month: Number(plainDateMatch[2]) - 1,
+                day: Number(plainDateMatch[3]),
+            };
+        }
+
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Europe/Amsterdam',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(date);
+        const readPart = (type) => Number(parts.find((part) => part.type === type)?.value);
+        return {
+            year: readPart('year'),
+            month: readPart('month') - 1,
+            day: readPart('day'),
+        };
+    }
+
+function getDashboardCalendarDateKey(parts) {
+        if (!parts || !Number.isFinite(parts.year) || !Number.isFinite(parts.month) || !Number.isFinite(parts.day)) {
+            return 0;
+        }
+        return (parts.year * 10000) + ((parts.month + 1) * 100) + parts.day;
+    }
+
 function getEffectiveRevenueDate(value, nowDate = new Date()) {
         const explicitDate = getExplicitRevenueDate(value);
         if (explicitDate) return explicitDate;
-        const nowValue = nowDate instanceof Date && !Number.isNaN(nowDate.getTime()) ? nowDate : new Date();
-        return new Date(nowValue.getFullYear(), nowValue.getMonth(), 1, 12, 0, 0);
+        const nowParts = getDashboardAmsterdamDateParts(nowDate) || getDashboardAmsterdamDateParts(new Date());
+        return new Date(Date.UTC(nowParts.year, nowParts.month, 1, 12, 0, 0));
     }
 
 function normalizeDashboardIdentityValue(value) {
@@ -58,12 +92,21 @@ function normalizeDashboardIdentityValue(value) {
             .trim();
     }
 
+function getDashboardPhoneIdentityToken(value) {
+        let digits = normalizeDashboardString(value).replace(/\D/g, '');
+        if (digits.startsWith('0031')) digits = `0${digits.slice(4)}`;
+        else if (digits.startsWith('31') && digits.length === 11) digits = `0${digits.slice(2)}`;
+        return digits.length >= 8 ? digits : '';
+    }
+
 function getDashboardIdentityTokens(...values) {
         const tokens = new Set();
         values.forEach((value) => {
             const normalized = normalizeDashboardIdentityValue(value);
             if (!normalized || normalized === '-' || normalized === 'onbekend') return;
             if (normalized.length >= 3) tokens.add(normalized);
+            const phoneToken = getDashboardPhoneIdentityToken(value);
+            if (phoneToken) tokens.add(phoneToken);
             normalized.split(/\s+/).forEach((part) => {
                 if (part.length >= 4) tokens.add(part);
             });
@@ -101,6 +144,99 @@ function getCustomerRevenueDate(customer, paidOrders, nowDate = new Date()) {
         const matchedPaidOrder = findPaidDashboardOrderForCustomer(customer, paidOrders);
         const matchedPaidDate = getExplicitRevenueDate(matchedPaidOrder?.ui?.paidAt || matchedPaidOrder?.paidAt);
         return matchedPaidDate || getEffectiveRevenueDate(customer?.datum, nowDate);
+    }
+
+function calculatePremiumDashboardRevenueMetrics(customers, nowDate = new Date(), options = {}) {
+        const currentDate = nowDate instanceof Date && !Number.isNaN(nowDate.getTime())
+            ? nowDate
+            : new Date();
+        const currentParts = getDashboardAmsterdamDateParts(currentDate) || getDashboardAmsterdamDateParts(new Date());
+        const currentYear = currentParts.year;
+        const currentMonth = currentParts.month;
+        const currentDateKey = getDashboardCalendarDateKey(currentParts);
+        const currentQuarterStartMonth = Math.floor(currentMonth / 3) * 3;
+        const resolveRevenueDate = typeof options.resolveRevenueDate === 'function'
+            ? options.resolveRevenueDate
+            : (customer) => getEffectiveRevenueDate(customer?.datum, currentDate);
+        const yearByMonth = Array.from({ length: 12 }, () => 0);
+        const rollingByMonth = {};
+        const periodRevenue = {
+            month: { website: 0, maintenance: 0, total: 0 },
+            quarter: { website: 0, maintenance: 0, total: 0 },
+            year: { website: 0, maintenance: 0, total: 0 },
+            all: { website: 0, maintenance: 0, total: 0 },
+        };
+        let yearWebsiteRevenue = 0;
+        let yearMaintenanceRevenue = 0;
+        let monthlyRecurringRevenue = 0;
+
+        const addRollingRevenue = (year, month, amount) => {
+            const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+            rollingByMonth[key] = (rollingByMonth[key] || 0) + amount;
+        };
+
+        (Array.isArray(customers) ? customers : []).forEach((customer) => {
+            if (normalizeDashboardString(customer?.status).toLowerCase() !== 'betaald') return;
+
+            const resolvedDate = resolveRevenueDate(customer, currentDate);
+            const revenueDate = resolvedDate instanceof Date && !Number.isNaN(resolvedDate.getTime())
+                ? resolvedDate
+                : getEffectiveRevenueDate(customer?.datum, currentDate);
+            const revenueParts = getDashboardAmsterdamDateParts(revenueDate);
+            const revenueDateKey = getDashboardCalendarDateKey(revenueParts);
+            if (!revenueDateKey || revenueDateKey > currentDateKey) return;
+            const revenueYear = revenueParts.year;
+            const revenueMonth = revenueParts.month;
+            const websiteAmount = Math.max(0, Number(customer?.websiteBedrag) || 0);
+            const maintenanceAmount = Math.max(0, Number(customer?.onderhoudPerMaand) || 0);
+
+            if (websiteAmount > 0) {
+                periodRevenue.all.website += websiteAmount;
+                addRollingRevenue(revenueYear, revenueMonth, websiteAmount);
+                if (revenueYear === currentYear) {
+                    yearWebsiteRevenue += websiteAmount;
+                    periodRevenue.year.website += websiteAmount;
+                    yearByMonth[revenueMonth] += websiteAmount;
+                    if (revenueMonth === currentMonth) periodRevenue.month.website += websiteAmount;
+                    if (revenueMonth >= currentQuarterStartMonth) periodRevenue.quarter.website += websiteAmount;
+                }
+            }
+
+            if (maintenanceAmount <= 0) return;
+            monthlyRecurringRevenue += maintenanceAmount;
+            periodRevenue.month.maintenance += maintenanceAmount;
+            const firstActiveMonth = revenueYear < currentYear ? 0 : revenueMonth;
+            for (let month = firstActiveMonth; month <= currentMonth; month += 1) {
+                yearMaintenanceRevenue += maintenanceAmount;
+                periodRevenue.year.maintenance += maintenanceAmount;
+                yearByMonth[month] += maintenanceAmount;
+                if (month >= currentQuarterStartMonth) periodRevenue.quarter.maintenance += maintenanceAmount;
+            }
+            for (let year = revenueYear; year <= currentYear; year += 1) {
+                const startMonth = year === revenueYear ? revenueMonth : 0;
+                const endMonth = year === currentYear ? currentMonth : 11;
+                for (let month = startMonth; month <= endMonth; month += 1) {
+                    periodRevenue.all.maintenance += maintenanceAmount;
+                    addRollingRevenue(year, month, maintenanceAmount);
+                }
+            }
+        });
+
+        Object.values(periodRevenue).forEach((period) => {
+            period.total = period.website + period.maintenance;
+        });
+
+        return {
+            currentYear,
+            currentMonth,
+            monthlyRecurringRevenue,
+            yearWebsiteRevenue,
+            yearMaintenanceRevenue,
+            yearTotalRevenue: yearWebsiteRevenue + yearMaintenanceRevenue,
+            yearByMonth,
+            rollingByMonth,
+            periodRevenue,
+        };
     }
 
 function getPremiumDashboardChunkMetaKey(baseKey) {
@@ -418,11 +554,13 @@ function formatMoneyEUR(amount) {
         normalizeDashboardTime,
         normalizeDashboardDate,
         getExplicitRevenueDate,
+        getDashboardAmsterdamDateParts,
         getEffectiveRevenueDate,
         normalizeDashboardIdentityValue,
         getDashboardIdentityTokens,
         findPaidDashboardOrderForCustomer,
         getCustomerRevenueDate,
+        calculatePremiumDashboardRevenueMetrics,
         getPremiumDashboardChunkMetaKey,
         getPremiumDashboardChunkPrefix,
 	        readPremiumDashboardChunkedStateValue,
