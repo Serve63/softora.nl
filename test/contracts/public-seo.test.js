@@ -583,10 +583,12 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
   }
 });
 
-test('bedrijfssoftware money page maakt het knelpunt en de eerste oplossing concreet', () => {
-  const source = fs.readFileSync(path.join(root, 'premium-bedrijfssoftware.html'), 'utf8');
+test('bedrijfssoftware overtuigingspagina maakt het knelpunt en de eerste oplossing concreet', () => {
+  const source = fs.readFileSync(path.join(root, 'bedrijfssoftware.html'), 'utf8');
 
-  assert.match(source, /<title>Bedrijfssoftware laten maken: aanpak voor MKB \| Softora<\/title>/);
+  assert.match(source, /<title>Bedrijfssoftware die voor je werkt \| Softora<\/title>/);
+  assert.match(source, /<meta name="robots" content="noindex, follow">/);
+  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
   assert.match(source, /administratieve taken en repetitieve taken/);
   assert.match(source, /tijd krijgt voor wat echt telt/);
   assert.match(source, /Je schakelt steeds tussen verschillende systemen/);
@@ -629,6 +631,7 @@ test('ai telefonist head metadata targets make and comparison intent', () => {
 test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');
+  assert.equal(getIndexablePublicPathFromHtmlFile('bedrijfssoftware.html'), '');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware'), '');
   assert.equal(getIndexablePublicHtmlFileFromPath('/website-laten-maken'), 'premium-websites.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/website'), '');

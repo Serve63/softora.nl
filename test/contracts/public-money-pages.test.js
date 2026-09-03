@@ -110,18 +110,18 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.ok(entry.relatedLinks.includes('/pakketten'));
 });
 
-test('bedrijfssoftware money page maakt tijdverlies en de maatwerkoplossing concreet', () => {
-  const source = readPage('premium-bedrijfssoftware.html');
+test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoplossing concreet', () => {
+  const source = readPage('bedrijfssoftware.html');
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
 
-  assert.match(source, /<title>Bedrijfssoftware laten maken: aanpak voor MKB \| Softora<\/title>/);
+  assert.match(source, /<title>Bedrijfssoftware die voor je werkt \| Softora<\/title>/);
   assert.match(
     source,
-    /<meta name="description" content="Bedrijfssoftware laten maken\? Bepaal het kernproces, de eerste versie, rollen, koppelingen en acceptatie\./
+    /<meta name="description" content="Ontdek hoe maatwerksoftware administratieve taken, dubbel werk en onnodige omwegen binnen je bedrijf kan verminderen\./
   );
-  assert.match(source, /<meta name="robots" content="index, follow">/);
-  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
-  assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
+  assert.match(source, /<meta name="robots" content="noindex, follow">/);
+  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
+  assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
   assert.match(source, /Bedrijfssoftware op maat die <em>voor je werkt\.<\/em>/);
   assert.match(source, /administratieve taken en repetitieve taken/);
@@ -196,9 +196,9 @@ test('bedrijfssoftware money page maakt tijdverlies en de maatwerkoplossing conc
   const faq = graph.find((item) => item['@type'] === 'FAQPage');
   const breadcrumb = graph.find((item) => item['@type'] === 'BreadcrumbList');
 
-  assert.equal(service && service['@id'], 'https://www.softora.nl/bedrijfssoftware-op-maat#service');
+  assert.equal(service && service['@id'], 'https://www.softora.nl/bedrijfssoftware#service');
   assert.equal(service && service.serviceType, 'Bedrijfssoftware op maat voor MKB');
-  assert.equal(faq && faq['@id'], 'https://www.softora.nl/bedrijfssoftware-op-maat#faq');
+  assert.equal(faq && faq['@id'], 'https://www.softora.nl/bedrijfssoftware#faq');
   assert.deepEqual(
     faq.mainEntity.map((question) => question.name),
     [
@@ -208,7 +208,7 @@ test('bedrijfssoftware money page maakt tijdverlies en de maatwerkoplossing conc
       'Waar beginnen we?',
     ]
   );
-  assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/bedrijfssoftware-op-maat#breadcrumb');
+  assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/bedrijfssoftware#breadcrumb');
 });
 
 test('crm money page is focused on pipeline, customers and AI follow-up', () => {
