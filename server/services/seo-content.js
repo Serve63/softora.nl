@@ -215,7 +215,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     category: 'AI ontwikkelingen',
     intent: 'Orientatie',
     publishedAt: '2026-05-19',
-    updatedAt: '2026-05-19',
+    updatedAt: '2026-09-03',
     readTime: '6 min',
     summary:
       'AI automatisering werkt het beste wanneer je begint bij herhaalbaar werk, duidelijke overdrachtsmomenten en meetbare tijdswinst.',
@@ -238,7 +238,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         heading: 'Maak succes meetbaar voordat je opschaalt',
         paragraphs: Object.freeze([
           'AI automatisering wordt pas serieus waardevol als je kunt meten wat er beter gaat. Meet bijvoorbeeld hoeveel minuten handwerk verdwijnen, hoeveel leads sneller opvolging krijgen, hoeveel fouten worden voorkomen en hoeveel klantvragen zonder vertraging worden beantwoord.',
-          'Daarna kun je veilig uitbreiden. Niet door overal AI overheen te leggen, maar door bewezen workflows stap voor stap te koppelen aan je website, CRM, agenda of maatwerk software.',
+          Object.freeze({ text: 'Daarna kun je veilig uitbreiden. Niet door overal AI overheen te leggen, maar door bewezen workflows stap voor stap te koppelen aan je website, CRM, agenda of maatwerk software. Vraag je meerdere leveranciers om die eerste route te bouwen, geef ze dan dezelfde invoer, foutgevallen en beslisgrenzen. Gebruik het praktische kader om offertes voor AI automatisering te vergelijken voordat toolnamen of totaalprijzen de procesvraag overnemen.', links: Object.freeze([Object.freeze({ anchor: 'offertes voor AI automatisering te vergelijken', href: '/blog/ai-automatisering-offerte-vergelijken', availableFrom: '2026-09-03' })]) }),
         ]),
       }),
     ]),
@@ -2001,7 +2001,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     category: 'Bedrijfssoftware',
     intent: 'Koopintentie',
     publishedAt: '2026-07-17',
-    updatedAt: '2026-07-17',
+    updatedAt: '2026-09-03',
     image: Object.freeze({
       src: '/assets/seo-content/maatwerk-software-offerte-vergelijkingsmatrix-softora.jpg',
       alt: 'Vergelijkingsmatrix voor twee maatwerk software offertes met controlepunten voor scope, acceptatie, koppelingen en beheer.',
@@ -2065,7 +2065,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         heading: 'Gebruik een gewogen beslismatrix',
         paragraphs: Object.freeze([
           'Zet de belangrijkste criteria in een matrix en geef vooraf gewicht aan wat voor jouw bedrijf telt. Een bruikbare verdeling kan bestaan uit begrip van het proces, volledigheid van scope, acceptatie en kwaliteit, migratie en koppelingen, beheer, samenwerking en totale kosten. Laat meerdere betrokkenen eerst afzonderlijk scoren en bespreek daarna vooral de grootste verschillen.',
-          'De winnaar hoeft niet de offerte met de meeste functies te zijn. Het beste voorstel is doorgaans het voorstel waarvan je de aannames begrijpt, de eerste versie kunt toetsen en de gevolgen van latere keuzes kunt overzien. Als de voorstellen nog te verschillend zijn, maak de scope eerst scherper voordat je een leverancier kiest.',
+          Object.freeze({ text: 'De winnaar hoeft niet de offerte met de meeste functies te zijn. Het beste voorstel is doorgaans het voorstel waarvan je de aannames begrijpt, de eerste versie kunt toetsen en de gevolgen van latere keuzes kunt overzien. Voor een route met een AI-laag helpt het aparte kader om een AI-automatiseringsofferte te vergelijken op gebruikseenheden, menselijke beslisgrenzen en bewijs. Als de voorstellen nog te verschillend zijn, maak de scope eerst scherper voordat je een leverancier kiest.', links: Object.freeze([Object.freeze({ anchor: 'AI-automatiseringsofferte te vergelijken', href: '/blog/ai-automatisering-offerte-vergelijken', availableFrom: '2026-09-03' })]) }),
         ]),
       }),
     ]),
