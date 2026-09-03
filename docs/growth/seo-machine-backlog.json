@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-09-02",
+  "updatedAt": "2026-09-03",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -2596,7 +2596,9 @@
     },
     {
       "id": "ai-automation-offer-031",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-09-03",
+      "shippedPath": "/blog/ai-automatisering-offerte-vergelijken",
       "path": "/blog/ai-automatisering-offerte-vergelijken",
       "contentType": "blog",
       "cluster": "ai-automatisering",
@@ -2680,7 +2682,95 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Herbevestig AI-specifieke offertevragen en ontwerp een leveranciersneutrale vergelijkingsmatrix zonder toolranking, ROI-belofte of oncontroleerbare beveiligingsclaim."
+      "nextAction": "Wacht op indexatie en beoordeel op 2026-09-17, 2026-10-01 en 2026-10-29 de niet-branded ontdekking, klikontwikkeling en route naar /ai-automatisering."
+    },
+    {
+      "id": "ai-automation-change-control-032",
+      "status": "ready",
+      "path": "/kennisbank/ai-automatisering-wijzigingen-beheren",
+      "contentType": "kennisbank",
+      "cluster": "ai-automatisering",
+      "primaryQuery": "ai automatisering beheren",
+      "intent": "Wijzigingen aan data, modelgedrag, koppelingen en beslisgrenzen na livegang gecontroleerd beoordelen en accepteren",
+      "intentClass": "risk",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-automatisering",
+      "clusterRole": "Wijzigings- en heracceptatiegids na oplevering, tussen dagelijks beheer, incidentherstel en uitbreiding van een bestaande AI-procesroute",
+      "demandEvidence": [
+        {
+          "type": "buyer-task-and-cluster-gap",
+          "source": "Softora AI-contentinventaris na kosten-, controle- en offertevergelijkingsroutes",
+          "observedAt": "2026-09-03",
+          "detail": "Softora dekt proceskeuze, kosten, menselijke controle, leveranciersvergelijking en acceptatie vóór livegang, maar nog niet hoe een eigenaar na livegang wijzigingen aan brondata, prompts, model, koppelingen, rechten of foutpaden classificeert, test, goedkeurt en terugdraait."
+        },
+        {
+          "type": "direct-source-pattern",
+          "source": "Actuele leveranciersdocumentatie over versie-, gebruiks- en modelwijzigingen",
+          "observedAt": "2026-09-03",
+          "detail": "Automatiserings- en modeldiensten kunnen onafhankelijk van het bedrijfsproces veranderen. De relevante MKB-taak is daarom geen algemene monitoringlijst, maar een controleerbaar wijzigingsdossier met impact, eigenaar, testset, acceptatie, livebewijs en herstelbesluit."
+        }
+      ],
+      "competitorPatterns": [
+        "Alle wijzigingen als technisch onderhoud behandelen terwijl beslisgrenzen en bedrijfsuitkomsten kunnen veranderen",
+        "Alleen bereikbaarheid monitoren zonder representatieve scenario’s na data-, prompt-, model- of koppelingwijziging opnieuw te testen",
+        "Een leverancier automatisch laten wijzigen zonder menselijke eigenaar, bewijs, stopregel of terugkeerpad"
+      ],
+      "overlap": {
+        "checkedAt": "2026-09-03",
+        "closestPaths": [
+          "/blog/ai-processen-automatiseren-zonder-controle-verliezen",
+          "/blog/ai-automatisering-offerte-vergelijken",
+          "/blog/ai-automatisering-kosten-mkb"
+        ],
+        "decision": "distinct",
+        "rationale": "De controlegids bepaalt menselijke grenzen tijdens uitvoering, de offertegids vergelijkt beheerafspraken vóór leverancierskeuze en de acceptatiegids test een eerste oplevering. Deze kandidaat bezit uitsluitend wijzigingsclassificatie, impactbeoordeling, heracceptatie, gecontroleerde uitrol en herstel van een reeds live procesroute."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "AI automatisering beheren: wijzigingen gecontroleerd doorvoeren",
+        "metaDescription": "Beoordeel wijzigingen aan data, prompts, modellen, koppelingen en rechten met impact, testbewijs, menselijke acceptatie en een herstelpad.",
+        "h1": "Hoe beheer je wijzigingen aan een AI automatisering?",
+        "outline": [
+          "Classificeer wijzigingen op procesuitkomst, data, gedrag, rechten en extern effect",
+          "Koppel iedere wijziging aan een eigenaar, aanleiding en verwachte impact",
+          "Herhaal passende normale, afwijkende en stopscenario’s vóór livegang",
+          "Rol begrensd uit met logging, vergelijking en een controleerbaar herstelpad",
+          "Sluit de wijziging pas na menselijk besluit en actueel livebewijs"
+        ],
+        "buyerQuestions": [
+          "Welke wijzigingen vragen volledige heracceptatie van een AI workflow?",
+          "Wie mag prompt-, model-, data- of koppelingwijzigingen goedkeuren?",
+          "Welk bewijs en terugkeerpad heb je vóór een productie-uitrol nodig?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-processen-automatiseren-zonder-controle-verliezen",
+          "/blog/ai-automatisering-offerte-vergelijken"
+        ],
+        "outgoingLinks": [
+          "/ai-automatisering",
+          "/kennisbank/wat-is-procesautomatisering"
+        ],
+        "conversionPath": "Van gecontroleerd wijzigingsbeheer naar een gesprek over een begrensde AI-procesroute met eigenaarschap, heracceptatie en herstel.",
+        "claimRisk": "Geen foutloze werking, volledige veiligheid of automatische compliance beloven; geen wijziging als causaal succes presenteren zonder representatieve vergelijking en livebewijs.",
+        "visualConcepts": [
+          "Wijzigingswerktafel met aparte tegels voor data, gedrag, koppeling, recht en procesuitkomst plus één menselijke vrijgave",
+          "Begrensde uitrolroute van testset naar kleine productiecontrole, bewijs, besluit en herstelpad"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig Nederlandse beheervragen en directe leveranciersbronnen; werk daarna een wijzigingsdossier uit zonder bereikbaarheid, modelbenchmark of compliance als volledige acceptatie te behandelen."
     }
   ]
 }

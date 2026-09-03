@@ -1898,6 +1898,73 @@ test('AI-automatiseringskostengids scheidt bouw, gebruik, menselijk werk en behe
   ]);
 });
 
+test('AI-automatiseringsoffertegids vergelijkt dezelfde route, bewijs en menselijke controle', () => {
+  const now = new Date('2026-09-03T12:00:00.000Z');
+  const item = getSeoContentItem('blog', 'ai-automatisering-offerte-vergelijken', { now });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const softwareOfferHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'maatwerk-software-offerte-beoordelen', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const startGuideHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-mkb-waar-beginnen', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-09-03');
+  assert.equal(item.updatedAt, '2026-09-03');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/ai-automatisering');
+  assert.equal(item.sources.length, 3);
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.keywordEvidence.locale.locId, 2528);
+  assert.equal(item.keywordEvidence.locale.language, 'Dutch');
+  assert.ok(item.informationGain.includes('vijf bewijsbanen'));
+  assert.ok(item.wordCount >= 1650);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualBrief.hero.visualFamily, 'aubergine-glass-parallel-proposals');
+  assert.equal(item.visualBrief.support.visualFamily, 'mineral-screenprint-five-proof-lanes');
+  assert.equal(item.visualBrief.hero.visualType, 'editorial-scene');
+  assert.equal(item.visualBrief.support.visualType, 'comparison-board');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+
+  const heroPath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  const supportPath = path.join(repoRoot, item.secondaryImage.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(heroPath), { width: 1672, height: 941 });
+  assert.deepEqual(readJpegDimensions(supportPath), { width: 1672, height: 941 });
+  assert.ok(fs.statSync(heroPath).size < 500 * 1024);
+  assert.ok(fs.statSync(supportPath).size < 500 * 1024);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-automatisering-offerte-vergelijken">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1672">/);
+  assert.match(html, /<meta property="og:image:height" content="941">/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-offerte-tweeroute-softora\.jpg"/);
+  assert.match(html, /"datePublished":"2026-09-03"/);
+  assert.match(html, /Schrijf een referentieroute van één pagina/);
+  assert.match(html, /Gebruik knock-outs vóór een gewogen score/);
+  assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-procesautomatisering">gids over procesautomatisering<\/a>/);
+  assert.match(html, /href="\/blog\/maatwerk-software-offerte-beoordelen">maatwerksoftware-offerte te beoordelen<\/a>/);
+  assert.match(html, /https:\/\/wa\.me\/31643262792/);
+  assert.match(softwareOfferHtml, /href="\/blog\/ai-automatisering-offerte-vergelijken">AI-automatiseringsofferte te vergelijken<\/a>/);
+  assert.match(startGuideHtml, /href="\/blog\/ai-automatisering-offerte-vergelijken">offertes voor AI automatisering te vergelijken<\/a>/);
+  assert.doesNotMatch(html, /gegarandeerde besparing|vaste ROI van|wij kiezen automatisch de leverancier|AI beslist zelfstandig/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/blog/ai-automatisering-offerte-vergelijken');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/ai-automatisering-offerte-tweeroute-softora.jpg',
+    '/assets/seo-content/ai-automatisering-offerte-bewijsmatrix-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));
