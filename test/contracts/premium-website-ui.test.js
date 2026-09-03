@@ -281,6 +281,8 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
     source,
     /<div class="footer-col-title">Contact<\/div>[\s\S]*<strong>Telefoon<\/strong>[\s\S]*<strong>Vestiging<\/strong>[\s\S]*<strong>Contact<\/strong><a href="\/contact" aria-label="Open het contactformulier">Open het contactformulier<\/a>/s
   );
+  assert.match(source, /\.contact-text a\s*\{[^}]*color:\s*var\(--text-secondary\);/s);
+  assert.doesNotMatch(source, /\.contact-text a\s*\{[^}]*color:\s*#9b2355;/s);
   assert.doesNotMatch(source, /<div class="footer-legal"[^>]*>[\s\S]*href="\/contact"/s);
   assert.doesNotMatch(source, />Projectintake<\/a>/);
   assert.doesNotMatch(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);
