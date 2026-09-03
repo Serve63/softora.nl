@@ -6,7 +6,7 @@ const path = require('node:path');
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
   '2030.png', '2035.png', 'alle-formaten-scheermesjes.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
-  'dertig-dagen-streak.png',
+  'de-driehoek-aanspreken.png', 'dertig-dagen-streak.png',
   'eigen-automaat-rijden.png', 'eigen-boot.png', 'eigen-cinema.png', 'eigen-kantoor.png',
   'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
   'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png', 'gezondheidscenter.png',
@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260901c" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260903a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -517,6 +517,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'honderd-dagen-streak', title: '100 dagen streak', imageId: 'dertig-dagen-streak' \}/);
   assert.match(endGameCardsJs, /\{ id: 'driehonderdvijfenzestig-dagen-streak', title: '365 dagen streak', imageId: 'dertig-dagen-streak' \}/);
   assert.match(endGameCardsJs, /\{ id: 'loondienst', title: 'Loondienst', imageId: 'bestaanszekerheid-bedrijf' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'de-driehoek-aanspreken', title: 'De Driehoek aanspreken' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
@@ -917,7 +918,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   }]);
   assert.equal(missionNumber, 68);
   assert.equal(cardIndex, firstStreakIndex - 1);
-  assert.equal(firstStreakIndex, checkpointIndex - 7);
+  assert.equal(firstStreakIndex, checkpointIndex - 8);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'funnel-sites-live')
@@ -955,7 +956,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
   const funnelSitesIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
   const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
 
-  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 1), expected);
+  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 2), expected);
   assert.deepEqual(expected.map((card) => (
     catalog.slice(0, catalog.findIndex((item) => item.id === card.id) + 1)
       .filter((item) => !['origin', 'checkpoint', 'destination'].includes(item.type))
@@ -1004,7 +1005,7 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
     imageId: 'bestaanszekerheid-bedrijf'
   }]);
   assert.equal(missionNumber, 75);
-  assert.equal(cardIndex, checkpointIndex - 1);
+  assert.equal(cardIndex, checkpointIndex - 2);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'loondienst')
@@ -1032,4 +1033,50 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
   })));
   assert.deepEqual(deletedReload.loondienst, { completed: false, deleted: true });
   assert.equal(deletedReload.__order.filter((id) => id === 'loondienst').length, 1);
+});
+
+test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurzame state', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const cardMatches = catalog.filter((card) => card.id === 'de-driehoek-aanspreken');
+  const cardIndex = catalog.findIndex((card) => card.id === 'de-driehoek-aanspreken');
+  const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
+  const missionNumber = catalog
+    .slice(0, cardIndex + 1)
+    .filter((card) => !['origin', 'checkpoint', 'destination'].includes(card.type))
+    .length;
+
+  assert.deepEqual(cardMatches, [{
+    id: 'de-driehoek-aanspreken',
+    title: 'De Driehoek aanspreken'
+  }]);
+  assert.equal(missionNumber, 76);
+  assert.equal(cardIndex, checkpointIndex - 1);
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards/de-driehoek-aanspreken.png')),
+    true
+  );
+
+  const oldPersistedOrder = catalog
+    .filter((card) => card.id !== 'de-driehoek-aanspreken')
+    .map((card) => card.id);
+  const migrated = JSON.parse(JSON.stringify(api.normalizeState({
+    loondienst: { completed: true, deleted: false },
+    __order: oldPersistedOrder
+  })));
+
+  assert.deepEqual(migrated['de-driehoek-aanspreken'], { completed: false, deleted: false });
+  assert.deepEqual(migrated.loondienst, { completed: true, deleted: false });
+  assert.equal(migrated.__order.filter((id) => id === 'de-driehoek-aanspreken').length, 1);
+  assert.equal(
+    migrated.__order.indexOf('de-driehoek-aanspreken'),
+    migrated.__order.indexOf('checkpoint-2028') - 1
+  );
+
+  const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
+    ...migrated,
+    'de-driehoek-aanspreken': { completed: true, deleted: false }
+  })));
+  assert.deepEqual(completedReload['de-driehoek-aanspreken'], { completed: true, deleted: false });
+  assert.deepEqual(completedReload.loondienst, migrated.loondienst);
 });
