@@ -12,12 +12,71 @@ test('premium dashboard core exposes stable pure helpers', () => {
   assert.equal(dashboardCore.normalizeDashboardDate('2026-04-28'), '2026-04-28');
   assert.equal(dashboardCore.normalizeDashboardDate('2026-04-28T10:00:00.000Z'), '2026-04-28');
   assert.equal(typeof dashboardCore.getCustomerRevenueDate, 'function');
+  assert.equal(typeof dashboardCore.calculatePremiumDashboardRevenueMetrics, 'function');
   assert.equal(typeof dashboardCore.fetchPremiumDashboardJson, 'function');
   assert.equal(typeof dashboardCore.forcePremiumDashboardBootShellVisible, 'function');
   assert.equal(typeof dashboardCore.releasePremiumDashboardBootShell, 'function');
   assert.equal(typeof dashboardCore.showPremiumDashboardBootShellForMinimum, 'function');
   assert.equal(typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap, 'function');
   assert.equal(typeof dashboardCore.startPremiumDashboardBootWatchdog, 'function');
+});
+
+test('premium dashboard core houdt jaaromzet en actuele maandinkomsten over kalenderjaren gelijk', () => {
+  const metrics = dashboardCore.calculatePremiumDashboardRevenueMetrics(
+    [
+      {
+        status: 'Betaald',
+        datum: '2025-11-10',
+        websiteBedrag: 300,
+        onderhoudPerMaand: 50,
+      },
+      {
+        status: 'Betaald',
+        datum: '2026-07-03',
+        websiteBedrag: 200,
+        onderhoudPerMaand: 25,
+      },
+      {
+        status: 'Betaald',
+        datum: '2026-10-01',
+        websiteBedrag: 999,
+        onderhoudPerMaand: 999,
+      },
+      {
+        status: 'Betaald',
+        datum: '2026-09-20',
+        websiteBedrag: 888,
+        onderhoudPerMaand: 888,
+      },
+    ],
+    new Date('2026-09-03T12:00:00.000Z')
+  );
+
+  assert.equal(metrics.monthlyRecurringRevenue, 75);
+  assert.equal(metrics.yearWebsiteRevenue, 200);
+  assert.equal(metrics.yearMaintenanceRevenue, 525);
+  assert.equal(metrics.yearTotalRevenue, 725);
+  assert.deepEqual(metrics.yearByMonth, [50, 50, 50, 50, 50, 50, 275, 75, 75, 0, 0, 0]);
+  assert.deepEqual(metrics.periodRevenue.month, { website: 0, maintenance: 75, total: 75 });
+  assert.deepEqual(metrics.periodRevenue.quarter, { website: 200, maintenance: 225, total: 425 });
+  assert.deepEqual(metrics.periodRevenue.year, { website: 200, maintenance: 525, total: 725 });
+  assert.deepEqual(metrics.periodRevenue.all, { website: 500, maintenance: 625, total: 1125 });
+});
+
+test('premium dashboard core gebruikt Amsterdam voor de kalendergrens op server en client', () => {
+  const metrics = dashboardCore.calculatePremiumDashboardRevenueMetrics(
+    [
+      { status: 'Betaald', datum: '2026-10-01', websiteBedrag: 100, onderhoudPerMaand: 10 },
+      { status: 'Betaald', datum: '2026-10-02', websiteBedrag: 900, onderhoudPerMaand: 90 },
+    ],
+    new Date('2026-09-30T22:30:00.000Z')
+  );
+
+  assert.equal(metrics.currentYear, 2026);
+  assert.equal(metrics.currentMonth, 9);
+  assert.equal(metrics.monthlyRecurringRevenue, 10);
+  assert.equal(metrics.yearTotalRevenue, 110);
+  assert.equal(metrics.yearByMonth[9], 110);
 });
 
 test('premium dashboard core resolves customer revenue date from matching paid order', () => {
@@ -42,6 +101,14 @@ test('premium dashboard core resolves customer revenue date from matching paid o
       .toISOString()
       .slice(0, 10),
     '2026-05-01'
+  );
+  assert.equal(
+    dashboardCore.getCustomerRevenueDate(
+      { naam: 'Andere naam', telefoon: '06 12 34 56 78', datum: '' },
+      [{ clientName: 'Losse opdracht', contactPhone: '+31 6 12 34 56 78', paidAt: '2026-04-02' }],
+      fallbackNow
+    ).toISOString().slice(0, 10),
+    '2026-04-02'
   );
 });
 

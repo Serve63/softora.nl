@@ -10,6 +10,10 @@ const {
   parseMailReadySnapshotCacheValue,
 } = require('./premium-database-mail-ready-snapshot');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL } = require('./coldmail-guard-sent-at');
+const {
+  calculatePremiumDashboardRevenueMetrics,
+  getCustomerRevenueDate,
+} = require('../../assets/premium-dashboard-core');
 
 const DATABASE_MAIL_STATS_CACHE_SCOPE = 'premium_coldmail_stats_cache';
 const DATABASE_MAIL_STATS_CACHE_KEY = 'softora_coldmail_stats_cache_v1';
@@ -234,22 +238,6 @@ function createCustomersPageBootstrapService(deps = {}) {
     'Nov',
     'Dec',
   ];
-
-  function getDashboardDate(value, fallback = new Date()) {
-    const normalized = normalizeDate(value);
-    if (!normalized) return fallback;
-    const date = new Date(`${normalized}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? fallback : date;
-  }
-
-  function countInclusiveMonths(startDate, endDate) {
-    if (!(startDate instanceof Date) || !(endDate instanceof Date)) return 0;
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
-    const start = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-    if (start.getTime() > end.getTime()) return 0;
-    return (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
-  }
 
   const CUSTOMER_SERVICE_OPTIONS = ['website', 'bedrijfssoftware', 'voicesoftware', 'chatbot'];
 
@@ -488,6 +476,39 @@ function createCustomersPageBootstrapService(deps = {}) {
       );
   }
 
+  function buildDashboardPaidOrders(activeOrdersState = {}) {
+    const values = activeOrdersState && typeof activeOrdersState.values === 'object' ? activeOrdersState.values : {};
+    let customOrders = [];
+    try {
+      const parsed = JSON.parse(String(readChunkedStateValue(values, orderKey) || '[]'));
+      if (Array.isArray(parsed)) customOrders = parsed;
+    } catch (_) {}
+    const runtimeMap = parseOrderRuntime(readChunkedStateValue(values, orderRuntimeKey));
+
+    return customOrders.map((item) => {
+      const id = Number(item?.id);
+      const amount = Math.round(Number(item?.amount));
+      if (!Number.isFinite(id) || id <= 0 || !Number.isFinite(amount) || amount <= 0) return null;
+      const runtime = runtimeMap[String(id)] || {};
+      const progressPct = Math.max(0, Math.min(100, Number(runtime?.progressPct) || 0));
+      const paidAt = normalizeString(runtime?.paidAt || item?.paidAt);
+      const fallbackStatus = progressPct >= 100 ? 'klaar' : progressPct > 0 ? 'bezig' : 'wacht';
+      const status = normalizeOrderStatus(runtime?.statusKey || item?.statusKey || item?.status || fallbackStatus);
+      const isBuilt = status === 'klaar' || status === 'betaald' || progressPct >= 100;
+      if (!paidAt || !isBuilt) return null;
+      return {
+        clientName: normalizeString(item?.clientName || item?.companyName || runtime?.name),
+        location: normalizeString(item?.location),
+        companyName: normalizeString(item?.companyName),
+        contactName: normalizeString(item?.contactName),
+        contactPhone: normalizeString(item?.contactPhone),
+        paidAt,
+        updatedAt: Number(runtime?.updatedAt) || 0,
+        ui: { paidAt, isPaid: true },
+      };
+    }).filter(Boolean).sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
   function escapeInlineJson(value) {
     return JSON.stringify(value === undefined ? null : value)
       .replace(/</g, '\\u003c')
@@ -619,63 +640,33 @@ function createCustomersPageBootstrapService(deps = {}) {
     );
   }
 
-  function buildDashboardMetricSummary(customers, nowDate = new Date()) {
+  function buildDashboardMetricSummary(customers, nowDate = new Date(), paidOrders = []) {
     const normalizedCustomers = (Array.isArray(customers) ? customers : [])
       .map((customer, index) => normalizeCustomer(customer, `dashboard-customer-${index}`))
       .filter((customer) => customer.databaseStatus === 'klant');
+    const revenueMetrics = calculatePremiumDashboardRevenueMetrics(normalizedCustomers, nowDate, {
+      resolveRevenueDate: (customer) => getCustomerRevenueDate(customer, paidOrders, nowDate),
+    });
 
-    return normalizedCustomers.reduce(
-      (summary, customer) => {
-        if (customer.status !== 'Betaald') return summary;
-        const paidAt = getDashboardDate(customer.datum, nowDate);
-        const websiteAmount = Math.max(0, Number(customer.websiteBedrag) || 0);
-        const maintenanceAmount = Math.max(0, Number(customer.onderhoudPerMaand) || 0);
-        const maintenanceMonths = maintenanceAmount > 0 ? countInclusiveMonths(paidAt, nowDate) : 0;
-        const maintenanceRevenue = maintenanceAmount * maintenanceMonths;
-
-        return {
-          totalCustomers: summary.totalCustomers,
-          totalRevenue: summary.totalRevenue + websiteAmount + maintenanceRevenue,
-          maintenanceRevenue: summary.maintenanceRevenue + maintenanceRevenue,
-        };
-      },
-      {
-        totalCustomers: normalizedCustomers.length,
-        totalRevenue: 0,
-        maintenanceRevenue: 0,
-      }
-    );
+    return {
+      totalCustomers: normalizedCustomers.length,
+      totalRevenue: revenueMetrics.yearTotalRevenue,
+      maintenanceRevenue: revenueMetrics.yearMaintenanceRevenue,
+      recurringRevenue: revenueMetrics.monthlyRecurringRevenue,
+    };
   }
 
-  function buildDashboardRevenueSeries(customers, nowDate = new Date()) {
-    const currentYear = nowDate instanceof Date && !Number.isNaN(nowDate.getTime())
-      ? nowDate.getFullYear()
-      : new Date().getFullYear();
-    const currentMonth = nowDate instanceof Date && !Number.isNaN(nowDate.getTime())
-      ? nowDate.getMonth()
-      : new Date().getMonth();
-    const values = Array.from({ length: 12 }, () => 0);
+  function buildDashboardRevenueSeries(customers, nowDate = new Date(), paidOrders = []) {
     const normalizedCustomers = (Array.isArray(customers) ? customers : [])
       .map((customer, index) => normalizeCustomer(customer, `dashboard-chart-customer-${index}`))
       .filter((customer) => customer.databaseStatus === 'klant' && customer.status === 'Betaald');
-
-    normalizedCustomers.forEach((customer) => {
-      const paidAt = getDashboardDate(customer.datum, nowDate);
-      if (paidAt.getFullYear() !== currentYear) return;
-      const websiteAmount = Math.max(0, Number(customer.websiteBedrag) || 0);
-      const maintenanceAmount = Math.max(0, Number(customer.onderhoudPerMaand) || 0);
-      if (websiteAmount > 0) values[paidAt.getMonth()] += websiteAmount;
-      if (maintenanceAmount <= 0 || paidAt.getMonth() > currentMonth) return;
-      for (let month = paidAt.getMonth(); month <= currentMonth; month += 1) {
-        values[month] += maintenanceAmount;
-      }
-    });
-
-    return values;
+    return calculatePremiumDashboardRevenueMetrics(normalizedCustomers, nowDate, {
+      resolveRevenueDate: (customer) => getCustomerRevenueDate(customer, paidOrders, nowDate),
+    }).yearByMonth;
   }
 
-  function buildDashboardRevenueChartHtml(customers, nowDate = new Date()) {
-    const values = buildDashboardRevenueSeries(customers, nowDate);
+  function buildDashboardRevenueChartHtml(customers, nowDate = new Date(), paidOrders = []) {
+    const values = buildDashboardRevenueSeries(customers, nowDate, paidOrders);
     const maxRevenue = Math.max(...values, 0);
     return DASHBOARD_MONTH_LABELS_SHORT.map((label, index) => {
       const amount = Math.max(0, Number(values[index]) || 0);
@@ -727,8 +718,11 @@ function createCustomersPageBootstrapService(deps = {}) {
     const activeOrdersBreakdown = isDashboardActiveOrdersStateUnavailable(payload?.activeOrdersState)
       ? null
       : buildActiveOrdersBreakdown(payload?.activeOrdersState);
+    const revenueNeedsPaidOrders = (Array.isArray(payload?.customers) ? payload.customers : [])
+      .map((customer, index) => normalizeCustomer(customer, `dashboard-revenue-date-${index}`))
+      .some((customer) => customer.databaseStatus === 'klant' && customer.status === 'Betaald' && !customer.datum);
 
-    if (payloadUnavailable) {
+    if (payloadUnavailable || (revenueNeedsPaidOrders && activeOrdersBreakdown === null)) {
       return {
         SOFTORA_DASHBOARD_TOTAL_REVENUE: '--',
         SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: '--',
@@ -738,12 +732,14 @@ function createCustomersPageBootstrapService(deps = {}) {
       };
     }
 
-    const summary = buildDashboardMetricSummary(payload.customers);
+    const dashboardNow = now();
+    const paidOrders = buildDashboardPaidOrders(payload.activeOrdersState);
+    const summary = buildDashboardMetricSummary(payload.customers, dashboardNow, paidOrders);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
-      SOFTORA_DASHBOARD_RECURRING_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
-      SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers),
+      SOFTORA_DASHBOARD_RECURRING_REVENUE: formatDashboardMoney(summary.recurringRevenue),
+      SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers, dashboardNow, paidOrders),
       SOFTORA_DASHBOARD_TOTAL_CLIENTS:
         String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown),
     };

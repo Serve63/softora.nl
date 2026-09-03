@@ -2083,11 +2083,11 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script><script src="assets/premium-dashboard-core.js?v=20260722a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script><script src="assets/premium-dashboard-core.js?v=20260903a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
     <script>
-        const now = new Date();
+        const initialNow = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
-        document.getElementById('currentDate').textContent = now.toLocaleDateString('nl-NL', options);
+        document.getElementById('currentDate').textContent = initialNow.toLocaleDateString('nl-NL', options);
         const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
         const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
         const PREMIUM_ACTIVE_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
@@ -2174,7 +2174,7 @@
             getPremiumDashboardChunkMetaKey,
             readPremiumDashboardChunkedStateValue,
             formatMoneyEUR,
-            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShell, readDashboardCustomersBootstrapPayload, hydratePremiumDashboardCustomersFromBootstrap, startPremiumDashboardBootWatchdog
+            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShell, readDashboardCustomersBootstrapPayload, hydratePremiumDashboardCustomersFromBootstrap, startPremiumDashboardBootWatchdog, calculatePremiumDashboardRevenueMetrics
         } = dashboardCore;
         const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload(); startPremiumDashboardBootWatchdog();
         aiManagementConfig = normalizeAiManagementConfig(null);
@@ -2780,6 +2780,7 @@
                             id: normalizeDashboardString(item && item.id) || `dashboard-customer-${index}`,
                             naam: normalizeDashboardString(item && item.naam) || 'Onbekend',
                             bedrijf: normalizeDashboardString(item && item.bedrijf) || '-',
+                            telefoon: normalizeDashboardString(item && item.telefoon),
                             type,
                             websiteBedrag,
                             onderhoudPerMaand,
@@ -2811,7 +2812,7 @@
             return { text: 'Openstaand', className: 'status-active' };
         }
 
-        function getEffectiveRevenueDate(value) {
+        function getEffectiveRevenueDate(value, currentDate = new Date()) {
             const raw = normalizeDashboardString(value);
             if (raw) {
                 const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
@@ -2819,27 +2820,7 @@
                     : new Date(raw);
                 if (!Number.isNaN(date.getTime())) return date;
             }
-            return new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0);
-        }
-
-        function getMaintenanceActiveMonthsForYear(startDate, currentYear, currentMonth) {
-            if (!startDate || Number.isNaN(startDate.getTime())) return 0;
-            if (startDate.getFullYear() > currentYear) return 0;
-            if (startDate.getFullYear() < currentYear) return currentMonth + 1;
-            if (startDate.getMonth() > currentMonth) return 0;
-            return currentMonth - startDate.getMonth() + 1;
-        }
-
-        function getMaintenanceActiveMonthsForCalendarYear(startDate, targetYear, currentYear, currentMonth) {
-            if (!startDate || Number.isNaN(startDate.getTime())) return 0;
-            const startYear = startDate.getFullYear();
-            if (targetYear < startYear || targetYear > currentYear) return 0;
-
-            const startMonth = targetYear === startYear ? startDate.getMonth() : 0;
-            const endMonth = targetYear === currentYear ? currentMonth : 11;
-
-            if (endMonth < startMonth) return 0;
-            return endMonth - startMonth + 1;
+            return new Date(currentDate.getFullYear(), currentDate.getMonth(), 1, 12, 0, 0);
         }
 
         function getCurrentQuarterStartMonth(month) {
@@ -2860,13 +2841,6 @@
             const monthStart = getMonthStartDate(dateLike);
             if (!monthStart) return '';
             return `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
-        }
-
-        function addRevenueToMonthMap(map, dateLike, amount) {
-            const monthKey = getMonthKey(dateLike);
-            const safeAmount = Math.max(0, Number(amount) || 0);
-            if (!monthKey || safeAmount <= 0) return;
-            map.set(monthKey, (map.get(monthKey) || 0) + safeAmount);
         }
 
         function buildRollingMonthSeries(monthRevenueMap, endDate, totalMonths = 12) {
@@ -2956,98 +2930,23 @@
             const customers = Array.isArray(premiumDashboardState.customers) ? premiumDashboardState.customers : [];
             if (!premiumDashboardState.customersHydrated) { showPremiumDashboardUnavailable(); return; }
             if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.clear();
-            const currentYear = now.getFullYear(); const currentMonth = now.getMonth();
-            const quarterStartMonth = getCurrentQuarterStartMonth(currentMonth); const quarterEndMonth = quarterStartMonth + 2;
-            const revenueByMonth = Array.from({ length: 12 }, () => 0);
-            const rollingMonthRevenue = new Map();
+            if (typeof calculatePremiumDashboardRevenueMetrics !== 'function') return;
+            const revenueNeedsPaidOrders = customers.some((customer) => customer?.status === 'Betaald' && !normalizeDashboardDate(customer?.datum));
+            if (revenueNeedsPaidOrders && !premiumDashboardState.ordersHydrated) { showPremiumDashboardUnavailable(); return; }
             const paidOrders = orders.filter((order) => order?.ui?.isPaid);
             const activeOrders = orders.filter((order) => !order?.ui?.isBuilt);
-            const revenueBreakdown = {
-                month: {
-                    website: 0,
-                    maintenance: 0,
-                    total: 0
-                },
-                year: {
-                    website: 0,
-                    maintenance: 0,
-                    total: 0
-                },
-                quarter: {
-                    website: 0,
-                    maintenance: 0,
-                    total: 0
-                },
-                all: {
-                    website: 0,
-                    maintenance: 0,
-                    total: 0
-                }
-            };
-
-            customers.forEach((customer) => {
-                    if (customer?.status !== 'Betaald') return;
-                    const paidAt = typeof dashboardCore.getCustomerRevenueDate === 'function'
+            const now = new Date();
+            const sharedRevenueMetrics = calculatePremiumDashboardRevenueMetrics(customers, now, {
+                resolveRevenueDate: (customer) => typeof dashboardCore.getCustomerRevenueDate === 'function'
                         ? dashboardCore.getCustomerRevenueDate(customer, paidOrders, now)
-                        : getEffectiveRevenueDate(customer?.datum);
-                    const websiteAmount = Math.max(0, Number(customer?.websiteBedrag) || 0);
-                    const maintenanceAmount = Math.max(0, Number(customer?.onderhoudPerMaand) || 0);
-
-                    if (websiteAmount > 0) {
-                        const paidYear = paidAt.getFullYear();
-                        revenueBreakdown.all.website += websiteAmount;
-                        addRevenueToMonthMap(rollingMonthRevenue, paidAt, websiteAmount);
-
-                        if (paidYear === currentYear) {
-                            revenueBreakdown.year.website += websiteAmount;
-                            revenueByMonth[paidAt.getMonth()] += websiteAmount;
-                            if (paidAt.getMonth() === currentMonth) {
-                                revenueBreakdown.month.website += websiteAmount;
-                            }
-                            if (paidAt.getMonth() >= quarterStartMonth && paidAt.getMonth() <= quarterEndMonth) {
-                                revenueBreakdown.quarter.website += websiteAmount;
-                            }
-                        }
-                    }
-
-                    if (maintenanceAmount > 0) {
-                        const activeMonths = getMaintenanceActiveMonthsForYear(paidAt, currentYear, currentMonth);
-                        if (activeMonths > 0) {
-                            revenueBreakdown.month.maintenance += maintenanceAmount;
-                            revenueBreakdown.year.maintenance += maintenanceAmount * activeMonths;
-
-                            const startMonth = paidAt.getFullYear() < currentYear ? 0 : paidAt.getMonth();
-                            for (let month = startMonth; month <= currentMonth; month += 1) {
-                                revenueByMonth[month] += maintenanceAmount;
-                                if (month >= quarterStartMonth && month <= quarterEndMonth) {
-                                    revenueBreakdown.quarter.maintenance += maintenanceAmount;
-                                }
-                            }
-                        }
-
-                        for (let year = paidAt.getFullYear(); year <= currentYear; year += 1) {
-                            const activeMonthsForYear = getMaintenanceActiveMonthsForCalendarYear(paidAt, year, currentYear, currentMonth);
-                            if (activeMonthsForYear <= 0) continue;
-                            const amountForYear = maintenanceAmount * activeMonthsForYear;
-                            revenueBreakdown.all.maintenance += amountForYear;
-                        }
-
-                        const firstActiveMonth = getMonthStartDate(paidAt);
-                        const lastActiveMonth = getMonthStartDate(now);
-                        if (firstActiveMonth && lastActiveMonth) {
-                            const cursor = new Date(firstActiveMonth);
-                            while (cursor.getTime() <= lastActiveMonth.getTime()) {
-                                addRevenueToMonthMap(rollingMonthRevenue, cursor, maintenanceAmount);
-                                cursor.setMonth(cursor.getMonth() + 1);
-                            }
-                        }
-                    }
-                });
-
-            revenueBreakdown.month.total = revenueBreakdown.month.website + revenueBreakdown.month.maintenance;
-            revenueBreakdown.year.total = revenueBreakdown.year.website + revenueBreakdown.year.maintenance;
-            revenueBreakdown.quarter.total = revenueBreakdown.quarter.website + revenueBreakdown.quarter.maintenance;
-            revenueBreakdown.all.total = revenueBreakdown.all.website + revenueBreakdown.all.maintenance;
+                        : getEffectiveRevenueDate(customer?.datum, now)
+            });
+            const currentYear = sharedRevenueMetrics.currentYear;
+            const currentMonth = sharedRevenueMetrics.currentMonth;
+            const quarterStartMonth = getCurrentQuarterStartMonth(currentMonth); const quarterEndMonth = quarterStartMonth + 2;
+            const revenueByMonth = sharedRevenueMetrics.yearByMonth;
+            const rollingMonthRevenue = new Map(Object.entries(sharedRevenueMetrics.rollingByMonth));
+            const revenueBreakdown = sharedRevenueMetrics.periodRevenue;
 
             const selectedRevenue = dashboardPeriodFilter === 'month'
                 ? revenueBreakdown.month
@@ -3057,7 +2956,7 @@
 
             const revenueYearEl = document.getElementById('kpiRevenueYear');
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(selectedRevenue.total);
-            const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
+            const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(revenueBreakdown.month.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
             if (totalClientsEl) totalClientsEl.textContent = String(customers.length);
             if (premiumDashboardState.ordersHydrated) updateKpiActiveOrdersDisplay(activeOrders);
