@@ -221,10 +221,10 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="card-number">04<\/div>\s*<h3>Chatbot<\/h3>\s*<p>Bezoekers willen antwoord nu — niet morgen\. Een slimme chatbot die vragen afhandelt, leads vastlegt en 24\/7 voor je klaarstaat\.<\/p>/
   );
-  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/website-laten-maken"/);
-  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/bedrijfssoftware-op-maat"/);
-  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/voicesoftware-op-maat"/);
-  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/chatbot-laten-maken"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/website"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/bedrijfssoftware"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/voicesoftware"/);
+  assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/chatbot"/);
   assert.match(source, /class="service-card-link-icon" aria-hidden="true"/);
   assert.match(source, /\.tilt-card:focus-visible\s*\{[\s\S]*outline:/);
   assert.match(
