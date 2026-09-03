@@ -39,6 +39,7 @@ const unlockedPublicSeoPaths = [
   '/website-laten-maken',
   '/website-laten-maken-oisterwijk',
   '/pakketten',
+  '/bedrijfssoftware',
   '/bedrijfssoftware-op-maat',
   '/crm-systeem-op-maat',
   '/ai-telefonist',
@@ -47,7 +48,7 @@ const unlockedPublicSeoPaths = [
   '/over-softora',
 ];
 
-const unbuiltHomepageServicePaths = ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot'];
+const unbuiltHomepageServicePaths = ['/website', '/voicesoftware', '/chatbot'];
 
 for (const pathName of unbuiltHomepageServicePaths) {
   test(`page smoke: ${pathName} blijft een losse, nog ongebouwde pagina`, async () => {
@@ -87,6 +88,22 @@ test('page smoke: / serves the real SEO homepage with a clean canonical', async 
   assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /.');
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/">/);
   assert.doesNotMatch(html, /url=\/premium-website|window\.location\.replace\('\/premium-website'\)/);
+});
+
+test('page smoke: /bedrijfssoftware is de publieke noindex overtuigingspagina', async () => {
+  const [pageResponse, sitemapResponse] = await Promise.all([
+    fetch(`${serverRef.baseUrl}/bedrijfssoftware`, { cache: 'no-store' }),
+    fetch(`${serverRef.baseUrl}/sitemap.xml`, { cache: 'no-store' }),
+  ]);
+  const html = await pageResponse.text();
+  const sitemap = await sitemapResponse.text();
+
+  assert.equal(pageResponse.status, 200);
+  assert.match(html, /Bedrijfssoftware op maat die <em>voor je werkt\.<\/em>/);
+  assert.match(html, /<meta name="robots" content="noindex, follow">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
+  assert.doesNotMatch(sitemap, /<loc>[^<]+\/bedrijfssoftware<\/loc>/);
+  assert.match(sitemap, /<loc>[^<]+\/bedrijfssoftware-op-maat<\/loc>/);
 });
 
 test('page smoke: /premium-website redirects permanently to the clean homepage', async () => {
