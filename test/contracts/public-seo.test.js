@@ -629,9 +629,9 @@ test('ai telefonist head metadata targets make and comparison intent', () => {
 test('public seo url mapping exposes clean paths and keeps legacy redirects available', () => {
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-bedrijfssoftware.html'), '/bedrijfssoftware-op-maat');
   assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware-op-maat'), 'premium-bedrijfssoftware.html');
-  assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware'), 'premium-bedrijfssoftware.html');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/bedrijfssoftware'), '');
   assert.equal(getIndexablePublicHtmlFileFromPath('/website-laten-maken'), 'premium-websites.html');
-  assert.equal(getIndexablePublicHtmlFileFromPath('/website'), 'premium-websites.html');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/website'), '');
   assert.equal(getIndexablePublicPathFromHtmlFile('website-laten-maken-oisterwijk.html'), '/website-laten-maken-oisterwijk');
   assert.equal(getIndexablePublicHtmlFileFromPath('/website-laten-maken-oisterwijk'), 'website-laten-maken-oisterwijk.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('diensten.html'), '/diensten');
@@ -639,9 +639,9 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
   assert.equal(getIndexablePublicHtmlFileFromPath('/crm-systeem-op-maat'), 'crm-systeem-op-maat.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/ai-telefonist'), 'ai-telefonist.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/voicesoftware-op-maat'), 'premium-voicesoftware.html');
-  assert.equal(getIndexablePublicHtmlFileFromPath('/voicesoftware'), 'premium-voicesoftware.html');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/voicesoftware'), '');
   assert.equal(getIndexablePublicHtmlFileFromPath('/chatbot-laten-maken'), 'premium-chatbot.html');
-  assert.equal(getIndexablePublicHtmlFileFromPath('/chatbot'), 'premium-chatbot.html');
+  assert.equal(getIndexablePublicHtmlFileFromPath('/chatbot'), '');
   assert.equal(getIndexablePublicPathFromHtmlFile('pakketten.html'), '/pakketten');
   assert.equal(getIndexablePublicHtmlFileFromPath('/pakketten'), 'pakketten.html');
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-over-softora.html'), '/over-softora');

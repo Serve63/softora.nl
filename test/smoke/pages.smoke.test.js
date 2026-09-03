@@ -36,20 +36,29 @@ const unlockedPublicSeoPaths = [
   '/contact',
   '/diensten',
   '/ai-automatisering',
-  '/website',
   '/website-laten-maken',
   '/website-laten-maken-oisterwijk',
   '/pakketten',
-  '/bedrijfssoftware',
   '/bedrijfssoftware-op-maat',
   '/crm-systeem-op-maat',
   '/ai-telefonist',
-  '/chatbot',
   '/chatbot-laten-maken',
-  '/voicesoftware',
   '/voicesoftware-op-maat',
   '/over-softora',
 ];
+
+const unbuiltHomepageServicePaths = ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot'];
+
+for (const pathName of unbuiltHomepageServicePaths) {
+  test(`page smoke: ${pathName} blijft een losse, nog ongebouwde pagina`, async () => {
+    const response = await fetch(`${serverRef.baseUrl}${pathName}`, { cache: 'no-store', redirect: 'manual' });
+    const body = await response.text();
+
+    assert.equal(response.status, 404, pathName);
+    assert.equal(response.headers.get('location'), null, pathName);
+    assert.match(body, /Niet gevonden/, pathName);
+  });
+}
 
 for (const pathName of unlockedPublicSeoPaths) {
   test(`page smoke: ${pathName} toont geen toegangscode-slot`, async () => {
