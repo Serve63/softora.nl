@@ -95,6 +95,14 @@ test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', (
   assert.match(pageSource, /Maandelijkse inkomsten/);
   assert.doesNotMatch(pageSource, /Terugkerende inkomsten/);
   assert.match(pageSource, /id="kpiRecurringRevenue"/);
+  assert.match(
+    pageSource,
+    /kpiRecurringRevenue'[\s\S]*formatMoneyEUR\(revenueBreakdown\.month\.maintenance\)/
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /kpiRecurringRevenue'[\s\S]{0,180}formatMoneyEUR\(selectedRevenue\.maintenance\)/
+  );
   assert.doesNotMatch(pageSource, /Overzicht van je bedrijfsprestaties/);
   assert.match(pageSource, /id="revenuePanelBadge">Omzet per maand<\/span>/);
   assert.doesNotMatch(pageSource, /id="revenuePanelBadge">Betaald per maand<\/span>/);
