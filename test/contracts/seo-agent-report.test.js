@@ -254,6 +254,37 @@ test('seo agent report ranks low CTR, striking distance and declining page actio
   assert.match(formatAgentMarkdown(report), /Lage CTR kansen/);
 });
 
+test('seo agent preserves property totals but removes excluded routes from actions', () => {
+  const report = buildSearchConsoleAgentReport({
+    totalsCurrent: [{ keys: [], clicks: 7, impressions: 300, ctr: 7 / 300, position: 12 }],
+    totalsPrevious: [{ keys: [], clicks: 5, impressions: 250, ctr: 5 / 250, position: 13 }],
+    queriesCurrent: [
+      { keys: ['website bouwen'], clicks: 1, impressions: 120, ctr: 1 / 120, position: 8 },
+      { keys: ['website laten maken'], clicks: 1, impressions: 100, ctr: 0.01, position: 9 },
+    ],
+    queriesPrevious: [],
+    pagesCurrent: [
+      { keys: ['https://www.softora.nl/website'], clicks: 4, impressions: 180, ctr: 4 / 180, position: 8 },
+      { keys: ['https://www.softora.nl/website-laten-maken'], clicks: 3, impressions: 120, ctr: 3 / 120, position: 9 },
+    ],
+    pagesPrevious: [],
+    pageQueryCurrent: [
+      { keys: ['https://www.softora.nl/website', 'website bouwen'], clicks: 1, impressions: 120, ctr: 1 / 120, position: 8 },
+      { keys: ['https://www.softora.nl/website-laten-maken', 'website laten maken'], clicks: 1, impressions: 100, ctr: 0.01, position: 9 },
+      { keys: ['https://www.softora.nl/website', 'website laten maken'], clicks: 1, impressions: 140, ctr: 1 / 140, position: 8 },
+    ],
+    sitemaps: [],
+  });
+
+  assert.equal(report.totals.current.clicks, 7);
+  assert.deepEqual(report.excludedAutomationPaths, ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot']);
+  assert.equal(report.queries.prioritized.some((item) => item.page.endsWith('/website')), false);
+  assert.equal(report.pages.top.some((item) => item.keys[0].endsWith('/website')), false);
+  assert.equal(report.pages.nonBranded.some((item) => item.page.endsWith('/website')), false);
+  assert.equal(report.actionQueue.some((item) => String(item.page || '').endsWith('/website')), false);
+  assert.equal(report.queries.prioritized.some((item) => item.page.endsWith('/website-laten-maken')), true);
+});
+
 test('seo agent prioritizes non-branded buyer intent and includes zero CTR opportunities once', () => {
   const report = buildSearchConsoleAgentReport({
     queriesCurrent: [

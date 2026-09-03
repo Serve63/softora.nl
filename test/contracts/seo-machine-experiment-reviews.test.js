@@ -79,6 +79,20 @@ test('review schedule uses the Amsterdam calendar at the UTC day boundary', () =
   ]);
 });
 
+test('review schedule drops excluded routes from historical experiment memory', () => {
+  const memory = `# SEO memory
+
+## 2026-08-01T08:00:00Z
+- Experiment \`excluded\`: URL \`/website\`; reviews 2026-08-15, 2026-08-29 and 2026-09-26.
+- Experiment \`mixed\`: URL \`/chatbot\`; supported URL \`/blog/allowed\`; reviews 2026-08-15, 2026-08-29 and 2026-09-26.
+`;
+  const schedule = parseExperimentReviewSchedule(memory, new Date('2026-08-15T12:00:00.000Z'));
+
+  assert.deepEqual(schedule.experiments.map((item) => item.experimentId), ['mixed']);
+  assert.deepEqual(schedule.experiments[0].paths, ['/blog/allowed']);
+  assert.deepEqual(schedule.due.map((item) => item.experimentId), ['mixed']);
+});
+
 test('review schedule recognizes plural aggregate review lines from historical runs', () => {
   const memory = `# SEO memory
 

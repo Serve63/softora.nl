@@ -101,6 +101,23 @@ const contentItems = [{
   secondaryImage: { src: SUPPORT, alt: 'Beslismatrix', width: 1200, height: 900 },
 }];
 
+test('live route gate refuses excluded routes before any network request', async () => {
+  let fetchCalls = 0;
+  const fetchImpl = async () => {
+    fetchCalls += 1;
+    throw new Error('fetch should not run');
+  };
+  const result = await runSeoMachineLiveRouteCheck({
+    url: 'https://www.softora.nl/website',
+    liveCommit: LIVE_COMMIT,
+    fetchImpl,
+  });
+
+  assert.equal(result.status, 'blocked');
+  assert.match(result.errors.join('\n'), /buiten de SEO-automation/i);
+  assert.equal(fetchCalls, 0);
+});
+
 test('live route gate proves commit, crawlability, schema, CTA and both content images', async () => {
   const result = await runSeoMachineLiveRouteCheck({
     url: URL,

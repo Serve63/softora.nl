@@ -6,6 +6,7 @@ const {
   getSeoContentPathForItem,
 } = require('./seo-content');
 const { requiresVisualQualityV2 } = require('./seo-machine-visual-quality');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const SOFTORA_HOSTS = new Set(['softora.nl', 'www.softora.nl']);
 const PRIVATE_TEXT_PATTERNS = Object.freeze([
@@ -271,6 +272,32 @@ async function runSeoMachineLiveRouteCheck({
   }
   if (target.protocol !== 'https:' || !SOFTORA_HOSTS.has(target.hostname)) {
     return { status: 'blocked', errors: ['changed URL moet een publieke HTTPS Softora-URL zijn.'], summary: {} };
+  }
+  if (isSeoAutomationExcludedPath(target.toString())) {
+    return {
+      status: 'blocked',
+      errors: [`changed URL valt buiten de SEO-automation: ${target.pathname.replace(/\/+$/, '') || '/'}.`],
+      summary: {},
+    };
+  }
+  if (isSeoAutomationExcludedPath(supportingAction?.path)) {
+    return {
+      status: 'blocked',
+      errors: [`supportingAction.path valt buiten de SEO-automation: ${normalizePathname(supportingAction.path)}.`],
+      summary: {},
+    };
+  }
+  if (
+    supportingAction?.verification?.kind === 'link_present'
+    && isSeoAutomationExcludedPath(supportingAction.verification.value)
+  ) {
+    return {
+      status: 'blocked',
+      errors: [
+        `supportingAction.verification.value valt buiten de SEO-automation: ${normalizePathname(supportingAction.verification.value)}.`,
+      ],
+      summary: {},
+    };
   }
   if (!/^[a-f0-9]{7,40}$/i.test(String(liveCommit || ''))) {
     return { status: 'blocked', errors: ['liveCommit ontbreekt of is ongeldig.'], summary: {} };

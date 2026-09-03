@@ -1,5 +1,6 @@
 const path = require('node:path');
 const { PUBLICATION_LANES } = require('./seo-machine-publication-lanes');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const SELECTION_SCHEMA_VERSION = 1;
 const MIN_PRIORITIZED_REVIEWS = 3;
@@ -111,6 +112,8 @@ function validateSupportingVerification(supportingAction, errors) {
   const value = normalizeText(verification.value);
   if (kind === 'link_present' && !normalizePublicPath(value)) {
     errors.push('selected.supportingAction.verification.value moet voor link_present een publieke Softora-route zijn.');
+  } else if (kind === 'link_present' && isSeoAutomationExcludedPath(value)) {
+    errors.push(`selected.supportingAction.verification.value valt buiten de SEO-automation: ${normalizePublicPath(value)}.`);
   } else if (kind === 'text_present' && value.length < 12) {
     errors.push('selected.supportingAction.verification.value is te vaag voor text_present.');
   } else if (kind === 'title_equals' && value.length < 10) {
@@ -132,6 +135,8 @@ function validateSupportingAction(selected, errors, options = {}) {
   const supportingPath = normalizePublicPath(supportingAction.path);
   if (!supportingPath) {
     errors.push('selected.supportingAction.path moet een publieke Softora-route zijn.');
+  } else if (isSeoAutomationExcludedPath(supportingPath)) {
+    errors.push(`selected.supportingAction.path valt buiten de SEO-automation: ${supportingPath}.`);
   }
   if (supportingPath && supportingPath === normalizePublicPath(selected.path)) {
     errors.push('selected.supportingAction.path moet een bestaande andere pagina versterken.');
@@ -156,6 +161,13 @@ function validateSelectedAction(selected, evidence, errors, options = {}) {
   if (!ALLOWED_SOURCES.has(normalizeText(selected.source))) errors.push('selected.source is ongeldig.');
   const selectedPath = normalizePublicPath(selected.path);
   if (!selectedPath) errors.push('selected.path moet een publieke Softora-route zijn.');
+  if (selectedPath && isSeoAutomationExcludedPath(selectedPath)) {
+    errors.push(`selected.path valt buiten de SEO-automation: ${selectedPath}.`);
+  }
+  const targetMoneyPage = normalizePublicPath(selected.targetMoneyPage);
+  if (targetMoneyPage && isSeoAutomationExcludedPath(targetMoneyPage)) {
+    errors.push(`selected.targetMoneyPage valt buiten de SEO-automation: ${targetMoneyPage}.`);
+  }
   const actionType = normalizeText(selected.actionType);
   if (!ALLOWED_ACTION_TYPES.has(actionType)) errors.push('selected.actionType is ongeldig.');
   if (normalizeText(selected.buyerTask).length < 12) errors.push('selected.buyerTask is te vaag.');
@@ -267,6 +279,11 @@ function validateSelectionEvidence(evidence = {}, report = {}, options = {}) {
     errors.push('generatedAt valt buiten het verse selectievenster van 30 minuten.');
   }
   if (report.status !== 'ready') errors.push('Het gekoppelde GSC-rapport is niet ready.');
+  for (const opportunity of prioritized) {
+    if (isSeoAutomationExcludedPath(opportunity?.page)) {
+      errors.push(`Het GSC-rapport bevat een uitgesloten SEO-route in queries.prioritized: ${normalizePublicPath(opportunity.page)}.`);
+    }
+  }
   if (!isValidDateTime(report.generatedAt)) errors.push('Het gekoppelde GSC-rapport mist generatedAt.');
   if (
     isValidDateTime(report.generatedAt)
@@ -314,6 +331,11 @@ function validateSelectionEvidence(evidence = {}, report = {}, options = {}) {
       errors.push(`prioritizedReview rank ${index + 1} heeft een ongeldige decision.`);
     } else if (review.decision === 'skipped') {
       validateSkipEvidence(review, evidence, errors);
+    }
+    for (const closestUrl of Array.isArray(review?.closestUrls) ? review.closestUrls : []) {
+      if (isSeoAutomationExcludedPath(closestUrl)) {
+        errors.push(`prioritizedReview rank ${index + 1} vergelijkt met een uitgesloten SEO-route: ${normalizePublicPath(closestUrl)}.`);
+      }
     }
   }
 

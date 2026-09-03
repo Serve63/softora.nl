@@ -97,6 +97,37 @@ test('selection gate accepts an exact top-three review with concrete skip eviden
   assert.equal(result.summary.highestOpportunity.reasonCode, 'recent_material_change');
 });
 
+test('selection gate blocks excluded routes in every actionable field', () => {
+  const mutations = [
+    (candidate) => { candidate.selected.path = '/website'; },
+    (candidate) => { candidate.selected.targetMoneyPage = '/bedrijfssoftware'; },
+    (candidate) => { candidate.selected.supportingAction.path = '/voicesoftware'; },
+    (candidate) => {
+      candidate.selected.supportingAction.type = 'existing_page_refresh';
+      candidate.selected.supportingAction.verification = { kind: 'link_present', value: '/chatbot' };
+    },
+  ];
+
+  for (const mutate of mutations) {
+    const candidate = evidence();
+    mutate(candidate);
+    const result = validate(candidate);
+    assert.equal(result.status, 'blocked');
+    assert.match(result.errors.join('\n'), /buiten de SEO-automation/i);
+  }
+
+  const protectedReport = report();
+  protectedReport.queries.prioritized[0].page = '/website';
+  const result = validateSelectionEvidence(evidence(), protectedReport, {
+    knownPublicPaths: KNOWN_PUBLIC_PATHS,
+    readyBacklogPaths: READY_BACKLOG_PATHS,
+    reportPath: 'reports/seo-agent/latest.json',
+    now: new Date('2026-08-28T06:25:00.000Z'),
+  });
+  assert.equal(result.status, 'blocked');
+  assert.match(result.errors.join('\n'), /uitgesloten SEO-route/i);
+});
+
 test('selection gate blocks a vague skip of the highest GSC opportunity', () => {
   const candidate = evidence();
   delete candidate.prioritizedReview[0].lastChangedAt;

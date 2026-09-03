@@ -8,6 +8,7 @@ const SOFTORA_LOCALITY = 'Oisterwijk';
 const SOFTORA_REGION = 'Noord-Brabant';
 const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
 const { addPublicWhatsappWidgetIfMissing } = require('./public-whatsapp-widget');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
@@ -292,7 +293,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     kind: 'legal',
     preserveDirectContactLinks: true,
   },
-]);
+].filter((entry) => !isSeoAutomationExcludedPath(entry.path)));
 
 const INDEXABLE_PAGE_BY_FILE = new Map(
   INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => [
@@ -435,7 +436,7 @@ function buildPublicSeoSitemapXml({ knownHtmlPageFiles, siteOrigin = DEFAULT_SIT
   const urlItems = entries
     .filter((entry) => {
       const pathName = normalizePublicPath(entry.path);
-      if (!pathName || seenPaths.has(pathName)) return false;
+      if (!pathName || isSeoAutomationExcludedPath(pathName) || seenPaths.has(pathName)) return false;
       seenPaths.add(pathName);
       return true;
     })

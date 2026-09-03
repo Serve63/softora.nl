@@ -74,3 +74,21 @@ test('SEO candidate scoring uses the stable positive weights and risk penalties'
     effort: 4,
   }), 4.4);
 });
+
+test('SEO backlog blocks every use of a permanently excluded route', () => {
+  const mutations = [
+    (item) => { item.path = '/website'; },
+    (item) => { item.targetMoneyPage = '/bedrijfssoftware'; },
+    (item) => { item.brief.incomingLinks[0] = '/voicesoftware'; },
+    (item) => { item.brief.outgoingLinks[0] = '/chatbot'; },
+    (item) => { item.overlap.closestPaths[0] = '/website'; },
+  ];
+
+  for (const mutate of mutations) {
+    const backlog = clone(loadSeoMachineBacklog());
+    mutate(backlog.items[0]);
+    const result = validateSeoMachineBacklog(backlog);
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join('\n'), /uitgesloten SEO-route|buiten de SEO-automation/i);
+  }
+});

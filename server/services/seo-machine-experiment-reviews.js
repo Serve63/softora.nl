@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const path = require('node:path');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const REVIEW_STAGES = Object.freeze(['D14', 'D28', 'D56']);
 const REVIEW_REPORT_MAX_AGE_MS = 30 * 60 * 1000;
@@ -69,9 +70,12 @@ function parseExperimentReviewSchedule(memoryContent, now = new Date()) {
     if (!match) continue;
     const reviewMatch = match[2].match(/\breviews?\s+(\d{4}-\d{2}-\d{2}),\s*(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\b/i);
     if (!reviewMatch || !reviewMatch.slice(1).every(validDateOnly)) continue;
+    const extractedPaths = extractExperimentPaths(match[2]);
+    const reviewablePaths = extractedPaths.filter((pathName) => !isSeoAutomationExcludedPath(pathName));
+    if (extractedPaths.length && reviewablePaths.length === 0) continue;
     experiments.push({
       experimentId: match[1],
-      paths: extractExperimentPaths(match[2]),
+      paths: reviewablePaths,
       lineIndex: index,
       stages: REVIEW_STAGES.map((stage, stageIndex) => ({
         stage,

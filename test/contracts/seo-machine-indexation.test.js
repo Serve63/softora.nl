@@ -60,6 +60,19 @@ test('inspection targets include money pages and only recent live content once',
   assert.deepEqual(targets.map((target) => target.path), ['/crm-systeem-op-maat', '/blog/recent']);
 });
 
+test('inspection targets ignore permanently excluded routes', () => {
+  const targets = selectInspectionTargets({
+    now: new Date('2026-07-23T12:00:00.000Z'),
+    priorityPaths: ['/website', '/website-laten-maken', '/bedrijfssoftware'],
+    publicationPlan: [
+      { path: '/chatbot', status: 'live', publishedAt: '2026-07-22', cluster: 'ai-contact' },
+      { path: '/blog/recent', status: 'live', publishedAt: '2026-07-22', cluster: 'software-crm' },
+    ],
+  });
+
+  assert.deepEqual(targets.map((target) => target.path), ['/website-laten-maken', '/blog/recent']);
+});
+
 test('indexation work preserves order while limiting concurrent API calls', async () => {
   let active = 0;
   let maximumActive = 0;

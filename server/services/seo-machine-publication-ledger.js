@@ -3,6 +3,7 @@ const {
   PUBLICATION_LANES,
   resolvePublicationLane,
 } = require('./seo-machine-publication-lanes');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const DEFAULT_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_HEALTH_PATH = '/api/health/baseline';
@@ -148,6 +149,7 @@ function buildPublicationCandidates({ publicationPlan, now = new Date(), maximum
     ? publicationPlan
     : getSeoMachinePublicationPlan({ now });
   return plan
+    .filter((item) => item && !isSeoAutomationExcludedPath(item.path))
     .filter((item) => item && item.status === 'live' && isPublicationInWindow(
       resolvePublicationEventAt(item),
       now,

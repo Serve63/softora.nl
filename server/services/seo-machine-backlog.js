@@ -9,6 +9,7 @@ const {
   PUBLICATION_LANES,
   resolvePublicationLane,
 } = require('./seo-machine-publication-lanes');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const DEFAULT_BACKLOG_PATH = path.join(REPO_ROOT, 'docs/growth/seo-machine-backlog.json');
@@ -145,6 +146,10 @@ function validateOverlap(item, itemLabel, errors, existingPaths) {
     errors.push(`${itemLabel}.overlap.closestPaths bevat duplicaten.`);
   }
   for (const closestPath of overlap.closestPaths) {
+    if (isSeoAutomationExcludedPath(closestPath)) {
+      errors.push(`${itemLabel}.overlap.closestPaths bevat een uitgesloten SEO-route: ${closestPath}.`);
+      continue;
+    }
     if (!existingPaths.has(closestPath)) {
       errors.push(`${itemLabel}.overlap.closestPaths verwijst naar onbekende content-URL ${closestPath}.`);
     }
@@ -175,6 +180,9 @@ function validateBrief(item, itemLabel, errors) {
   for (const linkField of ['incomingLinks', 'outgoingLinks']) {
     for (const linkPath of Array.isArray(brief[linkField]) ? brief[linkField] : []) {
       if (!isPublicPath(linkPath)) errors.push(`${itemLabel}.brief.${linkField} bevat ongeldige URL ${linkPath}.`);
+      if (isSeoAutomationExcludedPath(linkPath)) {
+        errors.push(`${itemLabel}.brief.${linkField} bevat een uitgesloten SEO-route: ${linkPath}.`);
+      }
     }
   }
   if (!Array.isArray(brief.visualConcepts) || brief.visualConcepts.length !== 2) {
@@ -232,6 +240,9 @@ function validateSeoMachineBacklog(backlog, options = {}) {
     seenPaths.add(item.path);
     if (!ALLOWED_STATUSES.has(item.status)) errors.push(`${itemLabel}.status is ongeldig: ${item.status}.`);
     if (!isPublicPath(item.path)) errors.push(`${itemLabel}.path is geen geldige publieke URL.`);
+    if (isSeoAutomationExcludedPath(item.path)) {
+      errors.push(`${itemLabel}.path valt buiten de SEO-automation: ${item.path}.`);
+    }
     if (existingPaths.has(item.path) && item.status !== 'shipped') {
       errors.push(`${itemLabel}.path bestaat al live of gepland: ${item.path}.`);
     }
@@ -243,6 +254,9 @@ function validateSeoMachineBacklog(backlog, options = {}) {
     }
     if (!isPublicPath(item.targetMoneyPage)) {
       errors.push(`${itemLabel}.targetMoneyPage is geen geldige publieke URL.`);
+    }
+    if (isSeoAutomationExcludedPath(item.targetMoneyPage)) {
+      errors.push(`${itemLabel}.targetMoneyPage valt buiten de SEO-automation: ${item.targetMoneyPage}.`);
     }
     validateEvidence(item, itemLabel, errors);
     validateOverlap(item, itemLabel, errors, existingPaths);

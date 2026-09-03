@@ -12,6 +12,10 @@ const {
   isBrandedQuery,
   rankSeoOpportunities,
 } = require('./seo-opportunity-scoring');
+const {
+  SEO_AUTOMATION_EXCLUDED_PATHS,
+  isSeoAutomationExcludedPath,
+} = require('../../server/services/seo-machine-route-policy');
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -447,9 +451,10 @@ function sortByNumberDesc(key) {
 
 function findLandingPageForQuery(query, pageQueryRows = []) {
   const normalizedQuery = normalizeString(query).toLowerCase();
-  const match = pageQueryRows
+  const matches = pageQueryRows
     .filter((row) => normalizeString(row.keys?.[1]).toLowerCase() === normalizedQuery)
-    .sort((a, b) => toFiniteNumber(b.impressions) - toFiniteNumber(a.impressions))[0];
+    .sort((a, b) => toFiniteNumber(b.impressions) - toFiniteNumber(a.impressions));
+  const match = matches.find((row) => !isSeoAutomationExcludedPath(row.keys?.[0])) || matches[0];
   return normalizeString(match?.keys?.[0]);
 }
 
@@ -501,16 +506,18 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     .filter((row) => !isBrandedQuery(rowKey(row, 0)))
     .filter((row) => row.ctr < toFiniteNumber(options.lowCtrThreshold, 0.025))
     .sort(sortByNumberDesc('impressions'))
-    .slice(0, 12)
-    .map((row) => compactOpportunity(row, 'low_ctr', pageQueryRows));
+    .map((row) => compactOpportunity(row, 'low_ctr', pageQueryRows))
+    .filter((item) => !isSeoAutomationExcludedPath(item.page))
+    .slice(0, 12);
 
   const strikingDistanceQueries = queryRows
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
     .filter((row) => row.position > 5 && row.position <= toFiniteNumber(options.maxStrikingDistancePosition, 20))
     .filter((row) => !isBrandedQuery(rowKey(row, 0)))
     .sort((a, b) => a.position - b.position || b.impressions - a.impressions)
-    .slice(0, 12)
-    .map((row) => compactOpportunity(row, 'striking_distance', pageQueryRows));
+    .map((row) => compactOpportunity(row, 'striking_distance', pageQueryRows))
+    .filter((item) => !isSeoAutomationExcludedPath(item.page))
+    .slice(0, 12);
 
   const emergingQueries = queryRows
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
@@ -519,8 +526,9 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     .filter((row) => !isBrandedQuery(rowKey(row, 0)))
     .filter((row) => getBusinessFit(rowKey(row, 0)) >= 4)
     .sort(sortByNumberDesc('impressions'))
-    .slice(0, 12)
-    .map((row) => compactOpportunity(row, 'emerging', pageQueryRows));
+    .map((row) => compactOpportunity(row, 'emerging', pageQueryRows))
+    .filter((item) => !isSeoAutomationExcludedPath(item.page))
+    .slice(0, 12);
 
   const prioritizedQueries = rankSeoOpportunities([
     ...lowCtrQueries,
@@ -532,14 +540,16 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     .filter((row) => row.previousClicks >= 3 || row.previousImpressions >= 50)
     .filter((row) => row.clicksDelta < 0 || row.impressionsDelta < -25)
     .sort((a, b) => a.clicksDelta - b.clicksDelta || a.impressionsDelta - b.impressionsDelta)
-    .slice(0, 10)
-    .map((row) => compactPage(row, 'declining_page'));
+    .map((row) => compactPage(row, 'declining_page'))
+    .filter((item) => !isSeoAutomationExcludedPath(item.page))
+    .slice(0, 10);
 
   const risingPages = pageRows
     .filter((row) => row.clicksDelta > 0 || row.impressionsDelta > 25)
     .sort((a, b) => b.clicksDelta - a.clicksDelta || b.impressionsDelta - a.impressionsDelta)
-    .slice(0, 10)
-    .map((row) => compactPage(row, 'rising_page'));
+    .map((row) => compactPage(row, 'rising_page'))
+    .filter((item) => !isSeoAutomationExcludedPath(item.page))
+    .slice(0, 10);
 
   const actionQueue = [];
   if (sitemapIssues.length > 0) {
@@ -587,6 +597,7 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     source: 'google-search-console',
     generatedAt,
     siteUrl: normalizeString(snapshot.siteUrl || DEFAULT_SITE_URL),
+    excludedAutomationPaths: [...SEO_AUTOMATION_EXCLUDED_PATHS],
     dateWindows: snapshot.dateWindows,
     totals: {
       current: currentTotals,
@@ -616,8 +627,11 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
       prioritized: prioritizedQueries,
     },
     pages: {
-      top: pageRows.sort(sortByNumberDesc('clicks')).slice(0, 20),
-      nonBranded: nonBrandedPages,
+      top: pageRows
+        .sort(sortByNumberDesc('clicks'))
+        .filter((row) => !isSeoAutomationExcludedPath(rowKey(row, 0)))
+        .slice(0, 20),
+      nonBranded: nonBrandedPages.filter((row) => !isSeoAutomationExcludedPath(row.page)),
       rising: risingPages,
       declining: decliningPages,
     },

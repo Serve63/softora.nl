@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { isSeoAutomationExcludedPath } = require('../server/services/seo-machine-route-policy');
 const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
 const RUN_LIFECYCLE_BLOCK = 'SEO_RUN_LIFECYCLE_STATE';
@@ -56,6 +57,10 @@ const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations'
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
   Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=6/ }),
+  Object.freeze({
+    label: 'excluded_seo_routes',
+    pattern: /SEO_AUTOMATION_EXCLUDED_PATHS=\/website,\/bedrijfssoftware,\/voicesoftware,\/chatbot/,
+  }),
   Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
   Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
   Object.freeze({ label: 'finish_run_receipt', pattern: /seo:automation-state -- finish-run/i }),
@@ -353,6 +358,9 @@ function validateRunGateReceipt(receipt, activeRun, label = 'gate') {
   if (receipt.gate === 'live_route') {
     if (!/^[a-f0-9]{7,40}$/i.test(String(receipt.liveCommit || ''))) errors.push(`${label}.liveCommit ontbreekt.`);
     if (!validSoftoraUrl(receipt.changedUrl)) errors.push(`${label}.changedUrl ontbreekt of is ongeldig.`);
+    if (isSeoAutomationExcludedPath(receipt.changedUrl)) {
+      errors.push(`${label}.changedUrl valt buiten de SEO-automation.`);
+    }
   }
   return errors;
 }
@@ -471,6 +479,9 @@ function validateRunReceipt(receipt, label = 'receipt') {
     && !/^[a-f0-9]{7,40}$/i.test(String(receipt.liveCommit))) errors.push(`${label}.liveCommit is ongeldig.`);
   if (receipt?.changedUrl !== null && receipt?.changedUrl !== undefined && !validSoftoraUrl(receipt.changedUrl)) {
     errors.push(`${label}.changedUrl moet een geldige Softora-URL zijn.`);
+  }
+  if (isSeoAutomationExcludedPath(receipt?.changedUrl)) {
+    errors.push(`${label}.changedUrl valt buiten de SEO-automation.`);
   }
   if (receipt?.outcome === 'published' && receipt?.publicEffect !== 'live') {
     errors.push(`${label} mag published alleen met publicEffect=live zijn.`);

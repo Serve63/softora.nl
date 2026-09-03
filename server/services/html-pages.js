@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { applyPublicSeoHeadDefaults } = require('./public-seo');
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const LOCAL_FONT_VERSION = '20260409a';
 const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
@@ -96,6 +97,32 @@ html,body{min-height:100vh;}
 </style>`,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
+
+function applySeoAutomationExcludedRouteDirectives(htmlRaw) {
+  let html = String(htmlRaw || '');
+  if (!html) return html;
+
+  const robotsTag = '<meta name="robots" content="noindex, nofollow">';
+  let foundRobotsTag = false;
+  html = html.replace(/<meta\b[^>]*>/gi, (tag) => {
+    if (!/\bname\s*=\s*["']robots["']/i.test(tag)) return tag;
+    if (foundRobotsTag) return '';
+    foundRobotsTag = true;
+    return robotsTag;
+  });
+  if (!foundRobotsTag) {
+    html = /<\/head>/i.test(html)
+      ? html.replace(/<\/head>/i, `    ${robotsTag}\n</head>`)
+      : `${robotsTag}\n${html}`;
+  }
+
+  html = html.replace(/\s*<link\b[^>]*rel\s*=\s*["']canonical["'][^>]*>\s*/gi, '\n');
+  html = html.replace(
+    /\s*<script\b[^>]*data-softora-public-seo\s*=\s*["']structured-data["'][^>]*>[\s\S]*?<\/script>\s*/gi,
+    '\n'
+  );
+  return html;
+}
 const PASSWORD_REGISTER_CSP = [
   "default-src 'none'",
   "base-uri 'none'",
@@ -778,6 +805,12 @@ function createHtmlPageCoordinator(options = {}) {
   async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
     const requestedFileName = sanitizeKnownHtmlFileName(fileNameRaw);
     if (!requestedFileName) return next();
+    const seoAutomationExcludedRoute = isSeoAutomationExcludedPath(
+      req?.path || req?.originalUrl || req?.url
+    );
+    if (seoAutomationExcludedRoute) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
 
     const premiumPageAccess = await resolvePremiumHtmlPageAccess(req, res, requestedFileName);
     if (premiumPageAccess.handled) return undefined;
@@ -792,7 +825,8 @@ function createHtmlPageCoordinator(options = {}) {
     try {
       const html = await readHtmlPageContent(fileName);
       if (!html) return next();
-      const shouldApplySeoOverrides = !isLoginPage && !isProtectedPremiumPage;
+      const shouldApplySeoOverrides =
+        !isLoginPage && !isProtectedPremiumPage && !seoAutomationExcludedRoute;
       const config = shouldApplySeoOverrides
         ? await resolveWithSoftTimeout(() => getSeoConfigCached(false, {
             suppressReadFailureCooldown: true,
@@ -838,7 +872,9 @@ function createHtmlPageCoordinator(options = {}) {
       }
       const isSidebarContentFrame = isPremiumSidebarContentFrameRequest(req);
       if (!isLoginPage && !isProtectedPremiumPage) {
-        rendered = applyPublicSeoHeadDefaults(rendered, fileName);
+        rendered = seoAutomationExcludedRoute
+          ? applySeoAutomationExcludedRouteDirectives(rendered)
+          : applyPublicSeoHeadDefaults(rendered, fileName);
       }
       rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null, {
         isSidebarContentFrame,

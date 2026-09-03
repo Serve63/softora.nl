@@ -11,6 +11,7 @@ const {
   buildPublicSeoSitemapXml,
   getIndexablePublicHtmlFileFromPath,
   getIndexablePublicPathFromHtmlFile,
+  getIndexablePublicSeoPageByPath,
   getIndexablePublicSeoPages,
   getLegacyPublicSeoRedirectTargetPath,
   getPublicSeoInternalLinks,
@@ -127,6 +128,10 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/pakketten<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
+  for (const excludedPath of ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot']) {
+    assert.equal(getIndexablePublicSeoPageByPath(excludedPath), null);
+    assert.doesNotMatch(sitemap, new RegExp(`<loc>https://www\\.softora\\.nl${excludedPath}</loc>`));
+  }
   assert.match(
     sitemap,
     /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>\s*<lastmod>2026-08-06<\/lastmod>/
