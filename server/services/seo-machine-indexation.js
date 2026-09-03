@@ -1,6 +1,7 @@
 const DEFAULT_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_SITE_URL = 'sc-domain:softora.nl';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 
 const DEFAULT_PRIORITY_PATHS = Object.freeze([
   '/website-laten-maken',
@@ -99,7 +100,7 @@ function selectInspectionTargets({ publicationPlan = [], priorityPaths = DEFAULT
   const targets = new Map();
   for (const path of priorityPaths) {
     const normalizedPath = normalizePath(path);
-    if (normalizedPath) {
+    if (normalizedPath && !isSeoAutomationExcludedPath(normalizedPath)) {
       targets.set(normalizedPath, {
         path: normalizedPath,
         url: `${origin}${normalizedPath}`,
@@ -114,7 +115,7 @@ function selectInspectionTargets({ publicationPlan = [], priorityPaths = DEFAULT
     const ageDays = ageInDays(item.publishedAt, now);
     if (ageDays === null || ageDays > days) continue;
     const path = normalizePath(item.path);
-    if (!path) continue;
+    if (!path || isSeoAutomationExcludedPath(path)) continue;
     targets.set(path, {
       path,
       url: `${origin}${path}`,

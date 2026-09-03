@@ -79,19 +79,19 @@ function createFixture(overrides = {}) {
       isProtectedPremiumPage: false,
       authState: null,
     })),
-    getSeoConfigCached: async () => ({
+    getSeoConfigCached: overrides.getSeoConfigCached || (async () => ({
       pages: {
         'premium-website.html': {
           title: 'Softora | SEO Test',
         },
       },
-    }),
-    applySeoOverridesToHtml: (fileName, html, config) => {
+    })),
+    applySeoOverridesToHtml: overrides.applySeoOverridesToHtml || ((fileName, html, config) => {
       if (fileName === 'premium-website.html' && config.pages[fileName]?.title) {
         return String(html || '').replace(/<title>.*?<\/title>/i, `<title>${config.pages[fileName].title}</title>`);
       }
       return String(html || '');
-    },
+    }),
     getPageBootstrapData: overrides.getPageBootstrapData || (async (_req, fileName) => {
       if (fileName !== 'premium-personeel-agenda.html') return null;
       return {
@@ -221,6 +221,44 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.match(res.body, /href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a"/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com/);
   assert.doesNotMatch(res.body, /fonts\.gstatic\.com/);
+});
+
+test('html page coordinator keeps excluded short routes outside all SEO enrichment', async () => {
+  let configReads = 0;
+  let overrideCalls = 0;
+  const { coordinator, pagesDir } = createFixture({
+    getSeoConfigCached: async () => {
+      configReads += 1;
+      return {};
+    },
+    applySeoOverridesToHtml: (_fileName, html) => {
+      overrideCalls += 1;
+      return `${html}<p>SEO override</p>`;
+    },
+  });
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-websites.html'),
+    [
+      '<!DOCTYPE html><html><head>',
+      '<title>Website</title>',
+      '<meta name="robots" content="index, follow">',
+      '<link rel="canonical" href="https://www.softora.nl/website-laten-maken">',
+      '<script type="application/ld+json" data-softora-public-seo="structured-data">{}</script>',
+      '</head><body>Website</body></html>',
+    ].join('')
+  );
+
+  const req = { originalUrl: '/website', path: '/website' };
+  const res = createResponseRecorder();
+  await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {}, 'premium-websites.html');
+
+  assert.equal(configReads, 0);
+  assert.equal(overrideCalls, 0);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['X-Robots-Tag'], 'noindex, nofollow');
+  assert.match(res.body, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(res.body, /rel="canonical"/);
+  assert.doesNotMatch(res.body, /application\/ld\+json|SEO override|data-softora-public-seo="conversion-cta"/);
 });
 
 test('html page coordinator serves the Winnen code gate at the same URL without dashboard markup', async () => {

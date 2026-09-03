@@ -34,6 +34,12 @@ De automation blijft na het halen of verstrijken van die datum actief totdat Ser
 - Iedere heartbeat voert eerst `audit` uit. Als daar nog een actieve invocation uit een eerdere heartbeat staat, sluit `recover-run` die expliciet als `interrupted` en `unverified` met controleerbaar herstelbewijs; pas daarna mag de nieuwe heartbeat `start-run` uitvoeren. `start-run` faalt dicht met `ACTIVE_RUN_REQUIRES_RECOVERY` en sluit nooit zelf een eerdere invocation. Iedere nieuwe invocation sluit vóór het eindrapport met `finish-run`.
 - Een bewezen ontbrekende connector-toolset in de actieve task mag tussen twee runs via `repair-thread-binding` naar exact één setup-only vervangtask worden hersteld. De bestaande automation-id, planning, ACTIVE-status, batch en teller blijven behouden; dit is geen normale vroege rotatie en maakt geen tweede automation.
 
+### Permanent uitgesloten routes
+
+De exacte routes `/website`, `/bedrijfssoftware`, `/voicesoftware` en `/chatbot` vallen volledig buiten de SEO-automation. De machine mag deze routes nooit selecteren, aanmaken, wijzigen, refreshen, vergelijken, inspecteren, voor indexering aanvragen, in de backlog of publieke SEO-inventory opnemen, als money-page target gebruiken, of als bron/doel voor interne links, metadata, schema, CRO en ondersteunende acties inzetten. Propertybrede GSC-totalen blijven volledig, maar geen routegerichte kans, aanbeveling of actie mag een van deze vier paden bevatten.
+
+Gebruik waar inhoudelijk passend uitsluitend de actieve alternatieven `/website-laten-maken`, `/bedrijfssoftware-op-maat`, `/voicesoftware-op-maat` en `/chatbot-laten-maken`. De centrale uitsluitingslijst in `server/services/seo-machine-route-policy.js` is bindend voor rapportage, selectie, backlog, indexatie en sitemap/inventory; een afwijking is een blokkerende kwaliteitsfout.
+
 ### Wekelijks
 
 - Draai de brede publieke link-, metadata-, visual- en CTA-controles.

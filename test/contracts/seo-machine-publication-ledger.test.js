@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  buildPublicationCandidates,
   buildWindowSummary,
   collectLivePublicationLedger,
   evaluateCadence,
@@ -83,6 +84,19 @@ test('publication helpers normalize canonical and UTC rolling windows', () => {
   );
   assert.equal(isPublicationInWindow('2026-07-11', new Date('2026-07-17T20:00:00Z'), 7), true);
   assert.equal(isPublicationInWindow('2026-07-10', new Date('2026-07-17T20:00:00Z'), 7), false);
+});
+
+test('publication candidates ignore permanently excluded product routes', () => {
+  const candidates = buildPublicationCandidates({
+    publicationPlan: [
+      { path: '/website', status: 'live', publishedAt: '2026-07-17' },
+      { path: '/blog/good', status: 'live', publishedAt: '2026-07-17' },
+    ],
+    now: new Date('2026-07-17T20:00:00Z'),
+    maximumDays: 7,
+  });
+
+  assert.deepEqual(candidates.map((item) => item.path), ['/blog/good']);
 });
 
 test('public SEO refreshes have an explicit machine-readable event plan', () => {

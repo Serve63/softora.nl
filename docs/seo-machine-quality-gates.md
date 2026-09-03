@@ -9,6 +9,7 @@ Deze poorten voorkomen dat productiesnelheid wordt verward met organische groei.
 - Sitemapcontrole bewaart `lastSubmitted`, `lastDownloaded`, errors, warnings en ingediende aantallen.
 - Een publicatie kan afzonderlijk `live`, `discovered`, `indexed`, `impressing`, `clicking` en `converting` zijn.
 - Alleen een live 200-HTML-route op de actuele productiecommit met self-canonical, indexeerbaarheid, sitemapvermelding en correcte publicatiedatum telt als live publicatie.
+- `/website`, `/bedrijfssoftware`, `/voicesoftware` en `/chatbot` zijn permanent uitgesloten van alle routegerichte SEO-rapportage en -acties. Zij mogen niet worden geselecteerd, aangemaakt, gewijzigd, vergeleken, geïnspecteerd, gelinkt, als target gebruikt of in backlog, sitemap en SEO-inventory worden opgenomen; de actieve alternatieven zijn `/website-laten-maken`, `/bedrijfssoftware-op-maat`, `/voicesoftware-op-maat` en `/chatbot-laten-maken`.
 
 ## Machine-Toestanden
 

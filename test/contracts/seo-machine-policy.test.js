@@ -72,6 +72,22 @@ test('SEO machine quality gates keep daily publishing claim-safe and visual-comp
   assert.match(qualityGates, /Doe geen backlink-outreach/i);
 });
 
+test('SEO machine permanently excludes the four short product routes', () => {
+  const policy = readRepoFile('docs/growth/seo-machine-policy.md');
+  const qualityGates = readRepoFile('docs/seo-machine-quality-gates.md');
+
+  for (const excludedPath of ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot']) {
+    assert.equal(policy.includes(`\`${excludedPath}\``), true);
+    assert.equal(qualityGates.includes(`\`${excludedPath}\``), true);
+  }
+  assert.match(policy, /nooit selecteren, aanmaken, wijzigen, refreshen, vergelijken, inspecteren/i);
+  assert.match(policy, /Propertybrede GSC-totalen blijven volledig/i);
+  assert.match(
+    policy,
+    /`\/website-laten-maken`[\s\S]*`\/bedrijfssoftware-op-maat`[\s\S]*`\/voicesoftware-op-maat`[\s\S]*`\/chatbot-laten-maken`/i
+  );
+});
+
 test('SEO machine keeps Ubersuggest advisory and requires natural keyword evidence', () => {
   const policy = readRepoFile('docs/growth/seo-machine-policy.md');
   const qualityGates = readRepoFile('docs/seo-machine-quality-gates.md');

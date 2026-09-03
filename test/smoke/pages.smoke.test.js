@@ -99,9 +99,11 @@ test('page smoke: /bedrijfssoftware is de publieke noindex overtuigingspagina', 
   const sitemap = await sitemapResponse.text();
 
   assert.equal(pageResponse.status, 200);
+  assert.equal(pageResponse.headers.get('x-robots-tag'), 'noindex, nofollow');
   assert.match(html, /Bedrijfssoftware op maat die <em>voor je werkt\.<\/em>/);
-  assert.match(html, /<meta name="robots" content="noindex, follow">/);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
+  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(html, /rel="canonical"/);
+  assert.doesNotMatch(html, /data-softora-structured-data/);
   assert.doesNotMatch(sitemap, /<loc>[^<]+\/bedrijfssoftware<\/loc>/);
   assert.match(sitemap, /<loc>[^<]+\/bedrijfssoftware-op-maat<\/loc>/);
 });

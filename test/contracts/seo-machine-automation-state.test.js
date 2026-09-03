@@ -65,6 +65,7 @@ function createGitRepository() {
 function validAutomationPrompt() {
   return [
     'SEO_MACHINE_PROMPT_VERSION=6',
+    'SEO_AUTOMATION_EXCLUDED_PATHS=/website,/bedrijfssoftware,/voicesoftware,/chatbot',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
     'Recover explicitly with npm run seo:automation-state -- recover-run.',
@@ -365,6 +366,17 @@ test('finish-run binds the selected path to the exact live route', () => {
     liveCommit: 'abcdef1234567890',
     changedUrl: 'https://www.softora.nl/blog/live-b',
   }), /PUBLISHED_GATES_INCOMPLETE.*selectedPath.*live route/i);
+});
+
+test('run-gate receipts can never record an excluded product route', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  assert.throws(() => recordPublishedGates(memoryPath, {
+    invocationAt,
+    selectedPath: '/website',
+    changedUrl: 'https://www.softora.nl/website',
+  }), /gate\.changedUrl valt buiten de SEO-automation/i);
 });
 
 test('finish-run rejects an invalid selected action type even with green route evidence', () => {
