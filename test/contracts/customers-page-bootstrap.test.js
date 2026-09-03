@@ -95,6 +95,36 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^2<script>/);
 });
 
+test('dashboard bootstrap toont actuele maandinkomsten en geen opgeteld jaaronderhoud', () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-09-03T12:00:00.000Z'),
+  });
+  const replacements = service.buildDashboardHtmlReplacements({
+    ok: true,
+    source: 'dashboard-customers',
+    customers: [
+      {
+        id: 'onderhoud-januari',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        datum: '2026-01-10',
+        onderhoudPerMaand: 49,
+      },
+      {
+        id: 'onderhoud-maart',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        datum: '2026-03-20',
+        onderhoudPerMaand: 79,
+      },
+    ],
+  });
+
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac994');
+  assert.equal(replacements.SOFTORA_DASHBOARD_MAINTENANCE_REVENUE, '\u20ac994');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '\u20ac128');
+});
+
 test('customers page bootstrap can defer heavy customer rows for the premium database page', async () => {
   const seenScopes = [];
   const service = createCustomersPageBootstrapService({

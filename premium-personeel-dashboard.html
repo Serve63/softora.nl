@@ -3057,7 +3057,7 @@
 
             const revenueYearEl = document.getElementById('kpiRevenueYear');
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(selectedRevenue.total);
-            const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
+            const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(revenueBreakdown.month.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
             if (totalClientsEl) totalClientsEl.textContent = String(customers.length);
             if (premiumDashboardState.ordersHydrated) updateKpiActiveOrdersDisplay(activeOrders);

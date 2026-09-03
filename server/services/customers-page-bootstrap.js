@@ -632,17 +632,20 @@ function createCustomersPageBootstrapService(deps = {}) {
         const maintenanceAmount = Math.max(0, Number(customer.onderhoudPerMaand) || 0);
         const maintenanceMonths = maintenanceAmount > 0 ? countInclusiveMonths(paidAt, nowDate) : 0;
         const maintenanceRevenue = maintenanceAmount * maintenanceMonths;
+        const monthlyRecurringRevenue = maintenanceMonths > 0 ? maintenanceAmount : 0;
 
         return {
           totalCustomers: summary.totalCustomers,
           totalRevenue: summary.totalRevenue + websiteAmount + maintenanceRevenue,
           maintenanceRevenue: summary.maintenanceRevenue + maintenanceRevenue,
+          monthlyRecurringRevenue: summary.monthlyRecurringRevenue + monthlyRecurringRevenue,
         };
       },
       {
         totalCustomers: normalizedCustomers.length,
         totalRevenue: 0,
         maintenanceRevenue: 0,
+        monthlyRecurringRevenue: 0,
       }
     );
   }
@@ -738,12 +741,13 @@ function createCustomersPageBootstrapService(deps = {}) {
       };
     }
 
-    const summary = buildDashboardMetricSummary(payload.customers);
+    const dashboardNow = now();
+    const summary = buildDashboardMetricSummary(payload.customers, dashboardNow);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
-      SOFTORA_DASHBOARD_RECURRING_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
-      SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers),
+      SOFTORA_DASHBOARD_RECURRING_REVENUE: formatDashboardMoney(summary.monthlyRecurringRevenue),
+      SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers, dashboardNow),
       SOFTORA_DASHBOARD_TOTAL_CLIENTS:
         String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown),
     };
