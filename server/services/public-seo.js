@@ -56,6 +56,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'premium-websites.html',
     path: '/website-laten-maken',
+    alternatePaths: ['/website'],
     legacyPaths: ['/premium-websites'],
     title: 'Website laten maken voor meer aanvragen',
     description:
@@ -85,6 +86,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
+    alternatePaths: ['/bedrijfssoftware'],
     legacyPaths: ['/premium-bedrijfssoftware'],
     title: 'Bedrijfssoftware laten maken: aanpak voor MKB',
     description:
@@ -191,6 +193,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'premium-voicesoftware.html',
     path: '/voicesoftware-op-maat',
+    alternatePaths: ['/voicesoftware'],
     legacyPaths: ['/premium-voicesoftware'],
     title: 'AI telefonie en voicesoftware op maat',
     description:
@@ -208,6 +211,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'premium-chatbot.html',
     path: '/chatbot-laten-maken',
+    alternatePaths: ['/chatbot'],
     legacyPaths: ['/premium-chatbot'],
     title: 'Chatbot laten maken voor leads en support',
     description:
@@ -300,13 +304,17 @@ const INDEXABLE_PAGE_BY_FILE = new Map(
     Object.freeze({
       ...entry,
       path: normalizePublicPath(entry.path),
+      alternatePaths: Object.freeze((entry.alternatePaths || []).map(normalizePublicPath).filter(Boolean)),
       legacyPaths: Object.freeze((entry.legacyPaths || []).map(normalizePublicPath).filter(Boolean)),
     }),
   ])
 );
 
 const INDEXABLE_PAGE_BY_PATH = new Map(
-  Array.from(INDEXABLE_PAGE_BY_FILE.values()).map((entry) => [entry.path, entry])
+  Array.from(INDEXABLE_PAGE_BY_FILE.values()).flatMap((entry) => [
+    [entry.path, entry],
+    ...entry.alternatePaths.map((alternatePath) => [alternatePath, entry]),
+  ])
 );
 
 const LEGACY_PUBLIC_PATH_TO_PAGE = new Map(

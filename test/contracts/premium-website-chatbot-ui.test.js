@@ -13,7 +13,7 @@ test('homepage chatbotkaart opent de verdiepende chatbotpagina', () => {
 
   assert.match(
     source,
-    /<a class="tilt-card fade-up"[^>]*href="\/chatbot-laten-maken"[^>]*>[\s\S]*?<h3>Chatbot<\/h3>/
+    /<a class="tilt-card fade-up"[^>]*href="\/chatbot"[^>]*>[\s\S]*?<h3>Chatbot<\/h3>/
   );
   assert.doesNotMatch(source, /class="tilt-card fade-up chatbot-trigger"/);
   assert.match(script, /document\.body\.insertAdjacentHTML\(/);
