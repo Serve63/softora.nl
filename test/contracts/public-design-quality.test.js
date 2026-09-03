@@ -231,12 +231,12 @@ test('legacy public hero line breaks keep readable text spacing', () => {
 test('public service heroes use route-relevant realistic assets', () => {
   const bedrijfssoftware = readFile('premium-bedrijfssoftware.html');
   const voicesoftware = readFile('premium-voicesoftware.html');
-  const bedrijfssoftwareHero = /<section class="hero">[\s\S]*?<img src="([^"]+)"[^>]*alt="Bedrijfsproces en maatwerksoftware in beeld"/;
+  const bedrijfssoftwareHero = /\.hero::before\s*\{[\s\S]*?background:\s*url\('([^']+)'\)[^;]*;/;
   const voicesoftwareHero = /\.hero::before\s*\{[\s\S]*?background:\s*url\('([^']+)'\)[^;]*;/;
 
   assert.match(
     bedrijfssoftware,
-    /<section class="hero">[\s\S]*?<img src="\/assets\/softora-crm-workflow\.jpg"[^>]*alt="Bedrijfsproces en maatwerksoftware in beeld"/,
+    /\.hero::before\s*\{[\s\S]*?background:\s*url\('\/assets\/softora-crm-workflow\.jpg'\)[^;]*;/,
     'Bedrijfssoftware hero moet een concrete CRM/workflow-foto gebruiken in plaats van een generiek dashboard'
   );
   assert.match(

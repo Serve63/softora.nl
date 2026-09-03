@@ -211,6 +211,23 @@ test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoploss
   assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/bedrijfssoftware#breadcrumb');
 });
 
+test('bedrijfssoftware SEO-pagina behoudt de uitgebreide buyer-intent inhoud', () => {
+  const source = readPage('premium-bedrijfssoftware.html');
+
+  assert.match(source, /<meta name="robots" content="index, follow">/);
+  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
+  assert.match(source, /Bedrijfssoftware <em>op maat<\/em><\/span> <br>laten maken/);
+  assert.match(source, /Welke bedrijfssoftware heb je nodig\?/);
+  assert.match(source, /CRM systeem op maat/);
+  assert.match(source, /Dashboard laten ontwikkelen/);
+  assert.match(source, /Klantportaal laten maken/);
+  assert.match(source, /Automatisch offerte systeem/);
+  assert.match(source, /Eerst scherpe scope, daarna pas bouwen/);
+  assert.match(source, /Wanneer bedrijfssoftware laten maken slim wordt/);
+  assert.match(source, /Veelgestelde vragen over bedrijfssoftware/);
+  assert.ok(countVisibleWords(source) >= 950, 'Bedrijfssoftware SEO-pagina mist buyer-intent diepte.');
+});
+
 test('crm money page is focused on pipeline, customers and AI follow-up', () => {
   const source = readPage('crm-systeem-op-maat.html');
   const entry = getRegistryEntry('crm-systeem-op-maat.html');
