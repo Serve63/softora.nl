@@ -76,6 +76,7 @@
     { id: 'honderd-dagen-streak', title: '100 dagen streak', imageId: 'dertig-dagen-streak' },
     { id: 'driehonderdvijfenzestig-dagen-streak', title: '365 dagen streak', imageId: 'dertig-dagen-streak' },
     { id: 'loondienst', title: 'Loondienst', imageId: 'bestaanszekerheid-bedrijf' },
+    { id: 'de-driehoek-aanspreken', title: 'De Driehoek aanspreken' },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
     { id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' },
     { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
