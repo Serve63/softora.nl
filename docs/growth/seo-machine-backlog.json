@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-09-03",
+  "updatedAt": "2026-09-04",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -928,7 +928,9 @@
     },
     {
       "id": "chatbot-acceptance-023",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-09-04",
+      "shippedPath": "/kennisbank/chatbot-acceptatietest-opstellen",
       "path": "/kennisbank/chatbot-acceptatietest-opstellen",
       "contentType": "kennisbank",
       "cluster": "ai-contact",
@@ -1013,7 +1015,7 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Valideer actuele vraagvarianten en bouw een systeemneutrale acceptatiematrix met bronbewijs, gedragsgrens, integratie-uitkomst en menselijke eigenaar."
+      "nextAction": "Wacht op indexatie en beoordeel op 2026-09-18, 2026-10-02 en 2026-10-30 de niet-branded ontdekking, klikontwikkeling en route naar /chatbot-laten-maken."
     },
     {
       "id": "chatbot-implementation-010",
@@ -2771,6 +2773,94 @@
         ]
       },
       "nextAction": "Herbevestig Nederlandse beheervragen en directe leveranciersbronnen; werk daarna een wijzigingsdossier uit zonder bereikbaarheid, modelbenchmark of compliance als volledige acceptatie te behandelen."
+    },
+    {
+      "id": "chatbot-knowledge-governance-033",
+      "status": "ready",
+      "path": "/kennisbank/chatbot-kennisbronnen-beheren",
+      "contentType": "kennisbank",
+      "cluster": "ai-contact",
+      "primaryQuery": "chatbot kennisbronnen beheren",
+      "intent": "Bronnen, eigenaarschap, actualiteit en antwoordbewijs van een zakelijke chatbot beheersbaar houden",
+      "intentClass": "risk",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/chatbot-laten-maken",
+      "clusterRole": "Bronbeheer na livegang, tussen chatbotacceptatie, dagelijks inhoudseigenaarschap en gecontroleerde herpublicatie",
+      "demandEvidence": [
+        {
+          "type": "buyer-task-and-cluster-gap",
+          "source": "Softora chatbot-contentinventaris na implementatie-, CRM-, overdracht- en acceptatieroutes",
+          "observedAt": "2026-09-04",
+          "detail": "Softora dekt selectie, implementatie, gekoppelde opvolging, menselijke overdracht en acceptatie vóór livegang, maar nog niet hoe een MKB-eigenaar goedgekeurde kennisbronnen inventariseert, actualiteit bewaakt, conflicten oplost en antwoorden na een bronwijziging opnieuw bewijst."
+        },
+        {
+          "type": "direct-source-pattern",
+          "source": "Microsoft Learn over knowledge sources en Google Cloud Dialogflow over knowledge-document refresh",
+          "observedAt": "2026-09-04",
+          "detail": "Actuele leveranciersdocumentatie maakt zichtbaar dat antwoorden op geconfigureerde bronnen worden gegrond en dat broninhoud of configuratie niet in iedere route vanzelf actueel wordt. Dat ondersteunt een eigen buyer task rond broneigenaar, wijzigingssignaal, conflictregel, hertest en bewijs."
+        }
+      ],
+      "competitorPatterns": [
+        "Bronnen technisch koppelen zonder eigenaar, goedkeuringsstatus, vervaldatum of conflictroute vast te leggen",
+        "Aannemen dat een gewijzigd document automatisch en direct in ieder chatbotantwoord is verwerkt",
+        "Een algemene nauwkeurigheidsscore tonen zonder herleidbaar bronbewijs en representatieve hertest"
+      ],
+      "overlap": {
+        "checkedAt": "2026-09-04",
+        "closestPaths": [
+          "/kennisbank/chatbot-acceptatietest-opstellen",
+          "/kennisbank/wat-is-chatbot-overdracht",
+          "/blog/chatbot-crm-koppeling-leads-opvolgen"
+        ],
+        "decision": "distinct",
+        "rationale": "De acceptatiegids beslist vóór livegang, de overdrachtspagina begrenst menselijke escalatie en de CRM-gids bewijst een opvolgketen. Deze kandidaat bezit uitsluitend de levenscyclus van goedgekeurde kennisbronnen: inventarisatie, eigenaarschap, actualiteit, bronconflict, herpublicatie en antwoordhertest."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "Chatbot kennisbronnen beheren na livegang",
+        "metaDescription": "Beheer chatbotbronnen met eigenaarschap, actualiteitsregels, conflictbesluiten, antwoordbewijs en een controleerbare hertest na iedere relevante wijziging.",
+        "h1": "Hoe beheer je kennisbronnen van een chatbot?",
+        "outline": [
+          "Maak een register van toegestane bronnen, onderwerpen, eigenaar en vervaldatum",
+          "Bepaal welke bron voorgaat bij conflicten en wanneer de chatbot moet stoppen",
+          "Koppel iedere inhoudswijziging aan impact, herpublicatie en een vaste antwoordtest",
+          "Bewijs in een steekproef welke bron en versie een antwoord ondersteunen",
+          "Laat een menselijke eigenaar afwijkingen besluiten en verouderde kennis intrekken"
+        ],
+        "buyerQuestions": [
+          "Wie is verantwoordelijk voor de kennis van een zakelijke chatbot?",
+          "Hoe voorkom je dat een chatbot verouderde informatie gebruikt?",
+          "Welke antwoorden moet je opnieuw testen nadat een bron verandert?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/chatbot-acceptatietest-opstellen",
+          "/blog/chatbot-crm-koppeling-leads-opvolgen"
+        ],
+        "outgoingLinks": [
+          "/chatbot-laten-maken",
+          "/kennisbank/wat-is-chatbot-overdracht"
+        ],
+        "conversionPath": "Van een controleerbaar bronregister naar een gesprek over een afgebakende chatbot met eigenaarschap, antwoordbewijs en herstelroute.",
+        "claimRisk": "Geen volledige actualiteit, foutloze antwoorden, automatische bronverwerking of compliance beloven; onderscheid configuratie, broninhoud, verwerkingstijd en menselijke acceptatie.",
+        "visualConcepts": [
+          "Bronregister met eigenaar, status, versie, vervaldatum en beslisregel rond één chatbotantwoord",
+          "Wijzigingsroute van bronsignaal via impact en hertest naar menselijke herpublicatie of intrekking"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig Nederlandse beheervragen en directe leveranciersdocumentatie; werk daarna een systeemneutraal bronregister uit zonder automatische actualiteit of foutloos antwoordgedrag te claimen."
     }
   ]
 }

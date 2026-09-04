@@ -22,6 +22,7 @@ const { WEBSITE_BRIEFING_CONTENT_ITEM } = require('./seo-content-website-briefin
 const { WEBSITE_MAINTENANCE_CONTENT_ITEM } = require('./seo-content-website-maintenance');
 const { AI_AUTOMATISERING_KOSTEN_CONTENT_ITEM } = require('./seo-content-ai-automatisering-kosten');
 const { AI_AUTOMATISERING_OFFERTE_CONTENT_ITEM } = require('./seo-content-ai-automatisering-offerte');
+const { CHATBOT_ACCEPTATIE_CONTENT_ITEM } = require('./seo-content-chatbot-acceptatie');
 
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
@@ -48,6 +49,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   WEBSITE_MAINTENANCE_CONTENT_ITEM,
   AI_AUTOMATISERING_KOSTEN_CONTENT_ITEM,
   AI_AUTOMATISERING_OFFERTE_CONTENT_ITEM,
+  CHATBOT_ACCEPTATIE_CONTENT_ITEM,
 ]);
 
 module.exports = {
