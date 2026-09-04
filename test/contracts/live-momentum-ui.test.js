@@ -53,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260903a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-day-hold\.js\?v=20260825a" defer><\/script>/);
@@ -587,6 +587,10 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(videoJs, /source: '\/assets\/momentum-attack-mode\.mp4\?v=20260722a'/);
   assert.match(videoJs, /source: 'https:\/\/www\.youtube-nocookie\.com\/embed\/Lo-lVbf6XxI\?start=12&autoplay=1&playsinline=1&rel=0'/);
   assert.match(videoJs, /source: 'https:\/\/www\.youtube-nocookie\.com\/embed\/LxXLfZYldIM\?start=18&autoplay=1&playsinline=1&rel=0'/);
+  assert.match(videoJs, /title: '15-8-2026',[\s\S]*source: '\/assets\/momentum-15-8-2026\.mp4\?v=20260904a'/);
+  const datedMomentumVideo = path.join(repoRoot, 'assets/momentum-15-8-2026.mp4');
+  assert.equal(fs.existsSync(datedMomentumVideo), true);
+  assert.ok(fs.statSync(datedMomentumVideo).size > 4_000_000);
   assert.match(videoJs, /video\.controls = false/);
   assert.match(videoJs, /video\.autoplay = true/);
   assert.match(videoJs, /document\.createElement\('iframe'\)/);

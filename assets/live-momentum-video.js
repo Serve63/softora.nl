@@ -14,6 +14,11 @@
       title: 'THE HUNGER IS THE MOST DIFFICULT',
       type: 'youtube',
       source: 'https://www.youtube-nocookie.com/embed/LxXLfZYldIM?start=18&autoplay=1&playsinline=1&rel=0'
+    },
+    {
+      title: '15-8-2026',
+      type: 'local',
+      source: '/assets/momentum-15-8-2026.mp4?v=20260904a'
     }
   ];
   const trigger = document.querySelector('.momentum-video-trigger');
