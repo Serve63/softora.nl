@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="/assets/live-momentum-endgame-checkpoint.css?v=20260804a">
   <link rel="stylesheet" href="/assets/live-momentum-endgame-subtitle.css?v=20260809a">
   <link rel="stylesheet" href="/assets/live-momentum-endgame-vakantieradar.css?v=20260810a">
-  <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260728a">
+  <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260904a">
   <link rel="stylesheet" href="/assets/live-momentum-history.css?v=20260814b">
   <link rel="stylesheet" href="/assets/live-momentum-mobile.css?v=20260901a">
   <link rel="stylesheet" href="/assets/live-momentum-day-hold.css?v=20260825a">
@@ -160,7 +160,15 @@
           </svg>
         </button>
       </header>
-      <div class="momentum-video-stage" data-momentum-video-player></div>
+      <div class="momentum-video-stage">
+        <div class="momentum-video-player" data-momentum-video-player></div>
+        <button class="momentum-video-nav momentum-video-nav--previous" type="button" data-momentum-video-previous aria-label="Vorige motivatievideo">
+          <span aria-hidden="true">‹</span>
+        </button>
+        <button class="momentum-video-nav momentum-video-nav--next" type="button" data-momentum-video-next aria-label="Volgende motivatievideo">
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
     </div>
   </dialog>
   <dialog class="momentum-history-dialog" id="momentum-history-dialog" aria-labelledby="momentum-history-title">
@@ -189,7 +197,7 @@
   <script src="/assets/live-momentum-goal-actions.js?v=20260716a" defer></script>
   <script src="/assets/live-momentum-endgame-interactions.js?v=20260831a" defer></script>
   <script src="/assets/live-momentum-endgame-cards.js?v=20260903a" defer></script>
-  <script src="/assets/live-momentum-video.js?v=20260722a" defer></script>
+  <script src="/assets/live-momentum-video.js?v=20260904a" defer></script>
   <script src="/assets/live-momentum-calendar.js?v=20260717a" defer></script>
   <script src="/assets/live-momentum-history.js?v=20260825a" defer></script>
   <script src="/assets/live-momentum-history-ui.js?v=20260814b" defer></script>
