@@ -26,7 +26,8 @@
   transform: translateY(-2px);
 }
 .momentum-video-trigger:focus-visible,
-.momentum-video-close:focus-visible {
+.momentum-video-close:focus-visible,
+.momentum-video-nav:focus-visible {
   outline: 3px solid rgba(46, 204, 113, .32);
   outline-offset: 3px;
 }
@@ -83,6 +84,7 @@
 }
 .momentum-video-header h2 {
   margin: 0;
+  max-width: 290px;
   font-family: var(--font-display);
   font-size: 1.32rem;
   font-weight: 700;
@@ -123,7 +125,13 @@
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .72);
   overflow: hidden;
 }
-.momentum-video-stage video {
+.momentum-video-player {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+.momentum-video-stage video,
+.momentum-video-stage iframe {
   position: absolute;
   z-index: 1;
   inset: 0;
@@ -131,8 +139,52 @@
   width: 100%;
   height: 100%;
   border: 0;
+  background: #030405;
+}
+.momentum-video-stage video {
   object-fit: cover;
   pointer-events: none;
+}
+.momentum-video-stage iframe {
+  object-fit: contain;
+}
+.momentum-video-nav {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  display: grid;
+  width: 44px;
+  height: 54px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 15px;
+  background: rgba(8, 10, 13, .72);
+  color: #f8f7f4;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .3);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transform: translateY(-50%);
+  backdrop-filter: blur(8px);
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.momentum-video-nav:hover {
+  border-color: rgba(227, 213, 181, .62);
+  background: rgba(24, 28, 34, .9);
+  transform: translateY(-50%) scale(1.05);
+}
+.momentum-video-nav span {
+  font-size: 2.15rem;
+  font-weight: 300;
+  line-height: .7;
+  transform: translateY(-2px);
+}
+.momentum-video-nav--previous {
+  left: 10px;
+}
+.momentum-video-nav--next {
+  right: 10px;
 }
 .momentum-video-interaction {
   position: absolute;
@@ -165,18 +217,31 @@ body.momentum-video-open {
     padding: 9px;
     border-radius: 20px;
   }
+  .momentum-video-header h2 {
+    max-width: 250px;
+    font-size: 1.12rem;
+  }
+  .momentum-video-nav {
+    width: 40px;
+    height: 50px;
+  }
 }
 
 @media (hover: none) {
   .momentum-video-trigger:hover,
-  .momentum-video-close:hover {
+  .momentum-video-close:hover,
+  .momentum-video-nav:hover {
     transform: none;
+  }
+  .momentum-video-nav:hover {
+    transform: translateY(-50%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .momentum-video-trigger,
-  .momentum-video-close {
+  .momentum-video-close,
+  .momentum-video-nav {
     transition: none;
   }
 }
