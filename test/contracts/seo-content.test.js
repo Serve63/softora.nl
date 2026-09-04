@@ -1965,6 +1965,71 @@ test('AI-automatiseringsoffertegids vergelijkt dezelfde route, bewijs en menseli
   ]);
 });
 
+test('chatbot-acceptatietest maakt bron, grenzen, acties, herstel en go-no-go controleerbaar', () => {
+  const now = new Date('2026-09-04T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'chatbot-acceptatietest-opstellen', { now });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const offerHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'chatbot-offerte-vergelijken', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const crmHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'chatbot-crm-koppeling-leads-opvolgen', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.visualQualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-09-04');
+  assert.equal(item.updatedAt, '2026-09-04');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/chatbot-laten-maken');
+  assert.equal(item.sources.length, 3);
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.keywordEvidence.locale.locId, 2528);
+  assert.equal(item.keywordEvidence.locale.language, 'Dutch');
+  assert.ok(item.informationGain.includes('vijf bewijsniveaus'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.visualBrief.hero.visualFamily, 'petrol-documentary-chatbot-testbench');
+  assert.equal(item.visualBrief.support.visualFamily, 'cobalt-linocut-repair-loop');
+  assert.notEqual(item.visualBrief.hero.visualType, item.visualBrief.support.visualType);
+
+  for (const image of [item.image, item.secondaryImage]) {
+    const imagePath = path.join(repoRoot, image.src.replace(/^\//, ''));
+    assert.deepEqual(readJpegDimensions(imagePath), { width: 1672, height: 941 });
+    assert.ok(fs.statSync(imagePath).size < 500 * 1024);
+    assert.equal(image.sourceType, 'trainedAlgorithmicMedia');
+  }
+
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/chatbot-acceptatietest-opstellen">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1672">/);
+  assert.match(html, /<meta property="og:image:height" content="941">/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/chatbot-acceptatietest-scenario-bewijs-softora\.jpg"/);
+  assert.match(html, /"datePublished":"2026-09-04"/);
+  assert.match(html, /Bouw een zevenveldentestkaart per scenario/);
+  assert.match(html, /Accepteer menselijke overdracht als volledige route/);
+  assert.match(html, /href="\/chatbot-laten-maken">chatbot laten maken<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-chatbot-overdracht">gids over chatbot overdracht<\/a>/);
+  assert.match(html, /href="\/blog\/chatbot-crm-koppeling-leads-opvolgen">chatbot en CRM koppelen<\/a>/);
+  assert.match(offerHtml, /href="\/kennisbank\/chatbot-acceptatietest-opstellen">chatbot acceptatietest op te stellen<\/a>/);
+  assert.match(crmHtml, /href="\/kennisbank\/chatbot-acceptatietest-opstellen">volledige chatbot acceptatietest<\/a>/);
+  assert.doesNotMatch(html, /wij garanderen|gegarandeerd resultaat|foutloze werking|AI beslist zelfstandig/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/chatbot-acceptatietest-opstellen');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/chatbot-acceptatietest-scenario-bewijs-softora.jpg',
+    '/assets/seo-content/chatbot-acceptatietest-herstelroute-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));

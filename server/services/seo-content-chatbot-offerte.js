@@ -152,7 +152,17 @@ const CHATBOT_OFFERTE_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Maak acceptatiebewijs onderdeel van de offerte',
       paragraphs: Object.freeze([
-        'Vraag om een acceptatieplan voordat de leverancier begint te bouwen. Dat plan benoemt de scenario\'s, invoer, verwachte uitkomst, toegestane variatie, blokkades en eigenaar van het go-no-go-besluit. Neem naast normale vragen ook ontbrekende gegevens, onbekende onderwerpen, foutieve bronnen, mislukte koppelingen en expliciete mensverzoeken op. Een technisch antwoord is pas bruikbaar wanneer het team de inhoud en vervolgstap kan controleren.',
+        Object.freeze({
+          text:
+            'Vraag om een acceptatieplan voordat de leverancier begint te bouwen. Dat plan benoemt de scenario\'s, invoer, verwachte uitkomst, toegestane variatie, blokkades en eigenaar van het go-no-go-besluit. Neem naast normale vragen ook ontbrekende gegevens, onbekende onderwerpen, foutieve bronnen, mislukte koppelingen en expliciete mensverzoeken op. De praktische gids om een chatbot acceptatietest op te stellen zet dit om in een reproduceerbare testkaart, bevindingclassificatie en hertest.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'chatbot acceptatietest op te stellen',
+              href: '/kennisbank/chatbot-acceptatietest-opstellen',
+              availableFrom: '2026-09-04',
+            }),
+          ]),
+        }),
         'Vergelijk daarna niet het aantal testcases, maar de dekking van de afgesproken taak. Welk bewijs laat zien dat antwoorden op de bron rusten? Hoe wordt aangetoond dat verboden acties uitblijven? Komt de overdracht met voldoende context aan? Kan een mislukte write worden hersteld zonder een dubbele lead? Laat ieder voorstel aangeven welke testomgeving, rapportage, hertest en herstelronde in de prijs zitten.',
       ]),
     }),

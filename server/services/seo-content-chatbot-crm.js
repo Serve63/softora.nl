@@ -174,7 +174,17 @@ const CHATBOT_CRM_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Test met scenario’s die de koppeling mogen breken',
       paragraphs: Object.freeze([
-        'Maak vóór livegang minimaal scenario’s voor een complete nieuwe lead, een bestaand contact, een ontbrekend e-mailadres, een verkeerd formaat, een expliciet mensverzoek, een servicevraag zonder koopintentie, een dubbele inzending, een CRM-time-out en een record zonder mogelijke eigenaar. Noteer per scenario de verwachte chatuitkomst, CRM-mutatie, taak, melding en herstelroute.',
+        Object.freeze({
+          text:
+            'Maak vóór livegang minimaal scenario’s voor een complete nieuwe lead, een bestaand contact, een ontbrekend e-mailadres, een verkeerd formaat, een expliciet mensverzoek, een servicevraag zonder koopintentie, een dubbele inzending, een CRM-time-out en een record zonder mogelijke eigenaar. Noteer per scenario de verwachte chatuitkomst, CRM-mutatie, taak, melding en herstelroute. De volledige chatbot acceptatietest voegt daar bronbewijs, verboden acties, antwoordvariatie, bevindingclassificatie en een menselijk go-no-go-besluit aan toe.',
+          links: Object.freeze([
+            Object.freeze({
+              anchor: 'volledige chatbot acceptatietest',
+              href: '/kennisbank/chatbot-acceptatietest-opstellen',
+              availableFrom: '2026-09-04',
+            }),
+          ]),
+        }),
         'Beoordeel daarna het bewijs in beide systemen. Staat de samenvatting bij het juiste contact, is de bron zichtbaar, blijft een bestaande status intact, is precies één taak aangemaakt en kan een medewerker de reden van de route begrijpen? Een groene API-response alleen is onvoldoende. De acceptatie gaat over bruikbare opvolging en gecontroleerd herstel, niet over het feit dat twee systemen technisch data uitwisselen.',
       ]),
     }),
