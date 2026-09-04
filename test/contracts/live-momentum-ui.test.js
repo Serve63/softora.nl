@@ -586,6 +586,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameInteractionsJs, /window\.SoftoraMomentumEndGameInteractions/);
   assert.match(videoJs, /source: '\/assets\/momentum-attack-mode\.mp4\?v=20260722a'/);
   assert.match(videoJs, /source: 'https:\/\/www\.youtube-nocookie\.com\/embed\/Lo-lVbf6XxI\?start=12&autoplay=1&playsinline=1&rel=0'/);
+  assert.match(videoJs, /source: 'https:\/\/www\.youtube-nocookie\.com\/embed\/LxXLfZYldIM\?start=18&autoplay=1&playsinline=1&rel=0'/);
   assert.match(videoJs, /video\.controls = false/);
   assert.match(videoJs, /video\.autoplay = true/);
   assert.match(videoJs, /document\.createElement\('iframe'\)/);

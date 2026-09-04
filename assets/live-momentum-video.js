@@ -9,6 +9,11 @@
       title: 'ALL GLORY TO JESUS CHRIST',
       type: 'youtube',
       source: 'https://www.youtube-nocookie.com/embed/Lo-lVbf6XxI?start=12&autoplay=1&playsinline=1&rel=0'
+    },
+    {
+      title: 'THE HUNGER IS THE MOST DIFFICULT',
+      type: 'youtube',
+      source: 'https://www.youtube-nocookie.com/embed/LxXLfZYldIM?start=18&autoplay=1&playsinline=1&rel=0'
     }
   ];
   const trigger = document.querySelector('.momentum-video-trigger');
