@@ -2,22 +2,18 @@
   const VIDEOS = [
     {
       title: 'ATTACK MODE',
-      type: 'local',
       source: '/assets/momentum-attack-mode.mp4?v=20260722a'
     },
     {
       title: 'ALL GLORY TO JESUS CHRIST',
-      type: 'youtube',
-      source: 'https://www.youtube-nocookie.com/embed/Lo-lVbf6XxI?start=12&autoplay=1&playsinline=1&rel=0'
+      source: '/assets/momentum-all-glory-to-jesus-christ.mp4?v=20260904a'
     },
     {
       title: 'THE HUNGER IS THE MOST DIFFICULT',
-      type: 'youtube',
-      source: 'https://www.youtube-nocookie.com/embed/LxXLfZYldIM?start=18&autoplay=1&playsinline=1&rel=0'
+      source: '/assets/momentum-hunger-is-the-most-difficult.mp4?v=20260904a'
     },
     {
       title: '15-8-2026',
-      type: 'local',
       source: '/assets/momentum-15-8-2026.mp4?v=20260904a'
     }
   ];
@@ -36,7 +32,7 @@
     return;
   }
 
-  function createLocalPlayer(item) {
+  function createPlayer(item) {
     const interactionLayer = document.createElement('button');
     video = document.createElement('video');
     video.src = item.source;
@@ -46,6 +42,7 @@
     video.muted = false;
     video.playsInline = true;
     video.preload = 'auto';
+    video.currentTime = 0;
     video.setAttribute('aria-label', 'Softora motivatievideo');
     interactionLayer.className = 'momentum-video-interaction';
     interactionLayer.type = 'button';
@@ -57,25 +54,11 @@
     video.play().catch(() => setPlaybackState('paused'));
   }
 
-  function createYoutubePlayer(item) {
-    const frame = document.createElement('iframe');
-    frame.src = item.source;
-    frame.title = item.title;
-    frame.allow = 'autoplay; encrypted-media; picture-in-picture; web-share';
-    frame.referrerPolicy = 'strict-origin-when-cross-origin';
-    frame.allowFullscreen = true;
-    player.replaceChildren(frame);
-  }
-
   function renderActiveVideo() {
     stopPlayer();
     const item = VIDEOS[activeVideoIndex];
     title.textContent = item.title;
-    if (item.type === 'youtube') {
-      createYoutubePlayer(item);
-      return;
-    }
-    createLocalPlayer(item);
+    createPlayer(item);
   }
 
   function stopPlayer() {

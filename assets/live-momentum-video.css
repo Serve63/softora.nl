@@ -130,8 +130,7 @@
   z-index: 1;
   inset: 0;
 }
-.momentum-video-stage video,
-.momentum-video-stage iframe {
+.momentum-video-stage video {
   position: absolute;
   z-index: 1;
   inset: 0;
@@ -144,9 +143,6 @@
 .momentum-video-stage video {
   object-fit: cover;
   pointer-events: none;
-}
-.momentum-video-stage iframe {
-  object-fit: contain;
 }
 .momentum-video-nav {
   position: absolute;
