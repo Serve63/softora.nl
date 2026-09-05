@@ -135,7 +135,7 @@ nav {
   background:
     radial-gradient(circle at 92% 20%, rgba(139,34,82,.14) 0%, transparent 50%),
     radial-gradient(circle at 28% 88%, rgba(139,34,82,.08) 0%, transparent 50%),
-    linear-gradient(90deg, rgba(10,14,25,.94) 0%, rgba(10,14,25,.78) 32%, rgba(10,14,25,.35) 52%, rgba(10,14,25,.08) 78%, rgba(10,14,25,.06) 100%);
+    linear-gradient(90deg, rgba(10,14,25,.98) 0%, rgba(10,14,25,.93) 48%, rgba(10,14,25,.7) 72%, rgba(10,14,25,.3) 100%);
   pointer-events: none;
   z-index: 0;
 }
@@ -149,20 +149,20 @@ nav {
     background-position: 70% center;
   }
 }
-.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(139,34,82,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #efbad1; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 .hero-eyebrow::before { content: ''; width: 32px; height: 2px; background: var(--crimson); border-radius: 1px; }
 .hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5.2vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
-.hero-title em { color: var(--crimson); font-style: normal; }
+.hero-title em { color: #efbad1; font-style: normal; }
 .hero-title .nowrap { white-space: nowrap; display: inline-block; }
 @media (max-width: 480px) {
   .hero-title { font-size: clamp(34px, 8.2vw, 72px); }
 }
-.hero-sub { font-size: 16px; color: rgba(255,255,255,.5); line-height: 1.7; margin: 24px 0 40px; max-width: 520px; }
+.hero-sub { font-size: 16px; color: #eeeaf0; line-height: 1.7; margin: 24px 0 28px; max-width: 520px; }
 .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; }
 .btn-primary { display: inline-flex; align-items: center; gap: 9px; padding: 14px 28px; background: var(--crimson); color: #fff; border: none; border-radius: 5px; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; text-decoration: none; }
 .btn-primary:hover { background: var(--clight); }
 .btn-primary svg { width: 14px; height: 14px; }
-.btn-ghost { display: inline-flex; align-items: center; gap: 9px; padding: 13px 28px; background: none; color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.15); border-radius: 5px; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
+.btn-ghost { display: inline-flex; align-items: center; gap: 9px; padding: 13px 28px; background: none; color: #eeeaf0; border: 1px solid rgba(255,255,255,.6); border-radius: 5px; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
 .btn-ghost:hover { border-color: rgba(255,255,255,.4); color: #fff; }
 
 /* STATS STRIP */
@@ -344,11 +344,13 @@ nav {
   .nav-logo { font-size: 1.6rem; }
   .hero {
     min-height: 560px;
-    padding: 72px 24px 80px;
+    padding: 48px 24px 56px;
   }
+  .hero::after { background: rgba(10,14,25,.9); }
   .hero-title {
-    font-size: clamp(40px, 11vw, 56px);
+    font-size: clamp(32px, 10vw, 48px);
     letter-spacing: 0;
+    overflow-wrap: anywhere;
   }
   .hero-title .nowrap,
   .section-title.is-single-line .nowrap {
@@ -383,12 +385,12 @@ nav {
 </style>
 <script type="application/ld+json" data-softora-public-seo="structured-data">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.softora.nl/#organization","name":"Softora","url":"https://www.softora.nl/","logo":"https://www.softora.nl/assets/softora-touch-icon.png","email":"info@softora.nl","telephone":"+31643262792","address":{"@type":"PostalAddress","addressLocality":"Oisterwijk","addressRegion":"Noord-Brabant","addressCountry":"NL"}},{"@type":"WebSite","@id":"https://www.softora.nl/#website","url":"https://www.softora.nl/","name":"Softora","inLanguage":"nl-NL","publisher":{"@id":"https://www.softora.nl/#organization"}},{"@type":"WebPage","@id":"https://www.softora.nl/bedrijfssoftware-op-maat#webpage","url":"https://www.softora.nl/bedrijfssoftware-op-maat","name":"Bedrijfssoftware laten maken voor het MKB","description":"Laat bedrijfssoftware op maat bouwen voor CRM, planning, offertes of een klantportaal. Softora helpt je de eerste versie, koppelingen en het beheer af te bakenen.","inLanguage":"nl-NL","isPartOf":{"@id":"https://www.softora.nl/#website"},"about":{"@id":"https://www.softora.nl/bedrijfssoftware-op-maat#service"}},{"@type":"Service","@id":"https://www.softora.nl/bedrijfssoftware-op-maat#service","name":"Bedrijfssoftware op maat","description":"Bedrijfssoftware op maat voor CRM, dashboards, klantportaal, offerteflow, planning, koppelingen en AI automatisering.","provider":{"@id":"https://www.softora.nl/#organization"},"areaServed":[{"@type":"AdministrativeArea","name":"Oisterwijk"},{"@type":"AdministrativeArea","name":"Tilburg"},{"@type":"AdministrativeArea","name":"Midden-Brabant"},{"@type":"Country","name":"Nederland"}],"serviceType":"Bedrijfssoftware op maat voor MKB","url":"https://www.softora.nl/bedrijfssoftware-op-maat"},{"@type":"FAQPage","@id":"https://www.softora.nl/bedrijfssoftware-op-maat#faq","mainEntity":[{"@type":"Question","name":"Wat kost bedrijfssoftware laten maken?","acceptedAnswer":{"@type":"Answer","text":"Dat hangt af van scope, rollen, data, koppelingen en hoeveel workflows direct nodig zijn. Softora begint daarom met een concrete procesanalyse en bouwt liever gefaseerd dan onnodig groot."}},{"@type":"Question","name":"Hoe lang duurt bedrijfssoftware op maat bouwen?","acceptedAnswer":{"@type":"Answer","text":"Een eerste werkbare versie hangt af van de omvang van het dashboard, CRM, klantportaal of offerteflow. De planning wordt vooraf afgebakend, met ruimte voor testen en doorontwikkeling na livegang."}},{"@type":"Question","name":"Kun je ook een dashboard, klantportaal of offertesysteem laten maken?","acceptedAnswer":{"@type":"Answer","text":"Ja. Bedrijfssoftware kan starten als dashboard, klantportaal, CRM of automatisch offerte systeem. De juiste eerste module hangt af van het proces waar nu de meeste tijd, foutkans of opvolging blijft liggen."}},{"@type":"Question","name":"Kan bedrijfssoftware koppelen met bestaande systemen?","acceptedAnswer":{"@type":"Answer","text":"Vaak wel. Denk aan websiteformulieren, mailbox, CRM, dashboards, betaalstromen, agenda, chatbot of AI automatisering, zolang de data betrouwbaar beschikbaar is en de koppeling waarde toevoegt."}},{"@type":"Question","name":"Wanneer is maatwerk bedrijfssoftware beter dan standaard software?","acceptedAnswer":{"@type":"Answer","text":"Maatwerk wordt logischer wanneer je team veel uitzonderingen, dubbele invoer, losse spreadsheets of specifieke rollen heeft die standaard software niet netjes ondersteunt."}},{"@type":"Question","name":"Waar begin je met bedrijfssoftware laten maken?","acceptedAnswer":{"@type":"Answer","text":"Begin bij een meetbaar kernproces, zoals leadopvolging, offertebeheer, planning of rapportage. Daarna bepaal je welke rollen, data, schermen en koppelingen nodig zijn voor een eerste bruikbare versie."}}]},{"@type":"BreadcrumbList","@id":"https://www.softora.nl/bedrijfssoftware-op-maat#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://www.softora.nl/"},{"@type":"ListItem","position":2,"name":"Bedrijfssoftware laten maken voor het MKB","item":"https://www.softora.nl/bedrijfssoftware-op-maat"}]}]}</script>
 </head>
-<body>
+<body data-softora-contact-placement="header">
 <!-- NAV -->
 <nav>
   <a class="nav-logo" href="/">SOFTORA.NL</a>
   <div class="nav-links">
-    <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792" class="nav-start-btn">Start Project</a>
+    <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792" class="nav-start-btn content-header-contact">Start Project</a>
   </div>
 </nav>
 

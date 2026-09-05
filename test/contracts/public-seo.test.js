@@ -25,6 +25,26 @@ const KNOWN_FILES = new Set([
   'premium-websitegenerator.html',
 ]);
 
+test('software service hero keeps mobile text readable even over a white image region', () => {
+  const source = fs.readFileSync(path.join(root, 'premium-bedrijfssoftware.html'), 'utf8');
+  const overlay = source.match(/\.hero::after\s*\{\s*background:\s*rgba\((\d+),(\d+),(\d+),([.\d]+)\)/);
+  assert.ok(overlay, 'The mobile image needs an explicit contrast-preserving overlay.');
+  const alpha = Number(overlay[4]);
+  const background = overlay.slice(1, 4).map((value) => Number(value) * alpha + 255 * (1 - alpha));
+  const luminance = (rgb) => rgb.map((value) => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  for (const selector of ['.hero-eyebrow', '.hero-title em', '.hero-sub', '.btn-ghost']) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = source.match(new RegExp(`${escaped}\\s*\\{[^}]*?color:\\s*#([a-f0-9]{6})`, 'i'));
+    assert.ok(match, `${selector} needs a measurable foreground color.`);
+    const foreground = match[1].match(/../g).map((value) => parseInt(value, 16));
+    const ratio = (luminance(foreground) + 0.05) / (luminance(background) + 0.05);
+    assert.ok(ratio >= 4.5, `${selector} contrast ${ratio.toFixed(2)} is below 4.5:1.`);
+  }
+});
+
 function runPublicConversionTracker({ formIsValid = true, trigger = 'submit', linkAttrs = {} } = {}) {
   const listeners = {};
   const opened = [];
