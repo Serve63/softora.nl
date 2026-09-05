@@ -222,28 +222,34 @@ function createLeadRadarPublicFetcher({ env = process.env, fetchImpl = globalThi
       await waitForOrigin(parsed.origin);
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
-      let response;
       try {
-        response = await fetchImpl(currentUrl, {
+        const response = await fetchImpl(currentUrl, {
           method: 'GET',
           redirect: 'manual',
           headers: { Accept: accept, 'User-Agent': userAgent },
           signal: controller?.signal,
         });
+        if ([301, 302, 303, 307, 308].includes(Number(response.status))) {
+          const location = response.headers?.get?.('location');
+          if (!location || redirectCount >= maxRedirects) throw new Error('Publieke bron heeft te veel redirects.');
+          currentUrl = await assertWebsitePreviewUrlIsPublic(new URL(location, currentUrl).toString());
+          continue;
+        }
+        const declaredLength = Number(response.headers?.get?.('content-length')) || 0;
+        if (declaredLength > maxBytes) throw new Error('Publieke bron is groter dan de toegestane responslimiet.');
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (buffer.length > maxBytes) throw new Error('Publieke bron overschrijdt de responslimiet.');
+        return { response, body: buffer.toString('utf8'), url: currentUrl };
+      } catch (error) {
+        if (controller?.signal.aborted || error?.name === 'AbortError') {
+          const timeoutError = new Error('De bron reageerde niet binnen 8 seconden.');
+          timeoutError.code = 'LEAD_RADAR_SOURCE_TIMEOUT';
+          throw timeoutError;
+        }
+        throw error;
       } finally {
         if (timeout) clearTimeout(timeout);
       }
-      if ([301, 302, 303, 307, 308].includes(Number(response.status))) {
-        const location = response.headers?.get?.('location');
-        if (!location || redirectCount >= maxRedirects) throw new Error('Publieke bron heeft te veel redirects.');
-        currentUrl = await assertWebsitePreviewUrlIsPublic(new URL(location, currentUrl).toString());
-        continue;
-      }
-      const declaredLength = Number(response.headers?.get?.('content-length')) || 0;
-      if (declaredLength > maxBytes) throw new Error('Publieke bron is groter dan de toegestane responslimiet.');
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length > maxBytes) throw new Error('Publieke bron overschrijdt de responslimiet.');
-      return { response, body: buffer.toString('utf8'), url: currentUrl };
     }
     throw new Error('Publieke bron kon niet veilig worden gevolgd.');
   }
@@ -275,9 +281,21 @@ function createLeadRadarPublicFetcher({ env = process.env, fetchImpl = globalThi
         throw error;
       }
     }
-    const result = await rawRequest(normalized, options);
-    if (!result.response.ok && !options.allowHttpErrors) throw new Error(`Publieke bron gaf HTTP ${result.response.status}.`);
-    return result;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = await rawRequest(normalized, options);
+        if (!result.response.ok && !options.allowHttpErrors) {
+          const error = new Error(`Publieke bron gaf HTTP ${result.response.status}.`);
+          error.status = Number(result.response.status);
+          throw error;
+        }
+        return result;
+      } catch (error) {
+        const transient = error?.code === 'LEAD_RADAR_SOURCE_TIMEOUT' || [502, 503, 504].includes(error?.status);
+        if (attempt || !transient) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
   }
 
   return { fetchPublic, getConfig: () => ({ timeoutMs, maxBytes, minIntervalMs, userAgent }) };
@@ -335,7 +353,7 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
       .map((value) => value.replace(/\/$/, '')),
     mastodonTags: parseTagList(env.LEAD_RADAR_MASTODON_TAGS, DEFAULT_MASTODON_TAGS),
     blueskyEnabled: parseBoolean(env.LEAD_RADAR_BLUESKY_ENABLED, false),
-    mastodonPages: safeLimit(env.LEAD_RADAR_MASTODON_PAGES, 3, 5),
+    mastodonPages: safeLimit(env.LEAD_RADAR_MASTODON_PAGES, 4, 5),
   };
 
   async function searchFeed(context, maxResults) {
@@ -346,11 +364,13 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
   async function searchMastodon(context, maxResults) {
     const items = [];
     let maxId = '';
+    const cutoff = Date.now() - safeLimit(context.maxAgeDays, 31, 31) * 86_400_000;
     const tag = parseTagList(context.term || context.tag, ['ondernemen'])[0];
     for (let page = 0; page < config.mastodonPages && items.length < maxResults; page += 1) {
       const endpoint = new URL(`/api/v1/timelines/tag/${encodeURIComponent(tag)}`, context.sourceUrl);
       endpoint.searchParams.set('local', 'true');
-      endpoint.searchParams.set('limit', '40');
+      // Sparse local hashtags can time out while searching for 40 posts years back.
+      endpoint.searchParams.set('limit', String(Math.min(10, maxResults - items.length)));
       if (maxId) endpoint.searchParams.set('max_id', maxId);
       const result = await publicFetcher.fetchPublic(endpoint.toString(), { accept: 'application/json' });
       const pageItems = JSON.parse(result.body);
@@ -372,8 +392,10 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
           source_verification_reason: 'Aanvraag rechtstreeks gelezen uit de toegestane openbare Mastodon-API.',
         });
       }
-      maxId = text(pageItems.at(-1)?.id, 200);
-      if (!maxId) break;
+      const lastItem = pageItems.at(-1);
+      const nextId = text(lastItem?.id, 200);
+      if (!nextId || nextId === maxId || new Date(lastItem?.created_at).getTime() < cutoff) break;
+      maxId = nextId;
     }
     return items.slice(0, maxResults);
   }
