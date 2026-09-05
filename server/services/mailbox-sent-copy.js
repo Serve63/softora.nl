@@ -120,7 +120,11 @@ function isLikelySentMailboxName(name) {
 
 async function resolveMailboxName(client, folder) {
   const candidates = FOLDER_ALIASES[folder] || ['INBOX'];
-  const boxes = typeof client.list === 'function' ? await client.list() : [];
+  // Subscription status is irrelevant to folder selection. Reuse this exact
+  // connection's listing across sequential folders and avoid a separate LSUB.
+  const boxes = client.folders instanceof Map && client.folders.size
+    ? Array.from(client.folders.values())
+    : typeof client.list === 'function' ? await client.list({ listOnly: true }) : [];
   const items = Array.isArray(boxes) ? boxes : [];
   const names = items.map(getMailboxPath).filter(Boolean);
   const specialUses = FOLDER_SPECIAL_USES[folder] || [];

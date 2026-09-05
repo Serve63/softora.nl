@@ -78,7 +78,7 @@ function createTargetedPrepared(overrides = {}) {
   };
 }
 
-function createRawSyncService({ store, fetcher, accountEmail = 'serve@softora.nl' }) {
+function createRawSyncService({ store, fetcher, accountEmail = 'serve@softora.nl', accounts = null }) {
   const selected = {
     email: accountEmail,
     imapHost: 'imap.example.test',
@@ -86,11 +86,11 @@ function createRawSyncService({ store, fetcher, accountEmail = 'serve@softora.nl
   };
   return createMailboxSyncService({
     mailboxIndexStore: store,
-    assertReadableAccount: () => selected,
+    assertReadableAccount: (email) => accounts ? accounts.find((account) => account.email === email) : selected,
     canUseMailboxIndex: () => true,
     fetchMessagesFromImap: fetcher,
     getSafeLimit: (value) => Number(value) || 30,
-    getAccounts: () => [selected],
+    getAccounts: () => accounts || [selected],
     normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
     normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
     logger: { error() {} },
@@ -1154,8 +1154,8 @@ test('snelle IMAP-timeout retryt alleen na bevestigde leasevrijgave en nooit na 
       store,
       fetcher: async (options) => {
         events.push(`fetch:${claims}`);
-        assert.equal(options.imapOperationTimeoutMs, 10_000);
-        assert.ok(options.deadlineAtMs <= Date.now() + 45_000);
+        assert.equal(options.imapOperationTimeoutMs, 45_000);
+        assert.ok(options.deadlineAtMs <= Date.now() + 60_000);
         if (scenario !== 'commit-ambiguous' && (claims === 1 || scenario === 'persistent-timeout')) throw timeout();
         return createSyncPass([{ uid: 42, id: 'inbox:42' }]);
       },
@@ -1169,6 +1169,38 @@ test('snelle IMAP-timeout retryt alleen na bevestigde leasevrijgave en nooit na 
     ]);
     if (scenario === 'persistent-timeout') assert.equal(events.filter((event) => event.startsWith('commit')).length, 0);
   }
+});
+
+test('een vastgelopen Gmail-account verdringt de folders van het volgende account niet', async () => {
+  const failedAccount = 'martijnven123@gmail.com';
+  const healthyAccount = 'contact.venvisuals@gmail.com';
+  const accounts = [failedAccount, healthyAccount].map((email) => ({ email, imapConfigured: true, imapHost: 'imap.gmail.com' }));
+  const fetched = [];
+  const sessions = new Map();
+  let claims = 0;
+  const store = {
+    getUidGenerationProtocol: async () => ({ ok: true, protocol: 'v2' }),
+    acquireSyncLockForProtocol: async () => ({ ok: true, protocolMode: 'v2', lockToken: `lease-${++claims}`, lockExpiresAt: futureLeaseExpiry() }),
+    prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+    checkpointTargetUidManifest: async () => { throw new Error('unexpected checkpoint'); },
+    confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
+    listLegacyUidIdentities: async () => [],
+    commitSyncPass: async () => ({ ok: true, committed: true, upserted: 1 }),
+    commitTargetedSyncPass: async () => { throw new Error('unexpected targeted commit'); },
+    skipSync: async () => { throw new Error('unexpected skip'); },
+    failSync: async () => ({ ok: true, applied: true }),
+  };
+  const result = await createRawSyncService({ store, accounts, fetcher: async (options) => {
+    fetched.push(`${options.account.email}|${options.folder}`);
+    if (sessions.has(options.account.email)) assert.equal(options.imapSession, sessions.get(options.account.email));
+    sessions.set(options.account.email, options.imapSession);
+    if (options.account.email === failedAccount) throw Object.assign(new Error('provider timeout'), { code: 'MAILBOX_IMAP_OPERATION_TIMEOUT' });
+    return createSyncPass([{ uid: 42, id: `${options.folder}:42` }]);
+  } }).syncMailbox({ owner: 'martijn', folders: ['inbox'], campaignOnly: true, incrementalOnly: true, fastRefresh: true });
+  assert.equal(result.ok, false);
+  assert.deepEqual(fetched, [`${failedAccount}|inbox`, `${failedAccount}|inbox`, `${healthyAccount}|inbox`, `${healthyAccount}|coldmail`]);
+  assert.deepEqual(result.results.map((entry) => entry.ok), [false, false, true, true]);
+  assert.notEqual(sessions.get(failedAccount), sessions.get(healthyAccount));
 });
 
 test('gerichte steady All Mail gebruikt uitsluitend het opgeslagen manifest en nooit legacy SEARCH', async () => {

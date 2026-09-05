@@ -1,7 +1,9 @@
 'use strict';
 
-const FAST_REFRESH_OPERATION_TIMEOUT_MS = 10_000;
-const FAST_REFRESH_BUDGET_MS = 45_000;
+// Measured slow Gmail sessions spend ~8s per post-auth command. Allow a
+// useful pass with the shared connection instead of restarting every 10s.
+const FAST_REFRESH_OPERATION_TIMEOUT_MS = 45_000;
+const FAST_REFRESH_BUDGET_MS = 60_000;
 
 async function runFastMailboxFolderSync(syncFolder, options, now = Date.now) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -18,6 +20,8 @@ async function runFastMailboxFolderSync(syncFolder, options, now = Date.now) {
       // our own unreleased lease a successful coalesced provider check.
       if (attempt > 0 || error?.code !== 'MAILBOX_IMAP_OPERATION_TIMEOUT' ||
           error.mailboxLeaseReleased !== true) throw error;
+      const remainingMs = options.refreshDeadlineAtMs - now();
+      if (remainingMs > 0 && remainingMs < FAST_REFRESH_OPERATION_TIMEOUT_MS) throw error;
     }
   }
 }
