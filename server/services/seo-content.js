@@ -2907,7 +2907,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     '<link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">',
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260905b">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260906a">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
