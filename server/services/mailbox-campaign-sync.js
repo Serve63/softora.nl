@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { createMailboxImapSession } = require('./mailbox-imap-session');
 const {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   getCampaignMailboxAccounts,
@@ -421,6 +422,7 @@ function createMailboxSyncService({
     fastRefresh = false,
     refreshDeadlineAtMs = 0,
     campaignSeedCache = null,
+    imapSession = null,
   } = {}) {
     const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder);
@@ -716,6 +718,7 @@ function createMailboxSyncService({
       }
       const fetchOptions = {
         account,
+        imapSession,
         folder: normalizedFolder,
         limit: campaignOnly
           ? Math.min(
@@ -1090,6 +1093,8 @@ function createMailboxSyncService({
       fastRefresh ? 1 : Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
       async (account) => {
         const results = [];
+        const imapSession = fastRefresh ? createMailboxImapSession() : null;
+        let accountTimeout = null;
         const folderList = getMailboxSyncFoldersForAccount({
           account,
           folders: requestedFolders,
@@ -1098,32 +1103,40 @@ function createMailboxSyncService({
           fastRefresh,
           normalizeFolder,
         });
-        for (const folder of folderList) {
-          try {
-            const folderOptions = {
-              accountEmail: account.email,
-              folder,
-              limit,
-              force,
-              campaignOnly,
-              incrementalOnly,
-              retryContention,
-              fastRefresh,
-              refreshDeadlineAtMs,
-              campaignSeedCache,
-            };
-            results.push(await (fastRefresh
-              ? runFastMailboxFolderSync(syncMailboxFolder, folderOptions)
-              : syncMailboxFolder(folderOptions)));
-          } catch (error) {
-            logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
-            results.push({
-              ok: false,
-              account: account.email,
-              folder,
-              error: String(error?.message || error || 'Mailbox sync mislukt'),
-            });
+        try {
+          for (const folder of folderList) {
+            try {
+              if (accountTimeout) throw accountTimeout;
+              const folderOptions = {
+                accountEmail: account.email,
+                folder,
+                limit,
+                force,
+                campaignOnly,
+                incrementalOnly,
+                retryContention,
+                fastRefresh,
+                refreshDeadlineAtMs,
+                campaignSeedCache,
+                imapSession,
+              };
+              results.push(await (fastRefresh
+                ? runFastMailboxFolderSync(syncMailboxFolder, folderOptions)
+                : syncMailboxFolder(folderOptions)));
+            } catch (error) {
+              if (fastRefresh && error?.code === 'MAILBOX_IMAP_OPERATION_TIMEOUT' &&
+                  error.mailboxLeaseReleased === true) accountTimeout = error;
+              logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
+              results.push({
+                ok: false,
+                account: account.email,
+                folder,
+                error: String(error?.message || error || 'Mailbox sync mislukt'),
+              });
+            }
           }
+        } finally {
+          await imapSession?.close();
         }
         return results;
       }

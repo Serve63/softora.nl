@@ -250,6 +250,7 @@ function createMailboxImapFetcher({
     oldestIndexedCampaignUid = 0,
     deadlineAtMs = null,
     imapOperationTimeoutMs = DEFAULT_MAILBOX_IMAP_OPERATION_TIMEOUT_MS,
+    imapSession = null,
     prepareUidGeneration = null,
     listLegacyUidIdentities = null,
     confirmUidBaseline = null,
@@ -260,7 +261,9 @@ function createMailboxImapFetcher({
   }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
-    const client = createClient(account, { emitLogs: true });
+    const create = () => createClient(account, { emitLogs: true });
+    const { client, reused = false } = imapSession
+      ? imapSession.acquire(account, create) : { client: create() };
     const observation = observeMailboxImapClient(client);
     const startedAt = Date.now();
     const logImapOperation = historySyncOptions.logImapOperation === true;
@@ -270,6 +273,7 @@ function createMailboxImapFetcher({
       nowMs: startedAt,
     });
     let operationTimedOut = false;
+    let operationFailed = false;
     if (logImapOperation) {
       logger.info?.('[Mailbox][ImapOperation]', {
         phase: 'start',
@@ -288,7 +292,7 @@ function createMailboxImapFetcher({
         timeoutMs: imapOperationTimeoutMs,
         deadlineAtMs,
         operation: () => observation.run(async () => {
-          await client.connect();
+          if (!reused) await client.connect();
           observation.setStage('resolve-folder');
           const mailboxName = await resolveMailboxName(client, normalizedFolder);
           if (!mailboxName) return { messages: [], syncPass: null, folderMissing: true };
@@ -663,6 +667,7 @@ function createMailboxImapFetcher({
       }
       return returnSyncPass ? fetched : fetched.messages;
     } catch (error) {
+      operationFailed = true;
       operationTimedOut = error?.code === 'MAILBOX_IMAP_OPERATION_TIMEOUT';
       if (logImapOperation) {
         logger.warn?.('[Mailbox][ImapOperation]', {
@@ -678,7 +683,9 @@ function createMailboxImapFetcher({
       }
       throw error;
     } finally {
-      if (deadlineAtMs) {
+      if (imapSession) {
+        if (operationFailed) await imapSession.close();
+      } else if (deadlineAtMs) {
         if (!operationTimedOut) void closeMailboxClientQuietly(client);
       } else {
         try {

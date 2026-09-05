@@ -24,3 +24,17 @@ test('authenticatie- en opslagfouten worden nooit als een vluchtige IMAP-timeout
     { refreshDeadlineAtMs: 45_000 }, () => 0), (actual) => actual === error);
   assert.equal(calls, 1);
 });
+
+test('a slow failed pass reserves remaining budget for other accounts instead of another doomed retry', async () => {
+  let now = 0;
+  let calls = 0;
+  const error = Object.assign(new Error('provider timeout'), {
+    code: 'MAILBOX_IMAP_OPERATION_TIMEOUT', mailboxLeaseReleased: true,
+  });
+  await assert.rejects(runFastMailboxFolderSync(async () => {
+    calls++; now = 45_000; throw error;
+  }, { refreshDeadlineAtMs: 60_000 }, () => now), (actual) => actual === error);
+  assert.equal(calls, 1);
+  assert.equal(await runFastMailboxFolderSync(async () => true,
+    { refreshDeadlineAtMs: 60_000 }, () => now), true);
+});
