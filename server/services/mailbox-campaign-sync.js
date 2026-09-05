@@ -385,6 +385,7 @@ async function syncMailboxRequest({
       force,
       campaignOnly,
       incrementalOnly,
+      fastRefresh,
       maxConcurrentAccounts: fastRefresh ? 2 : 1,
     });
   }
@@ -413,6 +414,7 @@ function createMailboxSyncService({
     campaignOnly = false,
     incrementalOnly = false,
     retryContention = false,
+    fastRefresh = false,
     campaignSeedCache = null,
   } = {}) {
     const account = assertReadableAccount(accountEmail);
@@ -588,7 +590,7 @@ function createMailboxSyncService({
             : [])
         );
       }
-      if (campaignOnly) {
+      if (campaignOnly && !(fastRefresh && incrementalOnly && useUidGenerationV2 && !recoverGmailAllMail)) {
         if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
           indexedUids = (await mailboxIndexStore.listMessageUidsForAccount({
             accountEmail: account.email,
@@ -730,6 +732,9 @@ function createMailboxSyncService({
         indexedUids,
         lastSyncedUid,
         syncCursorOverlap: campaignOnly ? 0 : REGULAR_SYNC_CURSOR_OVERLAP,
+        // The durable UID frontier already covers new mail. Historical header
+        // recovery remains in cron and in the targeted All Mail protocol.
+        skipHistoricalFallback: fastRefresh && incrementalOnly && useUidGenerationV2 && !recoverGmailAllMail,
         ...(useUidGenerationV2 ? { deadlineAtMs: syncDeadlineAtMs } : {}),
       };
 
@@ -1051,6 +1056,7 @@ function createMailboxSyncService({
     campaignOnly = false,
     incrementalOnly = false,
     retryContention = false,
+    fastRefresh = false,
     maxConcurrentAccounts = 1,
   } = {}) {
     const accounts = selectMailboxSyncAccounts({
@@ -1087,6 +1093,7 @@ function createMailboxSyncService({
               campaignOnly,
               incrementalOnly,
               retryContention,
+              fastRefresh,
               campaignSeedCache,
             }));
           } catch (error) {

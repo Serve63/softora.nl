@@ -68,6 +68,23 @@ test('berichtscope controleert de eigenaar en exacte generatie-identiteit vóór
   assert.deepEqual(calls[0].messages, [{ message_key: 'serve-key', contact_email: 'contact@example.nl' }]);
 });
 
+test('berichtbewijs leest alleen klantkandidaten en behoudt exact bewezen gesprekken van onbekende afzenders', async () => {
+  const calls = [];
+  const scope = createMailboxOutreachScope({ repository: {
+    filterCampaignMessages: async (input) => { calls.push(input); return ['reply']; },
+  } });
+  const rows = ['newsletter', 'reply', 'noise', 'exact-thread'].map((messageKey) => ({
+    accountEmail: 'serve@softora.nl', email: `${messageKey}@example.nl`, messageKey,
+  }));
+  const result = await scope.filterMessages({
+    owner: 'serve', messages: rows,
+    hasCampaignProof: (message) => message.messageKey === 'exact-thread',
+    isCustomerMessage: (message) => ['newsletter', 'reply'].includes(message.messageKey),
+  });
+  assert.deepEqual(calls[0].messages.map((message) => message.message_key), ['newsletter', 'reply']);
+  assert.deepEqual(result.map((message) => message.messageKey), ['reply', 'exact-thread']);
+});
+
 test('berichtbewijs wordt volledig in begrensde batches gelezen en databasefouten laten niets door', async () => {
   const calls = [];
   let failing = false;

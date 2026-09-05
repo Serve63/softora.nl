@@ -182,48 +182,49 @@
       }, Math.max(0, Number(delayMs) || 0));
     }
 
+    async function boundedOperation(operation, signal) {
+      if (signal?.aborted) throw createAbortError();
+      const controller = new AbortController();
+      let timeoutId;
+      let abortFromParent;
+      try {
+        return await Promise.race([
+          new Promise((_resolve, reject) => {
+            abortFromParent = () => { reject(createAbortError()); controller.abort(); };
+            signal?.addEventListener?.('abort', abortFromParent, { once: true });
+            timeoutId = scheduleTimeout(() => {
+              const error = new Error('Mailboxcontrole duurde te lang.');
+              error.retryable = true;
+              reject(error);
+              controller.abort();
+            }, REFRESH_REQUEST_TIMEOUT_MS);
+          }),
+          operation(controller.signal),
+        ]);
+      } finally {
+        cancelTimeout?.(timeoutId);
+        signal?.removeEventListener?.('abort', abortFromParent);
+      }
+    }
+
     async function requestJson(url, init, signal) {
       let lastError = null;
       for (let attempt = 0; attempt < REFRESH_MAX_ATTEMPTS; attempt += 1) {
         if (signal?.aborted) throw createAbortError();
-        const controller = typeof AbortController === 'function' ? new AbortController() : null;
-        const abortFromParent = () => controller?.abort?.();
-        signal?.addEventListener?.('abort', abortFromParent, { once: true });
-        let timeoutId = 0;
-        let timedOut = false;
-        let timeoutError = null;
         try {
-          const timeoutPromise = new Promise((_resolve, reject) => {
-            timeoutId = scheduleTimeout(() => {
-              timedOut = true;
-              timeoutError = new Error('Mailboxcontrole duurde te lang.');
-              timeoutError.retryable = true;
-              reject(timeoutError);
-              controller?.abort?.();
-            }, REFRESH_REQUEST_TIMEOUT_MS);
-          });
-          const response = await Promise.race([
-            request(url, {
-              ...init,
-              ...(controller ? { signal: controller.signal } : signal ? { signal } : {}),
-            }),
-            timeoutPromise,
-          ]);
-          const data = await response.json().catch(() => ({}));
-          if (response.ok) return { response, data };
-          const error = new Error(data?.detail || data?.error || 'Mailbox vernieuwen mislukt');
-          error.status = response.status;
-          error.retryable = isRetryableStatus(response.status);
-          throw error;
+          return await boundedOperation(async (requestSignal) => {
+            const response = await request(url, { ...init, signal: requestSignal });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok && typeof data?.ok === 'boolean') return { response, data, url };
+            const error = new Error(data?.detail || data?.error || 'Mailbox vernieuwen mislukt');
+            error.status = response.status;
+            error.retryable = response.ok || isRetryableStatus(response.status);
+            throw error;
+          }, signal);
         } catch (error) {
           if (signal?.aborted) throw createAbortError();
-          if (!timedOut && error?.name === 'AbortError') throw error;
-          const requestError = timedOut && timeoutError ? timeoutError : error;
-          lastError = requestError;
-          if (!requestError?.retryable || attempt === REFRESH_MAX_ATTEMPTS - 1) throw requestError;
-        } finally {
-          if (timeoutId) cancelTimeout?.(timeoutId);
-          signal?.removeEventListener?.('abort', abortFromParent);
+          lastError = error;
+          if (!error?.retryable || attempt === REFRESH_MAX_ATTEMPTS - 1) throw error;
         }
         await wait(REFRESH_RETRY_BASE_DELAY_MS * Math.pow(2, attempt), signal);
       }
@@ -317,7 +318,15 @@
               .filter((entry) => entry.status === 'fulfilled')
               .map((entry) => entry.value);
             if (!batchFulfilled.length) continue;
-            const batchListUpdated = await loadMessages({
+            // Only an explicit, successful no-change result can avoid a second
+            // list fetch. Unknown results and a failed first list must retry.
+            if (listUpdated && !listRefreshFailed && batchFulfilled.every((entry) => (
+              entry.url === '/api/mailbox/instantly/sync' && entry.data?.ok === true &&
+              Array.isArray(entry.data.results) && entry.data.results.length > 0 &&
+              entry.data.results.every((result) => result?.ok === true && result.stored === 0)
+            ))) continue;
+            const batchListUpdated = await boundedOperation((listSignal) => loadMessages({
+              signal: listSignal,
               showLoader: false,
               skipBackgroundSync: true,
               skipProviderRefresh: true,
@@ -325,7 +334,7 @@
               openLatest: false,
               preserveOnError: true,
               reuseActiveToken: true,
-            });
+            }), signal).catch(() => false);
             if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
             if (batchListUpdated === false) {
               listRefreshFailed = true;

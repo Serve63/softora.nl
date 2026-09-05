@@ -4526,9 +4526,12 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.deepEqual(JSON.parse(requests[1].options.body), { owner: 'both', fastRefresh: true });
   assert.equal(loads.length, 2);
   assert.deepEqual(loads[0], {
+    signal: loads[0].signal,
     showLoader: false, skipBackgroundSync: true, skipProviderRefresh: true, skipPageBootstrap: true, openLatest: false, preserveOnError: true, reuseActiveToken: true,
   });
-  assert.deepEqual(loads[1], loads[0]);
+  assert.ok(loads.every((load) => load.signal instanceof AbortSignal && !load.signal.aborted));
+  assert.notEqual(loads[0].signal, loads[1].signal);
+  assert.deepEqual({ ...loads[1], signal: undefined }, { ...loads[0], signal: undefined });
   assert.deepEqual(toasts, ['Mailbox volledig bijgewerkt']);
 
   controller.start();
@@ -11062,7 +11065,7 @@ test('coldmail inbox laadt alleen gekoppelde mailboxberichten van de gekozen eig
   assert.equal(result.messages[0].campaign.actionRequired, true);
   assert.equal(result.sync.source, 'campaign-replies-index');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&owner=serve&refreshInstantly=1');
+  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&metadataOnly=1&owner=serve&refreshInstantly=1');
   assert.equal(calls[0].options.cache, 'no-store');
   assert.doesNotMatch(calls[0].url, /ui-state-get/);
   assert.equal(await campaignInboxModule.load('inbox', (message) => message), null);
@@ -11075,7 +11078,7 @@ test('coldmail inbox laadt alleen gekoppelde mailboxberichten van de gekozen eig
       json: async () => ({ ok: true, messages: [], sync: { indexed: true } }),
     };
   }, { owner: 'serve', refreshInstantly: false });
-  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&owner=serve&refreshInstantly=0');
+  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&metadataOnly=1&owner=serve&refreshInstantly=0');
 });
 
 test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste client-request', async () => {

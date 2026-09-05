@@ -1074,6 +1074,7 @@
       : global.fetch.bind(global);
     const params = new URLSearchParams({
       limit: '200',
+      metadataOnly: '1',
       owner: owner === 'both' ? '' : owner,
       refreshInstantly: options && options.refreshInstantly === false ? '0' : '1',
     });

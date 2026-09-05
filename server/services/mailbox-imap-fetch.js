@@ -509,7 +509,7 @@ function createMailboxImapFetcher({
               });
               selectedUids = uidWindow.selectedUids;
               scannedThroughUid = uidWindow.scannedThroughUid;
-              if (prepared.mode === 'steady' && selectedUids.length < safeLimit) {
+              if (prepared.mode === 'steady' && selectedUids.length < safeLimit && historySyncOptions.skipHistoricalFallback !== true) {
                 const targetedUids = await resolveMailboxSyncUids({
                   client,
                   limit: safeLimit - selectedUids.length,

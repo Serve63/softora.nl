@@ -1092,6 +1092,37 @@ test('gerichte All Mail-rebuild checkpoint UID-windows duurzaam en gebruikt daar
   assert.equal(second.syncPass.scanComplete, true);
 });
 
+test('snelle v2-foldercontrole slaat historische seedlezingen over maar commit nieuwe mail duurzaam', async () => {
+  const fetched = [];
+  const commits = [];
+  const store = {
+    getUidGenerationProtocol: async () => ({ ok: true, protocol: 'v2' }),
+    acquireSyncLockForProtocol: async () => ({
+      ok: true, protocolMode: 'v2', lockToken: 'fast-lock', lockExpiresAt: futureLeaseExpiry(),
+    }),
+    prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+    checkpointTargetUidManifest: async () => { throw new Error('unexpected checkpoint'); },
+    confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
+    listLegacyUidIdentities: async () => [],
+    listMessageUidsForAccount: async () => { throw new Error('historical UID read'); },
+    listCampaignSeedMessagesForAccount: async () => { throw new Error('historical seed read'); },
+    commitSyncPass: async (input) => { commits.push(input); return { ok: true, committed: true, upserted: 1 }; },
+    commitTargetedSyncPass: async () => { throw new Error('unexpected targeted commit'); },
+    skipSync: async () => { throw new Error('unexpected skip'); },
+    failSync: async () => ({ ok: true, applied: true }),
+  };
+  const result = await createRawSyncService({
+    store,
+    fetcher: async (input) => { fetched.push(input); return createSyncPass([{ uid: 42, id: 'inbox:42' }]); },
+  }).syncMailbox({
+    owner: 'serve', folders: ['inbox'], limit: 4, campaignOnly: true, incrementalOnly: true, fastRefresh: true,
+  });
+  assert.equal(result.ok, true);
+  assert.ok(fetched.length > 0);
+  assert.ok(fetched.every((input) => input.skipHistoricalFallback === true));
+  assert.ok(commits.every((input) => input.messages[0].uid === 42 && input.accountEmail === 'serve@softora.nl'));
+});
+
 test('gerichte steady All Mail gebruikt uitsluitend het opgeslagen manifest en nooit legacy SEARCH', async () => {
   let legacySearches = 0;
   let selectedUids = [];
@@ -1115,7 +1146,7 @@ test('gerichte steady All Mail gebruikt uitsluitend het opgeslagen manifest en n
     sanitizeMailboxDisplayText: String, toClientMessage: (value) => value,
   });
   const fetched = await fetcher({
-    account: { email: 'martijnven123@gmail.com' }, folder: 'allmail', targetedOnly: true,
+    account: { email: 'martijnven123@gmail.com' }, folder: 'allmail', targetedOnly: true, skipHistoricalFallback: true,
     prepareUidGeneration: async () => createTargetedPrepared({
       mode: 'steady', resetDetected: false, activeGenerationId: GENERATION_A,
       targetGenerationId: GENERATION_A, scanUpperUid: 7,
@@ -1127,6 +1158,51 @@ test('gerichte steady All Mail gebruikt uitsluitend het opgeslagen manifest en n
   assert.equal(legacySearches, 0);
   assert.deepEqual(selectedUids, [7]);
   assert.deepEqual(fetched.syncPass.targetUidManifest, [7]);
+});
+
+test('snelle v2-controle gebruikt de duurzame frontier; historisch herstel en UID-reset blijven intact', async () => {
+  for (const [mode, skipHistoricalFallback, frontier, expectedUids, expectedRecovery] of [
+    ['steady', true, 7, [], 0],
+    ['steady', true, 5, [6, 7], 0],
+    ['steady', false, 7, [2], 1],
+    ['rebuild', true, 0, [1, 2, 3, 4], 0],
+  ]) {
+    let recoveryCalls = 0;
+    const searches = [];
+    const client = {
+      mailbox: { uidValidity: 700n, uidNext: 8 }, usable: true,
+      async connect() {}, async getMailboxLock() { return { release() {} }; },
+      async search(query) {
+        searches.push(query);
+        const [from, through] = query.uid.split(':').map(Number);
+        return Array.from({ length: through - from + 1 }, (_, i) => from + i);
+      },
+      async logout() { this.usable = false; },
+    };
+    const fetcher = createMailboxImapFetcher({
+      createClient: () => client, getSafeLimit: () => 4,
+      fetchSelectedMessages: async ({ selectedUids }) => selectedUids.map((uid) => ({ uid, id: `inbox:${uid}` })),
+      normalizeFolder: String, normalizeString: String, resolveMailboxName: async () => 'INBOX',
+      resolveMailboxSyncUids: async () => { recoveryCalls += 1; return [2]; },
+      runWithDeadline: async ({ operation }) => operation(),
+    });
+    const result = await fetcher({
+      account: { email: 'serve@softora.nl' }, folder: 'inbox', limit: 4,
+      skipHistoricalFallback, returnSyncPass: true,
+      prepareUidGeneration: async () => ({
+        ok: true, prepared: true, mode, resetDetected: mode === 'rebuild', resumed: false,
+        activeGenerationId: GENERATION_A, targetGenerationId: mode === 'rebuild' ? GENERATION_B : GENERATION_A,
+        currentUidValidity: mode === 'rebuild' ? 699 : 700, observedUidValidity: 700,
+        scanUpperUid: 7, scannedThroughUid: frontier, leaseExpiresAt: futureLeaseExpiry(),
+        selectionPolicy: MAILBOX_UID_SELECTION_POLICY, selectionTargets: [],
+      }),
+    });
+    assert.deepEqual(result.messages.map((message) => message.uid), expectedUids);
+    assert.equal(recoveryCalls, expectedRecovery);
+    assert.equal(result.syncPass.scannedThroughUid, mode === 'rebuild' ? 4 : 7);
+    assert.equal(result.syncPass.scanComplete, mode !== 'rebuild');
+    if (frontier === 7) assert.deepEqual(searches, []);
+  }
 });
 
 test('manifestcheckpoint behandelt een verloren response idempotent en timeout fail-closed', async () => {

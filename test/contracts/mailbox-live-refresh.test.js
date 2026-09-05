@@ -108,6 +108,7 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     force: false,
     campaignOnly: true,
     incrementalOnly: true,
+    fastRefresh: true,
     maxConcurrentAccounts: 2,
   }]);
   assert.equal(normalizeMailboxSyncOwner('ALL'), 'both');
@@ -791,6 +792,72 @@ test('outreach refresh toont IMAP-mail voordat de Instantly-provider start', asy
   finishInstantly();
   assert.equal(await refresh, true);
   assert.equal(events.at(-1), 'list:updated');
+  controller.destroy();
+});
+
+test('Instantly zonder wijzigingen vermijdt alleen een overbodige tweede geslaagde lijstlezing', async () => {
+  for (const [result, firstListOk, expectedLoads, complete] of [
+    [{ ok: true, stored: 0, skipped: true, reason: 'sync-in-progress' }, true, 1, true],
+    [{ ok: true, stored: 0 }, true, 1, true],
+    [{ ok: true, stored: 0 }, false, 2, true],
+    [{ ok: true, stored: 1 }, true, 2, true],
+    [{ ok: true }, true, 2, true],
+    [{ ok: false, stored: 0 }, true, 2, false],
+  ]) {
+    let loads = 0;
+    const controller = refreshModule.create({
+      autoStart: false, getFolder: () => 'outreach', getOwner: () => 'serve',
+      fetch: async (url) => successfulResponse(url.includes('instantly')
+        ? { ok: result.ok, results: [result] } : { ok: true }),
+      loadMessages: async () => { loads += 1; return loads > 1 || firstListOk; },
+      setTimeout: () => 1, clearTimeout() {},
+    });
+    assert.equal(await controller.refresh(), complete);
+    assert.equal(loads, expectedLoads);
+    controller.destroy();
+  }
+});
+
+test('hangende responsebody valt onder dezelfde timeout en maakt de verversknop weer vrij', async () => {
+  const timeouts = [];
+  const signals = [];
+  let attempts = 0;
+  const controller = refreshModule.create({
+    autoStart: false, getFolder: () => 'inbox', getAccount: () => 'serve@softora.nl',
+    fetch: async (_url, { signal }) => {
+      signals.push(signal); attempts += 1;
+      return { ok: true, status: 200, json: () => new Promise(() => {}) };
+    },
+    setTimeout(handler) { timeouts.push(handler); return timeouts.length; },
+    clearTimeout() {}, wait: async () => {},
+  });
+  const pending = controller.refresh({ manual: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  timeouts[0]();
+  await new Promise((resolve) => setImmediate(resolve));
+  timeouts[1]();
+  assert.equal(await pending, false);
+  assert.equal(attempts, 2);
+  assert.ok(signals.every((signal) => signal.aborted));
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'recovering' });
+  controller.destroy();
+});
+
+test('hangende mailboxlijst wordt geannuleerd en blijft eerlijk gedeeltelijk bijgewerkt', async () => {
+  const timeouts = [];
+  let listSignal;
+  const controller = refreshModule.create({
+    autoStart: false, getFolder: () => 'inbox', getAccount: () => 'serve@softora.nl',
+    fetch: async () => successfulResponse(),
+    loadMessages: ({ signal }) => { listSignal = signal; return new Promise(() => {}); },
+    setTimeout(handler) { timeouts.push(handler); return timeouts.length; }, clearTimeout() {},
+  });
+  const pending = controller.refresh();
+  await new Promise((resolve) => setImmediate(resolve));
+  timeouts.at(-1)();
+  assert.equal(await pending, false);
+  assert.equal(listSignal.aborted, true);
+  assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'partial' });
   controller.destroy();
 });
 

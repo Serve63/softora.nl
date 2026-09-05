@@ -314,6 +314,9 @@
         ? token
         : session.begin(scope);
       token = candidate;
+      const loadSignal = loadOptions.signal
+        ? AbortSignal.any([candidate.signal, loadOptions.signal].filter(Boolean))
+        : candidate.signal;
       const activeIdAtLoad = options.getActiveMail?.();
       const selectionVersionAtLoad = options.getSelectionVersion?.();
       const activeMessageAtLoad = (options.getMessages?.() || []).find(
@@ -331,12 +334,12 @@
           null,
           {
             owner: scope.owner,
-            signal: candidate.signal,
+            signal: loadSignal,
             skipBootstrap: loadOptions.skipPageBootstrap === true,
             refreshInstantly: loadOptions.skipProviderRefresh !== true,
           }
         );
-        if (!canApply(candidate)) {
+        if (!canApply(candidate) || loadSignal?.aborted) {
           setBusy(false);
           return false;
         }
@@ -378,14 +381,14 @@
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { Accept: 'application/json' },
-            ...(candidate.signal ? { signal: candidate.signal } : {}),
+            ...(loadSignal ? { signal: loadSignal } : {}),
           }
         );
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.ok) {
           throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
         }
-        if (!canApply(candidate)) {
+        if (!canApply(candidate) || loadSignal?.aborted) {
           setBusy(false);
           return false;
         }
@@ -414,7 +417,7 @@
         setBusy(false);
         return true;
       } catch (error) {
-        if (!canApply(candidate) || isAbortError(error)) {
+        if (!canApply(candidate) || loadSignal?.aborted || isAbortError(error)) {
           setBusy(false);
           return false;
         }

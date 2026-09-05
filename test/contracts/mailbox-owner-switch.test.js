@@ -56,6 +56,36 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
+test('timeout van refresh annuleert alleen de lijst en een laat antwoord overschrijft niets', async () => {
+  let messages = [{ id: 'huidig-bericht' }];
+  let release;
+  const refresh = new AbortController();
+  let requestSignal;
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      load: (_folder, _normalize, _fetch, { signal }) => {
+        requestSignal = signal;
+        return new Promise((resolve) => { release = resolve; });
+      },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getListElement: () => ({ setAttribute() {} }),
+  });
+  const pending = view.load({ signal: refresh.signal });
+  refresh.abort();
+  assert.equal(requestSignal.aborted, true);
+  release({ messages: [{ id: 'te-laat' }], sync: {} });
+  assert.equal(await pending, false);
+  assert.deepEqual(messages, [{ id: 'huidig-bericht' }]);
+  const next = view.load({ reuseActiveToken: true });
+  assert.equal(requestSignal.aborted, false);
+  release({ messages: [], sync: {} });
+  assert.equal(await next, true);
+});
+
 test('late normale inboxload kan een actieve zoekresultaatlijst niet overschrijven', async () => {
   let messages = [{ id: 'zoekresultaat-jenny' }];
   let searchActive = false;
