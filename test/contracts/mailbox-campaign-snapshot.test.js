@@ -555,7 +555,7 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 15,
+    version: 16,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{

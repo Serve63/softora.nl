@@ -60,8 +60,28 @@ function createMailboxOutreachScope(deps = {}) {
     return source.filter((_message, index) => eligible.has(contacts[index]));
   }
 
+  async function filterMessages({ owner = '', messages = [], hasCampaignProof = () => false } = {}) {
+    const accountEmails = getScopedAccounts(owner);
+    const allowedAccounts = new Set(accountEmails);
+    const source = (Array.isArray(messages) ? messages : []).filter((message) =>
+      allowedAccounts.has(String(message?.accountEmail || '').trim().toLowerCase()));
+    // Preserve the existing subject/label/exact-thread recovery paths. Only a
+    // customer-only admission needs additional durable per-message evidence.
+    const proven = new Set(source.filter(hasCampaignProof));
+    const candidates = source.filter((message) => !proven.has(message) &&
+      String(message?.messageKey || '').trim() && getCampaignCounterpartyEmail(message));
+    if (!candidates.length) return source.filter((message) => proven.has(message));
+    const requests = candidates.map((message) => ({
+      message_key: String(message.messageKey).trim(),
+      contact_email: getCampaignCounterpartyEmail(message),
+    }));
+    const eligible = new Set(await repository.filterCampaignMessages({ accountEmails, messages: requests }));
+    return source.filter((message) => proven.has(message) || eligible.has(String(message.messageKey || '').trim()));
+  }
+
   return {
     filterConversations,
+    filterMessages,
     getScopedAccounts,
   };
 }

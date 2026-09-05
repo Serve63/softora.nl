@@ -124,7 +124,26 @@ function createMailboxDiscoveryRepository(deps = {}) {
       .filter(Boolean);
   }
 
-  return { contactTimeline, filterOutreachContacts, search };
+  async function filterCampaignMessages({ accountEmails, messages }) {
+    const client = getClient();
+    if (!client) {
+      const error = new Error('De duurzame mailboxindex is niet beschikbaar.');
+      error.code = 'MAILBOX_DISCOVERY_UNAVAILABLE';
+      error.status = 503;
+      throw error;
+    }
+    const eligible = new Set();
+    for (let offset = 0; offset < messages.length; offset += 200) {
+      const rows = await withTimeout(client.rpc('softora_filter_mailbox_campaign_messages', {
+        p_account_emails: accountEmails,
+        p_messages: messages.slice(offset, offset + 200),
+      }), 'Bewijs van campagnereacties controleren');
+      rows.forEach((row) => eligible.add(String(row.message_key || '').trim()));
+    }
+    return [...eligible];
+  }
+
+  return { contactTimeline, filterCampaignMessages, filterOutreachContacts, search };
 }
 
 module.exports = {

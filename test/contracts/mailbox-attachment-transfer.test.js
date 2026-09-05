@@ -902,6 +902,7 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
   assert.equal((await compose.addAttachments(files, documentRef)).ok, true);
   const selected = withAttachmentDigests(compose.getAttachments());
   const calls = [];
+  const expiresAt = Date.now() + 30 * 60 * 1000;
   const uploads = files.map((file, index) => ({
     reference: `reference-${index}`,
     signedUrl: `https://storage.test/upload-${index}`,
@@ -910,7 +911,7 @@ test('compose uploadt drie normale PNGs direct en stuurt alleen korte references
     size: file.size,
     sha256: file.testSha256,
     referenceVersion: 2,
-    expiresAt: Date.now() + 30 * 60 * 1000,
+    expiresAt,
   }));
   const refs = await compose.uploadAttachments(selected, {
     fetch: async (url, options) => {
