@@ -226,6 +226,28 @@ function createOutboundGuardStore(calls = [], overrides = {}) {
   };
 }
 
+test('live IMAP previews remain valid Unicode when the cut falls inside an emoji', async () => {
+  const body = 'a'.repeat(138) + '😁 continued';
+  const date = new Date('2026-09-05T12:00:00.000Z');
+  const client = createFakeImapClient({
+    messagesByMailbox: { INBOX: [{ uid: 1, internalDate: date, source: {
+      date, text: body, subject: 'Unicode preview',
+      from: { value: [{ name: 'Customer', address: 'customer@example.test' }] },
+      to: { value: [{ address: 'serve@softora.nl' }] },
+    } }] },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{ email: 'serve@softora.nl', imapHost: 'imap.example.test', imapUser: 'serve@softora.nl', imapPass: 'test-password' }]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+    truncateText: require('../../server/services/runtime-primitives').truncateText,
+  });
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].preview.isWellFormed(), true);
+  assert.equal(messages[0].body, body);
+});
+
 function stripUnlinkedWebsiteDomainMarkup(html) {
   return String(html || '').replace(
     /<span class="softora-unlinked-website-domain"[^>]*>([\s\S]*?)<\/span>/g,
