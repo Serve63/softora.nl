@@ -231,11 +231,19 @@
       }
     }
     const seen = new Set(rootIdentity ? [rootIdentity] : []);
+    const currentByIdentity = new Map((root.threadMessages || []).map((message) => [getTimelineMessageIdentity(message), message]));
     root.threadMessages = normalized.filter((message) => {
       const identity = getTimelineMessageIdentity(message);
       if (!identity || seen.has(identity)) return false;
       seen.add(identity);
       return true;
+    }).map((message) => {
+      const current = currentByIdentity.get(getTimelineMessageIdentity(message));
+      // Only reconcile after contact/owner filtering and exact account identity.
+      // Timeline metadata must not discard a body or an in-flight hydration.
+      return current && global.SoftoraMailboxOwnerSession?.reconcileMessage
+        ? global.SoftoraMailboxOwnerSession.reconcileMessage(current, message)
+        : message;
     });
     root.externalContactEmail = normalizedContact;
     root.contactTimelineLoaded = true;
