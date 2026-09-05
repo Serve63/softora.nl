@@ -814,3 +814,15 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedQualityGatePath('scripts/export-runtime-backup.js'), false);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });
+
+
+test('SEO growth gate changes preserve source-bound review checks and same-invocation cadence validation', () => {
+  const reviewScript = readRepoFile('scripts/check-seo-machine-reviews.js');
+  const selectionScript = readRepoFile('scripts/check-seo-machine-selection.js');
+  const reviews = readRepoFile('server/services/seo-machine-experiment-reviews.js');
+  assert.match(reviewScript, /validateExperimentReviewEvidence/);
+  assert.match(reviewScript, /const report = readJson\(args.report\)/);
+  assert.match(reviews, /deriveExperimentReviewMetrics\(report, dueReview.paths\)/);
+  assert.match(selectionScript, /active\?\.invocationAt !== gateOptions.invocationAt/);
+  assert.match(selectionScript, /controlPlane = active.gates.cadence.summary/);
+});

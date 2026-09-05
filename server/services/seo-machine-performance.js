@@ -5,7 +5,8 @@ const DEFAULT_PERFORMANCE_THRESHOLDS = Object.freeze({
   recoveryMinimumImpressionRate: 0.4,
   recoveryZeroClickImpressions: 100,
   scaleMinimumImpressionRate: 0.6,
-  scaleMinimumClicks: 1,
+  scaleMinimumClicks: 10,
+  scaleMinimumClickingUrls: 3,
 });
 
 function toNumber(value, fallback = 0) {
@@ -112,7 +113,8 @@ function buildD28NonBrandedPerformance({
     };
   }
 
-  if (impressionRate >= thresholds.scaleMinimumImpressionRate && clicks >= thresholds.scaleMinimumClicks) {
+  if (impressionRate >= thresholds.scaleMinimumImpressionRate && clicks >= thresholds.scaleMinimumClicks
+    && clicking >= thresholds.scaleMinimumClickingUrls) {
     return { status: 'scale_ready', reasons: [], thresholds, summary, items };
   }
 

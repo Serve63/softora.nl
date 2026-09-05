@@ -720,7 +720,9 @@ function createMailboxSyncService({
         account,
         imapSession,
         folder: normalizedFolder,
-        limit: campaignOnly
+        // Large historical Gmail sent attachments exhausted the 70s pass for
+        // batches of four; complete single-message passes took 46-51s live.
+        limit: isGmailImapAccount(account) && normalizedFolder === 'sent' ? 1 : campaignOnly
           ? Math.min(
               getSafeLimit(limit),
               recoverGmailAllMail ? CAMPAIGN_GMAIL_ALL_MAIL_FETCH_LIMIT : CAMPAIGN_SYNC_FETCH_LIMIT

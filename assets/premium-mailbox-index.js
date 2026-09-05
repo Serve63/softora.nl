@@ -419,6 +419,7 @@ async function loadBody({
         if (mail.bodyLoaded && !needsLiveCampaignEnrichment) return;
         if (exactBodyAvailable) {
           mail.bodyLoading = false;
+          void openMail?.(id, { skipBodyFetch: true, skipReadPersist: true });
         }
       }
     } catch (error) {
@@ -588,6 +589,11 @@ function getThreadMessageResponseIdentity(source) {
 }
 
 function applyThreadMessagePayload(message, source, normalizeBodyImages, normalizeOptOutUrl) {
+  if (!Number(message.uid) && Number(source?.uid) > 0 && source?.requestMessageId) {
+    message.uid = Number(source.uid);
+    message.mailboxId = source.id;
+    message.storageFolder = source.folder;
+  }
   const previousEvidence = [
     message.bodyImageEvidenceKnown,
     message.webdesignLinkEvidenceKnown,
@@ -699,6 +705,7 @@ async function loadThreadBodies({
     ? targetMessages
     : Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
   const pendingTargets = messages.filter((message) => (
+    (retryFailed || !(Number(message?.providerMessageIdHydrationRetryAt) > Date.now())) &&
     (retryFailed || !normalizeText(message && message.bodyLoadError)) &&
     (
       needsThreadBodyHydration(message) ||
@@ -778,6 +785,9 @@ async function loadThreadBodies({
             if (source.providerMessageIdLookup === true) {
               const retryable = source.providerLookupRetryable === true;
               target.message.providerMessageIdHydrationRetryable = retryable;
+              target.message.providerMessageIdHydrationRetryAt = retryable ? Date.now() + 5 * 60_000 : 0;
+              target.message.bodyLoadError = needsThreadBodyHydration(target.message)
+                ? 'Volledig bericht kon niet worden geladen. Opnieuw proberen.' : '';
               if (!retryable) {
                 target.message.providerMessageIdHydrationAttempted = true;
                 target.message.webdesignLinkHydrationAttempted = true;
@@ -788,6 +798,7 @@ async function loadThreadBodies({
             return;
           }
           delete target.message.providerMessageIdHydrationRetryable;
+          delete target.message.providerMessageIdHydrationRetryAt;
           target.message.providerMessageIdHydrationAttempted = true;
           updated = applyThreadMessagePayload(
             target.message,

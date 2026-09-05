@@ -36,6 +36,7 @@
     'recipientRoutingNeedsHydration', 'to', 'toDisplay', 'cc', 'bcc', 'deliveredTo',
     'attachmentEvidenceKnown', 'attachmentHydrationAttempted',
     'providerMessageIdHydrationEligible', 'providerMessageIdHydrationAttempted',
+    'providerMessageIdHydrationRetryAt',
   ];
   const CONTACT_TIMELINE_FIELDS = [
     'contactTimelineLoaded', 'contactTimelineTotal', 'contactTimelineThreadCount',
@@ -87,7 +88,11 @@
     const currentContactTimeline = Object.fromEntries(
       CONTACT_TIMELINE_FIELDS.map((field) => [field, current[field]])
     );
-    const preserveHydration = current.bodyLoading === true ||
+    const providerReference = Number(current.uid) > 0 && !Number(incoming.uid) &&
+      normalize(current.accountEmail) === normalize(incoming.accountEmail) &&
+      Boolean(normalize(current.messageId)) && normalize(current.messageId) === normalize(incoming.messageId)
+      ? { uid: current.uid, mailboxId: current.mailboxId, storageFolder: current.storageFolder } : null;
+    const preserveHydration = Boolean(providerReference) || (current.bodyLoading === true && getBodyCompleteness(current) >= getBodyCompleteness(incoming)) ||
       getBodyCompleteness(current) > getBodyCompleteness(incoming);
     const preserveAttachmentEvidence = current.attachmentEvidenceKnown === true &&
       incoming.attachmentEvidenceKnown !== true;
@@ -105,7 +110,9 @@
     const preserveProviderMessageIdHydrationAttempt =
       current.providerMessageIdHydrationAttempted === true &&
       incoming.providerMessageIdHydrationAttempted !== true;
+    const retryAt = Math.max(Number(current.providerMessageIdHydrationRetryAt) || 0, Number(incoming.providerMessageIdHydrationRetryAt) || 0);
     Object.assign(current, incoming);
+    if (providerReference) Object.assign(current, providerReference);
     if (preserveHydration) {
       HYDRATED_MESSAGE_FIELDS.forEach((field) => { current[field] = currentBody[field]; });
     }
@@ -129,6 +136,7 @@
     if (!preserveHydration && preserveProviderMessageIdHydrationAttempt) {
       current.providerMessageIdHydrationAttempted = true;
     }
+    if (retryAt) current.providerMessageIdHydrationRetryAt = retryAt;
     if (preserveContactTimeline) {
       CONTACT_TIMELINE_FIELDS.forEach((field) => { current[field] = currentContactTimeline[field]; });
       current.contactTimelineNeedsRefresh = true;
@@ -497,7 +505,7 @@
     return { ensureToken, getToken: () => token, isCurrent, load, reset, switchOwner };
   }
 
-  const api = { create, createView, isAbortError, normalizeScope, reconcileMessages, sameScope };
+  const api = { create, createView, isAbortError, normalizeScope, reconcileMessage, reconcileMessages, sameScope };
   global.SoftoraMailboxOwnerSession = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

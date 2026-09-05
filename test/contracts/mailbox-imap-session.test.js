@@ -34,7 +34,7 @@ test('sequential folders reuse one account connection and listing, with fresh fo
       imapSession: session, deadlineAtMs: Date.now() + 1000 }), []);
   }
   assert.equal(created, 1);
-  assert.deepEqual(calls, ['connect', 'list', 'lock:INBOX', 'release:INBOX',
+  assert.deepEqual(calls, ['connect', 'lock:INBOX', 'release:INBOX', 'list',
     'lock:Softora / Coldmail', 'release:Softora / Coldmail']);
   await session.close();
   assert.equal(calls.at(-1), 'close');

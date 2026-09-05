@@ -20,20 +20,20 @@ function readyReport(nonBranded) {
   return { status: 'ready', pages: { nonBranded } };
 }
 
-test('D28 performance cohort becomes scale-ready only with reach and a non-brand click', () => {
+test('D28 performance requires repeatable clicks across three URLs before scaling', () => {
   const performance = buildD28NonBrandedPerformance({
     publicationPlan: publicationPlan(),
     report: readyReport([
-      { page: 'https://www.softora.nl/kennisbank/cohort-1', clicks: 1, impressions: 50, position: 8 },
-      { page: 'https://softora.nl/kennisbank/cohort-2/', clicks: 0, impressions: 30, position: 14 },
-      { page: '/kennisbank/cohort-3', clicks: 0, impressions: 20, position: 22 },
+      { page: 'https://www.softora.nl/kennisbank/cohort-1', clicks: 5, impressions: 50, position: 8 },
+      { page: 'https://softora.nl/kennisbank/cohort-2/', clicks: 3, impressions: 30, position: 14 },
+      { page: '/kennisbank/cohort-3', clicks: 2, impressions: 20, position: 22 },
     ]),
     now: new Date('2026-08-27T12:00:00.000Z'),
   });
   assert.equal(performance.status, 'scale_ready');
   assert.equal(performance.summary.reviewed, 5);
   assert.equal(performance.summary.impressing, 3);
-  assert.equal(performance.summary.clicks, 1);
+  assert.equal(performance.summary.clicks, 10);
 });
 
 test('D28 performance cohort triggers recovery for weak non-brand discovery', () => {
@@ -52,4 +52,14 @@ test('D28 performance cohort triggers recovery for weak non-brand discovery', ()
 test('D28 performance reports degraded data and normalizes page URLs', () => {
   assert.equal(normalizePagePath('https://www.softora.nl/blog/test/'), '/blog/test');
   assert.equal(buildD28NonBrandedPerformance({ report: null }).status, 'data_degraded');
+});
+
+
+test('one isolated non-brand click never unlocks scale', () => {
+  const performance = buildD28NonBrandedPerformance({
+    publicationPlan: publicationPlan(),
+    report: readyReport([1, 2, 3].map((id) => ({ page: `/kennisbank/cohort-${id}`, clicks: id === 1 ? 1 : 0, impressions: 50, position: 10 }))),
+    now: new Date('2026-08-27T12:00:00Z'),
+  });
+  assert.equal(performance.status, 'learning');
 });
