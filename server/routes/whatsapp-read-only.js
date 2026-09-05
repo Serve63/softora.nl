@@ -77,12 +77,33 @@ function registerWhatsAppReadOnlyRoutes(app, deps = {}) {
     }
   }
 
+  async function acceptYCloudWebhook(req, res) {
+    try {
+      const result = await service.acceptYCloudWebhook({
+        rawBody: req.rawBody,
+        signature: headerValue(req, 'ycloud-signature'),
+      });
+      return res.status(202).json(result);
+    } catch (error) {
+      const status = error?.code === 'WHATSAPP_WEBHOOK_SIGNATURE_INVALID'
+        ? 401
+        : error?.code === 'WHATSAPP_WEBHOOK_PAYLOAD_INVALID'
+          ? 400
+          : 503;
+      return res.status(status).json(safeError(error));
+    }
+  }
+
   app.get('/api/whatsapp/webhook', (req, res) => {
     return verifyChallenge(req, res);
   });
 
   app.post('/api/whatsapp/webhook', async (req, res) => {
     return acceptWebhook(req, res);
+  });
+
+  app.post('/api/whatsapp/ycloud-webhook', async (req, res) => {
+    return acceptYCloudWebhook(req, res);
   });
 
   app.get('/api/whatsapp/provider-webhook/:providerToken', (req, res) => {

@@ -22,7 +22,7 @@
       <h1>Privacy Policy</h1>
       <p class="archive-lead">This policy explains how Softora processes data from the WhatsApp Business account that its owner explicitly connects to the private, read-only archive.</p>
       <div class="archive-meta">
-        <span><strong>Effective:</strong> 13 August 2026</span>
+        <span><strong>Effective:</strong> 2 September 2026</span>
         <span><strong>Controller:</strong> Softora, Oisterwijk, the Netherlands</span>
         <span><strong>Contact:</strong> serve@softora.nl</span>
       </div>
@@ -34,7 +34,7 @@
 
     <section class="archive-section">
       <h2>1. Scope and data source</h2>
-      <p>This policy applies only to the app named <strong>Softora Read Archive</strong>. The account owner starts the official WhatsApp Business Platform Coexistence flow and chooses whether to share available history.</p>
+      <p>This policy applies only to the app named <strong>Softora Read Archive</strong>. The account owner starts the official WhatsApp Business Platform Coexistence flow through Meta and, where used, YCloud, and chooses whether to share available history.</p>
       <p>Subject to Meta's availability and the owner's choice, the archive can receive:</p>
       <ul>
         <li>WhatsApp Business account and phone-number identifiers;</li>
@@ -61,6 +61,7 @@
       <h2>4. Security and access</h2>
       <ul>
         <li>Direct Meta webhooks require a valid Meta signature. If an approved provider routes Meta events directly to Softora and cannot share its app secret, a separate high-entropy provider callback address is required and can be rotated independently.</li>
+        <li>YCloud webhook deliveries require a valid <code>YCloud-Signature</code>, verified with HMAC-SHA256 over the exact request body and the provider-issued endpoint secret.</li>
         <li>Message bodies, contact details and stored webhook payloads are encrypted at rest.</li>
         <li>Search uses keyed, non-plaintext indexes.</li>
         <li>Archive endpoints require a private access token and do not use browser caching.</li>
@@ -71,13 +72,14 @@
 
     <section class="archive-section">
       <h2>5. Service providers and international transfers</h2>
-      <p>Meta provides the WhatsApp Business Platform. Softora uses contracted hosting, database and AI-assistant infrastructure only as needed to operate the archive. These providers process data under their own terms and applicable data-protection safeguards. Softora does not sell WhatsApp data or share it with data brokers.</p>
+      <p>Meta provides the WhatsApp Business Platform. When selected by the account owner, YCloud acts as the WhatsApp solution provider that receives and forwards the permitted one-to-one history and new-message events. YCloud's provider-side retention for synchronized conversation data is up to six months under its service terms.</p>
+      <p>Softora separately stores a private archive in encrypted form and uses contracted hosting, database and AI-assistant infrastructure only as needed to operate it. These providers process data under their own terms and applicable data-protection safeguards. Softora does not sell WhatsApp data or share it with data brokers.</p>
       <p>If data is processed outside the European Economic Area, Softora uses available safeguards such as adequacy decisions or standard contractual clauses where required.</p>
     </section>
 
     <section class="archive-section">
       <h2>6. Retention</h2>
-      <p>Archived data is retained only while the archive remains active and the data is needed for the owner's stated retrieval purpose, legal obligations or dispute handling. The need for retention is reviewed periodically. A verified deletion request is completed without undue delay and normally within 30 days, unless a legal obligation requires limited retention.</p>
+      <p>YCloud's provider-side copy of synchronized conversation data may be retained for up to six months. Softora's separate encrypted archive is retained only while the archive remains active and the data is needed for the owner's stated retrieval purpose, legal obligations or dispute handling. The need for retention is reviewed periodically. A verified deletion request is completed without undue delay and normally within 30 days, unless a legal obligation requires limited retention.</p>
     </section>
 
     <section class="archive-section">
