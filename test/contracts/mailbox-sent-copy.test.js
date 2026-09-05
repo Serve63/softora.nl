@@ -8,7 +8,17 @@ const { simpleParser } = require('mailparser');
 const {
   appendSentMessage,
   assertRawMessageIntegrity,
+  resolveMailboxName,
 } = require('../../server/services/mailbox-sent-copy');
+
+test('opening the primary inbox avoids optional folder discovery even if LIST is unavailable', async () => {
+  let listed = false;
+  const client = { async list() { listed = true; throw new Error('LIST unavailable'); } };
+  assert.equal(await resolveMailboxName(client, 'inbox'), 'INBOX');
+  assert.equal(listed, false);
+  await assert.rejects(resolveMailboxName(client, 'sent'), /LIST unavailable/);
+  assert.equal(listed, true);
+});
 
 function createClient(appended) {
   return {
