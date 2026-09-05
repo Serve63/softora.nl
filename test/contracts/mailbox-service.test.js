@@ -531,6 +531,27 @@ test('selected owner response stays isolated while durable snapshot retains both
   );
 });
 
+test('campagnelijst kan alleen metadata ophalen terwijl bestaande callers volledige bodies behouden', async () => {
+  const reads = [];
+  const service = createMailboxService({
+    mailboxCampaignRepliesService: {
+      listRepliesWithSnapshot: async (options) => {
+        reads.push(options);
+        return { messages: [], snapshotMessages: [] };
+      },
+    },
+    instantlyMailboxService: { isConfigured: () => false },
+    setUiStateValues: async () => {},
+  });
+  for (const metadataOnly of [undefined, '1']) {
+    const res = createResponseRecorder();
+    await service.campaignRepliesResponse({ query: { owner: 'serve', metadataOnly } }, res);
+    assert.equal(res.statusCode, 200);
+  }
+  assert.deepEqual(reads.map((options) => options.hydrateBodies), [true, false]);
+  assert.ok(reads.every((options) => options.owner === 'serve' && options.snapshotLimit === 200));
+});
+
 test('mailbox service sends mail through selected account smtp', async () => {
   const sent = [];
   const service = createMailboxService({

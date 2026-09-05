@@ -24,8 +24,11 @@ function createMailboxCampaignRepliesList({
     includeSnapshotMessages = false,
     hydrateBodies = true,
   } = {}) {
+    const startedAt = Date.now();
     const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies });
+    const indexedAt = Date.now();
     const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
+    const mergedAt = Date.now();
     const result = {
       ok: true,
       messages,
@@ -50,6 +53,7 @@ function createMailboxCampaignRepliesList({
         logger.warn('[Mailbox][CampaignSnapshot]', error?.message || error);
       }
     }
+    logger.info?.('[Mailbox][CampaignListTiming]', { indexMs: indexedAt - startedAt, providerMs: mergedAt - indexedAt, snapshotMs: Date.now() - mergedAt, totalMs: Date.now() - startedAt, messages: messages.length, hydrateBodies });
     return includeSnapshotMessages ? { ...result, snapshotMessages } : result;
   };
 }
