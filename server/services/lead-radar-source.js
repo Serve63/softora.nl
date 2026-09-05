@@ -85,6 +85,11 @@ function extractPublicPostText(html) {
   return [...new Set(candidates.map(decodeJsonText).filter((value) => value.length >= 20))].join(' ');
 }
 
+function extractOriginalPostBody(html) {
+  const match = String(html || '').slice(0, 2_000_000).match(/"articleBody"\s*:\s*"((?:\\.|[^"\\]){8,})"/i);
+  return match ? decodeJsonText(match[1]) : '';
+}
+
 function contentMatchScore(expected, actual) {
   const tokenize = (value) => String(value || '')
     .toLowerCase()
@@ -130,7 +135,8 @@ function createLeadRadarSourceVerifier({ fetchImpl = globalThis.fetch, normalize
       if (requestedPostId && canonicalPostId && requestedPostId !== canonicalPostId) {
         return { ...baseResult, status: 'rejected', reason: 'De bron verwijst naar een andere post.', canonicalUrl, postId: canonicalPostId };
       }
-      const sourceText = extractPublicPostText(body);
+      const originalPostBody = extractOriginalPostBody(body);
+      const sourceText = originalPostBody || extractPublicPostText(body);
       const matchScore = contentMatchScore(options.expectedText, sourceText);
       if (sourceText && options.expectedText && matchScore < CONTENT_MATCH_THRESHOLD) {
         return {
@@ -156,6 +162,7 @@ function createLeadRadarSourceVerifier({ fetchImpl = globalThis.fetch, normalize
       return {
         status: 'verified', reason: 'Directe post, aanvraagtekst en publicatiedatum zijn bevestigd.', available: true,
         publication, canonicalUrl, postId: canonicalPostId || requestedPostId, contentMatchScore: matchScore,
+        messageText: originalPostBody || null,
       };
     } catch (error) {
       return { ...baseResult, reason: error?.name === 'AbortError' ? 'Broncontrole liep in een timeout.' : 'Broncontrole is technisch mislukt.' };
@@ -175,4 +182,3 @@ module.exports = {
   extractPostId,
   extractPublicPostText,
 };
-

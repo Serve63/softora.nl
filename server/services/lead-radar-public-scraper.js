@@ -2,6 +2,7 @@
 
 const { parseDocument } = require('htmlparser2');
 const { assertWebsitePreviewUrlIsPublic } = require('../security/public-url');
+const { isGoogleAlertsFeed, parseDiscoveryFeed } = require('./lead-radar-discovery-feeds');
 const {
   isBlockedLeadSourceUrl,
 } = require('./lead-radar-source-policy');
@@ -316,6 +317,8 @@ function buildPublicScraperPlan(options = {}) {
   const platforms = [...new Set(requested.filter((value) => ['web', 'mastodon', 'bluesky'].includes(value)))];
   const feeds = parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS)
     .filter((value) => !isBlockedLeadSourceUrl(value));
+  const discoveryFeeds = parseUrlList(env.LEAD_RADAR_DISCOVERY_FEED_URLS)
+    .filter((value) => !isBlockedLeadSourceUrl(value));
   const mastodonInstances = parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES)
     .filter((value) => !isBlockedLeadSourceUrl(value))
     .map((value) => value.replace(/\/$/, ''));
@@ -323,6 +326,10 @@ function buildPublicScraperPlan(options = {}) {
   const region = 'Nederland';
   const plan = [];
   if (platforms.includes('web')) {
+    discoveryFeeds.forEach((sourceUrl) => plan.push({
+      adapter: 'discovery_feed', platform: 'web', region, keywordGroup: 'buyer_intent', term: 'gerichte klantvragen',
+      query: sourceUrl, sourceUrl, maxResults: 10,
+    }));
     feeds.forEach((sourceUrl) => plan.push({
       adapter: 'feed', platform: 'web', region, keywordGroup: 'direct_owner_feed', term: 'directe openbare ondernemersvraag',
       query: sourceUrl, sourceUrl, maxResults: 100,
@@ -346,6 +353,8 @@ function buildPublicScraperPlan(options = {}) {
 function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
   const publicFetcher = createLeadRadarPublicFetcher({ env, fetchImpl, logger });
   const config = {
+    discoveryFeeds: parseUrlList(env.LEAD_RADAR_DISCOVERY_FEED_URLS)
+      .filter((value) => !isBlockedLeadSourceUrl(value)),
     feeds: parseUrlList(env.LEAD_RADAR_PUBLIC_FEED_URLS, DEFAULT_PUBLIC_FEEDS)
       .filter((value) => !isBlockedLeadSourceUrl(value)),
     mastodonInstances: parseUrlList(env.LEAD_RADAR_MASTODON_INSTANCES, DEFAULT_MASTODON_INSTANCES)
@@ -359,6 +368,14 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
   async function searchFeed(context, maxResults) {
     const result = await publicFetcher.fetchPublic(context.sourceUrl, { accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml;q=0.9' });
     return parsePublicFeed(result.body, result.url).slice(0, maxResults);
+  }
+
+  async function searchDiscoveryFeed(context, maxResults) {
+    const result = await publicFetcher.fetchPublic(context.sourceUrl, {
+      accept: 'application/atom+xml,application/rss+xml,application/xml',
+      checkRobots: !isGoogleAlertsFeed(context.sourceUrl),
+    });
+    return parseDiscoveryFeed(result.body, result.url, parsePublicFeed).slice(0, maxResults);
   }
 
   async function searchMastodon(context, maxResults) {
@@ -436,6 +453,7 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
       throw error;
     }
     if (normalizedContext.adapter === 'feed') return searchFeed(normalizedContext, limit);
+    if (normalizedContext.adapter === 'discovery_feed') return searchDiscoveryFeed(normalizedContext, limit);
     if (normalizedContext.adapter === 'mastodon') return searchMastodon(normalizedContext, limit);
     if (normalizedContext.adapter === 'bluesky') return searchBluesky(normalizedContext, limit);
     const error = new Error('Onbekende openbare scraperadapter.');
@@ -445,18 +463,19 @@ function createLeadRadarScraperProvider({ env = process.env, fetchImpl = globalT
 
   return {
     name: 'softora_public_scraper',
-    configured: Boolean(config.feeds.length || (config.mastodonInstances.length && config.mastodonTags.length) || config.blueskyEnabled),
+    configured: Boolean(config.discoveryFeeds.length || config.feeds.length || (config.mastodonInstances.length && config.mastodonTags.length) || config.blueskyEnabled),
     buildPlan(options = {}) {
       return buildPublicScraperPlan({ ...options, env });
     },
     search,
     getStatus() {
       return {
-        configured: Boolean(config.feeds.length || (config.mastodonInstances.length && config.mastodonTags.length) || config.blueskyEnabled),
+        configured: Boolean(config.discoveryFeeds.length || config.feeds.length || (config.mastodonInstances.length && config.mastodonTags.length) || config.blueskyEnabled),
         provider: 'softora_public_scraper',
         paid: false,
         message: 'Eigen Softora-scraper actief voor directe openbare ondernemersvragen; opdrachtmarktplaatsen zijn uitgesloten.',
         sources: {
+          discoveryFeeds: config.discoveryFeeds.length,
           publicFeeds: config.feeds.length,
           mastodonInstances: config.mastodonInstances.length,
           mastodonHashtags: config.mastodonTags.length,
