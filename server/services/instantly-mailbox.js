@@ -14,6 +14,7 @@ const {
 const { normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
+const { acquireInstantlyMailboxSyncLock } = require('./instantly-mailbox-sync-lock');
 const { finalizeInstantlyAcceptedReply } = require('./mailbox-instantly-reply-acceptance');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
@@ -669,9 +670,9 @@ function createInstantlyMailboxService(deps = {}) {
       const state = await mailboxIndexStore.getSyncState({ accountEmail: syncKey, folder: 'instantly' });
       const recentSync = buildRecentSyncResult({ state, owner: selectedOwner, accounts, minIntervalMs: options.minIntervalMs, nowMs: now().getTime() });
       if (recentSync) return recentSync;
-      const lock = await mailboxIndexStore.acquireSyncLock?.({
+      const lock = await acquireInstantlyMailboxSyncLock(mailboxIndexStore, {
         accountEmail: syncKey,
-        folder: 'instantly',
+        now: () => now().getTime(),
       });
       if (lock && !lock.ok) {
         if (lock.locked) {
@@ -796,12 +797,15 @@ function createInstantlyMailboxService(deps = {}) {
           });
           stored += hydrated.stored;
         }
-        await mailboxIndexStore.finishSync?.({
+        const finished = await mailboxIndexStore.finishSync?.({
           accountEmail: syncKey,
           folder: 'instantly',
           lockToken,
           messageCount: stored,
         });
+        if (!finished?.ok) {
+          throw createInstantlyMailboxError('Instantly-sync kon niet duurzaam worden afgerond.', 'INSTANTLY_SYNC_FINISH_FAILED', 503);
+        }
         await setContinuation(selectedOwner, cursor
           ? { cursor, minTimestamp }
           : { cursor: '', minTimestamp: '' });

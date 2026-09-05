@@ -33,10 +33,10 @@ function createStore(initialMessages = []) {
     async getSyncState({ accountEmail, folder }) {
       return syncStates.get(`${accountEmail}|${folder}`) || null;
     },
-    async acquireSyncLock({ accountEmail, folder }) {
+    async acquireSyncLockForProtocol({ accountEmail, folder }) {
       const lockToken = `lock:${accountEmail}:${folder}`;
       syncStates.set(`${accountEmail}|${folder}`, { lock_token: lockToken });
-      return { ok: true, lockToken };
+      return { ok: true, lockToken, protocolMode: 'v2' };
     },
     async finishSync({ accountEmail, folder, lockToken, messageCount, error }) {
       syncStates.set(`${accountEmail}|${folder}`, {
@@ -1893,7 +1893,7 @@ test('interactive refresh reuses a recent durable Instantly sync instead of hitt
   const store = createStore();
   let lockCalls = 0;
   store.getSyncState = async () => ({ last_synced_at: '2026-07-25T11:59:00.000Z' });
-  store.acquireSyncLock = async () => { lockCalls += 1; return { ok: true, lockToken: 'lock' }; };
+  store.acquireSyncLockForProtocol = async () => { lockCalls += 1; return { ok: true, lockToken: 'lock', protocolMode: 'v2' }; };
   const { service, requests } = buildService({ store });
 
   const result = await service.syncOwner('serve', { minIntervalMs: 3 * 60 * 1000 });
@@ -1905,6 +1905,45 @@ test('interactive refresh reuses a recent durable Instantly sync instead of hitt
   assert.equal(result.nextAllowedAt, '2026-07-25T12:02:00.000Z');
   assert.equal(lockCalls, 0);
   assert.equal(requests.length, 0);
+});
+
+test('Instantly refresh reports capacity and protocol rejection before any provider request', async () => {
+  for (const lock of [
+    { ok: false, locked: true, protocolMode: 'v2', contention: 'capacity' },
+    { ok: false, locked: true, protocolMode: 'draining', contention: 'active_lock' },
+    { ok: false, locked: true, protocolMode: 'legacy', contention: 'active_lock' },
+  ]) {
+    const store = createStore();
+    store.acquireSyncLockForProtocol = async () => lock;
+    const { service, requests } = buildService({ store });
+    await assert.rejects(service.syncOwner('serve'), (error) => error.status === 503 && error.retryable === true);
+    assert.equal(requests.length, 0);
+  }
+});
+
+test('Instantly only coalesces with a proven active lease for that owner', async () => {
+  const store = createStore();
+  store.acquireSyncLockForProtocol = async () => ({ ok: false, locked: true, protocolMode: 'v2', contention: 'active_lock' });
+  store.getSyncState = async ({ accountEmail, folder }) => {
+    assert.equal(accountEmail, 'instantly-serve@softora.internal');
+    assert.equal(folder, 'instantly');
+    return { status: 'syncing', lock_token: 'other-worker', lock_expires_at: '2026-07-25T12:01:00Z' };
+  };
+  const { service, requests } = buildService({ store });
+  assert.equal((await service.syncOwner('serve')).reason, 'sync-in-progress');
+  assert.equal(requests.length, 0);
+});
+
+test('Instantly refuses a missing protocol adapter or unconfirmed durable finish', async () => {
+  const store = createStore();
+  store.acquireSyncLockForProtocol = undefined;
+  const missing = buildService({ store });
+  await assert.rejects(missing.service.syncOwner('serve'), { code: 'INSTANTLY_SYNC_LOCK_FAILED' });
+  assert.equal(missing.requests.length, 0);
+  const failingStore = createStore();
+  failingStore.finishSync = async () => ({ ok: false });
+  const failed = buildService({ store: failingStore });
+  await assert.rejects(failed.service.syncOwner('serve'), { code: 'INSTANTLY_SYNC_FINISH_FAILED' });
 });
 
 test('suggested replies use the exact Instantly owner identity instead of falling back to Servé', async () => {
