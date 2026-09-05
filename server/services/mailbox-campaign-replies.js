@@ -1004,7 +1004,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
         .filter(Boolean)
     );
 
-    const replies = campaignMessages
+    const replies = (mailboxOutreachScope ? await mailboxOutreachScope.filterMessages({ owner: safeSnapshotLimit ? '' : owner, messages: campaignMessages, hasCampaignProof: (message) => provenCampaignConversationIds.has(getCampaignConversationId(message, campaignThreadSet)) }) : campaignMessages)
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
         const exactCampaignThread = provenCampaignConversationIds.has(

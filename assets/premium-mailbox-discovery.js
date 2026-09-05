@@ -244,7 +244,8 @@
       ? Number(totalCount)
       : 1 + root.threadMessages.length;
     root.contactTimelineRejectedCount = rejectedCount;
-    root.contactTimelineTotal = Math.max(1 + root.threadMessages.length, reportedTotal - rejectedCount);
+    root.contactTimelineTotal = totalCount === 0 && normalized.length === 0
+      ? 0 : Math.max(1 + root.threadMessages.length, reportedTotal - rejectedCount);
     root.contactTimelineThreadCount = new Set(normalized.map((message) => message.technicalThreadKey).filter(Boolean)).size;
     return root;
   }
@@ -287,7 +288,7 @@
     const more = mail.contactTimelineNextCursor
       ? `<button type="button" data-mailbox-action="load-more-contact-timeline" data-mailbox-id="${escapeHtml(mail.id)}">Oudere berichten laden</button>`
       : '';
-    return `<div class="mail-contact-summary" role="status"><strong>Contactdossier:</strong><span>${escapeHtml(`${messages} berichten · ${threads} onderwerpen${contact ? ` · ${contact}` : ''}`)}</span>${more}</div>`;
+    return `<div class="mail-contact-summary" role="status"><strong>Contactdossier:</strong><span>${escapeHtml(`${messages} ${messages === 1 ? 'bericht' : 'berichten'} · ${threads} ${threads === 1 ? 'onderwerp' : 'onderwerpen'}${contact ? ` · ${contact}` : ''}`)}</span>${more}</div>`;
   }
 
   function renderRootSentCardStart(mail, options = {}) {

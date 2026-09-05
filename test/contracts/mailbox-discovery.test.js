@@ -1224,6 +1224,8 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
   await database.exec(fs.readFileSync(atomicVisibilityMigrationPath, 'utf8'));
   await database.exec(fs.readFileSync(acceptedTimelineMigrationPath, 'utf8'));
   await database.exec(fs.readFileSync(campaignProvenanceMigrationPath, 'utf8'));
+  await database.exec(fs.readFileSync(path.resolve(__dirname,
+    '../../supabase/migrations/20260905023656_mailbox_campaign_message_gate.sql'), 'utf8'));
 
   const preMigrationDeleteState = await database.query(`
     select message_key, deleted_at
@@ -1756,6 +1758,43 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
   `);
   assert.equal(emptyState.rows.find((row) => row.folder === 'coldmail').deleted_at !== null, true);
   assert.equal(emptyState.rows.find((row) => row.folder === 'allmail').deleted_at, null);
+  // The same address is an outreach contact, but that does not authorize its newsletter.
+  await database.query(`
+    insert into public.softora_mailbox_messages (
+      message_key, account_email, folder, uid, provider_id, message_id,
+      sender_email, recipients_text, subject, body_text, payload
+    ) values ('newsletter-known-lead','martijn@softora.nl','inbox',987,'inbox:987',
+      '<newsletter@events.example>','communicatie@schakel-nu.nl','martijn@softora.nl',
+      'LAST WEEKEND TO SAVE','You subscribed to our newsletter.','{}');
+  `);
+  const campaignGateRequests = [
+    { message_key: 'tessa-back-a-in', contact_email: 'communicatie@schakel-nu.nl' },
+    { message_key: 'tessa-back-a-later', contact_email: 'communicatie@schakel-nu.nl' },
+    { message_key: 'tessa-back-serve', contact_email: 'communicatie@schakel-nu.nl' },
+    { message_key: 'newsletter-known-lead', contact_email: 'communicatie@schakel-nu.nl' },
+    { message_key: 'missing-generation', contact_email: 'communicatie@schakel-nu.nl' },
+  ];
+  const messageGate = await database.query(
+    'select * from public.softora_filter_mailbox_campaign_messages($1, $2::jsonb)',
+    [['martijn@softora.nl'], JSON.stringify(campaignGateRequests)]
+  );
+  assert.deepEqual(messageGate.rows.map((row) => row.message_key).sort(), ['tessa-back-a-in', 'tessa-back-a-later']);
+  const wrongContactGate = await database.query(
+    'select * from public.softora_filter_mailbox_campaign_messages($1, $2::jsonb)',
+    [['martijn@softora.nl'], JSON.stringify([{ message_key: 'tessa-back-a-in', contact_email: 'ander@schakel-nu.nl' }])]
+  );
+  assert.deepEqual(wrongContactGate.rows, []);
+  await database.query("update public.softora_mailbox_messages set generation_superseded_at = now() where message_key = 'tessa-back-a-in'");
+  const retiredGate = await database.query(
+    'select * from public.softora_filter_mailbox_campaign_messages($1, $2::jsonb)',
+    [['martijn@softora.nl'], JSON.stringify(campaignGateRequests.slice(0, 1))]
+  );
+  assert.deepEqual(retiredGate.rows, []);
+  const privileges = await database.query(`select
+    has_function_privilege('anon', 'public.softora_filter_mailbox_campaign_messages(text[],jsonb)', 'EXECUTE') as anon,
+    has_function_privilege('authenticated', 'public.softora_filter_mailbox_campaign_messages(text[],jsonb)', 'EXECUTE') as authenticated,
+    has_function_privilege('service_role', 'public.softora_filter_mailbox_campaign_messages(text[],jsonb)', 'EXECUTE') as service_role`);
+  assert.deepEqual(privileges.rows, [{ anon: false, authenticated: false, service_role: true }]);
   await database.close();
 });
 

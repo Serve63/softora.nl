@@ -6,7 +6,7 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v17';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v18';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({

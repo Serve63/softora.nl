@@ -1545,7 +1545,7 @@ test('contactdossier telt een geneste eigen quote niet als bericht en muteert de
   assert.equal(root.threadMessages.length, 0);
   assert.equal(root.contactTimelineTotal, 1);
   assert.match(summary, /<strong>Contactdossier:<\/strong>/);
-  assert.match(summary, /1 berichten/);
+  assert.match(summary, /1 bericht\b/);
   assert.match(html, /Bedankt voor je bericht\./);
   assert.doesNotMatch(html, /Dit is alleen geciteerde|Nested quote|Doorgestuurd bericht/);
   assert.doesNotMatch(html, /detail-mail-section-history-sent|citaat · niet ontvangen/i);
@@ -11186,7 +11186,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v17:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v18:usr_serve:serve');
         return {
           ok: true,
           owner: 'serve',
