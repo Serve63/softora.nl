@@ -118,3 +118,5 @@ body[data-flynow-page] .fn-back-host .settings-module-back{font-size:14px!import
 body[data-flynow-type="snow"] .fn-hero h1 em{color:#c5e2ee}
 
 @media(max-width:360px){body[data-flynow-page] .flynow-main .fn-mode{font-size:12px!important;padding:8px!important;gap:6px}}
+
+body[data-flynow-type="snow"] .fn-hero>img{object-position:center 22%}

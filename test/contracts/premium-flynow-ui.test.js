@@ -66,6 +66,9 @@ test('FlyNow heeft toegankelijke tabs, zoekveld, lege selectie en modaal reisven
   assert.match(js, /image\.loading = 'lazy'/); assert.match(html, /fetchpriority="high"/);
   assert.match(html, /aria-controls="fn-sidebar" aria-expanded="false"/);
   assert.match(js, /function toggleNavigation\(open\)/);
+  assert.match(js, /function syncFlyNowNavigation\(\)/);
+  assert.match(js, /attributeFilter: \['class'\]/);
+  assert.match(js, /setAttribute\('aria-current', 'location'\)/);
   assert.match(css, /\.fn-nav-open \.sidebar\{display:flex!important/);
   assert.match(css, /:focus-visible/); assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /@media\(max-width:580px\)/);
