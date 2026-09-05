@@ -1,4 +1,5 @@
 const DEFAULT_MAILBOX_IMAP_OPERATION_TIMEOUT_MS = 70_000;
+const { observeMailboxImapClient } = require('./mailbox-imap-observation');
 const {
   scanMailboxTargetUidManifestWindow,
 } = require('./mailbox-target-manifest-scan');
@@ -259,7 +260,8 @@ function createMailboxImapFetcher({
   }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
-    const client = createClient(account);
+    const client = createClient(account, { emitLogs: true });
+    const observation = observeMailboxImapClient(client);
     const startedAt = Date.now();
     const logImapOperation = historySyncOptions.logImapOperation === true;
     const effectiveTimeoutMs = getMailboxImapOperationTimeoutMs({
@@ -285,12 +287,15 @@ function createMailboxImapFetcher({
         folder: normalizedFolder,
         timeoutMs: imapOperationTimeoutMs,
         deadlineAtMs,
-        operation: async () => {
+        operation: () => observation.run(async () => {
           await client.connect();
+          observation.setStage('resolve-folder');
           const mailboxName = await resolveMailboxName(client, normalizedFolder);
           if (!mailboxName) return { messages: [], syncPass: null, folderMissing: true };
+          observation.setStage('open-folder');
           const lock = await client.getMailboxLock(mailboxName);
           try {
+            observation.setStage('read-folder');
             const observedUidValidity = normalizeMailboxUidValidity(client?.mailbox?.uidValidity);
             const observedUidNext = normalizeMailboxUidNext(client?.mailbox?.uidNext);
             const targetedOnly = historySyncOptions.targetedOnly === true;
@@ -644,7 +649,7 @@ function createMailboxImapFetcher({
           } finally {
             lock.release();
           }
-        },
+        }),
       });
       if (logImapOperation) {
         logger.info?.('[Mailbox][ImapOperation]', {
@@ -662,6 +667,7 @@ function createMailboxImapFetcher({
       if (logImapOperation) {
         logger.warn?.('[Mailbox][ImapOperation]', {
           phase: 'failed',
+          ...observation.snapshot(),
           account: account.email,
           folder: normalizedFolder,
           campaignHistory: Boolean(campaignHistory),

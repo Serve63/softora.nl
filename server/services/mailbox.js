@@ -831,7 +831,7 @@ function createMailboxService(deps = {}) {
     return { folder, uid };
   }
 
-  function createClient(account) {
+  function createClient(account, { emitLogs = false } = {}) {
     return createImapClient({
       host: account.imapHost,
       port: account.imapPort,
@@ -840,7 +840,7 @@ function createMailboxService(deps = {}) {
         user: account.imapUser,
         pass: account.imapPass,
       },
-      logger: false,
+      logger: false, emitLogs,
     });
   }
 
