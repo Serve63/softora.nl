@@ -782,7 +782,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {
   const pageSource = readRepoFile('premium-flynow.html');
-  const flynowCssSource = readRepoFile('assets/flynow.css');
+  const flynowCssSource = readRepoFile('assets/flynow-explore.css');
 
   assert.match(
     pageSource,
@@ -790,7 +790,7 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
   );
   assert.match(
     pageSource,
-    /<aside class="sidebar" data-flynow-sidebar-host="1" aria-label="Premium navigatie"><\/aside>/,
+    /<aside class="sidebar" data-flynow-sidebar-host="1" id="fn-sidebar" aria-label="Premium navigatie"><\/aside>/,
     'FLYNOW hoort leeg te starten en daarna de gedeelde premium-sidebar dynamisch te laten vullen'
   );
   assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
@@ -810,7 +810,7 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
   );
   assert.match(
     flynowCssSource,
-    /body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*box-sizing:\s*border-box !important/
+    /body\[data-flynow-page\] \.sidebar\s*\{[\s\S]*box-sizing:\s*border-box\s*!important/
   );
   assert.match(
     flynowCssSource,
@@ -822,11 +822,11 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
   );
   assert.match(
     flynowCssSource,
-    /\.deals-header\s*\{[\s\S]*position:\s*sticky;/
+    /\.fn-header\s*\{[\s\S]*display:\s*flex;/
   );
   assert.match(
     flynowCssSource,
-    /\.deals-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(230px,\s*1fr\)\)/
+    /\.fn-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/
   );
 });
 

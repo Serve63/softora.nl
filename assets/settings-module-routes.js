@@ -11,7 +11,7 @@
     Object.freeze({ label: 'OMZETWERK', description: 'Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1.000.000.', href: '/premium-omzetwerk', paths: ['/premium-omzetwerk'], files: ['premium-omzetwerk.html'], unlocked: true }),
     Object.freeze({ label: 'Ruben zet toto', description: 'Interne template-module die later verder ingevuld kan worden.', href: '', paths: [], files: [], unlocked: false }),
     Object.freeze({ label: 'world watcher', description: 'Interne template-module die later verder ingevuld kan worden.', href: '', paths: [], files: [], unlocked: false }),
-    Object.freeze({ label: 'Flynow', description: 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.', href: '', paths: [], files: [], unlocked: false }),
+    Object.freeze({ label: 'Flynow', description: 'Zon, zee of sneeuw. Ontdek je volgende bestemming.', href: '/premium-flynow', paths: ['/premium-flynow', '/premium-flynow.html'], files: ['premium-flynow.html'], unlocked: true }),
     Object.freeze({ label: 'Transfermarkt', description: 'Interne template-module die later verder ingevuld kan worden.', href: '', paths: [], files: [], unlocked: false }),
     Object.freeze({ label: 'Ruben’s Trading System', description: 'Interne template-module die later verder ingevuld kan worden.', href: '', paths: [], files: [], unlocked: false })
   ]);
