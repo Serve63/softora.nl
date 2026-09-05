@@ -840,3 +840,11 @@ test('SEO same-task migration preserves audited start and all publication gate r
   assert.match(script, /const audit = auditAutomationInstallation\(auditOptions\)/);
   assert.match(script, /validatePublishedRunGates\(receipt, receipt\)/);
 });
+
+test('SEO reading navigation cannot weaken the contact-route quality gate', () => {
+  const gates = readRepoFile('server/services/seo-machine-quality-gates.js');
+  assert.match(gates, /isArticleSectionNavigation\(anchor, html\)/);
+  assert.match(gates, /stripHtmlTags\(heading\[1\]\) === anchor.label/);
+  assert.match(gates, /lead-cta-not-whatsapp/);
+  assert.match(gates, /untracked-conversion-link/);
+});

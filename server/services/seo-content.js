@@ -1,3 +1,4 @@
+const { renderContentNavigation, renderReadingNavigation, sectionId } = require('./seo-content-reading-layout');
 const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 const { WEBSITE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-website-proposal');
 const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
@@ -2917,7 +2918,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     '<link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">',
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
-    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260608a">',
+    '<link rel="stylesheet" href="/assets/seo-content.css?v=20260905b">',
     `<meta property="og:type" content="${escapeHtml(ogType)}">`,
     '<meta property="og:site_name" content="Softora">',
     '<meta property="og:locale" content="nl_NL">',
@@ -2994,24 +2995,9 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '<head>',
     `    ${buildBaseHead({ title, description, canonicalUrl, structuredData, ogType, image })}`,
     '</head>',
-    '<body>',
-    '  <nav>',
-    '    <a class="nav-logo" href="/" aria-label="Softora homepage">SOFTORA.NL</a>',
-    '    <div class="nav-links" aria-label="Content navigatie">',
-    '      <a href="/diensten">Diensten</a>',
-    '      <a href="/pakketten">Pakketten</a>',
-    '      <a href="/website-laten-maken">Websites</a>',
-    '      <a href="/ai-automatisering">AI</a>',
-    '      <a href="/bedrijfssoftware-op-maat">Software</a>',
-    '      <a href="/blog">Blog</a>',
-    '      <a href="/kennisbank">Kennisbank</a>',
-    '      <a href="/vergelijkingen">Vergelijkingen</a>',
-    '      <a href="/branches">Branches</a>',
-    '      <a href="/regio">Regio</a>',
-    `      <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-nav-contact" data-softora-conversion-page="${escapeHtml(conversionPage)}" data-softora-conversion-target="whatsapp">Contact</a>`,
-    '    </div>',
-    '  </nav>',
-    '  <div class="seo-shell">',
+    '<body class="seo-content-page" data-softora-contact-placement="header">',
+    renderContentNavigation({ conversionPage, whatsappUrl: MARTIJN_WHATSAPP_URL, escapeHtml }),
+    '  <div class="seo-shell" id="hoofdinhoud" tabindex="-1">',
     body,
     '  </div>',
     '</body>',
@@ -3061,11 +3047,11 @@ function renderConversionCta(item) {
     '  <div>',
     '    <div class="meer-label">Volgende stap</div>',
     '    <h2>Wil je dit toepassen op jouw bedrijf?</h2>',
-    '    <p>Gebruik deze pagina als richting, maar laat de keuze afhangen van je echte proces, doelen en leadflow.</p>',
+    '    <p>Bekijk welke aanpak bij je bedrijf past. Heb je een concrete vraag? Leg die gerust aan ons voor.</p>',
     '  </div>',
     '  <div class="content-cta-actions">',
     `    <a class="content-cta-primary" href="${escapeHtml(primary.href)}" data-softora-conversion="content-primary" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="service">${escapeHtml(primary.label)}</a>`,
-    `    <a class="content-cta-secondary" href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">Contact</a>`,
+    `    <a class="content-cta-secondary" href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">Stel je vraag</a>`,
     '  </div>',
     '</section>',
   ].join('\n');
@@ -3318,26 +3304,10 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
 
 function renderAuthorityBlock(item) {
   const author = item.author || SEO_CONTENT_AUTHOR;
-  const reviewer = item.reviewedBy || SEO_CONTENT_REVIEWER;
   return [
-    '    <section class="artikel-eeat" data-softora-public-seo="eeat">',
-    '      <div>',
-    '        <span>Praktijkbasis</span>',
-    '        <p>Deze uitleg is geschreven vanuit Softora-werk aan websites, CRM, AI automatisering, klantcontact en digitale opvolging voor ondernemers.</p>',
-    '      </div>',
-    '      <div>',
-    '        <span>Auteur en controle</span>',
-    `        <p>Geschreven en inhoudelijk gecontroleerd door ${escapeHtml(
-      reviewer.name || author.name
-    )}. We verbeteren deze pagina op basis van zoekdata, klantvragen en wat in echte trajecten duidelijker moet.</p>`,
-    '      </div>',
-    '      <div>',
-    '        <span>Waarom dit helpt</span>',
-    `        <p>Het doel is niet om tekst te vullen, maar om bezoekers beter te laten kiezen en de stap naar ${escapeHtml(
-      getSeoContentClusterForItem(item).ctaLabel || 'contact'
-    )} logisch te maken.</p>`,
-    '      </div>',
-    '    </section>',
+    '    <aside class="artikel-eeat" data-softora-public-seo="eeat" aria-label="Over deze uitleg">',
+    `      <p>Door <a href="/over-softora">${escapeHtml(author.name)}</a> van Softora. <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-author-contact" data-softora-conversion-page="${escapeHtml(getSeoContentPathForItem(item))}" data-softora-conversion-target="whatsapp">Een vraag over deze uitleg?</a></p>`,
+    '    </aside>',
   ].join('\n');
 }
 
@@ -3473,22 +3443,23 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '      <div class="artikel-meta-dot"></div>',
     `      <span>${escapeHtml((item.author || SEO_CONTENT_AUTHOR).name)}</span>`,
     '    </div>',
+    `    <p class="artikel-intro">${escapeHtml(item.summary)}</p>`,
+    renderReadingNavigation(item, escapeHtml),
     '  </section>',
     '  <figure class="artikel-img">',
     `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" decoding="async" fetchpriority="high">`,
     `    <figcaption>${escapeHtml(item.title)}</figcaption>`,
     '  </figure>',
     '  <article class="artikel-body">',
-    `    <p><strong>${escapeHtml(item.summary)}</strong></p>`,
-    renderAuthorityBlock(item),
-    ...item.sections.map((section) =>
+    ...item.sections.map((section, index) =>
       [
-        `    <h2>${escapeHtml(section.heading)}</h2>`,
+        `    <h2 id="${sectionId(section, index)}">${escapeHtml(section.heading)}</h2>`,
         ...section.paragraphs.map((paragraph) => `    <p>${renderSeoParagraph(paragraph)}</p>`),
       ].join('\n')
     ),
     renderSecondaryImage(item),
     renderFaqBlock(item),
+    renderAuthorityBlock(item),
     '  </article>',
     renderConversionCta(item),
     renderRelatedLinks(item.relatedLinks),
