@@ -90,6 +90,25 @@ test('late provider completion cannot publish across an owner change', async () 
   assert.equal(v.detail.innerHTML, 'Andere mailbox');
 });
 
+test('account-ready timeline can publish into an existing provider hydration without waiting or duplicating it', async () => {
+  const provider = deferred();
+  let calls = 0;
+  const v = view({ shouldHydrateThread: () => true, hydrateThread: () => { calls += 1; return provider.promise; } });
+  v.mail.body = 'Complete incoming body'; v.mail.bodyLoaded = true;
+  const opening = v.controller.open(v.mail.id);
+  await tick();
+  assert.equal(calls, 1);
+  // Account discovery completes after the cached conversation was opened.
+  v.mail.threadMessages = [{ body: 'Exact accepted sent body', bodyLoaded: true }];
+  const refresh = v.controller.open(v.mail.id, { skipBodyFetch: true, skipContactTimeline: true, preserveVisibleDetail: true });
+  await tick();
+  assert.match(v.detail.innerHTML, /Exact accepted sent body/);
+  assert.equal(v.classes.has('is-detail-pending'), false);
+  assert.equal(calls, 1);
+  provider.resolve();
+  await Promise.all([opening, refresh]);
+});
+
 test('timeline refresh preserves exact-account body, attachments and retry state while adopting newly available text', () => {
   const sent = {
     id: 'accepted-sent:old', uid: 0, folder: 'sent', accountEmail: 'serve@softora.nl',
