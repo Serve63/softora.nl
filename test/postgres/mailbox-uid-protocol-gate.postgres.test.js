@@ -332,6 +332,49 @@ if (!databaseUrl) {
     `, /MAILBOX_UID_PROTOCOL_TRANSITION_INVALID/);
   });
 
+  test('Instantly runtime claims the active protocol and never treats protocol rejection as running work', async () => {
+    const client = await connect();
+    const { createMailboxSyncProtocolLockStore } = require('../../server/services/mailbox-sync-protocol-lock');
+    const { acquireInstantlyMailboxSyncLock } = require('../../server/services/instantly-mailbox-sync-lock');
+    const accountEmail = 'instantly-serve@softora.internal';
+    const oldClaim = await claim(client, { accountEmail, folder: 'instantly', token: 'old-provider', oldCaller: true });
+    assert.equal(oldClaim.acquired, false);
+    const adapter = createMailboxSyncProtocolLockStore({
+      normalizeEmail: (value) => String(value).toLowerCase(),
+      normalizeFolder: (value) => value,
+      normalizeString: (value) => value == null ? '' : String(value),
+      buildSyncKey: (account, folder) => `${account}|${folder}`,
+      runDurableWrite: async (_operation, execute) => ({ ok: true, data: await execute({
+        rpc: async (name, args) => {
+          if (name === 'softora_get_mailbox_uid_generation_protocol') {
+            return (await client.query('select * from public.softora_get_mailbox_uid_generation_protocol()')).rows;
+          }
+          assert.equal(name, 'softora_claim_mailbox_sync_lock');
+          assert.equal(args.p_protocol, 'v2');
+          return (await client.query(`select * from public.softora_claim_mailbox_sync_lock($1,$2,$3,$4,$5,$6,$7)`, [
+            args.p_sync_key, args.p_account_email, args.p_folder, args.p_lock_token,
+            args.p_lock_ttl_seconds, args.p_force, args.p_protocol,
+          ])).rows;
+        },
+      }) }),
+    });
+    const store = {
+      ...adapter,
+      getSyncState: async ({ accountEmail: account, folder }) => (await client.query(
+        'select * from public.softora_mailbox_sync_state where sync_key=$1', [`${account}|${folder}`]
+      )).rows[0],
+    };
+    const owned = await acquireInstantlyMailboxSyncLock(store, { accountEmail });
+    assert.equal(owned.ok, true);
+    assert.equal(owned.protocolMode, 'v2');
+    assert.equal((await acquireInstantlyMailboxSyncLock(store, { accountEmail })).ok, false);
+    const finished = await client.query(`update public.softora_mailbox_sync_state
+      set status='ok', lock_token=null, lock_expires_at=null, last_synced_at=now()
+      where sync_key=$1 and lock_token=$2 returning last_synced_at`, [`${accountEmail}|instantly`, owned.lockToken]);
+    assert.equal(finished.rowCount, 1);
+    assert.ok(finished.rows[0].last_synced_at);
+  });
+
   test('protocolfuncties zijn alleen uitvoerbaar door service_role', async () => {
     const client = await connect();
     const privileges = (await client.query(`
