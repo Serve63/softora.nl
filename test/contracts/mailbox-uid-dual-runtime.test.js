@@ -135,6 +135,46 @@ test('echte index-store wiret dual runtime zonder legacy rij-identiteit te wijzi
   assert.equal(generated.uid_generation_id, GENERATION_A);
 });
 
+test('Gmail sent sync commits complete individual messages and preserves other mailbox batch sizes', async () => {
+  for (const [imapHost, folder, expectedLimit] of [
+    ['imap.gmail.com', 'sent', 1], ['imap.googlemail.com', 'sent', 1],
+    ['imap.gmail.com', 'inbox', 30], ['imap.example.test', 'sent', 30],
+  ]) {
+    const accountEmail = 'mailbox@example.test';
+    const commits = [];
+    let pass = 0;
+    const service = createRawSyncService({
+      accountEmail,
+      accounts: [{ email: accountEmail, imapHost, imapConfigured: true }],
+      store: {
+        getUidGenerationProtocol: async () => ({ ok: true, protocol: 'v2' }),
+        acquireSyncLockForProtocol: async () => ({ ok: true, protocolMode: 'v2', lockToken: `lock-${pass}`, lockExpiresAt: futureLeaseExpiry() }),
+        prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+        confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
+        listLegacyUidIdentities: async () => [],
+        commitSyncPass: async (options) => { commits.push(options); return { ok: true, committed: true, upserted: options.messages.length }; },
+        commitTargetedSyncPass: async () => { throw new Error('unexpected targeted commit'); },
+        skipSync: async () => { throw new Error('unexpected skip'); },
+        failSync: async () => ({ ok: true, applied: true }),
+      },
+      fetcher: async (options) => {
+        assert.equal(options.limit, expectedLimit, `${imapHost}/${folder}`);
+        pass += 1;
+        return createSyncPass([{ uid: pass, id: `${folder}:${pass}`, body: 'Complete message', attachments: [{ filename: 'large.pdf', size: 3503985 }] }], { scannedFromUid: pass });
+      },
+    });
+    for (let index = 0; index < 2; index += 1) {
+      const result = await service.syncMailboxFolder({ accountEmail, folder, limit: 30 });
+      assert.equal(result.ok, true);
+      assert.equal(result.synced, 1);
+    }
+    assert.deepEqual(commits.map((item) => item.scannedThroughUid), [1, 2]);
+    assert.deepEqual(commits.map((item) => item.messages[0].uid), [1, 2]);
+    assert.ok(commits.every((item) => item.accountEmail === accountEmail && item.generationId === GENERATION_A));
+    assert.equal(commits[1].messages[0].attachments[0].size, 3503985);
+  }
+});
+
 test('dezelfde UID blijft voor Servé en Martijn in iedere generatie accountgescheiden', () => {
   const store = createMailboxIndexStore();
   const serveLegacy = store.buildMessageKey('serve@softora.nl', 'inbox', 91);

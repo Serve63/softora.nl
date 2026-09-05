@@ -119,6 +119,9 @@ function isLikelySentMailboxName(name) {
 }
 
 async function resolveMailboxName(client, folder) {
+  // INBOX is the protocol's reserved primary mailbox. Opening it does not need
+  // a LIST round trip (measured at 8-9 seconds on the slow Gmail connection).
+  if (folder === 'inbox') return 'INBOX';
   const candidates = FOLDER_ALIASES[folder] || ['INBOX'];
   // Subscription status is irrelevant to folder selection. Reuse this exact
   // connection's listing across sequential folders and avoid a separate LSUB.
