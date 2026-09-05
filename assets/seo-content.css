@@ -602,6 +602,8 @@ nav {
   padding: 34px 38px;
 }
 
+.content-cta .meer-label { color: #dcdce3; }
+
 .content-cta h2 {
   font-family: Oswald, Inter, sans-serif;
   font-size: clamp(28px, 3vw, 42px);

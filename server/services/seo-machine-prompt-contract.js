@@ -1,0 +1,51 @@
+const AUTOMATION_PROMPT_VERSION = 9;
+const REQUIRED_PROMPT_MARKERS = Object.freeze([
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=9/ }),
+  Object.freeze({ label: 'same_thread_policy', pattern: /SEO_THREAD_POLICY=same_thread/ }),
+  Object.freeze({
+    label: 'excluded_seo_routes',
+    pattern: /SEO_AUTOMATION_EXCLUDED_PATHS=\/website,\/bedrijfssoftware,\/voicesoftware,\/chatbot/,
+  }),
+  Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
+  Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
+  Object.freeze({ label: 'finish_run_receipt', pattern: /seo:automation-state -- finish-run/i }),
+  Object.freeze({ label: 'explicit_run_recovery', pattern: /seo:automation-state -- recover-run/i }),
+  Object.freeze({ label: 'run_gate_receipts', pattern: /--record-run-gate/i }),
+  Object.freeze({ label: 'selection_gate', pattern: /seo:selection:check/i }),
+  Object.freeze({ label: 'reviews_gate', pattern: /seo:reviews:check/i }),
+  Object.freeze({
+    label: 'review_evidence_metrics_schema',
+    pattern: /metrics object with nonBrandedClicks, nonBrandedImpressions, averagePosition and baselineComparison/i,
+  }),
+  Object.freeze({ label: 'fresh_gsc_evidence_window', pattern: /30-minute fresh GSC window/i }),
+  Object.freeze({
+    label: 'canonical_ready_selection_binding',
+    pattern: /new_url must not exist there yet and must exactly match a ready path/i,
+  }),
+  Object.freeze({ label: 'live_route_gate', pattern: /seo:live-route:check/i }),
+  Object.freeze({ label: 'ubersuggest_keyword_suggestions', pattern: /mcp__ubersuggest__keyword_suggestions/i }),
+  Object.freeze({ label: 'ubersuggest_google_suggestions', pattern: /mcp__ubersuggest__google_suggestions/i }),
+  Object.freeze({ label: 'ubersuggest_keyword_overview', pattern: /mcp__ubersuggest__keyword_overview/i }),
+  Object.freeze({ label: 'ubersuggest_serp_analysis', pattern: /mcp__ubersuggest__serp_analysis/i }),
+  Object.freeze({ label: 'ubersuggest_data_smoke', pattern: /seo:automation-state -- record-tool-smoke/i }),
+  Object.freeze({ label: 'internal_browser_binding', pattern: /cua\.createBrowserTab\("iab", url, \{ visible: false \}\)/i }),
+  Object.freeze({ label: 'chrome_browser_identity', pattern: /ordinary Google Chrome/i }),
+  Object.freeze({ label: 'internal_browser_default', pattern: /Use the internal Codex browser in the background for public research and page tests/i }),
+  Object.freeze({ label: 'page_experience_evidence', pattern: /--page-experience reports\/seo-agent\/page-experience\.json/i }),
+  Object.freeze({ label: 'truthful_review', pattern: /Never invent human authorship or review/i }),
+  Object.freeze({ label: 'browser_fallback_prohibition', pattern: /no generic browser fallback/i }),
+  Object.freeze({ label: 'evergreen_continuation', pattern: /remains ACTIVE until Serve explicitly pauses/i }),
+  Object.freeze({ label: 'post_deadline_rule', pattern: /After 31 December 2026/i }),
+  Object.freeze({ label: 'cost_stop', pattern: /Never buy credits/i }),
+  Object.freeze({ label: 'qwen_stop', pattern: /Never use Qwen/i }),
+]);
+const FORBIDDEN_PROMPT_MARKERS = Object.freeze([
+  Object.freeze({ label: 'automatic_thread_rotation', pattern: /On run 15, first finish|Then create exactly one setup-only replacement|Report run X\/15/i }),
+  Object.freeze({ label: 'edge_browser_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
+  Object.freeze({ label: 'stale_chrome_only_policy', pattern: /Use only Serve's ordinary Google Chrome|The built-in browser and Microsoft Edge are forbidden/i }),
+  Object.freeze({ label: 'extension_browser_binding', pattern: /agent\.browsers\.get\(["']extension["']\)/i }),
+  Object.freeze({ label: 'generic_browser_binding', pattern: /agent\.browsers\.(?:getDefault|getForUrl)\s*\(/i }),
+  Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge/i }),
+]);
+
+module.exports = { AUTOMATION_PROMPT_VERSION, REQUIRED_PROMPT_MARKERS, FORBIDDEN_PROMPT_MARKERS };

@@ -831,7 +831,7 @@ test('SEO same-task migration preserves audited start and all publication gate r
   const state = require('../../scripts/seo-machine-automation-state');
   const script = readRepoFile('scripts/seo-machine-automation-state.js');
   assert.equal(typeof state.keepAutomationInSameThread, 'function');
-  assert.equal(state.AUTOMATION_PROMPT_VERSION, 8);
+  assert.equal(state.AUTOMATION_PROMPT_VERSION, 9);
   assert.deepEqual([...state.REQUIRED_PUBLISHED_RUN_GATES], [
     'cadence', 'reviews', 'selection', 'keywords', 'visuals', 'verify_critical', 'live_production', 'live_route',
   ]);
@@ -847,4 +847,20 @@ test('SEO reading navigation cannot weaken the contact-route quality gate', () =
   assert.match(gates, /stripHtmlTags\(heading\[1\]\) === anchor.label/);
   assert.match(gates, /lead-cta-not-whatsapp/);
   assert.match(gates, /untracked-conversion-link/);
+});
+
+test('SEO experience and attribution changes preserve publication, source and contact requirements', () => {
+  const state = require('../../scripts/seo-machine-automation-state');
+  const liveScript = readRepoFile('scripts/check-seo-machine-live-route.js');
+  const gateScript = readRepoFile('scripts/seo-machine-automation-state.js');
+  const quality = readRepoFile('server/services/seo-machine-quality-gates.js');
+  assert.equal(state.RUN_GATE_VERSION, 3);
+  assert.match(liveScript, /validatePageExperience\(readSelectionEvidence/);
+  assert.match(liveScript, /result.summary.pageExperience = pageExperience/);
+  assert.match(gateScript, /gateVersion >= 3[\s\S]*validatePageExperienceReceipt/);
+  assert.match(quality, /unsupported-human-review/);
+  assert.match(quality, /missing-information-gain/);
+  assert.match(quality, /missing-content-sources/);
+  assert.match(quality, /missing-contextual-money-link/);
+  assert.match(quality, /lead-cta-not-whatsapp/);
 });
