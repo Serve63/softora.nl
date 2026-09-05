@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
+const { validatePageExperience } = require('../server/services/seo-machine-page-experience');
 const {
   normalizePathname,
   runSeoMachineLiveRouteCheck,
@@ -15,18 +16,19 @@ const {
 } = require('./seo-machine-automation-state');
 
 function parseArgs(argv) {
-  const args = { 'selection-evidence': 'reports/seo-agent/selection-evidence.json' };
+  const args = { 'selection-evidence': 'reports/seo-agent/selection-evidence.json',
+    'page-experience': 'reports/seo-agent/page-experience.json' };
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
     const value = argv[index + 1];
-    if (!['--url', '--live-commit', '--selection-evidence'].includes(key) || !value) {
+    if (!['--url', '--live-commit', '--selection-evidence', '--page-experience'].includes(key) || !value) {
       throw new Error(`Ongeldig argument: ${key}`);
     }
     args[key.slice(2)] = value;
   }
   if (!args.url || !args['live-commit']) throw new Error('--url en --live-commit zijn verplicht.');
-  if (!isSafeRelativePath(args['selection-evidence'])) {
-    throw new Error('--selection-evidence moet een veilig relatief repopad zijn.');
+  if (!isSafeRelativePath(args['selection-evidence']) || !isSafeRelativePath(args['page-experience'])) {
+    throw new Error('--selection-evidence en --page-experience moeten veilige relatieve repopaden zijn.');
   }
   return args;
 }
@@ -52,11 +54,16 @@ async function runCli(argv = process.argv.slice(2)) {
   if (!supportingAction) {
     throw new Error('LIVE_ROUTE_SUPPORTING_ACTION_MISSING: geselecteerde groei-actie mist selected.supportingAction.');
   }
+  const pageExperience = validatePageExperience(readSelectionEvidence(args['page-experience']), {
+    url: args.url, liveCommit: args['live-commit'],
+  });
+  if (pageExperience.status !== 'ready') throw new Error(pageExperience.errors.join('\n'));
   const result = await runSeoMachineLiveRouteCheck({
     url: args.url,
     liveCommit: args['live-commit'],
     supportingAction,
   });
+  result.summary.pageExperience = pageExperience;
   const runGate = result.status === 'ready'
     ? recordAutomationRunGateFromCli({
       gateOptions,

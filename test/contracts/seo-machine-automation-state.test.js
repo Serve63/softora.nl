@@ -4,6 +4,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { buildPageExperience } = require('../fixtures/seo-page-experience');
 
 const {
   AUTOMATION_ID,
@@ -31,6 +32,8 @@ const {
   runAutomationStateCli,
   startAutomationRun,
   validateRotationState,
+  validatePublishedRunGates,
+  digestRunGateDetails,
 } = require('../../scripts/seo-machine-automation-state');
 
 function createMemory(completedRunsInActiveThread = 6) {
@@ -66,7 +69,7 @@ function createGitRepository() {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=8',
+    'SEO_MACHINE_PROMPT_VERSION=9',
     'SEO_THREAD_POLICY=same_thread',
     'SEO_AUTOMATION_EXCLUDED_PATHS=/website,/bedrijfssoftware,/voicesoftware,/chatbot',
     `The sole automation id is ${AUTOMATION_ID}.`,
@@ -82,8 +85,11 @@ function validAutomationPrompt() {
     'Close every outcome with npm run seo:automation-state -- finish-run.',
     'Record setup evidence with npm run seo:automation-state -- record-tool-smoke.',
     'Require mcp__ubersuggest__keyword_suggestions, mcp__ubersuggest__google_suggestions, mcp__ubersuggest__keyword_overview and mcp__ubersuggest__serp_analysis.',
-    'Select agent.browsers.get("chrome") and use only ordinary Google Chrome.',
-    'The built-in browser and Microsoft Edge are forbidden, with no generic browser fallback.',
+    'Use the internal Codex browser in the background for public research and page tests.',
+    'Select cua.createBrowserTab("iab", url, { visible: false }); ordinary Google Chrome is for user steps.',
+    'Microsoft Edge is forbidden, with no generic browser fallback.',
+    'Require --page-experience reports/seo-agent/page-experience.json.',
+    'Never invent human authorship or review.',
     'This automation remains ACTIVE until Serve explicitly pauses.',
     'After 31 December 2026, continue on rolling evidence.',
     'Never buy credits or use paid fallbacks.',
@@ -123,7 +129,7 @@ function recordPublishedGates(memoryPath, options = {}) {
   const invocationAt = options.invocationAt || '2026-08-28T08:15:00+02:00';
   const checkedAt = options.checkedAt || '2026-08-28T09:00:00+02:00';
   const treeSha = options.treeSha || '1'.repeat(40);
-  const liveCommit = options.liveCommit || 'abcdef1234567890';
+  const liveCommit = options.liveCommit || 'abcdef1234567890abcdef1234567890abcdef12';
   const changedUrl = options.changedUrl || 'https://www.softora.nl/bedrijfssoftware-op-maat';
   const selectedPath = options.selectedPath || new URL(changedUrl).pathname;
   const selectedActionType = options.selectedActionType || 'substantial_refresh';
@@ -154,6 +160,9 @@ function recordPublishedGates(memoryPath, options = {}) {
         summary: {
           url: changedUrl,
           supportingAction: routeSupportingAction,
+          pageExperience: Object.prototype.hasOwnProperty.call(options, 'pageExperience') ? options.pageExperience : {
+            status: 'ready', evidence: buildPageExperience({ url: changedUrl, liveCommit, capturedAt: checkedAt }),
+          },
         },
       };
     }
@@ -306,7 +315,7 @@ test('audited run 16 continues in the same task and still requires all eight pub
   const publication = {
     memoryPath, threadId: 'thread-1', invocationAt, finishedAt: '2026-08-29T09:05:00+02:00',
     outcome: 'published', publicEffect: 'live', prNumber: 1808,
-    liveCommit: 'abcdef1234567890', changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12', changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
     evidence: 'Run 16 publication passed all gates on the same final tree and live commit.',
   };
   assert.throws(() => finishAutomationRun(publication), /cadence|RUN_GATES/);
@@ -374,7 +383,7 @@ test('finish-run closes the active invocation with a durable live receipt', () =
     publicEffect: 'live',
     evidence: 'PR #1808 merged and production parity plus route verification passed.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
   });
   const inspected = inspectAutomationState(memoryPath);
@@ -383,7 +392,7 @@ test('finish-run closes the active invocation with a durable live receipt', () =
   assert.equal(receipt.completionGateStatus, 'ready');
   assert.equal(Object.keys(receipt.gates).length, REQUIRED_PUBLISHED_RUN_GATES.length);
   assert.equal(inspected.lifecycle.activeRun, null);
-  assert.equal(inspected.lifecycle.lastReceipt.liveCommit, 'abcdef1234567890');
+  assert.equal(inspected.lifecycle.lastReceipt.liveCommit, 'abcdef1234567890abcdef1234567890abcdef12');
   assert.equal(inspected.lifecycle.receipts.length, 1);
   assert.equal(finishAutomationRun({
     memoryPath,
@@ -394,7 +403,7 @@ test('finish-run closes the active invocation with a durable live receipt', () =
     publicEffect: 'live',
     evidence: 'PR #1808 merged and production parity plus route verification passed.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
   }).idempotent, true);
 });
@@ -420,7 +429,7 @@ test('finish-run blocks a published claim until every same-run gate is ready on 
     publicEffect: 'live',
     evidence: 'Publication should be blocked because the selection receipt is missing.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
   }), /PUBLISHED_GATES_INCOMPLETE.*selection/);
 });
@@ -449,7 +458,7 @@ test('finish-run blocks tree drift between final validators and the live deploym
     publicEffect: 'live',
     evidence: 'Publication should be blocked because keyword evidence belongs to another tree.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
   }), /PUBLISHED_GATES_INCOMPLETE.*keywords.*niet uitgevoerd op de live productietree/);
 });
@@ -473,7 +482,7 @@ test('finish-run binds the selected path to the exact live route', () => {
     publicEffect: 'live',
     evidence: 'Publication must bind the selected URL to the exact route checked in production.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/blog/live-b',
   }), /PUBLISHED_GATES_INCOMPLETE.*selectedPath.*live route/i);
 });
@@ -504,7 +513,7 @@ test('finish-run rejects an invalid selected action type even with green route e
     publicEffect: 'live',
     evidence: 'Publication must retain a canonical selected action type through final closure.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
   }), /PUBLISHED_GATES_INCOMPLETE.*selectedActionType/i);
 });
@@ -536,7 +545,7 @@ test('finish-run requires live proof for every selected supporting optimization'
     publicEffect: 'live',
     evidence: 'Publication must prove the selected supporting optimization on the live site.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
   }), /PUBLISHED_GATES_INCOMPLETE.*supportingAction/i);
 
@@ -551,10 +560,14 @@ test('finish-run requires live proof for every selected supporting optimization'
       summary: {
         url: 'https://www.softora.nl/blog/nieuwe-route',
         supportingAction: { ...supportingAction, verified: true },
+        pageExperience: { status: 'ready', evidence: buildPageExperience({
+          url: 'https://www.softora.nl/blog/nieuwe-route',
+          liveCommit: 'abcdef1234567890abcdef1234567890abcdef12', capturedAt: '2026-08-28T09:02:00+02:00',
+        }) },
       },
     },
     treeSha: '1'.repeat(40),
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
   });
   const receipt = finishAutomationRun({
@@ -566,7 +579,7 @@ test('finish-run requires live proof for every selected supporting optimization'
     publicEffect: 'live',
     evidence: 'Publication proves the selected supporting optimization on the live site.',
     prNumber: 1808,
-    liveCommit: 'abcdef1234567890',
+    liveCommit: 'abcdef1234567890abcdef1234567890abcdef12',
     changedUrl: 'https://www.softora.nl/blog/nieuwe-route',
   });
   assert.equal(receipt.outcome, 'published');
@@ -862,6 +875,39 @@ test('automation installation audit rejects an Edge route even when Chrome marke
   assert.match(audit.errors.join(' '), /verboden browserroute/i);
 });
 
+test('v9 audit rejects the superseded Chrome-only instruction and missing page-experience controls', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const paths = createAutomationConfig(memoryPath, {
+    prompt: `${validAutomationPrompt()} Use only Serve's ordinary Google Chrome.`,
+  });
+  assert.match(auditAutomationInstallation({ memoryPath, ...paths }).errors.join(' '), /stale_chrome_only_policy/);
+  createAutomationConfig(memoryPath, {
+    prompt: validAutomationPrompt().replace('--page-experience reports/seo-agent/page-experience.json', ''),
+  });
+  assert.match(auditAutomationInstallation({ memoryPath, ...paths }).errors.join(' '), /page_experience_evidence/);
+  assert.ok(validateRotationState({ schemaVersion: 3 }).some((error) => /schemaVersion moet 1 of 2/.test(error)));
+});
+
+test('gate v3 refuses a publication without real experience evidence while historical v2 remains readable', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const invocationAt = '2026-08-28T08:15:00+02:00';
+  const liveCommit = 'a'.repeat(40);
+  const changedUrl = 'https://www.softora.nl/bedrijfssoftware-op-maat';
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt });
+  recordPublishedGates(memoryPath, { liveCommit, changedUrl, pageExperience: null });
+  const run = inspectAutomationState(memoryPath).lifecycle.activeRun;
+  assert.equal(run.gateVersion, 3);
+  assert.match(validatePublishedRunGates(run, { liveCommit, changedUrl }).join(' '), /pageExperience/);
+  assert.deepEqual(validatePublishedRunGates({ ...run, gateVersion: 2 }, { liveCommit, changedUrl }), []);
+  const withForgedProof = structuredClone(run);
+  const route = withForgedProof.gates.live_route;
+  route.summary.summary.pageExperience = { status: 'ready', evidence: buildPageExperience({
+    url: changedUrl, liveCommit: 'b'.repeat(40), capturedAt: route.checkedAt,
+  }) };
+  route.resultDigest = digestRunGateDetails(route.summary);
+  assert.match(validatePublishedRunGates(withForgedProof, { liveCommit, changedUrl }).join(' '), /exacte live commit/);
+});
+
 test('automation installation audit rejects tool names without a real four-tool data smoke', () => {
   const memoryPath = createMemory();
   ensureAutomationState(memoryPath);
@@ -912,12 +958,12 @@ test('automation-state CLI rejects a command-line memory path override', () => {
 });
 
 
-test('the versioned production prompt passes installation audit and rejects an IAB fallback', () => {
+test('the versioned production prompt passes installation audit and rejects a generic browser fallback', () => {
   const memoryPath = prepareOperationalState(createMemory());
   const prompt = fs.readFileSync(path.resolve(__dirname, '../../docs/growth/seo-machine-prompt.md'), 'utf8');
   const paths = createAutomationConfig(memoryPath, { prompt });
   const audit = auditAutomationInstallation({ memoryPath, ...paths });
   assert.equal(audit.status, 'ready', audit.errors.join(' '));
-  createAutomationConfig(memoryPath, { prompt: prompt + '\nUse agent.browsers.get("iab") as fallback.' });
+  createAutomationConfig(memoryPath, { prompt: prompt + '\nUse agent.browsers.getDefault() as fallback.' });
   assert.equal(auditAutomationInstallation({ memoryPath, ...paths }).status, 'invalid');
 });

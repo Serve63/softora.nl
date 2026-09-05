@@ -5,6 +5,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { isSeoAutomationExcludedPath } = require('../server/services/seo-machine-route-policy');
+const { AUTOMATION_PROMPT_VERSION, REQUIRED_PROMPT_MARKERS, FORBIDDEN_PROMPT_MARKERS } = require('../server/services/seo-machine-prompt-contract');
+const { validatePageExperienceReceipt } = require('../server/services/seo-machine-page-experience');
 const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
 const RUN_LIFECYCLE_BLOCK = 'SEO_RUN_LIFECYCLE_STATE';
@@ -13,8 +15,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTOMATION_ID = 'softora-seo-actiemachine';
 const AUTOMATION_NAME = 'Softora SEO dagmachine';
 const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
-const AUTOMATION_PROMPT_VERSION = 8;
-const RUN_GATE_VERSION = 2;
+const RUN_GATE_VERSION = 3;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
 ]);
@@ -38,6 +39,7 @@ const REQUIRED_PUBLISHED_RUN_GATES = Object.freeze([...RUN_GATES]);
 const REQUIRED_PUBLISHED_RUN_GATES_BY_VERSION = Object.freeze({
   1: Object.freeze(RUN_GATES.filter((gate) => gate !== 'reviews')),
   2: REQUIRED_PUBLISHED_RUN_GATES,
+  3: REQUIRED_PUBLISHED_RUN_GATES,
 });
 const TREE_BOUND_RUN_GATES = Object.freeze([
   'keywords',
@@ -55,53 +57,6 @@ const DEFAULT_MEMORY_PATH = path.join(
 );
 const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
-const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=8/ }),
-  Object.freeze({ label: 'same_thread_policy', pattern: /SEO_THREAD_POLICY=same_thread/ }),
-  Object.freeze({
-    label: 'excluded_seo_routes',
-    pattern: /SEO_AUTOMATION_EXCLUDED_PATHS=\/website,\/bedrijfssoftware,\/voicesoftware,\/chatbot/,
-  }),
-  Object.freeze({ label: 'single_automation_identity', pattern: /sole automation id is softora-seo-actiemachine/i }),
-  Object.freeze({ label: 'atomic_run_counter', pattern: /seo:automation-state -- start-run/i }),
-  Object.freeze({ label: 'finish_run_receipt', pattern: /seo:automation-state -- finish-run/i }),
-  Object.freeze({ label: 'explicit_run_recovery', pattern: /seo:automation-state -- recover-run/i }),
-  Object.freeze({ label: 'run_gate_receipts', pattern: /--record-run-gate/i }),
-  Object.freeze({ label: 'selection_gate', pattern: /seo:selection:check/i }),
-  Object.freeze({ label: 'reviews_gate', pattern: /seo:reviews:check/i }),
-  Object.freeze({
-    label: 'review_evidence_metrics_schema',
-    pattern: /metrics object with nonBrandedClicks, nonBrandedImpressions, averagePosition and baselineComparison/i,
-  }),
-  Object.freeze({ label: 'fresh_gsc_evidence_window', pattern: /30-minute fresh GSC window/i }),
-  Object.freeze({
-    label: 'canonical_ready_selection_binding',
-    pattern: /new_url must not exist there yet and must exactly match a ready path/i,
-  }),
-  Object.freeze({ label: 'live_route_gate', pattern: /seo:live-route:check/i }),
-  Object.freeze({ label: 'ubersuggest_keyword_suggestions', pattern: /mcp__ubersuggest__keyword_suggestions/i }),
-  Object.freeze({ label: 'ubersuggest_google_suggestions', pattern: /mcp__ubersuggest__google_suggestions/i }),
-  Object.freeze({ label: 'ubersuggest_keyword_overview', pattern: /mcp__ubersuggest__keyword_overview/i }),
-  Object.freeze({ label: 'ubersuggest_serp_analysis', pattern: /mcp__ubersuggest__serp_analysis/i }),
-  Object.freeze({ label: 'ubersuggest_data_smoke', pattern: /seo:automation-state -- record-tool-smoke/i }),
-  Object.freeze({ label: 'chrome_browser_binding', pattern: /agent\.browsers\.get\(["']chrome["']\)/i }),
-  Object.freeze({ label: 'chrome_browser_identity', pattern: /ordinary Google Chrome/i }),
-  Object.freeze({ label: 'private_browser_prohibition', pattern: /The built-in browser and Microsoft Edge are forbidden/i }),
-  Object.freeze({ label: 'browser_fallback_prohibition', pattern: /no generic browser fallback/i }),
-  Object.freeze({ label: 'evergreen_continuation', pattern: /remains ACTIVE until Serve explicitly pauses/i }),
-  Object.freeze({ label: 'post_deadline_rule', pattern: /After 31 December 2026/i }),
-  Object.freeze({ label: 'cost_stop', pattern: /Never buy credits/i }),
-  Object.freeze({ label: 'qwen_stop', pattern: /Never use Qwen/i }),
-]);
-const FORBIDDEN_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'automatic_thread_rotation', pattern: /On run 15, first finish|Then create exactly one setup-only replacement|Report run X\/15/i }),
-  Object.freeze({ label: 'edge_browser_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
-  Object.freeze({ label: 'iab_browser_binding', pattern: /agent\.browsers\.get\(["']iab["']\)/i }),
-  Object.freeze({ label: 'extension_browser_binding', pattern: /agent\.browsers\.get\(["']extension["']\)/i }),
-  Object.freeze({ label: 'generic_browser_binding', pattern: /agent\.browsers\.(?:getDefault|getForUrl)\s*\(/i }),
-  Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge/i }),
-]);
-
 function parseTomlString(content, key) {
   const safe = String(key).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = String(content || '').match(new RegExp(`^\\s*${safe}\\s*=\\s*("(?:\\\\.|[^"\\\\])*")\\s*$`, 'm'));
@@ -440,6 +395,7 @@ function validatePublishedRunGates(run, { liveCommit, changedUrl } = {}) {
       }
     }
   }
+  if (gateVersion >= 3) errors.push(...validatePageExperienceReceipt(routeGate, run, { liveCommit, changedUrl }));
   const finalTreeSha = liveGate?.treeSha;
   if (finalTreeSha) {
     for (const gateName of TREE_BOUND_RUN_GATES) {
@@ -460,7 +416,7 @@ function validateRunIdentity(run, label = 'activeRun') {
   if (!Number.isSafeInteger(Number(run.runNumber)) || Number(run.runNumber) < 1) {
     errors.push(`${label}.runNumber is ongeldig.`);
   }
-  if (run.gateVersion !== undefined && ![1, 2].includes(Number(run.gateVersion))) {
+  if (run.gateVersion !== undefined && ![1, 2, 3].includes(Number(run.gateVersion))) {
     errors.push(`${label}.gateVersion is ongeldig.`);
   }
   if (run.gates !== undefined && (!run.gates || typeof run.gates !== 'object' || Array.isArray(run.gates))) {
@@ -503,7 +459,7 @@ function validateRunReceipt(receipt, label = 'receipt') {
   if (receipt?.outcome === 'published' && (!Number.isInteger(Number(receipt.prNumber)) || Number(receipt.prNumber) < 1)) {
     errors.push(`${label} met published vereist een PR-nummer.`);
   }
-  if (receipt?.outcome === 'published' && [1, 2].includes(Number(receipt?.gateVersion))) {
+  if (receipt?.outcome === 'published' && [1, 2, 3].includes(Number(receipt?.gateVersion))) {
     errors.push(...validatePublishedRunGates(receipt, receipt).map((error) => `${label}.${error}`));
   }
   if (receipt?.outcome === 'interrupted' && receipt?.publicEffect !== 'unverified') {

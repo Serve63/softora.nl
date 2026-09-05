@@ -457,7 +457,7 @@ test('seo content renders the existing blog visual language with real links', ()
     html,
     /<img src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg" alt="Overleg aan tafel over workflow, planning en procesautomatisering voor het MKB\." width="1600" height="1000"/
   );
-  assert.match(html, /SEO groeipijlers/);
+  assert.match(html, /Kies een onderwerp/);
   assert.match(html, /data-softora-public-seo="content-clusters"/);
   assert.match(html, /data-content-cluster="websites"/);
   assert.match(html, /href="\/website-laten-maken">/);
@@ -493,14 +493,14 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /"articleSection":"AI automatisering"/);
   assert.match(html, /"image":\[\{"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
   assert.match(html, /"wordCount":\d{3,}/);
-  assert.match(html, /"author":\{"@type":"Person","name":"Martijn van de Ven"/);
-  assert.match(html, /"reviewedBy":\{"@type":"Person","name":"Martijn van de Ven"/);
+  assert.match(html, /"author":\{"@type":"Organization","name":"Softora"/);
+  assert.doesNotMatch(html, /"reviewedBy"/);
   assert.match(html, /"@type":"FAQPage"/);
   assert.match(html, /Wanneer is AI automatisering voor het MKB interessant voor mijn bedrijf\?/);
   assert.doesNotMatch(html, /Wanneer is AI automatisering voor het MKB: waar begin je\? interessant/);
   assert.match(html, /data-softora-public-seo="eeat"/);
   assert.match(html, /data-softora-public-seo="faq"/);
-  assert.match(html, />Martijn van de Ven<\/span>/);
+  assert.match(html, />Softora<\/span>/);
   assert.match(html, /<figure class="artikel-img">/);
   assert.match(
     html,
@@ -957,10 +957,15 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
     assert.ok(item.title.length >= 20, item.slug);
     assert.ok(item.description.length >= 80, item.slug);
     assert.ok(item.sections.length >= 3, item.slug);
-    assert.ok(countSeoContentWords(item) >= getSeoContentMinimumWordCount(item), `${item.slug} is te dun voor SEO.`);
-    assert.ok(item.wordCount >= getSeoContentMinimumWordCount(item), `${item.slug} mist berekende woordkwaliteit.`);
-    assert.ok(item.author && item.author.name === 'Martijn van de Ven', `${item.slug} mist auteur.`);
-    assert.ok(item.reviewedBy && item.reviewedBy.name === 'Martijn van de Ven', `${item.slug} mist review-signaal.`);
+    assert.equal(item.wordCount, countSeoContentWords(item), `${item.slug} mist een feitelijke woordtelling.`);
+    if (Number(item.qualityVersion) >= 2) {
+      assert.equal(getSeoContentMinimumWordCount(item), null, `${item.slug} mag geen vaste woordvloer krijgen.`);
+      assert.ok(item.informationGain && item.sources.length > 0, `${item.slug} mist inhoudelijke onderbouwing.`);
+    } else {
+      assert.ok(item.wordCount >= getSeoContentMinimumWordCount(item), `${item.slug} verliest bestaande inhoud.`);
+    }
+    assert.ok(item.author && item.author.name === 'Softora', `${item.slug} mist auteur.`);
+    assert.equal(item.reviewedBy, undefined, `${item.slug} krijgt geen verzonnen review.`);
     assert.ok(Array.isArray(item.faq), `${item.slug} mist een geldige FAQ-collectie.`);
     if (Number(item.qualityVersion) < 2) {
       assert.ok(item.faq.length >= 3, `${item.slug} mist FAQ-verdieping.`);

@@ -11,6 +11,7 @@ const DEFAULT_COMMERCIAL_TARGETS = Object.freeze([
 ]);
 
 const { auditKeywordEvidence } = require('./seo-machine-keyword-evidence');
+const { hasSupportedReview } = require('./seo-content-attribution');
 
 const DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS = Object.freeze({
   '/diensten': 8,
@@ -437,8 +438,11 @@ function auditContentQuality({ items = [], clusters = [], commercialTargets = DE
       issues.push({ type: 'thin-sections', path: pathName, message: `${pageLabel} heeft minder dan drie inhoudsblokken.` });
     }
     const usesNativeQuality = Number(item.qualityVersion) >= 2;
-    if (!item.author || !item.reviewedBy) {
-      issues.push({ type: 'missing-eeat', path: pathName, message: `${pageLabel} mist auteur of inhoudelijke controle.` });
+    if (!String(item.author?.name || '').trim()) {
+      issues.push({ type: 'missing-accountable-author', path: pathName, message: `${pageLabel} mist een verantwoordelijke auteur of organisatie.` });
+    }
+    if ((item.reviewedBy || item.reviewEvidence) && !hasSupportedReview(item)) {
+      issues.push({ type: 'unsupported-human-review', path: pathName, message: `${pageLabel} claimt controle zonder actuele reviewer, datum en bewijsreferentie.` });
     }
     if (!usesNativeQuality && (!Array.isArray(item.faq) || item.faq.length < 3)) {
       issues.push({ type: 'missing-faq-depth', path: pathName, message: `${pageLabel} mist FAQ-verdieping.` });

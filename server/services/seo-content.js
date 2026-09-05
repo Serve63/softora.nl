@@ -1,4 +1,5 @@
 const { renderContentNavigation, renderReadingNavigation, sectionId } = require('./seo-content-reading-layout');
+const { SEO_CONTENT_AUTHOR, buildContributorSchema, buildReviewSchema, hasSupportedReview } = require('./seo-content-attribution');
 const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 const { WEBSITE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-website-proposal');
 const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
@@ -184,18 +185,6 @@ const SEO_CONTENT_IMAGES_BY_CLUSTER = Object.freeze({
     width: 1600,
     height: 1000,
   }),
-});
-
-const SEO_CONTENT_AUTHOR = Object.freeze({
-  name: 'Martijn van de Ven',
-  role: 'Digitale strategie en automatisering',
-  href: '/over-softora',
-});
-
-const SEO_CONTENT_REVIEWER = Object.freeze({
-  name: 'Martijn van de Ven',
-  role: 'Inhoudelijke controle',
-  href: '/over-softora',
 });
 
 const SEO_CONTENT_MIN_WORDS_BY_COLLECTION = Object.freeze({
@@ -2596,13 +2585,14 @@ function countSeoContentWords(item) {
 }
 
 function getSeoContentMinimumWordCount(item) {
+  if (Number(item?.qualityVersion) >= 2) return null;
   const collection = String(item && item.collection ? item.collection : '').trim().toLowerCase();
   return SEO_CONTENT_MIN_WORDS_BY_COLLECTION[collection] || 650;
 }
 
 function formatSeoReadTime(wordCountRaw) {
   const wordCount = Number(wordCountRaw) || 0;
-  const minutes = Math.max(4, Math.ceil(wordCount / 190));
+  const minutes = Math.max(1, Math.ceil(wordCount / 190));
   return `${minutes} min`;
 }
 
@@ -2834,7 +2824,6 @@ function enrichSeoContentItem(item, { nowMs = Date.now() } = {}) {
   const base = Object.freeze({
     ...item,
     author: item.author || SEO_CONTENT_AUTHOR,
-    reviewedBy: item.reviewedBy || SEO_CONTENT_REVIEWER,
     relatedLinks: filterSeoContentRelatedLinks(item.relatedLinks, nowMs),
     sections,
     faq,
@@ -3063,8 +3052,8 @@ function renderCollectionConversionCta(collection) {
     '<section class="content-cta content-cta--index" data-softora-public-seo="conversion-cta">',
     '  <div>',
     '    <div class="meer-label">Volgende stap</div>',
-    '    <h2>Van lezen naar betere opvolging</h2>',
-    '    <p>Kies een dienstpagina voor context of start direct een gesprek als je jouw leadflow wilt aanscherpen.</p>',
+    '    <h2>Wat wil je verbeteren in je bedrijf?</h2>',
+    '    <p>Bekijk hoe Softora helpt met websites, bedrijfssoftware en automatisering. Je kunt ons ook direct een vraag stellen.</p>',
     '  </div>',
     '  <div class="content-cta-actions">',
     `    <a class="content-cta-primary" href="/diensten" data-softora-conversion="content-index-primary" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="service">Bekijk diensten</a>`,
@@ -3076,11 +3065,11 @@ function renderCollectionConversionCta(collection) {
 
 function renderPillarCards() {
   return [
-    '<section class="pillar-wrap" aria-label="SEO groeipijlers">',
+    '<section class="pillar-wrap" aria-label="Onderwerpen">',
     '  <div class="pillar-heading-row">',
     '    <div>',
-    '      <div class="meer-label">SEO groeipijlers</div>',
-    '      <h2>De onderwerpen waar Softora autoriteit op bouwt</h2>',
+    '      <div class="meer-label">Kies een onderwerp</div>',
+    '      <h2>Vind de uitleg die bij je vraag past</h2>',
     '    </div>',
     '    <a href="/diensten">Alle diensten</a>',
     '  </div>',
@@ -3117,17 +3106,6 @@ function getBackLabelForCollection(collection) {
   if (collection.key === 'branches') return 'branches';
   if (collection.key === 'regio') return 'regio';
   return 'overzicht';
-}
-
-function buildPersonSchema(person, site) {
-  if (!person || !person.name) return undefined;
-  return {
-    '@type': 'Person',
-    name: person.name,
-    jobTitle: person.role,
-    url: buildAbsoluteUrl(site, person.href || '/over-softora'),
-    worksFor: { '@id': `${site}/#organization` },
-  };
 }
 
 function buildMainEntityForItem(item, site, canonicalUrl) {
@@ -3174,8 +3152,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     datePublished: item.publishedAt,
     dateModified: item.updatedAt || item.publishedAt,
     inLanguage: 'nl-NL',
-    author: buildPersonSchema(item.author || SEO_CONTENT_AUTHOR, site),
-    reviewedBy: buildPersonSchema(item.reviewedBy || SEO_CONTENT_REVIEWER, site),
+    author: buildContributorSchema(item.author || SEO_CONTENT_AUTHOR, site),
     publisher: { '@id': `${site}/#organization` },
     mainEntityOfPage: { '@id': `${canonicalUrl}#webpage` },
   };
@@ -3306,7 +3283,8 @@ function renderAuthorityBlock(item) {
   const author = item.author || SEO_CONTENT_AUTHOR;
   return [
     '    <aside class="artikel-eeat" data-softora-public-seo="eeat" aria-label="Over deze uitleg">',
-    `      <p>Door <a href="/over-softora">${escapeHtml(author.name)}</a> van Softora. <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-author-contact" data-softora-conversion-page="${escapeHtml(getSeoContentPathForItem(item))}" data-softora-conversion-target="whatsapp">Een vraag over deze uitleg?</a></p>`,
+    `      <p>Van <a href="/over-softora">${escapeHtml(author.name)}</a>. <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-author-contact" data-softora-conversion-page="${escapeHtml(getSeoContentPathForItem(item))}" data-softora-conversion-target="whatsapp">Een vraag over deze uitleg?</a></p>`,
+    ...(hasSupportedReview(item) ? [`      <p>Inhoudelijk gecontroleerd door ${escapeHtml(item.reviewedBy.name)} op ${escapeHtml(item.reviewEvidence.reviewedAt.slice(0, 10))}.</p>`] : []),
     '    </aside>',
   ].join('\n');
 }
@@ -3399,6 +3377,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
         inLanguage: 'nl-NL',
         isPartOf: { '@id': `${site}/#website` },
         mainEntity: { '@id': mainEntity['@id'] },
+        ...buildReviewSchema(item, site),
       },
       {
         '@type': 'BreadcrumbList',

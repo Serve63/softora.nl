@@ -109,6 +109,15 @@ test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te gr
   assert.deepEqual(issues, []);
 });
 
+test('content quality requires accountable attribution and refuses an unproven human review', () => {
+  const source = getSeoContentItems({ now: seoMachineNow })[0];
+  const item = { ...source, cluster: getSeoContentClusterForItem(source).key };
+  const audit = (candidate) => auditContentQuality({ items: [candidate], clusters: getSeoContentClusters() });
+  assert.ok(audit({ ...item, author: null }).some((issue) => issue.type === 'missing-accountable-author'));
+  assert.ok(audit({ ...item, reviewedBy: { name: 'Test reviewer' } }).some((issue) => issue.type === 'unsupported-human-review'));
+  assert.deepEqual(audit(item), []);
+});
+
 test('seo machine ziet template-overlap als herstelwerk en niet als publicatiekwaliteit', () => {
   const report = buildContentOriginalityReport({
     sourceItems: SEO_CONTENT_ITEMS,
