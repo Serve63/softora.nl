@@ -2,11 +2,6 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-
-const source = fs.readFileSync(path.join(__dirname, '../../assets/lead-radar.js'), 'utf8');
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 function mount({ scan, signals = () => [], storageConfigured = true } = {}) {
@@ -22,10 +17,9 @@ function mount({ scan, signals = () => [], storageConfigured = true } = {}) {
     });
     return nodes.get(selector);
   };
-  vm.runInNewContext(source, {
+  const globals = {
     document: { querySelector: node, hidden: false },
     window: { setInterval: (handler) => intervals.push(handler) },
-    URL, URLSearchParams, Intl, Date,
     fetch: async (url, options) => {
       requests.push({ url, options });
       let body;
@@ -34,13 +28,29 @@ function mount({ scan, signals = () => [], storageConfigured = true } = {}) {
       else { const rows = signals(); body = { signals: rows, total: rows.length }; }
       return { ok: true, json: async () => ({ ok: true, ...body }) };
     },
-  });
-  return { node, requests, poll: () => intervals[0]() };
+  };
+  const previous = new Map(Object.keys(globals).map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+  const scriptPath = require.resolve('../../assets/lead-radar.js');
+  delete require.cache[scriptPath];
+  require('../../assets/lead-radar.js');
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+    delete require.cache[scriptPath];
+  };
+  return { node, requests, restore, poll: () => intervals[0]() };
 }
 
-test('Scanknop blijft geblokkeerd tijdens een aanvraag en het resultaat blijft zichtbaar', async () => {
+test('Scanknop blijft geblokkeerd tijdens een aanvraag en het resultaat blijft zichtbaar', async (t) => {
   let resolveScan;
   const ui = mount({ scan: () => new Promise((resolve) => { resolveScan = resolve; }) });
+  t.after(ui.restore);
   await settle();
   assert.equal(ui.node('#scan-button').disabled, false);
   const scanning = ui.node('#scan-button').click();
@@ -58,8 +68,9 @@ test('Scanknop blijft geblokkeerd tijdens een aanvraag en het resultaat blijft z
   assert.equal(ui.node('#scan-progress').hidden, true);
 });
 
-test('Een mislukte scan houdt zijn fout zichtbaar en kan opnieuw worden gestart', async () => {
+test('Een mislukte scan houdt zijn fout zichtbaar en kan opnieuw worden gestart', async (t) => {
   const ui = mount({ scan: async () => { throw new Error('Verbinding verbroken'); } });
+  t.after(ui.restore);
   await settle();
   await ui.node('#scan-button').click();
   assert.equal(ui.node('#scan-progress').hidden, false);
@@ -67,12 +78,13 @@ test('Een mislukte scan houdt zijn fout zichtbaar en kan opnieuw worden gestart'
   assert.equal(ui.node('#scan-button').disabled, false);
 });
 
-test('Een gepauzeerde scan gaat met hetzelfde run-ID verder', async () => {
+test('Een gepauzeerde scan gaat met hetzelfde run-ID verder', async (t) => {
   const payloads = [];
   const ui = mount({ scan: async (payload) => {
     payloads.push(payload);
     return { id: 'existing-run', status: payload.runId ? 'completed' : 'paused', query_cursor: payload.runId ? 6 : 3 };
   } });
+  t.after(ui.restore);
   await settle();
   await ui.node('#scan-button').click();
   assert.equal(payloads.length, 2);
@@ -80,12 +92,13 @@ test('Een gepauzeerde scan gaat met hetzelfde run-ID verder', async () => {
   assert.equal(payloads[1].runId, 'existing-run');
 });
 
-test('Achtergrondfout wist bestaande leads niet en ontbrekende opslag blokkeert de scan', async () => {
+test('Achtergrondfout wist bestaande leads niet en ontbrekende opslag blokkeert de scan', async (t) => {
   let fail = false;
   const ui = mount({ signals: () => {
     if (fail) throw new Error('Opslag tijdelijk niet bereikbaar');
     return [{ platform: 'web', post_url: 'https://example.com/vraag', display_summary: 'Website gezocht voor onze winkel.' }];
   } });
+  t.after(ui.restore);
   await settle();
   const previous = ui.node('#lead-list').innerHTML;
   assert.match(previous, /Website gezocht voor onze winkel/);
@@ -94,7 +107,9 @@ test('Achtergrondfout wist bestaande leads niet en ontbrekende opslag blokkeert 
   await settle();
   assert.equal(ui.node('#lead-list').innerHTML, previous);
   assert.match(ui.node('#inbox-state').textContent, /konden niet worden bijgewerkt/);
+  ui.restore();
   const unavailable = mount({ storageConfigured: false });
+  t.after(unavailable.restore);
   await settle();
   assert.equal(unavailable.node('#scan-button').disabled, true);
   assert.match(unavailable.node('#provider-banner').innerHTML, /Opslag tijdelijk niet beschikbaar/);
