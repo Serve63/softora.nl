@@ -30,6 +30,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/premium-actieve-opdrachten', marker: 'Softora | Actieve Opdrachten — Premium', allowLoginFallback: true },
   { path: '/kvk-database', marker: 'Bedrijven Scraper', allowLoginFallback: true },
   { path: '/kvk-database-bedrijven', marker: 'Alle gevonden bedrijven', allowLoginFallback: true },
+  { path: '/premium-world-watcher', marker: 'World Watcher', allowLoginFallback: true },
   { path: '/lead-radar', marker: 'Lead Radar', allowLoginFallback: true },
 ]);
 

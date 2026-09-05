@@ -111,7 +111,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /openLockedWinningModuleFromUrl/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
   assert.match(source, /premium-extra-modules\.js\?v=20260811a/);
-  assert.match(source, /settings-module-routes\.js\?v=20260905a/);
+  assert.match(source, /settings-module-routes\.js\?v=20260906a/);
   assert.match(source, /premium-user-management\.js\?v=20260814a/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);

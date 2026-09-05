@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="nl" data-personnel-loading="true" data-theme-mode="light" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Watcher — Wereldmonitor</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
+  <link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=20260611a">
+  <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/world-watcher.css?v=20260906a">
+  <script src="/assets/premium-sidebar-links.js?v=20260818a" defer></script>
+  <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
+  <script src="/assets/premium-sidebar-autopilot.js?v=20260611a" defer></script>
+</head>
+<body data-world-watcher>
+  <div class="dashboard-layout ww-layout" data-sidebar-shell="canonical">
+    <aside class="sidebar" id="ww-sidebar" aria-label="Premium navigatie"></aside>
+    <main class="main-content ww-main" id="ww-monitor">
+      <button class="ww-shade" id="ww-shade" type="button" aria-label="Sluit navigatie" hidden></button>
+      <header class="ww-header">
+        <button class="ww-menu" id="ww-menu" type="button" aria-label="Open navigatie" aria-controls="ww-sidebar" aria-expanded="false">☰</button>
+        <div class="ww-brand"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="16" cy="16" r="12"/><ellipse cx="16" cy="16" rx="5.5" ry="12"/><path d="M4 16h24M6.5 9h19M6.5 23h19"/></svg><div><h1>World Watcher<span>.</span></h1><p>Geopolitiek &amp; natuurrisico’s</p></div></div>
+        <div class="ww-header-right"><span class="ww-clock" id="ww-clock">UTC</span><span data-settings-module-back-host></span></div>
+      </header>
+      <div class="ww-summary" aria-label="Monitoroverzicht">
+        <div class="ww-stat"><span>Geopolitieke berichten</span><strong id="ww-stat-news">—</strong><small>op basis van trefwoorden</small></div>
+        <div class="ww-stat"><span>GDACS rood / oranje</span><strong id="ww-stat-alerts" class="ww-alert-number">—</strong><small>in deze selectie</small></div>
+        <div class="ww-stat"><span>Nieuwsdossiers op de kaart</span><strong id="ww-stat-regions">—</strong><small>regio’s met geopolitiek nieuws</small></div>
+        <div class="ww-stat ww-stat-source"><span>Bronverbindingen</span><strong id="ww-stat-sources">—</strong><small id="ww-updated">Bronnen worden opgehaald</small></div>
+      </div>
+      <div class="ww-toolbar">
+        <div class="ww-filters" role="group" aria-label="Soort meldingen"><button type="button" data-ww-kind="all" aria-pressed="true">Alles</button><button type="button" data-ww-kind="geopolitics" aria-pressed="false">Geopolitiek</button><button type="button" data-ww-kind="nature" aria-pressed="false">Natuurrisico’s</button></div>
+        <div class="ww-actions"><span class="ww-connection" id="ww-connection" role="status">Verbinden</span><button class="ww-icon-button" type="button" id="ww-refresh" aria-label="Bronnen verversen" title="Bronnen verversen">↻</button><button class="ww-icon-button" type="button" id="ww-fullscreen" aria-label="Volledig scherm" title="Volledig scherm">⛶</button></div>
+      </div>
+      <p class="ww-warning" id="ww-warning" role="status" hidden></p>
+      <div class="ww-workspace">
+        <section class="ww-feed" aria-labelledby="ww-feed-title">
+          <div class="ww-panel-heading"><h2 id="ww-feed-title">Nieuws &amp; meldingen</h2><span class="ww-count" id="ww-feed-count">—</span></div>
+          <label class="ww-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input id="ww-search" type="search" aria-label="Zoek in meldingen" placeholder="Zoek land, onderwerp of bron…" autocomplete="off"></label>
+          <div class="ww-selection" id="ww-selection" hidden><span id="ww-selection-name"></span><button id="ww-clear-selection" type="button" aria-label="Wis kaartselectie">×</button></div>
+          <div class="ww-news-list" id="ww-news-list" tabindex="0" aria-label="Gepubliceerd nieuws"><p class="ww-empty">BBC, NOS en GDACS worden opgehaald…</p></div>
+          <div class="ww-feed-footer"><span class="ww-tiny-dot"></span> Vernieuwt iedere 5 minuten</div>
+        </section>
+        <section class="ww-map-panel" aria-labelledby="ww-map-title">
+          <div class="ww-panel-heading"><div class="ww-map-title"><span class="ww-map-dot"></span><h2 id="ww-map-title">Wereldbeeld</h2><span>Laatste 7 dagen</span></div><button class="ww-text-button" type="button" id="ww-reset-map">Kaart herstellen ↗</button></div>
+          <div class="ww-map-viewport" id="ww-map-viewport" tabindex="0" aria-label="Interactieve wereldkaart; pijltjestoetsen verplaatsen, plus en min zoomen">
+            <div class="ww-map-plane" id="ww-map-plane"><img class="ww-world-map" src="/assets/world-watcher-map.svg" alt="Wereldkaart met landgrenzen van Natural Earth" width="1200" height="500" draggable="false"><div class="ww-markers" id="ww-markers"></div></div>
+            <div class="ww-map-caption"><span>GLOBAL SITUATION MONITOR</span><small id="ww-map-caption">Wachten op brongegevens</small></div>
+            <div class="ww-map-controls" role="group" aria-label="Kaartbediening"><button type="button" id="ww-zoom-in" aria-label="Inzoomen">+</button><button type="button" id="ww-zoom-out" aria-label="Uitzoomen">−</button></div>
+            <div class="ww-map-hint">Sleep de kaart · Klik op een signaal</div>
+            <div class="ww-map-detail" id="ww-map-detail" tabindex="-1" aria-labelledby="ww-detail-title" hidden><button class="ww-detail-close" id="ww-close-detail" type="button" aria-label="Sluit kaartdetail">×</button><span class="ww-eyebrow" id="ww-detail-type"></span><h3 id="ww-detail-title"></h3><p id="ww-detail-description"></p><a id="ww-detail-link" target="_blank" rel="noopener noreferrer">Lees de bron ↗</a></div>
+          </div>
+          <div class="ww-legend" aria-label="Kaartlegenda"><span><i class="ww-dot ww-dot-news"></i> Nieuwsregio</span><span><i class="ww-dot ww-dot-red"></i> GDACS rood</span><span><i class="ww-dot ww-dot-orange"></i> Oranje</span><span><i class="ww-dot ww-dot-green"></i> Groen</span></div>
+          <div class="ww-map-note"><span>Nieuws = regiopunt, geen exacte incidentlocatie.</span><button class="ww-text-button" type="button" id="ww-about">Bronnen &amp; betekenis ↗</button></div>
+          <section class="ww-source-strip" id="ww-source-strip" aria-label="Status van nieuwsbronnen"></section>
+        </section>
+      </div>
+      <footer class="ww-footer"><span>World Watcher <b>01</b></span><p>Geen algemene dreigingsscore. De kleuren komen uitsluitend van GDACS.</p><a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener noreferrer">Kaart: Natural Earth</a></footer>
+      <dialog id="ww-about-dialog" class="ww-dialog" aria-labelledby="ww-about-title"><button class="ww-detail-close" id="ww-close-about" type="button" aria-label="Sluit broninformatie" autofocus>×</button><p class="ww-eyebrow">Leeswijzer</p><h2 id="ww-about-title">Wat je hier ziet.</h2><p>BBC World en NOS Buitenland leveren gepubliceerde koppen, introducties en bronlinks. De oorspronkelijke publicatietijd staat bij elk bericht. De filter “Geopolitiek” herkent trefwoorden; dit is geen menselijke beoordeling.</p><p>Blauwe kaartpunten groeperen geopolitieke berichten per herkende regio. De punten geven een regio aan, niet de exacte plaats van een aanval of incident. Berichten zonder herkenbare regio blijven in het overzicht.</p><p>GDACS levert meldingen over onder meer aardbevingen, overstromingen en stormen. Rood, oranje en groen zijn de door GDACS gepubliceerde niveaus voor mogelijke humanitaire impact. Deze kleuren zijn geen score voor oorlogsdreiging of persoonlijke veiligheid.</p><p>De monitor toont maximaal 40 berichten per nieuwsbron en 60 GDACS-meldingen uit de laatste zeven dagen. Bij GDACS komen rode en oranje meldingen eerst in de selectie. Mislukte bronverbindingen worden gemeld; eerder opgehaalde gegevens blijven maximaal één uur beschikbaar als verouderd.</p><div class="ww-about-links"><a href="https://www.bbc.com/news/world" target="_blank" rel="noopener noreferrer">BBC World ↗</a><a href="https://nos.nl/nieuws/buitenland" target="_blank" rel="noopener noreferrer">NOS Buitenland ↗</a><a href="https://www.gdacs.org/" target="_blank" rel="noopener noreferrer">GDACS ↗</a></div></dialog>
+      <noscript><p>Zet JavaScript aan om de kaart en gepubliceerde meldingen te laden.</p></noscript>
+    </main>
+  </div>
+  <script src="/assets/settings-module-routes.js?v=20260906a" defer></script>
+  <script src="/assets/settings-module-back.js?v=20260814b" defer></script>
+  <script src="/assets/world-watcher.js?v=20260906a" defer></script>
+</body>
+</html>
