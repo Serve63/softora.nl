@@ -64,7 +64,7 @@ function createGitRepository() {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=6',
+    'SEO_MACHINE_PROMPT_VERSION=7',
     'SEO_AUTOMATION_EXCLUDED_PATHS=/website,/bedrijfssoftware,/voicesoftware,/chatbot',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
@@ -79,8 +79,8 @@ function validAutomationPrompt() {
     'Close every outcome with npm run seo:automation-state -- finish-run.',
     'Record setup evidence with npm run seo:automation-state -- record-tool-smoke.',
     'Require mcp__ubersuggest__keyword_suggestions, mcp__ubersuggest__google_suggestions, mcp__ubersuggest__keyword_overview and mcp__ubersuggest__serp_analysis.',
-    'Select agent.browsers.get("iab") and use only the returned built-in ChatGPT/Codex browser binding.',
-    'Google Chrome and Microsoft Edge are forbidden, with no generic browser fallback.',
+    'Select agent.browsers.get("chrome") and use only ordinary Google Chrome.',
+    'The built-in browser and Microsoft Edge are forbidden, with no generic browser fallback.',
     'This automation remains ACTIVE until Serve explicitly pauses.',
     'After 31 December 2026, continue on rolling evidence.',
     'Never buy credits or use paid fallbacks.',
@@ -720,7 +720,7 @@ test('automation installation audit proves one active heartbeat, matching task a
   assert.deepEqual(audit.automation.missingPromptMarkers, []);
 });
 
-test('automation installation audit rejects an Edge route even when IAB markers are present', () => {
+test('automation installation audit rejects an Edge route even when Chrome markers are present', () => {
   const memoryPath = prepareOperationalState(createMemory());
   const paths = createAutomationConfig(memoryPath, {
     prompt: `${validAutomationPrompt()} Legacy fallback agent.browsers.get("edge") family=edge.`,
@@ -778,4 +778,15 @@ test('automation-state CLI rejects a command-line memory path override', () => {
     '--memory',
     '/tmp/not-the-seo-automation.md',
   ]), /memory-padoverride is niet toegestaan/);
+});
+
+
+test('the versioned production prompt passes installation audit and rejects an IAB fallback', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const prompt = fs.readFileSync(path.resolve(__dirname, '../../docs/growth/seo-machine-prompt.md'), 'utf8');
+  const paths = createAutomationConfig(memoryPath, { prompt });
+  const audit = auditAutomationInstallation({ memoryPath, ...paths });
+  assert.equal(audit.status, 'ready', audit.errors.join(' '));
+  createAutomationConfig(memoryPath, { prompt: prompt + '\nUse agent.browsers.get("iab") as fallback.' });
+  assert.equal(auditAutomationInstallation({ memoryPath, ...paths }).status, 'invalid');
 });

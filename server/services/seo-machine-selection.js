@@ -17,7 +17,6 @@ const ALLOWED_SOURCES = new Set([
 const ALLOWED_DECISIONS = new Set(['selected', 'skipped']);
 const ALLOWED_ACTION_TYPES = new Set(['new_url', 'substantial_refresh', 'other_growth_action']);
 const ALLOWED_SKIP_REASONS = new Set([
-  'binding_new_url_floor',
   'recent_material_change',
   'protect_proven_winner',
   'intent_mismatch',
@@ -71,9 +70,18 @@ function isSafeRelativePath(value) {
   return !normalized.split(/[\\/]+/).includes('..');
 }
 
+function opportunityPath(value) {
+  try {
+    const parsed = new URL(normalizeText(value), 'https://www.softora.nl');
+    if (!['softora.nl', 'www.softora.nl'].includes(parsed.hostname) || parsed.search || parsed.hash) return '';
+    return normalizePublicPath(parsed.pathname);
+  } catch { return ''; }
+}
+
 function sameOpportunity(review, opportunity) {
-  return normalizeComparable(review?.query) === normalizeComparable(opportunity?.query)
-    && normalizeComparable(review?.page) === normalizeComparable(opportunity?.page);
+  const page = opportunityPath(review?.page);
+  return Boolean(page) && normalizeComparable(review?.query) === normalizeComparable(opportunity?.query)
+    && page === opportunityPath(opportunity?.page);
 }
 
 function normalizePublicPath(value) {
@@ -234,12 +242,6 @@ function validateSkipEvidence(review, evidence, errors) {
   if (normalizeText(review.evidence).length < 20) {
     errors.push(`prioritizedReview rank ${review.rank} mist concreet skipbewijs.`);
   }
-  if (reasonCode === 'binding_new_url_floor') {
-    const controlPlane = evidence.controlPlane || {};
-    if (controlPlane.newUrlRequired !== true && Number(controlPlane.newUrlDeficit) <= 0) {
-      errors.push(`prioritizedReview rank ${review.rank} claimt een nieuwe-URL-vloer zonder bindend deficit.`);
-    }
-  }
   if (RECENCY_SKIP_REASONS.has(reasonCode)) {
     if (!isValidDateTime(review.lastChangedAt)) {
       errors.push(`prioritizedReview rank ${review.rank} mist lastChangedAt voor de recency-skip.`);
@@ -306,6 +308,16 @@ function validateSelectionEvidence(evidence = {}, report = {}, options = {}) {
     errors.push('sourceReport.path wijkt af van het werkelijk ingelezen GSC-rapport.');
   }
   if (!normalizeText(evidence.machineState)) errors.push('machineState ontbreekt.');
+  if (evidence.controlPlane?.newUrlRequired === true || Number(evidence.controlPlane?.newUrlDeficit) > 0) {
+    errors.push('De opportunity-first strategie kent geen bindende nieuwe-URL-vloer.');
+  }
+  if (options.controlPlane) {
+    for (const field of ['moneyPageAllowed', 'moneyPageNewUrls', 'maximumMoneyPageNewUrlsPerWeek', 'allowedPublicationLanes']) {
+      if (JSON.stringify(evidence.controlPlane?.[field]) !== JSON.stringify(options.controlPlane[field])) {
+        errors.push(`controlPlane.${field} wijkt af van de cadence-receipt van deze invocation.`);
+      }
+    }
+  }
   validateSelectedAction(evidence.selected, evidence, errors, options);
 
   const reviews = Array.isArray(evidence.prioritizedReview) ? evidence.prioritizedReview : [];

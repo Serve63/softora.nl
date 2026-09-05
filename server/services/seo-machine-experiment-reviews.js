@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
+const { normalizePagePath } = require('./seo-machine-performance');
 
 const REVIEW_STAGES = Object.freeze(['D14', 'D28', 'D56']);
 const REVIEW_REPORT_MAX_AGE_MS = 30 * 60 * 1000;
@@ -140,26 +141,58 @@ function parseExperimentReviewSchedule(memoryContent, now = new Date()) {
   };
 }
 
-function validateMetrics(review, label, errors) {
+function deriveExperimentReviewMetrics(report, paths = []) {
+  const wanted = new Set(paths.map(normalizePagePath));
+  const rows = (Array.isArray(report?.pages?.nonBranded) ? report.pages.nonBranded : []).filter((row) => wanted.has(normalizePagePath(row.page)));
+  const observedPaths = [...new Set(rows.map((row) => normalizePagePath(row.page)))];
+  const missingPaths = [...wanted].filter((pathName) => !observedPaths.includes(pathName));
+  const complete = wanted.size > 0 && missingPaths.length === 0;
+  const valid = rows.every((row) => ['clicks', 'impressions', 'position'].every((key) => (
+    typeof row[key] === 'number' && Number.isFinite(row[key]) && row[key] >= 0
+  )));
+  const impressions = rows.reduce((sum, row) => sum + row.impressions, 0);
+  return {
+    nonBrandedClicks: complete && valid ? rows.reduce((sum, row) => sum + row.clicks, 0) : null,
+    nonBrandedImpressions: complete && valid ? impressions : null,
+    averagePosition: complete && valid && impressions > 0
+      ? Math.round(rows.reduce((sum, row) => sum + row.position * row.impressions, 0) / impressions * 100) / 100
+      : null,
+    observedPaths,
+    missingPaths,
+    valid,
+  };
+}
+
+function validateMetrics(review, label, errors, sourceMetrics) {
   const metrics = review.metrics;
   if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) {
     errors.push(`${label}.metrics ontbreekt.`);
     return;
   }
   for (const field of ['nonBrandedClicks', 'nonBrandedImpressions']) {
-    if (!Number.isFinite(Number(metrics[field])) || Number(metrics[field]) < 0) {
-      errors.push(`${label}.metrics.${field} moet een niet-negatief getal zijn.`);
+    if (metrics[field] !== null && (typeof metrics[field] !== 'number' || !Number.isFinite(metrics[field]) || metrics[field] < 0)) {
+      errors.push(`${label}.metrics.${field} moet een niet-negatief getal of null zijn.`);
     }
   }
   if (
     metrics.averagePosition !== null
-    && metrics.averagePosition !== undefined
-    && (!Number.isFinite(Number(metrics.averagePosition)) || Number(metrics.averagePosition) < 0)
+    && (typeof metrics.averagePosition !== 'number' || !Number.isFinite(metrics.averagePosition) || metrics.averagePosition < 0)
   ) {
     errors.push(`${label}.metrics.averagePosition moet een niet-negatief getal of null zijn.`);
   }
   if (normalizeText(metrics.baselineComparison).length < 20) {
     errors.push(`${label}.metrics.baselineComparison mist een concrete vergelijking.`);
+  }
+  if (sourceMetrics) {
+    if (!sourceMetrics.valid) errors.push(`${label}: ongeldige metriek in de GSC-bronrij.`);
+    for (const field of ['nonBrandedClicks', 'nonBrandedImpressions', 'averagePosition']) {
+      if (metrics[field] !== sourceMetrics[field]) {
+        errors.push(`${label}.metrics.${field} wijkt af van de gekoppelde GSC-paginarijen: verwacht ${sourceMetrics[field]}.`);
+      }
+    }
+    if (sourceMetrics.nonBrandedImpressions === null && (review.outcome !== 'insufficient_data' || review.decision !== 'hold')) {
+      errors.push(`${label}: ontbrekende GSC-rijen vereisen insufficient_data en hold; ontbrekend is niet nul.`);
+    }
   }
 }
 
@@ -183,6 +216,7 @@ function validateExperimentReviewEvidence({
     errors.push('generatedAt valt buiten het verse reviewvenster van 30 minuten.');
   }
   if (report.status !== 'ready') errors.push('Het gekoppelde GSC-rapport is niet ready.');
+  if (!Array.isArray(report?.pages?.nonBranded)) errors.push('Het gekoppelde GSC-rapport mist pages.nonBranded.');
   if (!validDateTime(report.generatedAt)) errors.push('Het gekoppelde GSC-rapport mist generatedAt.');
   if (
     validDateTime(report.generatedAt)
@@ -227,7 +261,7 @@ function validateExperimentReviewEvidence({
     if (!ALLOWED_INDEXATION_STATUSES.has(normalizeText(review.indexationStatus))) {
       errors.push(`${label}.indexationStatus is ongeldig.`);
     }
-    validateMetrics(review, label, errors);
+    validateMetrics(review, label, errors, dueReview && deriveExperimentReviewMetrics(report, dueReview.paths));
     if (normalizeText(review.evidence).length < 40) errors.push(`${label}.evidence mist controleerbaar reviewbewijs.`);
     if (normalizeText(review.nextAction).length < 20) errors.push(`${label}.nextAction is te vaag.`);
   }
@@ -256,6 +290,7 @@ module.exports = {
   REVIEW_REPORT_MAX_AGE_MS,
   REVIEW_STAGES,
   digestExperimentMemory,
+  deriveExperimentReviewMetrics,
   parseExperimentReviewSchedule,
   validateExperimentReviewEvidence,
 };

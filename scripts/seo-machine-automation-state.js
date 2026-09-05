@@ -13,7 +13,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTOMATION_ID = 'softora-seo-actiemachine';
 const AUTOMATION_NAME = 'Softora SEO dagmachine';
 const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
-const AUTOMATION_PROMPT_VERSION = 6;
+const AUTOMATION_PROMPT_VERSION = 7;
 const RUN_GATE_VERSION = 2;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
@@ -56,7 +56,7 @@ const DEFAULT_MEMORY_PATH = path.join(
 const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=6/ }),
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=7/ }),
   Object.freeze({
     label: 'excluded_seo_routes',
     pattern: /SEO_AUTOMATION_EXCLUDED_PATHS=\/website,\/bedrijfssoftware,\/voicesoftware,\/chatbot/,
@@ -83,9 +83,9 @@ const REQUIRED_PROMPT_MARKERS = Object.freeze([
   Object.freeze({ label: 'ubersuggest_keyword_overview', pattern: /mcp__ubersuggest__keyword_overview/i }),
   Object.freeze({ label: 'ubersuggest_serp_analysis', pattern: /mcp__ubersuggest__serp_analysis/i }),
   Object.freeze({ label: 'ubersuggest_data_smoke', pattern: /seo:automation-state -- record-tool-smoke/i }),
-  Object.freeze({ label: 'iab_browser_binding', pattern: /agent\.browsers\.get\(["']iab["']\)/i }),
-  Object.freeze({ label: 'iab_browser_identity', pattern: /built-in ChatGPT\/Codex browser binding/i }),
-  Object.freeze({ label: 'private_browser_prohibition', pattern: /Google Chrome and Microsoft Edge are forbidden/i }),
+  Object.freeze({ label: 'chrome_browser_binding', pattern: /agent\.browsers\.get\(["']chrome["']\)/i }),
+  Object.freeze({ label: 'chrome_browser_identity', pattern: /ordinary Google Chrome/i }),
+  Object.freeze({ label: 'private_browser_prohibition', pattern: /The built-in browser and Microsoft Edge are forbidden/i }),
   Object.freeze({ label: 'browser_fallback_prohibition', pattern: /no generic browser fallback/i }),
   Object.freeze({ label: 'evergreen_continuation', pattern: /remains ACTIVE until Serve explicitly pauses/i }),
   Object.freeze({ label: 'post_deadline_rule', pattern: /After 31 December 2026/i }),
@@ -94,7 +94,7 @@ const REQUIRED_PROMPT_MARKERS = Object.freeze([
 ]);
 const FORBIDDEN_PROMPT_MARKERS = Object.freeze([
   Object.freeze({ label: 'edge_browser_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
-  Object.freeze({ label: 'chrome_browser_binding', pattern: /agent\.browsers\.get\(["']chrome["']\)/i }),
+  Object.freeze({ label: 'iab_browser_binding', pattern: /agent\.browsers\.get\(["']iab["']\)/i }),
   Object.freeze({ label: 'extension_browser_binding', pattern: /agent\.browsers\.get\(["']extension["']\)/i }),
   Object.freeze({ label: 'generic_browser_binding', pattern: /agent\.browsers\.(?:getDefault|getForUrl)\s*\(/i }),
   Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge/i }),

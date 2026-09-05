@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   digestExperimentMemory,
+  deriveExperimentReviewMetrics,
   parseExperimentReviewSchedule,
   validateExperimentReviewEvidence,
 } = require('../../server/services/seo-machine-experiment-reviews');
@@ -21,6 +22,7 @@ function report() {
   return {
     status: 'ready',
     generatedAt: '2026-08-29T06:15:00.000Z',
+    pages: { nonBranded: ['/blog/done', '/kennisbank/due'].map((page) => ({ page, clicks: 0, impressions: 12, position: 24.5 })) },
   };
 }
 
@@ -170,4 +172,40 @@ test('review gate blocks stale reports, time travel and false report provenance'
   assert.equal(invalidProvenance.status, 'blocked');
   assert.match(invalidProvenance.errors.join(' '), /voor het gekoppelde GSC-rapport/);
   assert.match(invalidProvenance.errors.join(' '), /veilig relatief repopad/);
+});
+
+test('review gate rejects a zero or an invented count when the source contains impressions', () => {
+  for (const replacement of [0, 999, null, '12', false]) {
+    const candidate = evidence();
+    candidate.reviews[1].metrics.nonBrandedImpressions = replacement;
+    const result = validateExperimentReviewEvidence({ memoryContent: MEMORY, evidence: candidate, report: report(), now: new Date('2026-08-29T06:25:00Z') });
+    assert.equal(result.status, 'blocked');
+    assert.match(result.errors.join(' '), /nonBrandedImpressions.*GSC-paginarijen/);
+  }
+});
+
+test('missing query rows remain unknown and cannot establish a win or zero demand', () => {
+  const source = report();
+  source.pages.nonBranded.pop();
+  const candidate = evidence();
+  Object.assign(candidate.reviews[1].metrics, { nonBrandedClicks: null, nonBrandedImpressions: null, averagePosition: null });
+  const options = { memoryContent: MEMORY, evidence: candidate, report: source, now: new Date('2026-08-29T06:25:00Z') };
+  assert.equal(validateExperimentReviewEvidence(options).status, 'ready');
+  candidate.reviews[1].outcome = 'won';
+  candidate.reviews[1].decision = 'expand';
+  assert.equal(validateExperimentReviewEvidence(options).status, 'blocked');
+});
+
+test('review metrics use exact normalized paths and impression-weighted positions', () => {
+  const source = { pages: { nonBranded: [
+    { page: 'https://www.softora.nl/blog/a/', clicks: 1, impressions: 10, position: 10 },
+    { page: '/blog/b', clicks: 2, impressions: 30, position: 20 },
+    { page: '/blog/unrelated', clicks: 90, impressions: 100, position: 1 },
+  ] } };
+  const metrics = deriveExperimentReviewMetrics(source, ['/blog/a', '/blog/b']);
+  assert.equal(metrics.nonBrandedClicks, 3);
+  assert.equal(metrics.nonBrandedImpressions, 40);
+  assert.equal(metrics.averagePosition, 17.5);
+  assert.equal(deriveExperimentReviewMetrics(source, ['/blog/a', '/blog/missing']).nonBrandedClicks, null);
+  assert.equal(deriveExperimentReviewMetrics({}, ['/blog/a']).nonBrandedImpressions, null);
 });
