@@ -237,10 +237,10 @@
       ].join('|');
     }
 
-    async function hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext) {
+    async function hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext, publish) {
       const requestRender = (...args) => {
         const pending = stability.getPending(mail.id);
-        if (pending) return pending;
+        if (pending) return publish(runContext);
         if (!runContext.isLatest() || !isSelectionCurrent()) return resolvedStale();
         return open(...args);
       };
@@ -254,8 +254,9 @@
         requestRender,
       };
       const firstPass = [];
-      if (options.needsRootHydration?.(mail, openOptions)) firstPass.push(options.hydrateRoot?.(payload));
-      if (!openOptions.skipContactTimeline) firstPass.push(options.hydrateTimeline?.(payload));
+      if (options.needsRootHydration?.(mail, openOptions)) firstPass.push(Promise.resolve(options.hydrateRoot?.(payload)).then(() => { void publish(runContext); }));
+      if (!openOptions.skipContactTimeline) firstPass.push(Promise.resolve(options.hydrateTimeline?.(payload)).then(() => { void publish(runContext); }));
+      if (firstPass.length) void publish(runContext);
       if (firstPass.length) await Promise.allSettled(firstPass);
       if (!isSelectionCurrent()) return null;
       const currentMail = options.getMail?.(mail.id);
@@ -263,6 +264,7 @@
       if (options.shouldHydrateThread?.(currentMail, openOptions)) {
         await options.hydrateThread?.({ ...payload, mail: currentMail });
       }
+      await publish(runContext);
       return isSelectionCurrent() && options.getMail?.(mail.id) === mail ? mail : null;
     }
 
@@ -304,6 +306,27 @@
         options.getMail?.(mail.id) === mail &&
         sameScope(options.getScope?.(), scope)
       );
+      let published = false;
+      let publication = Promise.resolve();
+      const bodyReady = () => mail.bodyLoaded === true && !mail.bodyTruncated && mail.bodyLoading !== true;
+      const publish = (runContext) => {
+        // A complete stored body is readable independently of slow provider
+        // enrichment. Keep image preparation and selection fences per commit.
+        if (!bodyReady() || !runContext.isCurrent() || !isSelectionCurrent()) return publication;
+        publication = publication.then(async () => {
+          if (!runContext.isCurrent() || !isSelectionCurrent()) return;
+          let preparation;
+          try {
+            preparation = await options.prepare?.(mail, openOptions, runContext);
+            if (bodyReady() && runContext.isCurrent() && isSelectionCurrent()) published = commit(mail) || published;
+          } catch (error) {
+            options.onError?.(error);
+          } finally {
+            preparation?.release?.();
+          }
+        });
+        return publication;
+      };
       return stability.run({
         id: mail.id,
         identity: mail,
@@ -311,7 +334,7 @@
         forceNewRun: openOptions.forceRootHydration === true,
         signal: token.signal,
         isCurrent: isSelectionCurrent,
-        hydrate: (runContext) => hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext),
+        hydrate: (runContext) => hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext, publish),
         prepare: (hydratedMail, runContext) => (
           hydratedMail && isSelectionCurrent()
             ? options.prepare?.(hydratedMail, openOptions, runContext)
@@ -320,7 +343,7 @@
         commit: ({ value }) => {
           const currentMail = value || options.getMail?.(mail.id);
           if (!isSelectionCurrent() || currentMail !== mail) return false;
-          return commit(currentMail);
+          return commit(currentMail) || published;
         },
         onError: options.onError,
       }).finally(() => {

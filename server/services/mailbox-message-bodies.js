@@ -1,7 +1,8 @@
 const crypto = require('crypto');
+const { createMailboxImapSession } = require('./mailbox-imap-session');
 const MAX_MAILBOX_BODY_BATCH_SIZE = 20;
 const MAX_PROVIDER_MESSAGE_ID_HYDRATIONS_PER_BATCH = 1;
-const PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS = 18_000;
+const PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS = 65_000;
 const PROVIDER_MESSAGE_ID_MATCH_LIMIT = 2;
 const PROVIDER_MESSAGE_ID_FOLDERS = Object.freeze(['sent', 'allmail']);
 const RETRYABLE_PROVIDER_LOOKUP_CODES = new Set([
@@ -105,48 +106,76 @@ function createMailboxMessageBodiesService({
       providerLookupRetryable: false,
       bodyResolved: false,
     };
+    if (typeof mailboxIndexStore?.listMessagesByMessageIdsForAccounts === 'function') {
+      for (const folder of PROVIDER_MESSAGE_ID_FOLDERS) {
+        const stored = await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
+          accountEmails: [reference.accountEmail], folder,
+          messageIds: [reference.requestMessageId], priorityRead: true,
+        });
+        const exact = (Array.isArray(stored) ? stored : []).filter((message) => (
+          normalizeText(message.accountEmail).toLowerCase() === reference.accountEmail &&
+          normalizeMessageId(message.messageId).toLowerCase() === reference.canonicalMessageId
+        ));
+        if (exact.length > 1) return unresolved;
+        if (exact.length !== 1) continue;
+        const [hydrated] = await mailboxIndexStore.hydrateMessageBodies({ messages: exact });
+        if (hydrated?.bodyResolved !== true || hydrated.bodyTruncated || (hydrated.hasBody && !normalizeText(hydrated.body))) continue;
+        const visible = typeof assertMailboxMessageVisible === 'function'
+          ? assertMailboxMessageVisible(hydrated) : hydrated;
+        return { ...visible, requestMessageId: reference.requestMessageId, providerMessageIdLookup: true };
+      }
+    }
     if (typeof fetchMessagesFromImap !== 'function') return unresolved;
     let transientFailure = false;
-    for (const folder of PROVIDER_MESSAGE_ID_FOLDERS) {
-      try {
-        const messages = await fetchMessagesFromImap({
-          account: reference.account,
-          folder,
-          limit: PROVIDER_MESSAGE_ID_MATCH_LIMIT,
-          targetedOnly: true,
-          exactMessageIdOnly: true,
-          threadReferenceIds: [reference.requestMessageId],
-          threadRecipientTerms: [],
-          imapOperationTimeoutMs: PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS,
-          logImapOperation: true,
-        });
-        const exact = (Array.isArray(messages) ? messages : []).filter((message) => (
-          normalizeMessageId(message && message.messageId).toLowerCase() === reference.canonicalMessageId
-        ));
-        if (exact.length === 1) {
-          return {
-            ...exact[0],
-            accountEmail: reference.accountEmail,
-            bodyResolved: true,
-            requestMessageId: reference.requestMessageId,
-            providerMessageIdLookup: true,
-          };
-        }
-        if (exact.length > 1) {
-          logger.warn?.('[MailboxDetail][MessageIdHydration] dubbel exact providerbericht geweigerd', {
+    const deadlineAtMs = Date.now() + PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS;
+    const imapSession = createMailboxImapSession();
+    try {
+      for (const folder of PROVIDER_MESSAGE_ID_FOLDERS) {
+        if (Date.now() >= deadlineAtMs) { transientFailure = true; break; }
+        try {
+          const messages = await fetchMessagesFromImap({
+            account: reference.account,
+            folder,
+            limit: PROVIDER_MESSAGE_ID_MATCH_LIMIT,
+            targetedOnly: true,
+            exactMessageIdOnly: true,
+            threadReferenceIds: [reference.requestMessageId],
+            threadRecipientTerms: [],
+            imapOperationTimeoutMs: PROVIDER_MESSAGE_ID_HYDRATION_TIMEOUT_MS,
+            deadlineAtMs,
+            imapSession,
+            logImapOperation: true,
+          });
+          const exact = (Array.isArray(messages) ? messages : []).filter((message) => (
+            normalizeMessageId(message && message.messageId).toLowerCase() === reference.canonicalMessageId
+          ));
+          if (exact.length === 1) {
+            return {
+              ...exact[0],
+              accountEmail: reference.accountEmail,
+              bodyResolved: true,
+              requestMessageId: reference.requestMessageId,
+              providerMessageIdLookup: true,
+            };
+          }
+          if (exact.length > 1) {
+            logger.warn?.('[MailboxDetail][MessageIdHydration] dubbel exact providerbericht geweigerd', {
+              account: reference.accountEmail,
+              folder,
+            });
+            return unresolved;
+          }
+        } catch (error) {
+          transientFailure = transientFailure || isRetryableProviderLookupError(error);
+          logger.warn?.('[MailboxDetail][MessageIdHydration]', {
             account: reference.accountEmail,
             folder,
+            code: normalizeText(error && (error.code || error.status)) || 'UNKNOWN',
           });
-          return unresolved;
         }
-      } catch (error) {
-        transientFailure = transientFailure || isRetryableProviderLookupError(error);
-        logger.warn?.('[MailboxDetail][MessageIdHydration]', {
-          account: reference.accountEmail,
-          folder,
-          code: normalizeText(error && (error.code || error.status)) || 'UNKNOWN',
-        });
       }
+    } finally {
+      await imapSession.close();
     }
     return transientFailure ? { ...unresolved, providerLookupRetryable: true } : unresolved;
   }
