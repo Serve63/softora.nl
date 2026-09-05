@@ -79,7 +79,7 @@ test('control plane makes live blockers an operations P0 without a publication l
   assert.equal(state.supportingOptimizationRequired, false);
 });
 
-test('every non-P0 state keeps the seven-per-week growth URL target', () => {
+test('indexation recovery prioritizes repair without forcing new URLs', () => {
   const state = evaluateSeoMachineState(readyInputs({
     ledger: {
       status: 'ready',
@@ -99,16 +99,17 @@ test('every non-P0 state keeps the seven-per-week growth URL target', () => {
     },
   }));
   assert.equal(state.state, 'indexation_recovery');
-  assert.equal(state.minimumNewUrlsPerWeek, 7);
-  assert.equal(state.minimumEditorialNewUrlsPerWeek, 5);
+  assert.equal(state.minimumNewUrlsPerWeek, 0);
+  assert.equal(state.minimumEditorialNewUrlsPerWeek, 0);
   assert.equal(state.maximumMoneyPageNewUrlsPerWeek, 2);
-  assert.equal(state.newUrlDeficit, 7);
-  assert.equal(state.requiredPublicationLane, 'editorial');
-  assert.equal(state.nextCandidate.id, 'editorial-candidate');
+  assert.equal(state.newUrlDeficit, 0);
+  assert.equal(state.requiredPublicationLane, null);
+  assert.equal(state.nextCandidate.id, 'money-candidate');
+  assert.equal(state.action, 'improve_discovery_quality_internal_links_or_consolidate');
   assert.equal(state.companionAction, 'improve_discovery_quality_internal_links_or_consolidate');
 });
 
-test('performance recovery remains a companion action while the daily URL lane is behind', () => {
+test('performance recovery remains the main action regardless of publication count', () => {
   const state = evaluateSeoMachineState(readyInputs({
     ledger: {
       status: 'ready',
@@ -129,10 +130,10 @@ test('performance recovery remains a companion action while the daily URL lane i
     },
   }));
   assert.equal(state.state, 'performance_recovery');
-  assert.equal(state.newUrlRequired, true);
-  assert.equal(state.newUrlDeficit, 4);
-  assert.equal(state.requiredPublicationLane, 'editorial');
-  assert.match(state.action, /editorial_candidate_with_supporting_optimization/);
+  assert.equal(state.newUrlRequired, false);
+  assert.equal(state.newUrlDeficit, 0);
+  assert.equal(state.requiredPublicationLane, null);
+  assert.equal(state.action, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
   assert.equal(state.companionAction, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
 });
 
@@ -150,7 +151,7 @@ test('measured D28 recovery outranks corpus debt once the daily URL target is me
   assert.equal(state.action, 'improve_query_page_match_snippets_internal_routes_or_consolidate');
 });
 
-test('the third rolling money page is blocked and an editorial candidate is forced', () => {
+test('the third rolling money page is blocked without forcing a new publication', () => {
   const state = evaluateSeoMachineState(readyInputs({
     ledger: {
       status: 'ready',
@@ -164,15 +165,15 @@ test('the third rolling money page is blocked and an editorial candidate is forc
       }) },
     },
   }));
-  assert.equal(state.newUrlDeficit, 1);
+  assert.equal(state.newUrlDeficit, 0);
   assert.equal(state.moneyPageCapReached, true);
   assert.equal(state.moneyPageAllowed, false);
-  assert.equal(state.requiredPublicationLane, 'editorial');
+  assert.equal(state.requiredPublicationLane, null);
   assert.deepEqual(state.allowedPublicationLanes, ['editorial']);
   assert.equal(state.nextCandidate.id, 'editorial-candidate');
 });
 
-test('a second money page may win on score after five editorial URLs are live', () => {
+test('a second money page remains available as an advisory candidate', () => {
   const state = evaluateSeoMachineState(readyInputs({
     ledger: {
       status: 'ready',
@@ -186,7 +187,7 @@ test('a second money page may win on score after five editorial URLs are live', 
       }) },
     },
   }));
-  assert.equal(state.newUrlRequired, true);
+  assert.equal(state.newUrlRequired, false);
   assert.equal(state.requiredPublicationLane, null);
   assert.equal(state.moneyPageAllowed, true);
   assert.deepEqual(state.allowedPublicationLanes, ['editorial', 'money_page']);
@@ -255,7 +256,7 @@ test('control plane refuses scale without positive D28 non-brand evidence', () =
     },
   }));
   assert.equal(state.state, 'growth');
-  assert.equal(state.minimumNewUrlsPerWeek, 7);
+  assert.equal(state.minimumNewUrlsPerWeek, 0);
 });
 
 test('cadence check reuses only a fresh indexation report', () => {
@@ -278,4 +279,14 @@ test('cadence check reuses only a fresh GSC performance report', () => {
     'ready'
   );
   assert.equal(loadFreshPerformanceReport(reportPath, new Date('2026-07-23T11:00:00.000Z')), null);
+});
+
+
+test('seven new URLs exhausts new-page capacity while existing-page work continues', () => {
+  const state = evaluateSeoMachineState(readyInputs());
+  assert.equal(state.newUrlAllowed, false);
+  assert.deepEqual(state.allowedPublicationLanes, []);
+  assert.equal(state.publicActionRequired, true);
+  assert.equal(state.nextCandidate, null);
+  assert.equal(state.publicationStrategy, 'opportunity_first');
 });

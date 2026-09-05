@@ -12,6 +12,8 @@ const {
   loadSeoMachineBacklog,
 } = require('../server/services/seo-machine-backlog');
 const {
+  DEFAULT_MEMORY_PATH,
+  inspectAutomationState,
   extractRunGateCliOptions,
   recordAutomationRunGateFromCli,
 } = require('./seo-machine-automation-state');
@@ -57,7 +59,16 @@ function main(argv = process.argv.slice(2)) {
   const args = parseArgs(gateOptions.remaining);
   const evidence = readJson(args.evidence);
   const report = readJson(args.report);
+  let controlPlane;
+  if (gateOptions.enabled) {
+    const active = inspectAutomationState(DEFAULT_MEMORY_PATH).lifecycle.activeRun;
+    if (active?.threadId !== gateOptions.threadId || active?.invocationAt !== gateOptions.invocationAt || !active?.gates?.cadence) {
+      throw new Error('Selectie vereist de cadence-receipt van exact deze invocation.');
+    }
+    controlPlane = active.gates.cadence.summary;
+  }
   const result = validateSelectionEvidence(evidence, report, {
+    controlPlane,
     knownPublicPaths: getKnownPublicPaths(),
     readyBacklogPaths: getReadyBacklogPaths(),
     reportPath: args.report,
