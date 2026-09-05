@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { deduplicateRowsByKey } = require('./mailbox-index-message-rows');
+const { prepareMailboxMessageRowForStorage } = require('./mailbox-storage-text');
 const { createMailboxStateMutationStore } = require('../repositories/mailbox-state-mutation-store');
 const {
   isOriginalCampaignOutboundMessage,
@@ -279,7 +280,6 @@ function createMailboxIndexStore(deps = {}) {
       .digest();
     return Math.max(1, digest.readUInt32BE(0) & 0x7fffffff);
   }
-
   function buildMessageRow(message, accountEmail, folder, index = 0, options = {}) {
     const normalizedFolder = normalizeFolder(folder || message?.folder);
     const uid = parseUidFromMessage(message);
@@ -287,7 +287,7 @@ function createMailboxIndexStore(deps = {}) {
     const generationId = normalizeMailboxGenerationId(options.generationId);
     const dateIso = parseDateIso(message && message.date);
     const body = trimBodyForStorage(message, index);
-    return {
+    return prepareMailboxMessageRowForStorage({
       message_key: buildMessageKey(accountEmail, normalizedFolder, uid, generationId),
       account_email: normalizeEmail(accountEmail),
       folder: normalizedFolder,
@@ -343,7 +343,7 @@ function createMailboxIndexStore(deps = {}) {
         softoraThreadProvenanceKnown: message && message.softoraThreadProvenanceKnown === true,
       },
       updated_at: isoNow(),
-    };
+    });
   }
 
   function normalizeMessageRow(row = {}, options = {}) {
@@ -439,7 +439,7 @@ function createMailboxIndexStore(deps = {}) {
     const uid = stableProviderUid(provider, providerId);
     const body = trimBodyForStorage(message, 0);
     const dateIso = parseDateIso(message.date || message.receivedAt);
-    return {
+    return prepareMailboxMessageRowForStorage({
       message_key: buildProviderMessageKey(provider, providerId),
       account_email: accountEmail,
       folder: provider,
@@ -491,7 +491,7 @@ function createMailboxIndexStore(deps = {}) {
         webdesignLinkUrl: truncateText(normalizeString(message.webdesignLinkUrl), 4000),
       },
       updated_at: isoNow(),
-    };
+    });
   }
 
   async function upsertProviderMessages({ provider, messages = [] } = {}) {

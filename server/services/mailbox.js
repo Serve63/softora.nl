@@ -8,6 +8,7 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
+const { sanitizeMailboxStorageText } = require('./mailbox-storage-text');
 const { createMailboxImapFetcher } = require('./mailbox-imap-fetch');
 const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
 const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
@@ -1824,8 +1825,7 @@ function createMailboxService(deps = {}) {
       }
     );
     const attachments = buildMailboxAttachmentMetadata(parsed);
-    const bodyText = text;
-    const preview = truncateText(bodyText.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
+    const preview = sanitizeMailboxStorageText(truncateText(text.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140));
     const fromText = parsedFromName || account.name || account.email;
     return {
       id: `${folder}:${message.uid}`,
@@ -1844,7 +1844,7 @@ function createMailboxService(deps = {}) {
       recipientRoutingEvidenceKnown: true,
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
-      body: bodyText || preview,
+      body: text || preview,
       optOutUrl,
       bodyImages,
       attachments, attachmentEvidenceKnown: true,
