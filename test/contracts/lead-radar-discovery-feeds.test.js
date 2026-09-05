@@ -93,7 +93,7 @@ test('Een gerichte feed gaat via broncontrole naar opgeslagen en zichtbare Linke
   assert.equal(inbox.signals[0].published_at, published);
   assert.equal(inbox.signals[0].message_text, requestText);
   assert.equal(inbox.signals[0].source_verification_status, 'verified');
-  assert.ok(calls.includes(postUrl));
+  assert.equal(calls.filter(calledUrl => calledUrl === postUrl).length, 1);
   const repeated = await service.runScan({ platforms: ['web'], websiteLookupLimit: 0, maxAgeDays: 31 });
   assert.equal(repeated.new_signal_count, 0);
   assert.equal(repeated.duplicate_count, 1);
