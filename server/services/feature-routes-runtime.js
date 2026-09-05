@@ -48,6 +48,7 @@ const {
   registerWhoopHealthProtectedRoutes,
   registerWhoopHealthPublicRoutes,
 } = require('../routes/whoop-health');
+const { registerWorldWatcherRoutes } = require('../routes/world-watcher');
 const { registerWhatsAppReadOnlyRoutes } = require('../routes/whatsapp-read-only');
 const {
   createPremiumDatabaseImportCoordinator,
@@ -224,6 +225,8 @@ function registerFeatureRoutes(app, deps = {}) {
     service: facebookAdsService,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
+
+  registerWorldWatcherRoutes(app, { requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess });
 
   registerWhoopHealthProtectedRoutes(app, {
     service: whoopHealthService,

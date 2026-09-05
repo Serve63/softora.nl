@@ -830,6 +830,21 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
   );
 });
 
+test('World Watcher keeps the canonical sidebar, scoped styling and the shared settings exit', () => {
+  const html = readRepoFile('premium-world-watcher.html'), css = readRepoFile('assets/world-watcher.css'), script = readRepoFile('assets/world-watcher.js');
+  assert.match(html, /class="dashboard-layout ww-layout" data-sidebar-shell="canonical"/);
+  assert.match(html, /<aside class="sidebar" id="ww-sidebar" aria-label="Premium navigatie"><\/aside>/);
+  assert.match(html, /premium-sidebar-links\.js\?v=20260818a/);
+  assert.match(html, /personnel-theme\.css\?v=20260519b/);
+  assert.match(html, /premium-sidebar-autopilot\.css\?v=20260611a/);
+  assert.match(html, /data-settings-module-back-host/);
+  assert.match(css, /body\[data-world-watcher\] \.dashboard-layout\[data-sidebar-shell="canonical"\]>main\.ww-main/);
+  assert.match(css, /margin-left:var\(--premium-sidebar-width,320px\)!important/);
+  assert.match(css, /@media\(max-width:900px\)/);
+  assert.match(script, /node.getAttribute\('href'\) === '\/premium-instellingen'/);
+  assert.match(script, /sidebar.setAttribute\('data-static-sidebar', '1'\)/);
+});
+
 test('static premium sidebars ship the webdesign link in html', () => {
   for (const relativePath of staticSidebarPages) {
     const pageSource = readRepoFile(relativePath);
