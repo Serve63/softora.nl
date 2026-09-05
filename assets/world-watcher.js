@@ -33,9 +33,10 @@
   function renderStatus(data) {
     const ready = data.sources.filter((source) => source.status === 'ready').length;
     const available = data.sources.some((source) => source.status !== 'unavailable');
-    byId('ww-stat-news').textContent = available ? data.items.filter((item) => item.kind === 'geopolitics').length : '—';
-    byId('ww-stat-alerts').textContent = available ? data.items.filter((item) => ['red', 'orange'].includes(item.level)).length : '—';
-    byId('ww-stat-regions').textContent = available ? new Set(data.items.filter((item) => item.kind === 'geopolitics' && item.regionId).map((item) => item.regionId)).size : '—';
+    const newsAvailable = data.sources.some((source) => source.id !== 'gdacs' && source.status !== 'unavailable'), natureAvailable = data.sources.some((source) => source.id === 'gdacs' && source.status !== 'unavailable');
+    byId('ww-stat-news').textContent = newsAvailable ? data.items.filter((item) => item.kind === 'geopolitics').length : '—';
+    byId('ww-stat-alerts').textContent = natureAvailable ? data.items.filter((item) => ['red', 'orange'].includes(item.level)).length : '—';
+    byId('ww-stat-regions').textContent = newsAvailable ? new Set(data.items.filter((item) => item.kind === 'geopolitics' && item.regionId).map((item) => item.regionId)).size : '—';
     byId('ww-stat-sources').textContent = ready + ' / 3';
     byId('ww-updated').textContent = state.snapshot ? 'Gecontroleerd om ' + timeFormat.format(new Date(state.snapshot.checkedAt)) : 'Nog geen brongegevens';
     byId('ww-connection').dataset.state = ready === 3 ? 'ready' : available ? 'partial' : 'error';
@@ -51,7 +52,7 @@
   function openDetail(id, focus = false) {
     const item = view().items.find((candidate) => candidate.id === id);
     state.detailId = item ? id : ''; byId('ww-map-detail').hidden = !item;
-    if (!item) return;
+    if (!item) { byId('ww-markers').querySelectorAll('[data-item]').forEach((pin) => pin.dataset.selected = 'false'); return; }
     byId('ww-detail-type').textContent = (item.eventType || 'Nieuws · regiopunt') + ' · ' + levelName[item.level] + (item.stale ? ' · verouderd' : '');
     byId('ww-detail-title').textContent = item.title;
     byId('ww-detail-description').textContent = item.description || item.region;
@@ -87,7 +88,7 @@
     data.regions.forEach((region) => {
       const count = items.filter((item) => item.kind === 'geopolitics' && item.regionId === region.id).length; if (!count) return;
       const node = pin(region.lat, region.lon, 'news', region.name + ': ' + count + ' geopolitieke berichten'); node.dataset.region = region.id; node.dataset.selected = String(state.region === region.id); node.setAttribute('aria-pressed', String(state.region === region.id));
-      node.append(element('span', 'ww-pin-label', region.name + ' · ' + count)); node.addEventListener('click', () => { state.region = state.region === region.id ? '' : region.id; state.detailId = ''; renderContent(); byId('ww-markers').querySelector('[data-region="' + region.id + '"]')?.focus({ preventScroll: true }); byId('ww-news-list').scrollTop = 0; }); pins.push(node);
+      node.append(element('span', 'ww-pin-label', region.name + ' · ' + count)); node.addEventListener('click', () => { state.region = state.region === region.id ? '' : region.id; state.detailId = ''; renderContent(); byId('ww-markers').querySelector('[data-region="' + region.id + '"]')?.focus({ preventScroll: true }); byId('ww-news-list').scrollTop = 0; if (state.region && window.innerWidth <= 1150) byId('ww-feed-title').scrollIntoView({ behavior: 'instant', block: 'start' }); }); pins.push(node);
     });
     byId('ww-markers').replaceChildren(...pins); byId('ww-map-caption').textContent = pins.length + ' kaartpunten · brongegevens';
   }
