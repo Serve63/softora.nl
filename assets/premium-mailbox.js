@@ -831,8 +831,8 @@ async function loadMailboxAccounts() {
       } else if (!hasMailboxAccount(activeMailboxAccount)) {
         activeMailboxAccount = hasMailboxAccount(MAILBOX_ACCOUNT_DEFAULT) ? MAILBOX_ACCOUNT_DEFAULT : getMailboxAccountEmails()[0];
       }
-      renderMailboxAccountMenu();
-      setMailboxAccountUi(activeMailboxAccount);
+      renderMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount);
+      if (activeFolder === 'outreach') void mailboxDiscoveryController?.loadContactTimeline?.(findMailById(activeMail));
     }
   } catch (_) {
     toast('Mailboxaccounts laden mislukt');
@@ -1173,10 +1173,10 @@ window.addEventListener('keydown', (event) => {
     if (intent.account) activeMailboxAccount = intent.account;
     const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
     if (initialFolder === 'outreach') {
-      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder);
+      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountLoad = loadMailboxAccounts();
       setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
       await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
-      void loadMailboxAccounts();
+      await accountLoad;
       return;
     }
     await loadMailboxAccounts();
