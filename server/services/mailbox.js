@@ -840,7 +840,7 @@ function createMailboxService(deps = {}) {
         user: account.imapUser,
         pass: account.imapPass,
       },
-      logger: false, emitLogs,
+      logger: false, emitLogs, disableCompression: true,
     });
   }
 
