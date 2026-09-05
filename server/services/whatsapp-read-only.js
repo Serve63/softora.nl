@@ -1,4 +1,10 @@
 const crypto = require('node:crypto');
+const {
+  isValidYCloudWebhookSecret,
+  normalizeYCloudWebhookPayload,
+  signatureToleranceSeconds,
+  verifyYCloudWebhookSignature: verifyYCloudSignature,
+} = require('./whatsapp-ycloud-webhook');
 
 const OWNER_KEY = 'serve';
 const WEBHOOK_TABLE = 'softora_whatsapp_webhook_events';
@@ -56,9 +62,12 @@ function createWhatsAppReadOnlyService(deps = {}) {
   const appSecret = normalizeText(config.appSecret);
   const verifyToken = normalizeText(config.verifyToken);
   const providerWebhookToken = normalizeText(config.providerWebhookToken);
+  const ycloudWebhookSecret = normalizeText(config.ycloudWebhookSecret);
+  const ycloudWebhookToleranceSeconds = signatureToleranceSeconds(config.ycloudWebhookToleranceSeconds);
   const encryptionSecret = normalizeText(config.encryptionKey);
   const readToken = normalizeText(config.readToken);
   const ownerKey = normalizeText(config.ownerKey) || OWNER_KEY;
+  const ycloudStatusOwnerKey = `${ownerKey}:ycloud`;
 
   function db() {
     const client = getSupabaseClient({ timeoutMs: 30_000, ignoreFailureCooldown: true });
@@ -143,6 +152,16 @@ function createWhatsAppReadOnlyService(deps = {}) {
     if (!appSecret || !Buffer.isBuffer(rawBody) || !signature) return false;
     const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
     return safeEqual(expected, signature);
+  }
+
+  function verifyYCloudWebhookSignature(rawBody, signature) {
+    return verifyYCloudSignature({
+      rawBody,
+      signature,
+      secret: ycloudWebhookSecret,
+      toleranceSeconds: ycloudWebhookToleranceSeconds,
+      now: now(),
+    });
   }
 
   function hasValidProviderWebhookToken() {
@@ -370,6 +389,43 @@ function createWhatsAppReadOnlyService(deps = {}) {
     return { ok: true, accepted: true, eventKey };
   }
 
+  async function acceptYCloudWebhook({ rawBody, signature }) {
+    if (!verifyYCloudWebhookSignature(rawBody, signature)) {
+      const error = new Error('Ongeldige YCloud WhatsApp-webhookhandtekening.');
+      error.code = 'WHATSAPP_WEBHOOK_SIGNATURE_INVALID';
+      throw error;
+    }
+
+    let authenticatedPayload;
+    try {
+      authenticatedPayload = JSON.parse(rawBody.toString('utf8'));
+    } catch (_error) {
+      const error = new Error('Ongeldige YCloud WhatsApp-webhookpayload.');
+      error.code = 'WHATSAPP_WEBHOOK_PAYLOAD_INVALID';
+      throw error;
+    }
+    const normalized = normalizeYCloudWebhookPayload(authenticatedPayload);
+    if (!normalized.accepted) {
+      return { ok: true, accepted: false, reason: normalized.reason };
+    }
+
+    const eventKey = crypto
+      .createHash('sha256')
+      .update(`ycloud:${normalized.eventId}`, 'utf8')
+      .digest('hex');
+    const normalizedBody = JSON.stringify(normalized.payload);
+    const { error } = await db().from(WEBHOOK_TABLE).upsert({
+      event_key: eventKey,
+      encrypted_payload: encrypt(normalizedBody, 'webhook-payload'),
+      status: 'pending',
+      attempts: 0,
+      next_attempt_at: now().toISOString(),
+      received_at: now().toISOString(),
+    }, { onConflict: 'event_key', ignoreDuplicates: true });
+    if (error) throw error;
+    return { ok: true, accepted: true, eventKey };
+  }
+
   async function processEvent(event) {
     const payload = JSON.parse(decrypt(event.encrypted_payload, 'webhook-payload'));
     const extracted = extractPayload(payload);
@@ -387,7 +443,9 @@ function createWhatsAppReadOnlyService(deps = {}) {
       !latest || message.occurred_at > latest ? message.occurred_at : latest
     ), '');
     const syncPatch = {
-      owner_key: ownerKey,
+      owner_key: extracted.sync.phoneNumberKey.startsWith('ycloud:')
+        ? ycloudStatusOwnerKey
+        : ownerKey,
       last_webhook_at: now().toISOString(),
       updated_at: now().toISOString(),
       ...(extracted.sync.phoneNumberKey ? { phone_number_key: extracted.sync.phoneNumberKey } : {}),
@@ -404,7 +462,7 @@ function createWhatsAppReadOnlyService(deps = {}) {
 
   async function processWebhookQueue(options = {}) {
     const lockToken = randomBytes(16).toString('hex');
-    const limit = Math.max(1, Math.min(5, Number(options.limit || 2) || 2));
+    const limit = Math.max(1, Math.min(10, Number(options.limit || 10) || 10));
     const { data: events, error } = await db().rpc('softora_claim_whatsapp_webhook_events', {
       p_limit: limit,
       p_lock_token: lockToken,
@@ -440,16 +498,30 @@ function createWhatsAppReadOnlyService(deps = {}) {
   }
 
   async function getStatus() {
-    const { data, error } = await db().from(SYNC_TABLE).select('*').eq('owner_key', ownerKey).maybeSingle();
+    const metaConfigured = Boolean(verifyToken && (appSecret || hasValidProviderWebhookToken()));
+    const ycloudConfigured = isValidYCloudWebhookSecret(ycloudWebhookSecret);
+    const statusOwnerKey = ycloudConfigured ? ycloudStatusOwnerKey : ownerKey;
+    const client = db();
+    const [syncResult, queueResult] = await Promise.all([
+      client.from(SYNC_TABLE).select('*').eq('owner_key', statusOwnerKey).maybeSingle(),
+      client.from(WEBHOOK_TABLE)
+        .select('event_key', { count: 'exact', head: true })
+        .in('status', ['pending', 'processing', 'retry']),
+    ]);
+    const { data, error } = syncResult;
     if (error) throw error;
+    if (queueResult.error) throw queueResult.error;
+    const queuePendingEvents = Math.max(0, Number(queueResult.count || 0) || 0);
     return {
       configured: Boolean(
-        (appSecret || hasValidProviderWebhookToken()) &&
-        verifyToken &&
+        (metaConfigured || ycloudConfigured) &&
         encryptionSecret &&
         readToken
       ),
       connected: Boolean(data?.phone_number_key && data?.last_webhook_at),
+      provider: ycloudConfigured ? 'ycloud' : metaConfigured ? 'meta' : null,
+      queuePendingEvents,
+      queueCaughtUp: queuePendingEvents === 0,
       historyPhase: data?.history_phase ?? null,
       historyProgress: data?.history_progress ?? null,
       historyDeclined: Boolean(data?.history_declined),
@@ -520,6 +592,7 @@ function createWhatsAppReadOnlyService(deps = {}) {
 
   return {
     acceptWebhook,
+    acceptYCloudWebhook,
     getStatus,
     isReadAuthorized,
     isProviderWebhookAuthorized,
@@ -527,6 +600,7 @@ function createWhatsAppReadOnlyService(deps = {}) {
     readMessages,
     verifyChallenge,
     verifyWebhookSignature,
+    verifyYCloudWebhookSignature,
   };
 }
 

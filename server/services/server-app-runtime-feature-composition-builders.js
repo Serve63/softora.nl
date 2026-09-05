@@ -556,6 +556,8 @@ function buildServerAppFeatureWiringRuntimeContext({
           appSecret: env.WHATSAPP_APP_SECRET || '',
           verifyToken: env.WHATSAPP_VERIFY_TOKEN || '',
           providerWebhookToken: env.WHATSAPP_PROVIDER_WEBHOOK_TOKEN || '',
+          ycloudWebhookSecret: env.WHATSAPP_YCLOUD_WEBHOOK_SECRET || '',
+          ycloudWebhookToleranceSeconds: env.WHATSAPP_YCLOUD_WEBHOOK_TOLERANCE_SECONDS || '300',
           encryptionKey: env.WHATSAPP_ENCRYPTION_KEY || '',
           readToken: env.WHATSAPP_READ_TOKEN || '',
           ownerKey: env.WHATSAPP_OWNER_KEY || 'serve',

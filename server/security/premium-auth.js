@@ -355,6 +355,9 @@ function createPremiumAuthStateManager(options = {}) {
 
     for (const requestPath of requestPathVariants) {
       if (PREMIUM_PUBLIC_API_EXACT_MATCHES.has(requestPath)) return true;
+      if (requestPath === '/api/whatsapp/ycloud-webhook' && method === 'POST') {
+        return true;
+      }
       if (PREMIUM_PUBLIC_API_PREFIXES.some((prefix) => requestPath.startsWith(prefix))) {
         return true;
       }
