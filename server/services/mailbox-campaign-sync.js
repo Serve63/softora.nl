@@ -268,6 +268,7 @@ function getMailboxSyncFoldersForAccount({
   folders = [],
   campaignOnly = false,
   incrementalOnly = false,
+  fastRefresh = false,
   normalizeFolder = (value) => String(value || '').trim().toLowerCase(),
 } = {}) {
   const normalizedFolders = (Array.isArray(folders) ? folders : [])
@@ -282,7 +283,9 @@ function getMailboxSyncFoldersForAccount({
   }
   if (campaignOnly) {
     normalizedFolders.push(CAMPAIGN_GMAIL_LABEL_FOLDER);
-    if (incrementalOnly) normalizedFolders.push(CAMPAIGN_GMAIL_ALL_MAIL_FOLDER);
+    // Archive reconstruction is maintained by cron; an inbox poll should not
+    // implicitly rebuild All Mail. Explicit folder requests still work.
+    if (incrementalOnly && !fastRefresh) normalizedFolders.push(CAMPAIGN_GMAIL_ALL_MAIL_FOLDER);
   }
   return Array.from(new Set(normalizedFolders));
 }
@@ -386,7 +389,7 @@ async function syncMailboxRequest({
       campaignOnly,
       incrementalOnly,
       fastRefresh,
-      maxConcurrentAccounts: fastRefresh ? 2 : 1,
+      maxConcurrentAccounts: 1,
     });
   }
   return result;
@@ -1073,7 +1076,9 @@ function createMailboxSyncService({
     const campaignSeedCache = new Map();
     const accountResults = await mapWithConcurrency(
       accounts,
-      Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
+      // Cron can hold two of the three global leases. Keep the remaining
+      // foreground slot sequential instead of contending with ourselves.
+      fastRefresh ? 1 : Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
       async (account) => {
         const results = [];
         const folderList = getMailboxSyncFoldersForAccount({
@@ -1081,6 +1086,7 @@ function createMailboxSyncService({
           folders: requestedFolders,
           campaignOnly,
           incrementalOnly,
+          fastRefresh,
           normalizeFolder,
         });
         for (const folder of folderList) {
