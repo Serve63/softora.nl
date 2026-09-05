@@ -554,6 +554,17 @@ test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsA
   ]);
 });
 
+test('inhoudsopgave mag contactonderwerpen linken, maar alleen naar de echte gelijknamige kop', () => {
+  const link = '<a href="#onderdeel-1-contact-meten" data-softora-navigation="article-section">Contact meten</a>';
+  const heading = '<h2 id="onderdeel-1-contact-meten">Contact meten</h2>';
+  const audit = html => auditConversionCtas({ pages: [{ path: '/blog/uitleg', html }] }).filter(x=>x.type==='lead-cta-not-whatsapp');
+  assert.deepEqual(audit(link + heading), []);
+  assert.equal(audit(link).length, 1);
+  assert.equal(audit(link + heading.replace('>Contact meten<', '>Ander onderwerp<')).length, 1);
+  assert.equal(audit(link.replace('#onderdeel-1-contact-meten', '/contact') + heading).length, 1);
+  assert.equal(audit(link.replace(' data-softora-navigation="article-section"', '') + heading).length, 1);
+});
+
 test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gemarkeerd zijn', () => {
   const buttons = extractButtonEntries(
     '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur bericht</button>'
