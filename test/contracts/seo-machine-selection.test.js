@@ -173,7 +173,7 @@ test('selection gate blocks stale or time-traveling GSC evidence', () => {
   assert.match(pathMismatch.errors.join(' '), /werkelijk ingelezen GSC-rapport/);
 });
 
-test('selection gate only accepts new-URL-floor skips when cadence proves the deficit', () => {
+test('selection gate rejects publication-quota skips even when an agent claims a deficit', () => {
   const candidate = evidence();
   candidate.selected.source = 'canonical_backlog';
   delete candidate.selected.query;
@@ -194,7 +194,7 @@ test('selection gate only accepts new-URL-floor skips when cadence proves the de
   }));
   let result = validate(candidate);
   assert.equal(result.status, 'blocked');
-  assert.match(result.errors.join(' '), /zonder bindend deficit/);
+  assert.match(result.errors.join(' '), /ongeldige reasonCode/);
 
   candidate.controlPlane = {
     newUrlRequired: true,
@@ -206,7 +206,8 @@ test('selection gate only accepts new-URL-floor skips when cadence proves the de
     maximumMoneyPageNewUrlsPerWeek: 2,
   };
   result = validate(candidate);
-  assert.equal(result.status, 'ready');
+  assert.equal(result.status, 'blocked');
+  assert.match(result.errors.join(' '), /geen bindende nieuwe-URL-vloer/);
 });
 
 test('selection gate blocks a third money page in the rolling week', () => {
@@ -294,16 +295,16 @@ test('selection gate rejects a fictitious supporting page and missing live proof
     },
   };
   candidate.controlPlane = {
-    newUrlRequired: true,
-    newUrlDeficit: 1,
+    newUrlRequired: false,
+    newUrlDeficit: 0,
     requiredPublicationLane: 'editorial',
     allowedPublicationLanes: ['editorial'],
   };
   candidate.prioritizedReview = candidate.prioritizedReview.map((item) => ({
     ...item,
     decision: 'skipped',
-    reasonCode: 'binding_new_url_floor',
-    evidence: 'De bindende cadence vereist deze run een redactionele nieuwe openbare URL.',
+    reasonCode: 'higher_qualified_impact',
+    evidence: 'De unieke backlogbrief bedient een aantoonbaar grotere relevante koopvraag dan de huidige opties.',
   }));
 
   let result = validate(candidate);
@@ -390,4 +391,28 @@ test('selection gate fails closed when canonical inventory is unavailable', () =
   const result = validateSelectionEvidence(candidate, report());
   assert.equal(result.status, 'blocked');
   assert.match(result.errors.join(' '), /canonieke publieke inventaris ontbreekt/);
+});
+
+
+test('real GSC absolute URLs match canonical relative selection paths', () => {
+  const source = report();
+  const candidate = evidence();
+  source.queries.prioritized.forEach((row) => { row.page = 'https://www.softora.nl' + row.page; });
+  candidate.prioritizedReview.forEach((row) => { row.page = 'https://www.softora.nl' + row.page; });
+  const options = { knownPublicPaths: KNOWN_PUBLIC_PATHS, readyBacklogPaths: READY_BACKLOG_PATHS, now: new Date('2026-08-28T06:25:00Z') };
+  assert.equal(validateSelectionEvidence(candidate, source, options).status, 'ready');
+  candidate.prioritizedReview[1].page = 'https://example.com' + candidate.selected.path;
+  assert.equal(validateSelectionEvidence(candidate, source, options).status, 'blocked');
+});
+
+test('an agent cannot invent publication capacity different from the recorded cadence', () => {
+  const candidate = evidence();
+  const result = validateSelectionEvidence(candidate, report(), {
+    knownPublicPaths: KNOWN_PUBLIC_PATHS,
+    readyBacklogPaths: READY_BACKLOG_PATHS,
+    now: new Date('2026-08-28T06:25:00Z'),
+    controlPlane: { moneyPageAllowed: false, moneyPageNewUrls: 2, maximumMoneyPageNewUrlsPerWeek: 2, allowedPublicationLanes: ['editorial'] },
+  });
+  assert.equal(result.status, 'blocked');
+  assert.match(result.errors.join(' '), /cadence-receipt/);
 });
