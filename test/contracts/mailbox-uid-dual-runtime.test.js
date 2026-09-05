@@ -1123,6 +1123,54 @@ test('snelle v2-foldercontrole slaat historische seedlezingen over maar commit n
   assert.ok(commits.every((input) => input.messages[0].uid === 42 && input.accountEmail === 'serve@softora.nl'));
 });
 
+test('snelle IMAP-timeout retryt alleen na bevestigde leasevrijgave en nooit na commitdispatch', async () => {
+  for (const scenario of ['recover', 'release-failed', 'commit-ambiguous', 'persistent-timeout']) {
+    const events = [];
+    let claims = 0;
+    const timeout = () => Object.assign(new Error('IMAP timeout'), { code: 'MAILBOX_IMAP_OPERATION_TIMEOUT' });
+    const store = {
+      getUidGenerationProtocol: async () => ({ ok: true, protocol: 'v2' }),
+      acquireSyncLockForProtocol: async () => {
+        claims += 1; events.push(`claim:${claims}`);
+        return { ok: true, protocolMode: 'v2', lockToken: `lease-${claims}`, lockExpiresAt: futureLeaseExpiry() };
+      },
+      prepareUidGeneration: async () => ({ ok: true, prepared: true }),
+      checkpointTargetUidManifest: async () => { throw new Error('unexpected checkpoint'); },
+      confirmUidBaseline: async () => ({ ok: true, confirmed: true }),
+      listLegacyUidIdentities: async () => [],
+      commitSyncPass: async ({ lockToken }) => {
+        events.push(`commit:${lockToken}`);
+        if (scenario === 'commit-ambiguous') throw timeout();
+        return { ok: true, committed: true, upserted: 1 };
+      },
+      commitTargetedSyncPass: async () => { throw new Error('unexpected targeted commit'); },
+      skipSync: async () => { throw new Error('unexpected skip'); },
+      failSync: async ({ lockToken }) => {
+        events.push(`release:${lockToken}`);
+        return scenario === 'release-failed' ? { ok: false } : { ok: true, applied: true };
+      },
+    };
+    const result = await createRawSyncService({
+      store,
+      fetcher: async (options) => {
+        events.push(`fetch:${claims}`);
+        assert.equal(options.imapOperationTimeoutMs, 10_000);
+        assert.ok(options.deadlineAtMs <= Date.now() + 45_000);
+        if (scenario !== 'commit-ambiguous' && (claims === 1 || scenario === 'persistent-timeout')) throw timeout();
+        return createSyncPass([{ uid: 42, id: 'inbox:42' }]);
+      },
+    }).syncMailbox({
+      owner: 'serve', folders: ['inbox'], limit: 4, campaignOnly: true, incrementalOnly: true, fastRefresh: true,
+    });
+    assert.equal(result.ok, scenario === 'recover');
+    assert.equal(claims, ['recover', 'persistent-timeout'].includes(scenario) ? 2 : 1);
+    if (scenario === 'recover') assert.deepEqual(events, [
+      'claim:1', 'fetch:1', 'release:lease-1', 'claim:2', 'fetch:2', 'commit:lease-2',
+    ]);
+    if (scenario === 'persistent-timeout') assert.equal(events.filter((event) => event.startsWith('commit')).length, 0);
+  }
+});
+
 test('gerichte steady All Mail gebruikt uitsluitend het opgeslagen manifest en nooit legacy SEARCH', async () => {
   let legacySearches = 0;
   let selectedUids = [];

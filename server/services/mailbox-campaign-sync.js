@@ -48,6 +48,7 @@ const INCREMENTAL_LOCK_RETRY_ATTEMPTS = 12;
 const INCREMENTAL_LOCK_RETRY_DELAY_MS = 500;
 const REGULAR_CRON_LOCK_RETRY_ATTEMPTS = 150;
 const REGULAR_SYNC_CURSOR_OVERLAP = 3;
+const { FAST_REFRESH_OPERATION_TIMEOUT_MS, FAST_REFRESH_BUDGET_MS, runFastMailboxFolderSync } = require('./mailbox-fast-refresh');
 const CAMPAIGN_TARGET_ANCHOR_FOLDERS = new Set([
   'inbox',
   'sent',
@@ -418,6 +419,7 @@ function createMailboxSyncService({
     incrementalOnly = false,
     retryContention = false,
     fastRefresh = false,
+    refreshDeadlineAtMs = 0,
     campaignSeedCache = null,
   } = {}) {
     const account = assertReadableAccount(accountEmail);
@@ -532,6 +534,7 @@ function createMailboxSyncService({
     const useUidGenerationV2 = lock.protocolMode === MAILBOX_UID_PROTOCOL_V2;
 
     const failureCommitId = createMailboxSyncMutationId();
+    let providerFetchCompleted = false;
     let syncDeadlineAtMs = 0;
     try {
       if (useUidGenerationV2) assertMailboxSyncV2Store(mailboxIndexStore);
@@ -738,7 +741,10 @@ function createMailboxSyncService({
         // The durable UID frontier already covers new mail. Historical header
         // recovery remains in cron and in the targeted All Mail protocol.
         skipHistoricalFallback: fastRefresh && incrementalOnly && useUidGenerationV2 && !recoverGmailAllMail,
-        ...(useUidGenerationV2 ? { deadlineAtMs: syncDeadlineAtMs } : {}),
+        ...(fastRefresh ? {
+          imapOperationTimeoutMs: FAST_REFRESH_OPERATION_TIMEOUT_MS,
+          deadlineAtMs: Math.min(syncDeadlineAtMs || Infinity, refreshDeadlineAtMs || Date.now() + FAST_REFRESH_BUDGET_MS),
+        } : useUidGenerationV2 ? { deadlineAtMs: syncDeadlineAtMs } : {}),
       };
 
       if (!useUidGenerationV2) {
@@ -854,6 +860,7 @@ function createMailboxSyncService({
           }),
         returnSyncPass: true,
       });
+      providerFetchCompleted = true;
       if (fetched?.folderMissing === true) {
         const skipped = await mailboxIndexStore.skipSync({
           accountEmail: account.email,
@@ -1030,7 +1037,7 @@ function createMailboxSyncService({
           leaseExpiresAt: lock.lockExpiresAt,
           reserveMs: 1_000,
         });
-        await mailboxIndexStore.failSync({
+        const failure = await mailboxIndexStore.failSync({
           accountEmail: account.email,
           folder: normalizedFolder,
           lockToken: lock.lockToken,
@@ -1038,6 +1045,7 @@ function createMailboxSyncService({
           error: error?.message || error,
           ...(failureDeadlineAtMs ? { deadlineAtMs: failureDeadlineAtMs } : {}),
         }).catch(() => null);
+        if (error && typeof error === 'object') error.mailboxLeaseReleased = !providerFetchCompleted && failure?.ok === true && failure.applied === true;
       } else {
         await mailboxIndexStore.finishSync({
           accountEmail: account.email,
@@ -1074,6 +1082,7 @@ function createMailboxSyncService({
       new Set((Array.isArray(folders) && folders.length ? folders : defaultFolders).map(normalizeFolder))
     );
     const campaignSeedCache = new Map();
+    const refreshDeadlineAtMs = fastRefresh ? Date.now() + FAST_REFRESH_BUDGET_MS : 0;
     const accountResults = await mapWithConcurrency(
       accounts,
       // Cron can hold two of the three global leases. Keep the remaining
@@ -1091,7 +1100,7 @@ function createMailboxSyncService({
         });
         for (const folder of folderList) {
           try {
-            results.push(await syncMailboxFolder({
+            const folderOptions = {
               accountEmail: account.email,
               folder,
               limit,
@@ -1100,8 +1109,12 @@ function createMailboxSyncService({
               incrementalOnly,
               retryContention,
               fastRefresh,
+              refreshDeadlineAtMs,
               campaignSeedCache,
-            }));
+            };
+            results.push(await (fastRefresh
+              ? runFastMailboxFolderSync(syncMailboxFolder, folderOptions)
+              : syncMailboxFolder(folderOptions)));
           } catch (error) {
             logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
             results.push({
