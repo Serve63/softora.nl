@@ -183,6 +183,9 @@ function createLeadRadarQuality(deps) {
   }
 
   function getProviderPublicationDetails(item = {}) {
+    if (item.source_type === 'serp' && item.source_feed_url) {
+      return { publishedAt: null, source: 'unknown', raw: null, confidence: 0 };
+    }
     const base = normalizeDate(item.retrieved_at) || new Date().toISOString();
     const candidates = [
       ['provider_timestamp', item.timestamp, 100],
@@ -300,6 +303,8 @@ function createLeadRadarQuality(deps) {
     const profileOnly = isLikelyPlatformProfileUrl(sourceUrl);
     const sourcePolicy = sourceUrl ? classifyLeadSourceUrl(sourceUrl) : { allowed: true, category: 'unknown', reason: '' };
     const blockedSource = !sourcePolicy.allowed;
+    const requestClosed = /\b(?:inmiddels|ondertussen|intussen|al)\s+(?:(?:een|de|goede|geschikte|passende)\s+)*(?:iemand|partij|partner|webdesigner|ontwikkelaar)\s+gevonden\b/i.test(message) ||
+      /\b(?:opdracht|aanvraag|oproep)\s+(?:is\s+)?(?:gesloten|ingevuld|vergeven)\b/i.test(message);
     const publicSupportTopic = (() => {
       try {
         const parsed = new URL(sourceUrl);
@@ -309,7 +314,8 @@ function createLeadRadarQuality(deps) {
         return false;
       }
     })();
-    const hasWebsiteContext = /\b(?:\w*website\w*|webshops?|webwinkels?|webdesign|webdevelopers?|developers?|programmeurs?|programma|webapps?|dashboard|site|software|softwareontwikkelaars?|apps?|applicatie|systeem|crm|erp|portaal|klantenportaal|automatisering|automatiseren|automation|koppeling|api|database|tool|chatbot|ai[- ]?(?:agent|assistant|assistent|operator|workflow|oplossing|automatisering))\b/i.test(message);
+    const professionalRequest = /\b(?:ik\s+(?:zoek|ben\s+op\s*zoek\s+naar)|(?:wij|we)\s+(?:zoeken|zijn\s+op\s*zoek\s+naar))\s+(?:een\s+)?(?:(?:goede?|betaalbare?|ervaren|betrouwbare|creatieve|zelfstandige|freelance|nederlandse|lokale|en)\s+){0,6}(?:(?:wordpress|shopify|webflow)[ -])?(?:webdesigner|webdeveloper|websitebouwer|webshopbouwer|softwareontwikkelaar|(?:app|software)[ -](?:ontwikkelaar|developer))\b/i.test(message);
+    const hasWebsiteContext = /\b(?:\w*website\w*|webshops?|webwinkels?|webdesign(?:ers?)?|webdevelopers?|developers?|programmeurs?|programma|webapps?|dashboard|site|software|softwareontwikkelaars?|apps?|applicatie|systeem|crm|erp|portaal|klantenportaal|automatisering|automatiseren|automation|koppeling|api|database|tool|chatbot|ai[- ]?(?:agent|assistant|assistent|operator|workflow|oplossing|automatisering))\b/i.test(message);
     const directCustomerHelpRequest = /\bkan\s+iemand\s+(?:mij|me|ons)\b[^.!?]{0,220}\b(?:maken|bouwen|ontwikkelen|ontwerpen|implementeren|inrichten|opzetten|migreren|overzetten|integreren|automatiseren|moderniseren|vernieuwen|optimaliseren)\b/i.test(message) ||
       /\b(?:ik\s+ben|wij\s+zijn|we\s+zijn)\s+op\s*zoek\s+naar\s+(?:iemand|een\s+(?:partij|bureau|freelancer|ontwikkelaar|developer|programmeur|specialist|expert))\b/i.test(message) ||
       /\b(?:i(?:'|’)?m|we(?:'|’)?re|we are)\s+looking\s+for\b[^.!?]{0,220}\b(?:someone|developer|expert|specialist|agency|partner)\b/i.test(message);
@@ -320,10 +326,10 @@ function createLeadRadarQuality(deps) {
       /\b(ik|wij|we)\s+(?:wil|willen|zoek|zoeken)\b[^.]{0,160}\b(website|webshop|webdesigner|websitebouwer|software|ontwikkelaar|app|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
     const buyerRequestHits = countPhraseHits(message, BUYER_REQUEST_TERMS);
     const hasConcreteDigitalNeed = !publicSupportTopic && (
-      buyerRequestHits > 0 || directCustomerHelpRequest || explicitCommissionAction
+      buyerRequestHits > 0 || professionalRequest || directCustomerHelpRequest || explicitCommissionAction
     );
     const firstPersonWebsiteNeed = /\b(?:ik|wij|we|mijn|onze|ons)\b[^.]{0,180}\b(?:\w*website\w*|webshop|webwinkel|webdesigner|webdeveloper|software|ontwikkelaar|app|applicatie|crm|portaal|automatisering|koppeling|chatbot)\b/i.test(message);
-    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || firstPersonWebsiteNeed || directCustomerHelpRequest;
+    const hasBuyerVoice = hasClientContext || buyerRequestHits > 0 || professionalRequest || firstPersonWebsiteNeed || directCustomerHelpRequest;
     const designerHiringPhrase = /\b(webdesigner|webdeveloper)\s+gezocht\b/i.test(message);
     const staffingRequest = /\b(?:\d{2,3}\s*uur(?:\s+per\s+week)?|voor\s+(?:een\s+)?(?:internationale\s+)?eindklant|team[^.!?]{0,100}versterken|dienstverband)\b/i.test(message);
     const nonBuildServiceRequest = /\b(?:google ads|social media|contentmarketing|leadgeneratie|cold calling|seo-specialist|cro-specialist|salespartner)\b/i.test(message) &&
@@ -356,6 +362,7 @@ function createLeadRadarQuality(deps) {
     );
     const isWebsiteNeed = hasWebsiteContext && hasConcreteDigitalNeed && hasBuyerVoice && !blockedSource && !isRecruitment && !productSearch && !publicSupportTopic && !selfBuildGuidanceOnly && !adviceOnly;
     const reasons = [];
+    if (requestClosed) reasons.push('De opdrachtgever meldt dat de aanvraag al is ingevuld.');
     if (blockedSource) reasons.push(sourcePolicy.reason);
     if (isRecruitment) reasons.push('Recruitment- of vacaturebericht, geen klantvraag');
     if (isProvider) reasons.push('Zelfpromotie van webdesign-, SEO- of marketingaanbieder');
@@ -368,9 +375,9 @@ function createLeadRadarQuality(deps) {
     if (!hasConcreteDigitalNeed) reasons.push('Geen concrete digitale hulpvraag gevonden');
     if (!hasBuyerVoice) reasons.push('Geen herkenbare klantvraag vanuit ondernemer gevonden');
     return {
-      role: (blockedSource || isRecruitment || publicSupportTopic || nonBuildServiceRequest || selfBuildGuidanceOnly || adviceOnly) ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
+      role: (requestClosed || blockedSource || isRecruitment || publicSupportTopic || nonBuildServiceRequest || selfBuildGuidanceOnly || adviceOnly) ? 'excluded' : (isProvider ? 'provider' : (isWebsiteNeed ? 'prospect' : 'unclear')),
       isProvider,
-      isExcluded: blockedSource || isRecruitment || productSearch || publicSupportTopic || nonBuildServiceRequest || selfBuildGuidanceOnly || adviceOnly,
+      isExcluded: requestClosed || blockedSource || isRecruitment || productSearch || publicSupportTopic || nonBuildServiceRequest || selfBuildGuidanceOnly || adviceOnly,
       isWebsiteNeed,
       providerConfidence,
       buyerIntentHits,

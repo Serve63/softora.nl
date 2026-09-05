@@ -14,8 +14,8 @@ const WEBSITE_STATUSES = Object.freeze([
   'provider_unavailable',
 ]);
 const LEAD_STATUSES = Object.freeze(['new', 'relevant', 'not_relevant', 'follow_up', 'archived']);
-const PLATFORMS = Object.freeze(['web', 'mastodon', 'bluesky']);
-const IMPORT_PLATFORMS = Object.freeze([...PLATFORMS, 'facebook', 'linkedin']);
+const PLATFORMS = Object.freeze(['web', 'mastodon', 'bluesky', 'facebook', 'linkedin']);
+const IMPORT_PLATFORMS = PLATFORMS;
 const MAX_MESSAGE_LENGTH = 20_000;
 const MAX_NOTE_LENGTH = 5_000;
 const DEFAULT_PAGE_SIZE = 50;
@@ -633,6 +633,21 @@ function createLeadRadarService(deps = {}) {
       website_confidence_score: websiteUrl ? 100 : null,
       website_checked_at: websiteUrl ? new Date().toISOString() : null,
     };
+    const sourceCheck = await sourceVerifier.verifyPublicSource(sourceUrl, { expectedText: messageText });
+    if (sourceCheck.status !== 'verified' || !isRecentPublication(sourceCheck.publication?.publishedAt, MAX_LEAD_AGE_DAYS)) {
+      throw new LeadRadarValidationError('De originele aanvraag en publicatiedatum konden niet binnen het venster van 31 dagen worden bevestigd.');
+    }
+    Object.assign(payload, {
+      message_text: sourceCheck.messageText || messageText, snippet: sourceCheck.messageText || messageText,
+      published_at: sourceCheck.publication.publishedAt, publication_date_source: sourceCheck.publication.source,
+      publication_date_raw: sourceCheck.publication.raw, publication_date_confidence: sourceCheck.publication.confidence,
+      source_verification_status: 'verified', source_verification_reason: sourceCheck.reason,
+      source_verified_at: new Date().toISOString(), source_canonical_url: sourceCheck.canonicalUrl || sourceUrl,
+      source_post_id: sourceCheck.postId || null, source_content_match_score: sourceCheck.contentMatchScore,
+    });
+    if (!isEligibleAutomaticSignal(payload, { maxAgeDays: MAX_LEAD_AGE_DAYS, allowUnknownPublicationDate: false })) {
+      throw new LeadRadarValidationError('De originele post bevat geen actuele, concrete klantvraag.');
+    }
     const scored = scoreSignal(payload, { targetRegion: payload.region || '' });
     payload.relevance_score = scored.score;
     payload.score_reasons = scored.reasons;
@@ -898,7 +913,8 @@ function createLeadRadarService(deps = {}) {
           signal.source_canonical_url = sourceCheck.canonicalUrl || null;
           signal.source_post_id = sourceCheck.postId || null;
           signal.source_content_match_score = sourceCheck.contentMatchScore;
-          if (!isRecentPublication(signal.published_at, run.max_age_days || maxAgeDays)) {
+          if (sourceCheck.messageText) signal.message_text = signal.snippet = sourceCheck.messageText;
+          if (!isEligibleAutomaticSignal(signal, { maxAgeDays: run.max_age_days || maxAgeDays, allowUnknownPublicationDate: false })) {
             rejectedCount += 1;
             stats.rejected += 1;
             continue;
