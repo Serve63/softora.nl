@@ -838,12 +838,13 @@ function createLeadRadarService(deps = {}) {
     let sourceChecksLeft = DEFAULT_SOURCE_CHECK_LIMIT;
     let nextCursor = cursor;
     let fatalProviderError = '';
+    let lastSourceError = run.last_error || '';
     for (let index = cursor; index < end; index += 1) {
       const query = plan[index];
       const stats = platformStats[query.platform] || { queries: 0, results: 0, verified: 0, rejected: 0, unverified: 0, errors: 0 };
       platformStats[query.platform] = stats;
       try {
-        const items = await provider.search({ query: query.query, maxResults: query.maxResults || 50, context: query });
+        const items = await provider.search({ query: query.query, maxResults: query.maxResults || 50, context: { ...query, maxAgeDays: run.max_age_days || maxAgeDays } });
         stats.queries += 1;
         stats.results += items.length;
         resultCount += items.length;
@@ -856,7 +857,7 @@ function createLeadRadarService(deps = {}) {
             maxAgeDays: run.max_age_days || maxAgeDays,
             requireFresh: true,
           });
-          if (!signal) continue;
+          if (!signal) { rejectedCount += 1; stats.rejected += 1; continue; }
           if (!item?.source_verified && sourceChecksLeft <= 0) {
             unverifiedCount += 1;
             stats.unverified += 1;
@@ -925,6 +926,7 @@ function createLeadRadarService(deps = {}) {
       } catch (error) {
         errorCount += 1;
         stats.errors += 1;
+        lastSourceError = `${text(query.platform, 30)} (${text(query.term || query.query, 150)}): ${text(error?.message || error, 300)}`;
         usedQueries.push({ ...query, executedAt: new Date().toISOString(), resultCount: 0, status: 'error', error: text(error?.message || error, 500) });
         logger.warn('[LeadRadar][scan-query]', error?.message || error);
         if (error?.fatal) fatalProviderError = text(error.message || 'Alle openbare scraperbronnen zijn geblokkeerd.', 500);
@@ -943,12 +945,15 @@ function createLeadRadarService(deps = {}) {
         unverified_count: unverifiedCount,
         platform_stats: platformStats,
         error_count: errorCount,
-        last_error: fatalProviderError || null,
+        last_error: fatalProviderError || lastSourceError || null,
         status: fatalProviderError ? 'provider_unavailable' : 'running',
       });
       if (fatalProviderError) break;
     }
     const completed = !fatalProviderError && nextCursor >= plan.length;
+    if (completed && usedQueries.length && usedQueries.every((query) => query.status === 'error')) {
+      fatalProviderError = lastSourceError || 'Geen van de geselecteerde bronnen kon worden gelezen.';
+    }
     return updateRun(run.id, {
       query_cursor: nextCursor,
       used_queries: usedQueries,
@@ -962,7 +967,7 @@ function createLeadRadarService(deps = {}) {
       unverified_count: unverifiedCount,
       platform_stats: platformStats,
       error_count: errorCount,
-      last_error: fatalProviderError || null,
+      last_error: fatalProviderError || lastSourceError || null,
       status: fatalProviderError ? 'provider_unavailable' : (completed ? (errorCount ? 'completed_with_errors' : 'completed') : 'paused'),
       finished_at: completed || fatalProviderError ? new Date().toISOString() : null,
     });
@@ -988,6 +993,7 @@ function createLeadRadarService(deps = {}) {
 
   function summarizeScanRun(run) {
     if (!run) return null;
+    const sourceQueries = Array.isArray(run.used_queries) ? run.used_queries : [];
     return {
       id: run.id,
       scan_mode: run.scan_mode || 'manual',
@@ -1003,9 +1009,16 @@ function createLeadRadarService(deps = {}) {
       verified_count: Number(run.verified_count || 0),
       rejected_count: Number(run.rejected_count || 0),
       unverified_count: Number(run.unverified_count || 0),
+      filtered_count: Math.max(Number(run.rejected_count || 0) + Number(run.unverified_count || 0), Number(run.result_count || 0) - Number(run.verified_count || 0)),
+      max_age_days: Number(run.max_age_days || MAX_LEAD_AGE_DAYS),
       platform_stats: run.platform_stats && typeof run.platform_stats === 'object' ? run.platform_stats : {},
       error_count: Number(run.error_count || 0),
-      last_error: run.last_error || null,
+      last_error: run.last_error || sourceQueries.findLast((query) => query.status === 'error')?.error || null,
+      source_checks: sourceQueries.slice(-50).map((query) => ({
+        platform: text(query.platform, 30), term: text(query.term, 150),
+        source_url: normalizeHttpUrl(query.sourceUrl || query.query),
+        status: query.status, result_count: Number(query.resultCount || 0), error: text(query.error, 500) || null,
+      })),
     };
   }
 

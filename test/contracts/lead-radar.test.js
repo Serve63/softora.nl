@@ -268,6 +268,7 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
       { adapter: 'bluesky', platform: 'bluesky', region: 'Nederland', query: 'website hulp gezocht' },
     ],
     async search({ context }) {
+      assert.equal(context.maxAgeDays, 31);
       if (context.adapter === 'bluesky') throw new Error('Bron gaf HTTP 403.');
       return [{
         platform: 'web', source_type: 'feed', provider: 'softora_public_scraper',
@@ -275,6 +276,9 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
         snippet: 'Wij zoeken iemand die voor ons bedrijf een CRM-portaal kan bouwen en implementeren.',
         published_at: new Date().toISOString(), external_id: 'directe-ondernemersvraag-9',
         source_verified: true, source_verification_reason: 'Rechtstreeks op openbare detailpagina gecontroleerd.',
+      }, {
+        platform: 'web', url: 'https://example.com/nieuws', snippet: 'Vandaag is het mooi weer.',
+        published_at: new Date().toISOString(), source_verified: true,
       }];
     },
   };
@@ -291,8 +295,21 @@ test('Lead Radar bewaart werkende bronresultaten wanneer een andere openbare bro
   assert.equal(run.new_signal_count, 1, JSON.stringify({ run, signals: [...signals.values()] }, null, 2));
   assert.equal(run.verified_count, 1);
   assert.equal(run.error_count, 1);
+  assert.equal(run.result_count, 2);
+  assert.equal(run.rejected_count, 1);
+  assert.match(run.last_error, /bluesky.*HTTP 403/);
   assert.equal(signals.size, 1);
   assert.equal([...signals.values()][0].source_verification_status, 'verified');
+  const repeated = await service.runScan({ websiteLookupLimit: 0, maxAgeDays: 31 });
+  assert.equal(repeated.new_signal_count, 0);
+  assert.equal(repeated.duplicate_count, 1);
+  assert.equal(signals.size, 1);
+  provider.search = async () => { throw new Error('Bron tijdelijk niet bereikbaar.'); };
+  const failed = await service.runScan({ websiteLookupLimit: 0, maxAgeDays: 31 });
+  assert.equal(failed.status, 'provider_unavailable');
+  assert.equal(failed.error_count, 2);
+  assert.equal(failed.new_signal_count, 0);
+  assert.ok(failed.finished_at);
 });
 
 test('Lead Radar scoreert directe en recente websitevragen hoger', () => {
@@ -786,8 +803,9 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260826d/);
-  assert.match(page, /lead-radar\.js\?v=20260827a/);
+  assert.match(page, /lead-radar\.css\?v=20260906a/);
+  assert.match(page, /lead-radar\.js\?v=20260906a/);
+  assert.match(page, /id="scan-summary"[^>]*aria-live="polite"/);
   assert.doesNotMatch(page, /id="scan-platforms"|id="scan-region-mode"|id="scan-max-age-days"|data-custom-select/);
   assert.doesNotMatch(page, /<select\b/);
   assert.doesNotMatch(page, /Totaal signalen|Nieuwe signalen zoeken|Lead importeren|>Vernieuwen<|id="refresh-button"|id="open-import-button"|id="import-panel"|zoekopdrachten|Websitechecks/i);
