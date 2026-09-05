@@ -826,3 +826,17 @@ test('SEO growth gate changes preserve source-bound review checks and same-invoc
   assert.match(selectionScript, /active\?\.invocationAt !== gateOptions.invocationAt/);
   assert.match(selectionScript, /controlPlane = active.gates.cadence.summary/);
 });
+
+test('SEO same-task migration preserves audited start and all publication gate requirements', () => {
+  const state = require('../../scripts/seo-machine-automation-state');
+  const script = readRepoFile('scripts/seo-machine-automation-state.js');
+  assert.equal(typeof state.keepAutomationInSameThread, 'function');
+  assert.equal(state.AUTOMATION_PROMPT_VERSION, 8);
+  assert.deepEqual([...state.REQUIRED_PUBLISHED_RUN_GATES], [
+    'cadence', 'reviews', 'selection', 'keywords', 'visuals', 'verify_critical', 'live_production', 'live_route',
+  ]);
+  assert.match(script, /THREAD_POLICY_MIGRATION_REQUIRED/);
+  assert.match(script, /THREAD_ROTATION_DISABLED/);
+  assert.match(script, /const audit = auditAutomationInstallation\(auditOptions\)/);
+  assert.match(script, /validatePublishedRunGates\(receipt, receipt\)/);
+});
