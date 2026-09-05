@@ -34,7 +34,7 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /blijft na het halen of verstrijken van die datum actief totdat Servé haar expliciet pauzeert/i);
   assert.match(policy, /70% verdedigen\/uitbouwen van bewezen clusters[\s\S]*20% aangrenzende commerciële experimenten[\s\S]*10% technische/i);
   assert.match(policy, /`npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat/i);
-  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=7`/i);
+  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=8`/i);
   assert.match(qualityGates, /deadlinebestendige `growthHorizon`/i);
   assert.ok(
     qualityGates.indexOf('`performance_recovery`, `quality_recovery`') >= 0,
@@ -113,7 +113,8 @@ test('SEO machine enforces same-run selection, recovery and publication receipts
   assert.match(policy, /`finish-run published` accepteert alleen dezelfde invocation/i);
   assert.match(policy, /`cadence`[\s\S]*`reviews`[\s\S]*`selection`[\s\S]*`keywords`[\s\S]*`visuals`[\s\S]*`verify_critical`[\s\S]*`live_production`[\s\S]*`live_route`/i);
   assert.match(policy, /`--record-run-gate --run-thread <task-id> --run-invocation-at <invocation-at>`/i);
-  assert.match(policy, /`repair-thread-binding` behoudt[\s\S]*bestaande teller/i);
+  assert.match(policy, /`keep-thread` migreert[\s\S]*zonder teller, task, receipts of historie te wijzigen/i);
+  assert.match(policy, /`rotate-thread` en `repair-thread-binding` mogen die vaste task niet verplaatsen/i);
   assert.match(policy, /`record-tool-smoke` bewaart per verplichte tool[\s\S]*`ok`\/`ok_empty`/i);
   assert.match(policy, /`npm run seo:live-route:check` controleert na productiepariteit/i);
   assert.match(policy, /agent\.browsers\.get\("chrome"\)/i);
@@ -136,4 +137,19 @@ test('SEO execution contract preserves traffic priority, source-bound reviews an
   assert.match(prompt, /Never buy credits/);
   assert.match(prompt, /Never use Qwen/);
   assert.match(prompt, /Never promise rankings, traffic or revenue/);
+});
+
+test('SEO execution contract keeps the current task indefinitely without dropping publication gates', () => {
+  const prompt = readRepoFile('docs/growth/seo-machine-prompt.md');
+  const policy = readRepoFile('docs/growth/seo-machine-policy.md');
+  assert.match(prompt, /SEO_MACHINE_PROMPT_VERSION=8/);
+  assert.match(prompt, /SEO_THREAD_POLICY=same_thread/);
+  assert.match(prompt, /current target task indefinitely/);
+  assert.match(prompt, /maxRunsPerThread=null/);
+  assert.match(prompt, /Never create, fork, retarget or archive a task because of run count, context compaction or a tool-binding defect/);
+  assert.doesNotMatch(prompt, /On run 15, first finish|Then create exactly one setup-only replacement|Report run X\/15/);
+  assert.match(policy, /keep-thread[\s\S]*zonder teller, task, receipts of historie te wijzigen/);
+  for (const gate of ['cadence', 'reviews', 'selection', 'keywords', 'visuals', 'verify_critical', 'live_production', 'live_route']) {
+    assert.ok(policy.includes('`' + gate + '`'), `Publication gate ${gate} remains required`);
+  }
 });

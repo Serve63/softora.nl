@@ -19,6 +19,7 @@ const {
   finishAutomationRun,
   formatStateBlock,
   inspectAutomationState,
+  keepAutomationInSameThread,
   recordAutomationRunGate,
   recordAutomationRunGateFromCli,
   recordUbersuggestRun,
@@ -29,6 +30,7 @@ const {
   rotateAutomationThread,
   runAutomationStateCli,
   startAutomationRun,
+  validateRotationState,
 } = require('../../scripts/seo-machine-automation-state');
 
 function createMemory(completedRunsInActiveThread = 6) {
@@ -64,7 +66,8 @@ function createGitRepository() {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=7',
+    'SEO_MACHINE_PROMPT_VERSION=8',
+    'SEO_THREAD_POLICY=same_thread',
     'SEO_AUTOMATION_EXCLUDED_PATHS=/website,/bedrijfssoftware,/voicesoftware,/chatbot',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
@@ -183,7 +186,13 @@ function createCompletedRun15Memory() {
   return memoryPath;
 }
 
-function createAutomationConfig(memoryPath, overrides = {}) {
+function createAutomationConfig(memoryPath, overrides = {}, { keepLegacy = false } = {}) {
+  if (!keepLegacy) keepAutomationInSameThread({
+    memoryPath,
+    threadId: 'thread-1',
+    changedAt: '2026-08-28T10:00:00+02:00',
+    evidence: 'The user requests indefinite execution in this same task without rotation.',
+  });
   const automationDirectory = path.dirname(memoryPath);
   const automationPath = path.join(automationDirectory, 'automation.toml');
   const config = {
@@ -249,6 +258,107 @@ test('automation run start increments atomically and is idempotent for one invoc
   assert.equal(duplicate.completedRunsInActiveThread, 7);
   assert.equal(duplicate.idempotent, true);
   assert.equal(duplicate.lifecycle, 'running');
+});
+
+test('keep-thread migrates legacy state without losing task, counters, history or receipts', () => {
+  const memoryPath = createCompletedRun15Memory();
+  const initial = inspectAutomationState(memoryPath).rotation;
+  fs.writeFileSync(memoryPath, fs.readFileSync(memoryPath, 'utf8').replace(
+    formatStateBlock(ROTATION_BLOCK, initial),
+    formatStateBlock(ROTATION_BLOCK, { ...initial, batchNumber: 2, previousThreadIds: ['historical-thread'] })
+  ));
+  const previous = inspectAutomationState(memoryPath);
+  const previousContent = fs.readFileSync(memoryPath, 'utf8');
+  const migration = [
+    'keep-thread', '--thread', 'thread-1', '--changed-at', '2026-08-28T10:00:00+02:00',
+    '--evidence', 'The user requests indefinite execution in this same task without rotation.',
+  ];
+  const migrated = runAutomationStateCli(migration, { memoryPath });
+  const current = inspectAutomationState(memoryPath);
+  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.threadPolicy, 'same_thread');
+  assert.equal(migrated.maxRunsPerThread, null);
+  assert.equal(migrated.rotationStatus, 'active');
+  for (const key of ['activeThreadId', 'completedRunsInActiveThread', 'batchNumber', 'lastInvocationAt', 'previousThreadIds']) {
+    assert.deepEqual(migrated[key], previous.rotation[key]);
+  }
+  assert.deepEqual(current.lifecycle, previous.lifecycle);
+  assert.deepEqual(current.ubersuggest, previous.ubersuggest);
+  const currentContent = fs.readFileSync(memoryPath, 'utf8');
+  assert.equal(
+    currentContent.replace(formatStateBlock(ROTATION_BLOCK, current.rotation), ''),
+    previousContent.replace(formatStateBlock(ROTATION_BLOCK, previous.rotation), '')
+  );
+  assert.equal(runAutomationStateCli(migration, { memoryPath }).idempotent, true);
+  assert.equal(fs.readFileSync(memoryPath, 'utf8'), currentContent);
+});
+
+test('audited run 16 continues in the same task and still requires all eight publication gates', () => {
+  const memoryPath = createCompletedRun15Memory();
+  const paths = createAutomationConfig(memoryPath);
+  const invocationAt = '2026-08-29T08:15:00+02:00';
+  const command = ['start-run', '--thread', 'thread-1', '--invocation-at', invocationAt];
+  const started = runAutomationStateCli(command, { memoryPath, ...paths });
+  assert.equal(started.completedRunsInActiveThread, 16);
+  assert.equal(started.rotationStatus, 'active');
+  assert.equal(runAutomationStateCli(command, { memoryPath, ...paths }).idempotent, true);
+  assert.equal(inspectAutomationState(memoryPath).rotation.completedRunsInActiveThread, 16);
+  const publication = {
+    memoryPath, threadId: 'thread-1', invocationAt, finishedAt: '2026-08-29T09:05:00+02:00',
+    outcome: 'published', publicEffect: 'live', prNumber: 1808,
+    liveCommit: 'abcdef1234567890', changedUrl: 'https://www.softora.nl/bedrijfssoftware-op-maat',
+    evidence: 'Run 16 publication passed all gates on the same final tree and live commit.',
+  };
+  assert.throws(() => finishAutomationRun(publication), /cadence|RUN_GATES/);
+  recordPublishedGates(memoryPath, { invocationAt, checkedAt: '2026-08-29T09:00:00+02:00' });
+  const receipt = finishAutomationRun(publication);
+  assert.equal(receipt.runNumber, 16);
+  assert.equal(receipt.outcome, 'published');
+  assert.deepEqual(Object.keys(receipt.gates).sort(), [...REQUIRED_PUBLISHED_RUN_GATES].sort());
+  const current = inspectAutomationState(memoryPath);
+  assert.deepEqual(current.lifecycleErrors, []);
+  assert.equal(current.lifecycle.activeRun, null);
+  assert.equal(current.rotation.activeThreadId, 'thread-1');
+  assert.equal(current.rotation.batchNumber, 1);
+  assert.equal(current.lifecycle.receipts[0].runNumber, 15);
+});
+
+test('same-thread policy rejects rotation and binding retargeting without a write', () => {
+  const memoryPath = createCompletedRun15Memory();
+  createAutomationConfig(memoryPath);
+  const before = fs.readFileSync(memoryPath, 'utf8');
+  for (const command of ['rotate-thread', 'repair-thread-binding']) {
+    assert.throws(() => runAutomationStateCli([
+      command, '--from-thread', 'thread-1', '--to-thread', 'thread-2',
+      '--rotated-at', '2026-08-28T11:00:00+02:00',
+      '--evidence', 'A stale instruction attempts to move this task.',
+    ], { memoryPath }), /THREAD_ROTATION_DISABLED/);
+    assert.equal(fs.readFileSync(memoryPath, 'utf8'), before);
+  }
+});
+
+test('keep-thread refuses the wrong task or an unfinished invocation without altering state', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const migration = {
+    memoryPath, threadId: 'thread-1', changedAt: '2026-08-28T10:00:00+02:00',
+    evidence: 'The user requests indefinite execution in this same task without rotation.',
+  };
+  const before = fs.readFileSync(memoryPath, 'utf8');
+  assert.throws(() => keepAutomationInSameThread({ ...migration, threadId: 'thread-2' }), /Verkeerde automation-task/);
+  assert.equal(fs.readFileSync(memoryPath, 'utf8'), before);
+  startAutomationRun({ memoryPath, threadId: 'thread-1', invocationAt: '2026-08-28T08:15:00+02:00' });
+  const running = fs.readFileSync(memoryPath, 'utf8');
+  assert.throws(() => keepAutomationInSameThread(migration), /RUN_NOT_FINISHED/);
+  assert.equal(fs.readFileSync(memoryPath, 'utf8'), running);
+});
+
+test('same-thread schema forbids a hidden run cap or rotation-due state', () => {
+  const memoryPath = createCompletedRun15Memory();
+  createAutomationConfig(memoryPath);
+  const rotation = inspectAutomationState(memoryPath).rotation;
+  assert.deepEqual(validateRotationState({ ...rotation, completedRunsInActiveThread: 1000 }), []);
+  assert.match(validateRotationState({ ...rotation, maxRunsPerThread: 15 }).join(' '), /maxRunsPerThread=null/);
+  assert.match(validateRotationState({ ...rotation, rotationStatus: 'rotation_due' }).join(' '), /rotationStatus moet active/);
 });
 
 test('finish-run closes the active invocation with a durable live receipt', () => {
@@ -607,7 +717,7 @@ test('mid-batch connector repair preserves count and requires fresh tool-binding
   assert.equal(inspected.ubersuggest.boundTools.length, 4);
 });
 
-test('automation state enforces the fifteen-run task ceiling', () => {
+test('legacy automation state retains the historical fifteen-run ceiling until migration', () => {
   const memoryPath = prepareOperationalState(createMemory(15));
   assert.throws(() => startAutomationRun({
     memoryPath,
@@ -616,7 +726,7 @@ test('automation state enforces the fifteen-run task ceiling', () => {
   }), /ROTATION_REQUIRED/);
 });
 
-test('automation state rotates atomically after run fifteen and is idempotent', () => {
+test('legacy automation state retains atomic historical rotation and idempotency', () => {
   const memoryPath = createCompletedRun15Memory();
   const first = runAutomationStateCli([
     'rotate-thread',
@@ -718,6 +828,27 @@ test('automation installation audit proves one active heartbeat, matching task a
   assert.equal(audit.matchingAutomationCount, 1);
   assert.equal(audit.automation.targetThreadId, 'thread-1');
   assert.deepEqual(audit.automation.missingPromptMarkers, []);
+});
+
+test('v8 audit refuses an unmigrated legacy run limit before incrementing the counter', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const paths = createAutomationConfig(memoryPath, {}, { keepLegacy: true });
+  assert.match(auditAutomationInstallation({ memoryPath, ...paths }).errors.join(' '), /THREAD_POLICY_MIGRATION_REQUIRED/);
+  const before = fs.readFileSync(memoryPath, 'utf8');
+  assert.throws(() => runAutomationStateCli([
+    'start-run', '--thread', 'thread-1', '--invocation-at', '2026-08-28T08:15:00+02:00',
+  ], { memoryPath, ...paths }), /THREAD_POLICY_MIGRATION_REQUIRED/);
+  assert.equal(fs.readFileSync(memoryPath, 'utf8'), before);
+});
+
+test('v8 audit rejects stale rotation instructions and a missing same-thread marker', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const paths = createAutomationConfig(memoryPath, {
+    prompt: `${validAutomationPrompt()} On run 15, first finish and rotate.`,
+  });
+  assert.match(auditAutomationInstallation({ memoryPath, ...paths }).errors.join(' '), /automatic_thread_rotation/);
+  createAutomationConfig(memoryPath, { prompt: validAutomationPrompt().replace('SEO_THREAD_POLICY=same_thread', '') });
+  assert.match(auditAutomationInstallation({ memoryPath, ...paths }).errors.join(' '), /same_thread_policy/);
 });
 
 test('automation installation audit rejects an Edge route even when Chrome markers are present', () => {

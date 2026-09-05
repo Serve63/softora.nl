@@ -13,7 +13,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTOMATION_ID = 'softora-seo-actiemachine';
 const AUTOMATION_NAME = 'Softora SEO dagmachine';
 const AUTOMATION_RRULE = 'FREQ=DAILY;BYHOUR=8;BYMINUTE=15;BYSECOND=0';
-const AUTOMATION_PROMPT_VERSION = 7;
+const AUTOMATION_PROMPT_VERSION = 8;
 const RUN_GATE_VERSION = 2;
 const UBERSUGGEST_STATUSES = Object.freeze([
   'not_checked', 'not_required', 'ready', 'external_research_unavailable', 'auth_blocked', 'quota_blocked',
@@ -56,7 +56,8 @@ const DEFAULT_MEMORY_PATH = path.join(
 const DEFAULT_AUTOMATIONS_ROOT = path.join(os.homedir(), '.codex', 'automations');
 const DEFAULT_AUTOMATION_PATH = path.join(DEFAULT_AUTOMATIONS_ROOT, AUTOMATION_ID, 'automation.toml');
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=7/ }),
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=8/ }),
+  Object.freeze({ label: 'same_thread_policy', pattern: /SEO_THREAD_POLICY=same_thread/ }),
   Object.freeze({
     label: 'excluded_seo_routes',
     pattern: /SEO_AUTOMATION_EXCLUDED_PATHS=\/website,\/bedrijfssoftware,\/voicesoftware,\/chatbot/,
@@ -93,6 +94,7 @@ const REQUIRED_PROMPT_MARKERS = Object.freeze([
   Object.freeze({ label: 'qwen_stop', pattern: /Never use Qwen/i }),
 ]);
 const FORBIDDEN_PROMPT_MARKERS = Object.freeze([
+  Object.freeze({ label: 'automatic_thread_rotation', pattern: /On run 15, first finish|Then create exactly one setup-only replacement|Report run X\/15/i }),
   Object.freeze({ label: 'edge_browser_binding', pattern: /agent\.browsers\.get\(["']edge["']\)/i }),
   Object.freeze({ label: 'iab_browser_binding', pattern: /agent\.browsers\.get\(["']iab["']\)/i }),
   Object.freeze({ label: 'extension_browser_binding', pattern: /agent\.browsers\.get\(["']extension["']\)/i }),
@@ -164,21 +166,30 @@ function replaceStateBlock(contentRaw, name, state) {
   const pattern = stateBlockPattern(name);
   return `${pattern.test(content) ? content.replace(pattern, block) : `${content}\n\n${block}`}\n`;
 }
+function usesSameThreadPolicy(state) {
+  return Number(state?.schemaVersion) === 2 && state.threadPolicy === 'same_thread';
+}
 function validateRotationState(state) {
   const errors = [];
   if (!state || typeof state !== 'object') return ['Rotatiestaat ontbreekt.'];
-  if (Number(state.schemaVersion) !== 1) errors.push('schemaVersion moet 1 zijn.');
-  if (Number(state.maxRunsPerThread) !== DEFAULT_MAX_RUNS_PER_THREAD) errors.push('maxRunsPerThread moet 15 zijn.');
+  const sameThread = usesSameThreadPolicy(state);
+  if (![1, 2].includes(Number(state.schemaVersion))) errors.push('schemaVersion moet 1 of 2 zijn.');
+  if (Number(state.schemaVersion) === 2 && (!sameThread || state.maxRunsPerThread !== null)) {
+    errors.push('Schema 2 vereist threadPolicy=same_thread en maxRunsPerThread=null.');
+  }
+  if (Number(state.schemaVersion) === 1 && Number(state.maxRunsPerThread) !== DEFAULT_MAX_RUNS_PER_THREAD) {
+    errors.push('Legacy maxRunsPerThread moet 15 zijn.');
+  }
   if (!Number.isInteger(Number(state.batchNumber)) || Number(state.batchNumber) < 1) errors.push('batchNumber is ongeldig.');
   if (!String(state.activeThreadId || '').trim()) errors.push('activeThreadId ontbreekt.');
   const completed = Number(state.completedRunsInActiveThread);
-  if (!Number.isInteger(completed) || completed < 0 || completed > 15) errors.push('completedRunsInActiveThread is ongeldig.');
+  if (!Number.isSafeInteger(completed) || completed < 0 || (!sameThread && completed > 15)) errors.push('completedRunsInActiveThread is ongeldig.');
   const rotationStatus = String(state.rotationStatus || '');
   if (!['active', 'rotation_due'].includes(rotationStatus)) errors.push('rotationStatus is ongeldig.');
-  if (Number.isInteger(completed) && completed < 15 && rotationStatus !== 'active') {
-    errors.push('rotationStatus moet active zijn onder 15 runs.');
+  if ((sameThread || (Number.isInteger(completed) && completed < 15)) && rotationStatus !== 'active') {
+    errors.push('rotationStatus moet active zijn voor dezelfde task of onder 15 legacy runs.');
   }
-  if (completed === 15 && rotationStatus !== 'rotation_due') {
+  if (!sameThread && completed === 15 && rotationStatus !== 'rotation_due') {
     errors.push('rotationStatus moet rotation_due zijn bij 15 runs.');
   }
   const previousThreadIds = state.previousThreadIds;
@@ -446,7 +457,7 @@ function validateRunIdentity(run, label = 'activeRun') {
   if (!String(run.threadId || '').trim()) errors.push(`${label}.threadId ontbreekt.`);
   if (!validIso(run.invocationAt)) errors.push(`${label}.invocationAt is ongeldig.`);
   if (!validIso(run.startedAt)) errors.push(`${label}.startedAt is ongeldig.`);
-  if (!Number.isInteger(Number(run.runNumber)) || Number(run.runNumber) < 1 || Number(run.runNumber) > 15) {
+  if (!Number.isSafeInteger(Number(run.runNumber)) || Number(run.runNumber) < 1) {
     errors.push(`${label}.runNumber is ongeldig.`);
   }
   if (run.gateVersion !== undefined && ![1, 2].includes(Number(run.gateVersion))) {
@@ -573,6 +584,7 @@ function auditAutomationInstallation({
   try {
     state = inspectAutomationState(memoryPath, now);
     errors.push(...state.rotationErrors, ...state.ubersuggestErrors, ...state.lifecycleErrors);
+    if (!usesSameThreadPolicy(state.rotation)) errors.push('THREAD_POLICY_MIGRATION_REQUIRED: gebruik keep-thread voor onbeperkt doorgaan in dezelfde task.');
   } catch (error) {
     errors.push(`Automation memory kan niet worden gelezen: ${error.message}`);
   }
@@ -636,7 +648,7 @@ function auditAutomationInstallation({
       errors.push(`Automationprompt mist verplichte controles: ${missingPromptMarkers.join(', ')}.`);
     }
     if (forbiddenPromptMarkers.length) {
-      errors.push(`Automationprompt bevat een verboden browserroute: ${forbiddenPromptMarkers.join(', ')}.`);
+      errors.push(`Automationprompt bevat een verboden browserroute of taskwissel: ${forbiddenPromptMarkers.join(', ')}.`);
     }
   }
 
@@ -688,6 +700,27 @@ function ensureAutomationState(memoryPath, now = new Date()) {
     };
   });
 }
+function keepAutomationInSameThread({ memoryPath, threadId, changedAt, evidence }) {
+  return withMemoryLock(memoryPath, () => {
+    const content = fs.readFileSync(memoryPath, 'utf8');
+    const current = parseStateBlock(content, ROTATION_BLOCK);
+    const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
+    const errors = [...validateRotationState(current), ...validateRunLifecycleState(lifecycle)];
+    if (errors.length) throw new Error(`Ongeldige automation-state: ${errors.join(' ')}`);
+    if (current.activeThreadId !== String(threadId || '').trim()) throw new Error('Verkeerde automation-task.');
+    if (!validIso(changedAt)) throw new Error('changedAt is ongeldig.');
+    const policyEvidence = String(evidence || '').trim();
+    if (policyEvidence.length < 8 || policyEvidence.length > 500) throw new Error('Thread-policy bewijs moet 8-500 tekens bevatten.');
+    if (usesSameThreadPolicy(current)) return { ...current, idempotent: true };
+    if (lifecycle.activeRun) throw new Error('RUN_NOT_FINISHED: wijzig de thread-policy alleen tussen twee runs.');
+    const next = {
+      ...current, schemaVersion: 2, threadPolicy: 'same_thread', maxRunsPerThread: null,
+      rotationStatus: 'active', threadPolicyChangedAt: changedAt, threadPolicyEvidence: policyEvidence,
+    };
+    writeMemoryAtomic(memoryPath, replaceStateBlock(content, ROTATION_BLOCK, next));
+    return next;
+  });
+}
 function startAutomationRun({ memoryPath, threadId, invocationAt }) {
   return withMemoryLock(memoryPath, () => {
     const content = fs.readFileSync(memoryPath, 'utf8');
@@ -720,9 +753,10 @@ function startAutomationRun({ memoryPath, threadId, invocationAt }) {
         `ACTIVE_RUN_REQUIRES_RECOVERY: invocation ${lifecycle.activeRun.invocationAt} staat nog open; inspecteer externe effecten en gebruik recover-run.`
       );
     }
-    if (Number(current.completedRunsInActiveThread) >= 15) throw new Error('ROTATION_REQUIRED: deze task heeft al 15 heartbeat-runs verwerkt.');
+    const sameThread = usesSameThreadPolicy(current);
+    if (!sameThread && Number(current.completedRunsInActiveThread) >= 15) throw new Error('ROTATION_REQUIRED: deze legacy task heeft al 15 heartbeat-runs verwerkt.');
     const completedRunsInActiveThread = Number(current.completedRunsInActiveThread) + 1;
-    const next = { ...current, completedRunsInActiveThread, lastInvocationAt: invocationAt, rotationStatus: completedRunsInActiveThread === 15 ? 'rotation_due' : 'active' };
+    const next = { ...current, completedRunsInActiveThread, lastInvocationAt: invocationAt, rotationStatus: !sameThread && completedRunsInActiveThread === 15 ? 'rotation_due' : 'active' };
     const activeRun = {
       threadId: String(threadId), invocationAt, runNumber: completedRunsInActiveThread, startedAt: invocationAt,
       gateVersion: RUN_GATE_VERSION, gates: {},
@@ -901,6 +935,7 @@ function rotateAutomationThread({ memoryPath, fromThreadId, toThreadId, rotatedA
     const current = parseStateBlock(content, ROTATION_BLOCK);
     const errors = validateRotationState(current);
     if (errors.length) throw new Error(`Ongeldige rotatiestaat: ${errors.join(' ')}`);
+    if (usesSameThreadPolicy(current)) throw new Error('THREAD_ROTATION_DISABLED: de SEO-automation blijft in dezelfde task.');
     const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
     const lifecycleErrors = validateRunLifecycleState(lifecycle);
     if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
@@ -968,6 +1003,7 @@ function repairAutomationThreadBinding({ memoryPath, fromThreadId, toThreadId, r
     const current = parseStateBlock(content, ROTATION_BLOCK);
     const errors = validateRotationState(current);
     if (errors.length) throw new Error(`Ongeldige rotatiestaat: ${errors.join(' ')}`);
+    if (usesSameThreadPolicy(current)) throw new Error('THREAD_ROTATION_DISABLED: herstel de toolbinding in dezelfde task.');
     const lifecycle = parseStateBlock(content, RUN_LIFECYCLE_BLOCK);
     const lifecycleErrors = validateRunLifecycleState(lifecycle);
     if (lifecycleErrors.length) throw new Error(`Ongeldige run-lifecyclestaat: ${lifecycleErrors.join(' ')}`);
@@ -1218,6 +1254,9 @@ function runAutomationStateCli(argv = process.argv.slice(2), options = {}) {
   else if (args.command === 'recover-run') result = recoverInterruptedRun({
     memoryPath, threadId: args.thread, recoveredAt: args['recovered-at'], evidence: args.evidence,
   });
+  else if (args.command === 'keep-thread') result = keepAutomationInSameThread({
+    memoryPath, threadId: args.thread, changedAt: args['changed-at'], evidence: args.evidence,
+  });
   else if (args.command === 'rotate-thread') result = rotateAutomationThread({
     memoryPath, fromThreadId: args['from-thread'], toThreadId: args['to-thread'],
     rotatedAt: args['rotated-at'], evidence: args.evidence,
@@ -1255,10 +1294,10 @@ module.exports = {
   TREE_BOUND_RUN_GATES, UBERSUGGEST_BLOCK,
   UBERSUGGEST_STATUSES, auditAutomationInstallation, defaultUbersuggestState, ensureAutomationState,
   defaultRunLifecycleState, digestRunGateDetails, extractRunGateCliOptions, findSeoAutomationPaths,
-  finishAutomationRun, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue, parseArgs,
+  finishAutomationRun, formatStateBlock, inspectAutomationState, isWeeklyDiscoveryDue, keepAutomationInSameThread, parseArgs,
   parseAutomationToml, parseStateBlock, recordAutomationRunGate, recordAutomationRunGateFromCli,
   recordUbersuggestDataSmoke, recordUbersuggestRun, recordUbersuggestToolBinding, recoverInterruptedRun,
   repairAutomationThreadBinding, replaceStateBlock, resolveGitTreeSha, rotateAutomationThread,
-  runAutomationStateCli, startAutomationRun, validatePublishedRunGates, validateRotationState,
+  runAutomationStateCli, startAutomationRun, usesSameThreadPolicy, validatePublishedRunGates, validateRotationState,
   validateRunGateReceipt, validateRunLifecycleState, validateRunReceipt, validateUbersuggestState,
 };
