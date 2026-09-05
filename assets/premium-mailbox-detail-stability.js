@@ -136,11 +136,19 @@
     return first.folder === second.folder && first.owner === second.owner && first.account === second.account;
   }
 
+  function getMessageIdentity(mail) {
+    const account = String(mail?.accountEmail || mail?.account || mail?.campaign?.account || '').trim().toLowerCase();
+    const messageId = String(mail?.messageId || '').trim().toLowerCase().replace(/^<+|>+$/g, '');
+    return account && messageId ? JSON.stringify([account, messageId]) : '';
+  }
+
   function createController(options = {}) {
     const stability = create();
     let committedId = '';
     let committedVisibilityKey = '';
     let committedHtml = '';
+    let committedMessageIdentity = '';
+    let committedScope = null;
 
     function getDetail() {
       return options.getDetailElement?.() || null;
@@ -183,10 +191,15 @@
       const html = String(options.renderHtml?.(mail) || '');
       const id = String(mail.id || '');
       const visibilityKey = String(options.getVisibilityKey?.(mail) || id);
+      const messageIdentity = getMessageIdentity(mail);
+      const scope = normalizeScope(options.getScope?.());
       const domDirty = detail.dataset?.mailboxDomDirty === 'true';
       const changed = committedId !== id || committedHtml !== html || domDirty;
       if (changed) {
-        const preserveScroll = committedVisibilityKey === visibilityKey;
+        const preserveScroll = committedScope && sameScope(committedScope, scope) && (
+          committedVisibilityKey === visibilityKey ||
+          Boolean(messageIdentity && committedMessageIdentity === messageIdentity)
+        );
         const previousBody = preserveScroll ? detail.querySelector?.('.detail-body') : null;
         const scrollTop = previousBody && Number.isFinite(Number(previousBody.scrollTop))
           ? Number(previousBody.scrollTop)
@@ -207,6 +220,8 @@
         committedVisibilityKey = visibilityKey;
         if (detail.dataset) detail.dataset.mailboxCommittedVisibilityKey = visibilityKey;
       }
+      committedMessageIdentity = messageIdentity;
+      committedScope = scope;
       clearPending();
       options.afterCommit?.(mail, { changed });
       return changed;
@@ -263,10 +278,21 @@
       options.renderList?.({ openLatest: false });
       const detail = getDetail();
       const visibilityKey = String(options.getVisibilityKey?.(mail) || mail.id || '');
+      const messageIdentity = getMessageIdentity(mail);
+      // List metadata and the contact timeline can group the exact same
+      // message differently. That enrichment must not blank an open message.
+      const sameRenderedMessage = Boolean(
+        messageIdentity && messageIdentity === committedMessageIdentity &&
+        String(detail?.dataset?.mailboxCommittedId || '') === committedId
+      );
       const preserveVisibleDetail = Boolean(
         openOptions.preserveVisibleDetail === true &&
-        String(committedVisibilityKey || '') === visibilityKey &&
-        String(detail?.dataset?.mailboxCommittedVisibilityKey || '') === visibilityKey
+        committedScope && sameScope(committedScope, scope) && (
+          sameRenderedMessage || (
+            String(committedVisibilityKey || '') === visibilityKey &&
+            String(detail?.dataset?.mailboxCommittedVisibilityKey || '') === visibilityKey
+          )
+        )
       );
       const keepDetailVisible = Boolean(
         preserveVisibleDetail && !detail?.classList?.contains?.('is-detail-pending')
@@ -307,6 +333,8 @@
       committedId = '';
       committedVisibilityKey = '';
       committedHtml = '';
+      committedMessageIdentity = '';
+      committedScope = null;
       const detail = getDetail();
       if (detail?.dataset) {
         delete detail.dataset.mailboxDomDirty;
