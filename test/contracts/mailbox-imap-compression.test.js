@@ -5,7 +5,7 @@ const { ImapFlow } = require('imapflow');
 const { createMailboxService } = require('../../server/services/mailbox');
 const { runMailboxImapOperationWithDeadline } = require('../../server/services/mailbox-imap-fetch');
 
-test('mailbox can read after authentication when the provider stalls optional COMPRESS', async (t) => {
+test('mailbox can read when the provider stalls optional COMPRESS and ENABLE handshakes', async (t) => {
   const commands = [];
   const sockets = new Set();
   const server = net.createServer((socket) => {
@@ -22,8 +22,8 @@ test('mailbox can read after authentication when the provider stalls optional CO
         pending = pending.slice(end + 2);
         const [tag, command] = line.split(' ');
         commands.push(command);
-        if (command === 'COMPRESS') continue; // Observed provider failure: never answers.
-        if (command === 'CAPABILITY') socket.write('* CAPABILITY IMAP4rev1 NAMESPACE COMPRESS=DEFLATE\r\n');
+        if (command === 'COMPRESS' || command === 'ENABLE') continue; // Optional handshake stalls.
+        if (command === 'CAPABILITY') socket.write('* CAPABILITY IMAP4rev1 NAMESPACE COMPRESS=DEFLATE ENABLE CONDSTORE UTF8=ACCEPT\r\n');
         if (command === 'NAMESPACE') socket.write('* NAMESPACE (("" "/")) NIL NIL\r\n');
         if (command === 'SELECT' || command === 'EXAMINE') {
           socket.write('* 0 EXISTS\r\n* OK [UIDVALIDITY 1] valid\r\n* OK [UIDNEXT 1] next\r\n');
@@ -64,4 +64,5 @@ test('mailbox can read after authentication when the provider stalls optional CO
   assert.ok(commands.includes('LOGIN'));
   assert.ok(commands.includes('SELECT'));
   assert.equal(commands.includes('COMPRESS'), false);
+  assert.equal(commands.includes('ENABLE'), false);
 });
