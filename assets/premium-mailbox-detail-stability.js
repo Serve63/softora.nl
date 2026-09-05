@@ -40,6 +40,7 @@
         activeRun.key === key &&
         activeRun.identity === options.identity
       ) {
+        activeRun.refresh?.();
         return activeRun.promise;
       }
 
@@ -50,6 +51,7 @@
         identity: options.identity,
         key,
         isCurrent: options.isCurrent,
+        refresh: options.refresh,
         controller: typeof AbortController === 'function' ? new AbortController() : null,
         promise: null,
         settled: false,
@@ -308,6 +310,7 @@
       );
       let published = false;
       let publication = Promise.resolve();
+      let activeContext = null;
       const bodyReady = () => mail.bodyLoaded === true && !mail.bodyTruncated && mail.bodyLoading !== true;
       const publish = (runContext) => {
         // A complete stored body is readable independently of slow provider
@@ -334,7 +337,8 @@
         forceNewRun: openOptions.forceRootHydration === true,
         signal: token.signal,
         isCurrent: isSelectionCurrent,
-        hydrate: (runContext) => hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext, publish),
+        refresh: () => { if (activeContext) void publish(activeContext); },
+        hydrate: (runContext) => { activeContext = runContext; return hydrate(mail, token, openOptions, scope, isSelectionCurrent, runContext, publish); },
         prepare: (hydratedMail, runContext) => (
           hydratedMail && isSelectionCurrent()
             ? options.prepare?.(hydratedMail, openOptions, runContext)
