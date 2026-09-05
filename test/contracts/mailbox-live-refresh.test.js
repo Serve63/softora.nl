@@ -7,6 +7,7 @@ const {
   INCREMENTAL_LOCK_RETRY_ATTEMPTS,
   MAX_INCREMENTAL_CAMPAIGN_RECIPIENT_TERMS,
   REGULAR_CRON_LOCK_RETRY_ATTEMPTS,
+  getMailboxSyncFoldersForAccount,
   normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
   syncMailboxRequest,
@@ -109,7 +110,7 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     campaignOnly: true,
     incrementalOnly: true,
     fastRefresh: true,
-    maxConcurrentAccounts: 2,
+    maxConcurrentAccounts: 1,
   }]);
   assert.equal(normalizeMailboxSyncOwner('ALL'), 'both');
   await assert.rejects(
@@ -130,6 +131,44 @@ test('fast refresh request remains owner-scoped, incremental and bounded', async
     }),
     (error) => error.status === 400
   );
+});
+
+test('snelle inboxcontrole laat impliciet archiefherstel aan cron en behoudt expliciete All Mail-verzoeken', () => {
+  const options = { account: account('servec321@gmail.com'), folders: ['inbox'], campaignOnly: true, incrementalOnly: true };
+  assert.deepEqual(getMailboxSyncFoldersForAccount({ ...options, fastRefresh: true }), ['inbox', 'coldmail']);
+  assert.deepEqual(getMailboxSyncFoldersForAccount(options), ['inbox', 'coldmail', 'allmail']);
+  assert.deepEqual(getMailboxSyncFoldersForAccount({ ...options, fastRefresh: true, folders: ['allmail'] }), ['allmail', 'coldmail']);
+});
+
+test('snelle refresh claimt maximaal één lease naast twee actieve cronleases', async () => {
+  let activeReads = 0;
+  let peak = 0;
+  const selectedAccounts = SERVE_ACCOUNTS.slice(0, 2).map(account);
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'fixture-lock' }),
+      finishSync: async () => ({ ok: true }),
+      upsertMessages: async () => ({ ok: true, upserted: 0 }),
+    },
+    assertReadableAccount: (email) => selectedAccounts.find((candidate) => candidate.email === email),
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => {
+      activeReads += 1; peak = Math.max(peak, activeReads);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeReads -= 1;
+      return [];
+    },
+    getSafeLimit: Number,
+    getAccounts: () => selectedAccounts,
+    normalizeEmail: String, normalizeFolder: String, logger: { error() {} },
+  });
+  const result = await service.syncMailbox({
+    owner: 'serve', folders: ['inbox'], campaignOnly: true, incrementalOnly: true,
+    fastRefresh: true, maxConcurrentAccounts: 3, limit: 4,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.results.length, 2);
+  assert.equal(peak, 1);
 });
 
 test('mailbox cron houdt normale sync binnen runtime en voegt campaign-inboxrecovery toe', async () => {

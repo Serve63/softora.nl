@@ -41,6 +41,7 @@ const { resolveConversationActivity } = require('./mailbox-conversation-activity
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
 const { collectCampaignThreadParticipantEmails } = require('./mailbox-campaign-participants');
 const { loadMailboxCampaignContactHistory } = require('./mailbox-campaign-contact-history');
+const { mapMailboxReads, listMessagesAcrossFolders } = require('./mailbox-campaign-read-batches');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -238,12 +239,13 @@ async function listExactSentDescendants({
     if (!frontierByAccount.size) break;
 
     const nextFrontier = [];
-    for (const [accountEmail, messageIds] of frontierByAccount.entries()) {
-      const result = await mailboxIndexStore.listMessagesReferencingMessageIdsForAccounts({
-        accountEmails: [accountEmail],
-        folder: 'sent',
-        messageIds, priorityRead: true,
-      });
+    const accountResults = await mapMailboxReads([...frontierByAccount], async ([accountEmail, messageIds]) => ({
+      accountEmail, messageIds,
+      result: await mailboxIndexStore.listMessagesReferencingMessageIdsForAccounts({
+        accountEmails: [accountEmail], folder: 'sent', messageIds, priorityRead: true,
+      }),
+    }));
+    for (const { accountEmail, messageIds, result } of accountResults) {
       if (!Array.isArray(result)) {
         const error = new Error('Gerichte Sent-threadcontrole kon niet worden gelezen.');
         error.status = 503;
@@ -766,23 +768,6 @@ function shouldShowCampaignMessage(message) {
     : true;
 }
 
-async function listMessagesAcrossFolders({
-  mailboxIndexStore,
-  method,
-  folders = CAMPAIGN_INCOMING_FOLDERS,
-  options = {},
-} = {}) {
-  if (!mailboxIndexStore || typeof mailboxIndexStore[method] !== 'function') return [];
-  const batches = await Promise.all(
-    folders.map((folder) => mailboxIndexStore[method]({
-      ...options,
-      folder,
-    }))
-  );
-  if (batches.some((batch) => !Array.isArray(batch))) return null;
-  return dedupeCampaignMessages(batches.flat());
-}
-
 function normalizeKey(value) {
   return normalizeText(value)
     .toLowerCase()
@@ -886,6 +871,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
     snapshotLimit = 0,
     hydrateBodies = true,
   } = {}) {
+    const stages = {}; let stageAt = Date.now();
+    const stage = (name) => { const now = Date.now(); stages[name] = now - stageAt; stageAt = now; };
     const safeLimit = Math.max(1, Math.min(CAMPAIGN_REPLY_LIMIT, Number(limit) || 100));
     const safeSnapshotLimit = Math.max(
       0,
@@ -906,7 +893,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const recentMessages = await listMessagesAcrossFolders({
+    const [recentMessages, matchingMessages] = await Promise.all([listMessagesAcrossFolders({
+      folders: CAMPAIGN_INCOMING_FOLDERS, dedupeCampaignMessages,
       mailboxIndexStore,
       method: 'listMessagesForAccounts',
       options: {
@@ -914,9 +902,9 @@ function createMailboxCampaignRepliesService(deps = {}) {
         limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
         priorityRead: true,
       },
-    });
-    const matchingMessages = typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
-      ? await listMessagesAcrossFolders({
+    }), typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
+      ? listMessagesAcrossFolders({
+          folders: CAMPAIGN_INCOMING_FOLDERS, dedupeCampaignMessages,
           mailboxIndexStore,
           method: 'listMatchingMessagesForAccounts',
           options: {
@@ -927,7 +915,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
           },
         })
       : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-        ? await listMessagesAcrossFolders({
+        ? listMessagesAcrossFolders({
+            folders: CAMPAIGN_INCOMING_FOLDERS, dedupeCampaignMessages,
             mailboxIndexStore,
             method: 'listAllMessagesForAccounts',
             options: {
@@ -936,7 +925,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
               priorityRead: true,
             },
           })
-        : [];
+        : []]);
     const indexedMessages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
       ? dedupeCampaignMessages([...recentMessages, ...matchingMessages])
       : null;
@@ -945,6 +934,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       error.status = 503;
       throw error;
     }
+    stage('scan');
     const { messages, sentMessages: allSeedSentMessages } = await loadMailboxCampaignContactHistory({
       mailboxIndexStore,
       campaignMailboxAccounts,
@@ -957,6 +947,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       dedupeCampaignMessages,
       collectCampaignThreadParticipantEmails,
     });
+    stage('history');
     if (!messages.length) return { messages: [], snapshotMessages: [] };
 
     const campaignMessages = dedupeCampaignMessages(
@@ -981,6 +972,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
+    stage('customers');
     const campaignCustomerByEmail = new Map();
     customers.forEach((customer) => {
       const email = normalizeEmail(customer && (customer.email || customer.contactEmail));
@@ -1022,6 +1014,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       })
       .filter(Boolean);
 
+    stage('messageProof');
     const parentMessageIds = getMessageReferenceLookupValues(replies);
     const targetedParentMessagesResult = parentMessageIds.length &&
       typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
@@ -1031,6 +1024,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
           messageIds: parentMessageIds, priorityRead: true,
         }).catch(() => [])
       : [];
+    stage('parents');
     const targetedSentDescendantsResult = await listExactSentDescendants({
       mailboxIndexStore,
       seedMessages: [
@@ -1039,6 +1033,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ],
       allowedAccountEmails: campaignMailboxAccounts,
     });
+    stage('descendants');
     const acceptedSendIntents = mailboxSendProvenanceStore &&
       typeof mailboxSendProvenanceStore.listAcceptedMessages === 'function'
       ? await mailboxSendProvenanceStore.listAcceptedMessages({
@@ -1046,6 +1041,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
           limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
         })
       : [];
+    stage('acceptedSends');
     const sentMessages = dedupeCampaignMessages([
       ...allSeedSentMessages,
       ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
@@ -1077,6 +1073,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
           limit: Math.min(3000, unthreadedTargets.length * 3),
         }).catch(() => [])
       : [];
+    stage('unthreaded');
     const conversationsWithHistoricalReplies = attachTargetedUnthreadedSentMessages(
       exactConversations,
       targetedUnthreadedRows
@@ -1090,6 +1087,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       dataOpsStore, mailboxSendProvenanceStore,
       outboundRecipientGuardStore, knownSentMessages: sentMessages,
     });
+    stage('quotedRecovery');
     const conversationsWithQuotedOriginals = quotedRecovery.conversations;
     const hydratedRecoveryByIdentity = quotedRecovery.hydratedByIdentity;
     let allVisibleConversations = attachCrossAccountMailboxCopies(
@@ -1102,6 +1100,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
           : []),
       ])
     ).filter(shouldShowCampaignConversation); if (mailboxOutreachScope?.filterConversations) allVisibleConversations = await mailboxOutreachScope.filterConversations({ owner: safeSnapshotLimit ? '' : owner, messages: allVisibleConversations });
+    stage('conversationProof');
     const selectedAccountSet = new Set(selectedMailboxAccounts);
     const selectedConversations = allVisibleConversations
       .filter((conversation) => selectedAccountSet.has(getCampaignConversationAccountEmail(conversation)))
@@ -1111,6 +1110,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       safeSnapshotLimit
     );
 
+    (deps.logger || console).info?.('[Mailbox][CampaignIndexTiming]', stages);
     async function hydrateVisibleConversations(conversations) {
       if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') return conversations;
       const hydratedMessages = [];
