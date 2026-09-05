@@ -123,7 +123,7 @@ test('Import bevestigt de originele postdatum en blijft zichtbaar; een opgegeven
 });
 
 test('Natuurlijke aanvragen met rolmodifiers worden herkend zonder advies, reclame of vacatures toe te laten', () => {
-  for (const message_text of [requestText, 'Ik zoek een goede webdesigner.', 'Wij zijn op zoek naar een ervaren freelance softwareontwikkelaar voor onze software.']) {
+  for (const message_text of [requestText, 'Ik zoek een goede webdesigner.', 'Wij zijn op zoek naar een ervaren freelance softwareontwikkelaar voor onze software.', 'Voor een nieuw platform zijn we op zoek naar een enthousiaste freelance websitebouwer die onze visie tot leven kan brengen.']) {
     const classified = classifySignal({ message_text });
     assert.equal(classified.role, 'prospect', message_text);
     assert.equal(classified.isExcluded, false, message_text);
