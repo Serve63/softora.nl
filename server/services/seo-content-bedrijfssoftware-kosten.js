@@ -38,7 +38,9 @@ const BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM = Object.freeze({
     }),
   ]),
   publishedAt: '2026-08-03',
-  updatedAt: '2026-08-03',
+  updatedAt: '2026-09-05',
+  growthEventKind: 'other_growth_action',
+  growthEventAt: '2026-09-05',
   image: Object.freeze({
     src: '/assets/seo-content/bedrijfssoftware-kosten-scopekaart-softora.jpg',
     alt: 'Scopekaart voor bedrijfssoftware met gebruikersrollen, data, koppelingen, uitzonderingen en acceptatietests die samen het budget bepalen.',
@@ -168,10 +170,10 @@ const BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM = Object.freeze({
         'Schrijf vóór een gesprek op: welk probleem dagelijks zichtbaar is; welke uitkomst nodig is; wie de eerste gebruikers zijn; welke vijf scenario’s moeten werken; welke gegevens daarbij horen; welke bron leidend is; welke rollen verschillen; welke koppeling noodzakelijk is; welke uitzondering risicovol is; wat later mag; wie intern beslist; en hoe acceptatie plaatsvindt. Onbekende antwoorden hoeven niet te worden verzonnen, maar worden als onderzoeksvraag gemarkeerd.',
         Object.freeze({
           text:
-            'Met die antwoorden kan Softora tijdens een scopegesprek de kernworkflow, onzekerheden en een beheersbare eerste fase zichtbaar maken. De uitkomst is geen universele prijs of gegarandeerde besparing. Het is een onderbouwde bouwroute waarop een voorstel kan worden gebaseerd. Bekijk de mogelijkheden voor bedrijfssoftware op maat of start een gesprek wanneer je de huidige workflow en de gewenste eerste uitkomst wilt toetsen.',
+            'Wil je van je kostenkaart naar een voorstel? Neem de eerste workflow, gebruikersrollen, databronnen en noodzakelijke koppelingen mee in een gesprek met Softora. Bekijk bedrijfssoftware laten maken voor het MKB om te zien welke startversie bij je proces past en hoe bouw, testen en beheer worden afgebakend.',
           links: Object.freeze([
             Object.freeze({
-              anchor: 'mogelijkheden voor bedrijfssoftware op maat',
+              anchor: 'bedrijfssoftware laten maken voor het MKB',
               href: '/bedrijfssoftware-op-maat',
             }),
           ]),

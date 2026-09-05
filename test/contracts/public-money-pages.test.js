@@ -185,8 +185,8 @@ test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoploss
   assert.match(source, /data-step="01">Herken je deze situaties\?<\/div>/);
   assert.match(source, /data-step="04">Samen kijken wat makkelijker kan<\/div>/);
 
-  assert.equal(entry.title, 'Bedrijfssoftware laten maken: aanpak voor MKB');
-  assert.match(entry.description, /kernproces, de eerste versie, rollen, koppelingen en acceptatie/);
+  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor het MKB');
+  assert.match(entry.description, /CRM, planning, offertes of een klantportaal/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-offerte-automatisering'));

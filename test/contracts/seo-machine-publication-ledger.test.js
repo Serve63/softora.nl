@@ -104,7 +104,7 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
   assert.deepEqual(
     events.map((event) => [event.path, event.eventAt, event.publicationKind]),
     [
-      ['/bedrijfssoftware-op-maat', '2026-08-06', 'substantial_refresh'],
+      ['/bedrijfssoftware-op-maat', '2026-09-05', 'other_growth_action'],
       ['/crm-systeem-op-maat', '2026-08-28', 'other_growth_action'],
       ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
       ['/ai-telefonist', '2026-08-23', 'other_growth_action'],
@@ -123,6 +123,12 @@ test('content growth actions have an explicit machine-readable event plan', () =
         '2026-07-26',
         'substantial_refresh',
         'live',
+      ],
+      [
+        '/blog/bedrijfssoftware-laten-maken-kosten',
+        '2026-09-05',
+        'other_growth_action',
+        'scheduled',
       ],
       [
         '/vergelijkingen/chatbot-vs-livechat',
