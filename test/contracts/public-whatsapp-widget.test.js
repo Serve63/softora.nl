@@ -38,7 +38,20 @@ function assertHasOneSitewideWidget(html, pagePath) {
   assert.match(html, new RegExp(`data-softora-conversion-page="${pagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
 }
 
-test('iedere publieke vaste Softora-pagina krijgt dezelfde WhatsApp-widget precies één keer', () => {
+function assertHasHeaderContact(html, pagePath) {
+  assert.match(html, /<body\b[^>]*data-softora-contact-placement="header"/);
+  const anchors = [...html.matchAll(/<a\b[^>]*\bclass="[^"]*\bcontent-header-contact\b[^"]*"[^>]*>/g)];
+  assert.equal(anchors.length, 1, `${pagePath} moet één vaste headercontactknop houden.`);
+  assert.match(anchors[0][0], /href="https:\/\/wa\.me\/31643262792"/);
+  assert.match(anchors[0][0], /target="_blank"/);
+  assert.match(anchors[0][0], /data-softora-conversion-target="whatsapp"/);
+  assert.ok(anchors[0][0].includes(`data-softora-conversion-page="${pagePath}"`));
+  assert.doesNotMatch(html, /data-softora-whatsapp-widget|public-whatsapp-widget\.css/);
+  assert.equal((html.match(/\/assets\/public-conversion-tracking\.js\?/g) || []).length, 1);
+  assert.equal(addPublicWhatsappWidgetIfMissing(html, { pagePath }), html);
+}
+
+test('iedere publieke vaste pagina houdt meetbaar contact via widget of expliciete vaste header', () => {
   for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {
     const source = fs.readFileSync(path.join(repoRoot, entry.fileName), 'utf8');
     const once = applyPublicSeoHeadDefaults(source, entry.fileName, {
@@ -48,8 +61,9 @@ test('iedere publieke vaste Softora-pagina krijgt dezelfde WhatsApp-widget preci
       siteOrigin: 'https://www.softora.nl',
     });
 
-    assertHasOneSitewideWidget(once, entry.path);
-    assertHasOneSitewideWidget(twice, entry.path);
+    const verify = entry.path === '/bedrijfssoftware-op-maat' ? assertHasHeaderContact : assertHasOneSitewideWidget;
+    verify(once, entry.path);
+    verify(twice, entry.path);
   }
 });
 
