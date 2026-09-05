@@ -112,6 +112,72 @@ test('Lead Radar bouwt een begrensd plan voor openbare bronadapters', () => {
   assert.ok(plan.every((item) => !String(item.query).includes('site:facebook.com')));
 });
 
+test('Mastodon gebruikt kleine lokale batches en stopt zodra het scanvenster is bereikt', async () => {
+  const calls = [];
+  const provider = createLeadRadarScraperProvider({
+    env: { LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0' },
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === '/robots.txt') return fetchResponse('User-agent: *\nAllow: /');
+      calls.push(parsed);
+      const secondPage = parsed.searchParams.has('max_id');
+      return fetchResponse(JSON.stringify([{
+        id: secondPage ? '90' : '100', url: `https://example.org/@ondernemer/${secondPage ? '90' : '100'}`,
+        content: '<p>Ik zoek iemand die onze website kan bouwen.</p>',
+        created_at: new Date(Date.now() - (secondPage ? 40 : 1) * 86_400_000).toISOString(),
+        account: { display_name: 'Ondernemer' },
+      }]));
+    },
+  });
+  const items = await provider.search({ maxResults: 40, context: { adapter: 'mastodon', sourceUrl: 'https://example.org', term: 'website', maxAgeDays: 31 } });
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((url) => url.searchParams.get('local') === 'true' && Number(url.searchParams.get('limit')) <= 10));
+  assert.equal(calls[1].searchParams.get('max_id'), '100');
+  assert.equal(items.length, 2);
+  assert.ok(items.every((item) => item.source_verified));
+});
+
+test('Publieke bron herstelt een tijdelijke timeout met één retry en herhaalt geen toegangsfout', async () => {
+  let calls = 0;
+  let mode = 'timeout';
+  const fetcher = createLeadRadarPublicFetcher({
+    env: { LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0' },
+    fetchImpl: async (url) => {
+      if (new URL(url).pathname === '/robots.txt') return fetchResponse('User-agent: *\nAllow: /');
+      calls += 1;
+      if (mode === 'forbidden') return fetchResponse('', { status: 403 });
+      if (calls === 1) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+      return fetchResponse('<rss><channel/></rss>');
+    },
+  });
+  const result = await fetcher.fetchPublic('https://example.org/feed');
+  assert.equal(result.response.status, 200);
+  assert.equal(calls, 2);
+  mode = 'forbidden';
+  await assert.rejects(fetcher.fetchPublic('https://example.org/feed'), /HTTP 403/);
+  assert.equal(calls, 3);
+});
+
+test('Kleine Mastodon-batches behouden de limiet van veertig recente berichten', async () => {
+  let page = 0;
+  const provider = createLeadRadarScraperProvider({
+    env: { LEAD_RADAR_SCRAPER_MIN_INTERVAL_MS: '0' },
+    fetchImpl: async (url) => {
+      if (new URL(url).pathname === '/robots.txt') return fetchResponse('User-agent: *\nAllow: /');
+      page += 1;
+      return fetchResponse(JSON.stringify(Array.from({ length: 10 }, (_, index) => ({
+        id: String(1000 - page * 10 - index), url: `https://example.org/@ondernemer/${1000 - page * 10 - index}`,
+        content: '<p>Website gezocht voor onze winkel.</p>', created_at: new Date().toISOString(),
+        account: { display_name: 'Ondernemer' },
+      }))));
+    },
+  });
+  const items = await provider.search({ maxResults: 40, context: { adapter: 'mastodon', sourceUrl: 'https://example.org', term: 'website' } });
+  assert.equal(page, 4);
+  assert.equal(items.length, 40);
+  assert.equal(new Set(items.map((item) => item.url)).size, 40);
+});
+
 test('Lead Radar scant standaard directe ondernemersbronnen en nooit opdrachtmarktplaatsen', async () => {
   const plan = buildPublicScraperPlan({
     platforms: ['web', 'mastodon', 'bluesky'],

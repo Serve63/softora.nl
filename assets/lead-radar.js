@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const state = { offset: 0, limit: 50, total: 0, signals: [], status: null };
+  const state = { offset: 0, limit: 50, total: 0, signals: [], status: null, scanning: false, scanError: '' };
   const $ = (selector) => document.querySelector(selector);
   const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   async function api(path, options) {
@@ -25,20 +25,42 @@
     const lastRun = state.status && state.status.lastRun;
     const providerBlocked = provider?.configured && lastRun?.status === 'provider_unavailable';
     const partialFailure = provider?.configured && lastRun?.status === 'completed_with_errors';
+    const storageUnavailable = state.status?.storageConfigured === false;
     const scanButton = $('#scan-button');
     if (scanButton) {
-      scanButton.disabled = !provider || !provider.configured;
-      scanButton.title = provider && provider.configured
+      scanButton.disabled = state.scanning || storageUnavailable || !provider?.configured;
+      scanButton.textContent = state.scanning ? 'Scannen…' : 'Scan starten';
+      scanButton.title = storageUnavailable ? 'Lead Radar kan de resultaten momenteel niet opslaan.' : provider?.configured
         ? ''
         : 'Voeg minimaal één toegestane openbare scraperbron toe.';
     }
-    if (!banner || !provider || (provider.configured && !providerBlocked && !partialFailure)) { if (banner) banner.hidden = true; return; }
+    if (!banner || !provider || (!storageUnavailable && provider.configured && !providerBlocked && !partialFailure)) { if (banner) banner.hidden = true; return; }
     banner.hidden = false;
-    banner.innerHTML = providerBlocked
-      ? `<strong>Alle openbare scraperbronnen zijn geblokkeerd</strong><span>${escapeHtml(lastRun.last_error || 'Controleer de bronstatus en robots-regels.')} Er worden geen resultaten verzonnen of via een betaalde fallback opgehaald.</span>`
+    banner.innerHTML = storageUnavailable
+      ? '<strong>Opslag tijdelijk niet beschikbaar</strong><span>De scan kan pas starten als resultaten weer kunnen worden opgeslagen.</span>'
+      : providerBlocked
+      ? `<strong>Scan mislukt</strong><span>${escapeHtml(lastRun.last_error || 'De openbare bronnen konden niet worden gelezen.')} Probeer de scan opnieuw.</span>`
       : partialFailure
-        ? `<strong>Scan gedeeltelijk afgerond</strong><span>${Number(lastRun.error_count || 0)} broncontrole(s) mislukten; werkende bronnen zijn wel verwerkt. Lead Radar gebruikt geen betaalde zoekprovider.</span>`
+        ? `<strong>Scan gedeeltelijk afgerond</strong><span>${Number(lastRun.error_count || 0)} broncontrole(s) mislukten; resultaten van werkende bronnen zijn verwerkt. ${escapeHtml(lastRun.last_error || '')}</span>`
         : `<strong>Geen openbare scraperbron beschikbaar</strong><span>${escapeHtml(provider.message || 'Voeg een toegestane openbare feed of bron toe.')} Websitecontrole van bestaande leads blijft beschikbaar.</span>`;
+  }
+
+  function renderScanSummary() {
+    const element = $('#scan-summary');
+    const run = state.status?.lastRun;
+    if (!element) return;
+    element.hidden = !run;
+    if (!run) return;
+    const running = run.status === 'running' || run.status === 'paused';
+    const date = new Date(run.finished_at || run.started_at);
+    const when = Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }).format(date) : '';
+    const filtered = Number(run.filtered_count ?? (Number(run.rejected_count || 0) + Number(run.unverified_count || 0)));
+    const checks = (run.source_checks || []).map((check) => {
+      let source = check.platform || 'Openbare bron';
+      try { source = new URL(check.source_url).hostname; } catch {}
+      return `<li><span>${escapeHtml(source)}${check.platform === 'mastodon' ? ` · #${escapeHtml(check.term)}` : ''}</span><span>${check.status === 'error' ? escapeHtml(check.error || 'Niet beschikbaar') : `${Number(check.result_count || 0)} berichten gelezen`}</span></li>`;
+    }).join('');
+    element.innerHTML = `<strong>${running ? 'Scan nog niet afgerond' : 'Laatste scan'}${when ? ` · ${escapeHtml(when)}` : ''}</strong><p>${Number(run.result_count || 0)} berichten bekeken · ${Number(run.new_signal_count || 0)} nieuwe leads · ${filtered} niet geselecteerd</p><small>Alleen directe aanvragen van de laatste ${Number(run.max_age_days || 31)} dagen verschijnen in de inbox.</small>${checks ? `<details><summary>Bekijk broncontroles</summary><ul>${checks}</ul></details>` : ''}`;
   }
 
   function getLeadTitle(signal = {}) {
@@ -100,7 +122,7 @@
   function renderSignals() {
     const list = $('#lead-list');
     if (!list) return;
-    if (!state.signals.length) { list.innerHTML = ''; setInboxState('Geen leads gevonden.', ''); }
+    if (!state.signals.length) { list.innerHTML = ''; setInboxState('Geen recente, directe aanvragen gevonden. De laatste scan laat zien wat er is gecontroleerd.', ''); }
     else { setInboxState('', ''); list.innerHTML = state.signals.map(signalCard).join(''); }
     $('#result-count').textContent = `${state.total.toLocaleString('nl-NL')} resultaten`;
     const pagination = $('#pagination');
@@ -116,13 +138,16 @@
     return params.toString();
   }
 
-  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); }
+  async function loadStatus() { state.status = await api('/api/lead-radar/status'); renderProviderStatus(); renderMetrics(); renderScanSummary(); }
   async function loadSignals({ silent = false } = {}) {
     if (!silent) setInboxState('Leads laden...', '');
     try { const body = await api(`/api/lead-radar/signals?${getSignalQuery()}`); state.signals = body.signals || []; state.total = Number(body.total) || 0; renderSignals(); }
-    catch (error) { state.signals = []; state.total = 0; renderSignals(); setInboxState(error.message, 'error'); }
+    catch (error) { setInboxState(`Leads konden niet worden bijgewerkt: ${error.message}`, 'error'); }
   }
   async function startScan() {
+    if (state.scanning) return;
+    state.scanning = true;
+    state.scanError = '';
     const payload = {
       platforms: ['web', 'mastodon'],
       regionMode: 'nationwide',
@@ -132,21 +157,30 @@
       websiteLookupLimit: 0,
       keywordGroups: ['direct_website', 'renew_or_repair', 'webshop', 'new_business', 'software_automation'],
     };
-    const button = $('#scan-button'); button.disabled = true; $('#scan-progress').hidden = false; $('#scan-progress-label').textContent = 'Scan bezig — resultaten worden na afloop bijgewerkt.';
+    renderProviderStatus();
+    $('#scan-progress').hidden = false;
+    $('#scan-progress').classList.remove('scan-progress--error');
+    $('#scan-progress-label').textContent = 'Openbare bronnen worden gecontroleerd. Dit kan even duren.';
     try {
-      const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(payload) });
-      const run = body.run || {};
-      const stats = run.platform_stats || {};
-      const sourceSummary = Object.entries(stats).map(([source, values]) => `${source}: ${Number(values?.verified || 0)} bevestigd`).join('. ');
-      $('#scan-progress-label').textContent = run.status === 'provider_unavailable'
-        ? (run.last_error || 'Alle openbare bronnen zijn geblokkeerd.')
-        : `Scan afgerond. ${sourceSummary || 'Geen bronresultaten.'}. ${Number(run.rejected_count || 0) + Number(run.unverified_count || 0)} niet getoond na broncontrole.`;
+      let run;
+      do {
+        const body = await api('/api/lead-radar/scan', { method: 'POST', body: JSON.stringify(run ? { ...payload, runId: run.id } : payload) });
+        const previousCursor = run?.query_cursor;
+        run = body.run || {};
+        if (run.status === 'paused' && (!run.id || Number(run.query_cursor) <= Number(previousCursor ?? -1))) throw new Error('De scan kon niet verdergaan. Probeer opnieuw.');
+      } while (run.status === 'paused');
+      state.offset = 0;
       await Promise.all([loadStatus(), loadSignals()]);
     }
-    catch (error) { $('#scan-progress-label').textContent = error.message; }
+    catch (error) {
+      state.scanError = error.message;
+      $('#scan-progress').classList.add('scan-progress--error');
+      $('#scan-progress-label').textContent = `Scan niet afgerond: ${error.message}`;
+    }
     finally {
-      button.disabled = !state.status?.provider?.configured;
-      setTimeout(() => { $('#scan-progress').hidden = true; }, 1200);
+      state.scanning = false;
+      $('#scan-progress').hidden = !state.scanError;
+      renderProviderStatus();
     }
   }
 
@@ -155,7 +189,7 @@
   $('#scan-button').addEventListener('click', () => startScan());
 
   window.setInterval(() => {
-    if (document.hidden) return;
+    if (document.hidden || state.scanning) return;
     Promise.all([loadStatus(), loadSignals({ silent: true })]).catch(() => {});
   }, 60_000);
 

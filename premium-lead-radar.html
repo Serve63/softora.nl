@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260826d">
+  <link rel="stylesheet" href="/assets/lead-radar.css?v=20260906a">
 </head>
 <body class="lead-radar-page">
   <main class="lead-radar-app">
@@ -23,16 +23,18 @@
     <section class="status-banner" id="provider-banner" hidden></section>
 
     <section class="metric-grid" aria-label="Lead Radar tellingen">
-      <article class="metric-card metric-card--primary"><span>Totale leads</span><strong id="metric-total">-</strong><small>opgeslagen in Lead Radar</small></article>
+      <article class="metric-card metric-card--primary"><span>Totale leads</span><strong id="metric-total">-</strong><small>recente, gecontroleerde aanvragen</small></article>
       <article class="metric-card metric-card--scan">
         <div class="metric-card__summary"><span>Nieuwe leads</span><strong id="metric-new">-</strong><small>nog te beoordelen</small></div>
-        <button class="button button-primary scan-button" id="scan-button" type="button">Scan starten</button>
+        <button class="button button-primary scan-button" id="scan-button" type="button" disabled>Scan starten</button>
         <div class="scan-progress" id="scan-progress" hidden role="status" aria-live="polite">
           <div class="scan-progress__bar"><span id="scan-progress-bar"></span></div>
           <span id="scan-progress-label">Scan wordt uitgevoerd...</span>
         </div>
       </article>
     </section>
+
+    <section class="scan-summary" id="scan-summary" aria-label="Resultaat laatste scan" aria-live="polite" hidden></section>
 
     <section class="inbox-section" aria-label="Lead Radar inbox">
       <div class="inbox-heading">
@@ -50,6 +52,6 @@
     </section>
 
   </main>
-  <script src="/assets/lead-radar.js?v=20260827a" defer></script>
+  <script src="/assets/lead-radar.js?v=20260906a" defer></script>
 </body>
 </html>
