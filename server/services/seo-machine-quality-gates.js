@@ -697,6 +697,13 @@ function isTrackedWhatsappButton(button) {
   );
 }
 
+function isArticleSectionNavigation(anchor, html) {
+  if (getAttrValue(anchor.attrs, 'data-softora-navigation') !== 'article-section'
+    || !/^#onderdeel-\d+-[a-z0-9-]+$/.test(anchor.href)) return false;
+  const heading = html.match(new RegExp(`<h2\\b[^>]*\\bid=["']${anchor.href.slice(1)}["'][^>]*>([\\s\\S]*?)<\\/h2>`, 'i'));
+  return Boolean(heading && stripHtmlTags(heading[1]) === anchor.label);
+}
+
 function auditConversionCtas({ pages = [] } = {}) {
   const issues = [];
 
@@ -756,7 +763,7 @@ function auditConversionCtas({ pages = [] } = {}) {
         message: `${pathName} heeft een WhatsApp-link zonder target="_blank" en veilige rel-attributen.`,
       });
     }
-    const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label));
+    const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label) && !isArticleSectionNavigation(anchor, html));
     const nonWhatsappLeadCtas = leadCtaLinks.filter(
       (anchor) =>
         !isMartijnWhatsappHref(anchor.href) &&

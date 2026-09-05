@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { addPublicWhatsappWidgetIfMissing } = require('../../server/services/public-whatsapp-widget');
 
 const {
   INDEXABLE_PUBLIC_SEO_PAGES,
@@ -52,19 +53,31 @@ test('iedere publieke vaste Softora-pagina krijgt dezelfde WhatsApp-widget preci
   }
 });
 
-test('iedere dynamische contentindex en ieder artikel krijgt de sitebrede WhatsApp-widget', () => {
+test('contentpagina houdt meetbaar contact in de header zonder tekstoverlappende widget', () => {
+  function assertHeaderContact(html, pagePath) {
+    assert.doesNotMatch(html, /data-softora-whatsapp-widget|public-whatsapp-widget\.css/);
+    assert.match(html, /class="content-header-contact" href="https:\/\/wa\.me\/31643262792"/);
+    assert.match(html, /data-softora-conversion="content-nav-contact"/);
+    assert.equal((html.match(/\/assets\/public-conversion-tracking\.js\?/g) || []).length, 1);
+    assert.equal(addPublicWhatsappWidgetIfMissing(html, { pagePath }), html);
+  }
   for (const collection of Object.values(SEO_CONTENT_COLLECTIONS)) {
     const html = buildSeoContentIndexHtml(collection.key, {
       siteOrigin: 'https://www.softora.nl',
       now: new Date('2026-08-26T12:00:00+02:00'),
     });
-    assertHasOneSitewideWidget(html, collection.path);
+    assertHeaderContact(html, collection.path);
   }
 
   for (const item of SEO_CONTENT_ITEMS) {
     const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
-    assertHasOneSitewideWidget(html, `/${item.collection}/${item.slug}`);
+    assertHeaderContact(html, `/${item.collection}/${item.slug}`);
   }
+});
+
+test('headercontact-optie laat de widget bestaan wanneer de echte contactroute ontbreekt', () => {
+  const html = '<html><head></head><body data-softora-contact-placement="header"><a class="content-header-contact" href="/broken">Contact</a></body></html>';
+  assertHasOneSitewideWidget(addPublicWhatsappWidgetIfMissing(html, { pagePath: '/blog' }), '/blog');
 });
 
 test('de sitebrede widget blijft buiten interne en beschermde pagina-rendering', () => {
