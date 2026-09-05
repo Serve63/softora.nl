@@ -71,6 +71,50 @@ function createService(overrides = {}) {
   });
 }
 
+test('exact sent Message-ID resolves from the durable index without reconnecting to the provider', async () => {
+  const calls = [];
+  const service = createService({
+    mailboxIndexStore: {
+      async listMessagesByMessageIdsForAccounts(input) {
+        calls.push(input);
+        return [{ id: 'sent:42', uid: 42, folder: 'sent', accountEmail: 'serve@softora.nl', messageId: '<stored@example.test>' }];
+      },
+      async hydrateMessageBodies({ messages }) {
+        return messages.map((message) => ({ ...message, body: 'Exact stored sent body', hasBody: true, bodyResolved: true }));
+      },
+    },
+    fetchMessagesFromImap: () => assert.fail('Stored body must not wait for IMAP'),
+  });
+  const [body] = await service.getMessageBodies({ messages: [{
+    account: 'serve@softora.nl', folder: 'sent', messageId: '<stored@example.test>', providerMessageIdHydrationEligible: true,
+  }] });
+  assert.equal(body.resolved, true);
+  assert.equal(body.body, 'Exact stored sent body');
+  assert.equal(body.uid, 42);
+  assert.deepEqual(calls[0].accountEmails, ['serve@softora.nl']);
+  assert.deepEqual(calls[0].messageIds, ['<stored@example.test>']);
+});
+
+test('stored Message-ID lookup refuses ambiguous rows and ignores another account', async () => {
+  for (const ambiguous of [false, true]) {
+    let providerCalls = 0;
+    const row = { id: 'sent:42', uid: 42, folder: 'sent', accountEmail: ambiguous ? 'serve@softora.nl' : 'martijn@softora.nl', messageId: '<stored@example.test>' };
+    const service = createService({
+      mailboxIndexStore: {
+        listMessagesByMessageIdsForAccounts: async () => ambiguous ? [row, { ...row, uid: 43 }] : [row],
+        hydrateMessageBodies: () => assert.fail('Unproven body must not be read'),
+      },
+      fetchMessagesFromImap: async () => { providerCalls += 1; return []; },
+    });
+    const [body] = await service.getMessageBodies({ messages: [{
+      account: 'serve@softora.nl', folder: 'sent', messageId: '<stored@example.test>', providerMessageIdHydrationEligible: true,
+    }] });
+    assert.equal(body.resolved, false);
+    assert.equal(body.body, '');
+    assert.equal(providerCalls, ambiguous ? 0 : 2);
+  }
+});
+
 test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferenties', async () => {
   const service = createService();
 
@@ -350,7 +394,9 @@ test('UID-loze bewezen Sent-root hydrateert exact op Message-ID via Sent en daar
   assert.equal(calls.every((call) => call.targetedOnly === true), true);
   assert.equal(calls.every((call) => call.exactMessageIdOnly === true), true);
   assert.equal(calls.every((call) => call.limit === 2), true);
-  assert.equal(calls.every((call) => call.imapOperationTimeoutMs === 18_000), true);
+  assert.equal(calls.every((call) => call.imapOperationTimeoutMs === 65_000), true);
+  assert.equal(calls[0].deadlineAtMs, calls[1].deadlineAtMs);
+  assert.equal(calls[0].imapSession, calls[1].imapSession);
   assert.deepEqual(calls.map((call) => call.threadReferenceIds), [
     [requestedMessageId],
     [requestedMessageId],
