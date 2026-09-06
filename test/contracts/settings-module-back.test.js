@@ -19,6 +19,7 @@ test('de Extra-catalogus is de centrale route-inventory voor Instellingen-module
     '/premium-omzetwerk',
     '/premium-world-watcher',
     '/premium-flynow',
+    '/premium-wereldmap',
   ]);
   assert.equal(routes.RETURN_HREF, '/premium-instellingen#extra');
   assert.equal(routes.findByPath('/live-momentum.html')?.href, '/winnen');
@@ -26,11 +27,12 @@ test('de Extra-catalogus is de centrale route-inventory voor Instellingen-module
   assert.equal(routes.findByPath('/premium-kvk-database')?.href, '/kvk-database');
   assert.equal(routes.findByPath('/premium-world-watcher.html')?.href, '/premium-world-watcher');
   assert.equal(routes.findByPath('/premium-flynow.html')?.href, '/premium-flynow');
+  assert.equal(routes.findByPath('/premium-wereldmap.html')?.href, '/premium-wereldmap');
   assert.equal(routes.findByPath('/premium-personeel-dashboard'), null);
 
   const settings = read('premium-instellingen.html');
   const renderer = read('assets/premium-user-management.js');
-  assert.match(settings, /settings-module-routes\.js\?v=20260906a/);
+  assert.match(settings, /settings-module-routes\.js\?v=20260906b/);
   assert.match(renderer, /SoftoraSettingsModuleRoutes/);
   assert.match(renderer, /moduleRoutes\.EXTRA_MODULES\.slice\(\)/);
   assert.match(renderer, /window\.location\.hash === '#extra'/);
@@ -41,7 +43,7 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
   routes.getLinkedModules().forEach((module) => {
     module.files.forEach((file) => {
       const source = read(file);
-      const routesVersion = file === 'premium-world-watcher.html' ? '20260906a' : file === 'premium-flynow.html' ? '20260905a' : file === 'premium-kvk-database.html' ? '20260824c' : '20260818b';
+      const routesVersion = file === 'premium-wereldmap.html' ? '20260906b' : file === 'premium-world-watcher.html' ? '20260906a' : file === 'premium-flynow.html' ? '20260905a' : file === 'premium-kvk-database.html' ? '20260824c' : '20260818b';
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
       assert.match(source, /settings-module-back\.css\?v=20260818a/, file);
       assert.match(source, new RegExp(`settings-module-routes\\.js\\?v=${routesVersion}`), file);

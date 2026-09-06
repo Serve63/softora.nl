@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="nl" data-personnel-loading="true" data-theme-mode="light" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Servé's wereldmap — Softora</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2?v=20260409a" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
+  <link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=20260611a">
+  <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/serve-worldmap.css?v=20260906a">
+  <script src="/assets/premium-sidebar-links.js?v=20260818a" defer></script>
+  <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
+  <script src="/assets/premium-sidebar-autopilot.js?v=20260611a" defer></script>
+</head>
+<body data-serve-worldmap>
+  <div class="dashboard-layout wm-layout" data-sidebar-shell="canonical">
+    <aside class="sidebar" id="wm-sidebar" aria-label="Premium navigatie"></aside>
+    <main class="main-content wm-main">
+      <button class="wm-shade" id="wm-shade" type="button" aria-label="Sluit navigatie" hidden></button>
+      <header class="wm-header">
+        <button class="wm-menu" id="wm-menu" type="button" aria-label="Open navigatie" aria-controls="wm-sidebar" aria-expanded="false">☰</button>
+        <div><p class="wm-eyebrow">Jouw wereld, land voor land</p><h1>Servé's wereldmap<span>.</span></h1><p class="wm-intro">Verzamel herinneringen. Ontgrendel de wereld.</p></div>
+        <span data-settings-module-back-host></span>
+      </header>
+      <section class="wm-stats" aria-label="Jouw reisvoortgang">
+        <div><span>Ontgrendeld</span><strong id="wm-count">—</strong><small id="wm-total">landen &amp; gebieden</small></div>
+        <div><span>Wereld ontdekt</span><strong id="wm-percent">—</strong><progress id="wm-progress" max="100" value="0" aria-label="Percentage landen en gebieden bezocht"></progress></div>
+        <div><span>Werelddelen bezocht</span><strong id="wm-continents">—</strong><small>Elke reis maakt je wereld groter.</small></div>
+      </section>
+      <div class="wm-status-row"><span id="wm-save-status" role="status" aria-live="polite">Je wereldmap laden…</span><button id="wm-retry" type="button" hidden>Opnieuw proberen</button></div>
+      <div class="wm-workspace">
+        <section class="wm-map-card" aria-labelledby="wm-map-title">
+          <div class="wm-card-heading"><div><span class="wm-eyebrow">Een wereld aan mogelijkheden</span><h2 id="wm-map-title">Hier begint jouw volgende verhaal.</h2></div><button type="button" id="wm-reset" aria-label="Hele wereldkaart tonen">Hele wereld ↗</button></div>
+          <div class="wm-viewport" id="wm-viewport" tabindex="0" aria-label="Wereldkaart. Sleep of gebruik pijltjestoetsen om te verplaatsen, plus en min om te zoomen. Landen zijn ook te kiezen in de lijst.">
+            <svg id="wm-map" viewBox="0 0 1200 500" role="group" aria-label="Selecteer een land op de wereldkaart"><defs><pattern id="wm-grid" width="100" height="83.33" patternUnits="userSpaceOnUse"><path d="M100 0H0V83.33" fill="none" stroke="#dce5e0" stroke-width=".6"/></pattern></defs><rect x="-1200" y="-500" width="3600" height="1500" fill="url(#wm-grid)"/><g id="wm-countries"></g><g id="wm-small-countries"></g></svg>
+            <p id="wm-map-message" class="wm-map-message">Wereldkaart laden…</p>
+            <div class="wm-map-controls" role="group" aria-label="Kaartbediening"><button type="button" id="wm-zoom-in" aria-label="Inzoomen">+</button><button type="button" id="wm-zoom-out" aria-label="Uitzoomen">−</button></div>
+            <span class="wm-map-hint">Sleep om te ontdekken · Klik op een land</span>
+          </div>
+          <div class="wm-legend"><span><i class="wm-dot wm-dot-visited"></i>Ontgrendeld</span><span><i class="wm-dot"></i>Nog te ontdekken</span><span class="wm-legend-tip">Jij bepaalt waar je bent geweest.</span></div>
+          <div class="wm-selection" id="wm-selection" aria-labelledby="wm-country-name">
+            <span class="wm-flag" id="wm-country-flag" aria-hidden="true">◎</span><div class="wm-selection-copy"><span class="wm-eyebrow" id="wm-country-region">Jouw volgende herinnering</span><h2 id="wm-country-name">De wereld ligt open.</h2><p id="wm-country-status">Kies een land op de kaart of zoek het hiernaast.</p></div><button type="button" id="wm-unlock" class="wm-unlock" disabled>Selecteer een land</button>
+          </div>
+        </section>
+        <section class="wm-country-panel" aria-labelledby="wm-list-title">
+          <div class="wm-list-heading"><h2 id="wm-list-title">Jouw bestemmingen</h2><span id="wm-list-count">—</span></div>
+          <label class="wm-search"><span aria-hidden="true">⌕</span><input type="search" id="wm-search" placeholder="Zoek een land…" aria-label="Zoek een land" autocomplete="off"></label>
+          <div class="wm-filters" role="group" aria-label="Filter landen"><button type="button" data-wm-filter="all" aria-pressed="true">Alle</button><button type="button" data-wm-filter="visited" aria-pressed="false">Ontgrendeld</button><button type="button" data-wm-filter="locked" aria-pressed="false">Te ontdekken</button></div>
+          <div id="wm-list" class="wm-list" aria-label="Landen en gebieden"><p class="wm-empty">Landen laden…</p></div>
+          <p class="wm-panel-note">Al ergens geweest? Selecteer het land en ontgrendel het. Jouw kaart groeit met je mee.</p>
+        </section>
+      </div>
+      <footer class="wm-footer"><span>Elke groene plek is een verhaal van jou.</span><a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener noreferrer">Kaart: Natural Earth ↗</a></footer>
+      <noscript><p>Zet JavaScript aan om je wereldmap te bekijken en landen te ontgrendelen.</p></noscript>
+    </main>
+  </div>
+  <script src="/assets/settings-module-routes.js?v=20260906b" defer></script>
+  <script src="/assets/settings-module-back.js?v=20260814b" defer></script>
+  <script src="/assets/premium-ui-state-client.js?v=20260805a" defer></script>
+  <script src="/assets/serve-worldmap.js?v=20260906a" defer></script>
+</body>
+</html>

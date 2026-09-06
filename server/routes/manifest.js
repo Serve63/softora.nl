@@ -31,6 +31,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/kvk-database', marker: 'Bedrijven Scraper', allowLoginFallback: true },
   { path: '/kvk-database-bedrijven', marker: 'Alle gevonden bedrijven', allowLoginFallback: true },
   { path: '/premium-world-watcher', marker: 'World Watcher', allowLoginFallback: true },
+  { path: '/premium-wereldmap', marker: "Servé's wereldmap", allowLoginFallback: true },
   { path: '/lead-radar', marker: 'Lead Radar', allowLoginFallback: true },
 ]);
 
