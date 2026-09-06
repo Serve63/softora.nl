@@ -96,10 +96,10 @@
     return `${number > 0 ? '+' : ''}${formatNumber(number)}`;
   }
 
-  function signedPercent(value) {
+  function signedPercentagePoints(value) {
     const number = Number(value || 0);
-    if (!Number.isFinite(number) || number === 0) return '0,0%';
-    return `${number > 0 ? '+' : ''}${formatPercent(number)}`;
+    if (!Number.isFinite(number) || number === 0) return '0,0 pp';
+    return `${number > 0 ? '+' : ''}${decimalFormatter.format(number * 100)} pp`;
   }
 
   function setMetric(key, value, subtext, trend = '') {
@@ -141,7 +141,7 @@
 
     setMetric('clicks', formatNumber(current.clicks), `${signed(clicksDelta)} vs vorige periode`, clicksDelta > 0 ? 'up' : clicksDelta < 0 ? 'down' : '');
     setMetric('impressions', formatNumber(current.impressions, true), `${signed(impressionsDelta)} vs vorige periode`, impressionsDelta > 0 ? 'up' : impressionsDelta < 0 ? 'down' : '');
-    setMetric('ctr', formatPercent(current.ctr), `${signedPercent(ctrDelta).replace('%', ' pp')} vs vorige periode`, ctrDelta > 0 ? 'up' : ctrDelta < 0 ? 'down' : '');
+    setMetric('ctr', formatPercent(current.ctr), `${signedPercentagePoints(ctrDelta)} vs vorige periode`, ctrDelta > 0 ? 'up' : ctrDelta < 0 ? 'down' : '');
 
     const positionCopy = Number(previous.position || 0) <= 0 && Number(current.position || 0) > 0
       ? 'Nieuwe meetperiode'

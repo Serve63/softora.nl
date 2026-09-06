@@ -1,10 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-
-const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-seo-performance.js'), 'utf8');
+const scriptPath = require.resolve('../../assets/premium-seo-performance.js');
 function element(dataset = {}) {
   const attrs = {}, classes = new Set(), listeners = {};
   return { dataset, attrs, listeners, value: '', textContent: '', innerHTML: '', hidden: false,
@@ -14,7 +10,7 @@ function element(dataset = {}) {
     fire(key) { listeners[key]?.(); },
   };
 }
-function fixture() {
+function fixture(t) {
   const elements = new Map(), requests = [];
   const groups = {
     '[data-seo-days]': [7, 28, 90].map((days) => element({ seoDays: String(days) })),
@@ -23,9 +19,16 @@ function fixture() {
   };
   const get = (selector) => { if (!elements.has(selector)) elements.set(selector, element()); return elements.get(selector); };
   const root = { ...element(), querySelector: get, querySelectorAll: (selector) => groups[selector] || [] };
-  vm.runInNewContext(source, { document: { querySelector: () => root }, Intl, URL, Date,
-    fetch: (url) => new Promise((resolve, reject) => requests.push({ url, resolve, reject })),
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  t.after(() => {
+    if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+    else delete globalThis.document;
+    delete require.cache[scriptPath];
   });
+  globalThis.document = { querySelector: () => root };
+  t.mock.method(globalThis, 'fetch', (url) => new Promise((resolve, reject) => requests.push({ url, resolve, reject })));
+  delete require.cache[scriptPath];
+  require('../../assets/premium-seo-performance.js');
   const respond = async (request, payload, ok = true) => {
     request.resolve({ ok, json: async () => payload });
     await new Promise(setImmediate);
@@ -38,12 +41,13 @@ function payload(overrides = {}) {
     totals: { current: { clicks: 0, impressions: 0, ctr: 0, position: 0 } }, rows: {}, actionQueue: [], ...overrides };
 }
 
-test('loading and failed requests never masquerade as measured zero traffic', async () => {
-  const f = fixture();
+test('loading and failed requests never masquerade as measured zero traffic', async (t) => {
+  const f = fixture(t);
   assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '—');
   assert.equal(f.root.attrs['aria-busy'], 'true');
   await f.respond(f.performance()[0], payload());
   assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '0');
+  assert.equal(f.get('[data-seo-delta="ctr"]').textContent, '0,0 pp vs vorige periode');
   f.groups['[data-seo-days]'][0].fire('click');
   assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '—');
   await f.respond(f.performance()[1], { error: 'Unavailable' }, false);
@@ -53,8 +57,8 @@ test('loading and failed requests never masquerade as measured zero traffic', as
   assert.doesNotMatch(f.get('[data-seo-actions]').innerHTML, /Geen directe rode vlaggen/);
 });
 
-test('the latest selected period wins when requests finish in reverse order', async () => {
-  const f = fixture();
+test('the latest selected period wins when requests finish in reverse order', async (t) => {
+  const f = fixture(t);
   assert.match(f.performance()[0].url, /days=28$/);
   f.groups['[data-seo-days]'][2].fire('click');
   f.groups['[data-seo-days]'][0].fire('click');
@@ -68,8 +72,8 @@ test('the latest selected period wins when requests finish in reverse order', as
   assert.equal(f.root.attrs['aria-busy'], 'false');
 });
 
-test('the chart covers the complete period and its axis follows the selected metric', async () => {
-  const f = fixture();
+test('the chart covers the complete period and its axis follows the selected metric', async (t) => {
+  const f = fixture(t);
   const dates = Array.from({ length: 90 }, (_, index) => ({ label: new Date(Date.UTC(2026, 5, 8 + index)).toISOString().slice(0, 10), clicks: 4, impressions: 400 }));
   await f.respond(f.performance()[0], payload({ rows: { dates } }));
   const points = f.get('[data-seo-chart]').innerHTML.match(/points="([^"]+)"/)[1];
@@ -83,8 +87,8 @@ test('the chart covers the complete period and its axis follows the selected met
   assert.equal(f.get('[data-seo-chart-caption]').textContent, 'Vertoningen per dag');
 });
 
-test('table pagination, search and sorting retain every returned row without unsafe markup', async () => {
-  const f = fixture();
+test('table pagination, search and sorting retain every returned row without unsafe markup', async (t) => {
+  const f = fixture(t);
   const queries = Array.from({ length: 25 }, (_, index) => ({ label: `term ${String(index).padStart(2, '0')}`, clicks: index, impressions: 25 - index, position: index === 0 ? 0 : index }));
   queries[24].label = 'A < B & C';
   await f.respond(f.performance()[0], payload({ rows: { queries } }));
@@ -103,8 +107,8 @@ test('table pagination, search and sorting retain every returned row without uns
   assert.doesNotMatch(f.get('[data-seo-table-body]').innerHTML, /term 00/);
 });
 
-test('more priorities remain available and page links only open Softora URLs', async () => {
-  const f = fixture();
+test('more priorities remain available and page links only open Softora URLs', async (t) => {
+  const f = fixture(t);
   await f.respond(f.performance()[0], payload({ actionQueue: Array.from({ length: 7 }, (_, i) => ({ priority: 'hoog', action: `Actie ${i}` })), rows: { pages: [{ label: 'https://www.softora.nl/blog/kosten', clicks: 2 }, { label: 'https://example.org/', clicks: 1 }] } }));
   assert.equal(f.get('[data-seo-action-count]').textContent, '7');
   assert.match(f.get('[data-seo-actions]').innerHTML, /<details[^>]*><summary>Meer prioriteiten \(4\)/);
@@ -112,4 +116,14 @@ test('more priorities remain available and page links only open Softora URLs', a
   f.groups['[data-seo-table-tab]'][1].fire('click');
   assert.match(f.get('[data-seo-table-body]').innerHTML, /href="https:\/\/www\.softora\.nl\/blog\/kosten"/);
   assert.doesNotMatch(f.get('[data-seo-table-body]').innerHTML, /href="https:\/\/example\.org/);
+});
+
+test('CTR changes keep their sign and percentage-point unit', async (t) => {
+  const f = fixture(t);
+  await f.respond(f.performance()[0], payload({ totals: { current: { ctr: 0.014 }, ctrDelta: 0.004 } }));
+  assert.equal(f.get('[data-seo-metric="ctr"]').textContent, '1,4%');
+  assert.equal(f.get('[data-seo-delta="ctr"]').textContent, '+0,4 pp vs vorige periode');
+  f.groups['[data-seo-days]'][0].fire('click');
+  await f.respond(f.performance()[1], payload({ totals: { current: { ctr: 0.008 }, ctrDelta: -0.002 } }));
+  assert.equal(f.get('[data-seo-delta="ctr"]').textContent, '-0,2 pp vs vorige periode');
 });
