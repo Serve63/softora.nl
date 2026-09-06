@@ -8,14 +8,15 @@ const endGameCardFiles = [
   '2030.png', '2035.png', 'alle-formaten-scheermesjes.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
   'de-driehoek-aanspreken.png', 'dertig-dagen-streak.png',
   'eigen-automaat-rijden.png', 'eigen-boot.png', 'eigen-cinema.png', 'eigen-kantoor.png',
-  'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
+  'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fb-ads-getest-microplasticsvrij-codex.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
   'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png', 'gezondheidscenter.png',
   'haartransplantatie.png', 'huis-miljoen-plus.png', 'israel-bezoeken.png',
   'jaarlijkse-instagram-post.png', 'jurisalem-af.png', 'kantoor-a-af.png', 'kantoor-b-af.png', 'kantoorpand-in-haaren.png', 'ketting-armband.png',
-  'leuke-vriendin.png', 'lijpe-instagram-feed.png', 'maatpak.png', 'nieuwe-fiets.png', 'nieuwe-whoop.png', 'oktober-2024.png',
+  'leuke-vriendin.png', 'lijpe-instagram-feed.png', 'lopende-sponserdominatie-post.png', 'maatpak.png', 'nieuwe-fiets.png', 'nieuwe-whoop.png', 'oktober-2024.png',
   'persoonlijke-handtekening.png', 'professionele-fotoshoot.png', 'prp-behandeling.png',
   'range-rover-sport.png', 'rolex-datejust.png', 'ruben-zet-toto.png', 'rubens-company.png',
-  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'sertraline-vrij.png', 'serves-gezondheidsdossier.png', 'silence-controle.png', 'softora-apple-kwaliteit-software.png', 'sponsorbord-nemelaer.png',
+  'rubens-trading-system.png', 'rubens-vakantieradar.png', 'sertraline-vrij.png', 'serves-gezondheidsdossier.png', 'silence-controle.png', 'softora-apple-kwaliteit-software.png',
+  'sponserdominatie-haarensklokje.png', 'sponserdominatie-ltv-haaren.png', 'sponserdominatie-nemelaer.png', 'sponsorbord-nemelaer.png',
   'tanden-rechtzetten.png', 'tandenbleek-voorraad.png', 'transfermarkt.png',
   'vakantiehuis-kopen.png', 'vijf-kilo-spiermassa.png', 'vip-box-psv.png', 'vip-box-willem-2.png',
   'vitalora-draaiend.png', 'wereldkaart-bezochte-landen.png', 'world-watcher.png'
@@ -52,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260906a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260906b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -1105,7 +1106,7 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
 
 test('sponserdominatie cards migrate once without changing existing progress', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
-  const expected = [['sponserdominatie-nemelaer', 'Sponserdominatie Nemelaer', 'sponsorbord-nemelaer'], ['sponserdominatie-ltv-haaren', 'Sponserdominatie LTV Haaren', 'sponsorbord-nemelaer'], ['sponserdominatie-haarensklokje', 'Sponserdominatie Haarensklokje', 'sponsorbord-nemelaer'], ['lopende-sponserdominatie-post', 'Lopende Sponserdominatie Post', 'jaarlijkse-instagram-post'], ['fb-ads-getest-microplasticsvrij-codex', 'FB ads getest op Microplasticsvrij.nl via CODEX', 'softora-apple-kwaliteit-software']];
+  const expected = [['sponserdominatie-nemelaer', 'Sponserdominatie Nemelaer', 'sponserdominatie-nemelaer'], ['sponserdominatie-ltv-haaren', 'Sponserdominatie LTV Haaren', 'sponserdominatie-ltv-haaren'], ['sponserdominatie-haarensklokje', 'Sponserdominatie Haarensklokje', 'sponserdominatie-haarensklokje'], ['lopende-sponserdominatie-post', 'Lopende Sponserdominatie Post', 'lopende-sponserdominatie-post'], ['fb-ads-getest-microplasticsvrij-codex', 'FB ads getest op Microplasticsvrij.nl via CODEX', 'fb-ads-getest-microplasticsvrij-codex']];
   const ids = expected.map(([id]) => id);
   const oldOrder = api.CARD_CATALOG.filter(card => !ids.includes(card.id)).map(card => card.id);
   const state = api.normalizeState({ loondienst: { completed: true, deleted: false }, __order: oldOrder });
@@ -1121,4 +1122,11 @@ test('sponserdominatie cards migrate once without changing existing progress', (
   state[ids[0]] = { completed: true, deleted: false };
   state[ids[1]] = { completed: false, deleted: true };
   assert.deepEqual(api.normalizeState(state), state);
+});
+
+test('the five new missions each have a distinct generated photo', () => {
+  const ids = ['sponserdominatie-nemelaer', 'sponserdominatie-ltv-haaren', 'sponserdominatie-haarensklokje', 'lopende-sponserdominatie-post', 'fb-ads-getest-microplasticsvrij-codex'];
+  const crypto = require('node:crypto');
+  const hashes = ids.map(id => crypto.createHash('sha256').update(fs.readFileSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards', id + '.png'))).digest('hex'));
+  assert.equal(new Set(hashes).size, 5);
 });
