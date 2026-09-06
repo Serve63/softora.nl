@@ -78,7 +78,7 @@
     "@img/sharp-linux-x64": "^0.35.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.4",
+    "@electric-sql/pglite": "0.5.8",
     "pg": "8.23.0",
     "pgsql-parser": "18.2.6"
   }
