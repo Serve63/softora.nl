@@ -52,7 +52,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260903a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260906a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -940,7 +940,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   }]);
   assert.equal(missionNumber, 68);
   assert.equal(cardIndex, firstStreakIndex - 1);
-  assert.equal(firstStreakIndex, checkpointIndex - 8);
+  assert.equal(firstStreakIndex, checkpointIndex - 13);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'funnel-sites-live')
@@ -978,7 +978,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
   const funnelSitesIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
   const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
 
-  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 2), expected);
+  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 7), expected);
   assert.deepEqual(expected.map((card) => (
     catalog.slice(0, catalog.findIndex((item) => item.id === card.id) + 1)
       .filter((item) => !['origin', 'checkpoint', 'destination'].includes(item.type))
@@ -1027,7 +1027,7 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
     imageId: 'bestaanszekerheid-bedrijf'
   }]);
   assert.equal(missionNumber, 75);
-  assert.equal(cardIndex, checkpointIndex - 2);
+  assert.equal(cardIndex, checkpointIndex - 7);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'loondienst')
@@ -1073,7 +1073,7 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
     title: 'De Driehoek aanspreken'
   }]);
   assert.equal(missionNumber, 76);
-  assert.equal(cardIndex, checkpointIndex - 1);
+  assert.equal(cardIndex, checkpointIndex - 6);
   assert.equal(
     fs.existsSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards/de-driehoek-aanspreken.png')),
     true
@@ -1101,4 +1101,24 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
   })));
   assert.deepEqual(completedReload['de-driehoek-aanspreken'], { completed: true, deleted: false });
   assert.deepEqual(completedReload.loondienst, migrated.loondienst);
+});
+
+test('sponserdominatie cards migrate once without changing existing progress', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const expected = [['sponserdominatie-nemelaer', 'Sponserdominatie Nemelaer', 'sponsorbord-nemelaer'], ['sponserdominatie-ltv-haaren', 'Sponserdominatie LTV Haaren', 'sponsorbord-nemelaer'], ['sponserdominatie-haarensklokje', 'Sponserdominatie Haarensklokje', 'sponsorbord-nemelaer'], ['lopende-sponserdominatie-post', 'Lopende Sponserdominatie Post', 'jaarlijkse-instagram-post'], ['fb-ads-getest-microplasticsvrij-codex', 'FB ads getest op Microplasticsvrij.nl via CODEX', 'softora-apple-kwaliteit-software']];
+  const ids = expected.map(([id]) => id);
+  const oldOrder = api.CARD_CATALOG.filter(card => !ids.includes(card.id)).map(card => card.id);
+  const state = api.normalizeState({ loondienst: { completed: true, deleted: false }, __order: oldOrder });
+  for (const [id, title, imageId] of expected) {
+    assert.deepEqual(api.CARD_CATALOG.filter(card => card.id === id), [{ id, title, imageId }]);
+    assert.equal(fs.existsSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards', imageId + '.png')), true);
+    assert.deepEqual(state[id], { completed: false, deleted: false });
+    assert.equal(state.__order.filter(value => value === id).length, 1);
+    assert.ok(state.__order.indexOf(id) < state.__order.indexOf('checkpoint-2028'));
+  }
+  assert.deepEqual(state.loondienst, { completed: true, deleted: false });
+  assert.deepEqual(api.normalizeState(state), state);
+  state[ids[0]] = { completed: true, deleted: false };
+  state[ids[1]] = { completed: false, deleted: true };
+  assert.deepEqual(api.normalizeState(state), state);
 });
