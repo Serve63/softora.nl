@@ -2,13 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const { parseDocument } = require('htmlparser2');
 const { createPublicContactService } = require('../../server/services/public-contact');
+const { initWebsiteSalespage } = require('../../assets/website-salespage');
 
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'website.html'), 'utf8');
-const script = fs.readFileSync(path.join(root, 'assets/website-salespage.js'), 'utf8');
 
 function nodes(node, result = []) {
   if (node.attribs) result.push(node);
@@ -59,12 +58,13 @@ function setup({ fetchImpl, valid = true, fields = {} } = {}) {
   const calls = [];
   let timeoutCallback;
   let cleared = false;
-  vm.runInNewContext(script, {
+  initWebsiteSalespage({
     document: {
       getElementById: (id) => id === 'website-intake' ? form : null,
       querySelector: (selector) => selector === '[data-intake-success]' ? success : null,
     },
-    window: { setTimeout(callback, ms) { assert.equal(ms, 15000); timeoutCallback = callback; return 1; }, clearTimeout() { cleared = true; } },
+    setTimeout(callback, ms) { assert.equal(ms, 15000); timeoutCallback = callback; return 1; },
+    clearTimeout() { cleared = true; },
     AbortController,
     fetch: async (url, options) => {
       calls.push({ url, ...options });

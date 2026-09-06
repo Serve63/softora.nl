@@ -1,5 +1,15 @@
-(function () {
+(function (initialize) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = { initWebsiteSalespage: initialize };
+  } else if (typeof window === 'object' && window.document) {
+    initialize(window);
+  }
+})(function (window) {
   'use strict';
+  var document = window.document;
+  var fetch = window.fetch.bind(window);
+  var AbortController = window.AbortController;
+  var IntersectionObserver = window.IntersectionObserver;
   var form = document.getElementById('website-intake');
   if (!form) return;
   var button = form.querySelector('[data-intake-submit]');
@@ -91,4 +101,4 @@
     observer.observe(contactSection);
     form.addEventListener('focusin', function () { mobileContact.classList.add('is-hidden'); });
   }
-})();
+});
