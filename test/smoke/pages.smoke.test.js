@@ -48,7 +48,7 @@ const unlockedPublicSeoPaths = [
   '/over-softora',
 ];
 
-const unbuiltHomepageServicePaths = ['/website', '/voicesoftware', '/chatbot'];
+const unbuiltHomepageServicePaths = ['/voicesoftware', '/chatbot'];
 
 for (const pathName of unbuiltHomepageServicePaths) {
   test(`page smoke: ${pathName} blijft een losse, nog ongebouwde pagina`, async () => {
@@ -88,6 +88,34 @@ test('page smoke: / serves the real SEO homepage with a clean canonical', async 
   assert.match(html, /Websites die overtuigen/, 'Homepage-marker ontbreekt op /.');
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/">/);
   assert.doesNotMatch(html, /url=\/premium-website|window\.location\.replace\('\/premium-website'\)/);
+});
+
+test('page smoke: /website is an independent public sales page and preserves the SEO route', async () => {
+  const [pageResponse, seoResponse, sitemapResponse] = await Promise.all([
+    fetch(`${serverRef.baseUrl}/website`, { redirect: 'manual' }),
+    fetch(`${serverRef.baseUrl}/website-laten-maken`, { redirect: 'manual' }),
+    fetch(`${serverRef.baseUrl}/sitemap.xml`),
+  ]);
+  const html = await pageResponse.text();
+  const seoHtml = await seoResponse.text();
+  const sitemap = await sitemapResponse.text();
+  assert.equal(pageResponse.status, 200);
+  assert.equal(pageResponse.headers.get('location'), null);
+  assert.equal(pageResponse.headers.get('x-robots-tag'), 'noindex, nofollow');
+  assert.match(html, /Je volgende klant<br>begint bij<br><em>je website\.<\/em>/);
+  assert.match(html, /id="website-intake"/);
+  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(html, /data-public-lock|premium-public-lock|rel="canonical"/);
+  assert.equal(seoResponse.status, 200);
+  assert.match(seoHtml, /rel="canonical"[^>]+\/website-laten-maken/);
+  assert.doesNotMatch(seoHtml, /id="website-intake"/);
+  assert.doesNotMatch(sitemap, /<loc>[^<]+\/website<\/loc>/);
+  assert.match(sitemap, /<loc>[^<]+\/website-laten-maken<\/loc>/);
+  for (const assetPath of ['/assets/website-salespage.css', '/assets/website-salespage.js']) {
+    const response = await fetch(`${serverRef.baseUrl}${assetPath}`);
+    assert.equal(response.status, 200, assetPath);
+    assert.ok((await response.text()).length > 100, assetPath);
+  }
 });
 
 test('page smoke: /bedrijfssoftware is de publieke noindex overtuigingspagina', async () => {
