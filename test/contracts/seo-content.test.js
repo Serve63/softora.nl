@@ -1100,8 +1100,9 @@ test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht',
   });
 
   assert.equal(item.qualityVersion, 2);
-  assert.equal(item.updatedAt, '2026-08-15');
-  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.updatedAt, '2026-09-06');
+  assert.equal(item.growthEventKind, 'other_growth_action');
+  assert.equal(item.title, 'Conversiegerichte website: 5 controlepunten');
   assert.equal(item.targetMoneyPage, '/website-laten-maken');
   assert.ok(item.informationGain.includes('vijfdelige routekaart'));
   assert.ok(item.informationGain.includes('leklogboek'));
@@ -1112,8 +1113,9 @@ test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht',
   assert.ok(fs.statSync(imagePath).size < 300 * 1024);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-conversiegerichte-website">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
-  assert.match(html, /"dateModified":"2026-08-15"/);
+  assert.match(html, /"dateModified":"2026-09-06"/);
   assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /De 5 controlepunten in één minuut/);
   assert.match(html, /Leg per route vijf bewijspunten vast/);
   assert.match(html, /Een mooie bedankpagina zonder aantoonbare ontvangst is geen voltooide conversie/);
   assert.match(html, /href="\/website-laten-maken">website laten maken<\/a>/);
@@ -1124,6 +1126,12 @@ test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht',
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 0);
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+
+  const support = getSeoContentItem('blog', 'website-laten-maken-mkb-paginas', {
+    now: new Date('2026-09-06T12:00:00.000Z'),
+  });
+  const supportHtml = buildSeoContentArticleHtml(support, { siteOrigin: 'https://www.softora.nl' });
+  assert.match(supportHtml, /href="\/kennisbank\/wat-is-een-conversiegerichte-website">vijf controlepunten van een conversiegerichte website<\/a>/);
 });
 
 test('chatbot-vs-livechat gebruikt quality v2 als unieke beslispagina', () => {

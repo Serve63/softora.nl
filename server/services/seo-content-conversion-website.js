@@ -1,9 +1,9 @@
 const CONVERSION_WEBSITE_CONTENT_ITEM = Object.freeze({
   collection: 'kennisbank',
   slug: 'wat-is-een-conversiegerichte-website',
-  title: 'Wat is een conversiegerichte website?',
+  title: 'Conversiegerichte website: 5 controlepunten',
   description:
-    'Beoordeel een conversiegerichte website als complete route: van herkenbare vraag en bewijs tot bruikbare CTA, bevestigde overdracht en meetbare opvolging.',
+    'Een conversiegerichte website werkt pas als vraag, belofte, bewijs, CTA en overdracht kloppen. Controleer de vijf stappen vóór ontwerp of reparatie.',
   category: 'Websites',
   intent: 'Uitleg',
   qualityVersion: 2,
@@ -33,10 +33,10 @@ const CONVERSION_WEBSITE_CONTENT_ITEM = Object.freeze({
       observedAt: '2026-08-15',
     }),
   ]),
-  growthEventKind: 'substantial_refresh',
-  growthEventAt: '2026-08-15',
+  growthEventKind: 'other_growth_action',
+  growthEventAt: '2026-09-06',
   publishedAt: '2026-05-20',
-  updatedAt: '2026-08-15',
+  updatedAt: '2026-09-06',
   image: Object.freeze({
     src: '/assets/seo-content/conversiegerichte-website-bewijsroute-softora.jpg',
     alt: 'Fysieke route met vijf stappen van bezoekersvraag en bewijs naar actie en bevestigde menselijke overdracht.',
@@ -45,10 +45,10 @@ const CONVERSION_WEBSITE_CONTENT_ITEM = Object.freeze({
     sourceType: 'trainedAlgorithmicMedia',
   }),
   summary:
-    'Een conversiegerichte website is geen verzameling opvallende knoppen. Zij helpt een specifieke bezoeker van een herkenbare vraag via geloofwaardig bewijs naar een passende actie, bevestigt dat die actie technisch is gelukt en maakt duidelijk wie de opvolging overneemt.',
+    'Een conversiegerichte website laat vijf controlepunten samenwerken: bezoekersvraag, belofte, bewijs, passende actie en bevestigde overdracht.',
   sections: Object.freeze([
     Object.freeze({
-      heading: 'Het korte antwoord: test de hele route',
+      heading: 'De 5 controlepunten in één minuut',
       paragraphs: Object.freeze([
         Object.freeze({
           text: 'Een pagina is pas conversiegericht wanneer de volledige route klopt: de bezoeker herkent de eigen vraag, begrijpt de belofte, kan het bewijs beoordelen, ziet een passende volgende stap en krijgt na die stap een eerlijke bevestiging. Bij een website laten maken hoort die route vooraf in de scope te staan. Alleen een andere kleur knop of een korter formulier repareert geen onduidelijke belofte of mislukte overdracht.',

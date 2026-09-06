@@ -162,8 +162,8 @@ test('content growth actions have an explicit machine-readable event plan', () =
       ],
       [
         '/kennisbank/wat-is-een-conversiegerichte-website',
-        '2026-08-15',
-        'substantial_refresh',
+        '2026-09-06',
+        'other_growth_action',
         'scheduled',
       ],
       [
