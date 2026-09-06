@@ -5,12 +5,19 @@
   const performanceEndpoint = '/api/seo/search-console-performance';
   const auditEndpoint = '/api/seo/site-audit';
   const state = {
-    days: 90,
+    days: 28,
+    chartMetric: 'clicks',
+    page: 0,
+    sort: 'clicks',
+    loading: true,
     activeTab: 'queries',
     payload: null,
     audit: null,
     search: '',
   };
+
+  const pageSize = 8;
+  let performanceRequest = 0;
 
   const tableLabels = {
     queries: 'Zoekwoord',
@@ -89,10 +96,10 @@
     return `${number > 0 ? '+' : ''}${formatNumber(number)}`;
   }
 
-  function signedPercent(value) {
+  function signedPercentagePoints(value) {
     const number = Number(value || 0);
-    if (!Number.isFinite(number) || number === 0) return '0,0%';
-    return `${number > 0 ? '+' : ''}${formatPercent(number)}`;
+    if (!Number.isFinite(number) || number === 0) return '0,0 pp';
+    return `${number > 0 ? '+' : ''}${decimalFormatter.format(number * 100)} pp`;
   }
 
   function setMetric(key, value, subtext, trend = '') {
@@ -118,6 +125,12 @@
   }
 
   function renderMetrics(payload) {
+    if (!payload?.connected || payload.status === 'error' || payload.ok === false) {
+      ['clicks', 'impressions', 'ctr', 'position'].forEach((key) => {
+        setMetric(key, '—', state.loading ? 'Wordt geladen' : 'Niet beschikbaar');
+      });
+      return;
+    }
     const totals = payload?.totals || {};
     const current = totals.current || {};
     const previous = totals.previous || {};
@@ -128,7 +141,7 @@
 
     setMetric('clicks', formatNumber(current.clicks), `${signed(clicksDelta)} vs vorige periode`, clicksDelta > 0 ? 'up' : clicksDelta < 0 ? 'down' : '');
     setMetric('impressions', formatNumber(current.impressions, true), `${signed(impressionsDelta)} vs vorige periode`, impressionsDelta > 0 ? 'up' : impressionsDelta < 0 ? 'down' : '');
-    setMetric('ctr', formatPercent(current.ctr), `${signedPercent(ctrDelta)} vs vorige periode`, ctrDelta > 0 ? 'up' : ctrDelta < 0 ? 'down' : '');
+    setMetric('ctr', formatPercent(current.ctr), `${signedPercentagePoints(ctrDelta)} vs vorige periode`, ctrDelta > 0 ? 'up' : ctrDelta < 0 ? 'down' : '');
 
     const positionCopy = Number(previous.position || 0) <= 0 && Number(current.position || 0) > 0
       ? 'Nieuwe meetperiode'
@@ -160,47 +173,30 @@
     const axis = get('[data-seo-y-axis]');
     const label = get('[data-seo-date-label]');
     const rows = Array.isArray(payload?.rows?.dates) ? payload.rows.dates : [];
-    const visibleRows = rows.slice(-30);
-
-    if (axis) {
-      const maxImpressions = Math.max(...visibleRows.map((row) => Number(row.impressions || 0)), 0);
-      axis.innerHTML = [1, 0.66, 0.33, 0]
-        .map((factor) => `<span class="chart-y-label">${formatNumber(maxImpressions * factor, true)}</span>`)
-        .join('');
-    }
-
+    const key = state.chartMetric;
+    const metricName = key === 'clicks' ? 'Klikken' : 'Vertoningen';
+    const caption = get('[data-seo-chart-caption]');
+    if (caption) caption.textContent = `${metricName} per dag`;
     if (!chart) return;
-    if (visibleRows.length === 0) {
-      chart.innerHTML = [
-        '<div class="grid-line" style="top:0%"></div>',
-        '<div class="grid-line" style="top:33%"></div>',
-        '<div class="grid-line" style="top:66%"></div>',
-        '<div class="grid-line" style="top:99%"></div>',
-      ].join('');
-      if (label) label.textContent = 'Nog geen dagdata beschikbaar';
+    if (rows.length === 0) {
+      if (axis) axis.innerHTML = '';
+      chart.innerHTML = `<div class="seo-chart-empty">${state.loading ? 'Grafiek wordt geladen' : 'Geen dagdata beschikbaar'}</div>`;
+      if (label) label.textContent = state.loading ? 'Geselecteerde periode wordt geladen' : 'Nog geen dagdata beschikbaar';
       return;
     }
-
-    const padding = { left: 24, top: 12 };
-    const width = 336;
-    const height = 118;
-    const clicks = pointSeries(visibleRows, 'clicks', width, height, padding);
-    const impressions = pointSeries(visibleRows, 'impressions', width, height, padding);
-    const first = formatDate(visibleRows[0].label);
-    const last = formatDate(visibleRows[visibleRows.length - 1].label);
-
+    const maximum = Math.max(...rows.map((row) => Number(row[key] || 0)), 1);
+    if (axis) axis.innerHTML = [1, 0.66, 0.33, 0].map((factor) => `<span class="chart-y-label">${formatNumber(maximum * factor, true)}</span>`).join('');
+    const points = pointSeries(rows, key, 594, 166, { left: 3, top: 2 });
+    const [lastX, lastY] = points.split(' ').pop().split(',');
     chart.innerHTML = `
-      <svg class="seo-performance-chart" viewBox="0 0 380 150" role="img" aria-label="Search Console klikken en vertoningen per dag">
-        <g class="seo-performance-chart__grid">
-          <line x1="24" y1="12" x2="360" y2="12"></line>
-          <line x1="24" y1="51" x2="360" y2="51"></line>
-          <line x1="24" y1="91" x2="360" y2="91"></line>
-          <line x1="24" y1="130" x2="360" y2="130"></line>
-        </g>
-        <polyline class="seo-performance-chart__line seo-performance-chart__line--impressions" points="${impressions}"></polyline>
-        <polyline class="seo-performance-chart__line seo-performance-chart__line--clicks" points="${clicks}"></polyline>
+      <svg class="seo-performance-chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" aria-label="Search Console ${metricName.toLowerCase()} per dag">
+        <g class="seo-performance-chart__grid"><line x1="0" y1="2" x2="600" y2="2"></line><line x1="0" y1="57" x2="600" y2="57"></line><line x1="0" y1="112" x2="600" y2="112"></line><line x1="0" y1="168" x2="600" y2="168"></line></g>
+        <polyline class="seo-performance-chart__line seo-performance-chart__line--${key}" points="${points}"></polyline>
+        <circle class="seo-performance-chart__line seo-performance-chart__line--${key}" cx="${lastX}" cy="${lastY}" r="2.5"></circle>
       </svg>`;
-    if (label) label.textContent = first === last ? first : `${first} - ${last}`;
+    const first = formatDate(rows[0].label);
+    const last = formatDate(rows[rows.length - 1].label);
+    if (label) label.textContent = first === last ? first : `${first} – ${last}`;
   }
 
   function renderOpportunities(payload) {
@@ -241,18 +237,19 @@
       ? state.audit.improvements.map((action) => ({ priority: 'middel', action }))
       : [];
     const actions = [...gscActions, ...auditActions]
-      .filter((item, index, list) => item?.action && list.findIndex((candidate) => candidate.action === item.action) === index)
-      .slice(0, 5);
-    if (count) count.textContent = String(actions.length);
+      .filter((item, index, list) => item?.action && list.findIndex((candidate) => candidate.action === item.action) === index);
+    if (count) count.textContent = actions.length ? String(actions.length) : '—';
     if (actions.length === 0) {
-      target.innerHTML = '<p class="health-summary">Geen directe rode vlaggen. Blijf prestaties en indexatie volgen.</p>';
+      target.innerHTML = `<p class="health-summary">${state.loading ? 'Acties worden opgehaald.' : 'Geen actiegegevens beschikbaar. Bekijk de datastatus voordat je conclusies trekt.'}</p>`;
       return;
     }
-    target.innerHTML = actions.map((item) => `
+    const itemHtml = (item) => `
       <div class="action-item">
         <span class="action-priority${item.priority === 'hoog' ? '' : ' action-priority--middel'}">${escapeHtml(item.priority || 'middel')}</span>
         <p>${escapeHtml(item.action)}</p>
-      </div>`).join('');
+      </div>`;
+    target.innerHTML = actions.slice(0, 3).map(itemHtml).join('') + (actions.length > 3
+      ? `<details class="seo-more-actions"><summary>Meer prioriteiten (${actions.length - 3})</summary>${actions.slice(3).map(itemHtml).join('')}</details>` : '');
   }
 
   function renderAudit(audit) {
@@ -261,9 +258,11 @@
     const metrics = get('[data-seo-health-metrics]');
     if (!metrics) return;
     if (!audit?.ok) {
+      state.audit = null;
       if (score) score.textContent = '—';
       if (summary) summary.textContent = 'De technische pagina-audit kon nu niet worden geladen.';
       metrics.innerHTML = '';
+      renderActions();
       return;
     }
     state.audit = audit;
@@ -271,7 +270,7 @@
     if (summary) {
       const pages = Number(audit.totals?.pages || 0);
       const attention = Number(audit.totals?.pagesNeedingAttention || 0);
-      summary.textContent = `${pages} pagina's gecontroleerd · ${attention} vragen aandacht · score is gebaseerd op echte on-page checks.`;
+      summary.textContent = `${pages} pagina’s gecontroleerd. ${attention} pagina’s vragen aandacht.`;
     }
     metrics.innerHTML = (audit.metrics || []).slice(0, 5).map((metric) => `
       <div class="health-metric">
@@ -290,11 +289,30 @@
     const label = get('[data-seo-table-label]');
     const payload = state.payload || {};
     const sourceRows = Array.isArray(payload?.rows?.[state.activeTab]) ? payload.rows[state.activeTab] : [];
-    const rows = sourceRows.filter((row) => String(row.label || '').toLowerCase().includes(state.search));
+    const rows = sourceRows.filter((row) => String(row.label || '').toLowerCase().includes(state.search)).slice().sort((a, b) => {
+      const value = (row) => state.sort === 'position' ? (Number(row.position) > 0 ? Number(row.position) : Infinity) : Number(row[state.sort] || 0);
+      const difference = state.sort === 'position' ? value(a) - value(b) : value(b) - value(a);
+      return difference || Number(b.impressions || 0) - Number(a.impressions || 0) || String(a.label).localeCompare(String(b.label), 'nl');
+    });
+    state.page = Math.min(state.page, Math.max(0, Math.ceil(rows.length / pageSize) - 1));
+    const start = state.page * pageSize;
+    const count = get('[data-seo-table-count]');
+    if (count) count.textContent = state.loading ? 'Resultaten worden geladen' : rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} van ${rows.length} resultaten` : 'Geen resultaten';
+    const prev = get('[data-seo-table-prev]');
+    const next = get('[data-seo-table-next]');
+    if (prev) prev.disabled = state.loading || state.page === 0;
+    if (next) next.disabled = state.loading || start + pageSize >= rows.length;
 
     if (label) label.textContent = tableLabels[state.activeTab] || tableLabels.queries;
     if (!body || !empty) return;
 
+    if (state.loading) {
+      body.innerHTML = '';
+      empty.hidden = false;
+      if (emptyTitle) emptyTitle.textContent = 'Search Console wordt geladen';
+      if (emptySub) emptySub.textContent = 'Je resultaten worden opgehaald.';
+      return;
+    }
     if (!payload.connected) {
       body.innerHTML = '';
       empty.hidden = false;
@@ -323,23 +341,31 @@
 
     empty.hidden = true;
     body.innerHTML = rows
-      .slice(0, 25)
+      .slice(start, start + pageSize)
       .map((row) => {
         const labelText = state.activeTab === 'dates' ? formatDate(row.label) : row.label;
-        return `
-          <div class="table-row">
-            <span class="td-query" title="${escapeHtml(labelText)}">${escapeHtml(labelText)}</span>
-            <span class="td-num">${formatNumber(row.clicks)}</span>
-            <span class="td-num">${formatNumber(row.impressions)}</span>
-            <span class="td-num">${formatPercent(row.ctr)}</span>
-            <span class="td-num">${formatPosition(row.position)}</span>
-          </div>`;
+        let content = escapeHtml(labelText);
+        if (state.activeTab === 'pages') {
+          try {
+            const url = new URL(row.label, 'https://www.softora.nl');
+            if (['https://www.softora.nl', 'https://softora.nl'].includes(url.origin)) {
+              content = `<a href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url.pathname === '/' ? 'Homepage' : url.pathname)}</a>`;
+            }
+          } catch (_) { /* Keep an invalid page label as text. */ }
+        }
+        return `<tr><td title="${escapeHtml(labelText)}">${content}</td><td>${formatNumber(row.clicks)}</td><td>${formatNumber(row.impressions)}</td><td>${formatPercent(row.ctr)}</td><td>${formatPosition(row.position)}</td></tr>`;
       })
       .join('');
   }
 
   function renderPayload(payload) {
+    state.loading = false;
     state.payload = payload;
+    root.setAttribute('aria-busy', 'false');
+    const window = payload?.dateWindows?.current;
+    const period = get('[data-seo-period-label]');
+    if (period) period.textContent = window?.startDate && window?.endDate
+      ? `${formatDate(window.startDate)} – ${formatDate(window.endDate)}` : 'Periode niet beschikbaar';
     renderMetrics(payload);
     renderChart(payload);
     renderOpportunities(payload);
@@ -358,7 +384,7 @@
     const time = generatedAt && Number.isFinite(generatedAt.getTime())
       ? generatedAt.toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       : 'net';
-    setStatus(`Live bijgewerkt: ${time}`, 'good');
+    setStatus(`Opgehaald: ${time}`, 'good');
   }
 
   async function loadAudit() {
@@ -372,12 +398,25 @@
   }
 
   async function loadPerformance() {
+    const request = ++performanceRequest;
+    state.loading = true;
+    state.payload = null;
+    state.page = 0;
+    root.setAttribute('aria-busy', 'true');
     setStatus('Search Console laden...', 'muted');
+    const period = get('[data-seo-period-label]');
+    if (period) period.textContent = 'Geselecteerde periode wordt geladen';
+    renderMetrics(null);
+    renderChart(null);
+    renderTable();
+    renderOpportunities(null);
+    renderActions();
     try {
       const response = await fetch(`${performanceEndpoint}?days=${state.days}`, {
         headers: { Accept: 'application/json' },
       });
       const payload = await response.json().catch(() => ({}));
+      if (request !== performanceRequest) return;
       if (!response.ok) {
         payload.connected = true;
         payload.status = 'error';
@@ -385,6 +424,7 @@
       }
       renderPayload(payload);
     } catch (_error) {
+      if (request !== performanceRequest) return;
       renderPayload({
         ok: false,
         connected: true,
@@ -409,17 +449,20 @@
 
   getAll('[data-seo-days]').forEach((button) => {
     button.addEventListener('click', () => {
-      getAll('[data-seo-days]').forEach((item) => item.classList.remove('active'));
+      getAll('[data-seo-days]').forEach((item) => { item.classList.remove('active'); item.setAttribute('aria-pressed', 'false'); });
       button.classList.add('active');
-      state.days = Number(button.dataset.seoDays || 90) || 90;
+      button.setAttribute('aria-pressed', 'true');
+      state.days = Number(button.dataset.seoDays || 28) || 28;
       loadPerformance();
     });
   });
 
   getAll('[data-seo-table-tab]').forEach((button) => {
     button.addEventListener('click', () => {
-      getAll('[data-seo-table-tab]').forEach((item) => item.classList.remove('active'));
+      getAll('[data-seo-table-tab]').forEach((item) => { item.classList.remove('active'); item.setAttribute('aria-pressed', 'false'); });
       button.classList.add('active');
+      button.setAttribute('aria-pressed', 'true');
+      state.page = 0;
       state.activeTab = button.dataset.seoTableTab || 'queries';
       renderTable();
     });
@@ -428,10 +471,27 @@
   const searchInput = get('[data-seo-table-search]');
   if (searchInput) {
     searchInput.addEventListener('input', () => {
+      state.page = 0;
       state.search = String(searchInput.value || '').trim().toLowerCase();
       renderTable();
     });
   }
+
+  getAll('[data-seo-chart-metric]').forEach((button) => button.addEventListener('click', () => {
+    state.chartMetric = button.dataset.seoChartMetric;
+    getAll('[data-seo-chart-metric]').forEach((item) => {
+      const selected = item === button;
+      item.classList.toggle('active', selected);
+      item.setAttribute('aria-pressed', String(selected));
+    });
+    renderChart(state.payload);
+  }));
+  const sort = get('[data-seo-table-sort]');
+  if (sort) sort.addEventListener('change', () => { state.sort = sort.value; state.page = 0; renderTable(); });
+  const prev = get('[data-seo-table-prev]');
+  const next = get('[data-seo-table-next]');
+  if (prev) prev.addEventListener('click', () => { state.page = Math.max(0, state.page - 1); renderTable(); });
+  if (next) next.addEventListener('click', () => { state.page += 1; renderTable(); });
 
   loadConsole();
 }());

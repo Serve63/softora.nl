@@ -25,7 +25,7 @@
 </script>
 <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260722a"></script>
 <script src="assets/custom-selects.js?v=20260511a" defer></script>
-<script src="assets/premium-seo-performance.js?v=20260716a" defer></script>
+<script src="assets/premium-seo-performance.js?v=20260906a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -972,7 +972,7 @@ body {
   }
 }
 </style>
-<link rel="stylesheet" href="assets/premium-seo-performance.css?v=20260716a">
+<link rel="stylesheet" href="assets/premium-seo-performance.css?v=20260906a">
 </head>
 <body>
   <div class="dashboard-layout" data-sidebar-shell="canonical">
@@ -1040,89 +1040,72 @@ body {
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
   <main class="main-content seo-performance-main">
     <div class="dash">
-      <header class="seo-console-header">
-        <div><h1>SEO Console</h1><p>Zie wat groeit, waar omzetkansen liggen en welke pagina's aandacht nodig hebben.</p></div>
+      <header class="topbar seo-console-header">
+        <div class="topbar-left"><h1>SEO</h1><p>Je zichtbaarheid in Google, resultaten en eerstvolgende acties.</p></div>
         <div class="seo-console-header__actions">
-          <div class="topbar-meta" data-seo-performance-status aria-live="polite"><span class="dot" data-seo-performance-dot></span><span data-seo-last-updated>Live data laden...</span></div>
+          <div class="seo-periods" role="group" aria-label="Rapportageperiode">
+            <button class="filter-pill" type="button" data-seo-days="7" aria-pressed="false">7 dagen</button>
+            <button class="filter-pill active" type="button" data-seo-days="28" aria-pressed="true">28 dagen</button>
+            <button class="filter-pill" type="button" data-seo-days="90" aria-pressed="false">3 maanden</button>
+          </div>
+          <div class="topbar-meta" data-seo-performance-status aria-live="polite"><span class="dot" data-seo-performance-dot aria-hidden="true"></span><span data-seo-last-updated>Live data laden...</span></div>
         </div>
       </header>
-      <div class="seo-toolbar">
-        <div class="seo-periods" aria-label="Rapportageperiode">
-          <span class="seo-toolbar-label">Periode</span>
-          <button class="filter-pill" type="button" data-seo-days="7">7 dagen</button>
-          <button class="filter-pill" type="button" data-seo-days="28">28 dagen</button>
-          <button class="filter-pill active" type="button" data-seo-days="90">3 maanden</button>
-        </div>
-      </div>
+      <div class="seo-report-context"><span>Google Search Console</span><span data-seo-period-label>Geselecteerde periode wordt geladen</span></div>
       <section class="metrics-grid" aria-label="SEO prestaties samenvatting">
-        <article class="metric-card metric-card--clicks"><div class="metric-card__head"><span class="metric-label">Organische klikken</span><span class="metric-icon">↗</span></div><div class="metric-value zero" data-seo-metric="clicks">0</div><div class="metric-subtext" data-seo-delta="clicks">Search Console laden...</div></article>
-        <article class="metric-card metric-card--impressions"><div class="metric-card__head"><span class="metric-label">Vertoningen</span><span class="metric-icon">◎</span></div><div class="metric-value zero" data-seo-metric="impressions">0</div><div class="metric-subtext" data-seo-delta="impressions">Search Console laden...</div></article>
-        <article class="metric-card"><div class="metric-card__head"><span class="metric-label">Gemiddelde CTR</span><span class="metric-icon">%</span></div><div class="metric-value zero" data-seo-metric="ctr">0%</div><div class="metric-subtext" data-seo-delta="ctr">Search Console laden...</div></article>
-        <article class="metric-card"><div class="metric-card__head"><span class="metric-label">Gemiddelde positie</span><span class="metric-icon">#</span></div><div class="metric-value zero" data-seo-metric="position">—</div><div class="metric-subtext" data-seo-delta="position">Search Console laden...</div></article>
+        <article class="metric-card metric-card--clicks"><div class="metric-card__head"><span class="metric-label">Organische klikken</span><span class="metric-icon" aria-hidden="true">↗</span></div><div class="metric-value" data-seo-metric="clicks">—</div><div class="metric-subtext" data-seo-delta="clicks">Wordt geladen</div></article>
+        <article class="metric-card metric-card--impressions"><div class="metric-card__head"><span class="metric-label">Vertoningen</span><span class="metric-icon" aria-hidden="true">◎</span></div><div class="metric-value" data-seo-metric="impressions">—</div><div class="metric-subtext" data-seo-delta="impressions">Wordt geladen</div></article>
+        <article class="metric-card"><div class="metric-card__head"><span class="metric-label">Klikratio (CTR)</span><span class="metric-icon" aria-hidden="true">%</span></div><div class="metric-value" data-seo-metric="ctr">—</div><div class="metric-subtext" data-seo-delta="ctr">Wordt geladen</div></article>
+        <article class="metric-card"><div class="metric-card__head"><span class="metric-label">Gemiddelde positie</span><span class="metric-icon" aria-hidden="true">#</span></div><div class="metric-value" data-seo-metric="position">—</div><div class="metric-subtext" data-seo-delta="position">Wordt geladen</div></article>
       </section>
-      <section class="seo-overview-grid" aria-label="SEO trend en groeikansen">
-        <article class="console-card chart-area">
+      <div class="seo-workspace">
+        <section class="console-card chart-area" aria-labelledby="seo-trend-title">
           <div class="console-card__header">
-            <div><span class="console-card__eyebrow">Organische zichtbaarheid</span><h2>Prestatietrend</h2></div>
-            <div class="chart-legends" aria-label="Grafieklegenda">
-              <span class="chart-legend"><span class="legend-dot c1"></span>Klikken</span>
-              <span class="chart-legend"><span class="legend-dot c2"></span>Vertoningen</span>
+            <div><h2 id="seo-trend-title">Prestatietrend</h2><p class="console-card__description" data-seo-chart-caption>Klikken per dag</p></div>
+            <div class="chart-legends" role="group" aria-label="Grafiekmeting">
+              <button type="button" class="chart-legend active" data-seo-chart-metric="clicks" aria-pressed="true"><span class="legend-dot c1" aria-hidden="true"></span>Klikken</button>
+              <button type="button" class="chart-legend" data-seo-chart-metric="impressions" aria-pressed="false"><span class="legend-dot c2" aria-hidden="true"></span>Vertoningen</button>
             </div>
           </div>
           <div class="chart-body">
             <div class="chart-y-axis" data-seo-y-axis aria-hidden="true"></div>
-            <div class="chart-grid" data-seo-chart><div class="grid-line" style="top:0%"></div><div class="grid-line" style="top:33%"></div><div class="grid-line" style="top:66%"></div><div class="grid-line" style="top:99%"></div></div>
+            <div class="chart-grid" data-seo-chart></div>
             <div class="chart-date-label" data-seo-date-label>Laatste beschikbare dagen</div>
           </div>
-        </article>
-        <aside class="console-card opportunity-card">
-          <div class="console-card__header">
-            <div><span class="console-card__eyebrow">Focus</span><h2>Kansen &amp; winnaars</h2></div>
-            <span class="live-badge">Live berekend</span>
-          </div>
-          <div class="opportunity-list" data-seo-opportunities><div class="console-skeleton"></div><div class="console-skeleton"></div><div class="console-skeleton"></div></div>
-        </aside>
-      </section>
-      <section class="seo-health-grid" aria-label="Technische SEO en prioriteiten">
-        <article class="console-card health-card">
-          <div class="console-card__header">
-            <div><span class="console-card__eyebrow">On-page fundament</span><h2>Technische SEO-gezondheid</h2></div>
-            <div class="health-score" data-seo-health-score>—</div>
-          </div>
-          <p class="health-summary" data-seo-health-summary>De live pagina-audit wordt uitgevoerd.</p>
-          <div class="health-metrics" data-seo-health-metrics><div class="console-skeleton"></div><div class="console-skeleton"></div><div class="console-skeleton"></div></div>
-        </article>
-        <article class="console-card action-card">
-          <div class="console-card__header">
-            <div><span class="console-card__eyebrow">Van data naar actie</span><h2>Prioriteiten</h2></div>
-            <span class="action-count" data-seo-action-count>0</span>
-          </div>
+        </section>
+        <section class="console-card action-card" aria-labelledby="seo-action-title">
+          <div class="console-card__header"><div><h2 id="seo-action-title">Prioriteiten</h2><p class="console-card__description">Waar je nu aan kunt werken</p></div><span class="action-count" data-seo-action-count>—</span></div>
           <div class="action-list" data-seo-actions><div class="console-skeleton"></div><div class="console-skeleton"></div><div class="console-skeleton"></div></div>
-        </article>
-      </section>
-      <section class="console-card data-explorer">
-        <div class="data-explorer__header">
-          <div><span class="console-card__eyebrow">Search Console-verkenner</span><h2>Zoekdata</h2></div>
-          <label class="seo-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span class="sr-only">Filter tabel</span><input type="search" placeholder="Filter resultaten..." data-seo-table-search></label>
-        </div>
-        <div class="tabs" aria-label="SEO prestatie tabs">
-          <button class="tab active" type="button" data-seo-table-tab="queries">Zoekwoorden</button>
-          <button class="tab" type="button" data-seo-table-tab="pages">Pagina's</button>
-          <button class="tab" type="button" data-seo-table-tab="countries">Landen</button>
-          <button class="tab" type="button" data-seo-table-tab="devices">Apparaten</button>
-          <button class="tab" type="button" data-seo-table-tab="searchAppearance">Zoekopmaak</button>
-          <button class="tab" type="button" data-seo-table-tab="dates">Dagen</button>
-        </div>
-        <div class="seo-table-scroll">
-          <div class="table-header"><span class="th-query" data-seo-table-label>Zoekwoord</span><span class="th-num">Klikken</span><span class="th-num">Vertoningen</span><span class="th-num">CTR</span><span class="th-num">Positie</span></div>
-          <div data-seo-table-body></div>
-          <div class="empty-table" data-seo-empty-state>
-            <div class="empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-            <div class="empty-title" data-seo-empty-title>Search Console wordt geladen</div>
-            <div class="empty-sub" data-seo-empty-sub>Ik haal klikken, vertoningen, CTR en posities op.</div>
+          <details class="seo-winners"><summary>Kansen &amp; winnaars</summary><div class="opportunity-list" data-seo-opportunities><div class="console-skeleton"></div></div></details>
+        </section>
+        <section class="console-card data-explorer" aria-labelledby="seo-data-title">
+          <div class="data-explorer__header"><div><h2 id="seo-data-title">Zoekdata</h2><p class="console-card__description">Zoekwoorden, pagina’s en bezoekersgroepen</p></div></div>
+          <div class="tabs" role="group" aria-label="SEO prestatie tabs">
+            <button class="tab active" type="button" data-seo-table-tab="queries" aria-pressed="true">Zoekwoorden</button>
+            <button class="tab" type="button" data-seo-table-tab="pages" aria-pressed="false">Pagina's</button>
+            <button class="tab" type="button" data-seo-table-tab="countries" aria-pressed="false">Landen</button>
+            <button class="tab" type="button" data-seo-table-tab="devices" aria-pressed="false">Apparaten</button>
+            <button class="tab" type="button" data-seo-table-tab="searchAppearance" aria-pressed="false">Zoekopmaak</button>
+            <button class="tab" type="button" data-seo-table-tab="dates" aria-pressed="false">Dagen</button>
           </div>
-        </div>
-      </section>
+          <div class="seo-table-toolbar">
+            <label class="seo-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span class="sr-only">Filter tabel</span><input type="search" placeholder="Zoek in resultaten…" data-seo-table-search></label>
+            <label class="seo-sort"><span class="sr-only">Sorteer resultaten</span><select data-seo-table-sort><option value="clicks">Meeste klikken</option><option value="impressions">Meeste vertoningen</option><option value="ctr">Hoogste CTR</option><option value="position">Beste positie</option></select></label>
+          </div>
+          <div class="seo-table-scroll" tabindex="0" role="region" aria-label="Zoekresultaten; horizontaal schuifbaar op kleine schermen">
+            <table class="seo-results-table"><thead><tr><th scope="col" data-seo-table-label>Zoekwoord</th><th scope="col">Klikken</th><th scope="col">Vertoningen</th><th scope="col">CTR</th><th scope="col">Positie</th></tr></thead><tbody data-seo-table-body></tbody></table>
+            <div class="empty-table" data-seo-empty-state><div class="empty-title" data-seo-empty-title>Search Console wordt geladen</div><div class="empty-sub" data-seo-empty-sub>Je resultaten worden opgehaald.</div></div>
+          </div>
+          <div class="seo-table-footer"><span data-seo-table-count aria-live="polite">Resultaten worden geladen</span><div class="seo-pagination" role="group" aria-label="Resultatenpagina"><button type="button" data-seo-table-prev disabled aria-label="Vorige resultatenpagina">Vorige</button><button type="button" data-seo-table-next disabled aria-label="Volgende resultatenpagina">Volgende</button></div></div>
+          <p class="seo-data-note">Totale klikken omvatten ook merkverkeer. Google toont niet iedere zoekopdracht. Per categorie zie je maximaal 25 resultaten; bij Dagen de hele periode.</p>
+        </section>
+        <section class="console-card health-card" aria-labelledby="seo-health-title">
+          <div class="console-card__header"><div><h2 id="seo-health-title">Paginacontrole</h2><p class="console-card__description">Basis van je HTML-pagina’s</p></div><div class="health-score" data-seo-health-score>—</div></div>
+          <p class="health-summary" data-seo-health-summary>De pagina’s worden gecontroleerd.</p>
+          <div class="health-metrics" data-seo-health-metrics><div class="console-skeleton"></div><div class="console-skeleton"></div><div class="console-skeleton"></div></div>
+          <p class="seo-data-note">Dit is een controle van HTML-bronnen, geen Google-score of bewijs van indexatie.</p>
+        </section>
+      </div>
     </div>
     <div class="page-shell" hidden aria-hidden="true">
       <div class="page-title">SEO</div>

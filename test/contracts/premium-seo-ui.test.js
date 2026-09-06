@@ -8,17 +8,17 @@ test('premium seo page provides a live decision console in the premium shell', (
   const cssSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-seo-performance.css'), 'utf8');
   const jsSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-seo-performance.js'), 'utf8');
 
-  assert.match(source, /assets\/premium-seo-performance\.css\?v=20260716a/);
-  assert.match(source, /assets\/premium-seo-performance\.js\?v=20260716a/);
+  assert.match(source, /assets\/premium-seo-performance\.css\?v=20260906a/);
+  assert.match(source, /assets\/premium-seo-performance\.js\?v=20260906a/);
   assert.ok(
-    source.indexOf('</style>') < source.indexOf('assets/premium-seo-performance.css?v=20260716a'),
+    source.indexOf('</style>') < source.indexOf('assets/premium-seo-performance.css?v=20260906a'),
     'console CSS hoort na de legacy SEO-styles te laden'
   );
   assert.match(source, /<main class="main-content seo-performance-main">/);
-  assert.match(source, /<h1>SEO Console<\/h1>/);
+  assert.match(source, /class="topbar-left"><h1>SEO<\/h1>/);
   assert.match(source, /data-seo-performance-status/);
   assert.match(source, /data-seo-last-updated>Live data laden\.\.\.<\/span>/);
-  assert.match(source, /data-seo-days="90">3 maanden<\/button>/);
+  assert.match(source, /data-seo-days="90" aria-pressed="false">3 maanden<\/button>/);
 
   assert.doesNotMatch(source, /class="seo-console-eyebrow"/);
   assert.doesNotMatch(source, /data-seo-refresh/);
@@ -29,32 +29,41 @@ test('premium seo page provides a live decision console in the premium shell', (
     assert.match(source, new RegExp(`data-seo-delta="${metric}"`));
   });
 
-  assert.match(source, /<h2>Prestatietrend<\/h2>/);
+  assert.match(source, /<h2 id="seo-trend-title">Prestatietrend<\/h2>/);
   assert.match(source, /data-seo-chart/);
   assert.match(source, /data-seo-date-label>Laatste beschikbare dagen<\/div>/);
-  assert.match(source, /<h2>Kansen &amp; winnaars<\/h2>/);
+  assert.match(source, /<summary>Kansen &amp; winnaars<\/summary>/);
   assert.match(source, /data-seo-opportunities/);
-  assert.match(source, /<h2>Technische SEO-gezondheid<\/h2>/);
+  assert.match(source, /<h2 id="seo-health-title">Paginacontrole<\/h2>/);
   assert.match(source, /data-seo-health-score/);
   assert.match(source, /data-seo-health-metrics/);
-  assert.match(source, /<h2>Prioriteiten<\/h2>/);
+  assert.match(source, /<h2 id="seo-action-title">Prioriteiten<\/h2>/);
   assert.match(source, /data-seo-actions/);
   assert.match(source, /data-seo-action-count/);
   assert.match(source, /data-seo-table-search/);
-  assert.match(source, /data-seo-table-tab="queries">Zoekwoorden<\/button>/);
-  assert.match(source, /data-seo-table-label>Zoekwoord<\/span>/);
-  assert.match(source, /<span class="th-num">CTR<\/span>/);
-  assert.match(source, /<span class="th-num">Positie<\/span>/);
+  assert.match(source, /data-seo-table-tab="queries" aria-pressed="true">Zoekwoorden<\/button>/);
+  assert.match(source, /data-seo-table-label>Zoekwoord<\/th>/);
+  assert.match(source, /<th scope="col">CTR<\/th>/);
+  assert.match(source, /<th scope="col">Positie<\/th>/);
   assert.match(source, /data-seo-table-body/);
 
-  assert.match(cssSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.seo-performance-main/);
+  assert.match(cssSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\] > main\.seo-performance-main/);
   assert.match(cssSource, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
-  assert.match(cssSource, /\.seo-overview-grid/);
-  assert.match(cssSource, /\.seo-health-grid/);
+  assert.match(cssSource, /grid-template-areas: "trend actions" "data health"/);
+  assert.match(cssSource, /\.seo-workspace/);
   assert.match(cssSource, /\.seo-performance-chart__line--clicks/);
   assert.match(cssSource, /@media \(max-width: 1160px\)/);
   assert.match(cssSource, /@media \(max-width: 900px\)[\s\S]*display: block;[\s\S]*margin-left: 0 !important;/);
   assert.match(cssSource, /@media \(max-width: 720px\)/);
+  assert.match(cssSource, /background: #f7f5f2;/);
+  assert.match(cssSource, /\.seo-performance-main \.dash[^}]*padding: 0;/);
+  assert.match(source, /data-seo-period-label/);
+  assert.match(source, /data-seo-table-sort/);
+  assert.match(source, /data-seo-table-prev/);
+  assert.match(source, /data-seo-table-next/);
+  assert.match(source, /<table class="seo-results-table">/);
+  assert.match(source, /geen Google-score of bewijs van indexatie/);
+  assert.match(source, /data-seo-chart-metric="clicks" aria-pressed="true"/);
 
   assert.match(jsSource, /\/api\/seo\/search-console-performance/);
   assert.match(jsSource, /\/api\/seo\/site-audit/);

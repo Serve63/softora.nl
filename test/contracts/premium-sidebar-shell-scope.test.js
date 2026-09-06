@@ -1212,3 +1212,16 @@ test('premium instellingen centreert personeel PIN binnen de canonical shell', (
   assert.doesNotMatch(pinRule[0], /position:\s*fixed;/);
   assert.doesNotMatch(pinRule[0], /\b(?:left|right|top|bottom):/);
 });
+
+
+test('SEO uses the shared black heading and outer frame without changing the sidebar', () => {
+  const page = readRepoFile('premium-seo.html');
+  const css = readRepoFile('assets/premium-seo-performance.css');
+  assert.match(page, /data-sidebar-shell="canonical"/);
+  assert.match(page, /<header class="topbar seo-console-header">/);
+  assert.match(page, /<div class="topbar-left"><h1>SEO<\/h1>/);
+  assert.ok(page.indexOf('seo-console-header') > page.indexOf('</aside>'));
+  assert.match(css, /\.seo-performance-main \.dash[^}]*margin: 0;[^}]*padding: 0;/);
+  assert.match(css, /\.seo-console-header h1[^}]*color: var\(--text-primary\)/);
+  assert.doesNotMatch(css, /\.sidebar(?:\s|\[|\.|\{|:)/);
+});
