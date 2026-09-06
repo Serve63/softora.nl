@@ -831,7 +831,7 @@ test('SEO same-task migration preserves audited start and all publication gate r
   const state = require('../../scripts/seo-machine-automation-state');
   const script = readRepoFile('scripts/seo-machine-automation-state.js');
   assert.equal(typeof state.keepAutomationInSameThread, 'function');
-  assert.equal(state.AUTOMATION_PROMPT_VERSION, 9);
+  assert.equal(state.AUTOMATION_PROMPT_VERSION, 10);
   assert.deepEqual([...state.REQUIRED_PUBLISHED_RUN_GATES], [
     'cadence', 'reviews', 'selection', 'keywords', 'visuals', 'verify_critical', 'live_production', 'live_route',
   ]);
@@ -839,6 +839,20 @@ test('SEO same-task migration preserves audited start and all publication gate r
   assert.match(script, /THREAD_ROTATION_DISABLED/);
   assert.match(script, /const audit = auditAutomationInstallation\(auditOptions\)/);
   assert.match(script, /validatePublishedRunGates\(receipt, receipt\)/);
+});
+
+test('SEO portfolio retains the Softora release gate while separating local academy outcomes', () => {
+  const prompt = readRepoFile('docs/growth/seo-machine-prompt.md');
+  const cli = readRepoFile('scripts/seo-machine-portfolio.js');
+  const manifest = JSON.parse(readRepoFile('docs/growth/seo-machine-sites.json'));
+  const { REQUIRED_PROMPT_MARKERS } = require('../../server/services/seo-machine-prompt-contract');
+  assert.equal(manifest.sites.length, 10);
+  assert.equal(manifest.sites.filter((site) => site.mode === 'local_prelaunch').length, 9);
+  for (const marker of REQUIRED_PROMPT_MARKERS) assert.match(prompt, marker.pattern, marker.label);
+  assert.match(cli, /binding\.lifecycle\.lastReceipt/);
+  assert.match(cli, /portfolio\.verifyArtifacts/);
+  assert.match(prompt, /finish-run closes only the Softora site/);
+  assert.match(prompt, /One site's blocker must not stop the remaining sites/);
 });
 
 test('SEO reading navigation cannot weaken the contact-route quality gate', () => {

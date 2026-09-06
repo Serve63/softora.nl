@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "automationId": "softora-seo-actiemachine",
+  "threadPolicy": "same_thread",
+  "schedulePolicy": "all_sites_each_cycle",
+  "sites": [
+    { "id": "softora", "name": "Softora", "adapter": "softora", "repository": ".", "mode": "live", "origin": "https://www.softora.nl", "localOrigin": null, "gscProperty": "sc-domain:softora.nl", "offerPaths": ["/website-laten-maken", "/bedrijfssoftware-op-maat", "/voicesoftware-op-maat", "/chatbot-laten-maken"], "topic": "Maatwerksoftware en websites voor bedrijven" },
+    { "id": "vitale-vrouwen", "name": "Vitale Vrouwen Academie", "adapter": "academy", "repository": "Desktop/danielle-vitaal", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3000", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Vitaal leven en gewoonten na je veertigste", "sourceCare": "health" },
+    { "id": "zwanger-baby", "name": "Zwanger & Baby Academie", "adapter": "academy", "repository": "Desktop/academie-sites/zwanger-baby-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3001", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Zwangerschap, voorbereiding en babyverzorging", "sourceCare": "health" },
+    { "id": "relatie", "name": "Relatie Academie", "adapter": "academy", "repository": "Desktop/academie-sites/relatie-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3002", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Communicatie en relaties", "sourceCare": "wellbeing" },
+    { "id": "puppy", "name": "Puppy Academie", "adapter": "academy", "repository": "Desktop/academie-sites/puppy-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3003", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Puppygedrag, opvoeding en verzorging", "sourceCare": "animal_welfare" },
+    { "id": "katten", "name": "Katten Academie", "adapter": "academy", "repository": "Desktop/academie-sites/katten-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3004", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Kattengedrag, omgeving en verzorging", "sourceCare": "animal_welfare" },
+    { "id": "moestuin", "name": "Moestuin Academie", "adapter": "academy", "repository": "Desktop/academie-sites/moestuin-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3005", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Moestuinieren voor beginners" },
+    { "id": "huis-klus", "name": "Huis & Klus Academie", "adapter": "academy", "repository": "Desktop/academie-sites/huis-klus-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3006", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Goed voorbereid klussen en woningonderhoud", "sourceCare": "physical_safety" },
+    { "id": "loopbaan", "name": "Loopbaan Academie", "adapter": "academy", "repository": "Desktop/academie-sites/loopbaan-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3008", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Loopbaankeuzes, werk en solliciteren" },
+    { "id": "huid-haar", "name": "Huid & Haar Academie", "adapter": "academy", "repository": "Desktop/academie-sites/huid-haar-academie", "mode": "local_prelaunch", "origin": null, "localOrigin": "http://localhost:3009", "gscProperty": null, "offerPaths": ["/ebook", "/academy"], "topic": "Huid- en haarverzorging en eenvoudige routines", "sourceCare": "health" }
+  ]
+}
