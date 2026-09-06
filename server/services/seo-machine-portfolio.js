@@ -11,6 +11,12 @@ const iso = (value) => {
 };
 const day = (value) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
 const safeRelative = (value) => typeof value === 'string' && value.length > 0 && !path.isAbsolute(value) && !value.split(/[\\/]/).includes('..');
+const isAcademyBlogPath = (value) => typeof value === 'string' && /^\/blog(?:\/[a-z0-9][a-z0-9_-]*)?$/.test(value);
+const isAcademyBlogArtifact = (value) => safeRelative(value) && (
+  value.startsWith('app/blog/')
+  || /^app\/(?:blog-(?:data|editorial)|article-(?:content|editorial|guidance(?:-[a-z]+)?))\.tsx?$/.test(value)
+  || value.startsWith('public/images/blog/')
+);
 
 function validateManifest(manifest) {
   requireThat(manifest?.schemaVersion === 1 && manifest.automationId === 'softora-seo-actiemachine', 'Invalid portfolio identity.');
@@ -21,6 +27,7 @@ function validateManifest(manifest) {
     requireThat(SITE_IDS.includes(site.id) && site.name && site.topic && safeRelative(site.repository), 'Invalid site or repository.');
     requireThat(['live', 'local_prelaunch'].includes(site.mode), 'Invalid site mode.');
     requireThat(site.adapter === (site.id === 'softora' ? 'softora' : 'academy'), 'Invalid site adapter.');
+    requireThat(site.contentPolicy === (site.id === 'softora' ? 'seo_growth' : 'blogs_only'), 'Only Softora may use the money-page lane; academies are blogs_only.');
     requireThat(site.id === 'softora' ? site.repository === '.' : site.repository.startsWith('Desktop/'), 'Invalid repository location.');
     requireThat(Array.isArray(site.offerPaths) && site.offerPaths.length > 0 && site.offerPaths.every((p) => /^\/(?!\/)/.test(p)), 'Offer routes are required.');
     if (site.mode === 'local_prelaunch') {
@@ -74,12 +81,14 @@ function plan(state, manifest, now) {
       const lastAttempt = state.history.filter((r) => r.siteId === id).at(-1);
       const lastDiscovery = state.history.filter((r) => r.siteId === id && r.research?.weeklyCalls > 0 && r.research.status === 'ready').at(-1)?.finishedAt || null;
       const nativeLedger = site.adapter === 'softora';
+      const blogsOnly = site.contentPolicy === 'blogs_only';
       return {
         ...site, countedOutcome: site.mode === 'live' ? 'published' : 'local_ready',
         capacitySource: nativeLedger ? 'softora_live_publication_ledger' : 'portfolio_receipts',
         newUrlsLast7Days: nativeLedger ? null : newUrls.length, moneyPagesLast7Days: nativeLedger ? null : moneyPages.length,
-        newUrlAllowed: nativeLedger ? null : newUrls.length < 7, moneyPageAllowed: nativeLedger ? null : newUrls.length < 7 && moneyPages.length < 2,
-        maximumNewUrlsPerWeek: 7, maximumMoneyPagesPerWeek: 2,
+        newUrlAllowed: nativeLedger ? null : newUrls.length < 7, moneyPageAllowed: blogsOnly ? false : null,
+        allowedPublicationLanes: blogsOnly ? ['editorial'] : ['editorial', 'money_page'],
+        maximumNewUrlsPerWeek: 7, maximumMoneyPagesPerWeek: blogsOnly ? 0 : 2,
         lastWeeklyDiscoveryAt: lastDiscovery, weeklyDiscoveryDue: nativeLedger ? null : !lastDiscovery || Date.parse(timestamp) - Date.parse(lastDiscovery) >= WEEK_MS,
         lastAttempt: lastAttempt ? { outcome: lastAttempt.outcome, finishedAt: lastAttempt.finishedAt, evidenceFile: lastAttempt.evidenceFile, nextAction: lastAttempt.nextAction } : null,
       };
@@ -122,6 +131,11 @@ function validateReceipt(receipt, site) {
   if (receipt.outcome === 'blocked') return;
   requireThat(['new_url', 'substantial_refresh', 'other_growth_action'].includes(receipt.actionType) && ['editorial', 'money_page'].includes(receipt.lane), 'Classify the actual improvement and its publication lane.');
   requireThat(/^\/(?!\/)[^?#]*$/.test(receipt.changedPath), 'One canonical changed path is required.');
+  if (site.adapter === 'academy') {
+    requireThat(site.contentPolicy === 'blogs_only' && receipt.lane === 'editorial', 'Academies accept only blogs, never money pages or money-page refreshes.');
+    requireThat(isAcademyBlogPath(receipt.changedPath) && (receipt.actionType !== 'new_url' || receipt.changedPath !== '/blog'), 'Academies may change only existing blog overviews or individual blog articles.');
+    requireThat(isAcademyBlogPath(receipt.supportingAction?.path), 'An academy supporting action must stay within the blog.');
+  }
   requireThat(site.mode === 'live' ? receipt.outcome === 'published' : receipt.outcome === 'local_ready', 'Local work is never a live publication.');
   requireThat(receipt.verifiedOrigin === (site.mode === 'live' ? site.origin : site.localOrigin), 'Route proof belongs to another site or environment.');
   if (site.adapter === 'softora') {
@@ -133,6 +147,7 @@ function validateReceipt(receipt, site) {
     return;
   }
   requireThat(Array.isArray(receipt.artifacts) && receipt.artifacts.length > 0 && receipt.artifacts.every((file) => safeRelative(file.path) && /^[a-f0-9]{64}$/.test(file.sha256)), 'Changed source files and hashes are required.');
+  requireThat(receipt.artifacts.every((file) => isAcademyBlogArtifact(file.path)), 'Academy source changes must stay within blog files and dedicated blog images.');
   for (const check of ['lint', 'typecheck', 'build']) requireThat(receipt.checks?.[check]?.exitCode === 0 && receipt.checks[check].evidenceFile, `Missing successful ${check} evidence.`);
   const browser = receipt.pageExperience;
   requireThat(browser?.url === receipt.verifiedOrigin + receipt.changedPath && browser.httpStatus === 200 && browser.mobile === true && browser.desktop === true && browser.interactionsPassed === true && browser.mobileScreenshot && browser.desktopScreenshot && typeof browser.review === 'string' && browser.review.length >= 20, 'Both viewports, screenshots, interactions and a real visual review are required.');
@@ -179,6 +194,7 @@ function verifyArtifacts(receipt, repoRoot) {
     const resolved = fs.realpathSync(path.join(repoRoot, artifact.path));
     const root = fs.realpathSync(repoRoot) + path.sep;
     requireThat(resolved.startsWith(root), 'Artifact escapes the repository.');
+    if (receipt.siteId && receipt.siteId !== 'softora') requireThat(isAcademyBlogArtifact(path.relative(root, resolved)), 'Academy artifact resolves outside the allowed blog files.');
     requireThat(crypto.createHash('sha256').update(fs.readFileSync(resolved)).digest('hex') === artifact.sha256, 'Source changed after verification.');
   }
   for (const evidenceFile of [...Object.values(receipt.checks || {}).map((check) => check.evidenceFile), receipt.research?.evidenceFile].filter(Boolean)) {
@@ -207,4 +223,4 @@ function updateStateFile(file, operation) {
   }
 }
 
-module.exports = { SITE_IDS, validateManifest, emptyState, validateState, plan, beginCycle, startSite, validateReceipt, recordSite, finishCycle, verifyArtifacts, updateStateFile };
+module.exports = { SITE_IDS, isAcademyBlogPath, isAcademyBlogArtifact, validateManifest, emptyState, validateState, plan, beginCycle, startSite, validateReceipt, recordSite, finishCycle, verifyArtifacts, updateStateFile };

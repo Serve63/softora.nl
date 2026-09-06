@@ -1,8 +1,9 @@
-const AUTOMATION_PROMPT_VERSION = 10;
+const AUTOMATION_PROMPT_VERSION = 11;
 const REQUIRED_PROMPT_MARKERS = Object.freeze([
-  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=10/ }),
+  Object.freeze({ label: 'prompt_version', pattern: /SEO_MACHINE_PROMPT_VERSION=11/ }),
   Object.freeze({ label: 'same_thread_policy', pattern: /SEO_THREAD_POLICY=same_thread/ }),
   Object.freeze({ label: 'portfolio_daily_coverage', pattern: /SEO_PORTFOLIO_POLICY=all_sites_each_cycle/ }),
+  Object.freeze({ label: 'academy_blog_scope', pattern: /SEO_ACADEMY_CONTENT_POLICY=blogs_only/ }),
   Object.freeze({ label: 'portfolio_registry', pattern: /docs\/growth\/seo-machine-sites\.json/ }),
   Object.freeze({ label: 'portfolio_durable_queue', pattern: /node scripts\/seo-machine-portfolio\.js begin/ }),
   Object.freeze({ label: 'portfolio_local_truth', pattern: /Local work is never a live publication/ }),

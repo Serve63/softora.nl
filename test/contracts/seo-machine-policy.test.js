@@ -34,7 +34,7 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /blijft na het halen of verstrijken van die datum actief totdat Servé haar expliciet pauzeert/i);
   assert.match(policy, /70% verdedigen\/uitbouwen van bewezen clusters[\s\S]*20% aangrenzende commerciële experimenten[\s\S]*10% technische/i);
   assert.match(policy, /`npm run seo:automation-state -- audit` bewijst dat exact één canonieke ACTIVE heartbeat bestaat/i);
-  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=10`/i);
+  assert.match(policy, /`SEO_MACHINE_PROMPT_VERSION=11`/i);
   assert.match(qualityGates, /deadlinebestendige `growthHorizon`/i);
   assert.ok(
     qualityGates.indexOf('`performance_recovery`, `quality_recovery`') >= 0,
@@ -142,7 +142,7 @@ test('SEO execution contract preserves traffic priority, source-bound reviews an
 test('SEO execution contract keeps the current task indefinitely without dropping publication gates', () => {
   const prompt = readRepoFile('docs/growth/seo-machine-prompt.md');
   const policy = readRepoFile('docs/growth/seo-machine-policy.md');
-  assert.match(prompt, /SEO_MACHINE_PROMPT_VERSION=10/);
+  assert.match(prompt, /SEO_MACHINE_PROMPT_VERSION=11/);
   assert.match(prompt, /SEO_THREAD_POLICY=same_thread/);
   assert.match(prompt, /current target task indefinitely/);
   assert.match(prompt, /maxRunsPerThread=null/);

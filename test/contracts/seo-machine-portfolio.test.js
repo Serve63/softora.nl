@@ -34,10 +34,12 @@ test('the registry contains the approved ten distinct sites and nine local proje
   assert.equal(p.validateManifest(manifest), manifest);
   assert.deepEqual(manifest.sites.map((site) => site.id), [...p.SITE_IDS]);
   assert.equal(manifest.sites.filter((site) => site.mode === 'live').length, 1);
+  assert.equal(manifest.sites[0].contentPolicy, 'seo_growth');
   for (const site of manifest.sites.slice(1)) {
     assert.equal(site.gscProperty, null);
     assert.equal(site.origin, null);
     assert.equal(site.adapter, 'academy');
+    assert.equal(site.contentPolicy, 'blogs_only');
   }
   assert.throws(() => p.validateManifest({ ...manifest, sites: [...manifest.sites, manifest.sites[1]] }), /Exactly ten/);
   const unsafe = structuredClone(manifest);
@@ -82,15 +84,52 @@ test('local source work cannot be admitted as live or verified on another site',
   assert.throws(() => p.validateReceipt({ ...receipt, artifacts: [{ path: '../private', sha256: 'a'.repeat(64) }] }, site), /hashes/);
 });
 
-test('money-page limits belong to each site and never block another site or a refresh', () => {
-  let state = cycle(p.emptyState(), '01', localReceipt('vitale-vrouwen', 'eerste', 'money_page'));
-  state = cycle(state, '02', localReceipt('vitale-vrouwen', 'tweede', 'money_page'));
-  const view = p.plan(state, manifest, at('03'));
-  assert.equal(view.pending.find((site) => site.id === 'vitale-vrouwen').moneyPageAllowed, false);
-  assert.equal(view.pending.find((site) => site.id === 'puppy').moneyPageAllowed, true);
-  assert.throws(() => cycle(state, '03', localReceipt('vitale-vrouwen', 'derde', 'money_page')), /cap/);
-  assert.doesNotThrow(() => cycle(state, '03', { ...localReceipt('vitale-vrouwen', 'eerste', 'money_page'), actionType: 'substantial_refresh' }));
-  assert.equal(p.plan(state, manifest, at('10')).pending.find((site) => site.id === 'vitale-vrouwen').moneyPageAllowed, true);
+test('only Softora retains the money-page lane, including when academies go live', () => {
+  const view = p.plan(p.emptyState(), manifest, at('01')).pending;
+  assert.equal(view[0].maximumMoneyPagesPerWeek, 2);
+  assert.deepEqual(view[0].allowedPublicationLanes, ['editorial', 'money_page']);
+  for (const site of manifest.sites.slice(1)) {
+    const capacity = view.find((item) => item.id === site.id);
+    assert.equal(capacity.moneyPageAllowed, false);
+    assert.equal(capacity.maximumMoneyPagesPerWeek, 0);
+    assert.deepEqual(capacity.allowedPublicationLanes, ['editorial']);
+    for (const actionType of ['new_url', 'substantial_refresh', 'other_growth_action']) {
+      assert.throws(() => p.validateReceipt({ ...localReceipt(site.id, 'artikel', 'money_page'), actionType }, site), /only blogs/);
+    }
+    const live = { ...site, mode: 'live', origin: 'https://academy.example.com' };
+    assert.throws(() => p.validateReceipt({ ...localReceipt(site.id, 'artikel', 'money_page'), outcome: 'published', verifiedOrigin: live.origin }, live), /only blogs/);
+  }
+});
+
+test('the editorial seven-URL cap remains per academy and still permits blog refreshes', () => {
+  let state = p.emptyState();
+  for (let date = 1; date <= 7; date++) state = cycle(state, String(date).padStart(2, '0'), localReceipt('vitale-vrouwen', `artikel-${date}`));
+  const view = p.plan(state, manifest, at('08')).pending;
+  assert.equal(view.find((site) => site.id === 'vitale-vrouwen').newUrlAllowed, false);
+  assert.equal(view.find((site) => site.id === 'puppy').newUrlAllowed, true);
+  state = p.beginCycle(state, manifest, { threadId, invocationAt: at('08') }).state;
+  state = p.startSite(state, 'softora', at('08'));
+  state = p.recordSite(state, manifest, blocked('softora'), at('08'));
+  state = p.startSite(state, 'vitale-vrouwen', at('08'));
+  assert.throws(() => p.recordSite(state, manifest, localReceipt('vitale-vrouwen', 'artikel-8'), at('08')), /cap/);
+  assert.doesNotThrow(() => p.recordSite(state, manifest, { ...localReceipt('vitale-vrouwen', 'artikel-1'), actionType: 'substantial_refresh' }, at('08')));
+  assert.equal(p.plan(state, manifest, at('10')).pending.find((site) => site.id === 'vitale-vrouwen').newUrlAllowed, true);
+});
+
+test('an editorial label cannot admit an offer route, supporting offer edit or shared page file', () => {
+  const site = manifest.sites[1];
+  const receipt = localReceipt();
+  for (const changedPath of ['/ebook', '/academy', '/academy/cursus', '/', '/kennisbank/uitleg', '/blog/../ebook', '/blog/%2e%2e/ebook']) {
+    assert.throws(() => p.validateReceipt({ ...receipt, changedPath }, site), /blog overviews or individual/);
+  }
+  assert.throws(() => p.validateReceipt({ ...receipt, supportingAction: { path: '/ebook', verified: true } }, site), /supporting action/);
+  for (const file of ['app/ebook/page.tsx', 'app/academy/page.tsx', 'app/page.tsx', 'app/globals.css', 'public/brand-logo.png']) {
+    assert.throws(() => p.validateReceipt({ ...receipt, artifacts: [{ path: file, sha256: 'a'.repeat(64) }] }, site), /blog files/);
+  }
+  for (const file of ['app/blog/[slug]/page.tsx', 'app/blog/blog.module.css', 'app/article-guidance-life.ts', 'public/images/blog/artikel/hero.webp']) {
+    assert.doesNotThrow(() => p.validateReceipt({ ...receipt, artifacts: [{ path: file, sha256: 'a'.repeat(64) }] }, site));
+  }
+  assert.throws(() => p.validateManifest({ ...manifest, sites: manifest.sites.map((item) => item.id === site.id ? { ...item, contentPolicy: 'seo_growth' } : item) }), /Only Softora/);
 });
 
 test('existing Softora publications remain in their native ledger and discovery is site-specific', () => {
@@ -135,6 +174,21 @@ test('source drift, symlink escapes and missing logs prevent evidence admission'
   fs.symlinkSync(os.tmpdir(), path.join(directory, 'outside'));
   assert.throws(() => p.verifyArtifacts({ artifacts: [{ path: 'outside', sha256: 'a'.repeat(64) }] }, directory), /escapes/);
   assert.throws(() => p.verifyArtifacts({ checks: { lint: { evidenceFile: path.join(directory, 'missing.log') } } }, directory));
+});
+
+test('academy blog artifacts cannot resolve to offer files inside the same repository', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'portfolio-blog-scope-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(directory, 'app/blog'), { recursive: true });
+  fs.mkdirSync(path.join(directory, 'app/ebook'));
+  const content = 'verified source';
+  fs.writeFileSync(path.join(directory, 'app/blog/page.tsx'), content);
+  const proof = { siteId: 'vitale-vrouwen', artifacts: [{ path: 'app/blog/page.tsx', sha256: crypto.createHash('sha256').update(content).digest('hex') }] };
+  assert.doesNotThrow(() => p.verifyArtifacts(proof, directory));
+  fs.writeFileSync(path.join(directory, 'app/ebook/page.tsx'), content);
+  fs.unlinkSync(path.join(directory, 'app/blog/page.tsx'));
+  fs.symlinkSync('../ebook/page.tsx', path.join(directory, 'app/blog/page.tsx'));
+  assert.throws(() => p.verifyArtifacts(proof, directory), /outside the allowed blog files/);
 });
 
 test('state writes are exclusive and corrupt state is preserved for recovery', (t) => {

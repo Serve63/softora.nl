@@ -831,7 +831,7 @@ test('SEO same-task migration preserves audited start and all publication gate r
   const state = require('../../scripts/seo-machine-automation-state');
   const script = readRepoFile('scripts/seo-machine-automation-state.js');
   assert.equal(typeof state.keepAutomationInSameThread, 'function');
-  assert.equal(state.AUTOMATION_PROMPT_VERSION, 10);
+  assert.equal(state.AUTOMATION_PROMPT_VERSION, 11);
   assert.deepEqual([...state.REQUIRED_PUBLISHED_RUN_GATES], [
     'cadence', 'reviews', 'selection', 'keywords', 'visuals', 'verify_critical', 'live_production', 'live_route',
   ]);
@@ -848,6 +848,7 @@ test('SEO portfolio retains the Softora release gate while separating local acad
   const { REQUIRED_PROMPT_MARKERS } = require('../../server/services/seo-machine-prompt-contract');
   assert.equal(manifest.sites.length, 10);
   assert.equal(manifest.sites.filter((site) => site.mode === 'local_prelaunch').length, 9);
+  assert.equal(manifest.sites.filter((site) => site.contentPolicy === 'blogs_only').length, 9);
   for (const marker of REQUIRED_PROMPT_MARKERS) assert.match(prompt, marker.pattern, marker.label);
   assert.match(cli, /binding\.lifecycle\.lastReceipt/);
   assert.match(cli, /portfolio\.verifyArtifacts/);
