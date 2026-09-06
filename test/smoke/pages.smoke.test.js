@@ -102,7 +102,7 @@ test('page smoke: /website is an independent public sales page and preserves the
   assert.equal(pageResponse.status, 200);
   assert.equal(pageResponse.headers.get('location'), null);
   assert.equal(pageResponse.headers.get('x-robots-tag'), 'noindex, nofollow');
-  assert.match(html, /Je volgende klant<br>begint bij<br><em>je website\.<\/em>/);
+  assert.match(html, /Je volgende klant<br> begint bij <em>je website\.<\/em>/);
   assert.match(html, /id="website-intake"/);
   assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
   assert.doesNotMatch(html, /data-public-lock|premium-public-lock|rel="canonical"/);
