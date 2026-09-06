@@ -15,8 +15,10 @@ const {
   resolveDateWindows,
 } = require('../../scripts/lib/search-console-agent-report');
 const {
+  classifySeoQuery,
   getBusinessFit,
   isBrandedQuery,
+  isNonBrandedQuery,
   rankSeoOpportunities,
 } = require('../../scripts/lib/seo-opportunity-scoring');
 
@@ -356,6 +358,59 @@ test('seo opportunity scoring exposes deterministic business-fit inputs', () => 
   ]);
   assert.equal(ranked[0].query, 'crm op maat');
   assert.ok(ranked[0].opportunityScore > ranked[1].opportunityScore);
+});
+
+test('seo query classification recognizes names and keeps possible typos separate without substring matches', () => {
+  assert.equal(classifySeoQuery(' SoFtOrA.nl '), 'branded');
+  assert.equal(classifySeoQuery('Servé Creusen'), 'navigational');
+  assert.equal(classifySeoQuery('serve-creusen website laten maken'), 'navigational');
+  assert.equal(classifySeoQuery('softara'), 'ambiguousBrand');
+  assert.equal(isBrandedQuery('softara'), false);
+  for (const query of ['softoranje website', 'serve website', 'creusen software', 'software op maat']) {
+    assert.equal(isNonBrandedQuery(query), true, query);
+  }
+  for (const query of ['softora', 'Servé Creusen', 'softara', '', '  ']) {
+    assert.equal(isNonBrandedQuery(query), false, query);
+  }
+  assert.equal(classifySeoQuery(null), 'unclassified');
+  assert.equal(getBusinessFit('serve creusen website laten maken'), 1);
+});
+
+test('seo reports exclude names and uncertain brand queries from opportunities and page cohorts while conserving totals', () => {
+  const page = 'https://www.softora.nl/crm-op-maat';
+  const rows = [
+    { keys: ['softora.nl'], clicks: 10, impressions: 100, ctr: 0.1, position: 1 },
+    { keys: ['servé creusen'], clicks: 1, impressions: 80, ctr: 0.0125, position: 8 },
+    { keys: ['softara'], clicks: 1, impressions: 100, ctr: 0.01, position: 8 },
+    { keys: ['crm op maat'], clicks: 2, impressions: 200, ctr: 0.01, position: 8 },
+    { keys: [''], clicks: 1, impressions: 20, ctr: 0.05, position: 8 },
+  ];
+  const report = buildSearchConsoleAgentReport({
+    queriesCurrent: rows,
+    totalsCurrent: [{ clicks: 20, impressions: 550, position: 10 }],
+    pageQueryCurrent: rows.map((row) => ({ ...row, keys: [page, row.keys[0]] })),
+  });
+  const expected = { branded: [10, 100], navigational: [1, 80], ambiguousBrand: [1, 100],
+    nonBranded: [2, 200], unclassified: [6, 70] };
+  for (const [segment, [clicks, impressions]] of Object.entries(expected)) {
+    assert.equal(report.segments[segment].clicks, clicks, segment);
+    assert.equal(report.segments[segment].impressions, impressions, segment);
+  }
+  for (const metric of ['clicks', 'impressions']) {
+    assert.equal(Object.keys(expected).reduce((sum, key) => sum + report.segments[key][metric], 0),
+      report.totals.current[metric]);
+  }
+  for (const key of ['lowCtr', 'strikingDistance', 'prioritized']) {
+    assert.deepEqual(report.queries[key].map((item) => item.query), ['crm op maat'], key);
+  }
+  assert.deepEqual(report.pages.nonBranded, [{ page, clicks: 2, impressions: 200, ctr: 0.01, position: 8 }]);
+  assert.deepEqual(report.actionQueue.filter((item) => item.query).map((item) => item.query), ['crm op maat']);
+  assert.deepEqual(rankSeoOpportunities(rows.map((row) => ({ ...row, query: row.keys[0] })))
+    .map((item) => item.query), ['crm op maat']);
+  const markdown = formatAgentMarkdown(report);
+  assert.match(markdown, /Naamgericht: 1 klikken, 80 vertoningen/);
+  assert.match(markdown, /Mogelijk merkgericht: 1 klikken, 100 vertoningen/);
+  assert.match(markdown, /Niet classificeerbaar: 6 klikken, 70 vertoningen/);
 });
 
 test('seo agent keeps high-intent position 20-40 queries as lower-leverage emerging opportunities', () => {

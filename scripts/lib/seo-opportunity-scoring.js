@@ -1,5 +1,3 @@
-const BRAND_TERMS = ['softora'];
-
 const HIGH_INTENT_PATTERNS = [
   /\blaten maken\b/,
   /\bop maat\b/,
@@ -46,14 +44,28 @@ function matchesAny(value, patterns) {
   return patterns.some((pattern) => pattern.test(value));
 }
 
+function classifySeoQuery(query) {
+  const normalized = normalizeText(query).normalize('NFKD')
+    .replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  if (!normalized) return 'unclassified';
+  if (/(?:^| )softora(?: |$)/.test(normalized)) return 'branded';
+  if (/(?:^| )serve creusen(?: |$)/.test(normalized)) return 'navigational';
+  // An observed possible typo is ambiguous, not evidence of generic demand or a confirmed brand search.
+  if (/(?:^| )softara(?: |$)/.test(normalized)) return 'ambiguousBrand';
+  return 'nonBranded';
+}
+
 function isBrandedQuery(query) {
-  const normalized = normalizeText(query);
-  return BRAND_TERMS.some((term) => normalized.includes(term));
+  return classifySeoQuery(query) === 'branded';
+}
+
+function isNonBrandedQuery(query) {
+  return classifySeoQuery(query) === 'nonBranded';
 }
 
 function getBusinessFit(query) {
   const normalized = normalizeText(query);
-  if (!normalized || isBrandedQuery(normalized)) return 1;
+  if (!isNonBrandedQuery(normalized)) return 1;
 
   const hasHighIntent = matchesAny(normalized, HIGH_INTENT_PATTERNS);
   const hasCoreService = matchesAny(normalized, CORE_SERVICE_PATTERNS);
@@ -101,7 +113,7 @@ function mergeOpportunityTypes(items = []) {
   items.forEach((item) => {
     const query = normalizeText(item.query);
     const page = normalizeText(item.page);
-    if (!query || isBrandedQuery(query)) return;
+    if (!isNonBrandedQuery(query)) return;
 
     const key = `${query}|${page}`;
     const existing = opportunities.get(key) || {
@@ -155,11 +167,13 @@ function rankSeoOpportunities(items = []) {
 }
 
 module.exports = {
+  classifySeoQuery,
   getBusinessFit,
   getConfidence,
   getPositionLeverage,
   getTargetCtr,
   isBrandedQuery,
+  isNonBrandedQuery,
   rankSeoOpportunities,
   scoreOpportunity,
 };
