@@ -9,7 +9,6 @@
   var document = window.document;
   var fetch = window.fetch.bind(window);
   var AbortController = window.AbortController;
-  var IntersectionObserver = window.IntersectionObserver;
   var form = document.getElementById('website-intake');
   if (!form) return;
   var button = form.querySelector('[data-intake-submit]');
@@ -84,21 +83,4 @@
     }
   });
 
-  var mobileContact = document.querySelector('[data-mobile-contact]');
-  var contactSection = document.getElementById('website-gesprek');
-  var hero = document.querySelector('.hero');
-  if (mobileContact && contactSection && typeof IntersectionObserver === 'function') {
-    var heroVisible = Boolean(hero);
-    var contactVisible = false;
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.target === hero) heroVisible = entry.isIntersecting;
-        if (entry.target === contactSection) contactVisible = entry.isIntersecting;
-      });
-      mobileContact.classList.toggle('is-hidden', heroVisible || contactVisible);
-    }, { threshold: 0 });
-    if (hero) observer.observe(hero);
-    observer.observe(contactSection);
-    form.addEventListener('focusin', function () { mobileContact.classList.add('is-hidden'); });
-  }
 });
