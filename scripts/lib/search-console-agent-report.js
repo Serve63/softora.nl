@@ -8,8 +8,9 @@ const SEO_STRETCH_TARGET_CLICKS = 100000;
 const SEO_STRETCH_DEADLINE = '2026-12-31';
 const AVERAGE_MONTH_DAYS = 365.2425 / 12;
 const {
+  classifySeoQuery,
   getBusinessFit,
-  isBrandedQuery,
+  isNonBrandedQuery,
   rankSeoOpportunities,
 } = require('./seo-opportunity-scoring');
 const {
@@ -392,7 +393,7 @@ function aggregateNonBrandedPages(pageQueryRows = []) {
   for (const row of normalizeSearchRows(pageQueryRows)) {
     const page = rowKey(row, 0);
     const query = rowKey(row, 1);
-    if (!page || !query || isBrandedQuery(query)) continue;
+    if (!page || !isNonBrandedQuery(query)) continue;
     const current = byPage.get(page) || { clicks: 0, impressions: 0, weightedPosition: 0 };
     current.clicks += toFiniteNumber(row.clicks);
     current.impressions += toFiniteNumber(row.impressions);
@@ -494,8 +495,8 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const visibleCurrentTotals = aggregateRows(snapshot.queriesCurrent || []);
   const currentTotals = aggregateRows(snapshot.totalsCurrent || snapshot.queriesCurrent || []);
   const previousTotals = aggregateRows(snapshot.totalsPrevious || snapshot.queriesPrevious || []);
-  const brandedQueryRows = queryRows.filter((row) => isBrandedQuery(rowKey(row, 0)));
-  const nonBrandedQueryRows = queryRows.filter((row) => !isBrandedQuery(rowKey(row, 0)));
+  const segmentRows = (segment) => queryRows.filter((row) => classifySeoQuery(rowKey(row, 0)) === segment);
+  const classifiedQueryRows = queryRows.filter((row) => classifySeoQuery(rowKey(row, 0)) !== 'unclassified');
   const sitemapIssues = (snapshot.sitemaps || []).filter(
     (sitemap) => sitemap.errors > 0 || sitemap.warnings > 0 || sitemap.isPending
   );
@@ -503,7 +504,7 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const lowCtrQueries = queryRows
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
     .filter((row) => row.position <= toFiniteNumber(options.maxLowCtrPosition, 20))
-    .filter((row) => !isBrandedQuery(rowKey(row, 0)))
+    .filter((row) => isNonBrandedQuery(rowKey(row, 0)))
     .filter((row) => row.ctr < toFiniteNumber(options.lowCtrThreshold, 0.025))
     .sort(sortByNumberDesc('impressions'))
     .map((row) => compactOpportunity(row, 'low_ctr', pageQueryRows))
@@ -513,7 +514,7 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const strikingDistanceQueries = queryRows
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
     .filter((row) => row.position > 5 && row.position <= toFiniteNumber(options.maxStrikingDistancePosition, 20))
-    .filter((row) => !isBrandedQuery(rowKey(row, 0)))
+    .filter((row) => isNonBrandedQuery(rowKey(row, 0)))
     .sort((a, b) => a.position - b.position || b.impressions - a.impressions)
     .map((row) => compactOpportunity(row, 'striking_distance', pageQueryRows))
     .filter((item) => !isSeoAutomationExcludedPath(item.page))
@@ -523,7 +524,7 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
     .filter((row) => row.position > toFiniteNumber(options.maxStrikingDistancePosition, 20))
     .filter((row) => row.position <= toFiniteNumber(options.maxEmergingPosition, 40))
-    .filter((row) => !isBrandedQuery(rowKey(row, 0)))
+    .filter((row) => isNonBrandedQuery(rowKey(row, 0)))
     .filter((row) => getBusinessFit(rowKey(row, 0)) >= 4)
     .sort(sortByNumberDesc('impressions'))
     .map((row) => compactOpportunity(row, 'emerging', pageQueryRows))
@@ -614,10 +615,12 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
       deadline: options.stretchDeadline,
     }),
     segments: {
-      branded: aggregateRows(brandedQueryRows),
-      nonBranded: aggregateRows(nonBrandedQueryRows),
+      branded: aggregateRows(segmentRows('branded')),
+      navigational: aggregateRows(segmentRows('navigational')),
+      ambiguousBrand: aggregateRows(segmentRows('ambiguousBrand')),
+      nonBranded: aggregateRows(segmentRows('nonBranded')),
       visibleQueries: visibleCurrentTotals,
-      unclassified: buildUnclassifiedSegment(currentTotals, visibleCurrentTotals),
+      unclassified: buildUnclassifiedSegment(currentTotals, aggregateRows(classifiedQueryRows)),
     },
     queries: {
       top: [...queryRows].sort(sortByNumberDesc('clicks')).slice(0, 20),
@@ -847,6 +850,8 @@ function formatAgentMarkdown(report = {}) {
       '',
       `Non-branded: ${report.segments.nonBranded?.clicks || 0} klikken, ${report.segments.nonBranded?.impressions || 0} vertoningen, CTR ${formatPercent(report.segments.nonBranded?.ctr || 0)}`,
       `Branded: ${report.segments.branded?.clicks || 0} klikken, ${report.segments.branded?.impressions || 0} vertoningen, CTR ${formatPercent(report.segments.branded?.ctr || 0)}`,
+      `Naamgericht: ${report.segments.navigational?.clicks || 0} klikken, ${report.segments.navigational?.impressions || 0} vertoningen (persoonlijke naam, geen generieke klantvraag)`,
+      `Mogelijk merkgericht: ${report.segments.ambiguousBrand?.clicks || 0} klikken, ${report.segments.ambiguousBrand?.impressions || 0} vertoningen (mogelijke merktypfout, apart gehouden)`,
       `Niet classificeerbaar: ${report.segments.unclassified?.clicks || 0} klikken, ${report.segments.unclassified?.impressions || 0} vertoningen (geen merkclaim mogelijk)`,
       ''
     );
