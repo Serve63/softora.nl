@@ -69,8 +69,13 @@ function createGitRepository() {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=9',
+    'SEO_MACHINE_PROMPT_VERSION=10',
     'SEO_THREAD_POLICY=same_thread',
+    'SEO_PORTFOLIO_POLICY=all_sites_each_cycle',
+    'Read docs/growth/seo-machine-sites.json.',
+    'Run node scripts/seo-machine-portfolio.js begin before sites.',
+    'Local work is never a live publication.',
+    'Run node scripts/seo-machine-portfolio.js finish after all sites.',
     'SEO_AUTOMATION_EXCLUDED_PATHS=/website,/bedrijfssoftware,/voicesoftware,/chatbot',
     `The sole automation id is ${AUTOMATION_ID}.`,
     'Run npm run seo:automation-state -- start-run before effects.',
