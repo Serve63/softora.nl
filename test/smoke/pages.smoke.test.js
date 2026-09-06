@@ -238,7 +238,7 @@ test('page smoke: linked kennisbank articles do not 404', async () => {
   const linkedArticles = [
     {
       path: '/kennisbank/wat-is-een-conversiegerichte-website',
-      title: /Wat is een conversiegerichte website\?/,
+      title: /Conversiegerichte website: 5 controlepunten/,
     },
     {
       path: '/kennisbank/wat-is-een-ai-telefonist',

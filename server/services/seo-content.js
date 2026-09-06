@@ -397,7 +397,9 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Begin met pagina’s die een keuze makkelijker maken',
         paragraphs: Object.freeze([
-          'Veel websites starten vanuit wat een bedrijf zelf wil vertellen. Voor SEO en leads werkt het beter om te starten vanuit wat een bezoeker nodig heeft om vertrouwen te krijgen. Denk aan een duidelijke dienstenpagina, voorbeelden van werk, uitleg over het proces en een laagdrempelige manier om contact op te nemen.',
+          Object.freeze({ text: 'Veel websites starten vanuit wat een bedrijf zelf wil vertellen. Voor SEO en leads werkt het beter om te starten vanuit wat een bezoeker nodig heeft om vertrouwen te krijgen. Denk aan een duidelijke dienstenpagina, voorbeelden van werk, uitleg over het proces en een laagdrempelige manier om contact op te nemen. Toets die pagina’s daarna aan de vijf controlepunten van een conversiegerichte website.',
+            links: Object.freeze([Object.freeze({ anchor: 'vijf controlepunten van een conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' })]),
+          }),
           'De homepage hoeft niet alles te dragen. Juist aparte pagina’s voor diensten, branches, prijzen, werkwijze en veelgestelde vragen zorgen ervoor dat Google beter begrijpt waar je voor gevonden wilt worden.',
         ]),
       }),
@@ -420,13 +422,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
       Object.freeze({ label: 'Website kosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
-      Object.freeze({ label: 'Conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
       Object.freeze({
         label: 'Interne linkstructuur',
         href: '/kennisbank/wat-is-interne-linkstructuur',
         availableFrom: '2026-06-01',
       }),
-      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
   Object.freeze({
