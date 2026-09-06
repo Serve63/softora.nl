@@ -69,9 +69,10 @@ function createGitRepository() {
 
 function validAutomationPrompt() {
   return [
-    'SEO_MACHINE_PROMPT_VERSION=10',
+    'SEO_MACHINE_PROMPT_VERSION=11',
     'SEO_THREAD_POLICY=same_thread',
     'SEO_PORTFOLIO_POLICY=all_sites_each_cycle',
+    'SEO_ACADEMY_CONTENT_POLICY=blogs_only',
     'Read docs/growth/seo-machine-sites.json.',
     'Run node scripts/seo-machine-portfolio.js begin before sites.',
     'Local work is never a live publication.',
