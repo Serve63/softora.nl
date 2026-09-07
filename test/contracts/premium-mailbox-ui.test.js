@@ -195,9 +195,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   const page = readPage();
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
-  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260822a/);
+  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260825a/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260820b/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260907a/);
@@ -222,9 +222,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260822a') < page.indexOf('premium-mailbox-signature.js?v=20260825a'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260825a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260825a'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260825a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260907a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907b'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260905b'));
@@ -607,6 +607,82 @@ function loadMailboxHelpersForTest(options = {}) {
 function renderMailboxBodyForTest(body, images, options) {
   return loadMailboxHelpersForTest().renderMailBody(body, images, options);
 }
+
+function getMailLinesOutsideMessageCards(html) {
+  const { parseDocument, DomUtils } = require('htmlparser2');
+  const document = parseDocument(html);
+  const hasClass = (node, name) => String(node.attribs?.class || '').split(/\s+/).includes(name);
+  return DomUtils.findAll((node) => hasClass(node, 'detail-mail-line'), document.children)
+    .filter((node) => {
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        if (hasClass(parent, 'detail-mail-section-received') || hasClass(parent, 'detail-mail-section-sent')) return false;
+      }
+      return true;
+    })
+    .map((node) => DomUtils.textContent(node).trim())
+    .filter(Boolean);
+}
+
+test('inkomende hoofdkaart verbergt quotevoetnoten vanaf de eerste render zonder op historie te wachten', () => {
+  const authored = 'Bedankt voor uw enthousiasme. Onze website is pas vernieuwd.';
+  const parentBody = 'Goedendag, bekijk het ontwerp dat ik voor jullie website heb gemaakt via deze link [1].';
+  const body = [authored, '', 'Martijn van de Ven schreef op 2026-09-07 15:53:',
+    `> ${parentBody}`, '', 'Links:', '------', '[1] https://voorbeeld.nl/ontwerp'].join('\n');
+  const parent = { id: 'sent:footer-parent', messageId: '<footer-parent@example.test>',
+    folder: 'sent', direction: 'sent', accountEmail: 'martijnven123@gmail.com',
+    date: '2026-09-07T13:53:00.000Z', body: parentBody };
+  for (const state of [
+    { threadMessages: [] },
+    { threadMessages: [{ ...parent, body: '', bodyLoaded: false }] },
+    { threadMessages: [parent], contactTimelineLoaded: true },
+  ]) {
+    const mail = { id: 'inbox:footer-root', folder: 'inbox', direction: 'received',
+      accountEmail: parent.accountEmail, email: 'contact@example.test',
+      receivedAt: '2026-09-07T14:16:00.000Z', inReplyTo: parent.messageId, body, ...state };
+    const html = renderMailboxBodyForTest(body, [], { mail, replyMailId: mail.id });
+    assert.match(html, /Bedankt voor uw enthousiasme/);
+    assert.doesNotMatch(html, /Links:|https:\/\/voorbeeld\.nl\/ontwerp|schreef op/);
+    assert.deepEqual(getMailLinesOutsideMessageCards(html), []);
+    assert.equal(mail.body, body);
+    assert.equal(campaignInboxModule.getRootMessagePresentation(body, mail).body, authored);
+  }
+});
+
+test('eigen naschrift en ongekoppelde Links blijven ook voor hydratatie binnen de ontvangen hoofdkaart', () => {
+  const body = ['Mijn nieuwe antwoord.', '> Een oud geciteerd detail.', '',
+    'P.S. Dit is mijn eigen aanvulling.', 'Links:', '------',
+    '[1] https://voorbeeld.nl/eigen-agenda'].join('\n');
+  const mail = { id: 'inbox:authored-footer', folder: 'inbox',
+    accountEmail: 'serve@softora.nl', body, threadMessages: [] };
+  const html = renderMailboxBodyForTest(body, [], { mail, replyMailId: mail.id });
+  assert.match(html, /Mijn nieuwe antwoord/);
+  assert.match(html, /P\.S\. Dit is mijn eigen aanvulling/);
+  assert.match(html, /Links:/);
+  assert.match(html, /https:\/\/voorbeeld\.nl\/eigen-agenda/);
+  assert.doesNotMatch(html, /Een oud geciteerd detail/);
+  assert.deepEqual(getMailLinesOutsideMessageCards(html), []);
+  assert.equal(mail.body, body);
+});
+
+test('een gedeelde linkvoetnoot blijft beschikbaar wanneer het eigen antwoord ernaar verwijst', () => {
+  const parentBody = 'Het oude voorstel verwijst naar onze gezamenlijke agenda [1].';
+  const body = ['Mijn nieuwe voorstel staat in deze agenda [1].', '',
+    'Servé Creusen schreef op 2026-09-07 10:00:', `> ${parentBody}`, '',
+    'Links:', '------', '[1] https://voorbeeld.nl/gedeelde-agenda'].join('\n');
+  const parent = { id: 'sent:shared-link', folder: 'sent', accountEmail: 'serve@softora.nl',
+    date: '2026-09-07T08:00:00.000Z', body: parentBody };
+  for (const threadMessages of [[], [parent]]) {
+    const mail = { id: 'inbox:shared-link', folder: 'inbox', accountEmail: parent.accountEmail,
+      receivedAt: '2026-09-07T08:20:00.000Z', body, threadMessages };
+    const presentation = campaignInboxModule.getRootMessagePresentation(body, mail);
+    const html = renderMailboxBodyForTest(body, [], { mail });
+    assert.match(presentation.body, /Mijn nieuwe voorstel/);
+    assert.match(presentation.body, /https:\/\/voorbeeld\.nl\/gedeelde-agenda/);
+    assert.match(html, /https:\/\/voorbeeld\.nl\/gedeelde-agenda/);
+    assert.doesNotMatch(presentation.body, /Het oude voorstel/);
+    assert.deepEqual(getMailLinesOutsideMessageCards(html), []);
+  }
+});
 
 test('mailbox detailzichtbaarheid gebruikt conversation, RFC Message-ID en fysieke id in vaste scopevolgorde', async () => {
   const mailbox = loadMailboxHelpersForTest();
@@ -4479,7 +4555,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260907a/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260822a/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260905b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');

@@ -445,7 +445,13 @@
       const hasCorrespondingMarker = referenceNumbers.some((number) => (
         new RegExp(`\\[\\s*${number}\\s*\\]`).test(evidenceText)
       ));
-      if (valid && targetCount && hasCorrespondingMarker) {
+      const authoredText = source.slice(0, index).filter((_line, lineIndex) => (
+        !evidenceSegments.some((segment) => lineIndex >= segment.start && lineIndex < segment.end)
+      )).join('\n');
+      const hasAuthoredReference = referenceNumbers.some((number) => (
+        new RegExp(`\\[\\s*${number}\\s*\\]`).test(authoredText)
+      ));
+      if (valid && targetCount && hasCorrespondingMarker && !hasAuthoredReference) {
         return { start: index, end: source.length };
       }
     }
