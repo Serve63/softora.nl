@@ -89,6 +89,29 @@ test('ontbrekende, verouderde of oncontroleerbare snapshots vallen terug op de c
   }
 });
 
+test('snelle snapshot wist de verzendsamenvatting wanneer het bijbehorende antwoord niet meer zichtbaar is', async () => {
+  const receivedAt = '2026-09-03T07:35:54.000Z';
+  const replyAt = '2026-09-03T10:12:08.000Z';
+  const messages = [{ id: 'root', messageKey: 'root', accountEmail: 'serve@softora.nl',
+    folder: 'inbox', receivedAt, threadMessages: [{ id: 'reply', messageKey: 'reply',
+      accountEmail: 'serve@softora.nl', folder: 'sent', date: replyAt }] }];
+  const raw = serializeMailboxCampaignSnapshot({ ok: true, messages });
+  assert.equal(parseMailboxCampaignSnapshot(raw).messages[0].latestOutboundAt, replyAt);
+  for (const replyState of [null, { deleted_at: replyAt }, { generation_superseded_at: replyAt }]) {
+    const { list } = snapshotFixture({
+      getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw } }),
+      mailboxIndexStore: { listMessageStatesByKeys: async () => [
+        { message_key: 'root', account_email: 'serve@softora.nl' },
+        ...(replyState ? [{ message_key: 'reply', account_email: 'serve@softora.nl', ...replyState }] : []),
+      ] },
+    });
+    const result = await list({ owner: 'serve', hydrateBodies: false, preferSnapshot: true });
+    assert.equal(result.messages[0].latestOutboundAt, '');
+    assert.equal(result.messages[0].latestInboundAt, receivedAt);
+    assert.deepEqual(result.messages[0].threadMessages, []);
+  }
+});
+
 test('een hangende snapshotread blokkeert de canonical fallback niet onbeperkt', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
   let finishRead;
