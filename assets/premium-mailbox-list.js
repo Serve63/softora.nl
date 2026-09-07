@@ -29,7 +29,8 @@
       typeof global.SoftoraMailboxCampaignInbox.getConversationAction === 'function'
       ? global.SoftoraMailboxCampaignInbox.getConversationAction(mail)
       : null;
-    const needsReply = conversationAction && conversationAction.kind === 'reply' && !conversationAction.message?.replyDismissedAt;
+    const needsReply = global.SoftoraMailboxCampaignInbox?.needsConversationReply?.(mail, conversationAction)
+      ?? (conversationAction?.kind === 'reply' && !conversationAction.message?.replyDismissedAt);
     const searchMatch = mail && mail.searchMatch;
     const searchSnippet = searchMatch && global.SoftoraMailboxDiscovery?.renderSearchSnippet?.(
       searchMatch, mail.searchQuery, escapeHtml

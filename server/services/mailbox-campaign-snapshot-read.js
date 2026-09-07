@@ -6,6 +6,7 @@ const {
   parseMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 const { getMailboxMessageOwner } = require('./mailbox-instantly-integration');
+const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 const SNAPSHOT_READ_BUDGET_MS = 3500;
 const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -63,8 +64,10 @@ function createMailboxCampaignSnapshotRead({ getUiStateValues, mailboxIndexStore
       const messages = candidates.flatMap((message) => {
         const root = reconcile(message);
         if (!root) return [];
-        return [{ ...root, threadMessages: message.threadMessages
-          .map((entry) => reconcile(entry, message.accountEmail)).filter(Boolean) }];
+        const visible = { ...root, threadMessages: message.threadMessages
+          .map((entry) => reconcile(entry, message.accountEmail)).filter(Boolean) };
+        // Removed or superseded messages must not survive as status evidence.
+        return [{ ...visible, ...resolveConversationActivity(visible) }];
       });
       return {
         ok: true,

@@ -368,6 +368,15 @@
       .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left));
   }
 
+  function needsConversationReply(mail, action = getConversationAction(mail)) {
+    if (!mail || action?.kind !== 'reply' || action.message?.replyDismissedAt) return false;
+    // Indexed activity can arrive before the corresponding thread metadata.
+    // Use it for the indicator without inventing a message or reply target.
+    const inboundAt = Math.max(getMessageTimestamp(action.message || mail), Date.parse(mail.latestInboundAt || '') || 0);
+    const outboundAt = Date.parse(mail.latestOutboundAt || '') || 0;
+    return !outboundAt || outboundAt <= inboundAt;
+  }
+
   function groupConversationMessages(messages) {
     const groups = new Map();
     sortMessagesNewestFirst(messages).forEach((mail) => {
@@ -1119,6 +1128,7 @@
     getConversationVisibilityKey,
     getStableCampaignConversationId,
     getConversationAction,
+    needsConversationReply,
     getActionMessageKey,
     getFolder,
     hasPageBootstrap,

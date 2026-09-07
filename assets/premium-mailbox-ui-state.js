@@ -82,9 +82,11 @@
   function getReadState(mail, campaignInbox) {
     const conversationAction = campaignInbox?.getConversationAction?.(mail);
     const replyTarget = conversationAction?.kind === 'reply' ? (conversationAction.message || mail) : mail;
+    const needsReply = campaignInbox?.needsConversationReply?.(mail, conversationAction)
+      ?? (conversationAction?.kind === 'reply' && !replyTarget?.replyDismissedAt);
     return {
       conversationAction, replyTarget,
-      replyHandled: !conversationAction || conversationAction.kind !== 'reply' || Boolean(replyTarget.replyDismissedAt),
+      replyHandled: !needsReply,
       readPending: Boolean(mail?.readPending || replyTarget?.readPending || replyTarget?.replyDismissPending),
       readError: String(replyTarget?.readError || mail?.readError || ''),
     };
