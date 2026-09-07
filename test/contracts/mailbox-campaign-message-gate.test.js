@@ -104,13 +104,17 @@ test('berichtbewijs wordt volledig in begrensde batches gelezen en databasefoute
   await assert.rejects(() => repository.filterCampaignMessages({ accountEmails: ['serve@softora.nl'], messages }), /database unavailable/);
 });
 
-test('een lege succesvolle contacttijdlijn verzint geen bericht en gebruikt correct enkelvoud', () => {
+test('een leeg dossier verzint geen historie en telt alleen het al geopende bericht als geladen', () => {
   const root = { id: 'inbox:1', accountEmail: 'serve@softora.nl', email: 'contact@example.nl', messageId: '<one@example.nl>' };
   discovery.mergeContactTimeline(root, [], root.email, 0, {
     accountEmails: ['serve@softora.nl'], canonicalOwner: 'serve', getMessageOwner: () => 'serve',
   });
   assert.equal(root.contactTimelineTotal, 0);
-  assert.match(discovery.renderTimelineSummary(root, String), /0 berichten · 0 onderwerpen/);
+  assert.deepEqual(root.threadMessages, []);
+  const summary = discovery.renderTimelineSummary(root, String);
+  assert.match(summary, /data-contact-summary-state="partial"/);
+  assert.match(summary, /1 bericht geladen/);
+  assert.doesNotMatch(summary, /0 berichten|0 onderwerpen|state="complete"/);
   assert.match(discovery.renderTimelineSummary({ ...root, contactTimelineTotal: 1, contactTimelineThreadCount: 1 }, String), /1 bericht · 1 onderwerp/);
 });
 
