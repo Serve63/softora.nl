@@ -1115,7 +1115,7 @@ function createMailboxIndexStore(deps = {}) {
     listMatchingMessagesForAccounts,
   });
   const visibilityStore = createMailboxIndexVisibilityStore({
-    runDurableWrite, normalizeEmail, normalizeFolder, normalizeString,
+    run, runDurableWrite, normalizeEmail, normalizeFolder, normalizeString,
   });
   const uidGenerationIndex = createMailboxUidGenerationIndex({
     runDurableWrite,

@@ -935,6 +935,63 @@ test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen ber
   }
 });
 
+test('ongecachete eigenaar toont de serversnapshot terwijl exact een canonical verversing nog loopt', async () => {
+  const previousDocument = globalThis.document;
+  const previousSession = globalThis.SoftoraPageBootstrapSession;
+  const previousApi = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  const cache = new Map();
+  globalThis.document = { getElementById: () => null };
+  globalThis.SoftoraPageBootstrapSession = {
+    get: () => ({ authenticated: true, userId: 'switch-test', email: 'serve@softora.nl' }),
+    cache: { read: (key) => cache.get(key) || null, write: (key, value) => { cache.set(key, value); return true; } },
+  };
+  delete require.cache[modulePath];
+  const inbox = require(modulePath);
+  const requests = [];
+  let finishRefresh;
+  let messages = [];
+  const fetchImpl = async (url) => {
+    requests.push(new URL(url, 'https://www.softora.nl'));
+    if (requests.length === 1) return response({
+      ok: true, owner: 'martijn', fromSnapshot: true,
+      messages: [{ id: 'direct-zichtbaar', accountEmail: 'martijn@softora.nl' }],
+      sync: { stale: true, refreshRecommended: true },
+    });
+    return new Promise((resolve) => { finishRefresh = resolve; });
+  };
+  try {
+    const view = ownerSession.createView({
+      getScope: () => ({ owner: 'martijn', folder: 'outreach' }),
+      campaignInbox: { ...inbox, load: (folder, normalize, _fetch, options) => inbox.load(folder, normalize, fetchImpl, options) },
+      getMessages: () => messages,
+      setMessages: (value) => { messages = value; },
+      filterDeleted: (value) => value,
+      getListElement: () => ({ setAttribute() {} }),
+      renderList() {},
+    });
+    assert.equal(await view.load({ openLatest: false, skipProviderRefresh: true }), true);
+    assert.deepEqual(messages.map((message) => message.id), ['direct-zichtbaar']);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].searchParams.get('preferSnapshot'), '1');
+    assert.equal(requests[1].searchParams.has('preferSnapshot'), false);
+    assert.ok(requests.every((url) => url.searchParams.get('owner') === 'martijn' && url.searchParams.get('refreshInstantly') === '0'));
+    finishRefresh(response({ ok: true, messages: [{ id: 'canoniek', accountEmail: 'martijn@softora.nl' }], sync: {} }));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(messages.map((message) => message.id), ['canoniek']);
+    assert.equal(requests.length, 2);
+    const warm = await inbox.load('outreach', (message) => message, fetchImpl, { owner: 'martijn' });
+    assert.equal(warm.fromBootstrap, true);
+    assert.deepEqual(warm.messages.map((message) => message.id), ['canoniek']);
+    assert.equal(requests.length, 2);
+  } finally {
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraPageBootstrapSession = previousSession;
+    globalThis.SoftoraMailboxCampaignInbox = previousApi;
+  }
+});
+
 test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gescheiden', () => {
   const previousSession = global.SoftoraPageBootstrapSession;
   global.SoftoraPageBootstrapSession = {
