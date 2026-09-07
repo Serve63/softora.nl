@@ -979,7 +979,7 @@ function renderMailboxDetailHtml(m) {
               </div>
             </div>
           </div>
-          ${window.SoftoraMailboxDiscovery?.renderTimelineSummary?.(m, escapeHtml) || ''}
+          ${window.SoftoraMailboxDiscovery?.renderTimelineSummary?.(m, escapeHtml, contactDossier) || ''}
           ${rootHeaderRouting}${contactDossier.newMessageAction ? renderMailboxConversationAction(contactDossier.newMessageAction, m.id, { placement: 'contact-header' }) : ''}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
