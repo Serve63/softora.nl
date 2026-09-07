@@ -27,6 +27,7 @@ function isTemporaryMailboxSendInfrastructureError(error) {
   ).trim();
   if ([
     'MAILBOX_REPLY_TARGET_UNAVAILABLE',
+    'MAILBOX_CORRESPONDENCE_SOURCE_UNAVAILABLE',
     'MAILBOX_SEND_PROVENANCE_UNAVAILABLE',
     'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED',
     'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED',
@@ -705,6 +706,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
           mode: threadProvenance.mode,
           conversationId: threadProvenance.conversationId,
           replyTargetMessageId: threadProvenance.replyTargetMessageId,
+          correspondenceSourceMessageId: threadProvenance.correspondenceSourceMessageId || '',
           providerThreadId: threadProvenance.providerThreadId,
           reconcileProof: signedReconcileProof,
           reservationReady: Boolean(
