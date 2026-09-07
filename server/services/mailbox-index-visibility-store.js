@@ -2,11 +2,41 @@
 
 function createMailboxIndexVisibilityStore(deps = {}) {
   const {
+    run,
     runDurableWrite,
     normalizeEmail,
     normalizeFolder,
     normalizeString,
   } = deps;
+
+  async function listMessageStatesByKeys({ messageKeys = [], deadlineAtMs = Date.now() + 2500 } = {}) {
+    const keys = Array.from(new Set(messageKeys.map(normalizeString).filter(Boolean)));
+    if (!keys.length) return [];
+    if (keys.length > 2000 || typeof run !== 'function') return null;
+    const rows = [];
+    // Short primary-key batches avoid URL/header limits and full-history scans.
+    // Three reads at a time share one deadline; a failed read never means empty.
+    for (let offset = 0; offset < keys.length; offset += 150) {
+      const remainingMs = Math.min(1500, deadlineAtMs - Date.now());
+      if (remainingMs < 250) return null;
+      const batches = [0, 50, 100].map((start) => keys.slice(offset + start, Math.min(offset + start + 50, keys.length)))
+        .filter((batch) => batch.length);
+      const results = await Promise.all(batches.map((batch) => run('snapshot-message-states', (client) => client
+        .from('softora_mailbox_messages')
+        .select('message_key,account_email,unread,softora_read_at,reply_dismissed_at,state_revision,state_mutation_key,state_mutation_at,starred')
+        .in('message_key', batch)
+        .is('deleted_at', null)
+        .is('generation_superseded_at', null), {
+        bypassFailureCooldown: true,
+        suppressFailureCooldown: true,
+        queryTimeoutMs: remainingMs,
+        clientOptions: { timeoutMs: remainingMs, ignoreFailureCooldown: true, suppressFailureCooldown: true },
+      })));
+      if (results.some((result) => !result.ok || !Array.isArray(result.data))) return null;
+      rows.push(...results.flatMap((result) => result.data));
+    }
+    return rows;
+  }
 
   function normalizeTarget({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
     const normalizedFolder = normalizeFolder(folder);
@@ -73,6 +103,7 @@ function createMailboxIndexVisibilityStore(deps = {}) {
   }
 
   return {
+    listMessageStatesByKeys,
     markMessageDeleted: (input) => setMessageVisibility(input, true),
     restoreMessage: (input) => setMessageVisibility(input, false),
     setContactVisibility,

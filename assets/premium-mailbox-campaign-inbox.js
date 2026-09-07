@@ -1083,7 +1083,8 @@
       limit: '200',
       metadataOnly: '1',
       owner: owner === 'both' ? '' : owner,
-      refreshInstantly: options && options.refreshInstantly === false ? '0' : '1',
+      refreshInstantly: !options?.skipBootstrap || options.refreshInstantly === false ? '0' : '1',
+      ...(!options?.skipBootstrap ? { preferSnapshot: '1' } : {}),
     });
     try {
       const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
@@ -1099,7 +1100,7 @@
       if (owner !== 'both' && isPersonalOwner(data.owner) && normalizeOwner(data.owner) !== owner) {
         throw new Error('De mailboxresponse hoort bij een andere eigenaar.');
       }
-      return normalizeLoadResult(data, normalizeMessage, false, owner);
+      return normalizeLoadResult(data, normalizeMessage, data.fromSnapshot === true && !options?.skipBootstrap, owner);
     } catch (error) {
       if (options?.signal?.aborted || error?.name === 'AbortError') throw error;
       const fallback = getSessionFallback(owner);
