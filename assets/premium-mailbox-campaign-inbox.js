@@ -405,17 +405,24 @@
         })
         .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
       const allMessages = [primary, ...threadMessages];
-      const latestInboundAt = allMessages
-        .filter((message) => !isSentMessageByProvenance(message, primary.accountEmail) && !(message.copyContext && message.copyContext.evidenceKnown === true))
-        .map((message) => message.receivedAt || message.internalDate || message.date)
+      // Timeline bodies can arrive later than the indexed conversation summary.
+      const latestInboundAt = [
+        ...groupedMessages.map((message) => message.latestInboundAt),
+        ...allMessages
+          .filter((message) => !isSentMessageByProvenance(message, primary.accountEmail) && !(message.copyContext && message.copyContext.evidenceKnown === true))
+          .map((message) => message.receivedAt || message.internalDate || message.date),
+      ]
         .filter((value) => Number.isFinite(Date.parse(value || '')))
         .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || primary.latestInboundAt || primary.receivedAt || '';
-      const latestOutboundAt = allMessages
-        .filter((message) => isSentMessageByProvenance(message, primary.accountEmail) || (message.copyContext && message.copyContext.evidenceKnown === true))
-        .map((message) => message.receivedAt || message.internalDate || message.date)
+      const latestOutboundAt = [
+        ...groupedMessages.map((message) => message.latestOutboundAt),
+        ...allMessages
+          .filter((message) => isSentMessageByProvenance(message, primary.accountEmail) || (message.copyContext && message.copyContext.evidenceKnown === true))
+          .map((message) => message.receivedAt || message.internalDate || message.date),
+      ]
         .filter((value) => Number.isFinite(Date.parse(value || '')))
         .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || primary.latestOutboundAt || '';
-      const activityAt = [latestInboundAt, latestOutboundAt]
+      const activityAt = [...groupedMessages.map((message) => message.activityAt), latestInboundAt, latestOutboundAt]
         .filter((value) => Number.isFinite(Date.parse(value || '')))
         .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || latestInboundAt;
       return {

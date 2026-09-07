@@ -212,7 +212,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260828g/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
@@ -225,7 +225,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260822a') < page.indexOf('premium-mailbox-signature.js?v=20260825a'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260825a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260820b'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260820b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260826a'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260905b'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
@@ -4480,7 +4480,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260905c/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260822a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260826a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260905b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -5262,6 +5262,10 @@ test('coldmail rij gebruikt de laatste inkomende of uitgaande activiteit', () =>
 
 test('coldmail rij combineert een activiteit van vandaag nooit met de oude ontvangstdatum', () => {
   const helpers = loadMailboxHelpersForTest();
+  const fixedDisplay = {
+    ...helpers.display,
+    formatMailDate: (value) => helpers.display.formatMailDate(value, '2026-08-18T12:00:00.000Z'),
+  };
   const row = listModule.renderItem({
     id: 'martijn@softora.nl|inbox:58',
     from: 'Inkoop Seniorenwinkel',
@@ -5276,7 +5280,7 @@ test('coldmail rij combineert een activiteit van vandaag nooit met de oude ontva
   }, {
     activeMail: '',
     escapeHtml: String,
-    display: helpers.display,
+    display: fixedDisplay,
     displayOptions: { activeFolder: 'outreach', account: 'martijn@softora.nl' },
   });
 

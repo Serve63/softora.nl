@@ -11,10 +11,13 @@
       account: mail.accountEmail || displayOptions.account,
     });
     const activityAt = mail.activityAt || mail.receivedAt || '';
-    const listDate = Object.prototype.hasOwnProperty.call(mail, 'activityListDate')
+    const activityWhen = Number.isFinite(Date.parse(activityAt)) && typeof display.formatMailDate === 'function'
+      ? display.formatMailDate(activityAt)
+      : null;
+    const listDate = activityWhen ? activityWhen.listDate : Object.prototype.hasOwnProperty.call(mail, 'activityListDate')
       ? mail.activityListDate
       : mail.listDate;
-    const listTime = mail.activityTime || mail.time;
+    const listTime = activityWhen ? activityWhen.time : mail.activityTime || mail.time;
     const copyKind = mail.copyContext && mail.copyContext.evidenceKnown === true &&
       ['bcc', 'cc'].includes(String(mail.copyContext.kind || '').toLowerCase())
       ? String(mail.copyContext.kind).toUpperCase()

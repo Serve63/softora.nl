@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
 
 const read = (relativePath) => fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 
@@ -9,7 +10,7 @@ test('mailbox laadt de pagina-eigen mobiele laag als laatste en ondersteunt veil
   const page = read('premium-mailbox.html');
   assert.match(page, /content="width=device-width, initial-scale=1\.0, viewport-fit=cover"/);
   assert.ok(page.indexOf('premium-mailbox-mobile.css?v=20260822a') > page.indexOf('</style>'));
-  assert.ok(page.indexOf('premium-mailbox-mobile.js?v=20260728a') > page.indexOf('premium-mailbox.js?v=20260905c'));
+  assert.ok(page.indexOf('premium-mailbox-mobile.js?v=20260907a') > page.indexOf('premium-mailbox.js?v=20260905c'));
   assert.match(page, /data-mailbox-mobile-action="toggle-navigation"/);
   assert.match(page, /class="mailbox-mobile-sidebar-backdrop"[\s\S]*data-mailbox-mobile-action="close-navigation"/);
 });
@@ -34,4 +35,28 @@ test('mobiele controller bewaart uitsluitend visuele state en sluit detail toega
   assert.match(script, /event\.key === 'Escape'[\s\S]*close-compose/);
   assert.match(script, /new MutationObserver\([\s\S]*ensureDetailToolbar/);
   assert.doesNotMatch(script, /localStorage|sessionStorage|fetch\(|\/api\//);
+});
+
+test('sluiten van compose herstelt focus in het volgende frame zonder de gewiste referentie te gebruiken', () => {
+  const script = read('assets/premium-mailbox-mobile.js');
+  const syncComposeState = script.slice(script.indexOf('  function syncComposeState()'), script.indexOf('  function getFocusable('));
+  for (const outcome of ['connected', 'removed', 'reopened']) {
+    const callbacks = [];
+    let open = false;
+    let focused = 0;
+    const target = { isConnected: true, focus() { focused += 1; } };
+    const context = {
+      compose: { classList: { contains: () => open }, setAttribute() {} },
+      document: { body: { classList: { toggle() {} } } },
+      composeReturnFocus: target,
+      requestAnimationFrame: (callback) => callbacks.push(callback),
+    };
+    vm.runInNewContext(`${syncComposeState}\nsyncComposeState();`, context);
+    assert.equal(context.composeReturnFocus, null);
+    assert.equal(focused, 0);
+    if (outcome === 'removed') target.isConnected = false;
+    if (outcome === 'reopened') open = true;
+    assert.doesNotThrow(() => callbacks.forEach((callback) => callback()));
+    assert.equal(focused, outcome === 'connected' ? 1 : 0);
+  }
 });
