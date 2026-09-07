@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const vm = require('node:vm');
 
 const read = (relativePath) => fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 
@@ -38,25 +37,64 @@ test('mobiele controller bewaart uitsluitend visuele state en sluit detail toega
 });
 
 test('sluiten van compose herstelt focus in het volgende frame zonder de gewiste referentie te gebruiken', () => {
-  const script = read('assets/premium-mailbox-mobile.js');
-  const syncComposeState = script.slice(script.indexOf('  function syncComposeState()'), script.indexOf('  function getFocusable('));
+  const modulePath = require.resolve('../../assets/premium-mailbox-mobile.js');
+  const globalKeys = ['document', 'window', 'MutationObserver', 'requestAnimationFrame'];
+  const previousGlobals = new Map(globalKeys.map((key) => [key, Object.getOwnPropertyDescriptor(global, key)]));
   for (const outcome of ['connected', 'removed', 'reopened']) {
     const callbacks = [];
-    let open = false;
+    const events = new Map();
+    const observers = new Map();
     let focused = 0;
-    const target = { isConnected: true, focus() { focused += 1; } };
-    const context = {
-      compose: { classList: { contains: () => open }, setAttribute() {} },
-      document: { body: { classList: { toggle() {} } } },
-      composeReturnFocus: target,
-      requestAnimationFrame: (callback) => callbacks.push(callback),
-    };
-    vm.runInNewContext(`${syncComposeState}\nsyncComposeState();`, context);
-    assert.equal(context.composeReturnFocus, null);
-    assert.equal(focused, 0);
-    if (outcome === 'removed') target.isConnected = false;
-    if (outcome === 'reopened') open = true;
-    assert.doesNotThrow(() => callbacks.forEach((callback) => callback()));
-    assert.equal(focused, outcome === 'connected' ? 1 : 0);
+    const target = { isConnected: true, focus() { focused += 1; }, getAttribute: () => 'new-message' };
+    function element() {
+      const classes = new Set();
+      return {
+        classList: {
+          contains: (name) => classes.has(name),
+          add: (name) => classes.add(name),
+          remove: (name) => classes.delete(name),
+          toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); },
+        },
+        setAttribute() {}, removeAttribute() {}, querySelector() { return null; },
+      };
+    }
+    const compose = element();
+    const detail = element();
+    try {
+      global.document = {
+        querySelector: () => element(),
+        getElementById: (id) => id === 'compose-overlay' ? compose : detail,
+        body: element(), documentElement: { style: { setProperty() {} } },
+        addEventListener: (name, callback) => events.set(name, callback),
+      };
+      global.window = {
+        location: { search: '' }, innerHeight: 900, addEventListener() {},
+        matchMedia: () => ({ matches: false, addEventListener() {} }),
+      };
+      global.MutationObserver = class {
+        constructor(callback) { this.callback = callback; }
+        observe(node) { observers.set(node, this.callback); }
+      };
+      global.requestAnimationFrame = (callback) => callbacks.push(callback);
+      delete require.cache[modulePath];
+      require('../../assets/premium-mailbox-mobile.js');
+      events.get('click')({ target: { closest: (selector) => selector === '[data-mailbox-action]' ? target : null } });
+      observers.get(compose)();
+      assert.equal(callbacks.length, 1);
+      assert.equal(focused, 0);
+      if (outcome === 'removed') target.isConnected = false;
+      if (outcome === 'reopened') compose.classList.add('open');
+      assert.doesNotThrow(() => callbacks.splice(0).forEach((callback) => callback()));
+      assert.equal(focused, outcome === 'connected' ? 1 : 0);
+      compose.classList.remove('open');
+      observers.get(compose)();
+      assert.equal(callbacks.length, 0, 'focus mag maar eenmaal worden hersteld');
+    } finally {
+      delete require.cache[modulePath];
+      previousGlobals.forEach((descriptor, key) => {
+        if (descriptor) Object.defineProperty(global, key, descriptor);
+        else delete global[key];
+      });
+    }
   }
 });
