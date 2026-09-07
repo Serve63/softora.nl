@@ -28,7 +28,7 @@ const aliasLineageTimelineMigration = fs.readFileSync(path.resolve(
 ), 'utf8');
 const referenceAncestorsMigration = fs.readFileSync(path.resolve(
   __dirname,
-  '../../supabase/migrations/20260907165300_mailbox_contact_reference_ancestors.sql'
+  '../../supabase/migrations/20260907170516_mailbox_contact_reference_ancestors.sql'
 ), 'utf8');
 const uidGenerationMigration = fs.readFileSync(path.resolve(
   __dirname,
