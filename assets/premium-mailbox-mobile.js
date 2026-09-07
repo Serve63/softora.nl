@@ -94,8 +94,11 @@
     if (open) {
       requestAnimationFrame(() => document.getElementById('c-body')?.focus({ preventScroll: true }));
     } else if (composeReturnFocus?.isConnected) {
-      requestAnimationFrame(() => composeReturnFocus.focus({ preventScroll: true }));
+      const returnFocus = composeReturnFocus;
       composeReturnFocus = null;
+      requestAnimationFrame(() => {
+        if (returnFocus.isConnected && !compose.classList.contains('open')) returnFocus.focus({ preventScroll: true });
+      });
     }
   }
 
