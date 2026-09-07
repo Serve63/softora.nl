@@ -1318,7 +1318,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Begin bij het proces dat elke week terugkomt',
         paragraphs: Object.freeze([
-          'Een proces automatiseren met AI begint niet bij een model of prompt, maar bij terugkerend werk dat nu tijd kost. Denk aan aanvragen samenvatten, klantvragen sorteren, offertes voorbereiden, taken klaarzetten of gesprekken vertalen naar CRM-notities.',
+          Object.freeze({ text: 'Een proces automatiseren met AI begint niet bij een model of prompt, maar bij terugkerend werk dat nu tijd kost. Werk het proces eerst uit in een concrete proceskaart met trigger, status, beslisrecht, foutpad en acceptatiebewijs. Denk daarna aan aanvragen samenvatten, klantvragen sorteren, offertes voorbereiden, taken klaarzetten of gesprekken vertalen naar CRM-notities.', links: Object.freeze([Object.freeze({ anchor: 'concrete proceskaart', href: '/kennisbank/wat-is-procesautomatisering' })]) }),
           'Voor MKB-bedrijven is vooral herhaalbaarheid belangrijk. Als dezelfde informatie steeds opnieuw binnenkomt en dezelfde vervolgstap nodig is, kan AI helpen om de eerste voorbereiding sneller en consistenter te maken.',
         ]),
       }),

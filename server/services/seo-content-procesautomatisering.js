@@ -3,7 +3,7 @@ const PROCESS_AUTOMATION_CONTENT_ITEM = Object.freeze({
   slug: 'wat-is-procesautomatisering',
   title: 'Wat is procesautomatisering?',
   description:
-    'Leer procesautomatisering afbakenen met een proceskaart voor trigger, status, beslisrecht, foutpad, menselijke controle en acceptatiebewijs.',
+    'Procesautomatisering maakt een terugkerende werkroute bestuurbaar. Leg trigger, status, beslisrecht, foutpad, eigenaar en acceptatiebewijs vast.',
   category: 'Procesautomatisering',
   intent: 'Uitleg en afbakening',
   qualityVersion: 2,
@@ -33,10 +33,10 @@ const PROCESS_AUTOMATION_CONTENT_ITEM = Object.freeze({
       observedAt: '2026-08-20',
     }),
   ]),
-  growthEventKind: 'substantial_refresh',
-  growthEventAt: '2026-08-20',
+  growthEventKind: 'other_growth_action',
+  growthEventAt: '2026-09-07',
   publishedAt: '2026-06-24',
-  updatedAt: '2026-09-02',
+  updatedAt: '2026-09-07',
   visualQualityVersion: 2,
   visualBrief: Object.freeze({
     hero: Object.freeze({
