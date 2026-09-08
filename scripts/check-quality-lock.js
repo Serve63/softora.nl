@@ -204,6 +204,7 @@ function listQualityLockViolations(options = {}) {
     'check:public-data': 'node scripts/check-public-data-exposure.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
+    'test:e2e:auth': 'node --test test/e2e/premium-auth.browser.test.js',
     'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
     'check:live-production-version': 'node scripts/check-live-production-version.js',
     'check:live-production-version:wait': 'node scripts/wait-live-production-version.js',
@@ -256,7 +257,7 @@ function listQualityLockViolations(options = {}) {
 
   if (trackedFileSet.has('scripts/verify-critical.js')) {
     const verifyCriticalSource = readFile('scripts/verify-critical.js');
-    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:deps', 'check:quality-lock', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
+    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:deps', 'check:quality-lock', 'test:contracts', 'test:smoke', 'test:e2e:auth', 'check:secrets'].forEach(
       (scriptName) => {
         const pattern = new RegExp(`\\['run',\\s*'${scriptName.replace(':', '\\:')}'\\]`);
         if (!pattern.test(verifyCriticalSource)) {
@@ -358,7 +359,7 @@ function listQualityLockViolations(options = {}) {
     });
 
   trackedFiles
-    .filter((filePath) => /^test\/(?:contracts|smoke)\/.+\.js$/i.test(filePath))
+    .filter((filePath) => /^test\/(?:contracts|smoke|e2e)\/.+\.js$/i.test(filePath))
     .forEach((filePath) => {
       const source = readFile(filePath);
       TEST_WEAKENING_PATTERNS.forEach(({ label, pattern }) => {
