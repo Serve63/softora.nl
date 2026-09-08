@@ -2063,7 +2063,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = null;/);
   assert.match(pageSource, /nodes\.count\.textContent = displayText;/);
-  assert.match(pageSource, /Sunburst max: ca\. US\$0,16464 beeldprijs \+ invoer/);
+  assert.match(pageSource, /Sunburst max: /);
+  assert.match(pageSource, /SoftoraDatabasePhotoBatch\.formatOutputEstimate\(1\)/);
+  assert.match(pageSource, /SoftoraDatabasePhotoBatch\.pricingNote/);
   assert.doesNotMatch(pageSource, /URL-scan kost €0,00/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton"/);
@@ -2165,7 +2167,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-max-usage-costs/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-eur-vat-costs/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2416,9 +2418,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260908-max-usage-costs/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260908-eur-vat-costs/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-max-usage-costs/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-eur-vat-costs/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -2571,7 +2573,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-max-usage-costs/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-eur-vat-costs/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -2611,7 +2613,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-max-usage-costs/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-eur-vat-costs/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);

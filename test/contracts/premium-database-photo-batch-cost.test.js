@@ -13,6 +13,17 @@ test('opening a Sunburst batch shows explicit max output estimates for both sele
     closeAddActions() {}, generate() { assert.fail('Opening the selection must not generate images'); },
   });
   controller.open();
-  assert.equal(nodes.photoBatchAllCount.textContent, '100 bedrijven · ca. US$16,464 + invoer');
-  assert.equal(nodes.photoBatchSummary.textContent, 'Selectie: 10 bedrijven · ca. US$1,6464 + invoer (beeldprijs; invoer extra)');
+  assert.equal(nodes.photoBatchAllCount.textContent, '100 bedrijven · ca. €17,16 + invoer (incl. 21% btw)');
+  assert.equal(nodes.photoBatchSummary.textContent, 'Selectie: 10 bedrijven · ca. €1,72 + invoer (incl. 21% btw)');
+});
+
+
+test('euro prices round upwards to cents with exactly two decimals, without floating point phantom cents', () => {
+  assert.equal(formatEuroCost(0.1715), '€0,18');
+  assert.equal(formatEuroCost(0.1934), '€0,20');
+  assert.equal(formatEuroCost(0.18), '€0,18');
+  assert.equal(formatEuroCost(0.1 + 0.2), '€0,30');
+  assert.equal(formatEuroCost(0.00001), '€0,01');
+  assert.equal(formatEuroCost(0), '€0,00');
+  assert.equal(formatEuroCost(null), 'prijs na generatie');
 });
