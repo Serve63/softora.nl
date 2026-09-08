@@ -4,6 +4,10 @@ Generated with the built-in imagegen tool on 2026-09-08, using the corresponding
 
 Each `*-variants-v1.webp` is one 5-column by 3-row sprite sheet. Columns: zand, cognac, olijf, kiezel, antraciet. Rows: stof, microleder, leer. Files were converted losslessly to WebP without changing image pixels. Original PNGs are retained in the Codex generated-images folder.
 
+The generated chairs do not land at identical positions inside those tiles. `node scripts/measure-relaxst-chair-framing.js` reads the original pixels and records the exact crop, chair bounds, pedestal bounds and source hash in `assets/relaxst/chair-framing.js`. It does not edit the images. The viewer clips each tile separately and registers the top at 8%, the floor at 96%, and the pedestal midpoint at 50% of the fixed frame. Pedestal width follows the original photograph's proportions; minor horizontal corrections compensate for generation drift. This also aligns the original-to-material transition. Only explicit S/M/L selection scales the outer frame, around the same floor anchor. Re-run the measurement and visual switching checks whenever an image changes.
+
+Local release check, 2026-09-08: the cumulative demo branch contains 991 behavior lines against main, including the earlier complete configurator and its static preview builder; the registration follow-up changes eight files, with no backend changes. For this isolated static-demo publication only, use the explicitly permitted local `ALLOW_LARGE_BEHAVIOR_CHANGE=1 npm run verify:critical` exception. All other guardrails, contract/smoke tests, source-pixel checks and browser checks remain enabled; no CI or production guard is changed. Before merging the full demo into Softora main, split that cumulative change to meet the normal size gate.
+
 These are illustrative demo renders, not verified product swatches or technical drawings. Size is illustrated by scaling relative to the demo's existing seat heights (43/46/49 cm), anchored at the chair's feet. Actual measurements and combinations still require Relaxst confirmation. Mechanism and comfort extras intentionally do not change the image.
 
 Official references:

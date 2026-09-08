@@ -8,6 +8,7 @@ const FILES = [
   ['relaxst-configurator-demo.html', 'index.html'],
   ['assets/relaxst-configurator-demo.css', 'assets/relaxst-configurator-demo.css'],
   ['assets/relaxst-configurator-demo.js', 'assets/relaxst-configurator-demo.js'],
+  ['assets/relaxst/chair-framing.js', 'assets/relaxst/chair-framing.js'],
   ...['comfora', 'linea', 'zeus'].flatMap((model) => ['original.jpg', 'variants-v1.webp'].map((image) => {
     const file = `assets/relaxst/chairs/${model}-${image}`;
     return [file, file];

@@ -116,6 +116,7 @@
     mobileNext: document.querySelector('#mobile-next'),
     chairImage: document.querySelector('#chair-image'),
     chairFrame: document.querySelector('#chair-frame'),
+    chairArtwork: document.querySelector('#chair-artwork'),
     sizeMarker: document.querySelector('#size-marker'),
     previewFeedback: document.querySelector('#preview-feedback'),
     modelName: document.querySelector('#selected-model-name'),
@@ -266,7 +267,8 @@
   }
 
   function updateProductStage() {
-    const model = MODELS[state.model] || MODELS.linea;
+    const modelId = state.model || 'linea';
+    const model = MODELS[modelId];
     const color = COLORS[state.color];
     const upholstery = UPHOLSTERY[state.upholstery];
     const size = SIZES[state.size];
@@ -275,10 +277,30 @@
     // Sprite sheets let every color/material change render instantly after one image load.
     const column = Object.keys(COLORS).indexOf(state.color || 'zand');
     const row = Object.keys(UPHOLSTERY).indexOf(state.upholstery || 'stof');
-    elements.chairFrame.classList.toggle('has-variant', showVariant);
+    const framing = window.RelaxstChairFraming[modelId];
+    const source = showVariant ? framing.variants : framing.original;
+    const frame = source.frames[showVariant ? row * 5 + column : 0];
+    const reference = framing.original.frames[0];
+    // Keep the top, floor and pedestal fixed, including the original-to-variant switch.
+    // Horizontal registration corrects the small width differences in generated tiles.
+    const scaleY = 0.88 / (frame.bounds[3] - frame.bounds[1]);
+    const footWidth = 0.88 * (reference.foot[2] - reference.foot[0]) / (reference.bounds[3] - reference.bounds[1]);
+    const scaleX = footWidth / (frame.foot[2] - frame.foot[0]);
+    const [tileLeft, tileTop, tileWidth, tileHeight] = frame.tile;
+    Object.assign(elements.chairArtwork.style, {
+      left: `${(0.5 + (tileLeft - (frame.foot[0] + frame.foot[2]) / 2) * scaleX) * 100}%`,
+      top: `${(0.96 + (tileTop - frame.bounds[3]) * scaleY) * 100}%`,
+      width: `${tileWidth * scaleX * 100}%`,
+      height: `${tileHeight * scaleY * 100}%`,
+    });
     elements.chairFrame.style.transform = `scale(${size ? size.seatCm / SIZES.L.seatCm : 1})`;
-    elements.chairImage.style.left = showVariant ? `${-column * 100}%` : '0';
-    elements.chairImage.style.top = showVariant ? `${-row * 100}%` : '0';
+    // Clip one exact tile before positioning it, so adjacent chairs can never bleed in.
+    Object.assign(elements.chairImage.style, {
+      left: `${-tileLeft / tileWidth * 100}%`,
+      top: `${-tileTop / tileHeight * 100}%`,
+      width: `${source.width / tileWidth * 100}%`,
+      height: `${source.height / tileHeight * 100}%`,
+    });
     if (elements.chairImage.dataset.source !== image) {
       elements.chairImage.dataset.source = image;
       elements.previewFeedback.hidden = true;

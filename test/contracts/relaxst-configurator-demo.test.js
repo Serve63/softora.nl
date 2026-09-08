@@ -7,11 +7,14 @@ const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'relaxst-configurator-demo.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo.css'), 'utf8');
 const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo.js'), 'utf8');
+const framingScript = fs.readFileSync(path.join(root, 'assets/relaxst/chair-framing.js'), 'utf8');
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-6"/);
-  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-6"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-7"/);
+  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-7"/);
+  assert.match(html, /src="\/assets\/relaxst\/chair-framing\.js\?v=20260908-7" defer/);
+  assert.ok(html.indexOf('/assets/relaxst/chair-framing.js') < html.indexOf('/assets/relaxst-configurator-demo.js'));
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
   assert.match(html, /Interactieve conceptdemo/);
@@ -101,6 +104,7 @@ function demoHarness(saved = null, historyBlocked = false) {
     },
     matchMedia: () => ({ matches: false }),
   };
+  vm.runInNewContext(framingScript, { window });
   vm.runInNewContext(script, { document, window, Intl, Set, Object, JSON, URL, URLSearchParams, encodeURIComponent });
   const node = (selector) => document.querySelector(selector);
   function choose(name, value, checked = true) {
@@ -111,7 +115,7 @@ function demoHarness(saved = null, historyBlocked = false) {
   }
   const click = (selector) => node(selector).listeners.click();
   const step = (number) => stepButtons[number - 1].listeners.click();
-  return { node, choose, click, step, stepButtons, location };
+  return { node, choose, click, step, stepButtons, location, framing: window.RelaxstChairFraming };
 }
 
 function finishChoices(demo, next = '#next-step') {
@@ -336,8 +340,9 @@ test('Relaxst shows all 45 generated material/color variants and scales the sele
       for (const [column, color] of ['zand', 'cognac', 'olijf', 'kiezel', 'antraciet'].entries()) {
         demo.choose('color', color);
         assert.equal(demo.node('#chair-image').src, `/assets/relaxst/chairs/${model}-variants-v1.webp`);
-        assert.equal(demo.node('#chair-image').style.left, `${-column * 100}%`);
-        assert.equal(demo.node('#chair-image').style.top, `${-row * 100}%`);
+        const [left, top, width, height] = demo.framing[model].variants.frames[row * 5 + column].tile;
+        assert.equal(demo.node('#chair-image').style.left, `${-left / width * 100}%`);
+        assert.equal(demo.node('#chair-image').style.top, `${-top / height * 100}%`);
         assert.match(demo.node('#chair-image').alt, /digitale impressie/);
         assert.ok(fs.statSync(path.join(root, demo.node('#chair-image').src)).size > 0);
       }
@@ -351,11 +356,57 @@ test('Relaxst shows all 45 generated material/color variants and scales the sele
       assert.ok(demo.node('#chair-image').alt.includes(`maat ${size}`));
     }
     demo.click('#next-step');
-    const visual = () => JSON.stringify([demo.node('#chair-image').src, demo.node('#chair-image').style, demo.node('#chair-frame').style]);
+    const visual = () => JSON.stringify([demo.node('#chair-image').src, demo.node('#chair-image').style, demo.node('#chair-frame').style, demo.node('#chair-artwork').style]);
     const before = visual();
     for (const mechanism of ['handmatig', '2motor', '3motor', '5motor']) demo.choose('mechanism', mechanism);
     for (const extra of ['accu', 'topswing', 'lendenpomp', 'verwarming']) demo.choose('extra', extra);
     assert.equal(visual(), before, 'comfort choices do not change the chair image');
+  }
+});
+
+test('Relaxst registration matches the actual source pixels and detects stale framing', async () => {
+  const { measureChairFraming, serializeFraming } = require('../../scripts/measure-relaxst-chair-framing');
+  assert.equal(serializeFraming(await measureChairFraming(root)), framingScript);
+});
+
+test('Relaxst fixes the top, floor and pedestal across every color/material and the original photo', () => {
+  const percent = (value) => parseFloat(value) / 100;
+  const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 0.000001, `${label}: ${actual} vs ${expected}`);
+  assert.match(css, /\.chair-artwork\s*\{[^}]*overflow: hidden/);
+  assert.match(css, /\.chair-frame\s*\{[^}]*transform-origin: 50% 96%/);
+  for (const model of ['comfora', 'linea', 'zeus']) {
+    const demo = demoHarness();
+    demo.choose('model', model);
+    const reference = demo.framing[model].original.frames[0];
+    const footWidth = 0.88 * (reference.foot[2] - reference.foot[0]) / (reference.bounds[3] - reference.bounds[1]);
+    const verify = (source, frame) => {
+      const artwork = demo.node('#chair-artwork').style;
+      const image = demo.node('#chair-image').style;
+      const x = (pixel) => percent(artwork.left) + percent(artwork.width) * (percent(image.left) + pixel / source.width * percent(image.width));
+      const y = (pixel) => percent(artwork.top) + percent(artwork.height) * (percent(image.top) + pixel / source.height * percent(image.height));
+      near(y(frame.bounds[1]), 0.08, 'chair top');
+      near(y(frame.bounds[3]), 0.96, 'floor');
+      near((x(frame.foot[0]) + x(frame.foot[2])) / 2, 0.5, 'pedestal center');
+      near(x(frame.foot[2]) - x(frame.foot[0]), footWidth, 'pedestal width');
+      assert.ok(x(frame.bounds[0]) >= 0 && x(frame.bounds[2]) <= 1, 'entire chair stays inside frame');
+      const [left, top, width, height] = frame.tile;
+      near(x(left), percent(artwork.left), 'crop left');
+      near(x(left + width), percent(artwork.left) + percent(artwork.width), 'crop right');
+      near(y(top), percent(artwork.top), 'crop top');
+      near(y(top + height), percent(artwork.top) + percent(artwork.height), 'crop bottom');
+    };
+    verify(demo.framing[model].original, reference);
+    demo.click('#next-step');
+    for (const [row, material] of ['stof', 'microleder', 'leer'].entries()) {
+      demo.choose('upholstery', material);
+      for (const [column, color] of ['zand', 'cognac', 'olijf', 'kiezel', 'antraciet'].entries()) {
+        demo.choose('color', color);
+        const source = demo.framing[model].variants;
+        verify(source, source.frames[row * 5 + column]);
+      }
+    }
+    demo.click('#previous-step');
+    verify(demo.framing[model].original, reference);
   }
 });
 
@@ -395,7 +446,7 @@ test('Relaxst preview contains only its static assets and no server compute', ()
   const output = path.join(temp, 'output');
   try {
     const result = buildRelaxstPreview(root, output);
-    assert.equal(result.files.length, 9);
+    assert.equal(result.files.length, 10);
     assert.deepEqual(fs.readdirSync(output).sort(), ['config.json', 'static']);
     const config = JSON.parse(fs.readFileSync(path.join(output, 'config.json'), 'utf8'));
     assert.equal(config.version, 3);
@@ -406,6 +457,7 @@ test('Relaxst preview contains only its static assets and no server compute', ()
     assert.equal(fs.readFileSync(path.join(output, 'static/index.html'), 'utf8'), html);
     assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst-configurator-demo.js'), 'utf8'), script);
     assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst-configurator-demo.css'), 'utf8'), css);
+    assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst/chair-framing.js'), 'utf8'), framingScript);
     for (const file of result.files.filter((file) => file.includes('/chairs/'))) {
       assert.deepEqual(fs.readFileSync(path.join(output, 'static', file)), fs.readFileSync(path.join(root, file)));
     }
