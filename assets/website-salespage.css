@@ -442,5 +442,4 @@ h2,h3{text-transform:uppercase}
 /* Full-bleed shell: header and hero must reach both viewport edges. */
 html,body{width:100%;max-width:none;margin:0;padding:0;overflow-x:hidden}
 main{width:100%;max-width:none;margin:0;padding:0}
-.site-header{position:fixed;top:0;right:0;bottom:auto;left:0;width:100%;max-width:none;margin:0;z-index:50}
 .hero{width:100%;max-width:none;margin-left:0;margin-right:0}
