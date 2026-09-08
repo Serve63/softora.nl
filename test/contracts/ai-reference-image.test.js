@@ -6,6 +6,22 @@ const {
   normalizeWebsitePreviewReferenceImage,
 } = require('../../server/services/ai-reference-image');
 
+test('AVIF references remain decodable and convertible with the patched native image library', async () => {
+  const source = await sharp({
+    create: { width: 40, height: 24, channels: 3, background: { r: 238, g: 231, b: 226 } },
+  }).avif({ lossless: true }).toBuffer();
+  const metadata = await sharp(source).metadata();
+  assert.equal(metadata.format, 'heif');
+  assert.equal(metadata.width, 40);
+  assert.equal(metadata.height, 24);
+
+  const { data, info } = await sharp(source).resize(20, 12).jpeg().toBuffer({ resolveWithObject: true });
+  assert.equal(info.format, 'jpeg');
+  assert.equal(info.width, 20);
+  assert.equal(info.height, 12);
+  assert.ok(data.length > 0);
+});
+
 test('website preview reference normalizer keeps valid images already under the OpenAI limit', async () => {
   const bytes = Buffer.alloc(4096, 1);
   const result = await normalizeWebsitePreviewReferenceImage({
