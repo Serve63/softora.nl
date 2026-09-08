@@ -265,6 +265,45 @@
       : '';
   }
 
+  function numericText(value) {
+    return (String(value || '').match(/\p{Nd}/gu) || []).join('');
+  }
+
+  function isAdministrativeNumber(line, previousLine) {
+    const fields = [
+      { label: /^(?:kvk(?:[- ]?nummer)?|chamber (?:of|off) commerce)\s*:?\s*$/i, value: /^\d{8}$/ },
+      { label: /^(?:btw(?:[- ]?nummer)?|vat(?: number)?|tax number)\s*:?\s*$/i, value: /^[A-Z]{2}[A-Z0-9]{8,14}$/i },
+    ];
+    return fields.some(({ label, value }) => label.test(previousLine) && value.test(line));
+  }
+
+  function preserveUnrepresentedNumberLines(signatureLines, contact) {
+    const phoneDigits = numericText(contact.phone);
+    const addressDigits = contact.addressLines.map(numericText);
+    addressDigits.push(addressDigits.join(''));
+    const preserved = [];
+    let previousLine = '';
+    for (const value of signatureLines) {
+      const rawLine = normalizeWhitespace(value);
+      const line = /https?:\/\/|\S+@\S+\./i.test(rawLine)
+        ? rawLine.replace(/\s*\[\d{1,3}\]\s*$/, '')
+        : rawLine;
+      const digits = numericText(line);
+      const represented = digits && (
+        digits === phoneDigits ||
+        (/\p{L}/u.test(line) && addressDigits.includes(digits))
+      );
+      // A phone-format guess must never decide whether a number disappears.
+      // Keep every unrepresented numeric line verbatim, including extra phones,
+      // extensions, split numbers, unknown labels and international notation.
+      if (digits && !represented && !isAdministrativeNumber(line, previousLine)) {
+        preserved.push(line);
+      }
+      if (line) previousLine = line;
+    }
+    return preserved;
+  }
+
   function extractContact(signatureLines, messageContext) {
     const values = { phone: '', street: '', postcode: '', city: '', country: '' };
     for (let index = 1; index < signatureLines.length; index += 1) {
@@ -284,11 +323,14 @@
     appendUnique(addressLines, values.street || compactAddress.street);
     appendUnique(addressLines, [values.postcode, values.city].filter(Boolean).join(' ') || compactAddress.postcodeCity);
     appendUnique(addressLines, values.country);
-    return {
+    const contact = {
       phone: cleanFieldValue(values.phone),
       phoneHref: buildPhoneHref(values.phone),
       addressLines,
     };
+    const preservedLines = preserveUnrepresentedNumberLines(signatureLines, contact);
+    if (preservedLines.length) contact.preservedLines = preservedLines;
+    return contact;
   }
 
   function trimOuterBlankLines(lines) {
@@ -352,7 +394,9 @@
     const addressLines = (Array.isArray(source.addressLines) ? source.addressLines : [])
       .map(cleanFieldValue)
       .filter(Boolean);
-    if (!phone && !addressLines.length) return '';
+    const preservedLines = (Array.isArray(source.preservedLines) ? source.preservedLines : [])
+      .map(normalizeWhitespace).filter(Boolean);
+    if (!phone && !addressLines.length && !preservedLines.length) return '';
     const escapeValue = (value) => escapeMarkup(value).replace(/=/g, '&#61;');
     const items = [];
     if (phone) {
@@ -364,7 +408,10 @@
     if (addressLines.length) {
       items.push(`<div class="detail-mail-contact-item"><dt>Adres:</dt><dd class="detail-mail-contact-value">${addressLines.map(escapeValue).join(', ')}</dd></div>`);
     }
-    return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening"><dl class="detail-mail-contact-grid">${items.join('')}</dl></address>`;
+    const preservedHtml = preservedLines
+      .map((line) => `<div class="detail-mail-contact-value">${escapeValue(line)}</div>`).join('');
+    const fieldsHtml = items.length ? `<dl class="detail-mail-contact-grid">${items.join('')}</dl>` : '';
+    return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening">${fieldsHtml}${preservedHtml}</address>`;
   }
 
   const api = { parseIncoming, renderContactCard };
