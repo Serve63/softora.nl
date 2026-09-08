@@ -266,6 +266,78 @@
     });
   }
 
+  const chairImages = new Map();
+  let imageRequest = 0;
+
+  function prepareChairImage(src, priority = 'high') {
+    if (chairImages.has(src)) {
+      const cached = chairImages.get(src);
+      if (priority === 'high') cached.image.fetchPriority = priority;
+      return cached;
+    }
+    const current = elements.chairImage;
+    const image = current.getAttribute('src') === src && (!current.complete || current.naturalWidth > 0)
+      ? current : new window.Image();
+    const entry = { image, ready: false, promise: null };
+    chairImages.set(src, entry);
+    image.decoding = 'async';
+    image.fetchPriority = priority;
+    image.dataset.source = src;
+    const loaded = new Promise((resolve, reject) => {
+      if (image.complete && image.naturalWidth > 0) return resolve();
+      image.addEventListener('load', resolve, { once: true });
+      image.addEventListener('error', () => reject(new Error('Chair image unavailable')), { once: true });
+      if (image.getAttribute('src') !== src) image.src = src;
+    });
+    entry.promise = loaded.then(() => typeof image.decode === 'function' ? image.decode() : undefined)
+      .then(() => {
+        entry.ready = true;
+        return image;
+      }).catch((error) => {
+        // A failed speculative preload must not prevent the next deliberate retry.
+        chairImages.delete(src);
+        throw error;
+      });
+    return entry;
+  }
+
+  function showChairImage({ src, artworkStyle, imageStyle, scale, alt }) {
+    const request = ++imageRequest;
+    const entry = prepareChairImage(src);
+    const commit = () => {
+      if (request !== imageRequest) return;
+      // Keep both the old pixels and their crop until the replacement is decoded.
+      // Insert that same decoded element; changing the visible src can flash white.
+      const image = entry.image;
+      Object.assign(image.style, imageStyle);
+      image.id = 'chair-image';
+      image.alt = alt;
+      image.hidden = false;
+      if (image !== elements.chairImage) {
+        elements.chairImage.replaceWith(image);
+        elements.chairImage = image;
+      }
+      Object.assign(elements.chairArtwork.style, artworkStyle);
+      elements.chairFrame.style.transform = `scale(${scale})`;
+      elements.chairFrame.setAttribute('aria-busy', 'false');
+      elements.previewFeedback.hidden = true;
+    };
+    if (entry.ready && entry.image === elements.chairImage) return commit();
+    elements.chairFrame.setAttribute('aria-busy', 'true');
+    elements.previewFeedback.hidden = true;
+    // Detached cached images may have had their decoded surface evicted by the browser.
+    const ready = entry.ready && typeof entry.image.decode === 'function' ? entry.image.decode() : entry.promise;
+    ready.then(commit).catch(() => {
+      if (request !== imageRequest) return;
+      chairImages.delete(src);
+      elements.chairFrame.setAttribute('aria-busy', 'false');
+      elements.previewFeedback.textContent = elements.chairImage.complete && elements.chairImage.naturalWidth > 0
+        ? 'De nieuwe foto kon niet laden. Je ziet nog de vorige keuze. Probeer een andere keuze of vernieuw de pagina.'
+        : 'De stoelafbeelding kon niet laden. Probeer een andere keuze of vernieuw de pagina.';
+      elements.previewFeedback.hidden = false;
+    });
+  }
+
   function updateProductStage() {
     const modelId = state.model || 'linea';
     const model = MODELS[modelId];
@@ -287,30 +359,26 @@
     const footWidth = 0.88 * (reference.foot[2] - reference.foot[0]) / (reference.bounds[3] - reference.bounds[1]);
     const scaleX = footWidth / (frame.foot[2] - frame.foot[0]);
     const [tileLeft, tileTop, tileWidth, tileHeight] = frame.tile;
-    Object.assign(elements.chairArtwork.style, {
+    const artworkStyle = {
       left: `${(0.5 + (tileLeft - (frame.foot[0] + frame.foot[2]) / 2) * scaleX) * 100}%`,
       top: `${(0.96 + (tileTop - frame.bounds[3]) * scaleY) * 100}%`,
       width: `${tileWidth * scaleX * 100}%`,
       height: `${tileHeight * scaleY * 100}%`,
-    });
-    elements.chairFrame.style.transform = `scale(${size ? size.seatCm / SIZES.L.seatCm : 1})`;
+    };
     // Clip one exact tile before positioning it, so adjacent chairs can never bleed in.
-    Object.assign(elements.chairImage.style, {
+    const imageStyle = {
       left: `${-tileLeft / tileWidth * 100}%`,
       top: `${-tileTop / tileHeight * 100}%`,
       width: `${source.width / tileWidth * 100}%`,
       height: `${source.height / tileHeight * 100}%`,
-    });
-    if (elements.chairImage.dataset.source !== image) {
-      elements.chairImage.dataset.source = image;
-      elements.previewFeedback.hidden = true;
-      elements.chairImage.hidden = false;
-      elements.chairImage.src = image;
-    }
-    elements.chairImage.alt = [
+    };
+    const alt = [
       `Relaxstoel ${model.name}`, upholstery?.name, color?.name, state.size && `maat ${state.size}`,
       showVariant ? 'digitale impressie' : 'voorbeeldfoto',
     ].filter(Boolean).join(' · ');
+    showChairImage({ src: image, artworkStyle, imageStyle, scale: size ? size.seatCm / SIZES.L.seatCm : 1, alt });
+    // Prepare all material/color choices for the selected model before the next step.
+    if (state.model) prepareChairImage(model.variants, 'low').promise.catch(() => {});
     elements.sizeMarker.hidden = !size;
     elements.sizeMarker.textContent = size ? `Zithoogte ca. ${size.seatCm} cm` : '';
     elements.modelName.textContent = model.name;
@@ -367,7 +435,7 @@
     const heading = elements.content.querySelector('h3');
     heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
-    if (window.innerWidth < 700) {
+    if (window.innerWidth <= 700) {
       const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
       document.querySelector('.builder-panel').scrollIntoView({ behavior, block: 'start' });
     }
@@ -404,14 +472,6 @@
   elements.mobilePrevious.addEventListener('click', () => goToStep(state.step - 1));
   elements.next.addEventListener('click', advance);
   elements.mobileNext.addEventListener('click', advance);
-  elements.chairImage.addEventListener('error', () => {
-    elements.chairImage.hidden = true;
-    elements.previewFeedback.hidden = false;
-  });
-  elements.chairImage.addEventListener('load', () => {
-    elements.chairImage.hidden = false;
-    elements.previewFeedback.hidden = true;
-  });
   document.querySelectorAll('[data-step-target]').forEach((button) => {
     button.addEventListener('click', () => goToStep(Number(button.dataset.stepTarget)));
   });
@@ -425,5 +485,6 @@
   });
 
   render();
+  Object.values(MODELS).forEach((model) => prepareChairImage(model.image, 'low').promise.catch(() => {}));
   saveConfiguration();
 })();

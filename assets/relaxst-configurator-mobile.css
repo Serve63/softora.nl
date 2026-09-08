@@ -1,0 +1,96 @@
+/* Loaded only at phone widths; the approved desktop stylesheet stays unchanged. */
+@media (max-width: 700px) {
+  .site-header { height: 52px; padding-inline: max(14px, env(safe-area-inset-left)) max(14px, env(safe-area-inset-right)); }
+  .brand { min-height: 44px; font-size: 20px; }
+  .site-header nav { gap: 0; }
+  .concept-pill { padding: 6px 8px; }
+  main { width: auto; margin-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)); }
+  .hero { padding: 16px 2px 14px; }
+  .hero h1 { max-width: none; margin: 0; font-size: 23px; }
+  .hero p { display: none; }
+  .configurator { gap: 12px; margin-bottom: calc(104px + env(safe-area-inset-bottom)); scroll-margin-top: 8px; }
+
+  .product-stage {
+    position: sticky; top: 8px; z-index: 10;
+    grid-template-columns: 104px minmax(0, 1fr);
+    grid-template-rows: 16px 28px 36px 16px minmax(30px, auto);
+    gap: 2px 12px; padding: 12px; border-radius: 14px;
+    box-shadow: 0 4px 16px #25201b08;
+  }
+  .stage-topline { grid-row: 1; font-size: 11px; }
+  .product-caption { grid-row: 2; }
+  .product-caption h2 { margin: 0; font-size: 23px; }
+  .product-visual { grid-row: 1 / 5; height: 102px; margin: 0; }
+  .material-chip { grid-row: 3; align-self: center; gap: 7px; }
+  .material-chip small { display: none; }
+  .material-chip strong { font-size: 12px; line-height: 1.4; font-weight: 500; }
+  .material-swatch { width: 22px; height: 22px; border-radius: 6px; }
+  .size-marker { grid-row: 4; margin: 0; font-size: 10px; line-height: 16px; }
+  .selection-tags { display: none; }
+  .photo-note { grid-row: 5; margin: 4px 0 0; font-size: 10px; line-height: 1.45; gap: 6px; }
+  .photo-note-icon { width: 13px; height: 13px; margin-top: 0; }
+  .preview-feedback { padding: 4px; font-size: 10px; background: #ffffffed; border-radius: 8px; }
+
+  .builder-panel { padding: 16px 14px 0; scroll-margin-top: 188px; }
+  .builder-heading h2 { font-size: 13px; }
+  .step-count { font-size: 11px; }
+  .steps { margin: 8px 0 16px; gap: 3px; }
+  .steps button { min-height: 50px; padding: 6px 0 8px; gap: 4px; }
+  .steps button em { font-size: 10px; }
+  .steps button span { width: 18px; height: 18px; font-size: 9px; }
+  .step-content { padding: 0 0 18px; }
+  .step-intro { margin-bottom: 14px; }
+  .step-intro h3 { font-size: 23px; margin-bottom: 6px; }
+  .step-intro p { font-size: 12px; line-height: 1.5; }
+
+  .option-grid.models { grid-template-columns: 1fr; gap: 8px; }
+  .models .option-card { display: flex; align-items: center; gap: 14px; min-height: 82px; padding: 8px 12px; text-align: left; }
+  .models .option-card img { width: 64px; height: 64px; margin: 0; flex: none; }
+  .models .option-card strong { font-size: 16px; }
+  .models .option-card small { margin-top: 5px; font-size: 12px; }
+  .models .selection-indicator { position: static; order: 3; display: grid; place-items: center; width: 22px; height: 22px; flex: none; border: 1px solid #d9d3cb; border-radius: 50%; color: transparent; }
+  .models .is-selected .selection-indicator { position: static; width: 22px; height: 22px; font-size: 12px; border-color: #5c4d42; }
+  .option-card { min-height: 70px; padding: 12px; gap: 10px; }
+  .option-card strong { font-size: 14px; line-height: 1.35; }
+  .option-card small { font-size: 12px; line-height: 1.45; }
+  .option-card-price { font-size: 11px; }
+  .choice-section + .choice-section { margin-top: 20px; }
+  .choice-label { margin-bottom: 10px; font-size: 14px; }
+  .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .swatch-card { min-height: 82px; padding: 10px 4px; }
+  .swatch-card span { width: 32px; height: 32px; margin-bottom: 7px; }
+  .swatch-card small { font-size: 12px; }
+  .size-measure { margin-bottom: 12px; padding: 12px; font-size: 11px; }
+  .mechanism-grid .option-card { min-height: 76px; padding: 12px; }
+  .feature-card { min-height: 76px; padding: 12px; }
+  .checkmark { width: 22px; height: 22px; }
+  .summary-row { padding: 12px 10px; gap: 10px; font-size: 12px; }
+  .summary-total strong { font-size: 21px; }
+
+  .mobile-bar { padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); gap: 10px; }
+  .mobile-bar > div { flex: 1; min-width: 0; }
+  .mobile-bar span { font-size: 10px; line-height: 1.3; }
+  .mobile-bar strong { font-size: 22px; white-space: nowrap; }
+  .mobile-bar button { min-height: 48px; padding-inline: 14px; font-size: 12px; flex-shrink: 0; }
+  .mobile-bar button span { display: inline; font-size: inherit; color: inherit; }
+  #mobile-previous { min-width: 44px; min-height: 48px; font-size: 19px; }
+  dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); padding: 24px 16px 16px; border-radius: 16px; }
+  .dialog-close { width: 44px; height: 44px; top: 6px; right: 6px; }
+  dialog h2 { margin-right: 28px; font-size: 25px; }
+  dialog .eyebrow { margin-right: 28px; }
+  .dialog-primary { min-height: 44px; }
+}
+
+@media (max-width: 360px) {
+  .hero h1 { font-size: 21px; }
+  .builder-panel { padding-inline: 12px; scroll-margin-top: 204px; }
+  .product-stage { grid-template-columns: 94px minmax(0, 1fr); gap: 2px 10px; }
+  .mobile-bar { gap: 8px; }
+  .mobile-bar button { padding-inline: 10px; }
+  .mobile-bar strong { font-size: 20px; }
+}
+
+@media (max-width: 700px) and (max-height: 550px) {
+  .product-stage { position: static; }
+  .builder-panel { scroll-margin-top: 12px; }
+}

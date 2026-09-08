@@ -10,6 +10,10 @@ Local release check, 2026-09-08: the cumulative demo branch contains 991 behavio
 
 These are illustrative demo renders, not verified product swatches or technical drawings. Size is illustrated by scaling relative to the demo's existing seat heights (43/46/49 cm), anchored at the chair's feet. Actual measurements and combinations still require Relaxst confirmation. Mechanism and comfort extras intentionally do not change the image.
 
+Mobile/loading follow-up, 2026-09-08: the phone stylesheet is linked only at widths up to 700px. It provides a compact sticky preview, touch-sized choices and safe-area navigation; the approved desktop stylesheet and measured framing data remain byte-for-byte unchanged. The viewer preloads the selected model's sprite, retains the displayed image and crop while downloading/decoding, and swaps the decoded element atomically. Request generations discard stale completions after another choice or Back; failed downloads retain the current photo and permit retry. Detached cached images are decoded again before reuse. This isolated static-demo follow-up uses the same documented local cumulative-diff exception above, with all other required checks enabled.
+
+Browser checks for this follow-up: phone widths 320, 360, 375, 390 and 430px, plus 700x400 landscape, have no horizontal overflow. Model, material/color, size, comfort, overview, result dialog and Back were exercised; the last comfort option is reachable at 320x568. Previous/next targets are at least 44x48px. At 1280x720, all 11 measured desktop layout rectangles exactly match the pre-change reference. With 12 seconds of added network latency and a disabled HTTP cache, the complete original chair remained visible while the sprite was pending, then changed to the latest selected material/color. Normal network settings were restored after the check.
+
 Official references:
 - Comfora: https://www.relaxst.nl/wp-content/uploads/2025/12/Relaxst-1-.jpg
 - Linea: https://www.relaxst.nl/wp-content/uploads/2024/11/Relaxst-1-12.jpg
