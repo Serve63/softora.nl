@@ -651,7 +651,7 @@ test('premium database webdesign jobs persist status and generated photos throug
 
   assert.equal(statusRes.statusCode, 200);
   assert.equal(statusRes.body.job.status, 'done');
-  assert.deepEqual(persistedJobs, ['queued', 'running', 'done']);
+  assert.deepEqual(persistedJobs, ['queued', 'running', 'running', 'done']);
   assert.equal(uploadedPhotos[0].entry.customerId, 'customer-persist');
   assert.match(uploadedPhotos[0].entry.websiteMockup, /^data:image\/jpeg;base64,/);
   assert.equal(uploadedPhotos[0].entry.websiteMockupName, 'preview-device-mockup-v8.jpg');
@@ -1959,11 +1959,12 @@ test('premium database webdesign jobs requeue retryable OpenAI rate limits and r
   assert.ok(persistedJobs.some((job) => job.status === 'queued' && job.retry?.nextAttemptAt === 1760000003000));
 });
 
-test('premium database webdesign jobs requeue transient photo storage failures instead of showing a hard banner', async () => {
+test('premium database webdesign jobs retry saving the same image without regenerating', async () => {
   let nowMs = 1760000000000;
   let storageHealthy = false;
   let pipelineCalls = 0;
   const uploadedPhotos = [];
+  const waits = [];
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {}, warn() {} },
     normalizeString: (value) => String(value || '').trim(),
@@ -1971,6 +1972,7 @@ test('premium database webdesign jobs requeue transient photo storage failures i
     processJobsInline: true,
     now: () => nowMs,
     retryJitter: false,
+    storageRetrySleep: async (ms) => { waits.push(ms); storageHealthy = waits.length === 2; },
     dataOpsStore: {
       upsertWebdesignJob: async () => ({ ok: true }),
       uploadDesignPhoto: async (entry) => {
@@ -2013,30 +2015,15 @@ test('premium database webdesign jobs requeue transient photo storage failures i
   );
 
   assert.equal(firstPoll.statusCode, 200);
-  assert.equal(firstPoll.body.job.status, 'queued');
+  assert.equal(firstPoll.body.job.status, 'done');
   assert.equal(firstPoll.body.job.error, null);
-  assert.equal(firstPoll.body.job.retryAttempts, 1);
-  assert.equal(firstPoll.body.job.nextAttemptAt, nowMs + 5000);
+  assert.equal(firstPoll.body.job.retryAttempts, 0);
+  assert.equal(firstPoll.body.job.nextAttemptAt, null);
   assert.equal(pipelineCalls, 1);
-  assert.equal(uploadedPhotos.length, 0);
-
-  storageHealthy = true;
-  nowMs = firstPoll.body.job.nextAttemptAt + 1;
-  const retryPoll = createResponseRecorder();
-  await coordinator.getJobResponse(
-    {
-      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
-      params: { jobId: 'job_storage123456' },
-    },
-    retryPoll
-  );
-
-  assert.equal(retryPoll.statusCode, 200);
-  assert.equal(retryPoll.body.job.status, 'done');
-  assert.equal(retryPoll.body.job.error, null);
-  assert.equal(pipelineCalls, 2);
+  assert.deepEqual(waits, [5000, 10000]);
   assert.equal(uploadedPhotos.length, 1);
   assert.equal(uploadedPhotos[0].customerId, 'customer-storage-retry');
+  assert.equal(uploadedPhotos[0].dataUrl, TINY_PNG_DATA_URL);
 });
 
 test('premium database webdesign jobs show a safe message after exhausted OpenAI 500 retries', async () => {

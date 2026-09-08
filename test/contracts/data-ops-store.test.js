@@ -1941,6 +1941,7 @@ test('data ops store can suppress stale cache warnings for public-preview fallba
 
 test('data ops store saves webdesign and device mockup as one photo record', async () => {
   const uploads = [];
+  const clientOptions = [];
   const upserts = [];
   const client = {
     storage: {
@@ -1972,7 +1973,7 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
   };
   const store = createSoftoraDataOpsStore({
     isSupabaseConfigured: () => true,
-    getSupabaseClient: () => client,
+    getSupabaseClient: (options) => { clientOptions.push(options); return client; },
     logger: { error() {} },
   });
 
@@ -1998,6 +1999,7 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
   );
 
   assert.equal(result.ok, true);
+  assert.deepEqual(clientOptions, [{ timeoutMs: 30000, ignoreFailureCooldown: true, suppressFailureCooldown: true }]);
   assert.equal(uploads.length, 2);
   assert.equal(uploads[0].cacheControl, '31536000');
   assert.equal(uploads[1].cacheControl, '31536000');

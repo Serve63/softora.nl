@@ -1,4 +1,5 @@
 const { createHash } = require('crypto');
+const { normalizeWebdesignJobRetryPayload, buildWebdesignJobPayload } = require('./webdesign-job-payload');
 
 const {
   buildCustomerIdentityKey,
@@ -1492,7 +1493,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         deleted_at: null,
       };
       return client.from(TABLES.designPhotos).upsert(row, { onConflict: 'customer_id' });
-    });
+    }, getWriteOperationOptions({ timeoutMs: 30000 }));
   }
 
   async function replaceDesignPhotos(entries, meta = {}) {
@@ -2125,33 +2126,6 @@ function createSoftoraDataOpsStore(deps = {}) {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  function normalizeWebdesignJobRetryPayload(value = {}) {
-    const source = value && typeof value === 'object' ? value : {};
-    return {
-      attempts: Math.max(0, Math.floor(Number(source.attempts || 0) || 0)),
-      nextAttemptAt: Math.max(0, Number(source.nextAttemptAt || 0) || 0) || null,
-      lastRetryAt: Math.max(0, Number(source.lastRetryAt || 0) || 0) || null,
-      lastRetryReason: normalizeString(source.lastRetryReason || '').slice(0, 500),
-    };
-  }
-
-  function buildWebdesignJobPayload(job = {}) {
-    const retry = normalizeWebdesignJobRetryPayload(job.retry);
-    const payload = {
-      customer: job.customer && typeof job.customer === 'object' ? job.customer : {},
-    };
-    if (job.variant) payload.variant = normalizeString(job.variant).slice(0, 80);
-    if (job.batchId) payload.batchId = normalizeString(job.batchId).slice(0, 120);
-    if (Number.isFinite(Number(job.batchTargetIndex))) {
-      payload.batchTargetIndex = Math.max(0, Math.floor(Number(job.batchTargetIndex)));
-    }
-    if (job.cancelled === true) payload.cancelled = true;
-    if (retry.attempts || retry.nextAttemptAt || retry.lastRetryAt || retry.lastRetryReason) {
-      payload.retry = retry;
-    }
-    return payload;
-  }
-
   function buildWebdesignJobRow(job = {}) {
     return {
       job_id: normalizeString(job.id),
@@ -2182,6 +2156,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       finishedAt: toMsFromIso(row.finished_at),
       retry: normalizeWebdesignJobRetryPayload(payload.retry),
       cancelled: payload.cancelled === true,
+      generationAttempted: payload.generationAttempted === true,
       variant: normalizeString(payload.variant || ''),
       batchId: normalizeString(payload.batchId || ''),
       batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))
