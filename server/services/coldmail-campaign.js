@@ -1,3 +1,4 @@
+const { loadMatchedColdmailBounceStats } = require('./coldmail-bounce-recipient-proof');
 const nodemailer = require('nodemailer');
 const crypto = require('node:crypto');
 const dnsNative = require('node:dns');
@@ -45,7 +46,6 @@ const {
   COLDMAIL_SOFT_BOUNCE_PATTERN,
   buildBounceTypeCounts,
   mergeBounceRecords,
-  summarizeMailboxBounceStats,
 } = require('./coldmail-bounce-stats');
 const {
   ACTIVE_INSTANTLY_COLDMAIL_STATUSES,
@@ -3452,18 +3452,12 @@ function createColdmailCampaignService(deps = {}) {
     const rows = parseDatabaseRows(values);
     const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
-    const mailboxBounceStats = {
-      ...summarizeMailboxBounceStats(mailboxBounceCandidates.messages, {
-        currentDayKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
-        getDayKey: (date) => getColdmailAutopilotDateKey(date, DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
-        ownMailboxEmails: getAllowedSenderEmails(),
-        sentRecipientCounts: centralGuardStats.recipientCounts,
-        requireSentRecipientMatch: centralGuardStats.available === true,
-      }),
-      available: mailboxBounceCandidates.available === true,
-      reliable: mailboxBounceCandidates.available === true && centralGuardStats.available === true,
-      unavailableReason: mailboxBounceCandidates.unavailableReason || '',
-    };
+    const mailboxBounceStats = await loadMatchedColdmailBounceStats(mailboxBounceCandidates, {
+      store: outboundRecipientGuardStore, summarizeSentGroups: summarizeColdmailCentralGuardLiveStats,
+      currentDayKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
+      getDayKey: (date) => getColdmailAutopilotDateKey(date, DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
+      ownMailboxEmails: getAllowedSenderEmails(),
+    });
     const bounceStats = chooseColdmailLiveBounceStats(databaseStats, mailboxBounceStats);
     const centralGuardAvailable = Boolean(centralGuardStats.available);
     const centralGuardTotalSent = centralGuardAvailable
@@ -3560,7 +3554,7 @@ function createColdmailCampaignService(deps = {}) {
     try {
       const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
       if (!parsed || typeof parsed !== 'object' || parsed.ok !== true || !parsed.stats || typeof parsed.stats !== 'object') return null;
-      if (normalizeString(parsed.stats.bounceDeduplication) !== 'recipient-email' || parsed.stats.bounceStatsModel !== 'complete-mailbox-recipient-v2') return null;
+      if (normalizeString(parsed.stats.bounceDeduplication) !== 'recipient-email') return null;
       const updatedAtMs = Date.parse(normalizeString(parsed.stats.updatedAt));
       const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
       if (!updatedAtMs || normalizeString(parsed.stats.dateKey) !== expectedDateKey) return null;
@@ -3641,6 +3635,7 @@ function createColdmailCampaignService(deps = {}) {
         cachedAtMs: Date.parse(normalizeString(durablePayload.stats && durablePayload.stats.updatedAt)) || now().getTime(),
         payload: durablePayload,
       };
+      if (durablePayload.stats.bounceStatsModel !== 'complete-mailbox-recipient-v2') return refreshColdmailLiveStats();
       refreshColdmailLiveStats().catch((error) => {
         logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
       });

@@ -778,7 +778,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
     },
     outboundRecipientGuardStore: {
       listSentRecipientGroups: async (options) => {
-        centralGuardStatsOptions = options;
+        if (!options.recipientEmails) centralGuardStatsOptions = options;
         return [
           {
             reservation_id: 'guard-only-reservation',
@@ -12251,4 +12251,31 @@ test('coldmail campaign refuses to send when all recipient domains are invalid',
   assert.equal(savedRows[0].doNotMail, true);
   assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
   assert.equal(savedRows[0].hist[0].source, 'coldmail-invalid-email-domain');
+});
+
+test('legacy bounce cache upgrades through targeted send proof while keeping verified sent totals', async () => {
+  const { service } = createService({
+    now: () => new Date('2026-09-09T10:00:00Z'),
+    coldmailStatsCacheRaw: JSON.stringify({ ok: true, stats: {
+      reliable: true, dateKey: '2026-09-09', sentTimestampModel: 'delivery-evidence-v1',
+      authoritativeSource: 'central-outbound-recipient-guard',
+      systemTotalSent: 6000, totalSent: 6000, systemSentToday: 2, sentToday: 2,
+      bounceDeduplication: 'recipient-email', bounceStatsReliable: true,
+      bounceTypes: { hard: 40 }, updatedAt: '2026-09-09T09:59:30Z',
+    } }),
+    dataOpsStore: { async listMailboxMessages() { return [{
+      sender_email: 'mailer-daemon@example.test', subject: 'Returned Mail',
+      body_text: 'Final-Recipient: rfc822; old-recipient@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
+    }]; } },
+    outboundRecipientGuardStore: { async listSentRecipientGroups(options) {
+      if (!options.recipientEmails) throw new Error('global history read unavailable');
+      assert.deepEqual(options.recipientEmails, ['old-recipient@example.test']);
+      return [{ recipient_email: 'old-recipient@example.test', sender_email: 'serve@softora.nl', provider: 'softora', channel: 'coldmail' }];
+    } },
+  });
+  const result = await service.getColdmailLiveStats();
+  assert.equal(result.stats.systemTotalSent, 6000);
+  assert.equal(result.stats.bounceTypes.hard, 1);
+  assert.equal(result.stats.bounceStatsReliable, true);
+  assert.equal(result.stats.bounceStatsModel, 'complete-mailbox-recipient-v2');
 });
