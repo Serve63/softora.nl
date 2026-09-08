@@ -172,6 +172,10 @@
       "source": "/(.*)",
       "destination": "/api"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "codex/relaxst-demo-fixes-20260908": false
+    }
+  }
 }
-

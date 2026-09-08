@@ -10,8 +10,8 @@ const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-1"/);
-  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-1"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-3"/);
+  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-3"/);
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
   assert.match(html, /Interactieve conceptdemo/);
@@ -40,10 +40,10 @@ test('Relaxst demo exposes the promised product choices and live price logic', (
 
 test('Relaxst demo includes responsive and accessible interaction states', () => {
   assert.match(css, /@media \(max-width: 700px\)/);
-  assert.match(css, /white-space: nowrap/);
-  assert.match(css, /white-space: normal/);
-  assert.match(css, /\.hero \{[\s\S]*?min-height: 300px;[\s\S]*?align-items: center;/);
-  assert.match(css, /@media \(min-width: 1051px\)[\s\S]*?height: calc\(100dvh - 268px\);/);
+  assert.match(css, /\.builder-actions[\s\S]*?position: sticky/);
+  assert.match(css, /\.option-card\.is-selected/);
+  assert.doesNotMatch(html, /hero-number|visual-orbit|id="stage-price"/);
+  assert.match(html, /Totaal incl\. btw/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /:focus-visible/);
   assert.match(html, /aria-live="polite"/);
@@ -113,7 +113,7 @@ function demoHarness(saved = null, historyBlocked = false) {
 
 test('Relaxst computes selected prices, subtracts unchecked extras and exports exactly the chosen configuration', () => {
   const demo = demoHarness();
-  assert.match(demo.node('#stage-price').textContent, /2\.987/);
+  assert.match(demo.node('#compact-price').textContent, /2\.987/);
   demo.choose('model', 'zeus');
   demo.click('#next-step');
   demo.choose('upholstery', 'leer');
@@ -123,9 +123,9 @@ test('Relaxst computes selected prices, subtracts unchecked extras and exports e
   demo.click('#next-step');
   demo.choose('mechanism', '5motor');
   for (const extra of ['topswing', 'lendenpomp', 'verwarming']) demo.choose('extra', extra);
-  assert.match(demo.node('#stage-price').textContent, /5\.752/);
+  assert.match(demo.node('#compact-price').textContent, /5\.752/);
   demo.choose('extra', 'accu', false);
-  assert.match(demo.node('#stage-price').textContent, /5\.503/);
+  assert.match(demo.node('#compact-price').textContent, /5\.503/);
   demo.click('#next-step');
   demo.click('#next-step');
   assert.equal(demo.node('#success-dialog').open, true);
@@ -150,17 +150,17 @@ test('Relaxst keeps the latest model image when switching rapidly back to the in
 test('Relaxst restores only valid choices from its URL and works with corrupt data or blocked history', () => {
   const demo = demoHarness(JSON.stringify({ model: 'zeus', upholstery: '__proto__', color: 'invalid', size: 'L', extras: ['accu', 'accu', 'invalid'] }));
   assert.equal(demo.node('#selected-model-name').textContent, 'Zeus');
-  assert.match(demo.node('#stage-price').textContent, /3\.934/);
+  assert.match(demo.node('#compact-price').textContent, /3\.934/);
   const restored = demoHarness(JSON.stringify({ model: 'comfora', mechanism: 'handmatig', extras: [] }));
-  assert.match(restored.node('#stage-price').textContent, /2\.295/);
-  assert.match(demoHarness('{').node('#stage-price').textContent, /2\.987/);
+  assert.match(restored.node('#compact-price').textContent, /2\.295/);
+  assert.match(demoHarness('{').node('#compact-price').textContent, /2\.987/);
   const blocked = demoHarness(null, true);
   blocked.choose('model', 'comfora');
-  assert.match(blocked.node('#stage-price').textContent, /2\.939/);
+  assert.match(blocked.node('#compact-price').textContent, /2\.939/);
   demo.choose('model', 'linea');
   const reloaded = demoHarness(demo.location.searchParams.get('config'));
   assert.equal(reloaded.node('#selected-model-name').textContent, 'Linea');
-  assert.match(reloaded.node('#stage-price').textContent, /3\.082/);
+  assert.match(reloaded.node('#compact-price').textContent, /3\.082/);
 });
 
 test('Relaxst mobile navigation reaches the result and back without losing selections', () => {
@@ -170,7 +170,7 @@ test('Relaxst mobile navigation reaches the result and back without losing selec
   demo.choose('upholstery', 'microleder');
   demo.click('#mobile-previous');
   assert.equal(demo.node('#current-step-number').textContent, 1);
-  assert.match(demo.node('#stage-price').textContent, /3\.282/);
+  assert.match(demo.node('#compact-price').textContent, /3\.282/);
   for (let step = 1; step < 5; step++) demo.click('#mobile-next');
   assert.match(demo.node('#mobile-next').innerHTML, /Bekijk resultaat/);
   demo.click('#mobile-next');
@@ -186,4 +186,29 @@ test('Relaxst result stays open when clicking its own padding and closes on the 
   assert.equal(dialog.open, true);
   dialog.listeners.click({ target: dialog, clientX: 450, clientY: 20 });
   assert.equal(dialog.open, false);
+});
+
+
+test('Relaxst preview contains only its static assets and no server compute', () => {
+  const os = require('node:os');
+  const { buildRelaxstPreview } = require('../../scripts/build-relaxst-preview');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'relaxst-output-'));
+  const output = path.join(temp, 'output');
+  try {
+    const result = buildRelaxstPreview(root, output);
+    assert.equal(result.files.length, 3);
+    assert.deepEqual(fs.readdirSync(output).sort(), ['config.json', 'static']);
+    const config = JSON.parse(fs.readFileSync(path.join(output, 'config.json'), 'utf8'));
+    assert.equal(config.version, 3);
+    assert.equal(config.routes[0].dest, '/index.html');
+    assert.equal(config.functions, undefined);
+    assert.equal(config.crons, undefined);
+    assert.equal(config.images, undefined);
+    assert.equal(fs.readFileSync(path.join(output, 'static/index.html'), 'utf8'), html);
+    assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst-configurator-demo.js'), 'utf8'), script);
+    assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst-configurator-demo.css'), 'utf8'), css);
+    assert.throws(() => buildRelaxstPreview(root, output), /Output bestaat al/);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });

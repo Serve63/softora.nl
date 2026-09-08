@@ -879,3 +879,12 @@ test('SEO experience and attribution changes preserve publication, source and co
   assert.match(quality, /missing-contextual-money-link/);
   assert.match(quality, /lead-cta-not-whatsapp/);
 });
+
+
+test('Relaxst zero-cost preview disables only its own remote build and preserves main deployments', () => {
+  const config = JSON.parse(readRepoFile('vercel.json'));
+  assert.deepEqual(config.git.deploymentEnabled, {
+    'codex/relaxst-demo-fixes-20260908': false,
+  });
+  assert.notEqual(config.git.deploymentEnabled.main, false);
+});

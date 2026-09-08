@@ -100,7 +100,6 @@
     materialChip: document.querySelector('#material-chip'),
     tags: document.querySelector('#selection-tags'),
     prices: [
-      document.querySelector('#stage-price'),
       document.querySelector('#compact-price'),
       document.querySelector('#mobile-price'),
     ],
@@ -128,6 +127,7 @@
     return `
       <label class="option-card ${className} ${selected ? 'is-selected' : ''}">
         <input type="radio" name="${group}" value="${value}" ${selected ? 'checked' : ''}>
+        <span class="selection-indicator" aria-hidden="true">✓</span>
         ${image ? `<img src="${image}" alt="" loading="lazy">` : ''}
         <span class="option-card-text"><strong>${title}</strong><small>${note}</small></span>
         ${typeof price === 'number' ? `<span class="option-card-price">${priceSuffix(price)}</span>` : ''}
@@ -136,7 +136,7 @@
 
   function renderModelStep() {
     return `
-      <div class="step-intro"><h3>Welk model past bij jou?</h3><p>Dit zijn drie voorbeeldmodellen. De definitieve configurator kan het volledige assortiment slim filteren.</p></div>
+      <div class="step-intro"><h3>Kies je model</h3><p>Selecteer je favoriete stoel. De bekleding en functies kies je hierna.</p></div>
       <div class="option-grid models">
         ${Object.entries(MODELS).map(([id, model]) => radioCard({
           group: 'model', value: id, selected: state.model === id, title: model.name,
@@ -147,7 +147,7 @@
 
   function renderUpholsteryStep() {
     return `
-      <div class="step-intro"><h3>Kies jouw bekleding</h3><p>Kies een materiaal en kleurstaal. De foto toont het voorbeeldmodel; bekijk de echte bekleding in de winkel.</p></div>
+      <div class="step-intro"><h3>Kies je bekleding</h3><p>Kies een materiaal en kleurstaal. De foto toont het voorbeeldmodel; bekijk de echte bekleding in de winkel.</p></div>
       <div class="choice-section">
         <p class="choice-label">Materiaal</p>
         <div class="option-grid upholstery-grid">
@@ -171,7 +171,7 @@
 
   function renderSizeStep() {
     return `
-      <div class="step-intro"><h3>Welke maat voelt goed?</h3><p>Een goede zithoogte ondersteunt je benen zonder drukpunten. In de winkel meten we dit altijd exact na.</p></div>
+      <div class="step-intro"><h3>Kies je maat</h3><p>Een goede zithoogte ondersteunt je benen zonder drukpunten. In de winkel meten we dit altijd exact na.</p></div>
       <div class="size-measure"><span aria-hidden="true">↕</span><div><b>Snelle maathulp</b><br>Kies voorlopig op lichaamslengte; de zitspecialist controleert de definitieve maat.</div></div>
       <div class="option-grid">
         ${Object.entries(SIZES).map(([id, item]) => radioCard({
@@ -183,7 +183,7 @@
 
   function renderComfortStep() {
     return `
-      <div class="step-intro"><h3>Maak comfort persoonlijk</h3><p>Kies eerst de bediening en voeg daarna functies toe die jouw dagelijkse comfort verbeteren.</p></div>
+      <div class="step-intro"><h3>Kies je comfort</h3><p>Kies eerst de bediening en voeg daarna functies toe die jouw dagelijkse comfort verbeteren.</p></div>
       <div class="choice-section">
         <p class="choice-label">Bediening</p>
         <div class="option-grid mechanism-grid">
@@ -201,7 +201,7 @@
               <input type="checkbox" name="extra" value="${id}" ${state.extras.has(id) ? 'checked' : ''}>
               <span class="feature-icon" aria-hidden="true">${item.icon}</span>
               <span class="option-card-text"><strong>${item.name}</strong><small>${item.note}<br>+ ${formatPrice(item.price)}</small></span>
-              <span class="checkmark">✓</span>
+              <span class="checkmark" aria-hidden="true">✓</span>
             </label>`).join('')}
         </div>
       </div>`;
@@ -220,7 +220,7 @@
 
   function renderSummaryStep() {
     return `
-      <div class="step-intro"><h3>Jouw stoel staat klaar</h3><p>Controleer je keuzes en open het resultaat om je samenstelling te downloaden of zitadvies aan te vragen.</p></div>
+      <div class="step-intro"><h3>Bekijk je samenstelling</h3><p>Controleer je keuzes en open het resultaat om je samenstelling te downloaden of zitadvies aan te vragen.</p></div>
       <div class="summary-card">${summaryRows()}</div>
       <p class="summary-note">Demo met voorbeeldprijzen. Definitieve prijs, levertijd en technische combinaties worden bepaald met de aangeleverde productdata.</p>`;
   }
