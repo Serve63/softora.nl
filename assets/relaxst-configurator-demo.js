@@ -5,17 +5,20 @@
     comfora: {
       name: 'Comfora', code: 'CF-01', price: 2295,
       note: 'Zacht & ondersteunend',
-      image: 'https://www.relaxst.nl/wp-content/uploads/2025/12/Relaxst-1-.jpg',
+      image: '/assets/relaxst/chairs/comfora-original.jpg',
+      variants: '/assets/relaxst/chairs/comfora-variants-v1.webp',
     },
     linea: {
       name: 'Linea', code: 'LI-02', price: 2343,
       note: 'Compact & stijlvol',
-      image: 'https://www.relaxst.nl/wp-content/uploads/2024/11/Relaxst-1-12.jpg',
+      image: '/assets/relaxst/chairs/linea-original.jpg',
+      variants: '/assets/relaxst/chairs/linea-variants-v1.webp',
     },
     zeus: {
       name: 'Zeus', code: 'ZE-05', price: 3195,
       note: 'Ultiem sta-op comfort',
-      image: 'https://www.relaxst.nl/wp-content/uploads/2025/12/Relaxst-1-40.jpg',
+      image: '/assets/relaxst/chairs/zeus-original.jpg',
+      variants: '/assets/relaxst/chairs/zeus-variants-v1.webp',
     },
   };
 
@@ -34,9 +37,9 @@
   };
 
   const SIZES = {
-    S: { name: 'Compact', detail: 'Tot 1,68 m', seat: 'Zithoogte ca. 43 cm', price: 0 },
-    M: { name: 'Comfort', detail: '1,68 – 1,83 m', seat: 'Zithoogte ca. 46 cm', price: 0 },
-    L: { name: 'Ruim', detail: 'Vanaf 1,83 m', seat: 'Zithoogte ca. 49 cm', price: 95 },
+    S: { name: 'Compact', detail: 'Tot 1,68 m', seat: 'Zithoogte ca. 43 cm', seatCm: 43, price: 0 },
+    M: { name: 'Comfort', detail: '1,68 – 1,83 m', seat: 'Zithoogte ca. 46 cm', seatCm: 46, price: 0 },
+    L: { name: 'Ruim', detail: 'Vanaf 1,83 m', seat: 'Zithoogte ca. 49 cm', seatCm: 49, price: 95 },
   };
 
   const MECHANISMS = {
@@ -65,6 +68,10 @@
 
   const choices = { model: MODELS, upholstery: UPHOLSTERY, color: COLORS, size: SIZES, mechanism: MECHANISMS };
   const requiredChoices = [['model'], ['upholstery', 'color'], ['size'], ['mechanism']];
+  function clearChoicesAfter(step) {
+    requiredChoices.slice(step).flat().forEach((key) => { state[key] = null; });
+    if (step < 4) state.extras.clear();
+  }
   function isStepComplete(step) {
     return (requiredChoices[step - 1] || []).every((key) => state[key] !== null);
   }
@@ -87,6 +94,7 @@
       }
       state.step = Number.isInteger(saved.step)
         ? Math.min(firstIncompleteStep(), Math.max(1, saved.step)) : firstIncompleteStep();
+      clearChoicesAfter(state.step);
     }
   } catch { /* An invalid configuration link starts with no selected options. */ }
 
@@ -107,6 +115,9 @@
     next: document.querySelector('#next-step'),
     mobileNext: document.querySelector('#mobile-next'),
     chairImage: document.querySelector('#chair-image'),
+    chairFrame: document.querySelector('#chair-frame'),
+    sizeMarker: document.querySelector('#size-marker'),
+    previewFeedback: document.querySelector('#preview-feedback'),
     modelName: document.querySelector('#selected-model-name'),
     modelCode: document.querySelector('#stage-model-code'),
     stageLabel: document.querySelector('#stage-label'),
@@ -158,7 +169,7 @@
 
   function renderUpholsteryStep() {
     return `
-      <div class="step-intro"><h3>Kies je bekleding</h3><p>Kies een materiaal en kleurstaal. De foto toont het voorbeeldmodel; bekijk de echte bekleding in de winkel.</p></div>
+      <div class="step-intro"><h3>Kies je bekleding</h3><p>Kies een materiaal en kleur. Je ziet je keuze meteen terug op de stoel.</p></div>
       <div class="choice-section">
         <p class="choice-label">Materiaal</p>
         <div class="option-grid upholstery-grid">
@@ -258,10 +269,28 @@
     const model = MODELS[state.model] || MODELS.linea;
     const color = COLORS[state.color];
     const upholstery = UPHOLSTERY[state.upholstery];
-    if (elements.chairImage.src !== model.image) {
-      elements.chairImage.src = model.image;
+    const size = SIZES[state.size];
+    const showVariant = Boolean(state.model && (color || upholstery));
+    const image = showVariant ? model.variants : model.image;
+    // Sprite sheets let every color/material change render instantly after one image load.
+    const column = Object.keys(COLORS).indexOf(state.color || 'zand');
+    const row = Object.keys(UPHOLSTERY).indexOf(state.upholstery || 'stof');
+    elements.chairFrame.classList.toggle('has-variant', showVariant);
+    elements.chairFrame.style.transform = `scale(${size ? size.seatCm / SIZES.L.seatCm : 1})`;
+    elements.chairImage.style.left = showVariant ? `${-column * 100}%` : '0';
+    elements.chairImage.style.top = showVariant ? `${-row * 100}%` : '0';
+    if (elements.chairImage.dataset.source !== image) {
+      elements.chairImage.dataset.source = image;
+      elements.previewFeedback.hidden = true;
+      elements.chairImage.hidden = false;
+      elements.chairImage.src = image;
     }
-    elements.chairImage.alt = `Voorbeeldfoto van relaxstoel ${model.name}`;
+    elements.chairImage.alt = [
+      `Relaxstoel ${model.name}`, upholstery?.name, color?.name, state.size && `maat ${state.size}`,
+      showVariant ? 'digitale impressie' : 'voorbeeldfoto',
+    ].filter(Boolean).join(' · ');
+    elements.sizeMarker.hidden = !size;
+    elements.sizeMarker.textContent = size ? `Zithoogte ca. ${size.seatCm} cm` : '';
     elements.modelName.textContent = model.name;
     elements.modelCode.textContent = `Model ${model.code}`;
     elements.stageLabel.textContent = state.model ? 'Jouw stoel' : 'Voorbeeldmodel';
@@ -308,7 +337,9 @@
   }
 
   function goToStep(step) {
-    state.step = Math.min(firstIncompleteStep(), Math.max(1, step));
+    const target = Math.min(firstIncompleteStep(), Math.max(1, step));
+    if (target < state.step) clearChoicesAfter(target);
+    state.step = target;
     render();
     saveConfiguration();
     const heading = elements.content.querySelector('h3');
@@ -331,7 +362,7 @@
       `Bediening: ${MECHANISMS[state.mechanism].name}`,
       `Extra functies: ${[...state.extras].map((id) => EXTRAS[id].name).join(', ') || 'Geen'}`,
       `Prijsindicatie incl. btw: ${formatPrice(totalPrice())}`, '',
-      'Voorbeeldprijzen en voorbeeldfoto. Definitieve prijs en technische combinaties worden door Relaxst bevestigd.',
+      'Voorbeeldprijzen en digitale impressie. Definitieve kleur, maat, prijs en technische combinaties worden door Relaxst bevestigd.',
       'Zitadvies aanvragen: https://www.relaxst.nl/afspraak/',
       'Dit overzicht is geen bestelling of afspraakbevestiging.',
     ].join('\n');
@@ -351,6 +382,14 @@
   elements.mobilePrevious.addEventListener('click', () => goToStep(state.step - 1));
   elements.next.addEventListener('click', advance);
   elements.mobileNext.addEventListener('click', advance);
+  elements.chairImage.addEventListener('error', () => {
+    elements.chairImage.hidden = true;
+    elements.previewFeedback.hidden = false;
+  });
+  elements.chairImage.addEventListener('load', () => {
+    elements.chairImage.hidden = false;
+    elements.previewFeedback.hidden = true;
+  });
   document.querySelectorAll('[data-step-target]').forEach((button) => {
     button.addEventListener('click', () => goToStep(Number(button.dataset.stepTarget)));
   });
@@ -364,4 +403,5 @@
   });
 
   render();
+  saveConfiguration();
 })();

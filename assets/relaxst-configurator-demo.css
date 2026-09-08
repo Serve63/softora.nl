@@ -36,8 +36,12 @@ main { width: min(1280px, calc(100% - 56px)); margin: 0 auto; }
 .stage-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
 #stage-model-code { color: #908b85; font-size: 10px; }
 .product-caption h2 { margin: 7px 0 0; font-family: Manrope, Arial, sans-serif; font-size: 29px; line-height: 1.15; letter-spacing: -.04em; }
-.product-visual { height: 310px; margin: 8px 0 18px; display: grid; grid-template-rows: minmax(0, 1fr); place-items: center; }
-#chair-image { min-height: 0; max-height: 100%; max-width: 100%; width: 310px; height: 100%; object-fit: contain; }
+.product-visual { position: relative; container-type: size; height: 310px; margin: 8px 0 18px; display: grid; grid-template-rows: minmax(0, 1fr); place-items: center; }
+.chair-frame { position: relative; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); overflow: hidden; transform-origin: 50% 96%; transition: transform .2s ease; }
+#chair-image { position: absolute; inset: 0 auto auto 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
+.has-variant #chair-image { width: 500%; height: 300%; max-width: none; object-fit: fill; }
+.size-marker { margin: -8px 0 12px; text-align: center; color: var(--muted); font-size: 11px; }
+.preview-feedback { position: absolute; inset: 0; display: grid; align-content: center; padding: 20px; text-align: center; color: var(--muted); font-size: 12px; }
 .material-chip { display: flex; align-items: center; gap: 12px; padding-top: 18px; border-top: 1px solid var(--line); }
 .material-swatch { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; background: #c6ad92; box-shadow: inset 0 0 0 1px #0001; }
 .material-chip small, .material-chip strong { display: block; }
@@ -152,7 +156,7 @@ dialog > p:not(.eyebrow) { color: var(--muted); font-size: 13px; line-height: 1.
   main { width: calc(100% - 36px); }
   .configurator { grid-template-columns: 1fr; }
   .product-stage { position: static; display: grid; grid-template-columns: 130px minmax(0, 1fr); column-gap: 18px; }
-  .stage-topline, .product-caption, .material-chip, .selection-tags, .photo-note { grid-column: 2; }
+  .stage-topline, .product-caption, .material-chip, .selection-tags, .photo-note, .size-marker { grid-column: 2; }
   .stage-topline { grid-row: 1; }
   .product-caption { grid-row: 2; }
   .product-caption h2 { margin: 2px 0 10px; font-size: 24px; }
@@ -161,6 +165,7 @@ dialog > p:not(.eyebrow) { color: var(--muted); font-size: 13px; line-height: 1.
   .material-swatch { width: 25px; height: 25px; }
   .selection-tags { margin-top: 10px; }
   .photo-note { grid-column: 1 / -1; margin-top: 12px; }
+  .size-marker { margin: 0 0 8px; text-align: left; font-size: 10px; }
   .builder-panel { min-height: 580px; }
   .upholstery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .upholstery-grid .option-card { display: block; }

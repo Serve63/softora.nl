@@ -10,8 +10,8 @@ const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-5"/);
-  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-5"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-6"/);
+  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-6"/);
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
   assert.match(html, /Interactieve conceptdemo/);
@@ -207,7 +207,7 @@ test('Relaxst keeps the latest model image when switching rapidly back to the in
   demo.choose('model', 'zeus');
   demo.choose('model', 'linea');
   assert.equal(demo.node('#selected-model-name').textContent, 'Linea');
-  assert.match(demo.node('#chair-image').src, /2024\/11\/Relaxst-1-12\.jpg$/);
+  assert.match(demo.node('#chair-image').src, /\/assets\/relaxst\/chairs\/linea-original\.jpg$/);
   assert.match(demo.node('#chair-image').alt, /Linea/);
   assert.match(demo.node('#compact-price').textContent, /2\.343/);
 });
@@ -271,6 +271,112 @@ test('Relaxst mobile navigation preserves explicit choices and allows a result w
   assert.match(reloaded.node('#step-content').innerHTML, /Handmatig/);
 });
 
+test('Relaxst back navigation clears later choices, their price and URL on desktop and mobile', () => {
+  for (const back of ['#previous-step', '#mobile-previous']) {
+    const demo = demoHarness();
+    demo.choose('model', 'zeus');
+    demo.click('#next-step');
+    demo.choose('upholstery', 'microleder');
+    demo.choose('color', 'olijf');
+    demo.click('#next-step');
+    demo.choose('size', 'L');
+    demo.click('#next-step');
+    demo.choose('mechanism', '5motor');
+    demo.choose('extra', 'verwarming');
+    assert.match(demo.node('#compact-price').textContent, /4\.775/);
+    demo.click(back);
+    let saved = JSON.parse(demo.location.searchParams.get('config'));
+    assert.equal(saved.step, 3);
+    assert.equal(saved.size, 'L');
+    assert.equal(saved.mechanism, undefined);
+    assert.deepEqual(saved.extras, []);
+    assert.match(demo.node('#compact-price').textContent, /3\.585/);
+    demo.click(back);
+    saved = JSON.parse(demo.location.searchParams.get('config'));
+    assert.equal(saved.step, 2);
+    assert.equal(saved.size, undefined);
+    assert.equal(saved.upholstery, 'microleder');
+    assert.equal(demo.node('#size-marker').hidden, true);
+    assert.match(demo.node('#compact-price').textContent, /3\.490/);
+    demo.click(back);
+    saved = JSON.parse(demo.location.searchParams.get('config'));
+    assert.deepEqual(saved, { version: 2, step: 1, model: 'zeus', extras: [] });
+    assert.match(demo.node('#compact-price').textContent, /3\.195/);
+    assert.equal(demo.node('#selection-tags').innerHTML, '');
+    assert.equal(demo.node('#material-chip').hidden, true);
+    assert.match(demo.node('#chair-image').src, /zeus-original\.jpg$/);
+    const restored = demoHarness(demo.location.searchParams.get('config'));
+    restored.click('#next-step');
+    assert.equal(restored.node('#next-step').disabled, true);
+    assert.doesNotMatch(restored.node('#step-content').innerHTML, / checked/);
+  }
+});
+
+test('Relaxst clicking an earlier step or reopening an older URL removes stale future choices', () => {
+  const complete = { version: 2, step: 5, model: 'zeus', upholstery: 'leer', color: 'cognac', size: 'L', mechanism: '5motor', extras: ['accu'] };
+  const demo = demoHarness(JSON.stringify(complete));
+  demo.step(1);
+  assert.deepEqual(JSON.parse(demo.location.searchParams.get('config')), { version: 2, step: 1, model: 'zeus', extras: [] });
+  demo.step(5);
+  assert.equal(demo.node('#current-step-number').textContent, 2);
+  assert.equal(demo.node('#next-step').disabled, true);
+  const oldLink = demoHarness(JSON.stringify({ ...complete, step: 1 }));
+  assert.equal(oldLink.node('#selection-tags').innerHTML, '');
+  assert.equal(oldLink.node('#material-chip').hidden, true);
+  assert.match(oldLink.node('#compact-price').textContent, /3\.195/);
+});
+
+test('Relaxst shows all 45 generated material/color variants and scales the selected size', () => {
+  for (const model of ['comfora', 'linea', 'zeus']) {
+    const demo = demoHarness();
+    demo.choose('model', model);
+    demo.click('#next-step');
+    for (const [row, material] of ['stof', 'microleder', 'leer'].entries()) {
+      demo.choose('upholstery', material);
+      for (const [column, color] of ['zand', 'cognac', 'olijf', 'kiezel', 'antraciet'].entries()) {
+        demo.choose('color', color);
+        assert.equal(demo.node('#chair-image').src, `/assets/relaxst/chairs/${model}-variants-v1.webp`);
+        assert.equal(demo.node('#chair-image').style.left, `${-column * 100}%`);
+        assert.equal(demo.node('#chair-image').style.top, `${-row * 100}%`);
+        assert.match(demo.node('#chair-image').alt, /digitale impressie/);
+        assert.ok(fs.statSync(path.join(root, demo.node('#chair-image').src)).size > 0);
+      }
+    }
+    demo.click('#next-step');
+    for (const [size, cm] of [['S', 43], ['M', 46], ['L', 49]]) {
+      demo.choose('size', size);
+      assert.equal(demo.node('#chair-frame').style.transform, `scale(${cm / 49})`);
+      assert.equal(demo.node('#size-marker').textContent, `Zithoogte ca. ${cm} cm`);
+      assert.equal(demo.node('#size-marker').hidden, false);
+      assert.ok(demo.node('#chair-image').alt.includes(`maat ${size}`));
+    }
+    demo.click('#next-step');
+    const visual = () => JSON.stringify([demo.node('#chair-image').src, demo.node('#chair-image').style, demo.node('#chair-frame').style]);
+    const before = visual();
+    for (const mechanism of ['handmatig', '2motor', '3motor', '5motor']) demo.choose('mechanism', mechanism);
+    for (const extra of ['accu', 'topswing', 'lendenpomp', 'verwarming']) demo.choose('extra', extra);
+    assert.equal(visual(), before, 'comfort choices do not change the chair image');
+  }
+});
+
+test('Relaxst reacts to either material or color first without selecting an unchosen option', () => {
+  for (const first of [['upholstery', 'leer'], ['color', 'olijf']]) {
+    const demo = demoHarness();
+    demo.choose('model', 'linea');
+    demo.click('#next-step');
+    demo.choose(...first);
+    assert.match(demo.node('#chair-image').src, /linea-variants-v1.webp/);
+    assert.equal(demo.node('#next-step').disabled, true);
+    const saved = JSON.parse(demo.location.searchParams.get('config'));
+    assert.equal(saved[first[0] === 'color' ? 'upholstery' : 'color'], undefined);
+    demo.node('#chair-image').listeners.error();
+    assert.equal(demo.node('#chair-image').hidden, true);
+    assert.equal(demo.node('#preview-feedback').hidden, false);
+    demo.node('#chair-image').listeners.load();
+    assert.equal(demo.node('#preview-feedback').hidden, true);
+  }
+});
+
 test('Relaxst result stays open when clicking its own padding and closes on the backdrop', () => {
   const demo = demoHarness();
   finishChoices(demo);
@@ -289,7 +395,7 @@ test('Relaxst preview contains only its static assets and no server compute', ()
   const output = path.join(temp, 'output');
   try {
     const result = buildRelaxstPreview(root, output);
-    assert.equal(result.files.length, 3);
+    assert.equal(result.files.length, 9);
     assert.deepEqual(fs.readdirSync(output).sort(), ['config.json', 'static']);
     const config = JSON.parse(fs.readFileSync(path.join(output, 'config.json'), 'utf8'));
     assert.equal(config.version, 3);
@@ -300,6 +406,9 @@ test('Relaxst preview contains only its static assets and no server compute', ()
     assert.equal(fs.readFileSync(path.join(output, 'static/index.html'), 'utf8'), html);
     assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst-configurator-demo.js'), 'utf8'), script);
     assert.equal(fs.readFileSync(path.join(output, 'static/assets/relaxst-configurator-demo.css'), 'utf8'), css);
+    for (const file of result.files.filter((file) => file.includes('/chairs/'))) {
+      assert.deepEqual(fs.readFileSync(path.join(output, 'static', file)), fs.readFileSync(path.join(root, file)));
+    }
     assert.throws(() => buildRelaxstPreview(root, output), /Output bestaat al/);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });

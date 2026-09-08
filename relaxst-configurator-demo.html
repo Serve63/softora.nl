@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/relaxst-configurator-demo.css?v=20260908-5">
-  <script src="/assets/relaxst-configurator-demo.js?v=20260908-5" defer></script>
+  <link rel="stylesheet" href="/assets/relaxst-configurator-demo.css?v=20260908-6">
+  <script src="/assets/relaxst-configurator-demo.js?v=20260908-6" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -36,14 +36,18 @@
         <div class="stage-topline"><span id="stage-label">Voorbeeldmodel</span><span id="stage-model-code">Model LI-02</span></div>
         <div class="product-caption"><h2 id="selected-model-name">Linea</h2></div>
         <div class="product-visual">
-          <img id="chair-image" src="https://www.relaxst.nl/wp-content/uploads/2024/11/Relaxst-1-12.jpg" alt="Voorbeeldfoto van relaxstoel Linea">
+          <div class="chair-frame" id="chair-frame">
+            <img id="chair-image" src="/assets/relaxst/chairs/linea-original.jpg" alt="Voorbeeldfoto van relaxstoel Linea">
+          </div>
+          <p class="preview-feedback" id="preview-feedback" role="status" hidden>De stoelafbeelding kon niet laden. Vernieuw de pagina om het opnieuw te proberen.</p>
         </div>
+        <p class="size-marker" id="size-marker" hidden></p>
         <div class="material-chip" id="material-chip" hidden>
           <span class="material-swatch" id="material-swatch" hidden></span>
           <span><small>Gekozen bekleding</small><strong id="material-label"></strong></span>
         </div>
         <div class="selection-tags" id="selection-tags" aria-label="Huidige keuzes"></div>
-        <p class="photo-note">Voorbeeldfoto. Bekijk de echte kleur en bekleding in de winkel.</p>
+        <p class="photo-note">Digitale impressie van kleur, materiaal en maat. Bekijk en meet je stoel in de winkel.</p>
       </div>
 
       <div class="builder-panel">
