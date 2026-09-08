@@ -38,6 +38,28 @@ test('mailbox bewaart een los telefoonnummer in een handtekening voor een Apple 
   }
 });
 
+test('mailbox bewaart een telefoon achter de afzendernaam wanneer de import HTML-regels samenvoegt', () => {
+  for (const phone of ['06-12345678', '+31 6 12345678']) {
+    const parsed = signature.parseIncoming([
+      'Kunnen we morgenmiddag even bellen?',
+      '',
+      ' Groet',
+      ` Robin Voorbeeld ${phone}`,
+      '',
+      ' Op 7 sep 2026 om 13:38 heeft Servé Creusen het volgende geschreven:',
+      'Met vriendelijke groet,',
+      'Servé Creusen 06-87654321',
+    ].join('\n'), { from: 'Robin Voorbeeld', email: 'robin@example.nl' });
+    assert.equal(parsed.contact.phone, phone);
+    assert.ok(signature.renderContactCard(parsed.contact).includes(`>${phone}</a>`));
+  }
+  const otherIdentity = signature.parseIncoming(
+    'Antwoord.\n\nGroet\nRobin Voorbeeld\nAnder Persoon 06-87654321',
+    { from: 'Robin Voorbeeld', email: 'robin@example.nl' }
+  );
+  assert.equal(otherIdentity.contact.phone, '');
+});
+
 test('mailbox verwart losse datums en bedrijfsnummers niet met een telefoonnummer', () => {
   for (const value of ['2026-09-08', '07-09-2026', '17122606', '1234567890', '1234 AB', '06-123', 'NL001751168B24']) {
     const parsed = signature.parseIncoming(`Antwoord.\n\nGroet\nVoorbeeld\n${value}`);

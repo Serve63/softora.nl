@@ -252,7 +252,20 @@
     return { street: '', postcodeCity: '' };
   }
 
-  function extractContact(signatureLines) {
+  function extractUnlabelledPhone(value, senderEvidence) {
+    const line = cleanFieldValue(value);
+    const match = /(?:^|\s)((?:\+|00|\(0|0)[\d().\s/-]+)$/.exec(line);
+    if (!match || !buildPhoneHref(match[1])) return '';
+    const prefix = line.slice(0, match.index).trim();
+    if (prefix && !valueMatchesSenderEvidence(prefix, senderEvidence)) return '';
+    const compact = match[1].replace(/[().\s/-]/g, '');
+    // Unlabelled Dutch or international phone lines, never arbitrary company IDs or dates.
+    return /^(?:0[1-9]\d{8}|\+[1-9]\d{6,14}|00[1-9]\d{6,12})$/.test(compact)
+      ? cleanFieldValue(match[1])
+      : '';
+  }
+
+  function extractContact(signatureLines, messageContext) {
     const values = { phone: '', street: '', postcode: '', city: '', country: '' };
     for (let index = 1; index < signatureLines.length; index += 1) {
       const field = matchField(signatureLines[index]);
@@ -262,12 +275,9 @@
       values[field.key] = fieldValue;
     }
     if (!values.phone) {
-      values.phone = signatureLines.slice(1).map(cleanFieldValue).find((line) => {
-        if (!buildPhoneHref(line)) return false;
-        const compact = line.replace(/[().\s/-]/g, '');
-        // Unlabelled Dutch or international phone lines, never arbitrary company IDs or dates.
-        return /^(?:0[1-9]\d{8}|\+[1-9]\d{6,14}|00[1-9]\d{6,12})$/.test(compact);
-      }) || '';
+      const senderEvidence = buildSenderEvidence(messageContext);
+      values.phone = signatureLines.slice(1)
+        .map((line) => extractUnlabelledPhone(line, senderEvidence)).find(Boolean) || '';
     }
     const compactAddress = extractCompactDutchAddress(signatureLines);
     const addressLines = [];
@@ -321,7 +331,7 @@
             ...lines.slice(0, signatureStart),
             ...lines.slice(directBodyEnd),
           ]),
-      contact: extractContact(signatureLines),
+      contact: extractContact(signatureLines, messageContext),
       matched: true,
     };
   }
