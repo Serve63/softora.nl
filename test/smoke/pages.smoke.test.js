@@ -38,6 +38,7 @@ const unlockedPublicSeoPaths = [
   '/ai-automatisering',
   '/website-laten-maken',
   '/website-laten-maken-oisterwijk',
+  '/website',
   '/pakketten',
   '/bedrijfssoftware',
   '/bedrijfssoftware-op-maat',
@@ -90,7 +91,7 @@ test('page smoke: / serves the real SEO homepage with a clean canonical', async 
   assert.doesNotMatch(html, /url=\/premium-website|window\.location\.replace\('\/premium-website'\)/);
 });
 
-test('page smoke: removed /website returns 404 and preserves the SEO route', async () => {
+test('page smoke: /website is de publieke noindex overtuigingspagina en behoudt de SEO-route', async () => {
   const [pageResponse, seoResponse, sitemapResponse] = await Promise.all([
     fetch(`${serverRef.baseUrl}/website`, { redirect: 'manual' }),
     fetch(`${serverRef.baseUrl}/website-laten-maken`, { redirect: 'manual' }),
@@ -99,9 +100,13 @@ test('page smoke: removed /website returns 404 and preserves the SEO route', asy
   const html = await pageResponse.text();
   const seoHtml = await seoResponse.text();
   const sitemap = await sitemapResponse.text();
-  assert.equal(pageResponse.status, 404);
+  assert.equal(pageResponse.status, 200);
   assert.equal(pageResponse.headers.get('location'), null);
-  assert.doesNotMatch(html, /id="website-intake"|website-salespage/);
+  assert.equal(pageResponse.headers.get('x-robots-tag'), 'noindex, nofollow');
+  assert.match(html, /Een website die laat zien wat jouw bedrijf/);
+  assert.match(html, /id="website-intake"/);
+  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(html, /rel="canonical"/);
   assert.equal(seoResponse.status, 200);
   assert.match(seoHtml, /rel="canonical"[^>]+\/website-laten-maken/);
   assert.doesNotMatch(seoHtml, /id="website-intake"/);
@@ -109,7 +114,7 @@ test('page smoke: removed /website returns 404 and preserves the SEO route', asy
   assert.match(sitemap, /<loc>[^<]+\/website-laten-maken<\/loc>/);
   for (const assetPath of ['/assets/website-salespage.css', '/assets/website-salespage.js']) {
     const response = await fetch(`${serverRef.baseUrl}${assetPath}`);
-    assert.equal(response.status, 404, assetPath);
+    assert.equal(response.status, 200, assetPath);
   }
 });
 
