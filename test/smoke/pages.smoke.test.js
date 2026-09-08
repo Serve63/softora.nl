@@ -104,7 +104,9 @@ test('page smoke: /website is de publieke noindex overtuigingspagina en behoudt 
   assert.equal(pageResponse.headers.get('location'), null);
   assert.equal(pageResponse.headers.get('x-robots-tag'), 'noindex, nofollow');
   assert.match(html, /Een website die laat zien wat jouw bedrijf/);
-  assert.match(html, /id="website-intake"/);
+  assert.match(html, /id="website-gesprek"/);
+  assert.match(html, /Plan een gesprek/);
+  assert.doesNotMatch(html, /id="website-intake"/);
   assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
   assert.doesNotMatch(html, /rel="canonical"/);
   assert.equal(seoResponse.status, 200);

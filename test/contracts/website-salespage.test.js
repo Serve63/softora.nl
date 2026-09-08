@@ -47,11 +47,10 @@ test('website sales page has real local assets, unique anchors and accessible co
     if (node.attribs.target === '_blank') assert.match(node.attribs.rel, /noopener/);
   }
   assert.match(html, /href="tel:\+31643262792"/);
-  assert.match(html, /href="mailto:info@softora.nl"/);
   assert.match(html, /https:\/\/wa\.me\/31643262792/);
-  assert.match(html, /<noscript>/);
-  assert.match(html, /data-intake-success hidden/);
-  assert.match(html, /data-intake-status role="status" aria-live="polite"/);
+  assert.match(html, /id="website-gesprek"/);
+  assert.match(html, /Plan een gesprek/);
+  assert.doesNotMatch(html, /id="website-intake"/);
 });
 
 function setup({ fetchImpl, valid = true, fields = {} } = {}) {
