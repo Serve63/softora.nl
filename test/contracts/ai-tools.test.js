@@ -180,7 +180,7 @@ test('ai tools coordinator forwards database controls without leaking outreach i
   assert.equal(capturedScan.senderProfile, undefined);
 });
 
-test('ai tools coordinator gives V2 screenshot providers followed by direct website visuals', async () => {
+test('ai tools coordinator requires actual V2 screenshots and excludes direct website visuals', async () => {
   let capturedScan = null;
   const { coordinator } = createFixture({
     fetchWebsitePreviewScanFromUrl: async () => ({
@@ -217,7 +217,6 @@ test('ai tools coordinator gives V2 screenshot providers followed by direct webs
   assert.deepEqual(capturedScan.referenceImageUrls, [
     'https://image.thum.io/get/width/1200/crop/1600/allowJPG/noanimate/https://www.bliv.nl/',
     'https://s0.wordpress.com/mshots/v1/https%3A%2F%2Fwww.bliv.nl%2F?w=1280&h=1600',
-    'https://www.bliv.nl/og-image.jpg',
   ]);
 });
 

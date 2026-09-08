@@ -2409,3 +2409,31 @@ test('premium database webdesign inline processing keeps AI image jobs in a smal
   assert.equal(finalPoll.body.job.status, 'done');
   assert.equal(pipelineCalls, 2);
 });
+
+test('premium database webdesign jobs never store or automatically retry a rejected brand palette', async () => {
+  let generations = 0, promotions = 0;
+  const values = {};
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} }, processJobsInline: true,
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => {
+      generations++;
+      throw Object.assign(new Error('Het ontwerp is afgekeurd omdat bevestigde huiskleuren ontbreken.'), { status: 422, code: 'WEBDESIGN_BRAND_COLORS' });
+    } },
+    getUiStateValues: async () => ({ values }),
+    setUiStateValues: async (patch) => { Object.assign(values, patch); return { values }; },
+    mailReadySnapshotService: { markCustomersMailReadyAfterAssetUpsert: async () => { promotions++; } },
+  });
+  const req = { premiumAuth: { email: 'owner@softora.nl', userId: 'owner' }, body: {
+    jobId: 'job_brandcolor123', websiteUrl: 'https://merk.test', variant: 'v2-visual-dna',
+    customer: { id: 'customer-brand', bedrijf: 'Merk' },
+  } };
+  await coordinator.startJobResponse(req, createResponseRecorder());
+  const result = createResponseRecorder();
+  await coordinator.getJobResponse({ ...req, params: { jobId: req.body.jobId } }, result);
+  assert.equal(result.body.job.status, 'error');
+  assert.match(result.body.job.error, /huiskleuren ontbreken/);
+  assert.equal(generations, 1);
+  assert.equal(promotions, 0);
+  assert.equal(values.softora_database_photos_v1, undefined);
+  assert.equal(values.softora_database_photo_data_v1_customer_brand_0, undefined);
+});
