@@ -674,6 +674,10 @@
           }
         : {}),
       originalSentMail: getOriginalSentMail(mail),
+      conversationMessages: (Array.isArray(mail.threadMessages) ? mail.threadMessages : []).map((message) => ({
+        id: message.id, folder: message.folder, accountEmail: message.accountEmail, conversationId: message.conversationId,
+        body: message.body || message.preview || '', date: message.receivedAt || message.date || '',
+      })),
       mode: 'reply',
     };
   }
