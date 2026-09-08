@@ -11,7 +11,7 @@ const framingScript = fs.readFileSync(path.join(root, 'assets/relaxst/chair-fram
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-7"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-8"/);
   assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-7"/);
   assert.match(html, /src="\/assets\/relaxst\/chair-framing\.js\?v=20260908-7" defer/);
   assert.ok(html.indexOf('/assets/relaxst/chair-framing.js') < html.indexOf('/assets/relaxst-configurator-demo.js'));
