@@ -383,15 +383,31 @@ h2,h3{text-transform:uppercase}
 .contact-section{background:linear-gradient(120deg,rgba(19,20,32,.98),rgba(19,20,32,.91)),url('/assets/softora-website-wireframes.jpg') center 55%/cover}
 .contact-section .story-label{color:#e9a0bd}
 .contact-section .story-label:before{color:rgba(233,160,189,.62)}
+.site-header .nav-links{margin-left:auto;margin-right:0}
+.site-header .button-small{min-height:44px;padding:13px 20px;border-radius:5px;font-size:12px}
+.hero .eyebrow{display:flex;align-items:center;gap:10px;color:#e0a1bb;font-size:10px;font-weight:800;letter-spacing:.24em;text-transform:uppercase}
+.hero .eyebrow:before{content:"";width:30px;height:2px;background:var(--pink);flex:0 0 30px}
+.hero-actions{gap:12px;margin-top:27px}
+.hero-actions .button{min-height:53px;justify-content:center;gap:9px;border-radius:6px;padding:15px 20px;font-size:12px;letter-spacing:.12em}
+.hero-action-icon{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.hero-actions .button-phone{min-width:225px;justify-content:flex-start;border:1px solid rgba(255,255,255,.22);background:rgba(15,16,27,.24);color:rgba(255,255,255,.76);box-shadow:none}
+.hero-actions .button-phone:hover{border-color:rgba(255,255,255,.42);background:rgba(255,255,255,.08);color:#fff}
+.hero-bottom{display:none}
+.proof{position:absolute;z-index:4;left:auto;right:28px;bottom:24px;width:min(540px,calc(100% - 56px));display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:9px 8px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:rgba(19,20,29,.86);box-shadow:0 14px 34px rgba(11,12,20,.22);backdrop-filter:blur(14px);color:#fff}
+.proof-value{min-width:0;display:flex;align-items:center;gap:9px;padding:3px 13px}
+.proof-value+.proof-value{border-left:1px solid rgba(255,255,255,.18)}
+.proof-value-icon{flex:0 0 28px;width:28px;height:28px;display:grid;place-items:center;border:1px solid rgba(228,91,147,.32);border-radius:50%;color:#e45b93}
+.proof-value-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.proof-value-text{color:rgba(255,255,255,.9);font-size:9.5px;font-weight:600;line-height:1.25}
+.section-head{text-align:center;max-width:760px;margin:0 auto}
+.section-title{font-family:Oswald,Arial,sans-serif;font-size:clamp(37px,4.4vw,58px);line-height:1.02;margin:14px 0 16px;letter-spacing:-.025em;text-transform:uppercase}
+.section-sub{max-width:650px;margin:0 auto;color:var(--muted);font-size:16px;line-height:1.75}
 
 @media(max-width:900px){
   .hero,.hero-grid{min-height:620px}
   .hero-grid{padding-top:60px;padding-bottom:130px}
   .hero:before{background:linear-gradient(90deg,rgba(13,14,25,.97) 0%,rgba(13,14,25,.91) 50%,rgba(13,14,25,.5) 100%),linear-gradient(0deg,rgba(13,14,25,.5),transparent 48%)}
-  .hero-bottom{right:32px}
-  .trust-strip{grid-template-columns:repeat(2,minmax(0,1fr));width:min(560px,calc(100vw - 64px))}
-  .trust-strip span:nth-child(3){border-left:0;border-top:1px solid rgba(255,255,255,.14)}
-  .trust-strip span:nth-child(4){border-top:1px solid rgba(255,255,255,.14)}
+  .proof{right:28px;width:min(540px,calc(100vw - 64px))}
   .problem-list{grid-template-columns:repeat(2,1fr)}
   .approach-layout{grid-template-columns:1fr;gap:20px}
   .approach-layout .split-image{min-height:320px}
@@ -407,9 +423,11 @@ h2,h3{text-transform:uppercase}
   .hero-image{object-position:62% center}
   .hero:before{background:linear-gradient(90deg,rgba(13,14,25,.96),rgba(13,14,25,.73)),linear-gradient(0deg,rgba(13,14,25,.72),rgba(13,14,25,.18) 58%,rgba(13,14,25,.38))}
   .hero-bottom{left:20px;right:20px;bottom:16px}
-  .trust-strip{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 5px;font-size:8.5px}
-  .trust-strip span{padding:4px 7px}
-  .trust-strip span:before{flex-basis:22px;width:22px;height:22px;margin-right:6px}
+  .proof{left:20px;right:20px;bottom:16px;width:auto;padding:8px 5px}
+  .proof-value{gap:5px;padding:3px 6px}
+  .proof-value-icon{flex-basis:22px;width:22px;height:22px}
+  .proof-value-icon svg{width:16px;height:16px}
+  .proof-value-text{font-size:8px}
   .problem-list{grid-template-columns:1fr;margin-top:31px}
   .split-heading>p{font-size:15px}
   .process-head{text-align:left}

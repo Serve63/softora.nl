@@ -12,9 +12,9 @@ const html = fs.readFileSync(path.join(root, 'website.html'), 'utf8');
 test('website sales page vertelt dezelfde klantgerichte route als bedrijfssoftware zonder de SEO-pagina te kannibaliseren', () => {
   assert.match(html, /Een website die laat zien wat jouw bedrijf <em>waard is\.<\/em>/);
   assert.match(html, /Offline voelt je bedrijf sterk/);
-  assert.match(html, /Direct duidelijk wat je doet/);
-  assert.match(html, /Een route naar contact/);
-  assert.match(html, /SEO-basis voor vindbaarheid/);
+  assert.match(html, /Meer relevante bezoekers/);
+  assert.match(html, /Meer vertrouwen/);
+  assert.match(html, /Meer aanvragen/);
   assert.match(html, /Van jouw bedrijf naar een website die/);
   assert.match(html, /Bezoekers begrijpen sneller waarom ze/);
   assert.match(html, /<meta name="robots" content="noindex, follow">/);
