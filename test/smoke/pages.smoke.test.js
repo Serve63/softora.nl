@@ -118,6 +118,10 @@ test('page smoke: /website is de publieke noindex overtuigingspagina en behoudt 
     const response = await fetch(`${serverRef.baseUrl}${assetPath}`);
     assert.equal(response.status, 200, assetPath);
   }
+  assert.match(html, /website-salespage\.css\?v=20260908f/);
+  const websiteCss = await (await fetch(`${serverRef.baseUrl}/assets/website-salespage.css`, { cache: 'no-store' })).text();
+  assert.match(websiteCss, /\.hero-visual:after\s*\{[\s\S]*linear-gradient\(90deg,rgba\(13,14,25/);
+  assert.match(websiteCss, /\.hero\{min-height:520px\}/);
 });
 
 test('page smoke: /bedrijfssoftware is de publieke noindex overtuigingspagina', async () => {
