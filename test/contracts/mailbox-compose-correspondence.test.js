@@ -4,6 +4,8 @@ const { createMailboxService } = require('../../server/services/mailbox');
 const { createMailboxSendProvenanceStore } = require('../../server/services/mailbox-send-provenance-store');
 const { MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION } = require('../../server/services/mailbox-compose-email-renderer');
 const { withMailboxPreDispatchProvenance } = require('../helpers/mailbox-pre-dispatch-provenance-fixture');
+const { createSupabaseStateStore } = require('../../server/services/supabase-state');
+const { createOutboundRecipientGuardStore } = require('../../server/services/outbound-recipient-guard-store');
 
 const accountEmail = 'serve@softora.nl';
 const recipientEmail = 'info@correspondence.example';
@@ -60,7 +62,7 @@ function createHarness(options = {}) {
       },
     },
     mailboxSendProvenanceStore: options.provenanceUnavailable ? {} : provenanceStore,
-    outboundRecipientGuardStore: {
+    outboundRecipientGuardStore: options.outboundRecipientGuardStore || {
       findRecipientSuppressionConflict: async () => {
         calls.push('suppression');
         return { ok: true, conflict: options.suppressed ? { recipient_email: recipientEmail } : null };
@@ -211,3 +213,74 @@ test('proven correspondence cannot dispatch without durable provenance', async (
   assert.equal(checked.statusCode, 503);
   assert.equal(h.sent.length, 0);
 });
+
+test('suppression recovers inside one send despite an unrelated REST cooldown and a transient lookup failure', async () => {
+  let reads = 0;
+  const urls = [];
+  const state = createSupabaseStateStore({
+    supabaseUrl: 'https://database.example.test', supabaseServiceRoleKey: 'test-only',
+    fetchImpl: async (url) => {
+      urls.push(new URL(url));
+      if (!String(url).includes('softora_outbound_recipient_guards') || ++reads === 1) {
+        return new Response(JSON.stringify({ message: 'temporarily unavailable' }), { status: 503 });
+      }
+      return new Response('[]', { status: 200 });
+    },
+  });
+  await state.getSupabaseClient().from('unrelated_background_read').select('*');
+  const guard = createOutboundRecipientGuardStore({ ...state, sleep: async () => {} });
+  const h = createHarness({ outboundRecipientGuardStore: guard });
+  const checked = await h.preflight();
+  const result = await h.send(checked.body.result.reconcileProof);
+  assert.equal(result.statusCode, 200, result.body?.detail);
+  assert.equal(reads, 2);
+  assert.equal(h.sent.length, 1);
+  for (const url of urls.slice(1)) {
+    assert.equal(url.searchParams.get('suppressed'), 'eq.true');
+    assert.equal(url.searchParams.get('permanent'), 'eq.true');
+    assert.match(url.searchParams.get('guard_key'), /email:info@correspondence.example/);
+  }
+  await h.send(checked.body.result.reconcileProof);
+  assert.equal(h.sent.length, 1, 'the accepted intent prevents another provider dispatch');
+  assert.equal(reads, 2, 'accepted replay needs no new suppression lookup');
+});
+
+for (const scenario of ['outage', 'suppressed-after-retry', 'permission-denied', 'invalid-response']) {
+  test(`suppression ${scenario} never reaches SMTP`, async () => {
+    let reads = 0;
+    const state = createSupabaseStateStore({
+      supabaseUrl: 'https://database.example.test', supabaseServiceRoleKey: 'test-only',
+      fetchImpl: async () => {
+        reads += 1;
+        if (scenario === 'permission-denied') {
+          return new Response(JSON.stringify({ code: '42501', message: 'permission denied' }), { status: 403 });
+        }
+        if (scenario === 'invalid-response') return new Response('null', { status: 200 });
+        if (reads === 1 || scenario === 'outage') {
+          return new Response(JSON.stringify({ code: '57014', message: 'query cancelled' }), { status: 503 });
+        }
+        return new Response(JSON.stringify([{
+          guard_key: `email:${recipientEmail}`, recipient_email: recipientEmail, suppressed: true, permanent: true,
+        }]), { status: 200 });
+      },
+    });
+    const h = createHarness({
+      outboundRecipientGuardStore: createOutboundRecipientGuardStore({ ...state, sleep: async () => {} }),
+    });
+    const checked = await h.preflight();
+    const result = await h.send(checked.body.result.reconcileProof);
+    assert.equal(h.sent.length, 0);
+    assert.equal(result.body.externalEffect, false);
+    assert.equal(result.body.failurePhase, 'pre-dispatch');
+    assert.equal(reads, ['outage', 'suppressed-after-retry'].includes(scenario) ? 2 : 1);
+    if (scenario === 'suppressed-after-retry') {
+      assert.equal(result.statusCode, 409);
+      assert.equal(result.body.code, 'OUTBOUND_RECIPIENT_SUPPRESSED');
+      assert.notEqual(result.body.retryable, true);
+    } else {
+      assert.equal(result.statusCode, 503);
+      assert.equal(result.body.code, 'MAILBOX_SEND_TEMPORARY');
+      assert.equal(result.body.retryable, true);
+    }
+  });
+}
