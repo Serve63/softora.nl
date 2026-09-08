@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   createController,
+  getLast60Minutes,
 } = require('../../assets/kvk-database-metrics');
 
 function createTextNode() {
@@ -73,7 +74,8 @@ test('kvk database metrics render current last-hour and grade values without ano
         return elements[id] || null;
       },
     },
-    getState: () => scraperState,
+    getSnapshot: () => ({ state: scraperState, generatedAt: '2026-09-08T22:00:00Z' }),
+    now: () => Date.parse('2026-09-08T22:01:00Z'),
   });
 
   controller.renderMetrics();
@@ -121,7 +123,8 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
         return elements[id] || null;
       },
     },
-    getState: () => ({
+    now: () => Date.parse('2026-09-08T22:01:00Z'),
+    getSnapshot: () => ({ generatedAt: '2026-09-08T22:00:00Z', state: {
       with_website: 5,
       without_website: 1,
       unusable: 10,
@@ -130,7 +133,7 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
         unusable_grades: { 1: 0, 2: 2, 3: 4 },
         unusable_grade_activity: {},
       },
-    }),
+    } }),
   });
 
   controller.renderMetrics();
@@ -139,4 +142,57 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
   assert.equal(elements['companies-unusable-grade-2'].textContent, '6');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].hidden, true);
+});
+
+test('last-hour activity expires against source time, including every review counter', () => {
+  const snapshot = {
+    generatedAt: '2026-08-24T20:35:03+02:00',
+    syncedAt: '2026-09-08T22:15:00Z',
+    state: { last_60_minutes: {
+      found: 0, treated: 24, usable: 24, with_website: 0, without_website: 24,
+      unusable: 15, luna_max_found: 9, unusable_grades: { 1: 15, 2: 12 },
+      unusable_grade_activity: { 1: { added: 15, removed: 12 }, 2: { added: 12, removed: 0 } },
+    } },
+  };
+  const sourceTime = Date.parse(snapshot.generatedAt);
+  assert.deepEqual(getLast60Minutes(snapshot, sourceTime + 3_599_999), snapshot.state.last_60_minutes);
+  const zero = {
+    found: 0, treated: 0, usable: 0, with_website: 0, without_website: 0,
+    unusable: 0, luna_max_found: 0, unusable_grades: { 1: 0, 2: 0 },
+    unusable_grade_activity: { 1: { added: 0, removed: 0 }, 2: { added: 0, removed: 0 } },
+  };
+  assert.deepEqual(getLast60Minutes(snapshot, sourceTime + 3_600_000), zero);
+  assert.deepEqual(getLast60Minutes(snapshot, Date.parse('2026-09-08T22:15:00Z')), zero);
+  for (const generatedAt of [undefined, '', 'invalid', '2027-01-01T00:00:00Z']) {
+    assert.deepEqual(getLast60Minutes({ ...snapshot, generatedAt }, sourceTime), zero);
+  }
+  assert.equal(snapshot.state.last_60_minutes.treated, 24, 'Stored historical activity is preserved');
+});
+
+test('an open page expires activity without a new snapshot and resumes with fresh source data', () => {
+  const deltaSelectors = ['.stat-delta-number', '.stat-delta-label'];
+  const elements = Object.fromEntries([
+    'companies-treated', 'companies-treated-last60', 'companies-unusable-grade-1',
+    'companies-unusable-grade-2', 'companies-usable-last60',
+  ].map((id) => [id, createElement(deltaSelectors)]));
+  let snapshot = {
+    generatedAt: '2026-09-08T22:00:00Z',
+    state: { treated: 32518, last_60_minutes: { treated: 24, usable: 24 } },
+  };
+  let now = Date.parse('2026-09-08T22:59:59Z');
+  const controller = createController({
+    document: { getElementById: (id) => elements[id] || null },
+    getSnapshot: () => snapshot,
+    now: () => now,
+  });
+  controller.renderMetrics();
+  assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+24');
+  now += 1000;
+  controller.renderMetrics();
+  assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '0');
+  assert.equal(elements['companies-usable-last60'].nodes['.stat-delta-number'].textContent, '0');
+  assert.equal(elements['companies-treated'].textContent, '32.518');
+  snapshot = { generatedAt: new Date(now).toISOString(), state: { ...snapshot.state, last_60_minutes: { treated: 2 } } };
+  controller.renderMetrics();
+  assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+2');
 });
