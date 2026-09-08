@@ -93,6 +93,28 @@
     stroke-linejoin: round;
 }
 
+#diensten .diensten-product-grid .tilt-card:first-child .card-content::before {
+    content: '↗';
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 2;
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
+    background: rgba(15, 16, 24, 0.42);
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 18px;
+    line-height: 1;
+    box-shadow: 0 8px 22px rgba(8, 9, 15, 0.18);
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s var(--ease-out-expo), background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
 .tilt-card:hover::before,
 .tilt-card:focus-visible::before {
     transform: scale(1.045);
@@ -108,6 +130,15 @@
     box-shadow: 0 10px 26px rgba(139, 34, 82, 0.3);
 }
 
+#diensten .diensten-product-grid .tilt-card:first-child:hover .card-content::before,
+#diensten .diensten-product-grid .tilt-card:first-child:focus-visible .card-content::before {
+    transform: translate(2px, -2px);
+    border-color: rgba(207, 79, 132, 0.72);
+    background: rgba(155, 35, 85, 0.94);
+    color: #fff;
+    box-shadow: 0 10px 26px rgba(139, 34, 82, 0.3);
+}
+
 .tilt-card:focus-visible {
     outline: 3px solid rgba(207, 79, 132, 0.72);
     outline-offset: 4px;
@@ -115,6 +146,13 @@
 
 @media (max-width: 768px) {
     .service-card-link-icon {
+        top: 16px;
+        right: 16px;
+        width: 38px;
+        height: 38px;
+    }
+
+    #diensten .diensten-product-grid .tilt-card:first-child .card-content::before {
         top: 16px;
         right: 16px;
         width: 38px;

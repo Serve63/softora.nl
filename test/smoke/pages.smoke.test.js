@@ -429,6 +429,19 @@ test('page smoke: premium-website.html uses the current WhatsApp number', () => 
   assert.match(html, /Open WhatsApp chat met Softora op \+31 6 43 26 27 92/, 'WhatsApp-label mist het actuele nummer.');
 });
 
+test('page smoke: homepage websitekaart toont dezelfde subtiele pijlinkon als softwarekaart', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
+  const css = fs.readFileSync(path.join(repoRoot, 'assets/home-service-card-links.css'), 'utf8');
+  const websiteCard = html.match(/<a class="tilt-card fade-up"[^>]*href="\/website"[\s\S]*?<\/a>/)?.[0] || '';
+  assert.ok(websiteCard, 'De websitekaart op de homepage ontbreekt.');
+  assert.doesNotMatch(websiteCard, /service-card-link-icon/, 'De beschermde homepagekaart moet geen extra HTML-regel krijgen.');
+  assert.match(
+    css,
+    /\.tilt-card:first-child \.card-content::before[\s\S]*?content:\s*'↗'/,
+    'De websitekaart moet een subtiele ronde pijlinkon tonen.'
+  );
+});
+
 test('page smoke: premium-website.html handles missing cursor elements safely', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-website.html'), 'utf8');
   assert.match(
