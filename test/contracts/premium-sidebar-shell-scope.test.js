@@ -186,7 +186,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260804a') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260805h') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260908-publish') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
 });
 
@@ -1248,6 +1248,8 @@ test('SEO uses the shared black heading and outer frame without changing the sid
 test('database loading repair keeps its premium shell and serves matching design eligibility assets', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.ok(extractSidebarLinkTargets(source).database);
+  assert.match(source, /premium-database-boot\.js\?v=20260908a/);
+  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260908-publish/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
 });

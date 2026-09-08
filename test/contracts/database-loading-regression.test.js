@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const snapshotClient = require('../../assets/premium-database-mail-ready-snapshot');
+const assetClient = require('../../assets/premium-database-webdesign-asset-state');
+const bootClient = require('../../assets/premium-database-boot');
 const { resolveColdmailStatsResponse } = require('../../server/services/coldmail-live-stats-response');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL } = require('../../server/services/coldmail-guard-sent-at');
 const root = path.join(__dirname, '../..');
@@ -56,11 +58,8 @@ test('complete snapshot becomes visible while canonical customer details are sti
     canonicalSnapshotApplied: true, remoteCustomersLoaded: false,
   };
   let photoReads = 0, readyRenders = 0, finished = false;
-  const window = { SoftoraDatabaseResilience: {}, SoftoraDatabaseMailReadySnapshot: null };
-  vm.runInNewContext(fs.readFileSync(path.join(root, 'assets/premium-database-mail-ready-snapshot.js'), 'utf8'), { window });
-  window.SoftoraDatabaseMailReadySnapshot.load = () => snapshot.promise;
   const sandbox = {
-    window, state, console, databaseHadBootstrapCustomers: true, databaseHasFastSnapshotBootstrap: false,
+    snapshotClient, state, console, databaseHadBootstrapCustomers: true, databaseHasFastSnapshotBootstrap: false,
     normalizeCustomer: (value) => value, applyCustomerList() {},
     renderPage() { if (state.canonicalInventoryReady) readyRenders += 1; },
     bootstrapCustomers: () => customers.promise,
@@ -70,10 +69,18 @@ test('complete snapshot becomes visible while canonical customer details are sti
     releaseDatabaseBootShell() {}, databasePendingJobsPromise: Promise.resolve(),
     databaseImportController: { startAutoSync() { finished = true; } },
   };
-  vm.runInNewContext(page.match(/async function loadMailReadySnapshot\(\) \{[^\n]+/)[0], sandbox);
-  const boot = page.slice(page.lastIndexOf('void (async function () {'), page.lastIndexOf('})();') + 5);
-  vm.runInNewContext(boot, sandbox);
-  snapshot.resolve(true);
+  assert.match(page, /window\.SoftoraDatabaseBoot\.run\(/);
+  assert.match(page, /SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(\{ renderPage: renderPage/);
+  sandbox.loadMailReadySnapshot = () => snapshotClient.loadAndPublish({
+    state, renderPage: sandbox.renderPage, normalizeCustomer: (row) => row,
+    applyCustomerList: (rows) => { state.klanten = rows; },
+    fetchJsonWithTimeout: () => snapshot.promise,
+  });
+  const boot = bootClient.run(sandbox);
+  snapshot.resolve({ ok: true, json: async () => ({ ok: true, total: 0, customers: [],
+    availableTotal: 1, availableCustomers: state.availableSnapshotCustomers,
+    foundTotal: 0, foundCustomerIds: [], generatedAt: '2026-09-08T19:00:00.000Z',
+  }) });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(state.remoteCustomersLoaded, false);
   assert.equal(state.canonicalInventoryReady, true);
@@ -81,14 +88,13 @@ test('complete snapshot becomes visible while canonical customer details are sti
   assert.equal(photoReads, 0);
   customers.resolve(true);
   await new Promise((resolve) => setImmediate(resolve));
+  await boot;
   assert.equal(finished, true);
   assert.equal(photoReads, 0);
 });
 
 test('a valid design website is independent of email eligibility while mail readiness stays blocked', () => {
-  const window = {};
-  vm.runInNewContext(fs.readFileSync(path.join(root, 'assets/premium-database-webdesign-asset-state.js'), 'utf8'), { window });
-  const build = window.SoftoraDatabaseWebdesignAssetState.buildWebdesignAssetState;
+  const build = assetClient.buildWebdesignAssetState;
   const helpers = { isMailLeadEligible: () => false };
   for (const email of ['first@example.test; second@example.test', '', 'invalid']) {
     const customer = { id: 'design-1', website: 'https://example.test/contact', email };

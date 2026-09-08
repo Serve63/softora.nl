@@ -128,4 +128,5 @@
         mergeCustomersWithPhotos: mergeCustomersWithPhotos,
         isApprovedMockupQuality: isApprovedMockupQuality
     };
-})(window);
+    if (typeof module !== "undefined" && module.exports) module.exports = global.SoftoraDatabaseWebdesignAssetState;
+})(typeof window !== "undefined" ? window : globalThis);
