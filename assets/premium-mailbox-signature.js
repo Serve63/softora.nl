@@ -261,6 +261,14 @@
       if (field.key === 'phone' && field.requiresPhoneLikeValue && !buildPhoneHref(fieldValue)) continue;
       values[field.key] = fieldValue;
     }
+    if (!values.phone) {
+      values.phone = signatureLines.slice(1).map(cleanFieldValue).find((line) => {
+        if (!buildPhoneHref(line)) return false;
+        const compact = line.replace(/[().\s/-]/g, '');
+        // Unlabelled Dutch or international phone lines, never arbitrary company IDs or dates.
+        return /^(?:0[1-9]\d{8}|\+[1-9]\d{6,14}|00[1-9]\d{6,12})$/.test(compact);
+      }) || '';
+    }
     const compactAddress = extractCompactDutchAddress(signatureLines);
     const addressLines = [];
     appendUnique(addressLines, values.street || compactAddress.street);
