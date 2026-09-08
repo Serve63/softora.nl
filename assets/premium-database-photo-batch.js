@@ -1,5 +1,14 @@
 (function () {
   const FOCUS_STYLE_ID = "softora-photo-batch-focus-style";
+  // Dated reference conversion, not the card issuer's settlement rate.
+  // https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml (2026-09-08)
+  const EUR_USD_REFERENCE_RATE = 1.1614;
+  const VAT_RATE = 0.21;
+  const PRICING_NOTE = "Naar boven afgerond op centen, inclusief 21% btw; ECB-koers 08-09-2026: €1 = $1,1614. Je factuur kan afwijken door de betaalkoers of btw-verlegging.";
+
+  function usdToEuroIncludingVat(amountUsd) {
+    return amountUsd / EUR_USD_REFERENCE_RATE * (1 + VAT_RATE);
+  }
 
   function formatPhotoBatchCount(count) {
     return Number(count || 0).toLocaleString("nl-NL") + (count === 1 ? " bedrijf" : " bedrijven");
@@ -15,19 +24,21 @@
 
   function formatEuroCost(value) {
     if (!Number.isFinite(value)) return "prijs na generatie";
-    return "€" + value.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const cents = value * 100;
+    const rounded = Math.ceil(cents - Number.EPSILON * Math.max(1, Math.abs(cents)) * 4) / 100 || 0;
+    return "€" + rounded.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   // OpenAI calculator: Sunburst max, 1024x1536, 5488 output tokens at $30/M.
   function formatOutputEstimate(count) {
-    const amount = Math.max(0, Number(count) || 0) * 0.16464;
-    return "ca. US$" + amount.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 5 }) + " + invoer";
+    const amount = usdToEuroIncludingVat(Math.max(0, Number(count) || 0) * 0.16464);
+    return "ca. " + formatEuroCost(amount) + " + invoer (incl. 21% btw)";
   }
 
   function formatGenerationCost(generation) {
     const cost = generation && generation.cost;
     if (!cost || cost.basis !== "reported-image-usage" || cost.currency !== "USD" || !Number.isFinite(cost.amountUsd) || cost.amountUsd < 0) return "beeldkosten niet beschikbaar";
-    return "US$" + cost.amountUsd.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 8 }) + " beeldkosten (excl. btw)";
+    return "ca. " + formatEuroCost(usdToEuroIncludingVat(cost.amountUsd)) + " incl. invoer en 21% btw";
   }
 
   function createCostReporter(options) {
@@ -46,6 +57,7 @@
         const label = root.document.createElement("div");
         label.className = "photo-generate-charge-label";
         label.setAttribute("aria-live", "polite");
+        label.title = PRICING_NOTE;
         label.textContent = generation ? formatGenerationCost(generation) : (Number.isFinite(costEur) ? formatEuroCost(costEur) : formatOutputEstimate(1));
         root.document.body.appendChild(label);
         updateChargeLabelPositions();
@@ -70,7 +82,7 @@
       report: function (job) {
         const text = formatGenerationCost(job && job.generation);
         if (job && job.customerId) costs.set(job.customerId, text);
-        options.setStatusMessage((job && job.company || "Ontwerp") + " · " + text, "info", true);
+        options.setStatusMessage((job && job.company || "Ontwerp") + " · " + text + ". " + PRICING_NOTE, "info", true);
         if (job && job.generation) showChargeLabel(job.variant, job.generation);
       },
       consume: function (ids) {
@@ -90,6 +102,13 @@
     let mode = "custom";
     let cachedTargetCount = null;
     ensureInputFocusStyles();
+    if (typeof document !== "undefined" && !document.getElementById("photoBatchPricingNote")) {
+      const note = document.createElement("p");
+      note.id = "photoBatchPricingNote";
+      note.className = "photo-batch-summary";
+      note.textContent = "Vooraf: geschatte beeldprijs + invoer van de prompt en eventuele referentieafbeelding. Na een losse generatie: kosten van beide op basis van het API-verbruik. " + PRICING_NOTE;
+      nodes.photoBatchSummary.insertAdjacentElement("afterend", note);
+    }
 
     function getTargetCount(options) {
       if (!options || !options.force) {
@@ -113,7 +132,7 @@
       nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total) + " · " + (Number.isFinite(costEur) ? formatCost(total * costEur) : formatOutputEstimate(total));
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
       nodes.photoBatchSummary.textContent = message || (selectedCount
-        ? "Selectie: " + formatPhotoBatchCount(selectedCount) + " · " + (Number.isFinite(selectedCost) ? formatCost(selectedCost) : formatOutputEstimate(selectedCount)) + " (beeldprijs; invoer extra)"
+        ? "Selectie: " + formatPhotoBatchCount(selectedCount) + " · " + (Number.isFinite(selectedCost) ? formatCost(selectedCost) : formatOutputEstimate(selectedCount))
         : "Vul minimaal 1 in.");
     }
 
@@ -215,7 +234,7 @@
     };
   }
 
-  const api = { createCostReporter: createCostReporter, createController: createController, formatEuroCost: formatEuroCost, formatOutputEstimate: formatOutputEstimate, formatGenerationCost: formatGenerationCost };
+  const api = { pricingNote: PRICING_NOTE, usdToEuroIncludingVat: usdToEuroIncludingVat, createCostReporter: createCostReporter, createController: createController, formatEuroCost: formatEuroCost, formatOutputEstimate: formatOutputEstimate, formatGenerationCost: formatGenerationCost };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.SoftoraDatabasePhotoBatch = api;
 }());
