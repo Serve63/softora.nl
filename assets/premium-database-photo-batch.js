@@ -4,7 +4,7 @@
   // https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml (2026-09-08)
   const EUR_USD_REFERENCE_RATE = 1.1614;
   const VAT_RATE = 0.21;
-  const PRICING_NOTE = "Naar boven afgerond op centen, inclusief 21% btw; ECB-koers 08-09-2026: €1 = $1,1614. Je factuur kan afwijken door de betaalkoers of btw-verlegging.";
+  const PRICING_NOTE = "Richtprijs vooraf; het berekende bedrag verschijnt na generatie.";
 
   function usdToEuroIncludingVat(amountUsd) {
     return amountUsd / EUR_USD_REFERENCE_RATE * (1 + VAT_RATE);
@@ -29,16 +29,16 @@
     return "€" + rounded.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  // OpenAI calculator: Sunburst medium, 1024x1536, 343 output tokens at $30/M.
+  // User-selected medium estimate: EUR 0.04 per design, including input and VAT.
   function formatOutputEstimate(count) {
-    const amount = usdToEuroIncludingVat(Math.max(0, Number(count) || 0) * 0.01029);
-    return "ca. " + formatEuroCost(amount) + " + invoer (incl. 21% btw)";
+    const amount = Math.max(0, Number(count) || 0) * 0.04;
+    return "ca. " + formatEuroCost(amount);
   }
 
   function formatGenerationCost(generation) {
     const cost = generation && generation.cost;
     if (!cost || cost.basis !== "reported-image-usage" || cost.currency !== "USD" || !Number.isFinite(cost.amountUsd) || cost.amountUsd < 0) return "beeldkosten niet beschikbaar";
-    return "ca. " + formatEuroCost(usdToEuroIncludingVat(cost.amountUsd)) + " incl. invoer en 21% btw";
+    return "ca. " + formatEuroCost(usdToEuroIncludingVat(cost.amountUsd));
   }
 
   function createCostReporter(options) {
@@ -82,7 +82,7 @@
       report: function (job) {
         const text = formatGenerationCost(job && job.generation);
         if (job && job.customerId) costs.set(job.customerId, text);
-        options.setStatusMessage((job && job.company || "Ontwerp") + " · " + text + ". " + PRICING_NOTE, "info", true);
+        options.setStatusMessage((job && job.company || "Ontwerp") + " · " + text, "info", true);
         if (job && job.generation) showChargeLabel(job.variant, job.generation);
       },
       consume: function (ids) {
@@ -106,7 +106,7 @@
       const note = document.createElement("p");
       note.id = "photoBatchPricingNote";
       note.className = "photo-batch-summary";
-      note.textContent = "Vooraf: geschatte beeldprijs + invoer van de prompt en eventuele referentieafbeelding. Na een losse generatie: kosten van beide op basis van het API-verbruik. " + PRICING_NOTE;
+      note.textContent = PRICING_NOTE;
       nodes.photoBatchSummary.insertAdjacentElement("afterend", note);
     }
 

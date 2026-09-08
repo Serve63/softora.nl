@@ -1456,7 +1456,7 @@
             <div class="photo-preview-meta" id="photoPreviewMeta"></div>
         </div>
     </div>
-    <script src="assets/premium-database-photo-batch.js?v=20260909-medium-costs"></script>
+    <script src="assets/premium-database-photo-batch.js?v=20260909-short-costs"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260908-design-eligibility"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-webdesign-action.js?v=20260908-design-eligibility"></script><script src="assets/premium-database-webdesign-preview.js?v=20260714b"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
     <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606d"></script><script src="assets/premium-database-boot.js?v=20260908a"></script><script src="assets/premium-database-system-mail-count.js?v=20260909-bounces-appointments"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260616b"></script>
@@ -2156,7 +2156,7 @@
             const displayText = resultText || "-- resultaten"; nodes.count.textContent = displayText; if (pending) { nodes.generatePhotosButton.disabled = true; nodes.generatePhotosButton.title = "Beschikbare data wordt nog geladen."; nodes.generatePhotosButton.setAttribute("aria-label", "Beschikbare resultaten laden"); return; }
             if (nodes.generatePhotosButton.dataset.generating !== "true") nodes.generatePhotosButton.disabled = false;
             const eligibleCount = Number.isFinite(Number(eligibleCountOverride)) ? Math.max(0, Number(eligibleCountOverride)) : (customers || []).filter(isWebdesignPhotoEligible).length;
-            nodes.generatePhotosButton.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. Sunburst medium: " + window.SoftoraDatabasePhotoBatch.formatOutputEstimate(1) + ". Invoer = prompt en eventuele referentieafbeelding. " + window.SoftoraDatabasePhotoBatch.pricingNote;
+            nodes.generatePhotosButton.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. Sunburst medium: " + window.SoftoraDatabasePhotoBatch.formatOutputEstimate(1) + ". " + window.SoftoraDatabasePhotoBatch.pricingNote;
             nodes.generatePhotosButton.setAttribute("aria-label", displayText + " - webdesigns maken");
         }
         function resetVisibleLimit() { state.visibleLimit = TABLE_PAGE_SIZE; }
