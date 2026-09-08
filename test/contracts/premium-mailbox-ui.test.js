@@ -196,7 +196,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260908a/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260908b/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
@@ -222,8 +222,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260908a'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260908a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260908b'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260908b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260907a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
@@ -10449,8 +10449,7 @@ test('los telefoonnummer voor Apple Mail-geschiedenis blijft zichtbaar in hoofdm
     'Kunnen we morgenmiddag even bellen?',
     '',
     'Groet',
-    'Robin Voorbeeld',
-    '06-12345678',
+    ' Robin Voorbeeld 06-12345678',
     '',
     'Op 7 sep 2026 om 13:38 heeft Servé Creusen <serve@example.nl> het volgende geschreven:',
     'Dit is uitsluitend geciteerde oude tekst.',
@@ -10463,6 +10462,7 @@ test('los telefoonnummer voor Apple Mail-geschiedenis blijft zichtbaar in hoofdm
     folder: 'inbox',
     direction: 'received',
     accountEmail: 'serve@softora.nl',
+    from: 'Robin Voorbeeld',
     email: 'robin@example.nl',
     date: '2026-09-07T19:15:00.000Z',
     body,
