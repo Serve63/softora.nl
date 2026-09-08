@@ -8,6 +8,17 @@ const {
 
 const repoRoot = path.resolve(__dirname, '../..');
 
+test('manual production bundles use the same patched sharp binaries as the lockfile', () => {
+  const deployScript = fs.readFileSync(path.join(repoRoot, 'scripts/deploy-production-safe.js'), 'utf8');
+  const lock = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package-lock.json'), 'utf8'));
+  const packages = [...deployScript.matchAll(/name: '(@img\/sharp[^']+)', version: '([^']+)', tarball: '([^']+)'/g)];
+  assert.equal(packages.length, 4);
+  for (const [, name, version, tarball] of packages) {
+    assert.equal(version, lock.packages[`node_modules/${name}`].version, name);
+    assert.equal(tarball, `${name.replace('@', '').replace('/', '-')}-${version}.tgz`);
+  }
+});
+
 function createGitStub(overrides = {}) {
   const responses = {
     'rev-parse --is-inside-work-tree': { status: 0, stdout: 'true' },
