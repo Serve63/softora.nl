@@ -2023,6 +2023,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /id="photoBatchLimitInput" type="number"/);
   assert.match(pageSource, /id="photoBatchSummary" aria-live="polite"/);
   assert.match(pageSource, /\.photo-batch-option\.is-active/);
+  assert.match(pageSource, /\.photo-batch-option strong\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
   assert.match(pageSource, /function renderPhotoBatchHeader\(customers, pending, eligibleCountOverride, resultText\)/);
