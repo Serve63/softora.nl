@@ -2490,7 +2490,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /const selectedCost = Number\.isFinite\(costEur\) \? selectedCount \* costEur : null;/);
-  assert.match(pageSource, /if \(!Number\.isFinite\(value\)\) return "kosten variabel";/);
+  assert.match(photoBatchScriptSource, /if \(!Number\.isFinite\(value\)\) return "kosten variabel";/);
   assert.match(photoBatchScriptSource, /function formatPhotoBatchCount\(count\) \{[\s\S]*count === 1 \? " bedrijf" : " bedrijven"/);
   assert.match(photoBatchScriptSource, /let cachedTargetCount = null;/);
   assert.match(photoBatchScriptSource, /function getTargetCount\(options\) \{[\s\S]*cachedTargetCount = getTargets\(\)\.length;[\s\S]*return cachedTargetCount;[\s\S]*\}/);
