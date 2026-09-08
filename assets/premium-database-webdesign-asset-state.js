@@ -41,7 +41,7 @@
         const mockupPending = Boolean(id) && (Boolean(isMockupPending(id)) || Boolean(runtime.pendingMockupIds && runtime.pendingMockupIds.has && runtime.pendingMockupIds.has(id)));
         const mockupFailed = Boolean(id) && (Boolean(isMockupFailed(id)) || Boolean(runtime.failedMockupIds && runtime.failedMockupIds.has && runtime.failedMockupIds.has(id)));
         const leadEligible = Boolean(isMailLeadEligible(customer));
-        const canGeneratePhoto = visible && leadEligible && !hasPhoto && Boolean(resolveCustomerWebsiteUrl(customer));
+        const canGeneratePhoto = visible && !hasPhoto && Boolean(resolveCustomerWebsiteUrl(customer));
         const canRepairMockup = hasPhoto && !hasMockup && !mockupPending;
         const isMailReady = visible && leadEligible && hasPhoto && hasMockup;
 
@@ -128,4 +128,5 @@
         mergeCustomersWithPhotos: mergeCustomersWithPhotos,
         isApprovedMockupQuality: isApprovedMockupQuality
     };
-})(window);
+    if (typeof module !== "undefined" && module.exports) module.exports = global.SoftoraDatabaseWebdesignAssetState;
+})(typeof window !== "undefined" ? window : globalThis);

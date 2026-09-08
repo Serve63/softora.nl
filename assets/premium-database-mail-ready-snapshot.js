@@ -436,11 +436,21 @@
         }
     }
 
+    async function loadAndPublish(options) {
+        const loaded = await load(options);
+        if (loaded) {
+            markCanonicalInventoryReady(options.state);
+            if (typeof options.renderPage === "function") options.renderPage();
+        }
+        return loaded;
+    }
+
     function normalizeAvailableSnapshotRows(rows, offset, normalizeCustomer) {
         return dedupeCustomers((Array.isArray(rows) ? rows : []).map(function (row, index) {
             return normalizeAvailableSnapshotCustomer(row, offset + index, normalizeCustomer);
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, reconcileCustomerList: reconcileCustomerList, isCanonicalCustomerListCoherent: isCanonicalCustomerListCoherent, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load };
-})(window);
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, reconcileCustomerList: reconcileCustomerList, isCanonicalCustomerListCoherent: isCanonicalCustomerListCoherent, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load, loadAndPublish: loadAndPublish };
+    if (typeof module !== "undefined" && module.exports) module.exports = global.SoftoraDatabaseMailReadySnapshot;
+})(typeof window !== "undefined" ? window : globalThis);
