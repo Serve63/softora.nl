@@ -908,12 +908,12 @@
         }
 
         .photo-batch-options {
-            display: grid;
+            display: grid; min-width: 0;
             gap: 10px;
         }
 
         .photo-batch-option {
-            width: 100%;
+            width: 100%; min-width: 0; box-sizing: border-box;
             border: 1px solid var(--border);
             border-radius: 8px;
             background: var(--card-soft);
@@ -938,7 +938,7 @@
             color: var(--light);
             font-size: 12px;
             font-weight: 600;
-            white-space: nowrap;
+            white-space: normal; overflow-wrap: anywhere; min-width: 0; text-align: right;
         }
 
         .photo-batch-option.is-active {
