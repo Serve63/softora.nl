@@ -343,6 +343,9 @@ h2{font-size:40px}
 h1,h2{letter-spacing:-.025em}
 h2,h3{text-transform:uppercase}
 .problem-section{background:var(--cream)}
+.split-heading{display:block;text-align:center;max-width:760px}
+.split-heading>p{max-width:650px;margin:22px auto 0}
+.problem-list{grid-template-columns:repeat(2,1fr);max-width:1000px;margin-top:46px}
 .problem-list{gap:20px}
 .problem-list article{position:relative;overflow:hidden;min-height:245px;padding:30px 28px;background:#fff;border:1px solid var(--line);border-radius:10px}
 .problem-list article:before{content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--pink);transform:scaleX(.22);transform-origin:left;transition:transform .25s ease}
@@ -350,6 +353,11 @@ h2,h3{text-transform:uppercase}
 .item-number{font:700 45px/1 Oswald,sans-serif;color:rgba(163,38,95,.2)}
 .problem-list h3{font-family:Oswald,Arial,sans-serif;font-size:23px;line-height:1.08;margin:22px 0 11px}
 .process-section{background:#fff}
+.process-head{text-align:center;max-width:760px;padding-bottom:0}
+.process-head .story-label{justify-content:center}
+.process-head>p:not(.eyebrow){max-width:650px;margin:20px auto 0;color:var(--muted)}
+.approach-layout{grid-template-columns:minmax(280px,.82fr) minmax(0,1.18fr);gap:28px;margin-top:45px}
+.approach-layout .split-image{min-height:430px;background-image:url('/assets/softora-website-wireframes.jpg');background-position:center;background-size:cover}
 .process-steps li{margin-bottom:13px;padding:25px 26px;border:0;border-left:3px solid var(--pink);background:var(--cream)}
 .process-steps li:first-child{padding:25px 26px}
 .process-steps li:last-child{padding-bottom:25px;margin-bottom:0}
@@ -365,6 +373,13 @@ h2,h3{text-transform:uppercase}
 .value-feature>p:not(.eyebrow),.value-feature li,.value-feature:first-child>p:not(.eyebrow),.value-feature:first-child li{color:rgba(255,255,255,.73)}
 .value-feature h3{font-size:27px;text-transform:uppercase}
 .investment-section{background:var(--pink)}
+.investment-section{position:relative;overflow:hidden;background:linear-gradient(120deg,rgba(19,20,32,.96),rgba(19,20,32,.83)),url('/assets/softora-website-wireframes.jpg') center/cover;color:#fff;padding:105px 0;text-align:center}
+.investment-inner{display:block;max-width:760px}
+.investment-inner .eyebrow{justify-content:center;color:#e9a0bd}
+.investment-inner h2{font-size:clamp(42px,5vw,68px);line-height:1;margin:15px 0}
+.investment-inner>div>p:not(.eyebrow){max-width:580px;margin:0 auto;color:rgba(255,255,255,.7);font-size:16px}
+.investment-inner .button{margin:28px auto 0}
+.investment-inner .investment-note{font-size:12px!important;margin-top:17px!important;color:rgba(255,255,255,.55)!important}
 .contact-section{background:linear-gradient(120deg,rgba(19,20,32,.98),rgba(19,20,32,.91)),url('/assets/softora-website-wireframes.jpg') center 55%/cover}
 .contact-section .story-label{color:#e9a0bd}
 .contact-section .story-label:before{color:rgba(233,160,189,.62)}
@@ -377,6 +392,9 @@ h2,h3{text-transform:uppercase}
   .trust-strip{grid-template-columns:repeat(2,minmax(0,1fr));width:min(560px,calc(100vw - 64px))}
   .trust-strip span:nth-child(3){border-left:0;border-top:1px solid rgba(255,255,255,.14)}
   .trust-strip span:nth-child(4){border-top:1px solid rgba(255,255,255,.14)}
+  .problem-list{grid-template-columns:repeat(2,1fr)}
+  .approach-layout{grid-template-columns:1fr;gap:20px}
+  .approach-layout .split-image{min-height:320px}
 }
 
 @media(max-width:680px){
@@ -392,6 +410,13 @@ h2,h3{text-transform:uppercase}
   .trust-strip{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 5px;font-size:8.5px}
   .trust-strip span{padding:4px 7px}
   .trust-strip span:before{flex-basis:22px;width:22px;height:22px;margin-right:6px}
+  .problem-list{grid-template-columns:1fr;margin-top:31px}
+  .split-heading>p{font-size:15px}
+  .process-head{text-align:left}
+  .process-head .story-label{justify-content:flex-start}
+  .process-head>p:not(.eyebrow){font-size:15px}
+  .approach-layout{margin-top:34px}
+  .approach-layout .split-image{min-height:260px}
   .problem-list article{min-height:0;padding:25px 22px}
   .process-steps li,.process-steps li:first-child,.process-steps li:last-child{padding:22px 20px}
 }
