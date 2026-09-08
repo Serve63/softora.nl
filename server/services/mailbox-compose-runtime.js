@@ -31,6 +31,8 @@ function isTemporaryMailboxSendInfrastructureError(error) {
     'MAILBOX_SEND_PROVENANCE_UNAVAILABLE',
     'MAILBOX_SEND_PROVENANCE_RESERVE_FAILED',
     'MAILBOX_SEND_PROVENANCE_UPDATE_FAILED',
+    'OUTBOUND_SUPPRESSION_GUARD_FAILED',
+    'OUTBOUND_SUPPRESSION_GUARD_UNAVAILABLE',
     'SUPABASE_REST_COOLDOWN',
     '57014',
   ].includes(code)) return true;
@@ -358,8 +360,14 @@ function createMailboxComposeRuntime(dependencies = {}) {
       setAcceptedSendIdentityHeaders(res, result);
       return res.status(200).json({ ok: true, result });
     } catch (error) {
-      logger.error('[Mailbox][Send]', error?.message || error);
-      if (isTemporaryMailboxSendInfrastructureError(error)) {
+      logger.error('[Mailbox][Send]', error?.message || error, {
+        code: error?.code,
+        causeCode: error?.cause?.code,
+        causeName: error?.cause?.name,
+        causeStatus: error?.cause?.status || error?.cause?.statusCode,
+        externalEffectPossible,
+      });
+      if (!externalEffectPossible && isTemporaryMailboxSendInfrastructureError(error)) {
         return res.status(503).json({
           ok: false,
           code: 'MAILBOX_SEND_TEMPORARY',

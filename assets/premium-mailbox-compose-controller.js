@@ -656,6 +656,11 @@
           payload: sendPayload,
           attachments,
           fetch: options.fetch,
+          onRecovery: () => {
+            if (sendBtn && composeGeneration === sendComposeGeneration && replyContext === sendReplyContext) {
+              sendBtn.textContent = 'Verzendcontrole herstellen…';
+            }
+          },
           uploadAttachments: attachments.length ? options.compose.uploadAttachments : undefined,
           serializeSendPayload: typeof options.compose.serializeSendPayload === 'function'
             ? options.compose.serializeSendPayload
