@@ -16,6 +16,7 @@ const autopilotResilience = require('./coldmail-autopilot-resilience');
 const { createColdmailSendDurability } = require('./coldmail-send-provenance');
 const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation'); const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
+const { resolveColdmailStatsResponse } = require('./coldmail-live-stats-response');
 const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
 const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard');
@@ -3622,18 +3623,17 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function getColdmailLiveStats() {
-    const cachedAtMs = Number(coldmailLiveStatsCache && coldmailLiveStatsCache.cachedAtMs) || 0;
-    const cacheAgeMs = cachedAtMs ? now().getTime() - cachedAtMs : Number.POSITIVE_INFINITY;
-    if (coldmailLiveStatsCache && cacheAgeMs < COLDMAIL_LIVE_STATS_MEMORY_TTL_MS) {
-      return refreshCurrentDayColdmailStats(coldmailLiveStatsCache.payload);
-    }
+    const dateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+    const cacheAgeMs = coldmailLiveStatsCache ? now().getTime() - coldmailLiveStatsCache.cachedAtMs : Number.POSITIVE_INFINITY;
     if (coldmailLiveStatsCache) {
-      return refreshColdmailLiveStats();
+      const cached = coldmailLiveStatsCache.payload;
+      const refresh = cacheAgeMs < COLDMAIL_LIVE_STATS_MEMORY_TTL_MS && cached.stats.dateKey === dateKey
+        ? refreshCurrentDayColdmailStats(cached) : refreshColdmailLiveStats();
+      return resolveColdmailStatsResponse(refresh, cached, dateKey);
     }
     if (!coldmailLiveStatsDurableReadPromise) {
-      coldmailLiveStatsDurableReadPromise = readDurableColdmailLiveStats().finally(() => {
-        coldmailLiveStatsDurableReadPromise = null;
-      });
+      coldmailLiveStatsDurableReadPromise = readDurableColdmailLiveStats()
+        .finally(() => { coldmailLiveStatsDurableReadPromise = null; });
     }
     const durablePayload = await coldmailLiveStatsDurableReadPromise;
     if (durablePayload) {
@@ -3644,7 +3644,7 @@ function createColdmailCampaignService(deps = {}) {
       refreshColdmailLiveStats().catch((error) => {
         logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
       });
-      return refreshCurrentDayColdmailStats(durablePayload);
+      return resolveColdmailStatsResponse(refreshCurrentDayColdmailStats(durablePayload), durablePayload, dateKey);
     }
     return refreshColdmailLiveStats();
   }

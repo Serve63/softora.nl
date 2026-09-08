@@ -1243,3 +1243,11 @@ test('SEO uses the shared black heading and outer frame without changing the sid
   assert.match(css, /\.seo-console-header h1[^}]*color: var\(--text-primary\)/);
   assert.doesNotMatch(css, /\.sidebar(?:\s|\[|\.|\{|:)/);
 });
+
+
+test('database loading repair keeps its premium shell and serves matching design eligibility assets', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  assert.ok(extractSidebarLinkTargets(source).database);
+  assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
+});

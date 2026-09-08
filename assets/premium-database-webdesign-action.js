@@ -638,7 +638,7 @@
             const isPending = pendingIds.has(customer.id);
             const restoreBlocked = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending;
-            const canGenerate = !hasPhoto && !isPending && !restoreBlocked && Boolean(resolveCustomerWebsiteUrl(customer));
+            const canGenerate = !isPending && !restoreBlocked && isWebdesignPhotoEligible(customer);
             const inner = hasPhoto
                 ? (!hasPhotoSource || photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">")
                 : (isPending ? LOADING_ICON : LIGHTNING_ICON);
@@ -691,7 +691,7 @@
                 return { started: false, skipped: true };
             }
             if (!isWebdesignPhotoEligible(target)) {
-                const message = "Geen geldige website gevonden voor " + target.bedrijf + ".";
+                const message = resolveCustomerWebsiteUrl(target) ? "Voor " + target.bedrijf + " kan nu geen nieuw webdesign worden gemaakt." : "Geen geldige website gevonden voor " + target.bedrijf + ".";
                 if (!quiet) setStatusMessage(message, "error");
                 return { started: false, failed: true, error: message };
             }
