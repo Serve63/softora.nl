@@ -214,7 +214,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
   assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907c/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
-  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260828g/);
+  assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
   assert.match(page, /assets\/premium-mailbox-compose-send-state\.js\?v=20260831b/);
   assert.match(page, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260831c/);
@@ -5614,6 +5614,8 @@ test('voorgestelde reactie geeft ontvangen én oorspronkelijke verzonden mail al
   assert.equal(context.originalSentMail.body, 'Ik heb een fris webdesign voor je gemaakt.');
   assert.equal(context.accountEmail, 'serve@softora.nl');
   assert.equal(context.mode, 'reply');
+  assert.equal(context.conversationMessages.length, 2);
+  assert.equal(context.conversationMessages[0].body, 'Korte follow-up.');
 });
 
 test('nieuw bericht vanuit BCC-context gebruikt de bewezen afzender en echte ontvanger zonder antwoordprompt', () => {

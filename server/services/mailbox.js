@@ -2188,11 +2188,9 @@ function createMailboxService(deps = {}) {
       ? truncateText(enforceMailboxReplyProfile(generatedText, {
           firstName: payload.antwoordContext?.aanhefNaam,
           inboundText: [
-            payload.ontvangenMail?.subject,
-            payload.ontvangenMail?.body,
-            payload.ontvangenMail?.preview,
+            payload.ontvangenMail?.body || payload.ontvangenMail?.preview,
           ].filter(Boolean).join('\n'),
-          accountEmail: resolvedAccountEmail, conceptText: draft, senderName: payload.afzenderContext?.naam, originalSentMail: payload.oorspronkelijkeVerzondenMail,
+          conversation: payload.gespreksverloop, accountEmail: resolvedAccountEmail, conceptText: draft, senderName: payload.afzenderContext?.naam, originalSentMail: payload.oorspronkelijkeVerzondenMail,
         }), 8000)
       : generatedText;
     if (!text) {

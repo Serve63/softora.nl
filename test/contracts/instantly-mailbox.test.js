@@ -1985,7 +1985,7 @@ test('suggested replies use the exact Instantly owner identity instead of fallin
         data: {
           choices: [{
             message: {
-              content: 'Beste,\n\nDank voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven',
+              content: JSON.stringify({ intent: 'forward_interest', ctaAllowed: true, paragraphs: [{ text: 'Leuk om te horen! Wat wil je vooral weten over het ontwerp?', evidence: ['received.intent'], answers: ['q1'] }] }),
             },
           }],
         },
