@@ -181,7 +181,7 @@ test('loadRuntimeEnv defaults OpenAI text calls to GPT-5.5 Pro', () => {
   const runtimeEnv = loadRuntimeEnv({});
 
   assert.equal(runtimeEnv.ai.openaiModel, 'gpt-5.5-pro');
-  assert.equal(runtimeEnv.ai.openaiImageModel, 'gpt-image-2');
+  assert.equal(runtimeEnv.ai.openaiImageModel, 'gpt-image-2.5-sunburst');
   assert.equal(runtimeEnv.premiumAuth.agendaAppSessionTtlDays, 30);
 });
 

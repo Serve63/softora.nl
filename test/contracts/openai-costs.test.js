@@ -1001,3 +1001,19 @@ test('openai cost diagnostics compares official, usage and ledger without failin
     'softora_ledger',
   ]);
 });
+
+test('Sunburst image counts never reuse GPT Image 2 per-image estimates', async () => {
+  for (const model of ['gpt-image-2.5-sunburst', 'gpt-image-2.5-sunburst-2026-09-08', 'gpt-image-2.5-flare']) {
+    assert.throws(() => getOpenAiImageCostUsdPerImage(model, '1024x1536', { env: {} }), { code: 'OPENAI_IMAGE_USAGE_TOKENS_REQUIRED' });
+  }
+  assert.equal(getOpenAiImageCostUsdPerImage('gpt-image-2.5-sunburst', '1024x1536', {
+    env: { OPENAI_IMAGE_COST_USD_PER_IMAGE: '0.25' },
+  }), 0.25);
+  await assert.rejects(fetchOpenAiUsageEstimateSummary({
+    env: {}, openAiCostsApiKey: 'offline-test-key', usdToEurRate: 0.9,
+    fetchJsonWithTimeout: async url => ({
+      response: { ok: true, status: 200 },
+      data: { data: [{ results: url.includes('/usage/images') ? [{ model: 'gpt-image-2.5-sunburst', images: 2, size: '1024x1536' }] : [] }], has_more: false },
+    }),
+  }, { scope: 'month', nowMs: Date.UTC(2026, 8, 8) }), { code: 'OPENAI_IMAGE_USAGE_TOKENS_REQUIRED' });
+});

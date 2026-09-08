@@ -894,3 +894,11 @@ test('premium cinematic website page starts the cinematic job flow', () => {
   assert.match(scriptSource, /data\.job\.status !== "done"/);
   assert.match(scriptSource, /JOB_ENDPOINT \+ "\/" \+ encodeURIComponent\(currentJob\.id\)/);
 });
+
+test('cinematic database images default to Sunburst without generating during config checks', () => {
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    openAiImageModel: '', getOpenAiApiKey: () => 'offline-test-key', useVeo: false,
+    fetchJsonWithTimeout: async () => { throw new Error('Config must not generate an image'); },
+  });
+  assert.equal(coordinator.getProviderStatus().openAi.imageModel, 'gpt-image-2.5-sunburst');
+});

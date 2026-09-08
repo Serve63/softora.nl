@@ -1406,3 +1406,56 @@ test('ai remote service normalizes OpenAI dossier JSON into a stable layout payl
   });
   assert.deepEqual(result.usage, { prompt_tokens: 50, completion_tokens: 120 });
 });
+
+for (const withReference of [false, true]) {
+  test(`Sunburst database preview sends ${withReference ? 'edit' : 'generation'} requests with the selected model and max quality`, async () => {
+    const calls = [];
+    const model = 'gpt-image-2.5-sunburst';
+    const { service } = createService({
+      openAiImageModel: model,
+      sanitizeReferenceImages: images => images,
+      fetchBinaryWithTimeout: async url => ({
+        response: { ok: true, status: 200, url, headers: { get: () => 'image/png' } },
+        bytes: Buffer.alloc(2048, 1),
+      }),
+      fetchJsonWithTimeout: async (url, options) => {
+        calls.push({ url, options });
+        return { response: { ok: true, status: 200 }, data: { data: [{ b64_json: 'YWJjZA==' }], usage: { output_tokens: 123 } } };
+      },
+    });
+    const result = await service.generateWebsitePreviewImageWithAi({
+      host: 'softora.nl', imageQuality: 'max', referenceImageFidelity: 'high',
+      referenceImageUrls: withReference ? ['https://softora.nl/og-softora.png'] : [],
+    });
+    assert.equal(calls.length, 1);
+    assert.ok(calls[0].url.endsWith(withReference ? '/images/edits' : '/images/generations'));
+    const body = calls[0].options.body;
+    const payload = withReference ? Object.fromEntries(body.entries()) : JSON.parse(body);
+    assert.equal(payload.model, model);
+    assert.equal(payload.quality, 'max');
+    assert.equal(payload.size, '2160x3840');
+    assert.equal(payload.input_fidelity, undefined);
+    assert.equal(payload.response_format, undefined);
+    assert.equal(result.model, model);
+    assert.equal(result.usage.output_tokens, 123);
+    assert.equal(result.referenceImageCount, withReference ? 1 : 0);
+  });
+}
+
+test('Sunburst availability errors never fall back to another image model', async () => {
+  const calls = [];
+  const { service } = createService({
+    openAiImageModel: 'gpt-image-2.5-sunburst',
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push(JSON.parse(options.body));
+      return { response: { ok: false, status: 404 }, data: { error: { message: 'Model not available', code: 'model_not_found' } } };
+    },
+  });
+  await assert.rejects(service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' }), error => {
+    assert.equal(error.model, 'gpt-image-2.5-sunburst');
+    assert.equal(error.status, 404);
+    return true;
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].model, 'gpt-image-2.5-sunburst');
+});

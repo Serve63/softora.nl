@@ -1335,12 +1335,12 @@ async function fetchOpenAiUsageEstimateSummary(deps = {}, options = {}) {
   const usage = createEmptyUsageTotals();
   const endpointSummaries = [];
   const endpointsUnavailable = [];
-
   for (const endpoint of endpoints) {
     let summary;
     try {
       summary = await fetchOpenAiUsageEstimateForEndpoint(deps, window, endpoint);
     } catch (error) {
+      if (error.code === 'OPENAI_IMAGE_USAGE_TOKENS_REQUIRED') throw error;
       endpointsUnavailable.push({
         key: endpoint.key,
         path: endpoint.path,
