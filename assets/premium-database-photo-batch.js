@@ -29,9 +29,9 @@
     return "€" + rounded.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  // OpenAI calculator: Sunburst max, 1024x1536, 5488 output tokens at $30/M.
+  // OpenAI calculator: Sunburst medium, 1024x1536, 343 output tokens at $30/M.
   function formatOutputEstimate(count) {
-    const amount = usdToEuroIncludingVat(Math.max(0, Number(count) || 0) * 0.16464);
+    const amount = usdToEuroIncludingVat(Math.max(0, Number(count) || 0) * 0.01029);
     return "ca. " + formatEuroCost(amount) + " + invoer (incl. 21% btw)";
   }
 
