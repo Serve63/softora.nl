@@ -26,6 +26,10 @@ const aliasLineageTimelineMigration = fs.readFileSync(path.resolve(
   __dirname,
   '../../supabase/migrations/20260825164216_mailbox_contact_timeline_alias_lineage.sql'
 ), 'utf8');
+const referenceAncestorsMigration = fs.readFileSync(path.resolve(
+  __dirname,
+  '../../supabase/migrations/20260907170516_mailbox_contact_reference_ancestors.sql'
+), 'utf8');
 const uidGenerationMigration = fs.readFileSync(path.resolve(
   __dirname,
   '../../supabase/migrations/20260821202054_mailbox_uid_generation_epoch_v2.sql'
@@ -300,6 +304,7 @@ async function createTimelineDatabase(options = {}) {
   await database.exec(atomicVisibilityMigration);
   await database.exec(acceptedTimelineMigration);
   await database.exec(aliasLineageTimelineMigration);
+  await database.exec(referenceAncestorsMigration);
   await database.exec(functionSqlFrom(
     stateMutationIdempotencyMigration,
     'softora_preserve_mailbox_read_state'
@@ -896,6 +901,99 @@ test('contacttijdlijn koppelt een antwoordalias alleen via exact bewezen origin 
     `);
     assert.deepEqual(canonicalOwners.rows.map((row) => row.owner), [
       'serve', 'serve', 'martijn', 'martijn', null,
+    ]);
+  } finally {
+    await database.close();
+  }
+});
+
+test('aliasantwoord over een ontbrekende forward behoudt exact bewezen eigen historie zonder lineage-member', async () => {
+  const database = await createTimelineDatabase();
+  const accountEmail = 'servec321@gmail.com';
+  const contactEmail = 'communicatie@venue.example';
+  const rootId = '<campaign-root@gmail.com>';
+  const references = `${rootId} <own-followup@gmail.com> <unavailable-forward@venue.example>`;
+  const root = {
+    key: 'reference-root', accountEmail, folder: 'sent', uid: 11, providerId: 'sent:11',
+    messageId: rootId, senderEmail: accountEmail, recipients: 'gastenverblijven@venue.example',
+    subject: 'Kleine vraag', body: 'De originele verzonden mail.', date: '2026-05-25T15:20:00Z',
+    payload: { source: 'imap-sync', originalCampaignOutbound: true },
+    searchDocument: 'gastenverblijven@venue.example',
+  };
+  const reply = {
+    key: 'reference-reply', accountEmail, folder: 'inbox', uid: 12, providerId: 'inbox:12',
+    messageId: '<alias-reply@venue.example>', inReplyTo: '<unavailable-forward@venue.example>',
+    references, senderEmail: contactEmail, recipients: accountEmail,
+    subject: 'RE: Kleine vraag', body: 'Het echte antwoord.', date: '2026-05-26T12:57:00Z',
+    searchDocument: contactEmail,
+  };
+  try {
+    // Use the production References-first thread resolver for the missing-parent case.
+    const historyMigration = fs.readFileSync(path.resolve(
+      __dirname, '../../supabase/migrations/20260817102256_mailbox_full_history_search.sql'
+    ), 'utf8');
+    await database.exec(functionSqlFrom(historyMigration, 'softora_mailbox_technical_thread_key'));
+    await insertPhysical(database, root);
+    await insertPhysical(database, reply);
+    await insertPhysical(database, {
+      ...root, key: 'reference-followup', uid: 13, providerId: 'sent:13',
+      messageId: '<own-followup@gmail.com>', references: rootId, inReplyTo: rootId,
+      body: 'Mijn eerdere vervolgbericht.', date: '2026-05-26T10:00:00Z',
+      payload: { source: 'imap-sync' },
+    });
+    await database.query(`insert into public.softora_mailbox_campaign_lineage_roots
+      (message_key, account_email) values ($1,$2)`, [root.key, accountEmail]);
+    assert.equal((await database.query('select count(*) from public.softora_mailbox_campaign_lineage_members')).rows[0].count, 0);
+
+    for (const extra of [
+      { ...reply, key: 'reference-nearmiss', uid: 20, messageId: '<near@venue.example>', references: '<campaign-root@gmail.com.extra>', inReplyTo: '<campaign-root@gmail.com.extra>' },
+      { ...reply, key: 'reference-wrong-thread', uid: 21, messageId: '<wrong-thread@venue.example>', references: `<different-root@gmail.com> ${rootId}` },
+      { ...reply, key: 'reference-not-addressed-to-owner', uid: 22, messageId: '<other-recipient@venue.example>', recipients: 'someone@else.example' },
+      { ...reply, key: 'reference-other-owner', uid: 23, messageId: '<other-owner@venue.example>', accountEmail: 'martijn@softora.nl', recipients: 'martijn@softora.nl' },
+      { ...reply, key: 'reference-other-account', uid: 24, messageId: '<other-account@venue.example>', accountEmail: 'serve@softora.nl', recipients: 'serve@softora.nl' },
+      { ...reply, key: 'reference-automated', uid: 25, messageId: '<auto@venue.example>', payload: { source: 'imap-sync', autoSubmitted: 'auto-replied' } },
+      { ...reply, key: 'reference-sibling', uid: 26, messageId: '<sibling@venue.example>', senderEmail: 'colleague@venue.example', searchDocument: 'colleague@venue.example' },
+      { ...reply, key: 'reference-superseded', uid: 27, messageId: '<superseded@venue.example>' },
+      { ...root, key: 'reference-unrelated-sent', uid: 28, messageId: '<not-referenced@gmail.com>', references: rootId, inReplyTo: rootId, payload: { source: 'imap-sync' } },
+    ]) await insertPhysical(database, { ...extra, providerId: `${extra.folder}:${extra.uid}` });
+    await database.exec("update public.softora_mailbox_messages set generation_superseded_at=now() where message_key='reference-superseded'");
+    const accounts = [accountEmail, 'serve@softora.nl'];
+    const timeline = () => database.query(`select message_key, total_count from public.softora_mailbox_contact_timeline($1,$2,50,0)`, [accounts, contactEmail]);
+    await database.exec(functionSqlFrom(aliasLineageTimelineMigration, 'softora_mailbox_contact_scope'));
+    assert.deepEqual((await timeline()).rows, [], 'de oude scope reproduceert het lege dossier');
+    await database.exec(referenceAncestorsMigration);
+    assert.deepEqual((await timeline()).rows.map(row => row.message_key), [
+      'reference-reply', 'reference-followup', 'reference-root',
+    ]);
+    assert.equal(Number((await timeline()).rows[0].total_count), 3);
+    const secondPage = await database.query(`select message_key from public.softora_mailbox_contact_timeline($1,$2,1,1)`, [accounts, contactEmail]);
+    assert.deepEqual(secondPage.rows.map(row => row.message_key), ['reference-followup']);
+
+    // Removing materialized roots closes the physical fallback; subject/domain alone cannot admit it.
+    await database.query('delete from public.softora_mailbox_campaign_lineage_roots where message_key=$1', [root.key]);
+    assert.deepEqual((await timeline()).rows, []);
+    // Exact accepted-send provenance supports the same References-only chain.
+    await insertProvenance(database, {
+      intentId: 'reference-accepted', owner: 'serve', accountEmail,
+      recipientEmail: root.recipients, messageId: rootId, subject: root.subject,
+      mode: 'new-message', body: root.body, status: 'accepted', acceptedAt: root.date,
+    });
+    assert.deepEqual((await timeline()).rows.map(row => row.message_key), [
+      'reference-reply', 'reference-followup', 'reference-root',
+    ]);
+
+    await database.query(`select * from public.softora_set_mailbox_contact_visibility(
+      $1,$2,$3,'inbox',12,'inbox:12',3,true)`, [accounts, contactEmail, accountEmail]);
+    assert.deepEqual((await timeline()).rows, []);
+    const untouched = await database.query(`select message_key from public.softora_mailbox_messages
+      where message_key in ('reference-sibling','reference-unrelated-sent','reference-other-account') and deleted_at is null order by message_key`);
+    assert.deepEqual(untouched.rows.map(row => row.message_key), [
+      'reference-other-account', 'reference-sibling', 'reference-unrelated-sent',
+    ]);
+    await database.query(`select * from public.softora_set_mailbox_contact_visibility(
+      $1,$2,$3,'inbox',12,'inbox:12',0,false)`, [accounts, contactEmail, accountEmail]);
+    assert.deepEqual((await timeline()).rows.map(row => row.message_key), [
+      'reference-reply', 'reference-followup', 'reference-root',
     ]);
   } finally {
     await database.close();

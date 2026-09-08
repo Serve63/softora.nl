@@ -558,7 +558,7 @@ function createMailboxService(deps = {}) {
     mailboxCampaignRepliesService,
     instantlyMailboxService,
     filterVisibleMailboxMessages,
-    setUiStateValues,
+    setUiStateValues, getUiStateValues, mailboxIndexStore,
     logger,
     normalizeString,
     truncateText,
@@ -2247,7 +2247,7 @@ function createMailboxService(deps = {}) {
       return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
         owner: normalizeString(req.query?.owner),
-        refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)), hydrateBodies: !/^(1|true|yes)$/i.test(normalizeString(req.query?.metadataOnly)),
+        preferSnapshot: /^(1|true|yes)$/i.test(normalizeString(req.query?.preferSnapshot)), refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)), hydrateBodies: !/^(1|true|yes)$/i.test(normalizeString(req.query?.metadataOnly)),
       }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);

@@ -225,7 +225,11 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/bedrijfssoftware"/);
   assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/voicesoftware"/);
   assert.match(source, /<a\s+class="tilt-card fade-up"[^>]*href="\/chatbot"/);
-  assert.match(source, /class="service-card-link-icon" aria-hidden="true"/);
+  const serviceCards = [...source.matchAll(/<a class="tilt-card fade-up"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<\/a>/g)];
+  assert.equal(serviceCards.length, 4);
+  for (const [card, href] of serviceCards) {
+    assert.equal(card.includes('class="service-card-link-icon"'), href === '/bedrijfssoftware', href);
+  }
   assert.match(source, /\.tilt-card:focus-visible\s*\{[\s\S]*outline:/);
   assert.match(
     source,

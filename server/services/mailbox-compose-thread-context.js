@@ -150,6 +150,37 @@ function createMailboxComposeThreadContext(deps = {}) {
     };
   }
 
+  async function resolveNewMessageCorrespondence({ context, account, recipient }) {
+    const id = normalizeText(context.id || context.uid);
+    // Older composers include the exact sent ID but omit the folder and Message-ID.
+    const folder = normalizeText(context.folder || id.match(/(?:^|\|)(inbox|coldmail|sent):\d+$/)?.[1]).toLowerCase();
+    if (!id || !['inbox', 'coldmail', 'sent'].includes(folder)) return '';
+    const proofReader = mailboxIndexStore?.getMessageForReplyProof || mailboxIndexStore?.getMessage;
+    if (typeof proofReader !== 'function') {
+      throw inputError('De eerdere mail kan tijdelijk niet worden gecontroleerd.', 'MAILBOX_CORRESPONDENCE_SOURCE_UNAVAILABLE', 503);
+    }
+    let stored;
+    try {
+      stored = await proofReader.call(mailboxIndexStore, { accountEmail: account, folder, id });
+    } catch (_) {
+      throw inputError('De eerdere mail kan tijdelijk niet worden gecontroleerd.', 'MAILBOX_CORRESPONDENCE_SOURCE_UNAVAILABLE', 503);
+    }
+    const messageId = normalizeMessageId(stored?.messageId);
+    const requestedMessageId = normalizeMessageId(context.messageId);
+    const sentRecipients = normalizeText(stored?.to).toLowerCase().match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || [];
+    const participantMatches = folder === 'sent'
+      ? normalizeEmail(stored?.email) === account && sentRecipients.includes(recipient)
+      : normalizeEmail(stored?.replyTo || stored?.email) === recipient;
+    if (!messageId || normalizeEmail(stored?.accountEmail) !== account
+      || normalizeText(stored?.folder).toLowerCase() !== folder || !participantMatches
+      || (requestedMessageId && requestedMessageId !== messageId)) {
+      throw inputError('De eerdere mail hoort niet bij deze afzender en ontvanger.', 'MAILBOX_CORRESPONDENCE_SOURCE_MISMATCH', 409);
+    }
+    // An initial campaign mail alone must never exempt another coldmail from its guards.
+    if (folder === 'sent' && stored.originalCampaignOutbound !== false) return '';
+    return messageId;
+  }
+
   async function resolve({ body = {}, accountEmail, recipientEmail, provider = 'smtp' } = {}) {
     const mode = normalizeText(body.mode || 'new-message').toLowerCase();
     if (!['reply', 'new-message'].includes(mode)) throw inputError('Ongeldige verzendmodus.', 'MAILBOX_SEND_MODE_INVALID');
@@ -163,7 +194,8 @@ function createMailboxComposeThreadContext(deps = {}) {
     if (!idempotencyKey) throw inputError('Een veilige verzend-ID ontbreekt.', 'MAILBOX_SEND_IDEMPOTENCY_REQUIRED');
     const base = baseContext({ account, recipient, owner, senderName, mode, conversationId, idempotencyKey, provider });
     if (mode === 'new-message') {
-      return { ...base, providerThreadId: '', replyTargetMessageId: '', references: '' };
+      const correspondenceSourceMessageId = await resolveNewMessageCorrespondence({ context, account, recipient });
+      return { ...base, providerThreadId: '', replyTargetMessageId: '', references: '', correspondenceSourceMessageId };
     }
     if (!conversationId) {
       throw inputError('De gekozen conversatie mist een exacte thread-ID.', 'MAILBOX_REPLY_CONVERSATION_REQUIRED', 409);
@@ -212,7 +244,7 @@ function createMailboxComposeThreadContext(deps = {}) {
     const references = Array.from(new Set([
       ...parseReferences(stored.references), ...parseReferences(stored.inReplyTo), storedMessageId,
     ])).join(' ');
-    return { ...base, provider: 'smtp', providerThreadId: '', replyTargetMessageId: storedMessageId, references };
+    return { ...base, provider: 'smtp', providerThreadId: '', replyTargetMessageId: storedMessageId, references, correspondenceSourceMessageId: storedMessageId };
   }
 
   function resolveAttachmentCleanupBinding({ body = {}, accountEmail, recipientEmail, provider = 'smtp' } = {}) {

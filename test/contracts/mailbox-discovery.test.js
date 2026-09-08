@@ -1053,6 +1053,79 @@ test('contactdossier ververst na inboxreconciliatie opnieuw uit de exacte contac
   assert.equal(requests, 1);
 });
 
+test('een lege eerste contactpagina bewaart bekende historie en herstelt bij de volgende volledige lezing', async () => {
+  for (const loaded of [false, true]) {
+    const parent = {
+      id: 'sent:known', messageId: '<known@example.test>', accountEmail: 'serve@softora.nl',
+      folder: 'sent', email: 'serve@softora.nl', to: 'contact@example.test',
+      technicalThreadKey: 'thread-known', body: 'Een reeds geladen verzonden bericht.',
+      bodyFetchPromise: Promise.resolve('body'),
+    };
+    const mail = {
+      id: 'inbox:current', messageId: '<current@example.test>', accountEmail: 'serve@softora.nl',
+      folder: 'inbox', email: 'contact@example.test', to: 'serve@softora.nl',
+      externalContactEmail: 'contact@example.test', technicalThreadKey: 'thread-current',
+      threadMessages: [parent], contactTimelineLoaded: loaded,
+      contactTimelineTotal: 2, contactTimelineThreadCount: 2, contactTimelineNeedsRefresh: true,
+    };
+    let renders = 0;
+    let response = { ok: true, totalCount: 0, messages: [], nextCursor: null };
+    const controller = discoveryUi.create({
+      document: { getElementById: () => null, querySelector: () => null },
+      fetch: async () => ({ ok: true, json: async () => response }),
+      getActiveMail: () => mail.id,
+      getAccountEmails: () => ['serve@softora.nl'],
+      getMessageOwner: () => 'serve',
+      openMail: () => { renders += 1; },
+    });
+    assert.equal(await controller.loadContactTimeline(mail), false);
+    assert.equal(mail.threadMessages[0], parent);
+    assert.equal(mail.contactTimelineTotal, 2);
+    assert.equal(mail.contactTimelineLoaded, loaded);
+    assert.equal(mail.contactTimelineNeedsRefresh, true);
+    assert.equal(mail.contactTimelineLoading, false);
+    assert.equal(renders, 0);
+    assert.match(discoveryUi.renderTimelineSummary(mail, String, { active: true }), /2 berichten geladen/);
+    assert.equal(await controller.prepareCompleteContactTimelineForHide(mail), false);
+
+    response = { ok: true, totalCount: 2, messages: [{ ...mail, threadMessages: undefined }, parent] };
+    assert.equal(await controller.loadContactTimeline(mail), true);
+    assert.equal(mail.contactTimelineNeedsRefresh, false);
+    assert.equal(mail.contactTimelineError, '');
+    assert.equal(mail.threadMessages[0].body, parent.body);
+    assert.equal(renders, 1);
+
+    // A real, nonempty refresh still removes an absent unreferenced message.
+    response = { ok: true, totalCount: 1, messages: [{ ...mail, threadMessages: undefined }] };
+    assert.equal(await controller.loadContactTimeline(mail, { force: true }), true);
+    assert.deepEqual(mail.threadMessages, []);
+    assert.equal(mail.contactTimelineTotal, 1);
+  }
+});
+
+test('een oud nulberichtendossier wordt opnieuw gelezen en nooit als compleet getoond', async () => {
+  const mail = {
+    id: 'inbox:legacy', messageId: '<legacy@example.test>', accountEmail: 'serve@softora.nl',
+    folder: 'inbox', email: 'contact@example.test', to: 'serve@softora.nl',
+    contactTimelineLoaded: true, contactTimelineTotal: 0, contactTimelineNeedsRefresh: false,
+  };
+  assert.match(discoveryUi.renderTimelineSummary(mail, String), /1 bericht geladen/);
+  let requests = 0;
+  const controller = discoveryUi.create({
+    document: { getElementById: () => null, querySelector: () => null },
+    fetch: async () => {
+      requests += 1;
+      return { ok: true, json: async () => ({ ok: true, totalCount: 1, messages: [mail] }) };
+    },
+    getActiveMail: () => mail.id,
+    getAccountEmails: () => ['serve@softora.nl'],
+    getMessageOwner: () => 'serve',
+  });
+  assert.equal(await controller.loadContactTimeline(mail), true);
+  assert.equal(requests, 1);
+  assert.equal(mail.contactTimelineTotal, 1);
+});
+
 test('contactdossier verbergt technische onderwerpen en reply gebruikt exact het gekozen bronbericht', () => {
   campaignInbox.setOwner('both');
   const older = {

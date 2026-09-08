@@ -593,7 +593,9 @@ function createMailboxComposeSend(deps = {}) {
       }
     }
 
-    const webdesignParts = await runPreProviderStep(() => buildMailboxWebdesignSendParts({
+    // This source is supplied only by the server's exact mailbox proof, never by the HTTP body.
+    const webdesignParts = threadProvenance.correspondenceSourceMessageId ? null
+      : await runPreProviderStep(() => buildMailboxWebdesignSendParts({
         accountEmail: account.email,
         to: normalizedTo,
         subject: cleanSubject,

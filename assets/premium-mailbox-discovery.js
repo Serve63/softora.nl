@@ -288,15 +288,27 @@
       : escapeHtml(piece)).join('');
   }
 
-  function renderTimelineSummary(mail, escapeHtml) {
-    if (!mail?.contactTimelineLoaded || typeof escapeHtml !== 'function') return '';
-    const messages = Math.max(0, Number(mail.contactTimelineTotal) || 0);
-    const threads = Math.max(0, Number(mail.contactTimelineThreadCount) || 0);
-    const contact = String(mail.externalContactEmail || '').trim();
-    const more = mail.contactTimelineNextCursor
+  function renderTimelineSummary(mail, escapeHtml, dossier = {}) {
+    if (!mail || typeof escapeHtml !== 'function' || (!mail.contactTimelineLoaded && !dossier.active)) return '';
+    const complete = mail.contactTimelineLoaded === true && !mail.contactTimelineNeedsRefresh && Number(mail.contactTimelineTotal) > 0;
+    const contact = String(mail.externalContactEmail || dossier.contactEmail || '').trim();
+    let summary;
+    if (complete) {
+      const messages = Math.max(0, Number(mail.contactTimelineTotal) || 0);
+      const threads = Math.max(0, Number(mail.contactTimelineThreadCount) || 0);
+      summary = `${messages} ${messages === 1 ? 'bericht' : 'berichten'} · ${threads} ${threads === 1 ? 'onderwerp' : 'onderwerpen'}`;
+    } else {
+      // Count only the message identities already on screen. This is not yet
+      // the full contact total, and must not mark the timeline as loaded.
+      const messages = new Set([mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])]
+        .map(getTimelineMessageIdentity).filter(Boolean)).size;
+      summary = messages ? `${messages} ${messages === 1 ? 'bericht' : 'berichten'} geladen` : '';
+    }
+    summary = [summary, contact].filter(Boolean).join(' · ');
+    const more = complete && mail.contactTimelineNextCursor
       ? `<button type="button" data-mailbox-action="load-more-contact-timeline" data-mailbox-id="${escapeHtml(mail.id)}">Oudere berichten laden</button>`
       : '';
-    return `<div class="mail-contact-summary" role="status"><strong>Contactdossier:</strong><span>${escapeHtml(`${messages} ${messages === 1 ? 'bericht' : 'berichten'} · ${threads} ${threads === 1 ? 'onderwerp' : 'onderwerpen'}${contact ? ` · ${contact}` : ''}`)}</span>${more}</div>`;
+    return `<div class="mail-contact-summary" role="status" data-contact-summary-state="${complete ? 'complete' : 'partial'}"><span class="mail-contact-summary-text" title="${escapeHtml(`Contactdossier: ${summary}`)}"><strong>Contactdossier:</strong> ${escapeHtml(summary)}</span>${more}</div>`;
   }
 
   function renderRootSentCardStart(mail, options = {}) {
@@ -470,7 +482,7 @@
 
     async function loadContactTimeline(mail, { append = false, force = false, deferRender = false, signal } = {}) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
-      if (mail.contactTimelineLoaded && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
+      if (mail.contactTimelineLoaded && Number(mail.contactTimelineTotal) > 0 && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
       const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
       if (!contactEmail) return false;
       const timelineAccounts = Array.from(new Set(
@@ -526,6 +538,13 @@
         if (generation !== timelineGeneration || options.getActiveMail?.() !== mail.id) return false;
         if (!response.ok || data?.ok !== true) throw new Error(data?.error || 'Contacthistorie laden mislukt.');
         const incoming = (Array.isArray(data.messages) ? data.messages : []).map((message) => options.normalizeMessage?.(message) || message);
+        // An open, scoped message contradicts an empty first page. Do not turn
+        // that incomplete read into a completed zero-message dossier or erase
+        // already known history. Canonical list refresh handles actual removal.
+        if (!append && incoming.length === 0) {
+          mail.contactTimelineNeedsRefresh = true;
+          throw new Error('Contacthistorie bevat het geopende gesprek nog niet.');
+        }
         const prior = append && mail.contactTimelineLoaded ? [mail, ...(mail.threadMessages || [])] : [];
         const rows = [...prior, ...incoming];
         const nextCursor = String(data.nextCursor || '');

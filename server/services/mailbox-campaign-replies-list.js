@@ -7,24 +7,36 @@ const {
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
+const { createMailboxCampaignSnapshotRead } = require('./mailbox-campaign-snapshot-read');
 
 function createMailboxCampaignRepliesList({
   mailboxCampaignRepliesService,
   instantlyMailboxService,
   filterVisibleMailboxMessages,
   setUiStateValues,
+  getUiStateValues,
+  mailboxIndexStore,
   logger,
   normalizeString,
   truncateText,
 }) {
+  const readCampaignSnapshot = createMailboxCampaignSnapshotRead({ getUiStateValues, mailboxIndexStore, filterVisibleMailboxMessages });
   return async function listCampaignReplies({
     limit = 100,
     owner = '',
     refreshInstantly = false,
     includeSnapshotMessages = false,
     hydrateBodies = true,
+    preferSnapshot = false,
   } = {}) {
     const startedAt = Date.now();
+    if (preferSnapshot && !hydrateBodies && !includeSnapshotMessages && !refreshInstantly) {
+      const snapshot = await readCampaignSnapshot({ owner, limit });
+      if (snapshot) {
+        logger.info?.('[Mailbox][CampaignSnapshotTiming]', { totalMs: Date.now() - startedAt, messages: snapshot.messages.length, owner });
+        return snapshot;
+      }
+    }
     const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies });
     const indexedAt = Date.now();
     const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });

@@ -8,7 +8,156 @@ const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   parseMailboxCampaignSnapshot,
+  serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
+const { filterVisibleMailboxMessages } = require('../../server/services/mailbox-delivery-failure-visibility');
+
+function snapshotFixture(overrides = {}) {
+  const message = (id, accountEmail, extra = {}) => ({
+    id, messageKey: id, accountEmail, receivedAt: new Date().toISOString(), threadMessages: [], ...extra,
+  });
+  const messages = [
+    message('serve', 'serve@softora.nl'),
+    message('martijn', 'martijn@softora.nl', {
+      unread: true,
+      threadMessages: [message('sent', 'martijn@softora.nl', { folder: 'sent' }), message('hidden-child', 'martijn@softora.nl')],
+    }),
+    message('hidden', 'martijn@softora.nl'),
+    message('superseded', 'martijn@softora.nl'),
+    message('wrong-account', 'martijn@softora.nl'),
+    message('provider', 'martijn@softoradigital.nl', { provider: 'instantly', providerOwner: 'martijn' }),
+    message('automatic', 'martijn@softora.nl', { subject: 'Automatic reply', autoSubmitted: 'auto-replied' }),
+  ];
+  const rows = [
+    { message_key: 'serve', account_email: 'serve@softora.nl' },
+    { message_key: 'martijn', account_email: 'martijn@softora.nl', softora_read_at: '2026-09-07T12:00:00Z', reply_dismissed_at: '2026-09-07T12:01:00Z', state_revision: 7 },
+    { message_key: 'sent', account_email: 'martijn@softora.nl' },
+    { message_key: 'superseded', account_email: 'martijn@softora.nl', generation_superseded_at: '2026-09-07T12:00:00Z' },
+    { message_key: 'wrong-account', account_email: 'serve@softora.nl' },
+    { message_key: 'provider', account_email: 'martijn@softoradigital.nl' },
+    { message_key: 'automatic', account_email: 'martijn@softora.nl' },
+  ];
+  const calls = { canonical: 0, writes: 0, states: [] };
+  const raw = serializeMailboxCampaignSnapshot({ ok: true, messages });
+  const list = createMailboxCampaignRepliesList({
+    getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw } }),
+    mailboxIndexStore: { listMessageStatesByKeys: async (options) => { calls.states.push(options); return rows; } },
+    mailboxCampaignRepliesService: { listReplies: async () => { calls.canonical += 1; return []; } },
+    instantlyMailboxService: { isConfigured: () => false },
+    setUiStateValues: async () => { calls.writes += 1; },
+    filterVisibleMailboxMessages,
+    logger: { warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, length) => String(value || '').slice(0, length),
+    ...overrides,
+  });
+  return { list, calls, raw };
+}
+
+test('eerste eigenaarwissel krijgt een actuele zichtbare snapshot zonder geschiedenis of snapshotwrite af te wachten', async () => {
+  const { list, calls } = snapshotFixture({ mailboxCampaignRepliesService: {
+    listReplies: async () => { assert.fail('de trage geschiedenisopbouw mag de eerste lijst niet blokkeren'); },
+  } });
+  const result = await list({ owner: 'martijn', hydrateBodies: false, preferSnapshot: true });
+  assert.equal(result.fromSnapshot, true);
+  assert.equal(result.owner, 'martijn');
+  assert.deepEqual(result.messages.map((message) => message.id), ['martijn', 'provider']);
+  assert.deepEqual(result.messages[0].threadMessages.map((message) => message.id), ['sent']);
+  assert.equal(result.messages[0].unread, false);
+  assert.equal(result.messages[0].replyDismissedAt, '2026-09-07T12:01:00Z');
+  assert.equal(result.messages[0].stateRevision, 7);
+  assert.equal(result.sync.refreshRecommended, true);
+  assert.equal(result.sync.warming, false);
+  assert.equal(calls.writes, 0);
+  assert.ok(!calls.states[0].messageKeys.includes('serve'));
+});
+
+test('ontbrekende, verouderde of oncontroleerbare snapshots vallen terug op de canonical lijst', async () => {
+  const { raw } = snapshotFixture();
+  const stale = JSON.stringify({ ...JSON.parse(raw), savedAt: '2000-01-01T00:00:00Z' });
+  for (const overrides of [
+    { getUiStateValues: async () => null },
+    { getUiStateValues: async () => { throw new Error('read timeout'); } },
+    { getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: stale } }) },
+    { mailboxIndexStore: { listMessageStatesByKeys: async () => null } },
+    { mailboxIndexStore: { listMessageStatesByKeys: async () => { throw new Error('index unavailable'); } } },
+  ]) {
+    const { list, calls } = snapshotFixture(overrides);
+    const result = await list({ owner: 'martijn', hydrateBodies: false, preferSnapshot: true });
+    assert.equal(result.fromSnapshot, undefined);
+    assert.equal(calls.canonical, 1);
+  }
+});
+
+test('snelle snapshot wist de verzendsamenvatting wanneer het bijbehorende antwoord niet meer zichtbaar is', async () => {
+  const receivedAt = '2026-09-03T07:35:54.000Z';
+  const replyAt = '2026-09-03T10:12:08.000Z';
+  const messages = [{ id: 'root', messageKey: 'root', accountEmail: 'serve@softora.nl',
+    folder: 'inbox', receivedAt, threadMessages: [{ id: 'reply', messageKey: 'reply',
+      accountEmail: 'serve@softora.nl', folder: 'sent', date: replyAt }] }];
+  const raw = serializeMailboxCampaignSnapshot({ ok: true, messages });
+  assert.equal(parseMailboxCampaignSnapshot(raw).messages[0].latestOutboundAt, replyAt);
+  for (const replyState of [null, { deleted_at: replyAt }, { generation_superseded_at: replyAt }]) {
+    const { list } = snapshotFixture({
+      getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw } }),
+      mailboxIndexStore: { listMessageStatesByKeys: async () => [
+        { message_key: 'root', account_email: 'serve@softora.nl' },
+        ...(replyState ? [{ message_key: 'reply', account_email: 'serve@softora.nl', ...replyState }] : []),
+      ] },
+    });
+    const result = await list({ owner: 'serve', hydrateBodies: false, preferSnapshot: true });
+    assert.equal(result.messages[0].latestOutboundAt, '');
+    assert.equal(result.messages[0].latestInboundAt, receivedAt);
+    assert.deepEqual(result.messages[0].threadMessages, []);
+  }
+});
+
+test('een hangende snapshotread blokkeert de canonical fallback niet onbeperkt', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  let finishRead;
+  const { list, calls, raw } = snapshotFixture({
+    getUiStateValues: () => new Promise((resolve) => { finishRead = resolve; }),
+  });
+  const pending = list({ owner: 'martijn', hydrateBodies: false, preferSnapshot: true });
+  t.mock.timers.tick(3500);
+  const result = await pending;
+  assert.equal(result.fromSnapshot, undefined);
+  assert.equal(calls.canonical, 1);
+  finishRead({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw } });
+  await Promise.resolve();
+  assert.equal(calls.states.length, 0, 'een te late snapshot mag geen extra indexwerk meer starten');
+});
+
+test('backgroundrefresh, volledige bodies, providerrefresh en shared snapshot rebuild gebruiken altijd canonical data', async () => {
+  for (const options of [
+    { preferSnapshot: false },
+    { hydrateBodies: true },
+    { refreshInstantly: true },
+    { includeSnapshotMessages: true },
+  ]) {
+    const { list, calls } = snapshotFixture();
+    const result = await list({ owner: 'serve', hydrateBodies: false, preferSnapshot: true, ...options });
+    assert.equal(result.fromSnapshot, undefined);
+    assert.equal(calls.canonical, 1);
+    assert.equal(calls.states.length, 0);
+  }
+});
+
+test('een volledig verborgen snapshot geeft geen oude berichten terug', async () => {
+  const { list, calls } = snapshotFixture({ mailboxIndexStore: { listMessageStatesByKeys: async () => [] } });
+  const result = await list({ owner: 'martijn', hydrateBodies: false, preferSnapshot: true });
+  assert.deepEqual(result.messages, []);
+  assert.equal(result.fromSnapshot, true);
+  assert.equal(calls.canonical, 0);
+});
+
+test('snapshotpad accepteert geen onbekende eigenaar en houdt limiet en beide eigenaren intact', async () => {
+  const { list, calls } = snapshotFixture();
+  await assert.rejects(list({ owner: 'other', hydrateBodies: false, preferSnapshot: true }), { status: 400 });
+  assert.equal(calls.states.length, 0);
+  const result = await list({ owner: '', limit: 2, hydrateBodies: false, preferSnapshot: true });
+  assert.deepEqual(result.messages.map((message) => message.id), ['serve', 'martijn']);
+});
 
 test('campaign replies coordinator behoudt response en durable snapshot contract na extractie', async () => {
   const reply = {

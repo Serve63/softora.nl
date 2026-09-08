@@ -574,6 +574,22 @@ test('campagnelijst kan alleen metadata ophalen terwijl bestaande callers volled
   assert.ok(reads.every((options) => options.owner === 'serve' && options.snapshotLimit === 200));
 });
 
+test('campaign-replies route verbindt het optionele snelle eigenaarpad met de bestaande index en snapshot', async () => {
+  const message = { id: 'route-snapshot', messageKey: 'route-key', accountEmail: 'martijn@softora.nl', threadMessages: [] };
+  const service = createMailboxService({
+    mailboxCampaignRepliesService: { listReplies: async () => { assert.fail('eerste lijst hoeft de geschiedenis niet op te bouwen'); } },
+    mailboxIndexStore: { listMessageStatesByKeys: async () => [{ message_key: 'route-key', account_email: 'martijn@softora.nl' }] },
+    instantlyMailboxService: { isConfigured: () => false },
+    getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serializeMailboxCampaignSnapshot({ ok: true, messages: [message] }) } }),
+  });
+  const res = createResponseRecorder();
+  await service.campaignRepliesResponse({ query: { owner: 'martijn', metadataOnly: '1', preferSnapshot: '1', refreshInstantly: '0' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.fromSnapshot, true);
+  assert.equal(res.body.owner, 'martijn');
+  assert.deepEqual(res.body.messages.map((entry) => entry.id), ['route-snapshot']);
+});
+
 test('mailbox service sends mail through selected account smtp', async () => {
   const sent = [];
   const service = createMailboxService({

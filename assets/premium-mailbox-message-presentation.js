@@ -115,7 +115,12 @@
     }
 
     function getRootPresentation(value, mail) {
-      const presentation = getSourceSafeMessagePresentation(mail, mail, String(value || ''));
+      // Root cards hide embedded history just like incoming timeline cards.
+      // Split before rendering, so quote appendices cannot escape the card
+      // while the canonical parent message is still being hydrated.
+      const presentation = getSourceSafeMessagePresentation(mail, mail, String(value || ''), {
+        stripDetectedQuotes: Boolean(mail && typeof mail === 'object' && !Array.isArray(mail)),
+      });
       let contactInserted = false;
       return {
         ...presentation,
