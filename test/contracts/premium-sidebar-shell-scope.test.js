@@ -758,7 +758,9 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
   assert.match(pageSource, /assets\/premium-mailbox-signature\.js\?v=20260908c/);
-  const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20260828g');
+  const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20260908a');
+  assert.doesNotMatch(pageSource, /<button[^>]+(?:spellcheck-compose|undo-spelling)/);
+  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);
   assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907c/);
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');

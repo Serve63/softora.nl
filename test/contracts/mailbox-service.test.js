@@ -3470,7 +3470,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
           choices: [{ message: { content: JSON.stringify({
             intent: 'acknowledgement',
             ctaAllowed: false,
-            paragraphs: [{ text: 'Dankjewel voor je vraag.', evidence: ['received.intent'] }],
+            paragraphs: [{ text: 'Wat wil je precies voor vrijdag klaar hebben?', evidence: ['received.body'], answers: ['q1'] }],
           }) } }],
         },
       };
@@ -3499,7 +3499,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     },
   });
 
-  assert.equal(result.text, 'Beste,\n\nDankjewel voor je vraag. 😁\n\nMet vriendelijke groet,\nServé Creusen');
+  assert.equal(result.text, 'Beste,\n\nWat wil je precies voor vrijdag klaar hebben?\n\nMet vriendelijke groet,\nServé Creusen');
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
@@ -3508,9 +3508,9 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(calls[0].timeout, 65000);
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
-  assert.match(calls[0].payload.messages[0].content, /centraal antwoordprofiel serve-mailbox-reply-v2/);
+  assert.match(calls[0].payload.messages[0].content, /centraal antwoordprofiel serve-mailbox-reply-v3/);
   assert.match(calls[0].payload.messages[0].content, /Schrijf altijd namens Servé Creusen/);
-  assert.match(calls[0].payload.messages[0].content, /server voegt de bewezen aanhef, exact één 😁/);
+  assert.match(calls[0].payload.messages[0].content, /server voegt de bewezen aanhef en de juiste afzenderondertekening/);
   assert.match(calls[0].payload.messages[0].content, /iedere zin moet rechtstreeks volgen/i);
   assert.match(calls[0].payload.messages[0].content, /uitsluitend geldige JSON/);
   assert.match(calls[0].payload.messages[1].content, /"ontvangenMail"/);
@@ -3534,7 +3534,7 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
         response: { ok: true, status: 200 },
         data: {
           model: 'gpt-test',
-          choices: [{ message: { content: 'Hoi Lisa,\n\nDankjewel voor je reactie! 😁\n\nMet vriendelijke groet,\nMartijn van de Ven' } }],
+          choices: [{ message: { content: JSON.stringify({ intent: 'price_question', ctaAllowed: true, paragraphs: [{ text: 'Leuk dat je de preview wilt bekijken! De prijs hangt af van wat je precies nodig hebt.', evidence: ['received.body', 'known.price-depends-on-scope'], answers: ['q1'] }] }) } }],
         },
       };
     },
@@ -3559,8 +3559,8 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.doesNotMatch(result.text, /Servé Creusen/);
   assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
   assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
-  assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v2/);
-  assert.match(calls[0].messages[0].content, /prijsvraag blijft de enige vaste waarheid/i);
+  assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v3/);
+  assert.match(calls[0].messages[0].content, /prijsvraag hangt de prijs af/i);
   assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
   assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
   assert.match(calls[0].messages[1].content, /"aanhefNaam":"Lisa"/);
@@ -3569,7 +3569,7 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
 });
 
-test('mailbox service laat replycontext Martijn bepalen en corrigeert een verkeerde AI-signatuur', async () => {
+test('mailbox service laat replycontext Martijn bepalen en voegt uitsluitend de bewezen signatuur toe', async () => {
   const calls = [];
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-key',
@@ -3580,7 +3580,7 @@ test('mailbox service laat replycontext Martijn bepalen en corrigeert een verkee
       return {
         response: { ok: true, status: 200 },
         data: {
-          choices: [{ message: { content: 'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen' } }],
+          choices: [{ message: { content: JSON.stringify({ intent: 'acknowledgement', ctaAllowed: false, paragraphs: [{ text: 'Dankjewel voor je reactie 😁', evidence: ['received.intent'], answers: [] }] }) } }],
         },
       };
     },
@@ -3607,7 +3607,7 @@ test('mailbox service laat replycontext Martijn bepalen en corrigeert een verkee
   assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
 });
 
-test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail en corrigeert Webflow-feiten', async () => {
+test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail en behoudt een gegrond technisch antwoord', async () => {
   const calls = [];
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-key',
@@ -3620,7 +3620,7 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
         data: {
           choices: [{
             message: {
-              content: 'Beste,\n\nGoede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd. Dan kunnen we samen kort kijken wat er mogelijk is.\n\nAls je wilt, denk ik graag even met je mee over wat voor jou handig is. Als je wilt, is het een idee dat ik volgende week [dag] even langskom? 😁',
+              content: JSON.stringify({ intent: 'technical_question', ctaAllowed: false, paragraphs: [{ text: 'Ik bouw het ontwerp op maat met code. Daardoor kan ik de indeling en werking afstemmen op wat nodig is. Als jullie al in Webflow hebben geïnvesteerd, is dat natuurlijk iets om rekening mee te houden 😊', evidence: ['known.design-built-with-code', 'received.body'], answers: ['q1'] }] }),
             },
           }],
         },
@@ -3657,15 +3657,11 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
   );
   assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
   assert.match(result.text, /^Beste,/);
-  assert.match(result.text, /Het ontwerp dat ik stuurde heb ik volledig op maat met code gebouwd\./);
-  assert.match(result.text, /indeling, uitstraling en werking precies afstemmen/);
-  assert.match(result.text, /zonder vast te zitten aan een standaard websitebouwer/);
-  assert.doesNotMatch(result.text, /Hoi Salon|Leuke vraag|dus niet in Webflow|Webflow kan ik|Wij hebben nu|\bWebflow\b|\bjullie\b|laagdrempelig|\bkansen\b|denk ik graag even met je mee|Als je wilt/i);
-  assert.equal((result.text.match(/Als je wilt/g) || []).length, 0);
-  assert.equal((result.text.match(/\bWebflow\b/gi) || []).length, 0);
-  assert.doesNotMatch(result.text, /\[dag\]|langskom|volgende week|afspraak/i);
-  assert.doesNotMatch(result.text, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
-  assert.equal((result.text.match(/😁/gu) || []).length, 1);
+  assert.match(result.text, /op maat met code/);
+  assert.match(result.text, /Als jullie al in Webflow hebben geïnvesteerd/);
+  assert.doesNotMatch(result.text, /Ik gebruik Webflow|\[dag\]|langskom|volgende week|afspraak/i);
+  assert.equal((result.text.match(/😊/gu) || []).length, 1);
+  assert.equal((result.text.match(/😁/gu) || []).length, 0);
   assert.equal(result.text.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });
 
@@ -5159,4 +5155,26 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
       { to: 'vangestelsteigerbouw.nl' },
     ],
   });
+});
+
+test('reply quality failure returns 422 without canned text, retries or mail sends', async () => {
+  let calls = 0;
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-test-key',
+    logger: { error() {} },
+    fetchJsonWithTimeout: async () => {
+      calls += 1;
+      return { response: { ok: true }, data: { choices: [{ message: { content: 'Bedankt, ik kom dinsdag wel langs.' } }] } };
+    },
+  });
+  const res = createResponseRecorder();
+  await service.rewriteDraftResponse({ body: {
+    account: 'serve@softora.nl', to: 'klant@example.test', subject: 'Re: Vraag', body: 'Bestaand concept',
+    context: { from: 'Lisa', body: 'Geen interesse. Wat kost zoiets eigenlijk?' },
+  } }, res);
+  assert.equal(calls, 1);
+  assert.equal(res.statusCode, 422);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.text, undefined);
+  assert.match(res.body.detail, /Je concept is behouden/);
 });
