@@ -174,8 +174,8 @@ test('content growth actions have an explicit machine-readable event plan', () =
       ],
       [
         '/kennisbank/wat-is-procesautomatisering',
-        '2026-08-20',
-        'substantial_refresh',
+        '2026-09-07',
+        'other_growth_action',
         'scheduled',
       ],
       [

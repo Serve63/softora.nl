@@ -1512,7 +1512,7 @@ test('AI-telefonist acceptatiegids scheidt gesprek, audio, actie, overdracht en 
 });
 
 test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs toetsbaar', () => {
-  const now = new Date('2026-09-02T12:00:00.000Z');
+  const now = new Date('2026-09-07T12:00:00.000Z');
   const item = getSeoContentItem('kennisbank', 'wat-is-procesautomatisering', { now });
   const html = buildSeoContentArticleHtml(item, {
     siteOrigin: 'https://www.softora.nl',
@@ -1527,8 +1527,8 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   );
 
   assert.equal(item.qualityVersion, 2);
-  assert.equal(item.updatedAt, '2026-09-02');
-  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.updatedAt, '2026-09-07');
+  assert.equal(item.growthEventKind, 'other_growth_action');
   assert.equal(item.targetMoneyPage, '/ai-automatisering');
   assert.ok(item.informationGain.includes('negendelige proceskaart'));
   assert.ok(item.informationGain.includes('fout- en herstelroute'));
@@ -1555,7 +1555,8 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="900">/);
   assert.match(html, /"datePublished":"2026-06-24"/);
-  assert.match(html, /"dateModified":"2026-09-02"/);
+  assert.match(html, /"dateModified":"2026-09-07"/);
+  assert.match(html, /Procesautomatisering maakt een terugkerende werkroute bestuurbaar/);
   assert.match(html, /Vul een proceskaart met negen vaste velden/);
   assert.match(html, /Ontwerp de fout- en herstelroute vóór de succesroute live gaat/);
   assert.match(html, /href="\/ai-automatisering">AI automatisering<\/a>/);
@@ -1564,6 +1565,11 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat<\/a>/);
   assert.match(aiDefinitionHtml, /href="\/kennisbank\/wat-is-procesautomatisering"><span>Wat is procesautomatisering\?<\/span><\/a>/);
   assert.match(intakeHtml, /href="\/kennisbank\/wat-is-procesautomatisering"><span>Wat is procesautomatisering\?<\/span><\/a>/);
+  const aiProcessesHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-processen-automatiseren-zonder-controle-verliezen', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  assert.match(aiProcessesHtml, /href="\/kennisbank\/wat-is-procesautomatisering">concrete proceskaart<\/a>/);
   assert.doesNotMatch(html, /gegarandeerde tijdwinst|foutloze automatisering|volledig autonoom|altijd correct/i);
   assert.doesNotMatch(html, /<section class="artikel-faq"/);
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
