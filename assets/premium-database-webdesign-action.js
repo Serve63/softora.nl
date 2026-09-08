@@ -51,7 +51,7 @@
         const isMockupPending = typeof options.isMockupPending === "function" ? options.isMockupPending : function () { return false; };
         const getAssetState = typeof options.getAssetState === "function" ? options.getAssetState : null;
         const isRestoringPhotos = typeof options.isRestoringPhotos === "function" ? options.isRestoringPhotos : function (customer) { return Boolean(state && state.photoRestorePending) && shouldShowWebsitePhoto(customer); };
-        const costEur = Math.max(0, Number(options.costEur) || 0);
+        const costEur = Number.isFinite(options.costEur) ? Math.max(0, options.costEur) : null;
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollQueue = new Map();
@@ -391,7 +391,7 @@
             const label = global.document.createElement("div");
             label.className = "photo-generate-charge-label";
             label.setAttribute("aria-live", "polite");
-            label.textContent = formatCentCost(normalizeVariant(variant) === "v2-visual-dna" ? 0.06 : costEur);
+            label.textContent = Number.isFinite(costEur) ? formatCentCost(costEur) : "Kosten variabel";
             global.document.body.appendChild(label);
             updateChargeLabelPositions();
             const frame = typeof global.requestAnimationFrame === "function"

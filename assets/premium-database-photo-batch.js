@@ -39,12 +39,12 @@
       const selectedCount = mode === "all"
         ? total
         : (Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, total) : 0);
-      const selectedCost = selectedCount * costEur;
+      const selectedCost = Number.isFinite(costEur) ? selectedCount * costEur : null;
 
       nodes.photoBatchChoiceButtons.forEach(function (optionNode) {
         optionNode.classList.toggle("is-active", optionNode.dataset.photoBatchMode === mode);
       });
-      nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total) + " · " + formatEuroCost(total * costEur);
+      nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total) + " · " + formatEuroCost(Number.isFinite(costEur) ? total * costEur : null);
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
       nodes.photoBatchSummary.textContent = message || (selectedCount
         ? "Selectie: " + formatPhotoBatchCount(selectedCount) + " · " + formatEuroCost(selectedCost)
