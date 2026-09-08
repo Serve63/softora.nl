@@ -1,3 +1,5 @@
+const brandColorGuard = require('./website-brand-color-guard');
+const { extractCssVariableColorHints, extractCssBrandPalette, extractCssBrandColorEvidence } = require('./website-brand-colors');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   normalizeWebsitePreviewReferenceImage: normalizeWebsitePreviewReferenceImageDefault,
@@ -53,6 +55,8 @@ function createAiRemoteService(deps = {}) {
       new Promise((resolve) => setTimeout(resolve, 1600)),
     normalizeWebsitePreviewReferenceImage = normalizeWebsitePreviewReferenceImageDefault,
     logger = console,
+    prepareWebsitePreviewBrandGuard = brandColorGuard.prepareWebsitePreviewBrandGuard,
+    assertWebsitePreviewBrandColors = brandColorGuard.assertWebsitePreviewBrandColors,
     fetchImpl = fetch,
     extractOpenAiTextContent = () => '',
     extractAnthropicTextContent = () => '',
@@ -183,7 +187,7 @@ function createAiRemoteService(deps = {}) {
       const cssText = String(match[1] || '').trim();
       if (!cssText) continue;
       out.push(cssText);
-      if (out.length >= 8) break;
+      if (out.length >= 24) break;
     }
     return out;
   }
@@ -211,9 +215,11 @@ function createAiRemoteService(deps = {}) {
       if (!normalized || seen.has(normalized)) continue;
       seen.add(normalized);
       out.push(normalized);
-      if (out.length >= 4) break;
+      if (out.length >= 32) break;
     }
-    return out;
+    const priority = url => /\/themes\/|\/uploads\/elementor\/css\/post-|custom|(?:main|style)\.css/i.test(url) ? 2
+      : /\/plugins\/|\/wp-includes\/|bootstrap|swiper/i.test(url) ? 0 : 1;
+    return out.sort((a, b) => priority(b) - priority(a)).slice(0, 8);
   }
 
   function buildWebsitePreviewDocumentFetchProfiles() {
@@ -700,144 +706,6 @@ function createAiRemoteService(deps = {}) {
     return err;
   }
 
-  function extractColorTokensFromCss(textRaw) {
-    const text = String(textRaw || '');
-    if (!text) return [];
-    const matches = text.match(/#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b|rgba?\([^)]*\)|hsla?\([^)]*\)/gi);
-    if (!Array.isArray(matches)) return [];
-    return matches
-      .map((value) => normalizeString(value).toLowerCase().replace(/\s+/g, ' '))
-      .filter(Boolean);
-  }
-
-  function parseCssColorToRgb(colorRaw) {
-    const color = normalizeString(colorRaw || '').toLowerCase();
-    if (!color) return null;
-
-    const hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
-    if (hex) {
-      const value = hex[1];
-      if (value.length === 3 || value.length === 4) {
-        const r = Number.parseInt(value[0] + value[0], 16);
-        const g = Number.parseInt(value[1] + value[1], 16);
-        const b = Number.parseInt(value[2] + value[2], 16);
-        return { r, g, b };
-      }
-      const r = Number.parseInt(value.slice(0, 2), 16);
-      const g = Number.parseInt(value.slice(2, 4), 16);
-      const b = Number.parseInt(value.slice(4, 6), 16);
-      return { r, g, b };
-    }
-
-    const rgb = color.match(/^rgba?\(([^)]*)\)$/i);
-    if (rgb) {
-      const parts = rgb[1]
-        .split(',')
-        .map((item) => Number.parseFloat(String(item || '').trim()))
-        .filter((value) => Number.isFinite(value));
-      if (parts.length >= 3) {
-        return {
-          r: Math.max(0, Math.min(255, parts[0])),
-          g: Math.max(0, Math.min(255, parts[1])),
-          b: Math.max(0, Math.min(255, parts[2])),
-        };
-      }
-    }
-
-    return null;
-  }
-
-  function isLikelyNeutralCssColor(colorRaw) {
-    const parsed = parseCssColorToRgb(colorRaw);
-    if (!parsed) return false;
-    const values = [parsed.r, parsed.g, parsed.b];
-    const spread = Math.max(...values) - Math.min(...values);
-    return spread <= 18;
-  }
-
-  function extractCssVariableColorHints(cssSources = []) {
-    const hits = new Map();
-    const keywordWeights = [
-      ['accent', 10],
-      ['primary', 9],
-      ['brand', 9],
-      ['secondary', 8],
-      ['highlight', 7],
-      ['cta', 7],
-      ['hero', 5],
-      ['theme', 5],
-      ['bg', 3],
-      ['background', 3],
-      ['text', 2],
-    ];
-
-    for (const cssText of cssSources) {
-      const pattern = /--([a-z0-9-_]{2,60})\s*:\s*([^;}{]+)/gi;
-      let match;
-      while ((match = pattern.exec(String(cssText || '')))) {
-        const variableName = normalizeString(match[1] || '').toLowerCase();
-        const declaration = String(match[2] || '');
-        const colors = extractColorTokensFromCss(declaration);
-        if (!variableName || colors.length === 0) continue;
-
-        const color = colors[0];
-        let score = isLikelyNeutralCssColor(color) ? 1 : 4;
-        for (const [keyword, weight] of keywordWeights) {
-          if (variableName.includes(keyword)) score += weight;
-        }
-        if (variableName.includes('text')) score -= 5;
-        if (variableName.includes('bg') || variableName.includes('background')) score -= 2;
-
-        const key = `${variableName}:${color}`;
-        const existing = hits.get(key);
-        if (!existing || existing.score < score) {
-          hits.set(key, {
-            name: variableName,
-            color,
-            score,
-          });
-        }
-      }
-    }
-
-    return Array.from(hits.values())
-      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-      .slice(0, 6)
-      .map((entry) => `${entry.name}: ${entry.color}`);
-  }
-
-  function extractCssBrandPalette(cssSources = [], preferredColors = []) {
-    const counts = new Map();
-    const preferred = preferredColors
-      .map((value) => normalizeString(value || '').toLowerCase())
-      .filter(Boolean);
-
-    for (const cssText of cssSources) {
-      for (const color of extractColorTokensFromCss(cssText)) {
-        const current = counts.get(color) || 0;
-        const neutralPenalty = isLikelyNeutralCssColor(color) ? 0 : 2;
-        counts.set(color, current + 1 + neutralPenalty);
-      }
-    }
-
-    const palette = [];
-    for (const color of preferred) {
-      if (!palette.includes(color)) palette.push(color);
-      if (palette.length >= 6) return palette;
-    }
-
-    const ranked = Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([color]) => color);
-
-    for (const color of ranked) {
-      if (!palette.includes(color)) palette.push(color);
-      if (palette.length >= 6) break;
-    }
-
-    return palette.slice(0, 6);
-  }
-
   function extractCssFontFamilyHints(cssSources = []) {
     const counts = new Map();
     let seenIndex = 0;
@@ -933,6 +801,7 @@ function createAiRemoteService(deps = {}) {
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (rawImages.length >= maxImages) break;
+      if (isHomepageScreenshot && index >= screenshotCandidateCount) break;
       const candidateUrl = candidates[index];
       if (!isLikelyUsefulReferenceImageUrl(candidateUrl)) continue;
       const maxFetchAttempts = resolveReferenceFetchAttempts({
@@ -1276,8 +1145,10 @@ function createAiRemoteService(deps = {}) {
       scan.referenceImageFidelity || scan.websitePreviewReferenceImageFidelity || ''
     ).toLowerCase();
     const referenceImages = await fetchWebsitePreviewReferenceImages(scan);
+    const brandGuard = await prepareWebsitePreviewBrandGuard(scan, referenceImages);
     const prompt = buildWebsitePreviewPromptFromScan({
       ...scan,
+      verifiedBrandPalette: brandGuard?.palette.map(color => color.hex),
       referenceImageCount: referenceImages.length,
     });
     const imageGenerationTimeoutMs = resolveOpenAiImageGenerationTimeoutMs();
@@ -1359,6 +1230,7 @@ function createAiRemoteService(deps = {}) {
       throw err;
     }
 
+    await assertWebsitePreviewBrandColors(brandGuard, `data:image/png;base64,${b64}`);
     return {
       prompt,
       brief: buildWebsitePreviewBriefFromScan(scan),
@@ -1464,6 +1336,7 @@ function createAiRemoteService(deps = {}) {
       scan.clientRedirectUrl = normalizeWebsitePreviewTargetUrl(clientRedirectUrl) || clientRedirectUrl;
     }
     const cssSources = await fetchWebsitePreviewCssSources(html, finalUrl);
+    scan.brandColorEvidence = extractCssBrandColorEvidence(cssSources);
     const brandColorHints = extractCssVariableColorHints(cssSources);
     const brandPalette = extractCssBrandPalette(
       cssSources,

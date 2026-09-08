@@ -72,18 +72,6 @@ function createAiToolsCoordinator(deps = {}) {
     ];
   }
 
-  function buildVisualDnaReferenceUrls(screenshotUrls = [], websiteAssetUrls = []) {
-    const ordered = [];
-    const seen = new Set();
-    [...screenshotUrls, ...websiteAssetUrls].forEach((value) => {
-      const url = normalizeString(value || '');
-      if (!url || seen.has(url)) return;
-      seen.add(url);
-      ordered.push(url);
-    });
-    return ordered.slice(0, 6);
-  }
-
   function collectErrorText(value, out = []) {
     if (value === null || value === undefined) return out;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -168,26 +156,22 @@ function createAiToolsCoordinator(deps = {}) {
     try {
       fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
     } catch (error) {
-      if (!options.allowScanFallback) throw error;
-      if (usesHomepageScreenshot && [400, 401, 403, 422].includes(Number(error && error.status))) throw error;
+      if (!options.allowScanFallback || usesHomepageScreenshot) throw error;
       fetched = buildDatabasePreviewFallbackScan(inputUrl, body);
     }
     const homepageScreenshotUrls = usesHomepageScreenshot
       ? buildHomepageScreenshotReferenceUrls(fetched.finalUrl || fetched.normalizedUrl || inputUrl)
       : [];
-    const visualDnaReferenceUrls = usesHomepageScreenshot
-      ? buildVisualDnaReferenceUrls(homepageScreenshotUrls, fetched.scan?.referenceImageUrls)
-      : [];
     const generationScan = {
       ...fetched.scan,
       imageSize: normalizeString(options.imageSize || ''),
-      disableReferenceImages: options.disableReferenceImages === true,
+      disableReferenceImages: !usesHomepageScreenshot && options.disableReferenceImages === true,
       referenceImageMode,
-      requireReferenceImages: options.requireReferenceImages === true,
+      requireReferenceImages: usesHomepageScreenshot || options.requireReferenceImages === true,
       referenceImageFidelity: usesHomepageScreenshot ? 'high' : '',
       ...(usesHomepageScreenshot
         ? {
-            referenceImageUrls: visualDnaReferenceUrls,
+            referenceImageUrls: homepageScreenshotUrls,
             homepageScreenshotReferenceUrlCount: homepageScreenshotUrls.length,
           }
         : {}),

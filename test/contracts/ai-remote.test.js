@@ -11,6 +11,8 @@ function createService(overrides = {}) {
 
   const service = createAiRemoteService({
     env: overrides.env || {},
+    // Transport fixtures below contain dummy bytes; real raster guards have separate integration coverage.
+    prepareWebsitePreviewBrandGuard: async () => null,
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
     getOpenAiApiKey: () => overrides.openAiApiKey || 'openai-key',
@@ -472,7 +474,7 @@ test('ai remote service falls back to the next V2 screenshot provider and still 
   assert.equal(result.referenceImageCount, 1);
 });
 
-test('ai remote service skips permanent screenshot errors and uses a direct website visual for V2', async () => {
+test('ai remote service refuses a direct website photo as a replacement for a missing V2 screenshot', async () => {
   const generationCalls = [];
   const referenceFetches = [];
   const primaryUrl = 'https://image.thum.io/get/bliv';
@@ -515,19 +517,17 @@ test('ai remote service skips permanent screenshot errors and uses a direct webs
     },
   });
 
-  const result = await service.generateWebsitePreviewImageWithAi({
+  await assert.rejects(service.generateWebsitePreviewImageWithAi({
     host: 'www.bliv.nl',
     sourceUrl: 'https://www.bliv.nl/',
     referenceImageMode: 'homepage-screenshot',
     requireReferenceImages: true,
     homepageScreenshotReferenceUrlCount: 2,
     referenceImageUrls: [primaryUrl, fallbackUrl, websiteVisualUrl],
-  });
+  }), error => error.retryableWebdesignReference === true);
 
-  assert.deepEqual(referenceFetches, [primaryUrl, fallbackUrl, websiteVisualUrl]);
-  assert.equal(generationCalls.length, 1);
-  assert.equal(generationCalls[0].options.body.getAll('image[]').length, 1);
-  assert.equal(result.referenceImageCount, 1);
+  assert.deepEqual(referenceFetches, [primaryUrl, fallbackUrl]);
+  assert.equal(generationCalls.length, 0);
 });
 
 test('ai remote service normalizes an oversized valid V2 screenshot before sending it', async () => {

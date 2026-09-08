@@ -55,9 +55,9 @@ test('website generation helpers build preview prompt, brief and filename from s
 
   assert.match(prompt, /Domein of merk: softora\.nl\./);
   assert.match(prompt, /Bekijk eerst de website grondig op basis van de URL-scan hieronder/i);
-  assert.match(prompt, /Gebruik deze scan en eventuele referentiebeelden alleen als moodboard\/context/i);
+  assert.match(prompt, /Gebruik de bron als verplichte referentie voor de merkkleuren/i);
   assert.match(prompt, /Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept/i);
-  assert.match(prompt, /aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep/i);
+  assert.match(prompt, /aangeleverde screenshot de bestaande merkkleuren vastlegt/i);
   assert.match(prompt, /niet als layout-template/i);
   assert.match(prompt, /ontwerp vanaf nul een radicaal andere Awwwards-level website/i);
   assert.match(prompt, /NIEUW-DESIGN REGEL/i);
@@ -85,7 +85,13 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /shimmer-blokken, broken-image-iconen, lege placeholders/i);
   assert.match(prompt, /half-geladen panelen/i);
   assert.match(prompt, /kies altijd het nieuwe gerenderde webdesign met duidelijke UI-elementen/i);
-  assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; behandel die uitsluitend als moodboard/i);
+  assert.match(prompt, /Er zijn 2 referentiebeeld\(en\) meegegeven; gebruik die als verplichte referentie/i);
+  assert.match(prompt, /MERKKLEUREN VERPLICHT/);
+  assert.match(prompt, /Andere hex-codes, lichtere\/donkere tinten/);
+  assert.match(prompt, /kleurverlopen binnen dezelfde kleurfamilies zijn toegestaan/);
+  assert.match(prompt, /paars\/roze merk mag bijvoorbeeld geen groen\/geel ontwerp krijgen/);
+  assert.match(prompt, /Behoud ook het bestaande logo/);
+  assert.doesNotMatch(prompt, /alleen als moodboard|uitsluitend als moodboard/);
   assert.doesNotMatch(prompt, /DESIGN-DNA LOCK/);
   assert.doesNotMatch(prompt, /COPY LOCK/);
   assert.doesNotMatch(prompt, /STYLE LOCK/);

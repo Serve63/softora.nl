@@ -162,6 +162,20 @@ function createWebsiteGenerationHelpers(deps = {}) {
       .join('\n');
   }
 
+  function formatWebsitePreviewBrandColorLock(scan = {}) {
+    const palette = cleanWebsitePreviewList(scan.verifiedBrandPalette || [], 6, 40);
+    return [
+      'MERKKLEUREN VERPLICHT — deze regel gaat vóór creatieve vrijheid, moodboard en nieuw-design instructies:',
+      '- Behoud de herkenbare kleurfamilies van het bestaande merk. Blauw blijft blauw, paars blijft paars, roze blijft roze en groen blijft groen. Vervang primaire of secundaire merkkleuren nooit door andere kleurfamilies.',
+      '- Andere hex-codes, lichtere/donkere tinten, verfijnd contrast en kleurverlopen binnen dezelfde kleurfamilies zijn toegestaan. Behoud de herkenbare kleurcombinatie en gebruik de merkkleuren zichtbaar in knoppen, accenten en merkvlakken, niet uitsluitend in een klein logo.',
+      '- De homepage-screenshot is leidend voor de zichtbare huisstijl. CSS-kleuren zijn ondersteunend en tellen alleen als merkkleur wanneer ze op de website zichtbaar zijn; negeer ongebruikte framework-, cookie-, status- en pluginkleuren en toevallige kleuren uit fotografie.',
+      palette.length ? `- In de screenshot bevestigde merkkleuren: ${palette.join(' | ')}. Laat elke bijbehorende kleurfamilie herkenbaar terugkomen.` : '',
+      '- Heeft het merk een neutrale huisstijl, behoud dan zwart/wit/grijs zonder een nieuwe chromatische merkkleur te introduceren.',
+      '- Behoud ook het bestaande logo en de herkenbare logokleuren; verzin geen vervangend beeldmerk. Vernieuw compositie, typografie en informatiearchitectuur binnen deze huisstijl.',
+      '- Controleer vóór oplevering bron en ontwerp naast elkaar: dezelfde kleurfamilies en herkenbare kleurcombinatie moeten terugkomen. Een paars/roze merk mag bijvoorbeeld geen groen/geel ontwerp krijgen.',
+    ].filter(Boolean).join('\n');
+  }
+
   function buildWebsitePreviewPromptFromScan(scan = {}) {
     const host = normalizeString(scan.host || '');
     const title = normalizeString(scan.title || '');
@@ -185,13 +199,14 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const referenceImageCount = Math.max(0, Number(scan.referenceImageCount || 0) || 0);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
     return [
-      'Bekijk eerst de website grondig op basis van de URL-scan hieronder: begrijp merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep. Gebruik deze scan en eventuele referentiebeelden alleen als moodboard/context, niet als layout-template.',
+      'Bekijk eerst de website grondig op basis van de URL-scan hieronder: begrijp merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep. Gebruik de bron als verplichte referentie voor de merkkleuren en als context voor content en sfeer, niet als layout-template.',
       referenceImageCount
-        ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep.`
+        ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; gebruik die als verplichte referentie voor de bestaande merkkleuren en als inspiratie voor sfeer en doelgroep.`
         : '',
       formatWebsitePreviewCustomerIdentityLock(),
-      'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep, maar ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
-      'NIEUW-DESIGN REGEL: maak nooit een letterlijke screenshot, crop, browserweergave of bijna-kopie van de huidige website. De output moet zichtbaar een nieuw ontworpen homepage zijn met eigen compositie, nieuwe sectie-opbouw, vernieuwde visuele hiërarchie en herkenbare maar opnieuw geïnterpreteerde merkstijl.',
+      formatWebsitePreviewBrandColorLock(scan),
+      'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot de bestaande merkkleuren vastlegt en context geeft voor branche, contentbasis, sfeer en doelgroep; ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
+      'NIEUW-DESIGN REGEL: maak nooit een letterlijke screenshot, crop, browserweergave of bijna-kopie van de huidige website. De output moet zichtbaar een nieuw ontworpen homepage zijn met eigen compositie, nieuwe sectie-opbouw, vernieuwde visuele hiërarchie en herkenbare merkstijl met dezelfde kleurfamilies. Creatieve vrijheid geldt voor de vormgeving; behoud de bestaande kleuridentiteit.',
       'FULL-PAGE FRAME REGEL: de volledige homepage moet binnen één afbeelding zichtbaar zijn van bovenste navigatie/hero tot en met de laatste footer/onderkant. De footer is verplicht en moet volledig zichtbaar onderaan in beeld staan met merk/contactinformatie. Snijd de onderkant nooit af, maak geen partial scrollshot of viewport-crop, en schaal of schrap tussenliggende content wanneer nodig zodat de footer en laatste CTA volledig in beeld blijven.',
       'UI-ONLY OUTPUT: de afbeelding moet duidelijk een gerenderde desktop website-interface zijn, met zichtbare navigatie, hero, typografie, secties, knoppen en footer als onderdeel van één full-page webdesign. Maak géén losse stockfoto, kantoorinterieur, teamfoto, lifestylebeeld, mockup-scene of fotografische sfeerplaat als eindresultaat. Fotografie mag alleen klein en ingebed binnen het website-ontwerp voorkomen, nooit als volledige afbeelding.',
       'VOLLEDIG GELADEN STAAT: toon de website alsof alle secties, afbeeldingen, kaarten en previews klaar zijn. Gebruik nergens laadspinners, skeleton-loaders, progress-ringen, shimmer-blokken, broken-image-iconen, lege placeholders, browser error states of half-geladen panelen.',
