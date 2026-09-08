@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const { createPremiumUsersStore } = require('../../lib/premium-users-store');
 const { timingSafeEqualStrings } = require('../../server/security/crypto-utils');
 const { createPremiumAuthRuntime } = require('../../server/services/premium-auth-runtime');
@@ -24,10 +25,12 @@ async function startPremiumAuthBrowserServer({ loginReadDelayMs = 0 } = {}) {
   const pagesDir = await fs.mkdtemp(path.join(os.tmpdir(), 'softora-auth-browser-'));
   const sessionSecret = crypto.randomBytes(32).toString('hex');
   const password = crypto.randomBytes(18).toString('base64url');
+  const passwordSalt = crypto.randomBytes(16);
+  const passwordKey = crypto.scryptSync(password, passwordSalt, 64);
   const user = {
     id: 'usr_browser_fixture', email: 'browser@example.test', firstName: 'Browser', lastName: 'Test',
     role: 'admin', status: 'active', authVersion: 2, source: 'managed_ui',
-    passwordHash: `sha256:${crypto.createHash('sha256').update(password).digest('hex')}`,
+    passwordHash: `scrypt:${passwordSalt.toString('base64')}:${passwordKey.toString('base64')}`,
   };
   const state = { loginReadDelayMs, loginUnavailable: false, sessionUnavailable: false };
   const requests = [];
@@ -97,6 +100,8 @@ async function startPremiumAuthBrowserServer({ loginReadDelayMs = 0 } = {}) {
       clearPremiumSessionCookie: runtime.clearPremiumSessionCookie,
     });
     const app = express();
+    const requestLimiter = rateLimit({ windowMs: 60_000, limit: 300 });
+    const loginLimiter = rateLimit({ windowMs: 60_000, limit: 20 });
     app.use(express.json());
     app.use((req, res, next) => {
       res.on('finish', () => requests.push({ method: req.method, path: req.path, status: res.statusCode }));
@@ -104,8 +109,8 @@ async function startPremiumAuthBrowserServer({ loginReadDelayMs = 0 } = {}) {
     });
     app.get('/api/auth/session', (_req, res, next) => state.sessionUnavailable
       ? res.status(503).json({ ok: false }) : next());
-    registerPremiumAuthRoutes(app, { coordinator, premiumLoginRateLimiter: (_req, _res, next) => next() });
-    app.get('/api/quality-profile', api.requirePremiumApiAccess, (req, res) => {
+    registerPremiumAuthRoutes(app, { coordinator, premiumLoginRateLimiter: loginLimiter });
+    app.get('/api/quality-profile', requestLimiter, api.requirePremiumApiAccess, (req, res) => {
       res.json(auth.buildPremiumAuthSessionPayload(req.premiumAuth));
     });
     app.use('/assets', express.static(path.join(repoRoot, 'assets')));
@@ -113,7 +118,7 @@ async function startPremiumAuthBrowserServer({ loginReadDelayMs = 0 } = {}) {
       ['/premium-personeel-login', 'premium-personeel-login.html'],
       [probePath, 'premium-auth-probe.html'],
     ]) {
-      app.get(route, (req, res, next) => {
+      app.get(route, requestLimiter, (req, res, next) => {
         html.sendSeoManagedHtmlPageResponse(req, res, next, file).catch(next);
       });
     }
