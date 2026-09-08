@@ -444,8 +444,11 @@ h2,h3{text-transform:uppercase}
 /* Hero shell intentionally mirrors /bedrijfssoftware: same viewport ratio, rhythm and contrast. */
 .wrap{width:100%;max-width:1160px;margin:0 auto;padding-left:28px;padding-right:28px}
 .site-header{height:74px}
-.navigation{height:74px}
-.wordmark{font-size:24px;letter-spacing:-.04em}
+.navigation{width:100%;max-width:none;height:74px;padding-left:max(28px,calc((100vw - 1160px)/2));padding-right:max(28px,calc((100vw - 1160px)/2))}
+.wordmark{font-size:32px;letter-spacing:-.04em}
+.wordmark span{color:inherit}
+.wordmark:after{bottom:-4px;width:3.2ch;height:3px}
+.site-header .button-small{min-height:44px;padding:13px 20px;border-radius:5px;font-size:12px}
 .hero{min-height:520px}
 .hero:before{background:linear-gradient(90deg,rgba(13,14,25,.97) 0%,rgba(13,14,25,.9) 39%,rgba(13,14,25,.57) 66%,rgba(13,14,25,.2) 100%),linear-gradient(0deg,rgba(13,14,25,.42),transparent 42%),radial-gradient(circle at 17% 8%,rgba(163,38,95,.24),transparent 35%);background-size:auto;opacity:1}
 .hero-grid{min-height:520px;padding-top:54px;padding-bottom:112px}
@@ -469,6 +472,9 @@ h2,h3{text-transform:uppercase}
 
 @media(max-width:680px){
   .wrap{padding-left:20px;padding-right:20px}
+  .navigation{padding-left:18px;padding-right:18px}
+  .wordmark{font-size:23px}
+  .wordmark:after{bottom:-2px;width:2.8ch;height:2px}
   .site-header,.navigation{height:66px}
   .hero{margin-top:66px}
   .hero,.hero-grid{min-height:590px}
