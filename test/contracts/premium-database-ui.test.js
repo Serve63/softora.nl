@@ -2063,7 +2063,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = null;/);
   assert.match(pageSource, /nodes\.count\.textContent = displayText;/);
-  assert.match(pageSource, /Sunburst max: ca\. US\$0,16464 beeldprijs \+ invoer/);
+  assert.match(pageSource, /Sunburst max: /);
+  assert.match(pageSource, /SoftoraDatabasePhotoBatch\.formatOutputEstimate\(1\)/);
+  assert.match(pageSource, /SoftoraDatabasePhotoBatch\.pricingNote/);
   assert.doesNotMatch(pageSource, /URL-scan kost €0,00/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton"/);
@@ -2416,7 +2418,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260908-max-usage-costs/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260908-eur-vat-costs/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
