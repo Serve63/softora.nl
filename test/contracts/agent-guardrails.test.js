@@ -632,20 +632,20 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.equal(packageJson.engines.node, '22.x');
   assert.equal(nvmrcSource.trim(), '22');
-  assert.equal(packageJson.dependencies.nodemailer, '^9.0.1');
+  assert.equal(packageJson.dependencies.nodemailer, '^9.1.1');
   assert.equal(packageJson.dependencies.mailparser, '^3.9.14');
   assert.equal(packageJson.overrides['deepmerge-ts'], '8.0.1');
   assert.equal(packageJson.overrides.qs, '6.16.0');
   assert.equal(packageJson.dependencies.htmlparser2, '^10.1.0');
-  assert.equal(packageJson.dependencies.sharp, '^0.35.3');
+  assert.equal(packageJson.dependencies.sharp, '^0.35.4');
   assert.equal(packageJson.devDependencies.pg, '8.23.0');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.3');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.2');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.3');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.2');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.3');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.3 @img/sharp-linux-arm64@0.35.3 @img/sharp-libvips-linux-arm64@1.3.2'
+    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.4 @img/sharp-linux-arm64@0.35.4 @img/sharp-libvips-linux-arm64@1.3.3'
   );
   const standardIncludeFiles = '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}';
   const personalSiteIncludeFiles = '{*.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';
@@ -745,8 +745,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-x64/);
   assert.match(safeDeploySource, /@img\/sharp-linux-arm64/);
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-arm64/);
-  assert.match(safeDeploySource, /version: '0\.35\.3'/);
-  assert.match(safeDeploySource, /version: '1\.3\.2'/);
+  assert.match(safeDeploySource, /version: '0\.35\.4'/);
+  assert.match(safeDeploySource, /version: '1\.3\.3'/);
   assert.match(safeDeploySource, /check:live-production-version/);
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
   assert.match(agentsSource, /check:live-production-version/);
