@@ -196,7 +196,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260908b/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260908c/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
@@ -222,8 +222,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260908b'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260908b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260908c'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260908c') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260907a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
@@ -10442,6 +10442,54 @@ test('Outlook Verstuurd-header telt als verzendveld in een markdown-headercluste
 
   assert.equal(quotedThreadModule.isHeaderClusterAt(lines, 0), true);
   assert.deepEqual(fields.sent, ['woensdag 24 juni 2026 10:00']);
+});
+
+test('nummerbehoud geldt voor oude en nieuwe mails van alle mailboxaccounts en Instantly in beide weergaven', () => {
+  const accounts = [
+    'serve@softora.nl', 'servecreusen@softora.nl', 'servec321@gmail.com',
+    'serve290@gmail.com', 'servecreusen7@gmail.com', 'martijn@softora.nl',
+    'martijnvandeven@softora.nl', 'martijnven123@gmail.com', 'contact.venvisuals@gmail.com',
+  ];
+  const body = [
+    'Mijn antwoord blijft zichtbaar.',
+    '',
+    'Groet',
+    'Afdeling klantenservice',
+    'T: 073 123 45 67',
+    'WhatsApp: 06-87654321',
+    'Internationaal +49 (0)30 123456',
+    '[0612345678]',
+    '',
+    'Op 7 sep 2026 om 13:38 heeft Servé Creusen het volgende geschreven:',
+    'Oude geciteerde tekst.',
+    'WhatsApp: 06-11112222',
+  ].join('\n');
+  for (const provider of ['imap', 'instantly']) {
+    for (const accountEmail of accounts) {
+      for (const date of ['2026-06-01T12:00:00.000Z', '2027-01-01T12:00:00.000Z']) {
+        const root = {
+          id: `${provider}:number-preservation`,
+          folder: provider === 'instantly' ? 'instantly' : 'inbox',
+          direction: 'received', provider, accountEmail, date, body,
+          email: 'contact@example.nl', threadMessages: [],
+        };
+        const rootHtml = renderMailboxBodyForTest(body, [], {
+          replyMailId: root.id, mail: root, contactDossierMode: true,
+        });
+        const threadHtml = campaignInboxModule.renderThreadMessages({
+          id: 'inbox:number-thread', accountEmail, threadMessages: [root],
+        }, String, () => ({ date: '1 juni', time: '14:00' }));
+        for (const html of [rootHtml, threadHtml]) {
+          for (const number of ['073 123 45 67', '06-87654321', '+49 (0)30 123456', '[0612345678]']) {
+            assert.ok(html.includes(number), `${provider} ${accountEmail} ${date}: ${number}`);
+          }
+          assert.match(html, /Mijn antwoord blijft zichtbaar/);
+          assert.doesNotMatch(html, /Oude geciteerde tekst|11112222/);
+        }
+        assert.equal(root.body, body);
+      }
+    }
+  }
 });
 
 test('los telefoonnummer voor Apple Mail-geschiedenis blijft zichtbaar in hoofdmail en contactdossier', () => {

@@ -3,6 +3,77 @@ const assert = require('node:assert/strict');
 
 const signature = require('../../assets/premium-mailbox-signature.js');
 
+test('handtekeningfilter behoudt alle nummerregels die niet in de contactkaart zijn vertegenwoordigd', () => {
+  for (const line of [
+    '06-12345678',
+    'Robin 06-12345678',
+    'Afdeling verkoop: 073 234 56 78',
+    '☎ +49 (0)30 123456',
+    'WhatsApp: +32 470 12 34 56',
+    'Tel: 020 123 45 67 toestel 89',
+    'Mobiel: 06-12345678 | Kantoor: 073-2345678',
+    '0800-1234',
+    '0900 123 45 67',
+    '020 123456',
+    '1234567',
+    '06–12345678',
+    '06\u200b12345678',
+    '[Bel ons](tel:+31612345678)',
+    '[0612345678]',
+    'Telefoon: [0612345678]',
+    'Support +1 (212) 555-0123',
+    '携帯: ０９０１２３４５６７８',
+  ]) {
+    const body = ['Mijn antwoord.', '', 'Groet', 'Voorbeeld', line].join('\n');
+    const parsed = signature.parseIncoming(body, { from: 'Andere Naam', email: 'info@example.nl' });
+    const visible = parsed.bodyLines.join('\n') + signature.renderContactCard(parsed.contact);
+    assert.ok(visible.includes(line) || visible.includes(line.replace(/^(?:Tel|Mobiel): /, '')), line);
+  }
+});
+
+test('handtekeningfilter behoudt tweede nummers en over meerdere regels verdeelde telefoons', () => {
+  const parsed = signature.parseIncoming([
+    'Mijn antwoord.',
+    '',
+    'Groet',
+    'Voorbeeld',
+    'T: 073 123 45 67',
+    'M: 06 87654321',
+    '06',
+    '1234',
+    '5678',
+  ].join('\n'));
+  const html = signature.renderContactCard(parsed.contact);
+  assert.match(html, /073 123 45 67/);
+  assert.match(html, /M: 06 87654321/);
+  for (const part of ['06', '1234', '5678']) assert.ok(html.includes(`>${part}<`), part);
+});
+
+test('onherkende nummerregels na een bewezen afzenderfooter komen nooit uit de oude quote', () => {
+  const parsed = signature.parseIncoming([
+    'Mijn antwoord.',
+    '',
+    'Op 7 sep 2026 om 13:38 heeft Servé Creusen het volgende geschreven:',
+    '> Oude mail.',
+    '> WhatsApp: 06-11112222',
+    '',
+    '--',
+    'Robin Voorbeeld',
+    'WhatsApp: 06-33334444',
+  ].join('\n'), { from: 'Robin Voorbeeld', email: 'robin@example.nl' });
+  const html = signature.renderContactCard(parsed.contact);
+  assert.match(html, /WhatsApp: 06-33334444/);
+  assert.doesNotMatch(html, /11112222/);
+});
+
+test('bewaarde nummerregels renderen uitsluitend als veilige tekst', () => {
+  const parsed = signature.parseIncoming('Antwoord.\n\nGroet\nVoorbeeld\n06-12345678 <img src=x onerror=alert(1)>');
+  const html = signature.renderContactCard(parsed.contact);
+  assert.match(html, /06-12345678/);
+  assert.match(html, /&lt;img/);
+  assert.doesNotMatch(html, /<img|onerror=|<script/);
+});
+
 test('mailbox bewaart een los telefoonnummer in een handtekening voor een Apple Mail-citaat', () => {
   for (const [phone, href] of [
     ['06-12345678', 'tel:0612345678'],
