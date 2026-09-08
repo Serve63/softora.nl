@@ -97,21 +97,23 @@ function createCustomersPageBootstrapService(deps = {}) {
     const stats = cachedStatsPayload.stats && typeof cachedStatsPayload.stats === 'object' ? cachedStatsPayload.stats : {};
     const roiValues = roiState && roiState.values && typeof roiState.values === 'object' ? roiState.values : {};
     const roi = parseJsonObject(roiValues[DATABASE_MAIL_ROI_KEY]);
+    const appointments = parseJsonObject(roiValues['premium_database_mail_appointments_v1']);
     const autopilotValues = autopilotState && autopilotState.values && typeof autopilotState.values === 'object' ? autopilotState.values : {};
     const autopilot = parseJsonObject(autopilotValues[DATABASE_AUTOPILOT_KEY]);
     const dealCount = pickNonNegativeInteger(roi, ['dealCount', 'dealsCount', 'count']);
-    const hardBounces = pickNonNegativeInteger(stats, ['hardBounces', 'totalHardBounces'])
-      ?? pickNonNegativeInteger(stats.bounceTypes, ['hard']);
+    const hardBounces = stats.bounceStatsReliable === true && stats.bounceStatsModel === 'complete-mailbox-recipient-v2'
+      ? pickNonNegativeInteger(stats.bounceTypes, ['hard']) : null;
     return {
       mailStats: {
         sentToday: readReliableCurrentDaySentCount(stats),
         bounces: pickNonNegativeInteger(stats, ['bounces', 'totalBounces', 'bouncesTotal']),
-        hardBounces,
+        hardBounces, bounceStatsReliable: stats.bounceStatsReliable === true, bounceStatsModel: stats.bounceStatsModel,
+        bounceStatsUpdatedAt: stats.bounceStatsUpdatedAt, bounceStatsStale: stats.bounceStatsStale === true,
         totalSent: pickNonNegativeInteger(stats, ['systemTotalSent', 'totalSent', 'webdesignTotalSent', 'centralGuardTotalSent']),
         updatedAt: normalizeString(stats.updatedAt) || null,
       },
       mailRoi: {
-        dealCount,
+        dealCount, appointmentCount: pickNonNegativeInteger(appointments, ['appointmentCount']) || 0,
       },
       autopilot: Object.prototype.hasOwnProperty.call(autopilot, 'enabled')
         ? { loaded: true, enabled: autopilot.enabled === true }

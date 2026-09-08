@@ -48,6 +48,7 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
           calls.push(['select', table, columns]);
           return query;
         },
+        or(value) { calls.push(['or', value]); return query; },
         is(column, value) {
           calls.push(['is', column, value]);
           return query;
@@ -102,9 +103,9 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     'folder',
     ['inbox'],
   ]);
-  assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'date', { ascending: false }]);
-  assert.equal(calls.some((call) => call[0] === 'or'), false);
-  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
+  assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'message_key', { ascending: true }]);
+  assert.match(calls.find((call) => call[0] === 'or')[1], /sender_email.ilike.mailer-daemon/);
+  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 500]);
 });
 
 test('data ops store finds exact historical outbound recipients including tombstones and all outbound folders', async () => {
@@ -696,7 +697,7 @@ test('data ops store resolves exact customer ids without scanning the customer s
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 1000]);
 });
 
-test('data ops store reads bounce candidates per mailbox and filters without a table-wide OR scan', async () => {
+test('data ops store reads bounce candidates per mailbox with an account-scoped filter and retains stronger duplicate evidence', async () => {
   const accountQueries = [];
   const rowsByAccount = {
     'serve@softora.nl': [
@@ -721,7 +722,8 @@ test('data ops store reads bounce candidates per mailbox and filters without a t
         },
         in() { return query; },
         order() { return query; },
-        limit() { return Promise.resolve({ data: rowsByAccount[accountEmail] || [], error: null }); },
+        or() { return query; },
+        limit() { return Promise.resolve({ data: (rowsByAccount[accountEmail] || []).filter(row => /Returned Mail|delivery failed/.test(row.subject)), error: null }); },
       };
       return query;
     },
@@ -740,7 +742,7 @@ test('data ops store reads bounce candidates per mailbox and filters without a t
   });
 
   assert.deepEqual(accountQueries.sort(), ['martijn@softora.nl', 'serve@softora.nl']);
-  assert.deepEqual(rows.map((row) => row.message_key), ['martijn|1', 'serve|coldmail|1']);
+  assert.deepEqual(rows.map((row) => row.message_key), ['serve|1', 'serve|coldmail|1', 'martijn|1']);
 });
 
 test('data ops store saves cancelled webdesign batches with a table-compatible status', async () => {
@@ -3163,4 +3165,34 @@ test('data ops store never uses an old empty webdesign queue as fallback after a
     store.listVisibleWebdesignJobs('owner@softora.nl::owner'),
     (error) => error && error.webdesignJobStatusUnavailable === true
   );
+});
+
+test('bounce evidence paginates past the old limit and refuses partial or failed refreshes', async () => {
+  const calls = [];
+  const records = Array.from({ length: 1001 }, (_, index) => ({ message_key: `bounce-${String(index).padStart(5, '0')}`, account_email: 'serve@softora.nl', subject: 'Returned Mail' }));
+  let failPage = false;
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    logger: { error() {}, warn() {} },
+    getSupabaseClient: () => ({ from: () => {
+      let after = ''; let filtered = false; let account = '';
+      const query = {
+        select() { return query; }, is() { return query; }, in() { return query; },
+        eq(key, value) { if (key === 'account_email') account = value; return query; },
+        or() { filtered = true; return query; }, order() { return query; },
+        gt(key, value) { assert.equal(key, 'message_key'); after = value; return query; },
+        limit(size) {
+          assert.equal(account, 'serve@softora.nl'); assert.equal(filtered, true);
+          calls.push(after);
+          if (failPage && after) return { data: null, error: new Error('interrupted scan') };
+          return { data: records.filter((row) => row.message_key > after).slice(0, size), error: null };
+        },
+      }; return query;
+    } }),
+  });
+  const options = { accountEmails: ['serve@softora.nl'], bounceCandidatesOnly: true, maxRows: 1000, bypassReadFailureCooldown: true };
+  assert.equal((await store.listMailboxMessages(options)).length, 1001);
+  assert.deepEqual(calls, ['', 'bounce-00499', 'bounce-00999']);
+  failPage = true;
+  assert.equal(await store.listMailboxMessages(options), null);
 });

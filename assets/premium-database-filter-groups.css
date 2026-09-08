@@ -7,7 +7,7 @@
     background: #fff;
     border: 1px solid #e8e6e1;
     border-radius: 10px;
-    padding: 10px 16px;
+    padding: 7px 5px;
 }
 
 .status-filter-group {
@@ -15,7 +15,7 @@
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 0 16px;
+    padding: 0 8px;
     border: 0;
     background: transparent;
 }
@@ -120,17 +120,25 @@
     transform: none;
 }
 
+.filter-bar .sf-btn { padding: 5px 8px; font-size: 11px; }
+
+.page-shell .filter-bar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.filter-bar .top-right { width: 100%; }
+
 .filter-metrics {
     margin-left: 0;
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 24px;
+    gap: 0;
+    width: 100%;
     min-height: 44px;
     max-width: 100%;
 }
 
 .filter-search {
+    grid-column: 1 / -1;
+    justify-self: end;
     margin-left: auto;
     width: min(340px, 25vw);
     min-width: 260px;
@@ -142,6 +150,7 @@
 
 .mail-roi-calculator {
     display: inline-block;
+    width: 100%;
 }
 
 .mail-roi-note {
@@ -149,10 +158,10 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    min-height: 20px;
-    padding: 0 0 0 10px;
+    min-height: 14px;
+    padding: 0;
     color: #8a877f;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     line-height: 1.2;
     text-align: left;
@@ -160,16 +169,16 @@
 
 .mail-roi-cards {
     display: grid;
-    grid-template-columns: repeat(6, minmax(110px, 1fr));
+    grid-template-columns: .8fr 1.12fr .96fr 1fr 1.08fr 1.16fr 1.08fr 1fr;
     grid-template-areas:
-        ". . . note note note"
-        "autopilot today bounces sent deals ratio";
+        "autopilot today bounces sent appointments appointment-ratio deals ratio"
+        "note note note note note note note note";
     align-items: stretch;
-    gap: 6px;
+    gap: 4px;
 }
 
 .mail-roi-card {
-    min-width: 110px;
+    min-width: 0;
     border: 1px solid #e0ddd8;
     border-radius: 8px;
     background: #fff;
@@ -197,6 +206,9 @@
     grid-area: sent;
 }
 
+.mail-roi-card--appointments { grid-area: appointments; }
+.mail-roi-card--appointment-ratio { grid-area: appointment-ratio; }
+
 .mail-roi-card--deals {
     grid-area: deals;
 }
@@ -218,10 +230,10 @@
     margin-bottom: 5px;
     color: #6b6b6b;
     font-family: "Oswald", sans-serif;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 500;
     line-height: 1.15;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
     white-space: nowrap;
 }
@@ -235,7 +247,7 @@
 
 .mail-roi-value {
     color: #1a1a1a;
-    font: 500 1.15rem/1 "Oswald", sans-serif;
+    font: 500 1.05rem/1 "Oswald", sans-serif;
 }
 
 .mail-roi-autopilot-toggle {
@@ -517,14 +529,26 @@
         grid-template-columns: repeat(2, minmax(110px, 1fr));
         grid-template-areas:
             "autopilot today"
-            "bounces ."
-            "note note"
-            "sent deals"
-            "ratio ratio";
+            "bounces sent"
+            "appointments appointment-ratio"
+            "deals ratio"
+            "note note";
     }
 
     .mail-roi-note {
         padding-left: 0;
     }
 
+}
+
+@media (max-width: 1600px) and (min-width: 1401px) {
+    .mail-roi-cards {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-areas: "autopilot today bounces sent" "appointments appointment-ratio deals ratio" "note note note note";
+    }
+}
+@media (max-width: 1400px) {
+    .page-shell .filter-bar { grid-template-columns: minmax(0, 1fr); }
+    .filter-bar .top-right { margin-left: 0; }
+    .filter-metrics { justify-content: flex-start; }
 }

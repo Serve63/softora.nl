@@ -3531,7 +3531,7 @@ function createColdmailCampaignService(deps = {}) {
         totalBounces: bounceStats.totalBounces,
         bounceStatsSource: bounceStats.source,
         bounceStatsReliable: bounceStats.reliable,
-        bounceDeduplication: 'recipient-email',
+        bounceDeduplication: 'recipient-email', bounceStatsModel: 'complete-mailbox-recipient-v2', bounceStatsUpdatedAt: now().toISOString(),
         databaseBounces: databaseStats.totalBounces,
         databaseBouncesToday: databaseStats.bouncesToday,
         mailboxBounces: bounceStats.mailboxBounces,
@@ -3560,7 +3560,7 @@ function createColdmailCampaignService(deps = {}) {
     try {
       const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
       if (!parsed || typeof parsed !== 'object' || parsed.ok !== true || !parsed.stats || typeof parsed.stats !== 'object') return null;
-      if (normalizeString(parsed.stats.bounceDeduplication) !== 'recipient-email') return null;
+      if (normalizeString(parsed.stats.bounceDeduplication) !== 'recipient-email' || parsed.stats.bounceStatsModel !== 'complete-mailbox-recipient-v2') return null;
       const updatedAtMs = Date.parse(normalizeString(parsed.stats.updatedAt));
       const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
       if (!updatedAtMs || normalizeString(parsed.stats.dateKey) !== expectedDateKey) return null;

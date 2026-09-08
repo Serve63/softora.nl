@@ -335,7 +335,7 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
     now: () => new Date('2026-07-10T12:00:30.000Z'),
     getUiStateValues: async (scope, options) => {
       seenReads.push({ scope, options });
-      if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { reliable: true, authoritativeSource: 'central-outbound-recipient-guard', dateKey: '2026-07-10', sentTimestampModel: 'delivery-evidence-v1', centralGuardSentToday: 4, systemSentToday: 4, totalBounces: 29, bounceTypes: { hard: 11, soft: 10, unknown: 8 }, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
+      if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { reliable: true, authoritativeSource: 'central-outbound-recipient-guard', dateKey: '2026-07-10', sentTimestampModel: 'delivery-evidence-v1', centralGuardSentToday: 4, systemSentToday: 4, bounceStatsReliable: true, bounceStatsModel: 'complete-mailbox-recipient-v2', bounceStatsUpdatedAt: '2026-07-10T12:00:00.000Z', totalBounces: 29, bounceTypes: { hard: 11, soft: 10, unknown: 8 }, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
       if (scope === 'premium_database_mail_roi') return { source: 'supabase', values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 2 }) } };
       if (scope === 'premium_coldmail_autopilot') return { source: 'supabase', values: { softora_coldmail_autopilot_v1: JSON.stringify({ enabled: false }) } };
       assert.equal(scope, MAIL_READY_BOOTSTRAP_CACHE_SCOPE);
@@ -356,8 +356,8 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   assert.equal(payload.foundTotal, 2);
   assert.deepEqual(payload.foundCustomerIds, ['mail-ready-1', 'available-1']);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
-  assert.deepEqual(payload.mailStats, { sentToday: 4, bounces: 29, hardBounces: 11, totalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' });
-  assert.deepEqual(payload.mailRoi, { dealCount: 2 });
+  assert.deepEqual(payload.mailStats, { sentToday: 4, bounces: 29, hardBounces: 11, bounceStatsReliable: true, bounceStatsModel: 'complete-mailbox-recipient-v2', bounceStatsUpdatedAt: '2026-07-10T12:00:00.000Z', bounceStatsStale: false, totalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' });
+  assert.deepEqual(payload.mailRoi, { dealCount: 2, appointmentCount: 0 });
   assert.deepEqual(payload.autopilot, { loaded: true, enabled: false });
   assert.deepEqual(seenReads.map((read) => read.scope), [
     MAIL_READY_BOOTSTRAP_CACHE_SCOPE,

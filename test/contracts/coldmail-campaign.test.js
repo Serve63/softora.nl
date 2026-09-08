@@ -1120,7 +1120,7 @@ test('coldmail live stats never count historical guard backfills as sends from t
         systemTotalSent: 203,
         centralGuardTotalSent: 203,
         webdesignTotalSent: 203,
-        bounceDeduplication: 'recipient-email',
+        bounceDeduplication: 'recipient-email', bounceStatsModel: 'complete-mailbox-recipient-v2',
         updatedAt: '2026-08-17T10:44:11.000Z',
       },
     }),
@@ -1247,7 +1247,7 @@ test('coldmail live stats reconcile a stale durable zero with current-day centra
         totalSent: 1543,
         systemTotalSent: 1543,
         centralGuardTotalSent: 1543,
-        bounceDeduplication: 'recipient-email',
+        bounceDeduplication: 'recipient-email', bounceStatsModel: 'complete-mailbox-recipient-v2',
         updatedAt: '2026-08-04T14:59:00.000Z',
       },
     }),
@@ -1317,7 +1317,8 @@ test('coldmail live stats preserve proven bounces when the targeted mailbox read
   const preserved = await service.getColdmailLiveStats();
   assert.equal(preserved.stats.reliable, true);
   assert.equal(preserved.stats.bounces, 1);
-  assert.equal(preserved.stats.mailboxBounceStatsAvailable, true);
+  assert.equal(preserved.stats.mailboxBounceStatsAvailable, false);
+  assert.equal(preserved.stats.bounceStatsStale, true);
 });
 
 test('coldmail live stats ignore the legacy message-count bounce cache', async () => {

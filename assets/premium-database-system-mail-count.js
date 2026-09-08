@@ -1,6 +1,7 @@
 (function () {
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
+    const ROI_APPOINTMENTS_KEY = "premium_database_mail_appointments_v1";
     const COLDMAIL_STATS_URL = "/api/coldmailing/stats";
     const TODAY_SENT_REFRESH_MS = 60000;
     let roiControlsBound = false;
@@ -9,6 +10,9 @@
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
     let lastHardBouncesCount = null;
+    let lastBounceObservationMs = 0;
+    let roiAppointmentsCount = 0;
+    let roiAppointmentsDirty = false;
     let lastStatsMailCount = null;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
@@ -181,16 +185,17 @@
             const mailStats = payload && payload.mailStats && typeof payload.mailStats === "object" ? payload.mailStats : {};
             const roi = payload && payload.mailRoi && typeof payload.mailRoi === "object" ? payload.mailRoi : {};
             const sentToday = readNonNegativeInteger(mailStats.sentToday);
-            const hardBounces = readNonNegativeInteger(mailStats.hardBounces);
+            const hardBounces = readHardBouncesCountFromStats(mailStats);
             const totalSent = readNonNegativeInteger(mailStats.totalSent);
             const dealCount = readNonNegativeInteger(roi.dealCount);
             if (sentToday !== null) lastTodaySentCount = sentToday;
-            if (hardBounces !== null) lastHardBouncesCount = hardBounces;
+            if (hardBounces !== null) { lastHardBouncesCount = hardBounces; lastBounceObservationMs = Date.parse(mailStats.bounceStatsUpdatedAt) || 0; }
             if (totalSent !== null) {
                 lastStatsMailCount = lastStatsMailCount === null ? totalSent : Math.max(lastStatsMailCount, totalSent);
                 lastRenderedMailCount = lastRenderedMailCount === null ? totalSent : Math.max(lastRenderedMailCount, totalSent);
             }
             if (dealCount !== null && !roiDirtySinceLoad) roiDealsCount = dealCount;
+            if (!roiDirtySinceLoad) roiAppointmentsCount = clampDealCount(roi.appointmentCount);
         } catch (_error) {
             /* De live refresh blijft de veilige fallback. */
         }
@@ -252,6 +257,14 @@
                 roiDealsCount = storedCount;
                 renderRoiCalculator(lastRenderedMailCount, lastRenderedMailCount === null);
             }
+            if (!roiAppointmentsDirty) {
+                try {
+                    const raw = values[ROI_APPOINTMENTS_KEY];
+                    const value = typeof raw === "string" ? JSON.parse(raw) : raw;
+                    roiAppointmentsCount = clampDealCount(value && value.appointmentCount);
+                } catch (_) { roiAppointmentsCount = 0; }
+                renderRoiCalculator(lastRenderedMailCount, lastRenderedMailCount === null);
+            }
             return roiDealsCount;
         }).catch(function (error) {
             if (typeof console !== "undefined" && typeof console.error === "function") console.error("Mail ROI laden mislukt:", error);
@@ -263,28 +276,28 @@
     function persistDealCount(options) {
         const persistOptions = options || {};
         const countSnapshot = roiDealsCount;
+        const appointmentSnapshot = roiAppointmentsCount;
         const client = getUiStateClient();
         if (!client) {
             roiNeedsRemoteSync = true;
             return Promise.resolve(null);
         }
         roiNeedsRemoteSync = true;
+        const patch = {};
+        if (roiDirtySinceLoad) patch[ROI_STATE_KEY] = JSON.stringify({ dealCount: countSnapshot, updatedAt: new Date().toISOString() });
+        if (roiAppointmentsDirty) patch[ROI_APPOINTMENTS_KEY] = JSON.stringify({ appointmentCount: appointmentSnapshot, updatedAt: new Date().toISOString() });
         return client.set(ROI_STATE_SCOPE, {
-            patch: {
-                [ROI_STATE_KEY]: JSON.stringify({
-                    dealCount: countSnapshot,
-                    updatedAt: new Date().toISOString()
-                })
-            },
+            patch: patch,
             source: "premium-database-mail-roi",
             actor: "Premium database"
         }, {
             keepalive: persistOptions.keepalive !== false,
             timeoutMs: 10000
         }).then(function (result) {
-            if (countSnapshot === roiDealsCount) {
+            if (countSnapshot === roiDealsCount && appointmentSnapshot === roiAppointmentsCount) {
                 roiNeedsRemoteSync = false;
                 roiDirtySinceLoad = false;
+                roiAppointmentsDirty = false;
             }
             return result;
         }).catch(function (error) {
@@ -303,7 +316,7 @@
     }
 
     function flushPendingRoiSave() {
-        if (roiNeedsRemoteSync || roiDirtySinceLoad) void persistDealCount({ keepalive: true });
+        if (roiNeedsRemoteSync || roiDirtySinceLoad || roiAppointmentsDirty) void persistDealCount({ keepalive: true });
     }
 
     function bindRoiSaveLifecycle() {
@@ -349,6 +362,7 @@
     }
 
     function readHardBouncesCountFromStats(stats) {
+        if (!stats || stats.bounceStatsReliable !== true || stats.bounceStatsModel !== "complete-mailbox-recipient-v2") return null;
         const directFields = ["hardBounces", "totalHardBounces"];
         for (let index = 0; index < directFields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[directFields[index]]);
@@ -395,13 +409,22 @@
             element.textContent = "--";
             return;
         }
-        // Harde bounces zijn een cumulatieve teller. Een tijdelijke lege/partiele
-        // backend-read mag een al bewezen totaal nooit zichtbaar verlagen.
-        const stableCount = lastHardBouncesCount === null
-            ? count
-            : Math.max(lastHardBouncesCount, count);
-        lastHardBouncesCount = stableCount;
-        element.textContent = stableCount.toLocaleString("nl-NL");
+        lastHardBouncesCount = count;
+        element.textContent = count.toLocaleString("nl-NL");
+    }
+
+    function applyLiveBounceStats(stats) {
+        const count = readHardBouncesCountFromStats(stats);
+        const observedAt = Date.parse(stats.bounceStatsUpdatedAt) || 0;
+        const isCurrent = count !== null && observedAt >= lastBounceObservationMs;
+        if (isCurrent) {
+            lastBounceObservationMs = observedAt;
+            renderHardBouncesCount(count, false);
+        }
+        const element = getRootDocument() && getRootDocument().getElementById("systemMailBouncesTodayCount");
+        if (element) element.title = !isCurrent || stats.bounceStatsStale === true
+            ? "Laatste gecontroleerde telling; de bron wordt opnieuw opgehaald."
+            : "Unieke ontvangers met een bevestigde harde bounce, over de volledige mailboxhistorie.";
     }
 
     function renderSystemMailCount(value, isLoading) {
@@ -451,10 +474,9 @@
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
             const sentToday = readTodaySentCountFromStats(stats);
-            const hardBounces = readHardBouncesCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
-            renderHardBouncesCount(hardBounces, false);
+            applyLiveBounceStats(stats);
             if (systemMailCount !== null) {
                 lastStatsMailCount = lastStatsMailCount === null
                     ? systemMailCount
@@ -501,6 +523,11 @@
         if (!rootDocument) return;
         const dealsElement = rootDocument.getElementById("mailRoiDealsCount");
         const ratioElement = rootDocument.getElementById("mailRoiRatio");
+        const appointmentsElement = rootDocument.getElementById("mailRoiAppointmentsCount");
+        const appointmentRatioElement = rootDocument.getElementById("mailRoiAppointmentRatio");
+        if (appointmentsElement) appointmentsElement.textContent = roiAppointmentsCount.toLocaleString("nl-NL");
+        if (appointmentRatioElement) appointmentRatioElement.textContent = isLoading || !mailCount || roiAppointmentsCount <= 0
+            ? "—" : "1 op " + Math.round(mailCount / roiAppointmentsCount).toLocaleString("nl-NL");
         const deals = loadDealCount();
         if (dealsElement) dealsElement.textContent = deals.toLocaleString("nl-NL");
         if (!ratioElement) return;
@@ -521,7 +548,12 @@
         if (!buttons.length) return;
         buttons.forEach(function (button) {
             button.addEventListener("click", function () {
-                saveDealCount(loadDealCount() + Number(button.getAttribute("data-mail-roi-action") || 0));
+                const delta = Number(button.getAttribute("data-mail-roi-action") || 0);
+                if (button.getAttribute("data-mail-roi-metric") === "appointments") {
+                    roiAppointmentsCount = clampDealCount(roiAppointmentsCount + delta);
+                    roiAppointmentsDirty = true;
+                    void persistDealCount();
+                } else saveDealCount(loadDealCount() + delta);
                 renderRoiCalculator(lastRenderedMailCount, lastRenderedMailCount === null);
             });
         });
