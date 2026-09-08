@@ -121,10 +121,34 @@ test('generation marker round trips through the existing job table without image
   }; } };
   const store = createSoftoraDataOpsStore({ isSupabaseConfigured: () => true, getSupabaseClient: () => client });
   const result = await store.upsertWebdesignJob({ id: jobId, ownerKey: 'owner', customer: { id: 'test-customer' },
+    generation: { model: 'gpt-image-2.5-sunburst', quality: 'max', size: '1024x1536',
+      usage: { input_tokens: 1, output_tokens: 5488, input_tokens_details: { text_tokens: 1, image_tokens: 0 } } },
     generationAttempted: true, processingTimedOut: true, image, status: 'running', variant: 'v2-visual-dna',
   });
   assert.equal(result.ok, true);
   assert.equal(stored.payload.generationAttempted, true);
   assert.doesNotMatch(JSON.stringify(stored), /iVBORw0|processingTimedOut/);
-  assert.equal((await store.getWebdesignJob(jobId)).generationAttempted, true);
+  const restored = await store.getWebdesignJob(jobId);
+  assert.equal(restored.generationAttempted, true);
+  assert.equal(restored.generation.model, 'gpt-image-2.5-sunburst');
+  assert.equal(restored.generation.cost.amountUsd, 0.164645);
+});
+
+test('completed job exposes the measured cost and stores the same provenance with the photo', async () => {
+  let storedPhoto;
+  const generation = { image, model: 'gpt-image-2.5-sunburst', quality: 'max', size: '1024x1536',
+    usage: { input_tokens: 3000, output_tokens: 5488, input_tokens_details: { text_tokens: 1000, image_tokens: 2000 } } };
+  const f = fixture({
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => generation },
+    dataOpsStore: {
+      upsertWebdesignJob: async () => ({ ok: true }),
+      uploadDesignPhoto: async (photo) => { storedPhoto = photo; return { ok: true }; },
+    },
+  });
+  await start(f.coordinator);
+  const res = await poll(f.coordinator);
+  assert.equal(res.body.job.status, 'done');
+  assert.equal(res.body.job.generation.cost.amountUsd, 0.18564);
+  assert.equal(res.body.job.generation.quality, 'max');
+  assert.deepEqual(storedPhoto.legacyMeta.generation, res.body.job.generation);
 });

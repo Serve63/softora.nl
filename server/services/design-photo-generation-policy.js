@@ -13,6 +13,7 @@ function buildWebdesignGenerationProvenance(job = {}) {
     generationPolicy: WEBDESIGN_GENERATION_POLICY,
     generationJobId: String(job.id || '').trim(),
     generationVariant: normalizeWebdesignVariant(job.variant),
+    ...(job.generation ? { generation: job.generation } : {}),
   };
 }
 

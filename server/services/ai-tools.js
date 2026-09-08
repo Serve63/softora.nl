@@ -182,6 +182,8 @@ function createAiToolsCoordinator(deps = {}) {
         fileName: generated.fileName,
       },
       model: generated.model,
+      quality: generated.quality,
+      size: generated.size,
       revisedPrompt: generated.revisedPrompt || '',
       usage: generated.usage,
       openAiEnabled: true,
