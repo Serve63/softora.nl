@@ -1,3 +1,4 @@
+const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
 const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
@@ -564,7 +565,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const BULK_WORKER_CONCURRENCY = Math.max(1, Math.min(PROCESSING_CONCURRENCY, Math.floor(Number(bulkWorkerConcurrency) || 2)));
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
-  const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
   let activeProcessingCount = 0;
   let processingWakeTimer = null;
   let processingWakeAt = 0;
@@ -1222,32 +1222,15 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     // irreversible boundary so an expired job can never reach a paid provider.
     if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
 
-    if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
-      throw new Error('Websitegenerator is niet beschikbaar.');
-    }
-
-    const variant = normalizeWebdesignVariant(job.variant);
-    const usesHomepageScreenshot = variant === WEBDESIGN_VARIANT_V2;
-    const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
-      allowScanFallback: true,
-      imageSize: DATABASE_PHOTO_IMAGE_SIZE,
-      disableReferenceImages: !usesHomepageScreenshot,
-      referenceImageMode: usesHomepageScreenshot ? 'homepage-screenshot' : 'prompt-only',
-      requireReferenceImages: usesHomepageScreenshot,
-      body: {
-        source: 'premium-database',
-        action: 'webdesign',
-        variant,
-        company: job.customer.bedrijf,
-        domain: job.customer.dom,
+    await deliverWebdesignImage(job, {
+      aiToolsCoordinator, persistJob, requiresPersistentJobStorage, persistGeneratedPhoto, logger,
+      storageRetrySleep: deps.storageRetrySleep,
+      assertActive: () => {
+        if (job.processingTimedOut) throw createWebdesignDeliveryInterruptedError();
+        if (job.cancelled === true) throw createCancelledWebdesignJobError();
+        if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
       },
     });
-
-    if (job.cancelled === true || (job.status === 'error' && job.error === WEBDESIGN_JOB_CANCELLED_ERROR)) {
-      throw createCancelledWebdesignJobError();
-    }
-
-    await persistGeneratedPhoto(job, payload && payload.image);
     if (
       mailReadySnapshotService &&
       typeof mailReadySnapshotService.markCustomersMailReadyAfterAssetUpsert === 'function'
@@ -1274,6 +1257,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function withJobProcessTimeout(job, promise) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        job.processingTimedOut = true;
+        if (job.generationAttempted) return reject(createWebdesignDeliveryInterruptedError());
         const error = new Error(`Webdesign maken duurde te lang (${Math.round(JOB_PROCESS_TIMEOUT_MS / 1000)}s). Probeer het opnieuw.`);
         error.status = 504;
         error.retryableOpenAiImage = true;
@@ -1322,7 +1307,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         await persistJob(job);
         return job;
       }
-      if (isRetryableWebdesignError(error)) {
+      if (!job.generationAttempted && !error?.noAutomaticWebdesignRetry && isRetryableWebdesignError(error)) {
         const retry = getRetryState(job);
         const failedAttemptCount = retry.attempts + 1;
         if (failedAttemptCount < MAX_RETRY_ATTEMPTS) {
