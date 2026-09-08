@@ -22,7 +22,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     getClientIpFromRequest = () => '',
     getRequestPathname = () => '/',
     getRequestOriginFromHeaders = () => '',
-    premiumLoginUsersReadTimeoutMs = 450,
+    premiumLoginUsersReadTimeoutMs = 3500,
   } = deps;
 
   function getRequestUserAgent(req) {
@@ -72,7 +72,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   function getLoginUsersReadTimeoutMs() {
-    return Math.max(250, Math.min(900, Number(premiumLoginUsersReadTimeoutMs) || 450));
+    return Math.max(250, Math.min(3500, Number(premiumLoginUsersReadTimeoutMs) || 3500));
   }
 
   function getAuthoritativeRevision(value) {
@@ -84,14 +84,17 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   async function loadUsersForLogin() {
     const hydrated = await premiumUsersStore.ensureUsersHydrated({
       force: true,
+      requireFresh: true,
       readTimeoutMs: getLoginUsersReadTimeoutMs(),
-      allowBootstrapFallback: true,
     });
-    const hydratedUsers = Array.isArray(hydrated?.users) ? hydrated.users : [];
-    const cachedUsers = premiumUsersStore.getCachedUsers();
+    // A new session must use the persisted identity and authVersion. Bootstrap
+    // or stale cached users can produce a successful login revoked by the next server.
+    const hydratedUsers = hydrated?.source === 'supabase' && Array.isArray(hydrated.users)
+      ? hydrated.users
+      : [];
     return {
       hydrated,
-      users: hydratedUsers.length > 0 ? hydratedUsers : cachedUsers,
+      users: hydratedUsers,
       revision: getAuthoritativeRevision(hydrated?.revision),
     };
   }
@@ -211,7 +214,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     const { hydrated, users, revision } = await loadUsersForLogin();
 
     if (users.length === 0) {
-      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
+      const isTemporaryUserStoreFailure = hydrated?.source !== 'supabase';
       appendAuditEvent(
         req,
         {

@@ -315,8 +315,8 @@ test('premium auth login returns 503 when auth is not fully configured', async (
   assert.equal(auditEvents[0].reason, 'security_login_rejected');
 });
 
-test('premium auth login accepts bootstrap-backed users when supabase hydration falls back', async () => {
-  const { coordinator } = createFixture({
+test('premium auth login rejects bootstrap fallback without issuing a session', async () => {
+  const { coordinator, cookieSets, tokenCalls } = createFixture({
     hydrationSource: 'bootstrap_env',
   });
   const req = createRequest({
@@ -326,9 +326,22 @@ test('premium auth login accepts bootstrap-backed users when supabase hydration 
 
   await coordinator.loginResponse(req, res);
 
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.body.authenticated, true);
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /tijdelijk niet beschikbaar/i);
+  assert.equal(cookieSets.length, 0);
+  assert.equal(tokenCalls.length, 0);
+});
+
+test('premium auth login does not fall back to cached users when fresh hydration fails', async () => {
+  const fixture = createFixture({ hydrationSource: 'unavailable' });
+  const res = createResponseRecorder();
+  await fixture.coordinator.loginResponse(createRequest({
+    body: { email: 'admin@softora.nl', password: 'secret123' },
+  }), res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(fixture.cookieSets.length, 0);
+  assert.equal(fixture.tokenCalls.length, 0);
+  assert.equal(fixture.premiumUsersStore.persistCalls.length, 0);
 });
 
 test('premium agenda app legacy PIN login is permanently disabled', async () => {
@@ -555,8 +568,8 @@ test('premium auth login hydrates users only after cheap guards pass', async () 
   assert.equal(fixture.premiumUsersStore.hydrationCalls.length, 1);
   assert.deepEqual(fixture.premiumUsersStore.hydrationCalls[0], {
     force: true,
-    readTimeoutMs: 450,
-    allowBootstrapFallback: true,
+    requireFresh: true,
+    readTimeoutMs: 3500,
   });
 });
 
