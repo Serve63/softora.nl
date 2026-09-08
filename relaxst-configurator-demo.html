@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/relaxst-configurator-demo.css?v=20260908-3">
-  <script src="/assets/relaxst-configurator-demo.js?v=20260908-3" defer></script>
+  <link rel="stylesheet" href="/assets/relaxst-configurator-demo.css?v=20260908-4">
+  <script src="/assets/relaxst-configurator-demo.js?v=20260908-4" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -33,14 +33,14 @@
 
     <section class="configurator" id="configurator" aria-labelledby="configurator-title">
       <div class="product-stage">
-        <div class="stage-topline"><span>Jouw stoel</span><span id="stage-model-code">Model LI-02</span></div>
+        <div class="stage-topline"><span id="stage-label">Voorbeeldmodel</span><span id="stage-model-code">Model LI-02</span></div>
         <div class="product-caption"><h2 id="selected-model-name">Linea</h2></div>
         <div class="product-visual">
           <img id="chair-image" src="https://www.relaxst.nl/wp-content/uploads/2024/11/Relaxst-1-12.jpg" alt="Voorbeeldfoto van relaxstoel Linea">
         </div>
-        <div class="material-chip" id="material-chip">
-          <span class="material-swatch" id="material-swatch"></span>
-          <span><small>Gekozen bekleding</small><strong id="material-label">Comfortstof · Zand</strong></span>
+        <div class="material-chip" id="material-chip" hidden>
+          <span class="material-swatch" id="material-swatch" hidden></span>
+          <span><small>Gekozen bekleding</small><strong id="material-label"></strong></span>
         </div>
         <div class="selection-tags" id="selection-tags" aria-label="Huidige keuzes"></div>
         <p class="photo-note">Voorbeeldfoto. Bekijk de echte kleur en bekleding in de winkel.</p>
@@ -65,8 +65,8 @@
         <div class="builder-actions">
           <button type="button" class="button-secondary" id="previous-step">Terug</button>
           <div class="compact-total">
-            <span>Totaal incl. btw</span>
-            <strong id="compact-price">€ 2.987</strong>
+            <span>Jouw keuzes incl. btw</span>
+            <strong id="compact-price">—</strong>
           </div>
           <button type="button" class="button-primary" id="next-step">Volgende stap <span aria-hidden="true">→</span></button>
         </div>
@@ -76,7 +76,7 @@
 
   <div class="mobile-bar" aria-label="Mobiele configuratiebediening">
     <button type="button" id="mobile-previous" aria-label="Vorige stap">←</button>
-    <div><span>Totaal incl. btw</span><strong id="mobile-price">€ 2.987</strong></div>
+    <div><span>Jouw keuzes incl. btw</span><strong id="mobile-price">—</strong></div>
     <button type="button" id="mobile-next">Volgende <span aria-hidden="true">→</span></button>
   </div>
 

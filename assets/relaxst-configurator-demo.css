@@ -9,6 +9,7 @@
   --green: #315a45;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--cream); color: var(--ink); font-family: 'DM Sans', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; }
@@ -113,6 +114,8 @@ main { width: min(1280px, calc(100% - 56px)); margin: 0 auto; }
 .button-primary, .button-secondary { min-height: 47px; padding: 12px 17px; border-radius: 9px; border: 1px solid var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; text-align: center; }
 .button-primary { background: var(--ink); color: #fff; }
 .button-primary:hover { background: #48403a; }
+.button-primary:disabled, .mobile-bar button:disabled { opacity: .4; cursor: not-allowed; }
+.steps button:disabled { cursor: not-allowed; }
 .button-secondary { border-color: #d9d3cb; background: white; color: var(--ink); }
 .button-secondary:disabled { visibility: hidden; }
 .compact-total { margin-left: auto; }

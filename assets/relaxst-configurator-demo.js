@@ -55,32 +55,46 @@
 
   const state = {
     step: 1,
-    model: 'linea',
-    upholstery: 'stof',
-    color: 'zand',
-    size: 'M',
-    mechanism: '2motor',
-    extras: new Set(['accu']),
+    model: null,
+    upholstery: null,
+    color: null,
+    size: null,
+    mechanism: null,
+    extras: new Set(),
   };
 
   const choices = { model: MODELS, upholstery: UPHOLSTERY, color: COLORS, size: SIZES, mechanism: MECHANISMS };
+  const requiredChoices = [['model'], ['upholstery', 'color'], ['size'], ['mechanism']];
+  function isStepComplete(step) {
+    return (requiredChoices[step - 1] || []).every((key) => state[key] !== null);
+  }
+  function firstIncompleteStep() {
+    const index = requiredChoices.findIndex((_, index) => !isStepComplete(index + 1));
+    return index === -1 ? 5 : index + 1;
+  }
   try {
     const saved = JSON.parse(new URLSearchParams(window.location.search).get('config'));
-    if (saved && typeof saved === 'object') {
-      Object.entries(choices).forEach(([key, options]) => {
-        if (typeof saved[key] === 'string' && Object.hasOwn(options, saved[key])) state[key] = saved[key];
-      });
-      if (Array.isArray(saved.extras)) {
+    // Earlier links included automatic defaults, so they cannot prove a user's choices.
+    if (saved && saved.version === 2) {
+      for (const [index, keys] of requiredChoices.entries()) {
+        if (index > 0 && !isStepComplete(index)) break;
+        keys.forEach((key) => {
+          if (typeof saved[key] === 'string' && Object.hasOwn(choices[key], saved[key])) state[key] = saved[key];
+        });
+      }
+      if (firstIncompleteStep() >= 4 && Array.isArray(saved.extras)) {
         state.extras = new Set(saved.extras.filter((id) => typeof id === 'string' && Object.hasOwn(EXTRAS, id)));
       }
+      state.step = Number.isInteger(saved.step)
+        ? Math.min(firstIncompleteStep(), Math.max(1, saved.step)) : firstIncompleteStep();
     }
-  } catch { /* An invalid configuration link falls back to the demo defaults. */ }
+  } catch { /* An invalid configuration link starts with no selected options. */ }
 
   function saveConfiguration() {
     try {
       const url = new URL(window.location.href);
-      const selected = Object.fromEntries(Object.keys(choices).map((key) => [key, state[key]]));
-      url.searchParams.set('config', JSON.stringify({ ...selected, extras: [...state.extras] }));
+      const selected = Object.fromEntries(Object.keys(choices).filter((key) => state[key] !== null).map((key) => [key, state[key]]));
+      url.searchParams.set('config', JSON.stringify({ version: 2, step: state.step, ...selected, extras: [...state.extras] }));
       window.history.replaceState(null, '', url);
     } catch { /* Downloading remains available if this browser cannot update the URL. */ }
   }
@@ -95,6 +109,7 @@
     chairImage: document.querySelector('#chair-image'),
     modelName: document.querySelector('#selected-model-name'),
     modelCode: document.querySelector('#stage-model-code'),
+    stageLabel: document.querySelector('#stage-label'),
     materialLabel: document.querySelector('#material-label'),
     materialSwatch: document.querySelector('#material-swatch'),
     materialChip: document.querySelector('#material-chip'),
@@ -116,11 +131,7 @@
 
   function totalPrice() {
     const extrasTotal = [...state.extras].reduce((sum, id) => sum + EXTRAS[id].price, 0);
-    return MODELS[state.model].price
-      + UPHOLSTERY[state.upholstery].price
-      + SIZES[state.size].price
-      + MECHANISMS[state.mechanism].price
-      + extrasTotal;
+    return Object.entries(choices).reduce((total, [key, options]) => total + (options[state[key]]?.price || 0), extrasTotal);
   }
 
   function radioCard({ group, value, selected, title, note, price, image = '', className = '' }) {
@@ -237,36 +248,41 @@
           choice.closest('label').classList.toggle('is-selected', choice.checked);
         });
         updateProductStage();
+        updateNavigation();
         saveConfiguration();
       });
     });
   }
 
   function updateProductStage() {
-    const model = MODELS[state.model];
+    const model = MODELS[state.model] || MODELS.linea;
     const color = COLORS[state.color];
+    const upholstery = UPHOLSTERY[state.upholstery];
     if (elements.chairImage.src !== model.image) {
       elements.chairImage.src = model.image;
     }
     elements.chairImage.alt = `Voorbeeldfoto van relaxstoel ${model.name}`;
     elements.modelName.textContent = model.name;
     elements.modelCode.textContent = `Model ${model.code}`;
-    elements.materialLabel.textContent = `${UPHOLSTERY[state.upholstery].name} · ${color.name}`;
-    elements.materialSwatch.style.background = color.hex;
-    elements.prices.forEach((item) => { item.textContent = formatPrice(totalPrice()); });
+    elements.stageLabel.textContent = state.model ? 'Jouw stoel' : 'Voorbeeldmodel';
+    elements.materialChip.hidden = !upholstery && !color;
+    elements.materialLabel.textContent = [upholstery?.name, color?.name].filter(Boolean).join(' · ');
+    elements.materialSwatch.hidden = !color;
+    elements.materialSwatch.style.background = color?.hex || '';
+    elements.prices.forEach((item) => { item.textContent = state.model ? formatPrice(totalPrice()) : '—'; });
     elements.tags.innerHTML = [
-      `Maat ${state.size}`,
-      MECHANISMS[state.mechanism].name,
+      state.size && `Maat ${state.size}`,
+      MECHANISMS[state.mechanism]?.name,
       ...[...state.extras].map((id) => EXTRAS[id].name),
-    ].map((label) => `<span>${label}</span>`).join('');
+    ].filter(Boolean).map((label) => `<span>${label}</span>`).join('');
+    elements.tags.hidden = !elements.tags.innerHTML;
   }
 
-  function render() {
-    const renderers = [renderModelStep, renderUpholsteryStep, renderSizeStep, renderComfortStep, renderSummaryStep];
-    elements.content.innerHTML = renderers[state.step - 1]();
-    elements.currentStep.textContent = state.step;
+  function updateNavigation() {
     elements.previous.disabled = state.step === 1;
     elements.mobilePrevious.disabled = state.step === 1;
+    elements.next.disabled = !isStepComplete(state.step);
+    elements.mobileNext.disabled = elements.next.disabled;
     elements.next.innerHTML = state.step === 5
       ? 'Bekijk resultaat <span aria-hidden="true">→</span>'
       : 'Volgende stap <span aria-hidden="true">→</span>';
@@ -276,16 +292,25 @@
     document.querySelectorAll('[data-step-target]').forEach((button) => {
       const target = Number(button.dataset.stepTarget);
       button.classList.toggle('is-active', target === state.step);
-      button.classList.toggle('is-complete', target < state.step);
+      button.classList.toggle('is-complete', target < state.step && isStepComplete(target));
       button.setAttribute('aria-current', target === state.step ? 'step' : 'false');
+      button.disabled = target > firstIncompleteStep();
     });
+  }
+
+  function render() {
+    const renderers = [renderModelStep, renderUpholsteryStep, renderSizeStep, renderComfortStep, renderSummaryStep];
+    elements.content.innerHTML = renderers[state.step - 1]();
+    elements.currentStep.textContent = state.step;
+    updateNavigation();
     bindStepInputs();
     updateProductStage();
   }
 
   function goToStep(step) {
-    state.step = Math.min(5, Math.max(1, step));
+    state.step = Math.min(firstIncompleteStep(), Math.max(1, step));
     render();
+    saveConfiguration();
     const heading = elements.content.querySelector('h3');
     heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
@@ -296,6 +321,7 @@
   }
 
   function completeConfiguration() {
+    if (firstIncompleteStep() !== 5) return;
     elements.dialogSummary.innerHTML = `<div class="summary-card">${summaryRows()}</div>`;
     const overview = [
       'Relaxst - jouw samenstelling (conceptdemo)', '',
@@ -316,6 +342,7 @@
   }
 
   function advance() {
+    if (!isStepComplete(state.step)) return;
     if (state.step === 5) completeConfiguration();
     else goToStep(state.step + 1);
   }

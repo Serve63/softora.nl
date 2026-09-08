@@ -10,8 +10,8 @@ const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-3"/);
-  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-3"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-4"/);
+  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-4"/);
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
   assert.match(html, /Interactieve conceptdemo/);
@@ -43,7 +43,7 @@ test('Relaxst demo includes responsive and accessible interaction states', () =>
   assert.match(css, /\.builder-actions[\s\S]*?position: sticky/);
   assert.match(css, /\.option-card\.is-selected/);
   assert.doesNotMatch(html, /hero-number|visual-orbit|id="stage-price"/);
-  assert.match(html, /Totaal incl\. btw/);
+  assert.match(html, /Jouw keuzes incl\. btw/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /:focus-visible/);
   assert.match(html, /aria-live="polite"/);
@@ -62,7 +62,7 @@ function demoHarness(saved = null, historyBlocked = false) {
       if (!nodes.has(selector)) nodes.set(selector, element());
       return nodes.get(selector);
     },
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) { return selector === '[data-step-target]' ? stepButtons : []; },
   };
   function element() {
     const listeners = {};
@@ -89,6 +89,7 @@ function demoHarness(saved = null, historyBlocked = false) {
       get innerHTML() { return this.html; },
     };
   }
+  const stepButtons = Array.from({ length: 5 }, (_, i) => Object.assign(element(), { dataset: { stepTarget: String(i + 1) } }));
   const location = new URL('https://demo.example/relaxst-configurator-demo');
   if (saved !== null) location.searchParams.set('config', saved);
   const window = {
@@ -108,12 +109,74 @@ function demoHarness(saved = null, historyBlocked = false) {
     input.listeners.change();
   }
   const click = (selector) => node(selector).listeners.click();
-  return { node, choose, click, location };
+  const step = (number) => stepButtons[number - 1].listeners.click();
+  return { node, choose, click, step, stepButtons, location };
 }
 
-test('Relaxst computes selected prices, subtracts unchecked extras and exports exactly the chosen configuration', () => {
+function finishChoices(demo, next = '#next-step') {
+  demo.choose('model', 'linea');
+  demo.click(next);
+  demo.choose('upholstery', 'stof');
+  demo.choose('color', 'zand');
+  demo.click(next);
+  demo.choose('size', 'M');
+  demo.click(next);
+  demo.choose('mechanism', 'handmatig');
+  demo.click(next);
+}
+
+test('Relaxst starts without implied choices or costs and adds only deliberate selections', () => {
   const demo = demoHarness();
-  assert.match(demo.node('#compact-price').textContent, /2\.987/);
+  assert.equal(demo.node('#compact-price').textContent, '—');
+  assert.equal(demo.node('#mobile-price').textContent, '—');
+  assert.equal(demo.node('#stage-label').textContent, 'Voorbeeldmodel');
+  assert.equal(demo.node('#material-chip').hidden, true);
+  assert.equal(demo.node('#selection-tags').hidden, true);
+  assert.doesNotMatch(demo.node('#step-content').innerHTML, / checked/);
+  assert.equal(demo.node('#next-step').disabled, true);
+  demo.click('#next-step');
+  demo.click('#mobile-next');
+  demo.step(5);
+  assert.equal(demo.node('#current-step-number').textContent, 1);
+  assert.equal(demo.node('#success-dialog').open, undefined);
+  assert.equal(demo.stepButtons[4].disabled, true);
+
+  demo.choose('model', 'comfora');
+  assert.match(demo.node('#compact-price').textContent, /2\.295/);
+  assert.equal(demo.node('#stage-label').textContent, 'Jouw stoel');
+  assert.equal(demo.node('#selection-tags').innerHTML, '');
+  assert.equal(demo.node('#material-chip').hidden, true);
+  demo.click('#next-step');
+  assert.doesNotMatch(demo.node('#step-content').innerHTML, / checked/);
+  demo.choose('upholstery', 'microleder');
+  assert.equal(demo.node('#material-label').textContent, 'Microleder');
+  assert.equal(demo.node('#material-swatch').hidden, true);
+  assert.match(demo.node('#compact-price').textContent, /2\.590/);
+  assert.equal(demo.node('#next-step').disabled, true);
+  demo.click('#next-step');
+  assert.equal(demo.node('#current-step-number').textContent, 2);
+  demo.choose('color', 'antraciet');
+  assert.equal(demo.node('#material-label').textContent, 'Microleder · Antraciet');
+  demo.click('#next-step');
+  assert.equal(demo.node('#selection-tags').innerHTML, '');
+  assert.doesNotMatch(demo.node('#step-content').innerHTML, / checked/);
+  demo.choose('size', 'S');
+  assert.equal(demo.node('#selection-tags').innerHTML, '<span>Maat S</span>');
+  demo.click('#next-step');
+  assert.doesNotMatch(demo.node('#step-content').innerHTML, / checked/);
+  demo.choose('mechanism', '2motor');
+  assert.match(demo.node('#compact-price').textContent, /2\.985/);
+  assert.doesNotMatch(demo.node('#selection-tags').innerHTML, /Draadloze accu/);
+  demo.choose('extra', 'accu');
+  assert.match(demo.node('#compact-price').textContent, /3\.234/);
+  assert.match(demo.node('#selection-tags').innerHTML, /Draadloze accu/);
+  demo.choose('extra', 'accu', false);
+  assert.match(demo.node('#compact-price').textContent, /2\.985/);
+  assert.doesNotMatch(demo.node('#selection-tags').innerHTML, /Draadloze accu/);
+});
+
+test('Relaxst computes and exports exactly the explicitly chosen configuration', () => {
+  const demo = demoHarness();
   demo.choose('model', 'zeus');
   demo.click('#next-step');
   demo.choose('upholstery', 'leer');
@@ -122,7 +185,7 @@ test('Relaxst computes selected prices, subtracts unchecked extras and exports e
   demo.choose('size', 'L');
   demo.click('#next-step');
   demo.choose('mechanism', '5motor');
-  for (const extra of ['topswing', 'lendenpomp', 'verwarming']) demo.choose('extra', extra);
+  for (const extra of ['accu', 'topswing', 'lendenpomp', 'verwarming']) demo.choose('extra', extra);
   assert.match(demo.node('#compact-price').textContent, /5\.752/);
   demo.choose('extra', 'accu', false);
   assert.match(demo.node('#compact-price').textContent, /5\.503/);
@@ -145,49 +208,78 @@ test('Relaxst keeps the latest model image when switching rapidly back to the in
   assert.equal(demo.node('#selected-model-name').textContent, 'Linea');
   assert.match(demo.node('#chair-image').src, /2024\/11\/Relaxst-1-12\.jpg$/);
   assert.match(demo.node('#chair-image').alt, /Linea/);
+  assert.match(demo.node('#compact-price').textContent, /2\.343/);
 });
 
-test('Relaxst restores only valid choices from its URL and works with corrupt data or blocked history', () => {
-  const demo = demoHarness(JSON.stringify({ model: 'zeus', upholstery: '__proto__', color: 'invalid', size: 'L', extras: ['accu', 'accu', 'invalid'] }));
-  assert.equal(demo.node('#selected-model-name').textContent, 'Zeus');
-  assert.match(demo.node('#compact-price').textContent, /3\.934/);
-  const restored = demoHarness(JSON.stringify({ model: 'comfora', mechanism: 'handmatig', extras: [] }));
-  assert.match(restored.node('#compact-price').textContent, /2\.295/);
-  assert.match(demoHarness('{').node('#compact-price').textContent, /2\.987/);
+test('Relaxst ignores legacy defaults and sanitizes incomplete saved choices without skipping steps', () => {
+  const legacy = demoHarness(JSON.stringify({ model: 'comfora', size: 'S', mechanism: '2motor', extras: ['accu'] }));
+  assert.equal(legacy.node('#compact-price').textContent, '—');
+  assert.equal(legacy.node('#selection-tags').innerHTML, '');
+  const corrupt = demoHarness(JSON.stringify({ version: 2, step: 5, model: 'zeus', upholstery: '__proto__', color: 'invalid', size: 'L', extras: ['accu'] }));
+  assert.match(corrupt.node('#compact-price').textContent, /3\.195/);
+  assert.equal(corrupt.node('#current-step-number').textContent, 2);
+  assert.equal(corrupt.node('#selection-tags').innerHTML, '');
+  assert.equal(demoHarness('{').node('#compact-price').textContent, '—');
   const blocked = demoHarness(null, true);
-  blocked.choose('model', 'comfora');
-  assert.match(blocked.node('#compact-price').textContent, /2\.939/);
-  demo.choose('model', 'linea');
-  const reloaded = demoHarness(demo.location.searchParams.get('config'));
-  assert.equal(reloaded.node('#selected-model-name').textContent, 'Linea');
-  assert.match(reloaded.node('#compact-price').textContent, /3\.082/);
+  finishChoices(blocked);
+  blocked.click('#next-step');
+  assert.equal(blocked.node('#success-dialog').open, true);
 });
 
-test('Relaxst mobile navigation reaches the result and back without losing selections', () => {
+test('Relaxst resumes partial choices and the current step without filling future choices', () => {
+  const demo = demoHarness();
+  demo.choose('model', 'comfora');
+  demo.click('#next-step');
+  demo.choose('color', 'antraciet');
+  const saved = JSON.parse(demo.location.searchParams.get('config'));
+  assert.equal(saved.version, 2);
+  assert.equal(saved.step, 2);
+  assert.equal(saved.size, undefined);
+  assert.equal(saved.mechanism, undefined);
+  assert.equal(saved.upholstery, undefined);
+  assert.deepEqual(saved.extras, []);
+  const restored = demoHarness(JSON.stringify(saved));
+  assert.equal(restored.node('#current-step-number').textContent, 2);
+  assert.equal(restored.node('#material-label').textContent, 'Antraciet');
+  assert.equal(restored.node('#selection-tags').innerHTML, '');
+  assert.match(restored.node('#compact-price').textContent, /2\.295/);
+  assert.equal(restored.node('#next-step').disabled, true);
+  restored.choose('upholstery', 'microleder');
+  restored.click('#next-step');
+  assert.equal(restored.node('#current-step-number').textContent, 3);
+  assert.equal(restored.node('#next-step').disabled, true);
+});
+
+test('Relaxst mobile navigation preserves explicit choices and allows a result without optional extras', () => {
   const demo = demoHarness();
   assert.equal(demo.node('#mobile-previous').disabled, true);
-  demo.click('#mobile-next');
-  demo.choose('upholstery', 'microleder');
+  assert.equal(demo.node('#mobile-next').disabled, true);
+  finishChoices(demo, '#mobile-next');
   demo.click('#mobile-previous');
-  assert.equal(demo.node('#current-step-number').textContent, 1);
-  assert.match(demo.node('#compact-price').textContent, /3\.282/);
-  for (let step = 1; step < 5; step++) demo.click('#mobile-next');
+  assert.equal(demo.node('#current-step-number').textContent, 4);
+  assert.match(demo.node('#selection-tags').innerHTML, /Maat M/);
+  assert.doesNotMatch(demo.node('#selection-tags').innerHTML, /Draadloze accu/);
+  demo.click('#mobile-next');
   assert.match(demo.node('#mobile-next').innerHTML, /Bekijk resultaat/);
   demo.click('#mobile-next');
   assert.equal(demo.node('#success-dialog').open, true);
-  assert.match(demo.node('#dialog-summary').innerHTML, /Microleder/);
+  assert.match(demo.node('#dialog-summary').innerHTML, /Geen extra functies/);
+  assert.match(demo.node('#mobile-price').textContent, /2\.343/);
+  const reloaded = demoHarness(demo.location.searchParams.get('config'));
+  assert.equal(reloaded.node('#current-step-number').textContent, 5);
+  assert.match(reloaded.node('#step-content').innerHTML, /Handmatig/);
 });
 
 test('Relaxst result stays open when clicking its own padding and closes on the backdrop', () => {
   const demo = demoHarness();
-  for (let step = 1; step <= 5; step++) demo.click('#next-step');
+  finishChoices(demo);
+  demo.click('#next-step');
   const dialog = demo.node('#success-dialog');
   dialog.listeners.click({ target: dialog, clientX: 20, clientY: 20 });
   assert.equal(dialog.open, true);
   dialog.listeners.click({ target: dialog, clientX: 450, clientY: 20 });
   assert.equal(dialog.open, false);
 });
-
 
 test('Relaxst preview contains only its static assets and no server compute', () => {
   const os = require('node:os');
