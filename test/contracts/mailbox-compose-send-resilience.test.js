@@ -1235,6 +1235,178 @@ test('twee tabbladen delen de volledige Web Lock-flow en starten extern maar é�
   assert.equal(sendCalls, 1);
 });
 
+test('temporary pre-dispatch recovery keeps the cross-tab lock, reconciles failure and reuploads cleaned attachments', async () => {
+  const storage = new MemoryStorage(), locks = createLockManager();
+  const failedKeys = new Set(), sentPayloads = [], preflights = [], uploads = [];
+  let accepted = false, providerEffects = 0, recoveries = 0;
+  let releaseRecovery, recoveryStarted;
+  const gate = new Promise((resolve) => { releaseRecovery = resolve; });
+  const started = new Promise((resolve) => { recoveryStarted = resolve; });
+  const attachments = [createProductionAttachment('ontwerp.png', 'image/png', 4)];
+  const fetch = async (url, request) => {
+    const payload = parseRequest(request);
+    if (url.endsWith('/preflight')) {
+      const status = accepted ? 'accepted' : failedKeys.has(payload.idempotencyKey) ? 'failed' : 'ready';
+      preflights.push(status);
+      return response(200, { ok: true, result: preflightResult(payload, status) });
+    }
+    sentPayloads.push(payload);
+    if (sentPayloads.length === 1) {
+      failedKeys.add(payload.idempotencyKey);
+      return response(503, { ok: false, code: 'MAILBOX_SEND_TEMPORARY', retryable: true,
+        externalEffect: false, failurePhase: 'pre-dispatch' });
+    }
+    providerEffects += 1;
+    accepted = true;
+    return response(200, { ok: true, result: acceptedSendResult('recovered-once') });
+  };
+  const uploadAttachments = async (selected) => {
+    const staged = selected.map((file) => ({
+      reference: `upload-${uploads.length + 1}`, filename: file.filename, contentType: file.contentType,
+      size: file.size, sha256: file.sha256, referenceVersion: 2, expiresAt: 1_801_000,
+    }));
+    uploads.push(staged);
+    return staged;
+  };
+  // The live error adapter intentionally differs from the node-only fallback.
+  const previousErrorAdapter = global.SoftoraMailboxError;
+  global.SoftoraMailboxError = require('../../assets/premium-mailbox-error');
+  try {
+    const firstTab = createProtocol({ storage, locks, fetch, now: () => 1_000,
+      sleep: async () => { recoveryStarted(); await gate; } });
+    const secondTab = createProtocol({ storage, locks, fetch, now: () => 1_000 });
+    const payload = basePayload({ cc: 'cc@example.nl', bcc: 'bcc@example.nl' });
+    const first = firstTab.execute({ payload, attachments, uploadAttachments,
+      onRecovery: () => { recoveries += 1; } });
+    await started;
+    const second = secondTab.execute({ payload: { ...payload, idempotencyKey: 'browser:other-tab' },
+      attachments, uploadAttachments });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(sentPayloads.length, 1);
+    assert.equal(providerEffects, 0);
+    releaseRecovery();
+    const results = await Promise.all([first, second]);
+    assert.equal(providerEffects, 1);
+    assert.equal(recoveries, 1);
+    assert.equal(sentPayloads.length, 2);
+    assert.deepEqual(preflights, ['ready', 'failed', 'ready', 'accepted']);
+    assert.equal(uploads.length, 2, 'failed server attempts clean staging, so the retry must upload again');
+    assert.notEqual(sentPayloads[0].idempotencyKey, sentPayloads[1].idempotencyKey);
+    assert.notEqual(sentPayloads[0].attachments[0].reference, sentPayloads[1].attachments[0].reference);
+    assert.equal(sentPayloads[0].attachments[0].sha256, sentPayloads[1].attachments[0].sha256);
+    for (const key of ['to', 'cc', 'bcc', 'subject', 'body']) {
+      assert.equal(sentPayloads[1][key], payload[key]);
+    }
+    assert.deepEqual(results.map((result) => result.recoveredByPreflight), [false, true]);
+  } finally {
+    releaseRecovery();
+    global.SoftoraMailboxError = previousErrorAdapter;
+  }
+});
+
+test('a persistent proven temporary failure has one automatic recovery and never dispatches', async () => {
+  const failedKeys = new Set();
+  let sendCalls = 0, recoveries = 0;
+  const protocol = createProtocol({ sleep: async () => {}, fetch: async (url, request) => {
+    const payload = parseRequest(request);
+    if (url.endsWith('/preflight')) return response(200, { ok: true,
+      result: preflightResult(payload, failedKeys.has(payload.idempotencyKey) ? 'failed' : 'ready') });
+    sendCalls += 1;
+    failedKeys.add(payload.idempotencyKey);
+    return response(503, { ok: false, code: 'MAILBOX_SEND_TEMPORARY', retryable: true,
+      externalEffect: false, failurePhase: 'pre-dispatch' });
+  } });
+  await assert.rejects(protocol.execute({ payload: basePayload(), attachments: [],
+    onRecovery: () => { recoveries += 1; } }), (error) => error.code === 'MAILBOX_SEND_TEMPORARY');
+  assert.equal(sendCalls, 2);
+  assert.equal(recoveries, 1);
+});
+
+for (const persistent of [false, true]) {
+  test(`controller rejects extra clicks throughout recovery and ${persistent ? 'preserves the failed draft' : 'shows one accepted mail'}`, async () => {
+    const fields = Object.fromEntries(['c-to', 'c-cc', 'c-bcc', 'c-subject', 'c-body'].map((id) => [id, { value: '' }]));
+    const button = { disabled: false, textContent: 'Versturen',
+      setAttribute(name, value) { this[name] = value; }, removeAttribute(name) { delete this[name]; } };
+    const toasts = [], accepted = [], failedKeys = new Set();
+    let sends = 0, releaseRecovery, startedRecovery;
+    const gate = new Promise((resolve) => { releaseRecovery = resolve; });
+    const started = new Promise((resolve) => { startedRecovery = resolve; });
+    const mail = { id: 'inbox:controller', accountEmail: 'serve@softora.nl', email: 'prospect@example.nl',
+      subject: 'Bestaand gesprek', conversationId: 'conversation:controller' };
+    const fetch = async (url, request) => {
+      const payload = parseRequest(request);
+      if (url.endsWith('/preflight')) return response(200, { ok: true,
+        result: preflightResult(payload, failedKeys.has(payload.idempotencyKey) ? 'failed' : 'ready') });
+      sends += 1;
+      if (sends === 1 || persistent) {
+        failedKeys.add(payload.idempotencyKey);
+        return response(503, { ok: false, code: 'MAILBOX_SEND_TEMPORARY', retryable: true,
+          detail: 'Je mail is niet verzonden en je concept blijft staan.',
+          externalEffect: false, failurePhase: 'pre-dispatch' });
+      }
+      return response(200, { ok: true, result: acceptedSendResult('controller-recovery') });
+    };
+    const controller = composeController.create({
+      document: { getElementById: (id) => fields[id] || null,
+        querySelector: (selector) => selector === '.btn-send' ? button : null },
+      sendResilience: createProtocol({ fetch, sleep: async () => { startedRecovery(); await gate; } }),
+      compose: {
+        buildNewMessageContext: () => ({ id: mail.id, accountEmail: mail.accountEmail, to: mail.email,
+          subject: mail.subject, conversationId: mail.conversationId, mode: 'new-message' }),
+        getAttachments: () => [], reset() {}, resetOptionalFields() {}, serializeSendPayload: JSON.stringify,
+      },
+      campaignInbox: { getConversationAction: () => ({ kind: 'new-message', message: mail }),
+        getAccount: () => mail.accountEmail, getOwnerByAccount: () => 'serve',
+        getMessageOwner: () => 'serve', getOwnerLabel: () => 'Servé Creusen' },
+      findMail: () => mail, normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+      getAccount: () => mail.accountEmail, getOwner: () => 'serve', getActiveFolder: () => 'inbox', fetch,
+      onAcceptedSend: (record) => accepted.push(record), toast: (message) => toasts.push(message),
+    });
+    controller.newMessage(mail);
+    fields['c-body'].value = 'Exact bewaard concept.';
+    const sending = controller.send();
+    await started;
+    assert.equal(button.disabled, true);
+    assert.equal(button['aria-busy'], 'true');
+    assert.equal(button.textContent, 'Verzendcontrole herstellen…');
+    await Promise.all([controller.send(), controller.send(), controller.send()]);
+    assert.equal(sends, 1);
+    assert.equal(toasts.length, 0, 'no error toast while automatic recovery is running');
+    releaseRecovery();
+    await sending;
+    assert.equal(sends, 2);
+    assert.equal(accepted.length, persistent ? 0 : 1);
+    assert.equal(button.disabled, false);
+    assert.equal(button.textContent, 'Versturen');
+    assert.equal(toasts.length, 1);
+    if (persistent) assert.equal(fields['c-body'].value, 'Exact bewaard concept.');
+    else assert.match(toasts[0], /Mail verzonden/);
+  });
+}
+
+test('temporary errors without exact pre-dispatch evidence never retry a possible provider effect', async (t) => {
+  for (const variant of [
+    { externalEffect: undefined }, { externalEffect: true }, { failurePhase: 'provider-dispatch' },
+    { result: {} }, { headers: { 'X-Softora-Message-Id': '<possibly-sent@example.nl>' } },
+    { code: 'OUTBOUND_RECIPIENT_SUPPRESSED' }, { retryable: false },
+  ]) {
+    await t.test(JSON.stringify(variant), async () => {
+      let sendCalls = 0, recoveries = 0;
+      const protocol = createProtocol({ sleep: async () => {}, fetch: async (url, request) => {
+        const payload = parseRequest(request);
+        if (url.endsWith('/preflight')) return response(200, { ok: true, result: preflightResult(payload) });
+        sendCalls += 1;
+        return response(503, { ok: false, code: 'MAILBOX_SEND_TEMPORARY', retryable: true,
+          externalEffect: false, failurePhase: 'pre-dispatch', ...variant }, variant.headers);
+      } });
+      await assert.rejects(protocol.execute({ payload: basePayload(), attachments: [],
+        onRecovery: () => { recoveries += 1; } }));
+      assert.equal(sendCalls, 1);
+      assert.equal(recoveries, 0);
+    });
+  }
+});
+
 test('processing blijft unresolved en start nooit upload of send', async () => {
   const storage = new MemoryStorage();
   let sendOrUploadCalls = 0;

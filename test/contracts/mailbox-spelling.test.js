@@ -253,7 +253,7 @@ test('sluiten tijdens controle blokkeert iedere late bodymutatie', async () => {
   assert.equal(harness.toasts.length, 0);
 });
 
-test('composerfooter plaatst Spellingscontrole en inline undo direct naast Voorgestelde reactie en blijft mobiel bruikbaar', () => {
+test('composerfooter toont alleen Voorgestelde reactie als assistentie en blijft mobiel bruikbaar', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
   const mobileCss = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-mobile.css'), 'utf8');
   const controllerSource = fs.readFileSync(
@@ -261,7 +261,9 @@ test('composerfooter plaatst Spellingscontrole en inline undo direct naast Voorg
     'utf8'
   );
 
-  assert.match(page, /class="compose-assist-actions">\s*<button[^>]+rewrite-compose[^>]*>Voorgestelde reactie<\/button>\s*<button[^>]+spellcheck-compose[^>]*>Spellingscontrole<\/button>\s*<button[^>]+undo-spelling[^>]+hidden[^>]+disabled[^>]*>Ongedaan maken<\/button>/);
+  assert.match(page, /class="compose-assist-actions">\s*<button[^>]+rewrite-compose[^>]*>Voorgestelde reactie<\/button>\s*<\/div>/);
+  assert.doesNotMatch(page, /<button[^>]+(?:spellcheck-compose|undo-spelling)/);
+  assert.match(page, /data-mailbox-action="send-mail"/);
   assert.match(page, /\.btn-rewrite-compose,\s*\.btn-spellcheck-compose \{/);
   assert.match(page, /\.btn-spellcheck-compose:focus-visible/);
   assert.match(mobileCss, /\.compose-assist-actions \{ flex: 1 1 100%; flex-wrap: wrap; \}/);
@@ -273,6 +275,6 @@ test('composerfooter plaatst Spellingscontrole en inline undo direct naast Voorg
   assert.match(controllerSource, /action === 'spellcheck-compose'[\s\S]*void spellcheck\(\)/);
   assert.match(controllerSource, /action === 'undo-spelling'[\s\S]*undoSpelling\(\)/);
   assert.doesNotMatch(controllerSource, /spellcheck[\s\S]{0,500}\/api\/mailbox\/send/);
-  assert.match(page, /assets\/premium-mailbox-compose-controller\.js\?v=20260828f/);
+  assert.match(page, /assets\/premium-mailbox-compose-controller\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-mobile\.css\?v=20260822a/);
 });

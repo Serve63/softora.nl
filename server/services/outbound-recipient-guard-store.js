@@ -1,5 +1,7 @@
 const DEFAULT_TABLE = 'softora_outbound_recipient_guards';
 const DEFAULT_RESERVATION_TTL_MS = 2 * 60 * 60 * 1000;
+const SUPPRESSION_READ_TIMEOUT_MS = 8000;
+const SUPPRESSION_READ_MAX_ATTEMPTS = 2;
 const MAX_EXACT_RECIPIENT_EMAIL_FILTERS = 100;
 const HISTORICAL_MAILBOX_LEDGER_GUARD_KEY = 'system:mailbox-outbound-ledger-v1';
 const PERSONAL_MAILBOX_DOMAINS = new Set([
@@ -142,6 +144,15 @@ function getIdentityKeyRows(identity = {}, normalizeString = defaultNormalizeStr
   return rows;
 }
 
+function isTransientSuppressionReadError(error, status = 0) {
+  const code = String(error?.code || '').toUpperCase();
+  const httpStatus = Number(status || error?.status || error?.statusCode || 0);
+  const text = String(error?.message || error?.details || error?.name || '');
+  return [408, 429].includes(httpStatus) || httpStatus >= 500
+    || ['57014', 'SUPABASE_REST_COOLDOWN'].includes(code)
+    || /abort|timeout|timed out|cooldown|fetch failed|network|econnreset|etimedout|connection terminated/i.test(text);
+}
+
 function createOutboundRecipientGuardStore(deps = {}) {
   const {
     table = DEFAULT_TABLE,
@@ -151,6 +162,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     truncateText = (value, maxLength = 500) => defaultNormalizeString(value).slice(0, maxLength),
     now = () => new Date(),
     logger = console,
+    sleep = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
   } = deps;
 
   function getClient() {
@@ -196,7 +208,13 @@ function createOutboundRecipientGuardStore(deps = {}) {
   }
 
   async function findRecipientSuppressionConflict(identities = []) {
-    const client = getClient();
+    // Always read the authoritative list, independently of unrelated REST cooldowns.
+    // Only this read is retried; reservations and provider dispatch are never replayed here.
+    const client = isSupabaseConfigured() ? getSupabaseClient({
+      timeoutMs: SUPPRESSION_READ_TIMEOUT_MS,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    }) : null;
     if (!client) return { ok: false, reason: 'supabase_not_configured', conflict: null };
     const keys = Array.from(new Set(
       (Array.isArray(identities) ? identities : [identities])
@@ -207,14 +225,25 @@ function createOutboundRecipientGuardStore(deps = {}) {
     if (!keys.length) return { ok: false, reason: 'no_recipient_identity', conflict: null };
     for (let index = 0; index < keys.length; index += 500) {
       const keyChunk = keys.slice(index, index + 500);
-      const { data, error } = await client
-        .from(table)
-        .select('*')
-        .in('guard_key', keyChunk)
-        .eq('suppressed', true)
-        .eq('permanent', true)
-        .limit(1);
-      if (error) throw error;
+      let data;
+      for (let attempt = 0; attempt < SUPPRESSION_READ_MAX_ATTEMPTS; attempt += 1) {
+        let status = 0;
+        try {
+          const result = await client.from(table).select('*').in('guard_key', keyChunk)
+            .eq('suppressed', true).eq('permanent', true).limit(1);
+          status = result?.status;
+          if (result?.error) throw result.error;
+          if (!Array.isArray(result?.data)) {
+            throw new Error('De blokkadelijst gaf geen geldige controlerespons.');
+          }
+          data = result.data;
+          break;
+        } catch (error) {
+          if (!isTransientSuppressionReadError(error, status)
+            || attempt === SUPPRESSION_READ_MAX_ATTEMPTS - 1) throw error;
+          await sleep(150);
+        }
+      }
       if (Array.isArray(data) && data.length) return { ok: true, conflict: data[0] };
     }
     return { ok: true, conflict: null };

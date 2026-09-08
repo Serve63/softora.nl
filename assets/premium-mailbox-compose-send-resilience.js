@@ -488,6 +488,7 @@
         if (serverProvedPreDispatchFailure(response, data)) {
           error.externalEffect = false;
           error.failurePhase = 'pre-dispatch';
+          error.retryable = data.retryable === true;
         }
         throw error;
       }
@@ -726,6 +727,7 @@
           }
           let failedRotations = 0;
           let preDispatchProofRefreshes = 0;
+          let temporaryPreDispatchRetries = 0;
           let mutablePreflightRequired = false;
           for (;;) {
             const attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
@@ -861,6 +863,8 @@
               const shouldRefreshProof = PRE_DISPATCH_PROOF_REFRESH_CODES.has(
                 normalizeText(error?.code).toUpperCase()
               ) && preDispatchProofRefreshes < 1;
+              const shouldRetryTemporary = error.code === 'MAILBOX_SEND_TEMPORARY'
+                && error.retryable === true && temporaryPreDispatchRetries < 1;
               marker = patchMarker(storage, marker, {
                 state: staging.length ? 'staged' : 'armed',
                 sendStartedAt: undefined,
@@ -868,6 +872,13 @@
               }, options);
               if (shouldRefreshProof) {
                 preDispatchProofRefreshes += 1;
+                continue;
+              }
+              if (shouldRetryTemporary) {
+                temporaryPreDispatchRetries += 1;
+                input.onRecovery?.();
+                await (options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms))))(350);
+                // Reconcile first. Only a durably failed attempt may rotate its key/staging.
                 continue;
               }
             }

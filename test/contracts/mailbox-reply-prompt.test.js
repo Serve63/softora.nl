@@ -2,13 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  MAILBOX_REPLY_NEXT_STEP,
-  MAILBOX_REPLY_PRICE_EXPLANATION,
   MAILBOX_REPLY_PROFILE,
-  MAILBOX_REPLY_WEBFLOW_ANSWER,
-  MAILBOX_REPLY_WEBFLOW_NEXT_STEP,
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplySystemPrompt,
+  buildMailboxReplyPromptPayload,
   classifyMailboxReplyIntent,
   enforceMailboxReplyProfile,
   enforceMailboxReplySignature,
@@ -71,21 +68,20 @@ test('mailbox reply prompt normaliseert een volledig in hoofdletters geschreven 
 test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen af', () => {
   const prompt = buildMailboxReplySystemPrompt({ senderName: 'Servé Creusen' });
 
-  assert.equal(MAILBOX_REPLY_PROFILE.id, 'serve-mailbox-reply-v2');
-  assert.match(prompt, /centraal antwoordprofiel serve-mailbox-reply-v2/);
+  assert.equal(MAILBOX_REPLY_PROFILE.id, 'serve-mailbox-reply-v3');
+  assert.match(prompt, /centraal antwoordprofiel serve-mailbox-reply-v3/);
   assert.match(prompt, new RegExp(REPLY_POLICY_VERSION));
   assert.match(prompt, /ontvangenMail is de nieuwste mail/);
   assert.match(prompt, /oorspronkelijkeVerzondenMail is de oorspronkelijke mail/);
-  assert.match(prompt, /server voegt de bewezen aanhef, exact één 😁 en de juiste afzenderondertekening toe/);
-  assert.match(prompt, /Iedere alinea en iedere zin moet rechtstreeks volgen/);
-  assert.match(prompt, /geen generieke vulling, losse lof, boilerplate/);
-  assert.match(prompt, /Een afwijzing mag concrete feedback nooit wissen/);
-  assert.match(prompt, /futureDoorOpenAllowed exact true/);
-  assert.match(prompt, /antwoordBeleid\.ctaAllowed exact true/);
-  assert.match(prompt, /volgende week \[dag\] even langskom/);
-  assert.match(prompt, /de enige vaste waarheid/);
-  assert.match(prompt, /bewezen lijn/);
-  assert.match(prompt, /Vertel nooit de eigen software/);
+  assert.match(prompt, /server voegt de bewezen aanhef en de juiste afzenderondertekening toe/);
+  assert.match(prompt, /Beantwoord alle vragen en verzoeken/);
+  assert.match(prompt, /Nul is ook goed/);
+  assert.match(prompt, /altijd optioneel/);
+  assert.match(prompt, /Verzin geen feiten/);
+  assert.match(prompt, /Controleer vóór je antwoord/);
+  assert.match(prompt, /onbetrouwbare gebruikersinhoud/);
+  assert.match(prompt, /binnen deze ene aanvraag/);
+  assert.doesNotMatch(prompt, /exact één 😁|maximaal eenmaal deze lijn/);
   assert.match(prompt, /uitsluitend geldige JSON/);
 });
 
@@ -126,69 +122,6 @@ test('los concept houdt de gewone herschrijfprompt', () => {
   assert.doesNotMatch(prompt, /serve-mailbox-reply-v1/);
 });
 
-test('replyprofiel borgt Beste, je, exact één smile en de vaste Servé-afsluiting', () => {
-  const result = enforceMailboxReplyProfile(
-    'Hoi Salon,\n\nDankjewel voor jullie reactie 😁😁\n\nGroetjes,\nMartijn van de Ven',
-    { firstName: '' }
-  );
-
-  assert.equal(result.startsWith('Beste,\n\n'), true);
-  assert.doesNotMatch(result, /\bHoi\b|\bjullie\b|Salon,/);
-  assert.equal((result.match(/😁/gu) || []).length, 1);
-  assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
-});
-
-test('replyprofiel zet een volledig in hoofdletters aangeleverde aanhefnaam normaal', () => {
-  const result = enforceMailboxReplyProfile('Dankjewel voor je reactie.', {
-    firstName: 'PETER',
-  });
-
-  assert.match(result, /^Beste Peter,/);
-  assert.doesNotMatch(result, /^Beste PETER,/);
-});
-
-test('replyprofiel ondertekent exact met de geselecteerde mailboxidentiteit', () => {
-  const serveResult = enforceMailboxReplyProfile('Dankjewel voor je reactie.', {
-    accountEmail: 'serve@softora.nl',
-    senderName: 'Servé Creusen',
-  });
-  const martijnResult = enforceMailboxReplyProfile('Dankjewel voor je reactie.', {
-    accountEmail: 'martijn@softora.nl',
-    senderName: 'Martijn van de Ven',
-  });
-
-  assert.equal(serveResult.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
-  assert.equal(martijnResult.endsWith('Met vriendelijke groet,\nMartijn van de Ven'), true);
-  assert.doesNotMatch(martijnResult, /Servé Creusen/);
-});
-
-test('Salon TOF krijgt een inhoudelijk code-antwoord zonder ongegronde uitnodiging', () => {
-  const result = enforceMailboxReplyProfile(
-    'Beste,\n\nGoede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd. Dan kunnen we samen kort kijken wat er mogelijk is.\n\nAls je wilt, denk ik graag even met je mee over wat voor jou handig is. Als je wilt, is het een idee dat ik volgende week [dag] even langskom? 😁',
-    {
-      firstName: '',
-      inboundText: 'Met welk programma werk je? Wij hebben nu Webflow.',
-    }
-  );
-
-  assert.equal(result, [
-    'Beste,',
-    '',
-    MAILBOX_REPLY_WEBFLOW_ANSWER,
-    '',
-    'Met vriendelijke groet,',
-    'Servé Creusen',
-  ].join('\n'));
-  assert.match(result, /volledig op maat met code/);
-  assert.match(result, /indeling, uitstraling en werking precies afstemmen/);
-  assert.match(result, /zonder vast te zitten aan een standaard websitebouwer/);
-  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan ik|advies over Webflow|Wij hebben nu|\bWebflow\b|\bjullie\b|denk ik graag even met je mee|Als je wilt/i);
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|volgende week/i);
-  assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
-  assert.equal((result.match(/😁/gu) || []).length, 1);
-  assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
-});
-
 test('replyprofiel classificeert interesse, prijs en afwijzing vóór afspraaklogica', () => {
   assert.equal(classifyMailboxReplyIntent('Ik ben benieuwd, kan je de preview sturen?'), 'interest');
   assert.equal(classifyMailboxReplyIntent('Ik vind dit wel interessant.'), 'interest');
@@ -220,416 +153,206 @@ test('antwoordbeleid laat alleen expliciete vooruitgerichte signalen een CTA ope
   assert.equal(pricing.ctaAllowed, true);
 });
 
-test('De Krekul krijgt een persoonlijke tevredenheidsreactie met jubileum en zachte toekomstdeur', () => {
-  const inbound = [
-    'Hoi Servé,',
-    '',
-    'Je bent net te laat...',
-    'Ik wist niet dat jij ook websites kon bouwen.',
-    '',
-    'We hebben onze site net geheel vernieuwd en zijn heel tevreden met de nieuwe uitstraling en huisstijl.',
-    '',
-    'Voorlopig gaan we geen aanpassingen doen. Komend jaar vieren we ons 60-jarig jubileum en bouwen verder aan deze huisstijl.',
-    '',
-    'Dank voor interesse.',
-    '',
-    'Met vriendelijke groet,',
-    'Marie-José Inneme - de Jong',
-  ].join('\n');
-  const policy = analyzeMailboxReplyContext(inbound, {
-    originalText: 'Goedendag,\n\nAfgelopen week kwam ik jullie website tegen.',
-  });
-  const firstName = inferMailboxReplyFirstName({
-    from: 'Voorzitter De Krekul',
-    body: inbound,
-  });
-  const result = enforceMailboxReplyProfile('', {
-    firstName,
-    inboundText: inbound,
-    originalSentMail: {
-      body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website tegen.',
-    },
-  });
 
-  assert.equal(policy.intent, 'satisfied');
-  assert.equal(firstName, 'Marie-José');
+function draft(inboundText, texts, options = {}, extra = {}) {
+  const policy = analyzeMailboxReplyContext(inboundText, {
+    conceptText: options.conceptText, originalText: options.originalSentMail?.body, conversation: options.conversation,
+  });
+  return JSON.stringify({ intent: policy.intent, ctaAllowed: policy.ctaAllowed,
+    paragraphs: texts.map((text, index) => ({ text, evidence: policy.allowedEvidence.filter((item) => item !== 'sender.identity'), answers: index === 0 ? policy.questions.map((q) => q.id) : [] })), ...extra });
+}
+function respond(inboundText, texts, options = {}, extra = {}) {
+  return enforceMailboxReplyProfile(draft(inboundText, texts, options, extra), { inboundText, ...options });
+}
+function rejectsReply(inbound, text, options = {}) {
+  assert.throws(() => respond(inbound, [text], options), { code: 'MAILBOX_REPLY_NEEDS_REVIEW', status: 422 });
+}
+
+test('hartelijke ondertekening met lege regels gaat vóór bedrijfsnaam, ook met geciteerde afzender', () => {
+  const context = { from: 'Voorbeeld schoolfoto', body: 'Geen behoefte aan een ander ontwerp.\n\nMet hartelijke groet,\n\nMarjolein van Dalen\nVoorbeeld schoolfoto\n\nOp dinsdag schreef Servé:\nGroet,\nServé' };
+  assert.equal(inferMailboxReplyFirstName(context), 'Marjolein');
+  assert.equal(inferMailboxReplyFirstName({ from: 'Voorbeeld schoolfoto', body: 'Bedankt.' }), '');
+  assert.equal(inferMailboxReplyFirstName({ from: 'Lisa Jansen <lisa@example.test>', body: 'Bedankt.' }), 'Lisa');
+});
+
+test('natuurlijke afwijzing blijft exact behouden zonder verplichte toekomstzin of emoji', () => {
+  const input = 'We zijn tevreden met onze huidige website en hebben geen behoefte aan een nieuw ontwerp.';
+  const body = 'Helemaal begrijpelijk. Fijn dat jullie tevreden zijn met de website. Dan laat ik het hierbij!';
+  assert.equal(respond(input, [body], { firstName: 'Lisa' }), `Beste Lisa,\n\n${body}\n\nMet vriendelijke groet,\nServé Creusen`);
+});
+
+test('warmte blijft behouden: nul, een andere of meerdere passende smileys worden niet herschreven', () => {
+  for (const emoji of ['', '😁', '😊', ':)', '😁 😊']) {
+    const body = `Dankjewel voor je reactie! ${emoji}`.trim();
+    assert.ok(respond('Dank voor je bericht.', [body]).includes(body));
+    assert.equal((respond('Dank voor je bericht.', [body]).match(/😁/gu) || []).length, emoji.includes('😁') ? 1 : 0);
+  }
+});
+
+test('afwijzing met compliment erkent het compliment en laat de keuze vrij', () => {
+  const result = respond('Leuk gedaan, maar we hebben geen interesse.', ['Leuk om te horen dat jullie het ontwerp mooi vinden. Geen probleem natuurlijk, dan laat ik het hierbij 😁']);
+  assert.match(result, /mooi vinden/);
+  assert.doesNotMatch(result, /toekomst|afspraak|langskom/);
+});
+
+test('korte vervolgbevestiging mag zonder aanhef en handtekening', () => {
+  assert.equal(respond('Prima, tot morgen!', ['Top. Tot morgen!'], {}, { replyForm: 'short' }), 'Top. Tot morgen!');
+  assert.match(respond('Bedankt voor je bericht.', ['Dankjewel voor je reactie.'], {}, { replyForm: 'short' }), /^Beste,/);
+});
+
+test('aanhef en ondertekening blijven van de juiste afzender en volgen het gesprek', () => {
+  assert.match(respond('Bedankt.', ['Dankjewel voor je reactie.'], { firstName: 'PETER', originalSentMail: { body: 'Hoi Peter,\nHier is het ontwerp.' } }), /^Hoi Peter,/);
+  assert.match(respond('Bedankt.', ['Dankjewel voor je reactie.'], { firstName: 'Lisa', originalSentMail: { body: 'Goedendag,\nHier is het ontwerp.' } }), /^Goedendag Lisa,/);
+  assert.match(respond('Bedankt.', ['Dankjewel voor je reactie.'], { accountEmail: 'martijn@softora.nl' }), /Martijn van de Ven$/);
+  rejectsReply('Bedankt.', 'Met vriendelijke groet, Servé Creusen');
+});
+
+test('tevredenheid met vernieuwing en jubileum behoudt alleen werkelijk genoemde details', () => {
+  const input = 'Je bent net te laat. Onze website is recent vernieuwd en we zijn tevreden. Volgend jaar vieren we ons 25-jarig jubileum.';
+  const result = respond(input, ['Dan ben ik inderdaad net te laat! Fijn dat jullie blij zijn met de vernieuwde website.', 'Alvast veel plezier met jullie 25-jarig jubileum!']);
+  assert.match(result, /25-jarig jubileum/);
+  assert.doesNotMatch(result, /huisstijl|toekomst/);
+});
+
+test('concrete stijlfeedback erft geen Ibiza of andere niet genoemde klantdetails', () => {
+  const input = 'Het ontwerp is te donker en past niet bij ons. We willen juist een warme, persoonlijke uitstraling.';
+  const good = 'Ik snap wat je bedoelt: het ontwerp is te donker, terwijl jullie juist een warme, persoonlijke uitstraling zoeken. Daar heb ik wat aan!';
+  assert.ok(respond(input, [good]).includes(good));
+  rejectsReply(input, 'Bedankt voor je feedback!');
+  assert.doesNotMatch(respond(input, [good]), /Ibiza|chique|clean/);
+});
+
+test('uitgebreide afwijzing bewaart representatieve feedback en compliment', () => {
+  const input = 'We gaan hier niet mee verder. Het overzicht is goed, maar de huisstijl ontbreekt. De foto’s zijn niet van ons bedrijf en de tekst is onleesbaar.';
+  const body = 'Bedankt dat je er zo uitgebreid naar hebt gekeken. Fijn dat het overzicht goed overkomt. Ik snap je punten over de ontbrekende huisstijl en de foto’s die niet bij jullie bedrijf passen.';
+  assert.ok(respond(input, [body]).includes(body));
+  rejectsReply(input, 'Bedankt, helemaal duidelijk.');
+});
+
+test('geen budget en een platformvraag worden beide behandeld zonder bezoekvoorstel', () => {
+  const input = 'We hebben geen budget, maar met welk programma werk je? Onze site staat nu in Webflow.';
+  const policy = analyzeMailboxReplyContext(input);
+  assert.equal(policy.technicalQuestion, true);
   assert.equal(policy.ctaAllowed, false);
-  assert.equal(policy.futureDoorOpenAllowed, true);
-  assert.deepEqual(policy.replyHighlights, {
-    lateTiming: true,
-    recentWebsiteRenewal: true,
-    anniversaryYears: 60,
-    styleBrandName: '',
-  });
-  assert.equal(result, [
-    'Goedendag Marie-José,',
-    '',
-    'Dan ben ik inderdaad net te laat! Fijn om te horen dat jullie website helemaal is vernieuwd en dat jullie zo tevreden zijn met de nieuwe uitstraling en huisstijl. 😁',
-    '',
-    'Alvast veel succes met jullie 60-jarig jubileum!',
-    '',
-    'Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor jullie website, dan mag je me altijd een berichtje sturen.',
-    '',
-    'Met vriendelijke groet,',
-    'Servé Creusen',
-  ].join('\n'));
-  assert.doesNotMatch(result, /afspraak|langskom|\[dag\]|helemaal duidelijk/i);
+  const body = 'Helemaal begrijpelijk dat er nu geen budget is. Ik bouw het ontwerp op maat met code. Als jullie al in Webflow hebben geïnvesteerd, hoeft dat niet meteen allemaal vervangen te worden.';
+  assert.ok(respond(input, [body]).includes(body));
+  rejectsReply(input, 'Ik gebruik ook Webflow en kan even langskomen.');
 });
 
-test('Bliss by Patty krijgt een concrete stijlreactie in plaats van generieke feedbacktekst', () => {
-  const inbound = [
-    'Goeiemiddag,',
-    '',
-    'Bedankt voor je mailtje en leuk dat je geïnteresseerd bent in mijn bedrijf.',
-    'Ik vind jouw webdesign niet echt bij Bliss passen, sorry... is veel te strak,',
-    'clean en chique.',
-    'Bliss staat juist voor vrolijk, speels met een Ibiza vibe en ik vind de',
-    'uitstraling die de website op dit moment daar goed bij passen.',
-    '',
-    'Wel heel leuk dat je dit initiatief hebt genomen!',
-    '',
-    'Grts, Patty',
-  ].join('\n');
-  const policy = analyzeMailboxReplyContext(inbound, {
-    originalText: 'Goedendag,\n\nAfgelopen week kwam ik jullie website blissbypatty.nl tegen.',
-  });
-  const firstName = inferMailboxReplyFirstName({
-    from: 'Bliss.by.Patty',
-    body: inbound,
-  });
-  const result = enforceMailboxReplyProfile('', {
-    firstName,
-    inboundText: inbound,
-    originalSentMail: {
-      body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website blissbypatty.nl tegen.',
-    },
-  });
-
-  assert.equal(firstName, 'Patty');
-  assert.equal(policy.intent, 'feedback_only');
-  assert.equal(policy.substantiveFeedback, true);
-  assert.equal(policy.futureDoorOpenAllowed, true);
-  assert.deepEqual(policy.feedbackDetails.themes.map((theme) => theme.key), ['style_mismatch']);
-  assert.equal(policy.replyHighlights.styleBrandName, 'Bliss');
-  assert.equal(result, [
-    'Goedendag Patty,',
-    '',
-    'Bedankt voor je eerlijke feedback! 😁',
-    '',
-    'Ik snap wat je bedoelt: mijn ontwerp is inderdaad te strak, clean en chique voor de vrolijke, speelse Ibiza-uitstraling van Bliss. Daar kan ik zeker iets mee.',
-    '',
-    'Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor jullie website, dan mag je me altijd een berichtje sturen.',
-    '',
-    'Met vriendelijke groet,',
-    'Servé Creusen',
-  ].join('\n'));
-  assert.doesNotMatch(result, /Dankjewel voor je uitgebreide en concrete feedback|afspraak|langskom|\[dag\]/i);
+test('een platformvermelding of eerdere kosten op zichzelf zijn geen vraag of koopsignaal', () => {
+  const policy = analyzeMailboxReplyContext('We hebben veel kosten gemaakt voor onze Webflow-site.');
+  assert.equal(policy.technicalQuestion, false);
+  assert.equal(policy.priceQuestion, false);
+  assert.equal(policy.ctaAllowed, false);
 });
 
-test('Bossche Brouwers feedback erft geen actieve CTA uit geciteerde coldmail', () => {
-  const inbound = [
-    'Beste Servé,',
-    '',
-    'Dank voor de moeite. De opzet ziet er verzorgd uit.',
-    'Als feedback zou ik vooral meer van onze eigen sfeer en brouwerij laten terugkomen.',
-    'Succes met je verdere werk.',
-    '',
-    'Op vr 24 jul 2026 om 09:10 schreef Servé Creusen:',
-    '> Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
-    '> Je kunt het webdesign hier bekijken.',
-  ].join('\n');
-  assert.equal(classifyMailboxReplyIntent(inbound), 'neutral');
-
-  const result = enforceMailboxReplyProfile(
-    'Dankjewel voor je uitgebreide en concrete feedback. Daar kan ik iets mee. Misschien is het leuk als ik volgende week [dag] een keer langskom om verder te bespreken wat er mogelijk is.',
-    {
-      firstName: '',
-      inboundText: inbound,
-    }
-  );
-
-  assert.match(result, /Bedankt voor je eerlijke en duidelijke feedback/);
-  assert.match(result, /jullie eigen sfeer en identiteit/);
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|verder bespreken/i);
-  assert.equal((result.match(/😁/gu) || []).length, 1);
-  assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
-});
-
-test('Bossche Brouwers krijgt een inhoudelijke feedbackreactie ondanks de afwijzing', () => {
-  const inbound = [
-    'Hallo Servé',
-    '',
-    'Leuk dat je aandacht schenkt aan ons bedrijf.',
-    'Je design ziet er netjes uit. We gaan het echter niet gebruiken :)',
-    'Een paar reacties:',
-    '',
-    'Het design is voor ons bedrijf wat te vlak/algemeen. Dit zou voor iedere brouwerij gebruikt kunnen worden.',
-    '- Het is te duidelijk ai',
-    '- Het eten wat je toont is niet door onze koks gemaakt',
-    '- Onze huisstijl komt nergens terug in het design',
-    '- De glazen zijn niet onze glazen, en de kleur van het bier klopt niet helemaal.',
-    "- De silo's met lichtreclame zijn niet aanwezig op de Tramkade en de tekst van de lichtreclame valt door ai uit elkaar.",
-    '',
-    'Wat ik goed vind aan je design is sfeer en overzicht. Wat we missen is identiteit.',
-    'Goed dat je hiermee bezig bent, heel veel succes!',
-    '',
-    'Vriendelijke groet;',
-    'Leonard Hamers',
-  ].join('\n');
-  const policy = analyzeMailboxReplyContext(inbound);
-
+test('een afwijzing mag bijkomende technische en prijsvragen niet overslaan', () => {
+  const input = 'Nu geen interesse. Met welk programma werk je? Wat kost een ontwerp globaal?';
+  const policy = analyzeMailboxReplyContext(input);
   assert.equal(policy.intent, 'rejection');
+  assert.equal(policy.questions.length, 2);
   assert.equal(policy.ctaAllowed, false);
-  assert.equal(policy.substantiveFeedback, true);
-  assert.equal(policy.futureDoorOpenAllowed, true);
-  assert.deepEqual(
-    policy.feedbackDetails.themes.map((theme) => theme.key),
-    [
-      'generic_identity',
-      'non_own_imagery',
-      'missing_brand_style',
-      'inaccurate_details',
-      'broken_text',
-    ]
-  );
-  assert.deepEqual(
-    policy.feedbackDetails.positiveThemes.map((theme) => theme.key),
-    ['atmosphere', 'overview', 'presentation']
-  );
-
-  const result = enforceMailboxReplyProfile(
-    JSON.stringify({
-      intent: 'rejection',
-      ctaAllowed: false,
-      paragraphs: [{
-        text: 'Dankjewel voor je reactie.',
-        evidence: ['received.intent'],
-      }],
-    }),
-    {
-      firstName: 'Leonard',
-      inboundText: inbound,
-      senderName: 'Servé Creusen',
-      originalSentMail: {
-        body: [
-          'Goedendag,',
-          '',
-          'Afgelopen week kwam ik jullie website bosschebrouwers.nl tegen.',
-          '',
-          'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
-        ].join('\n'),
-      },
-    }
-  );
-
-  assert.equal(result, [
-    'Goedendag Leonard,',
-    '',
-    'Bedankt dat je er zo uitgebreid naar hebt gekeken en je eerlijke feedback hebt gedeeld! Fijn om te horen dat de sfeer en het overzicht wel goed overkwamen. 😁',
-    '',
-    'Je punten over de algemene uitstraling, de beelden die niet bij jullie bedrijf passen en het ontbreken van jullie huisstijl zijn duidelijk. Daar kan ik zeker iets mee.',
-    '',
-    'Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor jullie website, dan mag je me altijd een berichtje sturen.',
-    '',
-    'Met vriendelijke groet,',
-    'Servé Creusen',
-  ].join('\n'));
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|prijs|vervolgvoorstel|\?/i);
+  rejectsReply(input, 'Geen probleem, dan laat ik het hierbij.');
+  const valid = draft(input, ['Helemaal begrijpelijk. Ik bouw het ontwerp op maat met code.', 'De prijs hangt af van wat je precies nodig hebt.']);
+  assert.match(enforceMailboxReplyProfile(valid, { inboundText: input }), /code/);
+  const missing = JSON.parse(valid); missing.paragraphs[0].answers = ['q1'];
+  assert.throws(() => enforceMailboxReplyProfile(JSON.stringify(missing), { inboundText: input }), /niet alle vragen/);
 });
 
-test('een expliciet verzoek om geen verder contact blokkeert ook de zachte toekomstzin', () => {
-  const inbound = [
-    'Bedankt voor je werk. De sfeer is goed, maar onze huisstijl ontbreekt en de beelden zijn niet van ons.',
-    'Mail ons niet meer en schrijf ons uit.',
-  ].join('\n');
-  const policy = analyzeMailboxReplyContext(inbound, {
-    originalText: 'Ik kwam jullie website tegen.',
-  });
-  const result = enforceMailboxReplyProfile('', {
-    inboundText: inbound,
-    originalSentMail: { body: 'Goedendag,\n\nIk kwam jullie website tegen.' },
-  });
-
-  assert.equal(policy.substantiveFeedback, true);
-  assert.equal(policy.noFurtherContact, true);
-  assert.equal(policy.futureDoorOpenAllowed, false);
-  assert.doesNotMatch(result, /in de toekomst|berichtje sturen|wat er mogelijk is/i);
+test('preview plus prijsvraag krijgt beide onderwerpen zonder verzonnen link of dag', () => {
+  const input = 'Stuur de preview maar door. Wat kost zoiets?';
+  const result = respond(input, ['Leuk dat je de preview wilt bekijken. Welke onderdelen wil je graag kunnen aanpassen? De prijs hangt af van wat er precies nodig is.']);
+  assert.match(result, /preview/);
+  assert.match(result, /prijs/);
+  rejectsReply(input, 'Bekijk de preview op https://example.test/verzonnen. De prijs hangt af van de scope.');
+  rejectsReply(input, 'De prijs hangt af van de scope.');
 });
 
-test('interesse krijgt exact één concreet vrijblijvend voorstel met bewerkbare dag', () => {
-  const result = enforceMailboxReplyProfile(
-    'Beste Lisa,\n\nLeuk dat je interesse hebt 😁 Zullen we een afspraak maken om het samen te bekijken?',
-    {
-      firstName: 'Lisa',
-      inboundText: 'Ik ben benieuwd en ontvang de preview graag.',
-    }
-  );
-
-  assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
-  assert.match(result, /het ontwerp samen kort bekijken/);
-  assert.doesNotMatch(result, /Zullen we een afspraak maken/);
-  assert.doesNotMatch(result, /Als je wilt, is het een idee/i);
-  assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
+test('interesse laat één vrijblijvend voorstel toe zonder bewerkbare placeholders', () => {
+  const input = 'Ik ben geïnteresseerd. Kunnen we het ontwerp samen bespreken?';
+  assert.match(respond(input, ['Leuk om te horen! Ik kan vrijblijvend langskomen om het ontwerp samen te bekijken. Dan bespreken we wat voor jou handig is.']), /vrijblijvend/);
+  rejectsReply(input, 'Leuk! Ik kom volgende week [dag] langs.');
+  rejectsReply(input, 'Leuk! Ik kom dinsdag langs.');
 });
 
-test('afwijzing verwijdert ieder afspraakvoorstel en blijft kort respectvol', () => {
-  const result = enforceMailboxReplyProfile(
-    'Beste Daffy,\n\nHelemaal begrijpelijk. Zullen we toch een afspraak maken zodat ik volgende week woensdag langskom?',
-    {
-      firstName: 'Daffy',
-      inboundText: 'Bedankt, maar we hebben geen interesse en zijn tevreden met onze huidige partij.',
-    }
-  );
-
-  assert.doesNotMatch(result, /afspraak|langskom|volgende week|\[dag\]/i);
-  assert.match(result, /Mocht je in de toekomst/);
-  assert.match(result, /^Beste Daffy,/);
-  assert.equal((result.match(/😁/gu) || []).length, 1);
+test('verschillende afwijzingen en geciteerde coldmail geven geen actieve CTA', () => {
+  for (const input of ['Geen interesse.', 'Wij gaan hier niet mee verder.', 'Het traject is niet aan de orde.', 'We zijn tevreden met onze website.', 'We willen geen gebruik maken van je aanbod.']) {
+    assert.equal(analyzeMailboxReplyContext(input).ctaAllowed, false);
+    rejectsReply(input, 'Dankjewel! Ik kan vrijblijvend langskomen om alles samen te bekijken.');
+  }
+  const policy = analyzeMailboxReplyContext('Geen interesse.\n\nOp maandag schreef Servé:\nKunnen we de prijs bespreken?');
+  assert.equal(policy.priceQuestion, false);
+  assert.equal(policy.questions.length, 0);
 });
 
-test('Hoogstam Brigade afwijzing blokkeert ieder bezoek en generieke interesseheuristiek', () => {
-  const inbound = [
-    'Beste Servé,',
-    '',
-    'Dank voor je uitgebreide toelichting en de mooie eerste opzet.',
-    'Het verder ingaan van een traject met Softora is voor ons niet aan de orde.',
-    '',
-    'Met vriendelijke groet,',
-    'Hub Meertens',
-  ].join('\n');
-  const result = enforceMailboxReplyProfile(
-    'Wat fijn dat je de opzet mooi vindt. Ik denk graag mee. Is het een idee dat ik volgende week [dag] even langskom om prijzen en mogelijkheden te bespreken?',
-    {
-      firstName: 'Hub',
-      inboundText: inbound,
-      originalSentMail: {
-        body: 'Ik ben benieuwd wat je van het ontwerp vindt en kom graag langs.',
-      },
-    }
-  );
-
-  assert.match(result, /^Beste Hub,/);
-  assert.match(result, /Bedankt voor je duidelijke reactie/);
-  assert.match(result, /Mocht je in de toekomst/);
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|meedenk|prijs|vervolgstap|traject/i);
-  assert.equal((result.match(/😁/gu) || []).length, 1);
-  assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
+test('stopverzoek krijgt geen toekomstdeur, vrolijke emoji of fictieve uitschrijfbevestiging', () => {
+  const input = 'Mail ons niet meer en verwijder ons.';
+  assert.equal(analyzeMailboxReplyContext(input).futureDoorOpenAllowed, false);
+  assert.match(respond(input, ['Helemaal duidelijk, ik respecteer jullie verzoek.']), /respecteer/);
+  for (const text of ['Bedankt, mocht je later willen kijken, laat maar weten.', 'Helemaal duidelijk 😁', 'Ik heb jullie uitgeschreven.']) rejectsReply(input, text);
 });
 
-test('Nederlandse afwijzingsvarianten krijgen nooit een vervolgvoorstel', () => {
-  const variants = [
-    'Wij gaan hier niet mee verder.',
-    'Er is geen sprake van een vervolgtraject.',
-    'We willen geen gebruik maken van je aanbod.',
-    'Dit valt buiten onze scope.',
-    'Laat het hierbij en mail ons niet opnieuw.',
-  ];
-  variants.forEach((inboundText) => {
-    const result = enforceMailboxReplyProfile(
-      'Ik denk graag met je mee en kan volgende week [dag] langskomen voor een afspraak.',
-      { inboundText }
-    );
-    assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|meedenk|prijs|vervolg/i, inboundText);
-  });
+test('ziekte krijgt een menselijke reactie zonder geforceerde afspraak of lach', () => {
+  const body = 'Vervelend om te horen, beterschap! Neem vooral rustig de tijd. Laat maar weten wanneer het weer uitkomt.';
+  assert.ok(respond('Ik ben ziek en heb nu geen tijd voor een gesprek.', [body]).includes(body));
 });
 
-test('prijsvraag verwijdert verzonnen bedragen, legt afhankelijkheid uit en laat de dag bewerkbaar', () => {
-  const result = enforceMailboxReplyProfile(
-    'Beste Lisa,\n\nDit kost € 995,-. Ik kan woensdag langskomen om de kansen te bespreken.',
-    {
-      firstName: 'Lisa',
-      inboundText: 'Wat kost zoiets ongeveer?',
-    }
-  );
-
-  assert.match(result, /De prijs hangt af van wat je precies wilt en wat daarvoor nodig is/);
-  assert.match(result, /volgende week \[dag\] even langskom/);
-  assert.doesNotMatch(result, /995|€|\bkansen\b/i);
-  assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
+test('prijzen uit eigen gesprekscontext blijven bruikbaar; klantenvoorstel is geen offerte', () => {
+  const input = 'Wat kost de afgesproken opzet?';
+  const body = 'De prijs voor de besproken opzet is €2400.';
+  const options = { conversation: [{ folder: 'sent', body: 'Voor de besproken opzet is de prijs €2400.' }] };
+  assert.ok(respond(input, [body], options).includes('€2400'));
+  rejectsReply(input, body);
+  rejectsReply('Kun je het voor €2400 doen?', body);
+  rejectsReply(input, 'De prijs is €9999.', options);
 });
 
-test('technische vraag zonder commercieel vervolgsignaal krijgt geen gestapelde templates', () => {
-  const result = enforceMailboxReplyProfile(
-    [
-      'Beste,',
-      '',
-      'Dankjewel voor je vraag.',
-      '',
-      'Dankjewel voor je vraag!',
-      '',
-      'Als je wilt, denk ik graag even met je mee over wat voor jou handig is.',
-      '',
-      'Als je wilt, denk ik graag even met je mee over wat voor jou handig is.',
-      'Is het een idee dat ik volgende week [dag] even langskom?',
-    ].join('\n'),
-    {
-      inboundText: 'Kun je vertellen hoe je dit hebt gemaakt?',
-    }
-  );
-
-  assert.equal((result.match(/Als je wilt/g) || []).length, 0);
-  assert.doesNotMatch(result, /Als je wilt, is het een idee/i);
-  assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 0);
-  assert.match(result, /volledig op maat met code gebouwd/);
-  assert.equal((result.match(/😁/gu) || []).length, 1);
+test('bewezen datum en link mogen worden gebruikt zonder nieuwe beschikbaarheid te verzinnen', () => {
+  const input = 'Tot dinsdag!';
+  assert.equal(respond(input, ['Top, tot dinsdag!'], {}, { replyForm: 'short' }), 'Top, tot dinsdag!');
+  const opts = { originalSentMail: { body: 'Het ontwerp staat op https://example.test/demo' } };
+  assert.match(respond('Mag ik de preview bekijken?', ['Hier is de preview: https://example.test/demo'], opts), /example.test\/demo/);
 });
 
-test('Christine Jetten tevredenheid blokkeert een bezoek ondanks een slechte AI-draft', () => {
-  const result = enforceMailboxReplyProfile(
-    JSON.stringify({
-      intent: 'forward_interest',
-      ctaAllowed: true,
-      paragraphs: [{
-        text: 'Wat leuk, misschien kan ik volgende week [dag] langskomen om de mogelijkheden te bespreken.',
-        evidence: ['received.forward-request'],
-      }],
-    }),
-    {
-      firstName: 'Christine',
-      inboundText: 'Bedankt voor de moeite, maar ik ben tevreden met mijn huidige website en heb geen interesse.',
-    }
-  );
-
-  assert.match(result, /^Beste Christine,/);
-  assert.match(result, /Fijn om te horen dat je tevreden bent met je huidige website/);
-  assert.match(result, /Mocht je in de toekomst/);
-  assert.doesNotMatch(result, /langskom|\[dag\]|afspraak/i);
+test('verzonnen afgerond werk, claims en bewijslabels worden geweigerd', () => {
+  for (const text of ['Ik heb de foto’s aangepast.', 'Ik garandeer dat je nooit meer gehackt wordt.', 'Ik heb de nieuwe site gepubliceerd.']) rejectsReply('Bedankt voor je bericht.', text);
+  const input = 'Kun je de foto’s aanpassen?';
+  assert.match(respond(input, ['Ik heb de foto’s aangepast.'], { conceptText: 'Ik heb de foto’s aangepast.' }), /aangepast/);
+  const raw = JSON.parse(draft('Bedankt.', ['Een ruimtereis is morgen gegarandeerd.']));
+  raw.paragraphs[0].evidence = ['invented.fact'];
+  assert.throws(() => enforceMailboxReplyProfile(JSON.stringify(raw), { inboundText: 'Bedankt.' }), /onvoldoende onderbouwd/);
 });
 
-test('iedere modelalinea moet relevante bewijslabels en inhoud hebben of valt veilig terug', () => {
-  const result = enforceMailboxReplyProfile(
-    JSON.stringify({
-      intent: 'feedback_only',
-      ctaAllowed: false,
-      paragraphs: [
-        { text: 'Dankjewel voor je concrete feedback.', evidence: ['received.intent'] },
-        { text: 'Hopelijk kunnen we samen mooie kansen ontdekken.', evidence: ['received.body'] },
-      ],
-    }),
-    { inboundText: 'Als feedback mis ik vooral onze eigen sfeer en fotografie.' }
-  );
-
-  assert.match(result, /eerlijke en duidelijke feedback/);
-  assert.match(result, /jullie eigen sfeer en identiteit/);
-  assert.doesNotMatch(result, /Hopelijk|kansen|samen|langskom|\[dag\]/i);
+test('ongeldige of onvolledige modeluitvoer wordt nooit als standaardreactie vermomd', () => {
+  for (const value of ['', 'Geen JSON', '{}', '{"paragraphs":[null]}']) {
+    assert.throws(() => enforceMailboxReplyProfile(value, { inboundText: 'Wat kost het?' }), { code: 'MAILBOX_REPLY_NEEDS_REVIEW' });
+  }
+  const input = 'Bedankt.';
+  rejectsReply(input, 'x'.repeat(1201));
+  assert.throws(() => respond(input, ['Dankjewel.', 'Dankjewel.']), /onvoldoende onderbouwd/);
 });
 
-test('een expliciet medewerkersconcept blijft bruikbare bewijscontext bij herschrijven', () => {
-  const result = enforceMailboxReplyProfile(
-    JSON.stringify({
-      intent: 'acknowledgement',
-      ctaAllowed: false,
-      paragraphs: [{
-        text: 'Ik neem je concrete vraag over de planning mee.',
-        evidence: ['concept.body'],
-      }],
-    }),
-    {
-      inboundText: 'Bedankt voor je reactie.',
-      conceptText: 'Neem de concrete vraag over de planning mee.',
-    }
-  );
+test('uitgebreide inhoud mag meer dan drie korte alinea’s hebben', () => {
+  const texts = ['Dankjewel voor de uitgebreide uitleg.', 'Je eerdere investering snap ik.', 'De foto’s moeten echt bij jullie passen.', 'Ook de eigen huisstijl is duidelijk belangrijk.', 'De tekst moet leesbaar blijven.'];
+  assert.ok(respond('We hebben geïnvesteerd in onze eigen huisstijl, foto’s en leesbare tekst.', texts).includes(texts.join('\n\n')));
+});
 
-  assert.match(result, /concrete vraag over de planning mee/);
-  assert.doesNotMatch(result, /langskom|\[dag\]|mogelijkheden/i);
+test('prompt gebruikt recente historie begrensd en alleen uit het eigen gesprek', () => {
+  const messages = Array.from({ length: 11 }, (_, index) => ({ id: `m${index}`, folder: 'sent', accountEmail: 'serve@softora.nl', conversationId: 'a', body: `Scope ${index} ` + 'x'.repeat(1700), date: `2026-08-${String(index + 1).padStart(2, '0')}` }));
+  const payload = buildMailboxReplyPromptPayload({ isReply: true, accountEmail: 'serve@softora.nl', context: { id: 'latest', accountEmail: 'serve@softora.nl', conversationId: 'a', date: '2026-09-08', body: 'Wat kost het?', conversationMessages: [...messages, { id: 'other', accountEmail: 'martijn@softora.nl', folder: 'sent', body: 'Private andere mailbox' }, { id: 'future', folder: 'sent', date: '2027-01-01', body: 'Toekomst' }, { id: 'cross', conversationId: 'b', folder: 'sent', body: 'Ander gesprek' }] } });
+  assert.equal(payload.gespreksverloop.length, 8);
+  assert.ok(payload.gespreksverloop.every((message) => message.body.length <= 1500));
+  assert.match(payload.gespreksverloop[0].body, /Scope 3/);
+  assert.match(payload.gespreksverloop.at(-1).body, /Scope 10/);
+  assert.equal(payload.antwoordBeleid.questions[0].text, 'Wat kost het?');
+  assert.ok(payload.antwoordBeleid.allowedEvidence.includes('conversation.body'));
+  assert.doesNotMatch(JSON.stringify(payload), /Private andere mailbox|Ander gesprek|Toekomst/);
+});
+
+test('prijs en planning kunnen samen worden beantwoord zonder de planning tot prijs te maken', () => {
+  const input = 'Wat kost het? Ik heb pas in 2027 tijd.';
+  const result = respond(input, ['De prijs voor de besproken opzet is €2400. Helemaal begrijpelijk dat je pas in 2027 tijd hebt.'], { originalSentMail: { body: 'Voor deze opzet reken ik €2400.' } });
+  assert.match(result, /2027/);
+  assert.equal(analyzeMailboxReplyContext(input).ctaAllowed, false);
+  rejectsReply('Kan het voor 900?', 'Dat kan voor 900.');
 });
