@@ -558,7 +558,7 @@
                     return;
                 }
                 if (job.status === "error") {
-                    await finishPendingJob(storedJob, job.safetyBlocked ? "" : (normalizeString(job.error) || "Webdesign maken is mislukt."), "failed");
+                    await finishPendingJob(storedJob, job.safetyBlocked ? "De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen." : (normalizeString(job.error) || "Webdesign maken is mislukt."), "failed");
                     return;
                 }
                 schedulePoll(jobId, resolveJobPollDelay(job));
@@ -752,7 +752,7 @@
                     return { started: true, done: true, jobId: job.id };
                 }
                 if (job.status === "error") {
-                    const errorMessage = job.safetyBlocked ? "" : (normalizeString(job.error) || "Webdesign maken is mislukt.");
+                    const errorMessage = job.safetyBlocked ? "De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen." : (normalizeString(job.error) || "Webdesign maken is mislukt.");
                     if (quiet) return clearPendingStart(target, job.id, startOptions, errorMessage);
                     await finishPendingJob({ customerId: target.id, jobId: job.id }, errorMessage, "failed");
                     return { started: false, failed: true, error: errorMessage };

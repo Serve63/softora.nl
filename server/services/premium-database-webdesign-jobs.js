@@ -1,3 +1,4 @@
+const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
 const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
 const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant, WEBDESIGN_VARIANT_V1, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
@@ -861,24 +862,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function sanitizeBatchUserError(value) {
     return sanitizeWebdesignJobErrorForUser(value) || '';
-  }
-
-  function isOpenAiSafetyBlockedError(error) {
-    if (error && error.openAiSafetyBlocked === true) return true;
-    const detail = [
-      typeof error === 'string' ? error : '',
-      error && error.message,
-      error?.data?.error?.message,
-      error?.data?.error?.detail,
-      error?.data?.error?.code,
-      error?.data?.error,
-      error?.data?.detail,
-      error?.data?.safety_violations,
-      error?.data?.safetyViolations,
-    ].map(normalizeString).filter(Boolean).join(' ').toLowerCase();
-    return /safety[_ -]?violations|safety system|request was rejected|content policy|policy violation|violated policy/.test(
-      detail
-    );
   }
 
   function createRetryablePhotoStorageError(message, cause) {

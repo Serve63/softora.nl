@@ -1,3 +1,4 @@
+const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 function createAiToolsCoordinator(deps = {}) {
   const {
     normalizeString = (value) => String(value || '').trim(),
@@ -70,41 +71,6 @@ function createAiToolsCoordinator(deps = {}) {
       `https://image.thum.io/get/width/1200/crop/1600/allowJPG/noanimate/${targetUrl}`,
       `https://s0.wordpress.com/mshots/v1/${encodeURIComponent(targetUrl)}?w=1280&h=1600`,
     ];
-  }
-
-  function collectErrorText(value, out = []) {
-    if (value === null || value === undefined) return out;
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      out.push(String(value));
-      return out;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((entry) => collectErrorText(entry, out));
-      return out;
-    }
-    if (typeof value === 'object') {
-      [
-        'message',
-        'detail',
-        'error',
-        'code',
-        'type',
-        'param',
-        'safety_violations',
-        'safetyViolations',
-        'violations',
-      ].forEach((key) => collectErrorText(value[key], out));
-    }
-    return out;
-  }
-
-  function isOpenAiSafetyBlockedError(error) {
-    if (error && error.openAiSafetyBlocked === true) return true;
-    const haystack = collectErrorText(error).map(normalizeString).join(' ').toLowerCase();
-    if (!haystack) return false;
-    return /safety[_ -]?violations|safety system|request was rejected|content policy|policy violation|violated policy/.test(
-      haystack
-    );
   }
 
   function shouldUseDatabasePreviewFallback(body = {}) {
