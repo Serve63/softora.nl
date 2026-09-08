@@ -1,3 +1,4 @@
+const { buildWebsiteImageGenerationMetadata } = require('./website-image-generation-cost');
 const { normalizeString } = require('./data-ops-serialization');
 
 function normalizeWebdesignJobRetryPayload(value = {}) {
@@ -20,6 +21,7 @@ function buildWebdesignJobPayload(job = {}) {
   }
   if (job.cancelled === true) payload.cancelled = true;
   if (job.generationAttempted === true) payload.generationAttempted = true;
+  if (job.generation) payload.generation = buildWebsiteImageGenerationMetadata(job.generation);
   if (retry.attempts || retry.nextAttemptAt || retry.lastRetryAt || retry.lastRetryReason) payload.retry = retry;
   return payload;
 }

@@ -1206,7 +1206,7 @@ function createAiRemoteService(deps = {}) {
     return {
       prompt,
       brief: buildWebsitePreviewBriefFromScan(scan),
-      model: usedImageModel,
+      model: usedImageModel, quality: imageQuality, size: usedImageSize,
       mimeType: 'image/png',
       dataUrl: `data:image/png;base64,${b64}`,
       fileName: buildWebsitePreviewDownloadFileName(scan),

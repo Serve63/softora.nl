@@ -2156,7 +2156,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       finishedAt: toMsFromIso(row.finished_at),
       retry: normalizeWebdesignJobRetryPayload(payload.retry),
       cancelled: payload.cancelled === true,
-      generationAttempted: payload.generationAttempted === true,
+      generationAttempted: payload.generationAttempted === true, generation: payload.generation || null,
       variant: normalizeString(payload.variant || ''),
       batchId: normalizeString(payload.batchId || ''),
       batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))

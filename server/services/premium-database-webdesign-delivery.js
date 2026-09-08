@@ -1,3 +1,4 @@
+const { buildWebsiteImageGenerationMetadata } = require('./website-image-generation-cost');
 const { normalizeWebdesignVariant, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
 
 function createWebdesignDeliveryInterruptedError() {
@@ -42,6 +43,8 @@ async function deliverWebdesignImage(job, {
     if (!job.processingTimedOut) job.generationAttempted = false;
     throw error;
   }
+  job.generation = buildWebsiteImageGenerationMetadata(payload);
+  if (job.generation) await persistJob(job);
   for (let attempt = 0; attempt < 4; attempt += 1) {
     assertActive();
     try {

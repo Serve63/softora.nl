@@ -930,7 +930,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       startedAt: job.startedAt || null,
       finishedAt: job.finishedAt || null,
       nextAttemptAt: retry.nextAttemptAt || null,
-      retryAttempts: retry.attempts,
+      retryAttempts: retry.attempts, generation: job.generation || null,
     };
   }
 

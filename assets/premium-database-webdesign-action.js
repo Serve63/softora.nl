@@ -25,7 +25,6 @@
 
     function normalizeString(value) { return String(value || "").trim(); }
     function normalizeVariant(value) { return normalizeString(value).toLowerCase() === "v2-visual-dna" ? "v2-visual-dna" : "v1-prompt-only"; }
-    function formatCentCost(value) { return "-" + Math.round(Math.max(0, Number(value) || 0) * 100) + " cent"; }
 
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
@@ -52,6 +51,7 @@
         const getAssetState = typeof options.getAssetState === "function" ? options.getAssetState : null;
         const isRestoringPhotos = typeof options.isRestoringPhotos === "function" ? options.isRestoringPhotos : function (customer) { return Boolean(state && state.photoRestorePending) && shouldShowWebsitePhoto(customer); };
         const costEur = Number.isFinite(options.costEur) ? Math.max(0, options.costEur) : null;
+        const costReporter = global.SoftoraDatabasePhotoBatch.createCostReporter({ root: global, costEur: costEur, setStatusMessage: setStatusMessage });
         const pendingIds = new Set();
         const pendingJobs = new Map();
         const pollQueue = new Map();
@@ -378,37 +378,6 @@
             return "webdesign_" + now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
         }
 
-        function updateChargeLabelPositions() {
-            if (!global.document) return;
-            const labels = Array.from(global.document.querySelectorAll(".photo-generate-charge-label"));
-            labels.reverse().forEach(function (label, index) {
-                label.style.bottom = (18 + (index * 44)) + "px";
-            });
-        }
-
-        function showChargeLabel(variant) {
-            if (!global.document) return;
-            const label = global.document.createElement("div");
-            label.className = "photo-generate-charge-label";
-            label.setAttribute("aria-live", "polite");
-            label.textContent = Number.isFinite(costEur) ? formatCentCost(costEur) : "Kosten variabel";
-            global.document.body.appendChild(label);
-            updateChargeLabelPositions();
-            const frame = typeof global.requestAnimationFrame === "function"
-                ? global.requestAnimationFrame
-                : function (callback) { global.setTimeout(callback, 0); };
-            frame(function () {
-                label.classList.add("is-visible");
-            });
-            global.setTimeout(function () {
-                label.classList.remove("is-visible");
-            }, 1800);
-            global.setTimeout(function () {
-                if (label.parentNode) label.parentNode.removeChild(label);
-                updateChargeLabelPositions();
-            }, 2200);
-        }
-
         function isPendingJobFresh(job) { return Boolean(job && job.customerId && job.jobId && Number(job.startedAt) >= (now() - PENDING_TTL_MS)); }
         function pruneExpiredPendingJobs() { let removed = 0; Array.from(pendingJobs.values()).forEach(function (job) { if (isPendingJobFresh(job)) return; clearPollTimer(job && job.jobId); removePendingJob(job && job.customerId); removed += 1; }); return removed; }
         function readPendingJobs() { pruneExpiredPendingJobs(); return Array.from(pendingJobs.values()); }
@@ -462,7 +431,8 @@
             if (finishedPhotoRefreshRunning) return finishedPhotoRefreshPromise;
             finishedPhotoRefreshRunning = true; if (finishedPhotoRefreshTimer && typeof global.clearTimeout === "function") global.clearTimeout(finishedPhotoRefreshTimer); finishedPhotoRefreshTimer = null;
             const customerIds = Array.from(finishedPhotoRefreshIds), successCount = customerIds.filter(function (id) { return finishedPhotoSuccessIds.has(id); }).length; finishedPhotoRefreshIds.clear(); finishedPhotoSuccessIds.clear();
-            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); if (successCount && typeof setStatusMessage === "function") setStatusMessage(successCount === 1 ? "Webdesign klaar. De lead staat nu bij Mailklaar." : successCount + " webdesigns klaar en naar Mailklaar verplaatst.", "success", true); }
+            const costText = costReporter.consume(customerIds);
+            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); if (successCount && typeof setStatusMessage === "function") setStatusMessage((successCount === 1 ? "Webdesign klaar. De lead staat nu bij Mailklaar." : successCount + " webdesigns klaar en naar Mailklaar verplaatst.") + (costText ? " " + costText : ""), "success", true); }
             finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh("", false); }
         }
 
@@ -554,6 +524,7 @@
                     throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-status laden is mislukt.");
                 }
                 if (job.status === "done") {
+                    costReporter.report(job);
                     await finishPendingJob(storedJob, "", "success");
                     return;
                 }
@@ -726,7 +697,7 @@
             }
             if (!quiet) {
                 setStatusMessage("");
-                showChargeLabel(variant);
+                costReporter.show(variant);
             }
             const jobId = createJobId();
             setPendingJob({ customerId: target.id, jobId: jobId, variant: variant, startedAt: now() }, { deferRender: deferRender });
@@ -748,6 +719,7 @@
                 if (job.id !== jobId) clearPollTimer(jobId);
                 setPendingJob({ customerId: target.id, jobId: job.id, variant: normalizeVariant(job.variant || variant), startedAt: Math.max(0, Number(job.createdAt) || now()) }, { deferRender: true });
                 if (job.status === "done") {
+                    costReporter.report(job);
                     await finishPendingJob({ customerId: target.id, jobId: job.id }, "", "success");
                     return { started: true, done: true, jobId: job.id };
                 }
