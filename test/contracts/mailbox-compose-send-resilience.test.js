@@ -350,6 +350,80 @@ test('real SMTP reply accepts the server-canonical References chain before dispa
   );
 });
 
+test('SMTP preflight and browser agree on incoming Message-ID whitespace without weakening scope checks', async (t) => {
+  const canonicalMessageId = '<Inbound.Case$Part@Example.nl>';
+  const cases = [
+    ['canonical', canonicalMessageId],
+    ['trailing inner space', '<Inbound.Case$Part@Example.nl >'],
+    ['leading inner space', '< Inbound.Case$Part@Example.nl>'],
+    ['folded header', '<\r\n\tInbound.Case$Part@Example.nl\r\n >'],
+    ['bare identifier', ' Inbound.Case$Part@Example.nl '],
+    ['bare folded identifier', 'Inbound.Case$Part@Example.nl\t'],
+  ];
+  for (const [label, sourceMessageId] of cases) {
+    await t.test(label, async () => {
+      const original = basePayload();
+      const payload = {
+        ...original,
+        context: { ...original.context, messageId: sourceMessageId, references: '<Root.Case@Example.nl>' },
+        replyIdentity: {
+          version: 1, provider: 'smtp', owner: original.owner, accountEmail: original.account,
+          sourceMessageId, conversationId: original.context.conversationId,
+        },
+      };
+      const resolver = createMailboxComposeThreadContext({
+        mailboxIndexStore: {
+          async getMessageForReplyProof() {
+            return {
+              accountEmail: payload.account, email: payload.to, messageId: sourceMessageId,
+              references: payload.context.references,
+            };
+          },
+        },
+        getOwnerIdentity: () => ({ profileKey: 'serve', name: 'Servé Creusen' }),
+      });
+      const provenance = await resolver.resolve({
+        body: payload, accountEmail: payload.account, recipientEmail: payload.to, provider: 'smtp',
+      });
+      const intent = createMailboxSendProvenanceStore().preview({
+        ...provenance, subject: payload.subject, body: payload.body, requestBody: payload.body,
+        cc: '', bcc: '', attachments: [], attachmentsMetadata: [],
+      });
+      const proof = signMailboxReconcileProof(createMailboxReconcileProof(intent), 'test-only-secret');
+      const calls = [];
+      await createProtocol({
+        fetch: async (url, request) => {
+          const requestPayload = parseRequest(request);
+          calls.push(url);
+          if (url.endsWith('/preflight')) {
+            return response(200, { ok: true, result: preflightResult({ ...requestPayload, reconcileProof: proof }) });
+          }
+          assert.equal(requestPayload.reconcileProof.replyTargetMessageId, canonicalMessageId);
+          assert.equal(requestPayload.reconcileProof.references, `<Root.Case@Example.nl> ${canonicalMessageId}`);
+          return response(200, { ok: true, result: acceptedSendResult('whitespace-reply') });
+        },
+      }).execute({ payload, attachments: [] });
+      assert.deepEqual(calls, ['/api/mailbox/send/preflight', '/api/mailbox/send']);
+
+      // Formatting normalization must never make a different, case-sensitive target valid.
+      await assert.rejects(resolver.resolve({
+        body: { ...payload, replyIdentity: { ...payload.replyIdentity, sourceMessageId: '<inbound.Case$Part@Example.nl>' } },
+        accountEmail: payload.account, recipientEmail: payload.to, provider: 'smtp',
+      }), (error) => error.code === 'MAILBOX_REPLY_TARGET_MISMATCH');
+      let sends = 0;
+      await assert.rejects(createProtocol({
+        fetch: async (url, request) => {
+          if (!url.endsWith('/preflight')) { sends += 1; throw new Error('Unexpected send'); }
+          return response(200, { ok: true, result: preflightResult({ ...parseRequest(request), reconcileProof: proof }, 'ready', {
+            replyTargetMessageId: '<different@Example.nl>',
+          }) });
+        },
+      }).execute({ payload, attachments: [] }), (error) => error.code === 'MAILBOX_SEND_PREFLIGHT_SCOPE_MISMATCH');
+      assert.equal(sends, 0);
+    });
+  }
+});
+
 test('real Instantly reply accepts the exact provider message as reply proof before dispatch', async () => {
   const payload = {
     ...basePayload(),

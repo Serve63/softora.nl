@@ -9,7 +9,14 @@ const REPLY_IDENTITY_VERSION = 1;
 
 function normalizeMessageId(value) {
   const text = normalizeText(value);
-  return !text || (text.startsWith('<') && text.endsWith('>')) ? text : `<${text.replace(/[<>]/g, '')}>`;
+  if (!text) return '';
+  // Match the browser preflight identity, including malformed/folded inbound headers.
+  // Preserve case: this is a message identity, not an email address.
+  if (text.startsWith('<') && text.endsWith('>') && /^[^<>\s]+$/.test(text.slice(1, -1))) {
+    return text;
+  }
+  const token = text.replace(/[<>\s]/g, '');
+  return token ? `<${token}>` : '';
 }
 
 function parseReferences(value) {

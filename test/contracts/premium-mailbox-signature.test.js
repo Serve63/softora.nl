@@ -3,6 +3,61 @@ const assert = require('node:assert/strict');
 
 const signature = require('../../assets/premium-mailbox-signature.js');
 
+test('mailbox bewaart een los telefoonnummer in een handtekening voor een Apple Mail-citaat', () => {
+  for (const [phone, href] of [
+    ['06-12345678', 'tel:0612345678'],
+    ['06 12 34 56 78', 'tel:0612345678'],
+    ['(073) 123 45 67', 'tel:0731234567'],
+    ['+31 6 12345678', 'tel:+31612345678'],
+    ['0032 470 12 34 56', 'tel:+32470123456'],
+  ]) {
+    const quote = [
+      'Op 7 sep 2026 om 13:38 heeft Servé Creusen <serve@example.nl> het volgende geschreven:',
+      'Goedendag,',
+      'Met vriendelijke groet,',
+      'Servé Creusen',
+      '06-87654321',
+    ];
+    const parsed = signature.parseIncoming([
+      'Kunnen we morgenmiddag even bellen?',
+      '',
+      'Groet',
+      'Robin Voorbeeld',
+      phone,
+      '',
+      ...quote,
+    ].join('\n'));
+
+    assert.equal(parsed.matched, true, phone);
+    assert.equal(parsed.contact.phone, phone);
+    assert.equal(parsed.contact.phoneHref, href);
+    assert.deepEqual(parsed.bodyLines, ['Kunnen we morgenmiddag even bellen?', '', ...quote]);
+    const html = signature.renderContactCard(parsed.contact);
+    assert.ok(html.includes(`href="${href}">${phone}</a>`), phone);
+    assert.doesNotMatch(html, /87654321/);
+  }
+});
+
+test('mailbox verwart losse datums en bedrijfsnummers niet met een telefoonnummer', () => {
+  for (const value of ['2026-09-08', '07-09-2026', '17122606', '1234567890', '1234 AB', '06-123', 'NL001751168B24']) {
+    const parsed = signature.parseIncoming(`Antwoord.\n\nGroet\nVoorbeeld\n${value}`);
+    assert.equal(parsed.contact.phone, '', value);
+  }
+  const quoteOnly = signature.parseIncoming([
+    'Antwoord.',
+    'Groet',
+    'Voorbeeld',
+    '',
+    'Op 7 sep 2026 om 13:38 heeft Servé Creusen <serve@example.nl> het volgende geschreven:',
+    'Groet',
+    'Servé',
+    '06-87654321',
+  ].join('\n'));
+  assert.equal(quoteOnly.contact.phone, '');
+  const bodyOnly = 'Bel mij op\n06-12345678';
+  assert.deepEqual(signature.parseIncoming(bodyOnly).bodyLines, bodyOnly.split('\n'));
+});
+
 test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend telefoon en adres', () => {
   const body = [
     'Ziet er zeker gaaf uit!',
