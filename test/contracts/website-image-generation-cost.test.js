@@ -13,8 +13,8 @@ test('image cost includes prompt and reference input, not only output', () => {
   assert.equal(result.cost.amountUsd, 0.18564); // $0.005 prompt + $0.016 reference + $0.16464 image.
   assert.equal(result.cost.currency, 'USD');
   assert.equal(result.quality, 'max');
-  assert.equal(formatGenerationCost(result), 'US$0,18564 beeldkosten (excl. btw)');
-  assert.equal(formatOutputEstimate(1), 'ca. US$0,16464 + invoer');
+  assert.equal(formatGenerationCost(result), 'ca. €0,20 incl. invoer en 21% btw');
+  assert.equal(formatOutputEstimate(1), 'ca. €0,18 + invoer (incl. 21% btw)');
 });
 
 test('cached text and cached image tokens receive their own discounted rates', () => {
@@ -49,10 +49,10 @@ test('the completed price replaces the estimate and survives the photo refresh a
   }, requestAnimationFrame: (fn) => fn(), setTimeout() {} };
   const reporter = createCostReporter({ root, costEur: null, setStatusMessage: (text) => messages.push(text) });
   reporter.show('v2-visual-dna');
-  assert.equal(labels[0].textContent, 'ca. US$0,16464 + invoer');
+  assert.equal(labels[0].textContent, 'ca. €0,18 + invoer (incl. 21% btw)');
   reporter.report({ customerId: 'example', company: 'Example', generation: metadata(payload) });
-  assert.equal(labels[1].textContent, 'US$0,18564 beeldkosten (excl. btw)');
-  assert.equal(messages[0], 'Example · US$0,18564 beeldkosten (excl. btw)');
-  assert.equal(reporter.consume(['example']), 'US$0,18564 beeldkosten (excl. btw)');
+  assert.equal(labels[1].textContent, 'ca. €0,20 incl. invoer en 21% btw');
+  assert.equal(messages[0], 'Example · ca. €0,20 incl. invoer en 21% btw. ' + require('../../assets/premium-database-photo-batch').pricingNote);
+  assert.equal(reporter.consume(['example']), 'ca. €0,20 incl. invoer en 21% btw');
   assert.equal(reporter.consume(['example']), '');
 });
