@@ -10,8 +10,8 @@ const script = fs.readFileSync(path.join(root, 'assets/relaxst-configurator-demo
 
 test('Relaxst demo keeps the configurator as a self-contained public page', () => {
   assert.match(html, /<title>Stel jouw ideale relaxstoel samen \| Relaxst<\/title>/);
-  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-4"/);
-  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-4"/);
+  assert.match(html, /href="\/assets\/relaxst-configurator-demo\.css\?v=20260908-5"/);
+  assert.match(html, /src="\/assets\/relaxst-configurator-demo\.js\?v=20260908-5"/);
   assert.match(html, /data-step-target="1"/);
   assert.match(html, /data-step-target="5"/);
   assert.match(html, /Interactieve conceptdemo/);
@@ -40,7 +40,8 @@ test('Relaxst demo exposes the promised product choices and live price logic', (
 
 test('Relaxst demo includes responsive and accessible interaction states', () => {
   assert.match(css, /@media \(max-width: 700px\)/);
-  assert.match(css, /\.builder-actions[\s\S]*?position: sticky/);
+  assert.match(css, /\.builder-actions\s*\{[^}]*position: static/);
+  assert.match(css, /@media \(min-width: 801px\) and \(max-height: 800px\)/);
   assert.match(css, /\.option-card\.is-selected/);
   assert.doesNotMatch(html, /hero-number|visual-orbit|id="stage-price"/);
   assert.match(html, /Jouw keuzes incl\. btw/);

@@ -194,7 +194,7 @@
 
   function renderComfortStep() {
     return `
-      <div class="step-intro"><h3>Kies je comfort</h3><p>Kies eerst de bediening en voeg daarna functies toe die jouw dagelijkse comfort verbeteren.</p></div>
+      <div class="step-intro"><h3>Kies je comfort</h3><p>Kies de bediening en voeg eventueel extra comfort toe.</p></div>
       <div class="choice-section">
         <p class="choice-label">Bediening</p>
         <div class="option-grid mechanism-grid">
@@ -211,7 +211,7 @@
             <label class="option-card feature-card ${state.extras.has(id) ? 'is-selected' : ''}">
               <input type="checkbox" name="extra" value="${id}" ${state.extras.has(id) ? 'checked' : ''}>
               <span class="feature-icon" aria-hidden="true">${item.icon}</span>
-              <span class="option-card-text"><strong>${item.name}</strong><small>${item.note}<br>+ ${formatPrice(item.price)}</small></span>
+              <span class="option-card-text"><strong>${item.name}</strong><small>${item.note} <span class="feature-price">+ ${formatPrice(item.price)}</span></small></span>
               <span class="checkmark" aria-hidden="true">✓</span>
             </label>`).join('')}
         </div>
