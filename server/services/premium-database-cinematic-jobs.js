@@ -2,7 +2,7 @@ const { Readable } = require('node:stream');
 
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
+const DEFAULT_IMAGE_MODEL = 'gpt-image-2.5-sunburst';
 const DEFAULT_VEO_MODEL = 'veo-3.1-generate-preview';
 const DEFAULT_IMAGE_COUNT = 8;
 const MIN_IMAGE_SEQUENCE_COUNT = 4;

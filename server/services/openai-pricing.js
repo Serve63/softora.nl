@@ -57,7 +57,13 @@ function getOpenAiImageCostUsdPerImage(modelRaw, sizeRaw, deps = {}) {
   const isPortraitOrLandscape = size === '1024x1536' || size === '1536x1024';
   const isSquare = size === '1024x1024';
 
-  if (model.includes('gpt-image-2') || model === 'chatgpt-image-latest') {
+  // GPT Image 2.5 has different token consumption; the GPT Image 2 per-image calculator does not apply.
+  if (/^gpt-image-2\.5-/.test(model)) {
+    throw Object.assign(new Error('GPT Image 2.5 beeldkosten vereisen werkelijke tokenusage of de officiële Costs API; het GPT Image 2 tarief per beeld is niet toepasbaar.'), {
+      code: 'OPENAI_IMAGE_USAGE_TOKENS_REQUIRED',
+    });
+  }
+  if (model === 'gpt-image-2' || model === 'chatgpt-image-latest') {
     if (isPortraitOrLandscape) return GPT_IMAGE_2_1024X1536_USD_BY_QUALITY[quality];
     if (isSquare) return GPT_IMAGE_2_1024X1024_USD_BY_QUALITY[quality];
     return GPT_IMAGE_2_1024X1536_USD_BY_QUALITY[quality];

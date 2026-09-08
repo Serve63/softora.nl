@@ -1456,8 +1456,8 @@
             <div class="photo-preview-meta" id="photoPreviewMeta"></div>
         </div>
     </div>
-    <script src="assets/premium-database-photo-batch.js?v=20260616a"></script>
-    <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-webdesign-action.js?v=20260726a"></script><script src="assets/premium-database-webdesign-preview.js?v=20260714b"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
+    <script src="assets/premium-database-photo-batch.js?v=20260908-sunburst-costs"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-webdesign-action.js?v=20260908-sunburst-costs"></script><script src="assets/premium-database-webdesign-preview.js?v=20260714b"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
     <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606d"></script><script src="assets/premium-database-system-mail-count.js?v=20260811a"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260616b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
@@ -1478,7 +1478,7 @@
         const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
         const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;
-        const WEBSITE_PHOTO_COST_EUR = 0.005; const TABLE_PAGE_SIZE = 25;
+        const WEBSITE_PHOTO_COST_EUR = null; const TABLE_PAGE_SIZE = 25;
         const DATABASE_LAZY_SCRIPT_URLS = { deepSearchHelpers: "assets/premium-database-deep-search-helpers.js?v=20260521b", targetCoords: "assets/premium-database-target-coords.js?v=20260616a", deepSearch: "assets/premium-database-deep-search.js?v=20260521d" };
         const COLDMAIL_TEST_COMPANIES = ["mcv e-commerce", "softora testmodus"];
         const ORDER_SCOPE = "premium_active_orders";
@@ -2149,14 +2149,14 @@
 
         function buildDatabaseMediaDebugItems(customers) { return (customers || []).slice(0, 30).map(function (customer) { const assetState = buildCustomerWebdesignAssetState(customer); return { id: customer.id, status: customer.status, bedrijf: customer.bedrijf, hasPhoto: assetState.hasPhoto, hasMockup: assetState.hasMockup, mockupApproved: assetState.mockupApproved, mockupState: assetState.mockupState, isMailReady: assetState.isMailReady, canGeneratePhoto: assetState.canGeneratePhoto, canRepairMockup: assetState.canRepairMockup }; }); }
 
-        function formatEuroCost(value) { return "€" + Number(value || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function formatEuroCost(value) { return window.SoftoraDatabasePhotoBatch.formatEuroCost(value); }
 
         function isMailReadyCalculationPending() { if (state.activeStatus !== "benaderbaar" && state.activeStatus !== "beschikbaar") return false; if (state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || !hasLoadedColdmailGuard()) return true; if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded) return false; if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded) return false; if (state.activeStatus === "benaderbaar" && state.photoRestoreFailed && !state.mailReadySnapshotLoaded) return true; return false; }
         function renderPhotoBatchHeader(customers, pending, eligibleCountOverride, resultText) { const showPhotoBatchControl = state.activeStatus === "beschikbaar"; if (nodes.photoHeaderTitle) nodes.photoHeaderTitle.hidden = showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl; if (!showPhotoBatchControl) return;
             const displayText = resultText || "-- resultaten"; nodes.count.textContent = displayText; if (pending) { nodes.generatePhotosButton.disabled = true; nodes.generatePhotosButton.title = "Beschikbare data wordt nog geladen."; nodes.generatePhotosButton.setAttribute("aria-label", "Beschikbare resultaten laden"); return; }
             if (nodes.generatePhotosButton.dataset.generating !== "true") nodes.generatePhotosButton.disabled = false;
-            const eligibleCount = Number.isFinite(Number(eligibleCountOverride)) ? Math.max(0, Number(eligibleCountOverride)) : (customers || []).filter(isWebdesignPhotoEligible).length, totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
-            nodes.generatePhotosButton.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. Totale kosten: " + formatEuroCost(totalCost) + ".";
+            const eligibleCount = Number.isFinite(Number(eligibleCountOverride)) ? Math.max(0, Number(eligibleCountOverride)) : (customers || []).filter(isWebdesignPhotoEligible).length;
+            nodes.generatePhotosButton.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. Kosten variëren per afbeelding.";
             nodes.generatePhotosButton.setAttribute("aria-label", displayText + " - webdesigns maken");
         }
         function resetVisibleLimit() { state.visibleLimit = TABLE_PAGE_SIZE; }

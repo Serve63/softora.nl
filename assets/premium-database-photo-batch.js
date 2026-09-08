@@ -13,10 +13,15 @@
     document.head.appendChild(style);
   }
 
+  function formatEuroCost(value) {
+    if (!Number.isFinite(value)) return "kosten variabel";
+    return "€" + value.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function createController(options) {
     const nodes = options.nodes;
     const getTargets = options.getTargets;
-    const formatEuroCost = options.formatEuroCost;
+    const formatCost = options.formatEuroCost || formatEuroCost;
     const costEur = options.costEur;
     const closeAddActions = options.closeAddActions;
     const setStatusMessage = options.setStatusMessage;
@@ -39,15 +44,15 @@
       const selectedCount = mode === "all"
         ? total
         : (Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, total) : 0);
-      const selectedCost = selectedCount * costEur;
+      const selectedCost = Number.isFinite(costEur) ? selectedCount * costEur : null;
 
       nodes.photoBatchChoiceButtons.forEach(function (optionNode) {
         optionNode.classList.toggle("is-active", optionNode.dataset.photoBatchMode === mode);
       });
-      nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total) + " · " + formatEuroCost(total * costEur);
+      nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total) + " · " + formatCost(Number.isFinite(costEur) ? total * costEur : null);
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
       nodes.photoBatchSummary.textContent = message || (selectedCount
-        ? "Selectie: " + formatPhotoBatchCount(selectedCount) + " · " + formatEuroCost(selectedCost)
+        ? "Selectie: " + formatPhotoBatchCount(selectedCount) + " · " + formatCost(selectedCost)
         : "Vul minimaal 1 in.");
     }
 
@@ -149,7 +154,7 @@
     };
   }
 
-  window.SoftoraDatabasePhotoBatch = {
-    createController: createController,
-  };
+  const api = { createController: createController, formatEuroCost: formatEuroCost };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof window !== "undefined") window.SoftoraDatabasePhotoBatch = api;
 }());

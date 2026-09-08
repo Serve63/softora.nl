@@ -13,7 +13,7 @@ const {
   resolveReferenceFetchAttempts,
 } = require('./ai-reference-fetch');
 const {
-  isSupportedOpenAiImageModel,
+  isSupportedOpenAiImageModel, normalizeOpenAiImageGenerationQuality,
   requiresLegacyOpenAiImageResponseFormat,
   supportsOpenAiInputFidelity,
   supportsOpenAiReferenceImageEdits,
@@ -710,7 +710,7 @@ function createAiRemoteService(deps = {}) {
       .slice(0, 5);
   }
 
-  function resolveOpenAiWebsitePreviewImageQuality(scan = {}) {
+  function resolveOpenAiWebsitePreviewImageQuality(scan = {}, imageModel = '') {
     const raw = normalizeString(
       scan.imageQuality ||
         scan.websitePreviewImageQuality ||
@@ -719,7 +719,7 @@ function createAiRemoteService(deps = {}) {
         env.OPENAI_IMAGE_QUALITY ||
         'low'
     ).toLowerCase();
-    return ['low', 'medium', 'high', 'auto'].includes(raw) ? raw : 'low';
+    return normalizeOpenAiImageGenerationQuality(raw, imageModel);
   }
 
   function isSupportedWebsitePreviewReferenceMimeType(mimeTypeRaw) {
@@ -1088,7 +1088,7 @@ function createAiRemoteService(deps = {}) {
       throw err;
     }
     const imageModel = normalizeString(
-      openAiImageModel || env.WEBSITE_PREVIEW_IMAGE_MODEL || env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
+      openAiImageModel || env.WEBSITE_PREVIEW_IMAGE_MODEL || env.OPENAI_IMAGE_MODEL || 'gpt-image-2.5-sunburst'
     );
     if (!isSupportedOpenAiImageModel(imageModel)) {
       const err = new Error(`OpenAI image-model ongeldig geconfigureerd (${imageModel || 'leeg'})`);
@@ -1096,7 +1096,7 @@ function createAiRemoteService(deps = {}) {
       err.data = {
         error: {
           detail:
-            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-2, chatgpt-image-latest, gpt-image-1.5 of gpt-image-1-mini.',
+            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-2.5-sunburst, gpt-image-2, chatgpt-image-latest, gpt-image-1.5 of gpt-image-1-mini.',
         },
       };
       throw err;
@@ -1107,7 +1107,7 @@ function createAiRemoteService(deps = {}) {
     );
     const primaryImageSize = requestedImageSize || '2160x3840';
     const fallbackImageSize = primaryImageSize === '1024x1536' ? '' : '1024x1536';
-    const imageQuality = resolveOpenAiWebsitePreviewImageQuality(scan);
+    const imageQuality = resolveOpenAiWebsitePreviewImageQuality(scan, imageModel);
     const inputFidelity = normalizeString(
       scan.referenceImageFidelity || scan.websitePreviewReferenceImageFidelity || ''
     ).toLowerCase();
