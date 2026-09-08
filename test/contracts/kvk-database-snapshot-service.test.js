@@ -48,6 +48,36 @@ function createSnapshot() {
   };
 }
 
+test('snapshot reads expire historical hourly activity without changing totals or stored data', async () => {
+  const snapshot = createSnapshot();
+  snapshot.state.last_60_minutes = {
+    treated: 24, usable: 24, without_website: 24,
+    unusable_grade_activity: { 1: { added: 15, removed: 12 } },
+  };
+  let now = new Date('2026-06-18T08:59:59Z');
+  const service = createKvkDatabaseSnapshotService({
+    fetchSupabaseRowByKeyViaRest: async () => ({ ok: true, body: {
+      payload: { snapshot, updatedAt: '2026-09-08T22:15:00Z' },
+    } }),
+    now: () => now,
+  });
+  const freshResponse = createJsonResponse();
+  await service.sendGetSnapshotResponse({}, freshResponse);
+  assert.equal(freshResponse.payload.snapshot.state.last_60_minutes.treated, 24);
+  now = new Date('2026-09-08T22:15:00Z');
+  const response = createJsonResponse();
+  await service.sendGetSnapshotResponse({}, response);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.payload.snapshot.state.last_60_minutes, {
+    treated: 0, usable: 0, without_website: 0,
+    unusable_grade_activity: { 1: { added: 0, removed: 0 } },
+  });
+  assert.equal(response.payload.snapshot.state.companies_found, 100);
+  assert.equal(response.payload.snapshot.state.with_website, 4);
+  assert.equal(response.payload.snapshot.generatedAt, snapshot.generatedAt);
+  assert.equal(snapshot.state.last_60_minutes.treated, 24);
+});
+
 test('kvk database snapshot service stores token-protected snapshots with a summary', async () => {
   const snapshot = createSnapshot();
   let savedRow = null;

@@ -7,11 +7,11 @@
   api.start({
     document: globalScope.document,
     window: globalScope.window || globalScope,
-    getState() {
+    getSnapshot() {
       try {
         if (typeof activeSnapshot === 'undefined') return null;
-        return activeSnapshot && typeof activeSnapshot.state === 'object'
-          ? activeSnapshot.state
+        return activeSnapshot && typeof activeSnapshot === 'object'
+          ? activeSnapshot
           : null;
       } catch {
         return null;
@@ -20,6 +20,22 @@
   });
 })(typeof globalThis === 'object' ? globalThis : this, function createKvkDatabaseMetricsApi() {
   const numberFormat = new Intl.NumberFormat('nl-NL');
+
+  // Activity belongs to the source's hour, never the time we fetched it.
+  // Share this rule with the snapshot API and re-evaluate it on every render.
+  function getLast60Minutes(snapshot, now = Date.now()) {
+    const activity = snapshot?.state?.last_60_minutes || {};
+    const generatedAt = Date.parse(snapshot?.generatedAt || '');
+    const age = Number(now) - generatedAt;
+    if (Number.isFinite(age) && age >= 0 && age < 60 * 60 * 1000) return activity;
+    function zeroCounts(counts) {
+      return Object.fromEntries(Object.entries(counts).map(([key, value]) => [
+        key,
+        value && typeof value === 'object' ? zeroCounts(value) : 0,
+      ]));
+    }
+    return zeroCounts(activity);
+  }
 
   function sumCounts(...values) {
     return values.reduce((total, value) => {
@@ -67,7 +83,8 @@
 
   function createController(deps = {}) {
     const documentRef = deps.document;
-    const getState = typeof deps.getState === 'function' ? deps.getState : () => null;
+    const getSnapshot = typeof deps.getSnapshot === 'function' ? deps.getSnapshot : () => null;
+    const now = typeof deps.now === 'function' ? deps.now : Date.now;
     const elements = {
       treatedTotal: documentRef.getElementById('companies-treated'),
       successfulFound: documentRef.getElementById('companies-successful-found'),
@@ -83,9 +100,10 @@
     };
 
     function renderMetrics() {
-      const scraperState = getState();
+      const snapshot = getSnapshot();
+      const scraperState = snapshot?.state;
       if (!scraperState) return;
-      const last60 = scraperState.last_60_minutes || {};
+      const last60 = getLast60Minutes(snapshot, now());
       const unusableGrades = scraperState.unusable_grades || {};
       const unusableGradeLast60 = last60.unusable_grades || {};
       const unusableGradeActivity = last60.unusable_grade_activity || {};
@@ -157,6 +175,7 @@
 
   return {
     createController,
+    getLast60Minutes,
     renderLast60Delta,
     renderUnusableGradeLast60,
     start,

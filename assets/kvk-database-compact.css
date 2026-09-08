@@ -23,7 +23,7 @@
 
   .app-shell {
     display: grid;
-    grid-template-rows: 30px 42px 82px minmax(0, 1fr) 184px;
+    grid-template-rows: 30px 42px 100px minmax(0, 1fr) 184px;
     gap: 9px;
     height: 100dvh;
     min-height: 0;
@@ -73,7 +73,7 @@
   }
 
   .stats-grid {
-    height: 82px;
+    height: 100px;
     min-height: 0;
     gap: 12px;
     margin: 0;
