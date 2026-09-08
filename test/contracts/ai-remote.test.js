@@ -719,6 +719,48 @@ test('ai remote service includes OpenAI upstream detail in image generation erro
   );
 });
 
+test('ai remote service preserves ordinary rejected requests as actionable errors', async () => {
+  const calls = [];
+  const warnings = [];
+  const { service } = createService({
+    logger: { warn: (...args) => warnings.push(args) },
+    fetchJsonWithTimeout: async (...args) => {
+      calls.push(args);
+      return {
+        response: { ok: false, status: 403, headers: { get: () => 'req_test_access' } },
+        data: { error: { code: 'permission_denied', type: 'invalid_request_error', message: 'Your request was rejected because this project lacks image access.' } },
+      };
+    },
+  });
+  await assert.rejects(() => service.generateWebsitePreviewImageWithAi({ host: 'example.com' }), error => {
+    assert.equal(error.status, 403);
+    assert.notEqual(error.openAiSafetyBlocked, true);
+    assert.equal(error.data.error.code, 'permission_denied');
+    assert.match(error.message, /lacks image access/);
+    return true;
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(warnings[0][1].safetyBlocked, false);
+  assert.equal(warnings[0][1].requestId, 'req_test_access');
+  assert.doesNotMatch(JSON.stringify(warnings), /openai-key|Authorization|prompt|lacks image access/);
+});
+
+test('ai remote service recognizes explicit moderation codes without explanatory text', async () => {
+  let calls = 0;
+  const { service } = createService({
+    fetchJsonWithTimeout: async () => {
+      calls++;
+      return { response: { ok: false, status: 400 }, data: { error: { code: 'moderation_blocked', message: 'Request declined.' } } };
+    },
+  });
+  await assert.rejects(() => service.generateWebsitePreviewImageWithAi({ host: 'example.com' }), error => {
+    assert.equal(error.openAiSafetyBlocked, true);
+    assert.equal(error.upstreamErrorCode, 'moderation_blocked');
+    return true;
+  });
+  assert.equal(calls, 1, 'moderation rejection must not trigger another image request');
+});
+
 test('ai remote service sanitizes OpenAI safety rejection details for image generation', async () => {
   const rawSafetyMessage =
     'Your request was rejected by the safety system. If you believe this is an error, contact us at help.openai.com and include the request ID req_caef77d7f5d84889803634ba4e82ac8a. safety_violations=[sexual].';

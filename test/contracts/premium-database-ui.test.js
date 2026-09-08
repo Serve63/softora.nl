@@ -4033,8 +4033,10 @@ test('premium database webdesign action keeps a failed job visible and never ann
   assert.equal(messages.some((item) => item.tone === 'success'), false);
 });
 
-test('premium database webdesign action hides safety-blocked job errors from the banner', async () => {
+for (const safetyPhase of ['start', 'poll']) test(`premium database webdesign action explains safety blocks during ${safetyPhase} without leaking provider details`, async () => {
   const messages = [];
+  const timers = [];
+  let photoRefreshes = 0;
   const chargeLabels = [];
   const document = {
     getElementById: () => null,
@@ -4056,13 +4058,15 @@ test('premium database webdesign action hides safety-blocked job errors from the
   };
   const webdesignActionClient = loadDatabaseWebdesignActionClient({
     document,
-    fetch: async () => ({
+    setTimeout(callback, delay) { const timer = { callback, delay }; timers.push(timer); return timer; },
+    clearTimeout(timer) { const index = timers.indexOf(timer); if (index >= 0) timers.splice(index, 1); },
+    fetch: async (_url, options) => ({
       ok: true,
       json: async () => ({
         job: {
           id: 'job-safety-blocked-1',
           customerId: 'customer-1',
-          status: 'error',
+          status: safetyPhase === 'poll' && options.method === 'POST' ? 'queued' : 'error',
           error: null,
           safetyBlocked: true,
         },
@@ -4089,12 +4093,19 @@ test('premium database webdesign action hides safety-blocked job errors from the
       messages.push({ message, tone, autoClear });
     },
     renderPage() {},
-    refreshPhotos: async () => {},
+    refreshPhotos: async () => { photoRefreshes++; },
   });
 
   await controller.generateForCustomer('customer-1');
+  if (safetyPhase === 'poll') {
+    const pollTimer = timers.find(timer => timer.delay === 0);
+    assert.ok(pollTimer);
+    pollTimer.callback();
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(photoRefreshes, 0);
 
-  assert.deepEqual(messages.filter((item) => item.tone === 'error'), []);
+  assert.deepEqual(messages.filter((item) => item.tone === 'error').map(item => item.message), ['De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen.']);
   assert.doesNotMatch(JSON.stringify(messages), /request ID|safety_violations|sexual|help\.openai\.com/i);
 });
 

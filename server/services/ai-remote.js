@@ -1,3 +1,4 @@
+const { isOpenAiSafetyBlockedError: isOpenAiSafetyRejectionData, buildOpenAiImageFailureDiagnostic } = require('./openai-image-errors');
 const brandColorGuard = require('./website-brand-color-guard');
 const { extractCssVariableColorHints, extractCssBrandPalette, extractCssBrandColorEvidence } = require('./website-brand-colors');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
@@ -113,40 +114,6 @@ function createAiRemoteService(deps = {}) {
 
   const OPENAI_WEBSITE_PREVIEW_SAFETY_DETAIL =
     'Deze websitepreview is door de AI-veiligheidscheck overgeslagen. Probeer opnieuw met een andere website of input.';
-
-  function collectOpenAiErrorText(value, out = []) {
-    if (value === null || value === undefined) return out;
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      out.push(String(value));
-      return out;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((entry) => collectOpenAiErrorText(entry, out));
-      return out;
-    }
-    if (typeof value === 'object') {
-      [
-        'message',
-        'detail',
-        'error',
-        'code',
-        'type',
-        'param',
-        'safety_violations',
-        'safetyViolations',
-        'violations',
-      ].forEach((key) => collectOpenAiErrorText(value[key], out));
-    }
-    return out;
-  }
-
-  function isOpenAiSafetyRejectionData(data, upstreamDetail) {
-    const haystack = collectOpenAiErrorText(data, [upstreamDetail]).map(normalizeString).join(' ').toLowerCase();
-    if (!haystack) return false;
-    return /safety[_ -]?violations|safety system|request was rejected|content policy|policy violation|violated policy/.test(
-      haystack
-    );
-  }
 
   function buildOpenAiWebsitePreviewSafetyError(response, data, model) {
     const err = new Error(OPENAI_WEBSITE_PREVIEW_SAFETY_DETAIL);
@@ -1160,6 +1127,7 @@ function createAiRemoteService(deps = {}) {
     let response = null;
     let data = null;
     let usedImageModel = imageModel;
+    let usedImageSize = primaryImageSize;
     let lastTransportError = null;
 
     for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
@@ -1176,6 +1144,7 @@ function createAiRemoteService(deps = {}) {
           timeoutMs: imageGenerationTimeoutMs,
         }));
         usedImageModel = attempt.imageModel;
+        usedImageSize = attempt.imageSize;
       } catch (error) {
         if (isOpenAiImageRetryableTransportError(error) && attemptIndex === attempts.length - 1) {
           buildOpenAiImageTransportError(error, imageGenerationTimeoutMs);
@@ -1198,6 +1167,9 @@ function createAiRemoteService(deps = {}) {
     }
 
     if (!response.ok) {
+      logger.warn?.('[AiRemote][website-image-rejected]', buildOpenAiImageFailureDiagnostic(response, data, {
+        model: usedImageModel, imageSize: usedImageSize, referenceImageCount: referenceImages.length,
+      }));
       const upstreamDetail = truncateText(
         normalizeString(data?.error?.message || data?.error?.detail || data?.error || data?.message || ''),
         500

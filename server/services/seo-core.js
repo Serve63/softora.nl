@@ -1,3 +1,5 @@
+const { removeHiddenWebsitePreviewContent } = require('./website-visible-html');
+
 function createSeoCore(deps = {}) {
   const {
     knownHtmlPageFiles = new Set(),
@@ -486,7 +488,7 @@ function createSeoCore(deps = {}) {
   }
 
   function extractWebsitePreviewScanFromHtml(htmlRaw, pageUrlRaw) {
-    const html = String(htmlRaw || '');
+    const html = removeHiddenWebsitePreviewContent(htmlRaw);
     const normalizedUrl = normalizeWebsitePreviewTargetUrl(pageUrlRaw);
     const parsedUrl = normalizedUrl ? new URL(normalizedUrl) : null;
     const source = extractSeoSourceFromHtml(html);
