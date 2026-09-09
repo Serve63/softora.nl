@@ -248,6 +248,31 @@ test('app middleware skips Supabase hydration for non-api requests', async () =>
   assert.equal(hydrateCalls, 0);
 });
 
+test('mailbox preferences reach their own durable store despite failed legacy hydration, without exempting other scopes', async () => {
+  const app = createAppRecorder(); let hydrateCalls = 0;
+  applyAppMiddleware(app, createDeps({ ensureRuntimeStateHydratedFromSupabase: async () => { hydrateCalls += 1; return false; } }));
+  const middleware = getLastMiddleware(app);
+  for (const req of [
+    { path: '/api/ui-state-set', query: { scope: 'premium_mailbox_preferences' } },
+    { path: '/api/ui-state/premium_mailbox_preferences', query: {} },
+  ]) {
+    let reachedStore = false;
+    middleware({ ...req, method: 'POST' }, {}, () => { reachedStore = true; });
+    assert.equal(reachedStore, true);
+  }
+  assert.equal(hydrateCalls, 0);
+  for (const scope of ['premium_mailbox_preferences_backup', 'premium_customers_database']) {
+    const blocked = await new Promise(resolve => middleware(
+      { method: 'POST', path: '/api/ui-state-set', query: { scope } },
+      { status(code) { this.code = code; return this; }, json(body) { resolve({ code: this.code, body }); } },
+      () => resolve({ code: 200 })
+    ));
+    assert.equal(blocked.code, 503);
+    assert.match(blocked.body.error, /Gedeelde Supabase-opslag/);
+  }
+  assert.equal(hydrateCalls, 2);
+});
+
 test('app middleware geeft audio-notitie uploads een grotere JSON-limiet', async () => {
   const app = createAppRecorder();
   const selectedLimits = [];

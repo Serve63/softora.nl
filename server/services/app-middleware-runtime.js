@@ -70,6 +70,7 @@ function applyAppMiddleware(app, deps = {}) {
     ],
     skipSupabaseHydrateUiStateScopes = [
       'premium_monthly_costs',
+      'premium_mailbox_preferences',
     ],
   } = deps;
 
