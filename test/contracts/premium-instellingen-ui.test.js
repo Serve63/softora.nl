@@ -116,7 +116,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(moduleRoutesSource, /label: 'Winnen'[\s\S]*label: 'Database'[\s\S]*label: "Servé's gezondheidsdossier"/);
-  assert.match(moduleRoutesSource, /Ruben zet toto/);
+  assert.match(moduleRoutesSource, /ai zet toto/);
   assert.match(moduleRoutesSource, /world watcher/);
   assert.match(moduleRoutesSource, /Flynow/);
   assert.match(moduleRoutesSource, /Transfermarkt/);

@@ -502,7 +502,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'kantoor-b-af', title: 'Kantoor B af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'world-watcher', title: "Ruben's World Watcher" \}/);
   assert.match(endGameCardsJs, /\{ id: 'rubens-vakantieradar', title: "Ruben's vakantieradar" \}/);
-  assert.match(endGameCardsJs, /\{ id: 'wereldkaart-bezochte-landen-2028', title: "Ruben's wereldkaart", timeframe: 2028, imageId: 'wereldkaart-bezochte-landen' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'wereldkaart-bezochte-landen-2028', title: 'Wereldkaart', timeframe: 2028, imageId: 'wereldkaart-bezochte-landen' \}/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
   assert.match(endGameCardsJs, /\{ id: 'vaste-parfum-voorraad', title: 'Vaste Parfum voorraad', imageId: 'eigen-parfum' \}/);
   assert.match(endGameCardsJs, /\{ id: 'alle-formaten-scheermesjes', title: 'Alle formaten scheermesjes' \}/);
@@ -547,11 +547,11 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Eigen kantoor', 'TV-scherm aan muur op kantoor', 'Prikbord op kantoor', 'Kapstok op kantoor', 'Zelfde bureau als Martijn',
     'Kantoor aangekleed met planten', 'Verfvlekken weg', 'Boekhouding verplaatst naar boven', 'Kantoorpand in Haaren',
     'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
-    "Servé's gezondheidsdossier", 'Ruben zet toto', 'Kantoor A af', 'Kantoor B af', "Ruben's World Watcher", "Ruben's vakantieradar", 'Ruben Romano',
+    "Servé's gezondheidsdossier", 'ai zet toto', 'Kantoor A af', 'Kantoor B af', "Ruben's World Watcher", "Ruben's vakantieradar", 'Transferoverzicht',
     'Ruben’s Company', 'Ruben’s Trading System', 'Jurisalem af', 'Gewenst lang kapsel', 'Gewenste kledingkast',
     'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
-    "Ruben's wereldkaart", 'Professionele fotoshoot', 'Persoonlijke handtekening',
+    'Wereldkaart', 'Professionele fotoshoot', 'Persoonlijke handtekening',
     'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
     'Sertraline vrij', 'Gratis opleiding via gemeente', 'Silence controle', 'Funnel Sites Live',
     '5 dagen streak', '10 dagen streak', '20 dagen streak', '50 dagen streak', '100 dagen streak', '365 dagen streak',
