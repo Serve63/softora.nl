@@ -52,9 +52,14 @@
   border-color: rgba(46, 115, 95, 0.72);
 }
 
+.kvk-stat-card-enhanced .stat-main > span {
+  min-height: 22px;
+  line-height: 1.2;
+}
+
 .stat-card-without-website .stat-main > span {
   font-size: 0.55rem;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .stat-card-decision .stat-main > span {
