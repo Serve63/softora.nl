@@ -40,7 +40,7 @@ for (const fileName of modulePages) {
     assert.match(res.body, /scrollbar-gutter:auto !important/);
     assert.match(res.body, /premium-sidebar-mobile\.css\?v=/);
     assert.doesNotMatch(res.body, /premium-sidebar-links\.js\?v=20260818a/);
-    assert.match(res.body, /premium-sidebar-links\.js\?v=20260909a/);
+    assert.match(res.body, /premium-sidebar-links\.js\?v=20260909d" defer blocking="render"/);
     assert.match(res.body, /function prefillPremiumSidebarActiveState/);
   });
 }
