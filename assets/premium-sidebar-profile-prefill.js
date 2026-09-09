@@ -189,6 +189,7 @@
             if (!Number.isFinite(savedAt) || Date.now() - savedAt > NAV_STATE_TTL_MS) return;
             if (!Number.isFinite(scrollTop) || scrollTop < 0) return;
             nav.scrollTop = Math.max(0, scrollTop);
+            nav.scrollLeft = Math.max(0, Number(state.scrollLeft) || 0);
             sidebar.setAttribute("data-sidebar-scroll-prefilled", "1");
         } catch (_) {
             /* ignore */

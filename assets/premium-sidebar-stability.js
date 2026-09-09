@@ -27,6 +27,7 @@
         if (!nav) return;
         writeCookieValue(NAV_STATE_KEY, JSON.stringify({
             scrollTop: Math.max(0, Number(nav.scrollTop) || 0),
+            scrollLeft: Math.max(0, Number(nav.scrollLeft) || 0),
             targetHref: String(targetHref || ""),
             savedAt: Date.now(),
         }), NAV_STATE_MAX_AGE_SECONDS);

@@ -33,9 +33,19 @@ for (const fileName of modulePages) {
     assert.doesNotMatch(sidebar, /data-sidebar-key="(?:agenda|coldmailing|bookkeeping|pdfs|websitegenerator)"/);
     assert.ok(res.body.indexOf('id="softora-premium-sidebar-critical"') < res.body.indexOf('assets/personnel-theme.css'));
     assert.match(res.body, /scrollbar-gutter:auto !important/);
+    assert.match(res.body, /premium-sidebar-mobile\.css\?v=/);
     assert.match(res.body, /function prefillPremiumSidebarActiveState/);
   });
 }
+
+test('mobile shell overrides desktop geometry and keeps navigation and logout reachable', () => {
+  const css = fs.readFileSync(path.join(root, 'assets/premium-sidebar-mobile.css'), 'utf8');
+  assert.match(css, /@media \(max-width: 900px\)/);
+  assert.match(css, /grid-template-areas: "logo profile" "nav nav"/);
+  assert.match(css, /overflow-x: auto !important; overflow-y: hidden !important/);
+  assert.match(css, /sidebar-footer \{[^}]*display: block !important/);
+  assert.match(css, /margin-left: 0 !important; width: 100% !important/);
+});
 
 test('empty-host rendering preserves page hooks and never adds owner navigation for staff', () => {
   const render = createPremiumSidebarShell();

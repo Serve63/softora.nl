@@ -24,6 +24,7 @@ const PREMIUM_SIDEBAR_LINKS_VERSION = '20260818a';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
+  `<link rel="stylesheet" href="/assets/premium-sidebar-mobile.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
   `<link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}">`,
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
   `<script src="/assets/premium-sidebar-autopilot.js?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}" defer></script>`,

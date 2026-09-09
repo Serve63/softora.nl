@@ -449,6 +449,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /function readCookieValue\(name\) \{/);
   assert.match(prefillSource, /function prefillPremiumSidebarScrollState\(\) \{/);
   assert.match(prefillSource, /nav\.scrollTop = Math\.max\(0, scrollTop\);/);
+  assert.match(prefillSource, /nav\.scrollLeft = Math\.max\(0, Number\(state\.scrollLeft\) \|\| 0\);/);
   assert.match(prefillSource, /avatarEl\.replaceChildren\(\);/);
   assert.doesNotMatch(prefillSource, /avatarEl\.innerHTML\s*=/);
   assert.match(prefillSource, /function mergeSessions\(primarySession, fallbackSession\) \{/);
@@ -475,6 +476,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /res\.setHeader\('X-Frame-Options', 'SAMEORIGIN'\);/);
   assert.match(htmlPagesSource, /frame-ancestors 'self'/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);
+  assert.match(htmlPagesSource, /premium-sidebar-mobile\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.js\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.js\?v=/);
