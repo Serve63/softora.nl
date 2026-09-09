@@ -20,12 +20,16 @@
       const models = new Set();
       const unavailable = !value || value.unavailable || typeof value.enabled !== 'boolean';
       for (const key of keys) {
+        if (Array.isArray(value?.activeWorkerKeys) && !value.activeWorkerKeys.includes(key)) continue;
         const worker = value?.workers?.[key];
         const beat = Date.parse(worker?.workerHeartbeatAt || '');
         const request = Date.parse(value?.requestedAt || '');
+        // Match the server's finite allowance for native Luna Max reasoning.
+        // A configured label alone does not extend an actual worker heartbeat.
+        const staleAfter = worker?.model === 'gpt-5.6-luna' && worker?.reasoningEffort === 'max' ? 600000 : 150000;
         const running = !unavailable && value.enabled && worker?.workerState === 'running'
           && !worker.stale && !worker.stalled && worker.queuePending !== false
-          && Number.isFinite(beat) && now - beat >= -5000 && now - beat <= 150000
+          && Number.isFinite(beat) && now - beat >= -5000 && now - beat <= staleAfter
           && (!Number.isFinite(request) || beat >= request);
         if (running) active++;
         const source = worker?.model ? worker : config[key];
@@ -48,7 +52,7 @@
       count.textContent = `${label}: ${group.active === null ? '—' : group.active} actief`;
       const model = root.document.createElement('span');
       model.textContent = group.models.join(' · ') || 'Model onbekend';
-      item.title = group.active === null ? 'Workerstatus tijdelijk niet beschikbaar.' : 'Actief bij een recente running-heartbeat. Model en denkniveau volgens de workerconfiguratie.';
+      item.title = group.active === null ? 'Werkstatus tijdelijk niet beschikbaar.' : 'Actief volgens de recente werkstatus. Model en denkniveau volgens de workerconfiguratie.';
       item.append(count, model);
       return item;
     });
