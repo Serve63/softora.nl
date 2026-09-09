@@ -87,7 +87,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /var isLinkedModule = item\.unlocked === true && Boolean\(moduleHref\);/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
   assert.match(moduleRoutesSource, /href: '\/premium-gezondheidsdossier'/);
-  assert.match(moduleRoutesSource, /href: '\/premium-omzetwerk'/);
+  assert.doesNotMatch(moduleRoutesSource, /href: '\/premium-omzetwerk'/);
   assert.match(userManagementSource, /card\.classList\.add\('settings-extra-card--locked'\);/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-locked', 'true'\);/);
   assert.match(userManagementSource, /card\.setAttribute\('aria-disabled', 'true'\);/);
@@ -111,8 +111,8 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /openLockedWinningModuleFromUrl/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
   assert.match(source, /premium-extra-modules\.js\?v=20260811a/);
-  assert.match(source, /settings-module-routes\.js\?v=20260906b/);
-  assert.match(source, /premium-user-management\.js\?v=20260909a/);
+  assert.match(source, /settings-module-routes\.js\?v=20260909a/);
+  assert.match(source, /premium-user-management\.js\?v=20260909b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(moduleRoutesSource, /label: 'Winnen'[\s\S]*label: 'Database'[\s\S]*label: "Servé's gezondheidsdossier"/);
@@ -120,8 +120,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(moduleRoutesSource, /world watcher/);
   assert.match(moduleRoutesSource, /Flynow/);
   assert.match(moduleRoutesSource, /Transfermarkt/);
-  assert.match(moduleRoutesSource, /OMZETWERK/);
-  assert.match(moduleRoutesSource, /Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1\.000\.000\./);
+  assert.doesNotMatch(moduleRoutesSource, /OMZETWERK/);
   assert.match(moduleRoutesSource, /Ruben’s Trading System/);
   assert.match(userManagementSource, /extraItemsForRender\.length \+ ' onderdelen'/);
   assert.doesNotMatch(userManagementSource, /Net Worth Index/);
