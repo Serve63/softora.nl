@@ -2536,7 +2536,10 @@ function createLegacyMissingRootScenario(options = {}) {
       },
       listMessagesReferencingMessageIdsForAccounts: async () => [],
       listUnthreadedSentCandidatesForConversations: async () => [],
-      listSentCandidatesForQuotedReplies: async () => options.sentCandidates || [],
+      listSentCandidatesForQuotedReplies: async () => {
+        if (options.quotedReadError) throw options.quotedReadError;
+        return options.sentCandidates || [];
+      },
       hydrateMessageBodies: async ({ messages }) => messages,
     },
     dataOpsStore: {
@@ -3099,4 +3102,10 @@ test('een teruggekeerde echte Sent-root vervangt de read-only fallback zonder du
   assert.equal(afterReplies[0].threadMessages[0].id, after.actualSent.id);
   assert.equal(afterReplies[0].threadMessages[0].legacyAcceptedRoot, undefined);
   assert.equal(afterReplies[0].threadMessages[0].messageId, after.actualSent.messageId);
+});
+
+test('quoteherstel publiceert geen ontbrekende oorspronkelijke mail bij een leesfout', async () => {
+  const error = Object.assign(new Error('Quote-Sent-read tijdelijk niet beschikbaar'), { status: 503 });
+  const { service } = createLegacyMissingRootScenario({ quotedReadError: error });
+  await assert.rejects(service.listReplies({ owner: 'serve' }), (actual) => actual === error);
 });

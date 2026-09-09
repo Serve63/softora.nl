@@ -42,7 +42,7 @@ const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thre
 const { collectCampaignThreadParticipantEmails } = require('./mailbox-campaign-participants');
 const { loadMailboxCampaignContactHistory } = require('./mailbox-campaign-contact-history');
 const { mapMailboxReads, listMessagesAcrossFolders } = require('./mailbox-campaign-read-batches');
-
+const { requireMailboxEvidenceRows } = require('../repositories/mailbox-read-evidence');
 function normalizeText(value) {
   return String(value || '').trim();
 }
@@ -1022,14 +1022,14 @@ function createMailboxCampaignRepliesService(deps = {}) {
           accountEmails: campaignMailboxAccounts,
           folder: 'sent',
           messageIds: parentMessageIds, priorityRead: true,
-        }).catch(() => [])
+        })
       : [];
     stage('parents');
     const targetedSentDescendantsResult = await listExactSentDescendants({
       mailboxIndexStore,
       seedMessages: [
         ...replies,
-        ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
+        ...requireMailboxEvidenceRows(targetedParentMessagesResult, 'parent-messages'),
       ],
       allowedAccountEmails: campaignMailboxAccounts,
     });
@@ -1046,7 +1046,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ...allSeedSentMessages,
       ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
       ...targetedSentDescendantsResult,
-      ...(Array.isArray(acceptedSendIntents) ? acceptedSendIntents.map(buildAcceptedProvenanceMessage) : []),
+      ...requireMailboxEvidenceRows(acceptedSendIntents, 'accepted-sends').map(buildAcceptedProvenanceMessage),
     ]);
     const exactConversations = attachSentThreadMessages(replies, sentMessages);
     const stableKeyCounts = new Map();

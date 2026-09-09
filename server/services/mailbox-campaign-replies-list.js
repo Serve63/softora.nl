@@ -37,9 +37,9 @@ function createMailboxCampaignRepliesList({
         return snapshot;
       }
     }
-    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies });
+    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies, includeSnapshotMessages });
     const indexedAt = Date.now();
-    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
+    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText, includeSnapshotMessages });
     const mergedAt = Date.now();
     const result = {
       ok: true,
@@ -53,7 +53,9 @@ function createMailboxCampaignRepliesList({
         instantly: instantlySync,
       },
     };
-    const serializedSnapshot = serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
+    // Only the explicit shared rebuild may replace the shared presentation cache.
+    // Interactive owner reads return their canonical result without another write.
+    const serializedSnapshot = includeSnapshotMessages && serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
     if (serializedSnapshot) {
       try {
         await setUiStateValues(

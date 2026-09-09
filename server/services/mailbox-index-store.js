@@ -1066,7 +1066,7 @@ function createMailboxIndexStore(deps = {}) {
     normalizeFolder,
     normalizeMessageRow,
   });
-  const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
+  const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run: runPriorityRead, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
   const targetedLookups = createMailboxIndexTargetedLookups({
     parseDateIso,
     run,
