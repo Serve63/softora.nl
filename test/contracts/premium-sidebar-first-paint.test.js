@@ -168,7 +168,6 @@ test('Extra is server-rendered from the shared module list before deferred perso
 });
 
 test('Extra deep link, open and back work synchronously without personnel JavaScript', () => {
-  const vm = require('node:vm');
   const createScreen = active => {
     const classes = new Set(active ? ['active'] : []);
     return { dataset: {}, classList: { add: name => classes.add(name), remove: name => classes.delete(name), contains: name => classes.has(name) } };
@@ -186,7 +185,7 @@ test('Extra deep link, open and back work synchronously without personnel JavaSc
     history: { pushState: (_state, _title, url) => { window.location.hash = url; }, replaceState: () => { window.location.hash = ''; } },
     addEventListener: (name, listener) => { events[name] = listener; }
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-settings-first-paint.js'), 'utf8'), { window, document });
+  require('../../assets/premium-settings-first-paint').initialize(window, document);
   assert.equal(extra.classList.contains('active'), true);
   assert.equal(overview.classList.contains('active'), false);
   assert.equal(personnel.classList.contains('active'), false);

@@ -1286,8 +1286,7 @@ test('sidebar scroll survives module/tile navigation and more than thirty second
   const window = { location: { pathname: '/premium-instellingen', href: '/premium-instellingen#extra', hash: '#extra' },
     addEventListener: (name, listener) => { events[name] = listener; } };
   const sessionStorage = { getItem: () => null };
-  const context = { window, document, sessionStorage, URL };
-  vm.runInNewContext(readRepoFile('assets/premium-sidebar-stability.js'), context);
+  require('../../assets/premium-sidebar-stability').initialize(window, document);
   // A module tile or browser history can leave without a sidebar click.
   events.pagehide();
   const key = 'softora_premium_sidebar_nav_state_v1';
@@ -1297,7 +1296,7 @@ test('sidebar scroll survives module/tile navigation and more than thirty second
   state.savedAt -= 120000;
   document.cookie = key + '=' + encodeURIComponent(JSON.stringify(state));
   nav.scrollTop = nav.scrollLeft = 0;
-  vm.runInNewContext(readRepoFile('assets/premium-sidebar-profile-prefill.js'), context);
+  require('../../assets/premium-sidebar-profile-prefill').initialize(window, document, sessionStorage);
   assert.equal(nav.scrollTop, 155);
   assert.equal(nav.scrollLeft, 24);
 });

@@ -13,8 +13,8 @@ function renderPremiumSettingsShell(html) {
   if (!html.includes(marker)) return html;
   const cards = sortExtraSettingsItems(EXTRA_MODULES).map((item, index) => {
     const linked = item.unlocked === true && Boolean(item.href);
-    const tag = linked ? 'button' : 'div';
-    const attributes = linked ? `type="button" data-settings-extra-href="${escape(item.href)}"`
+    const tag = linked ? 'a' : 'div';
+    const attributes = linked ? `href="${escape(item.href)}" data-settings-extra-href="${escape(item.href)}"`
       : 'data-settings-extra-locked="true" aria-disabled="true"';
     const status = linked ? svg('<polyline points="9 18 15 12 9 6"/>', 'tegel-arrow')
       : svg('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>', 'settings-extra-lock');

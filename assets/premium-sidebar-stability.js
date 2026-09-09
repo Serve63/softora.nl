@@ -1,4 +1,7 @@
-(function () {
+(function (initialize) {
+    if (typeof module === 'object' && module.exports) module.exports = { initialize };
+    else initialize(window, document);
+})(function (window, document) {
     var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
     var NAV_STATE_MAX_AGE_SECONDS = 60 * 60 * 24;
     function isPremiumPath() {
@@ -118,4 +121,4 @@
     } else {
         bindSidebarStability();
     }
-})();
+});
