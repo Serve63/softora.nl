@@ -965,3 +965,28 @@ test('ui-seo runtime keeps durable state reads critical and isolated by default'
   assert.match(source, /ignoreSupabaseRestFailureCooldown:\s*true/);
   assert.match(source, /suppressSupabaseRestFailureCooldown:\s*true/);
 });
+
+test('mailbox owner preferences remain readable through unrelated REST cooldowns and recover on the next request', async () => {
+  const { RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE, RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE } = require('../../server/services/ui-seo-runtime');
+  let failNextMailboxRead = true;
+  const { store, restReads } = createFixture({
+    uiStateReadTimeoutMsByScope: RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
+    uiStateReadOptionsByScope: RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE,
+    fetchResult: async (_key, _columns, _count, options) => {
+      if (!options.ignoreFailureCooldown || failNextMailboxRead) {
+        if (options.ignoreFailureCooldown) failNextMailboxRead = false;
+        return { ok: false, error: 'Supabase REST timeout / shared cooldown' };
+      }
+      return { ok: true, body: { payload: { values: { selected: 'martijn' } } } };
+    },
+  });
+  assert.equal(await store.getUiStateValues('unrelated_scope'), null);
+  assert.equal(await store.getUiStateValues('premium_mailbox_preferences'), null);
+  const state = await store.getUiStateValues('premium_mailbox_preferences');
+  assert.equal(state.values.selected, 'martijn');
+  assert.equal(state.source, 'supabase');
+  const mailboxReads = restReads.filter(read => read.rowKey === 'ui_state:premium_mailbox_preferences');
+  assert.equal(mailboxReads.length, 2, 'a transient failure must not disable subsequent preference reads for a minute');
+  assert.deepEqual(mailboxReads[1].requestOptions, { timeoutMs: 4000, ignoreFailureCooldown: true, suppressFailureCooldown: true });
+  assert.equal(restReads[0].requestOptions.ignoreFailureCooldown, false);
+});
