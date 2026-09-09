@@ -14,6 +14,7 @@ const steps = [
   ['run', 'check:quality-lock'],
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],
+  ['run', 'test:e2e:auth'],
   ['run', 'test:postgres:mailbox-locks'],
   ['run', 'test:postgres:mailbox-uid-protocol-gate'],
   ['run', 'test:postgres:mailbox-uid-generation-v2'],
