@@ -210,7 +210,55 @@
   }
 
   function cleanFieldValue(value) {
-    return normalizeWhitespace(value).replace(/\s*\[\d+\]\s*$/g, '').trim();
+    return normalizeWhitespace(value);
+  }
+
+  function safeContactHref(value) {
+    const source = String(value || '').trim();
+    if (!source || /[<>"\s]/.test(source)) return '';
+    try {
+      const url = new URL(/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#]|$)/i.test(source) ? `https://${source}` : source);
+      return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
+        ? url.href : '';
+    } catch (_) { return ''; }
+  }
+
+  function signatureReferenceLinks(body) {
+    const references = new Map();
+    for (const line of normalizeBody(body).split('\n')) {
+      const match = /^\s*\[(\d{1,3})\]\s*:?\s+(\S+)\s*$/.exec(line);
+      if (!match) continue;
+      const href = safeContactHref(match[2]);
+      // Conflicting definitions cannot prove which destination belongs to a label.
+      if (references.has(match[1]) && references.get(match[1]) !== href) references.set(match[1], '');
+      else if (!references.has(match[1])) references.set(match[1], href);
+    }
+    return references;
+  }
+
+  function normalizeSignatureLines(lines, messageContext) {
+    const evidence = buildSenderEvidence(messageContext);
+    return lines.flatMap((value) => {
+      let line = normalizeWhitespace(value);
+      if (/^[-*_•\s]+$/.test(line)) return [];
+      line = line.replace(/^\*+(?=\p{L})/u, '').replace(/\*+$/, '').trim();
+      line = line.replace(/^[📞☎☏]\uFE0F?\s*/u, 'Tel: ').replace(/^📍\s*/u, '');
+      // Only split an attached name when the actual sender identity supports it.
+      const joined = /^(.+?)(?=(?:Tel(?:efoon)?|Phone|Mobiel|Mobile)\.?\s*:\s*(?:\+|\d))/i.exec(line);
+      if (joined && valueMatchesSenderEvidence(joined[1], evidence)) {
+        line = `${joined[1].trim()}\n${line.slice(joined[1].length)}`;
+      }
+      return line.split('\n').flatMap((part) => {
+        const field = matchField(part);
+        const website = /(?:https?:\/\/|www\.)\S+$/i.exec(part);
+        if (field?.key === 'phone' && website && buildPhoneHref(part.slice(0, website.index).replace(/^[^:]+:\s*/, ''))) {
+          return [part.slice(0, website.index).trim(), website[0]];
+        }
+        const phone = extractUnlabelledPhone(part, evidence);
+        if (phone && part !== phone) return [part.slice(0, part.lastIndexOf(phone)).trim(), phone];
+        return [part];
+      });
+    });
   }
 
   function readFieldValue(lines, index, inlineValue) {
@@ -241,7 +289,7 @@
 
   function extractCompactDutchAddress(signatureLines) {
     const pattern = /^([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ.'’\- ]{1,80}\s+\d{1,5}[A-Za-z]?(?:[-/]\d{1,5}[A-Za-z]?)?)\s*\|\s*(\d{4})\s*([A-Za-z]{2})\s+([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ.'’\- ]{1,80})$/;
-    for (let index = 1; index < signatureLines.length; index += 1) {
+    for (let index = 0; index < signatureLines.length; index += 1) {
       const match = pattern.exec(normalizeWhitespace(signatureLines[index]));
       if (!match) continue;
       return {
@@ -269,44 +317,52 @@
     return (String(value || '').match(/\p{Nd}/gu) || []).join('');
   }
 
-  function isAdministrativeNumber(line, previousLine) {
-    const fields = [
-      { label: /^(?:kvk(?:[- ]?nummer)?|chamber (?:of|off) commerce)\s*:?\s*$/i, value: /^\d{8}$/ },
-      { label: /^(?:btw(?:[- ]?nummer)?|vat(?: number)?|tax number)\s*:?\s*$/i, value: /^[A-Z]{2}[A-Z0-9]{8,14}$/i },
-    ];
-    return fields.some(({ label, value }) => label.test(previousLine) && value.test(line));
-  }
-
-  function preserveUnrepresentedNumberLines(signatureLines, contact) {
-    const phoneDigits = numericText(contact.phone);
-    const addressDigits = contact.addressLines.map(numericText);
-    addressDigits.push(addressDigits.join(''));
-    const preserved = [];
-    let previousLine = '';
-    for (const value of signatureLines) {
-      const rawLine = normalizeWhitespace(value);
-      const line = /https?:\/\/|\S+@\S+\./i.test(rawLine)
-        ? rawLine.replace(/\s*\[\d{1,3}\]\s*$/, '')
-        : rawLine;
-      const digits = numericText(line);
-      const represented = digits && (
-        digits === phoneDigits ||
-        (/\p{L}/u.test(line) && addressDigits.includes(digits))
-      );
-      // A phone-format guess must never decide whether a number disappears.
-      // Keep every unrepresented numeric line verbatim, including extra phones,
-      // extensions, split numbers, unknown labels and international notation.
-      if (digits && !represented && !isAdministrativeNumber(line, previousLine)) {
-        preserved.push(line);
+  function preserveUnrepresentedLines(signatureLines, contact, values, references) {
+    const beforeLines = [];
+    const preservedLines = [];
+    const representedValues = Object.values(values).filter(Boolean).map(cleanFieldValue);
+    representedValues.push(...contact.addressLines);
+    const linkedReferences = new Set(signatureLines.flatMap((line) => {
+      const match = /^.+\s+\[(\d{1,3})\]$/.exec(line);
+      return match && references.get(match[1]) ? [match[1]] : [];
+    }));
+    let sawField = false;
+    for (let index = 0; index < signatureLines.length; index += 1) {
+      let line = normalizeWhitespace(signatureLines[index]);
+      if (!line || isStandaloneSignoff(line)) continue;
+      const referenceId = (value) => /^\s*\[(\d{1,3})\]\s*:?\s+\S+\s*$/.exec(value)?.[1];
+      if (linkedReferences.has(referenceId(line))) continue;
+      if (/^(?:Links|References):?$/i.test(line)) {
+        const tail = signatureLines.slice(index + 1).filter(Boolean);
+        if (tail.length && tail.every((value) => linkedReferences.has(referenceId(value)))) continue;
       }
-      if (line) previousLine = line;
+      const field = matchField(line);
+      const compactAddress = extractCompactDutchAddress([line]);
+      const represented = representedValues.includes(cleanFieldValue(line)) ||
+        (field && (!field.value || representedValues.includes(cleanFieldValue(field.value)))) ||
+        (compactAddress.street && contact.addressLines.includes(compactAddress.street) && contact.addressLines.includes(compactAddress.postcodeCity));
+      if (represented) sawField = true;
+      if (!represented) {
+        const reference = /^(.*?)\s+\[(\d{1,3})\]$/.exec(line);
+        if (reference) {
+          const href = references.get(reference[2]);
+          const label = reference[1].replace(/^[-•]\s*/, '');
+          if (href) line = `[${label}](${href})`;
+          else if (safeContactHref(label) || /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(label)) line = label;
+        }
+        // Preserve all remaining information, including names, roles, extra phones,
+        // unknown numbers and prose. Only exact represented values are deduplicated.
+        const target = sawField || numericText(line) ? preservedLines : beforeLines;
+        if (![...beforeLines, ...preservedLines].includes(line)) target.push(line);
+      }
     }
-    return preserved;
+    return { beforeLines, preservedLines };
   }
 
-  function extractContact(signatureLines, messageContext) {
+  function extractContact(sourceLines, messageContext, references) {
+    const signatureLines = normalizeSignatureLines(sourceLines, messageContext);
     const values = { phone: '', street: '', postcode: '', city: '', country: '' };
-    for (let index = 1; index < signatureLines.length; index += 1) {
+    for (let index = 0; index < signatureLines.length; index += 1) {
       const field = matchField(signatureLines[index]);
       if (!field || values[field.key]) continue;
       const fieldValue = readFieldValue(signatureLines, index, field.value);
@@ -315,7 +371,7 @@
     }
     if (!values.phone) {
       const senderEvidence = buildSenderEvidence(messageContext);
-      values.phone = signatureLines.slice(1)
+      values.phone = signatureLines
         .map((line) => extractUnlabelledPhone(line, senderEvidence)).find(Boolean) || '';
     }
     const compactAddress = extractCompactDutchAddress(signatureLines);
@@ -328,7 +384,8 @@
       phoneHref: buildPhoneHref(values.phone),
       addressLines,
     };
-    const preservedLines = preserveUnrepresentedNumberLines(signatureLines, contact);
+    const { beforeLines, preservedLines } = preserveUnrepresentedLines(signatureLines, contact, values, references);
+    if (beforeLines.length) contact.beforeLines = beforeLines;
     if (preservedLines.length) contact.preservedLines = preservedLines;
     return contact;
   }
@@ -373,7 +430,7 @@
             ...lines.slice(0, signatureStart),
             ...lines.slice(directBodyEnd),
           ]),
-      contact: extractContact(signatureLines, messageContext),
+      contact: extractContact(signatureLines, messageContext, signatureReferenceLinks(messageContext?.body || normalizedBody)),
       matched: true,
     };
   }
@@ -396,8 +453,21 @@
       .filter(Boolean);
     const preservedLines = (Array.isArray(source.preservedLines) ? source.preservedLines : [])
       .map(normalizeWhitespace).filter(Boolean);
-    if (!phone && !addressLines.length && !preservedLines.length) return '';
+    const beforeLines = (Array.isArray(source.beforeLines) ? source.beforeLines : [])
+      .map(normalizeWhitespace).filter(Boolean);
+    if (!phone && !addressLines.length && !preservedLines.length && !beforeLines.length) return '';
     const escapeValue = (value) => escapeMarkup(value).replace(/=/g, '&#61;');
+    function renderLine(line) {
+      const markdown = /^(?:[A-Z][.:]?\s+)?\[([^\[\]]+)\]\(([^\s]+)\)$/i.exec(line);
+      const raw = line.replace(/^(?:[-•]|(?:website|web|w|i|e(?:-?mail)?|from)[.:]?)\s+/i, '');
+      const email = /^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(raw) ? raw : '';
+      const href = markdown ? safeContactHref(markdown[2]) : safeContactHref(raw) || (email ? `mailto:${email}` : '');
+      const label = markdown ? markdown[1] : raw;
+      const content = href
+        ? `<a class="detail-mail-contact-link" href="${escapeValue(href)}"${/^https?:/.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeValue(label)}</a>`
+        : escapeValue(line);
+      return `<div class="detail-mail-contact-value">${content}</div>`;
+    }
     const items = [];
     if (phone) {
       const phoneValue = phoneHref
@@ -408,10 +478,9 @@
     if (addressLines.length) {
       items.push(`<div class="detail-mail-contact-item"><dt>Adres:</dt><dd class="detail-mail-contact-value">${addressLines.map(escapeValue).join(', ')}</dd></div>`);
     }
-    const preservedHtml = preservedLines
-      .map((line) => `<div class="detail-mail-contact-value">${escapeValue(line)}</div>`).join('');
+    const preservedHtml = preservedLines.map(renderLine).join('');
     const fieldsHtml = items.length ? `<dl class="detail-mail-contact-grid">${items.join('')}</dl>` : '';
-    return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening">${fieldsHtml}${preservedHtml}</address>`;
+    return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening">${beforeLines.map(renderLine).join('')}${fieldsHtml}${preservedHtml}</address>`;
   }
 
   const api = { parseIncoming, renderContactCard };

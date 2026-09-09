@@ -759,7 +759,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-compose-no-drag aria-label="Sluiten"/);
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
-  assert.match(pageSource, /assets\/premium-mailbox-signature\.js\?v=20260908c/);
+  assert.match(pageSource, /assets\/premium-mailbox-signature\.js\?v=20260909a/);
   const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20260908a');
   assert.doesNotMatch(pageSource, /<button[^>]+(?:spellcheck-compose|undo-spelling)/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);

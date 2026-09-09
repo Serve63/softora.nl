@@ -196,7 +196,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260908c/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260909a/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
@@ -222,8 +222,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260908c'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260908c') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260909a'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260909a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260907a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
@@ -3603,7 +3603,8 @@ test('mailbox bewaart Moniques eigen tekst en zet telefoon uit de suffix in een 
 
   assert.match(html, /Maar ik houd het graag bij mijn eigen ontwerp!/);
   assert.match(html, /Hartelijke Groeten Monique/);
-  assert.doesNotMatch(html, /Dierenkliniek ’t Spoor|T 073 123 45 67/);
+  assert.match(html, /detail-mail-contact-value">Dierenkliniek ’t Spoor/);
+  assert.doesNotMatch(html, /T 073 123 45 67/);
   assert.match(html, /detail-mail-contact-card/);
   assert.match(html, /href="tel:0731234567"/);
   assert.doesNotMatch(html, /Op di 4 aug 2026 om 16:37 schreef/);
@@ -3677,7 +3678,9 @@ test('mailbox rendert Lia haar antwoord en contactgegevens correct met en zonder
       expectedColdmailOccurrences,
       label
     );
-    assert.doesNotMatch(html, /LIA HESEMANS|eindredactie|auteursbegeleiding|schrijftraining|www\.stroomvantaal-popup\.nl/, label);
+    assert.match(html, /LIA HESEMANS/, label);
+    assert.match(html, /eindredactie \| auteursbegeleiding \| schrijftraining/, label);
+    assert.match(html, /href="http:\/\/www\.stroomvantaal-popup\.nl\/"/, label);
     assert.equal((html.match(/<dt>Telefoon:<\/dt>/g) || []).length, 1, label);
     assert.equal((html.match(/<dt>Adres:<\/dt>/g) || []).length, 1, label);
     assert.match(html, /class="detail-mail-contact-card"/, label);
@@ -3758,7 +3761,8 @@ test('mailbox vindt een sterke post-quote footer vóór een latere From-regel di
   });
 
   assert.match(html, /groet,<\/div>\s*<div class="detail-mail-line">Lia<\/div>/);
-  assert.doesNotMatch(html, /lia@example\.nl|LIA HESEMANS/);
+  assert.match(html, /href="mailto:lia@example\.nl"/);
+  assert.match(html, /LIA HESEMANS/);
   assert.equal((html.match(/<dt>Telefoon:<\/dt>/g) || []).length, 1);
   assert.equal((html.match(/<dt>Adres:<\/dt>/g) || []).length, 1);
   assert.match(html, /href="tel:0633688506">06 33688506<\/a>/);
@@ -4139,7 +4143,8 @@ test('mailbox toont TTV Irene als nieuwe reactie zonder standaardhandtekening pl
   });
 
   assert.match(html, /Ik ontvang graag een offerte voor de nieuwe website\./);
-  assert.doesNotMatch(html, /Steven van den Brink|Webmaster TTV Irene/);
+  assert.match(html, /detail-mail-contact-value">Steven van den Brink/);
+  assert.match(html, /detail-mail-contact-value">Webmaster TTV Irene/);
   assert.doesNotMatch(html, /From: secretaris@ttvirene\.nl|Begin doorgestuurd bericht/);
   assert.equal((html.match(/Afgelopen week kwam ik jullie website ttvirene\.nl tegen\./g) || []).length, 1);
   assert.match(html, /Jouw bericht/);
@@ -10581,15 +10586,19 @@ test('JT Performance signature wordt in hoofdmail en inkomende thread een veilig
     const contactBlock = html.match(/<address class="detail-mail-contact-card"[\s\S]*?<\/address>/)?.[0] || '';
     assert.match(contactBlock, /Nieuwe Baan 1, 5076 SV Haaren, Nederland/);
     assert.doesNotMatch(contactBlock, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
-    assert.doesNotMatch(html, /Best regards|Jeroen Sterke|JT-performance|Chamber|17122606|Tax Number|NL001751168B24/);
+    assert.doesNotMatch(html, /Best regards|tel:17122606/);
+    for (const value of ['Chamber off commerce:', '17122606', 'Tax Number', 'NL001751168B24']) assert.ok(contactBlock.includes(value), value);
+    assert.match(contactBlock, /Jeroen Sterke/);
+    assert.match(contactBlock, /JT-performance/);
+    assert.match(contactBlock, /href="mailto:service@jt-performance\.nl"/);
   }
-  assert.doesNotMatch(rootHtml, /jt-performance\.nl|service@jt-performance\.nl/);
-  assert.equal((threadHtml.match(/service@jt-performance\.nl/g) || []).length, 1);
+  assert.match(rootHtml, /href="http:\/\/www\.jt-performance\.nl\/"/);
+  assert.equal((threadHtml.match(/service@jt-performance\.nl/g) || []).length, 3);
   assert.match(rootHtml, /detail-mail-section-received[\s\S]*detail-mail-contact-card[\s\S]*<\/section>/);
   assert.equal(root.body, body);
 });
 
-test('Niels-signature verdwijnt in hoofdmail en thread terwijl Telefoon in de normale mailstijl blijft', () => {
+test('Niels-handtekening blijft leesbaar in hoofdmail en thread met behoud van de juiste berichtidentiteiten', () => {
   const authoredBody = [
     'Hallo Serve,',
     '',
@@ -10660,6 +10669,8 @@ test('Niels-signature verdwijnt in hoofdmail en thread terwijl Telefoon in de no
     phone: '06 - 29 03 73 59',
     phoneHref: 'tel:0629037359',
     addressLines: [],
+    beforeLines: ['Niels van Kollenburg'],
+    preservedLines: ['E. info@nielsvankollenburg.nl', 'W. nielsvankollenburg.nl', 'Klik hier voor meer info'],
   });
   for (const html of [rootHtml, threadHtml]) {
     assert.match(html, /Hallo Serve,/);
@@ -10669,15 +10680,16 @@ test('Niels-signature verdwijnt in hoofdmail en thread terwijl Telefoon in de no
     assert.equal((html.match(/>Jouw bericht<\/div>/g) || []).length, 1);
     assert.equal((html.match(/Dank voor je reactie\. Ik stuur je de online preview en licht de voordelen graag toe\./g) || []).length, 1);
     assert.match(html, /<dt>Telefoon:<\/dt><dd><a class="detail-mail-contact-link" href="tel:0629037359">06 - 29 03 73 59<\/a><\/dd>/);
-    assert.doesNotMatch(html, /<dt>Adres:<\/dt>|Muzikale groet|T\. 06 - 29 03 73 59|E\. info@nielsvankollenburg\.nl|W\. nielsvankollenburg\.nl|Klik hier voor meer info/i);
+    assert.doesNotMatch(html, /<dt>Adres:<\/dt>|Muzikale groet|T\. 06 - 29 03 73 59|E\. info@nielsvankollenburg\.nl|W\. nielsvankollenburg\.nl/i);
+    assert.match(html, /Klik hier voor meer info/);
     assert.match(html, /<span>Van:<\/span><strong>Niels van Kollenburg[\s\S]*?info@nielsvankollenburg\.nl[\s\S]*?<\/strong>/);
     assert.match(html, /<span>Aan:<\/span><strong>[\s\S]*?Servé Creusen[\s\S]*?servecreusen@softora\.nl[\s\S]*?<\/strong>/);
     assert.match(html, /<span>Van:<\/span><strong>Servé Creusen[\s\S]*?servecreusen@softora\.nl[\s\S]*?<\/strong>/);
     assert.match(html, /<span>Aan:<\/span><strong>[\s\S]*?Niels van Kollenburg[\s\S]*?info@nielsvankollenburg\.nl[\s\S]*?<\/strong>/);
   }
   for (const html of [rootHtml, threadHtml]) {
-    assert.equal((html.match(/Niels van Kollenburg/g) || []).length, 2);
-    assert.equal((html.match(/info@nielsvankollenburg\.nl/g) || []).length, 2);
+    assert.equal((html.match(/Niels van Kollenburg/g) || []).length, 3);
+    assert.equal((html.match(/info@nielsvankollenburg\.nl/g) || []).length, 4);
     assert.equal((html.match(/servecreusen@softora\.nl/g) || []).length, 2);
     assert.doesNotMatch(html, /Martijn van de Ven|martijn@softora\.nl/);
   }
@@ -10739,7 +10751,8 @@ test('Resin Art JR reverse-header en References-footer verdwijnen alleen bij é�
   assert.equal(presentation.body, 'Hoi Servé,\n\nDank voor het ontwerp, maar we gaan er niet mee verder.');
   assert.equal(presentation.signatureMatched, true);
   assert.match(html, /Dank voor het ontwerp, maar we gaan er niet mee verder\./);
-  assert.doesNotMatch(html, /Resin Art JR|schreef op 2026-08-19|References:|softora\.nl\/webdesign\/resin-art-jr/);
+  assert.doesNotMatch(html, /schreef op 2026-08-19|References:|softora\.nl\/webdesign\/resin-art-jr/);
+  assert.match(html, /detail-mail-contact-value">Resin Art JR/);
   assert.equal((html.match(/Afgelopen week kwam ik jullie website resinartjr\.nl tegen\./g) || []).length, 1);
   assert.equal(incoming.body, incomingBody);
 
