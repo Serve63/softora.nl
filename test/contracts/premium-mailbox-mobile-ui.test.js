@@ -9,7 +9,7 @@ test('mailbox laadt de pagina-eigen mobiele laag als laatste en ondersteunt veil
   const page = read('premium-mailbox.html');
   assert.match(page, /content="width=device-width, initial-scale=1\.0, viewport-fit=cover"/);
   assert.ok(page.indexOf('premium-mailbox-mobile.css?v=20260822a') > page.indexOf('</style>'));
-  const mailboxScriptIndex = page.indexOf('premium-mailbox.js?v=20260907a');
+  const mailboxScriptIndex = page.indexOf('premium-mailbox.js?v=20260909a');
   assert.ok(mailboxScriptIndex >= 0);
   assert.ok(page.indexOf('premium-mailbox-mobile.js?v=20260907a') > mailboxScriptIndex);
   assert.match(page, /data-mailbox-mobile-action="toggle-navigation"/);

@@ -15,4 +15,15 @@ async function readMailboxEvidenceBatches(items, read) {
   return results;
 }
 
-module.exports = { requireMailboxEvidenceRows, readMailboxEvidenceBatches };
+function createMailboxReadLimiter(maximum = 3) {
+  let active = 0;
+  const queue = [];
+  return async function limitedRead(operation) {
+    if (active >= maximum) await new Promise((resolve) => queue.push(resolve));
+    else active += 1;
+    try { return await operation(); }
+    finally { if (queue.length) queue.shift()(); else active -= 1; }
+  };
+}
+
+module.exports = { requireMailboxEvidenceRows, readMailboxEvidenceBatches, createMailboxReadLimiter };

@@ -371,6 +371,7 @@ async function mergeCampaignReplies({
       instantlySync = {
         ok: false,
         code: normalizeString(error?.code) || 'INSTANTLY_MAILBOX_SYNC_FAILED',
+      ...(retryAfterMs ? { retryAfterMs, nextAllowedAt: error.nextAllowedAt } : {}),
         error: truncateText(normalizeString(error?.message || error), 500),
       };
     }
@@ -505,9 +506,12 @@ async function syncInstantlyMailboxResponse({
     });
   } catch (error) {
     logger.error('[Mailbox][InstantlySync]', error?.message || error);
+    const retryAfterMs = Math.max(0, Number(error?.retryAfterMs) || 0);
+    if (retryAfterMs) res.setHeader?.('Retry-After', String(Math.ceil(retryAfterMs / 1000)));
     return res.status(error.status || 500).json({
       ok: false,
       code: normalizeString(error?.code) || 'INSTANTLY_MAILBOX_SYNC_FAILED',
+      ...(retryAfterMs ? { retryAfterMs, nextAllowedAt: error.nextAllowedAt } : {}),
       error: 'Instantly-mailbox sync mislukt',
       detail: String(error?.message || 'Onbekende fout'),
     });

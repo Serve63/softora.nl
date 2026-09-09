@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { readMailboxEvidenceBatches } = require('../repositories/mailbox-read-evidence');
 const { deduplicateRowsByKey } = require('./mailbox-index-message-rows');
 const { prepareMailboxMessageRowForStorage } = require('./mailbox-storage-text');
 const { createMailboxStateMutationStore } = require('../repositories/mailbox-state-mutation-store');
@@ -785,7 +786,8 @@ function createMailboxIndexStore(deps = {}) {
     const normalizedFolder = normalizeFolder(folder);
     const read = priorityRead ? runPriorityRead : run;
     const rowsByKey = new Map();
-    for (let offset = 0; offset < normalizedMessageIds.length; offset += MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE) {
+    const offsets = Array.from({ length: Math.ceil(normalizedMessageIds.length / MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE) }, (_, index) => index * MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE);
+    const batches = await readMailboxEvidenceBatches(offsets, async (offset) => {
       const batch = normalizedMessageIds.slice(offset, offset + MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE);
       const result = await read(`list-messages-by-message-id:${normalizedFolder}:${offset}`, (client) =>
         client
@@ -797,8 +799,11 @@ function createMailboxIndexStore(deps = {}) {
           .is('deleted_at', null)
           .is('generation_superseded_at', null)
       );
-      if (!result.ok) return null;
-      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+      return result?.ok && Array.isArray(result.data) ? result.data : null;
+    });
+    if (batches.some((batch) => !Array.isArray(batch))) return null;
+    for (const rows of batches) {
+      rows.forEach((row) => {
         const key = normalizeString(row && row.message_key);
         if (key && !rowsByKey.has(key)) rowsByKey.set(key, row);
       });
