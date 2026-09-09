@@ -196,8 +196,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260909a/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260907a/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260909b/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260909a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260907a/);
@@ -222,9 +222,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260909a'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260909a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260907a'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260907a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260909b'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260909b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260909a'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260909a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260905b'));
@@ -260,6 +260,10 @@ test('bewaarde contactgegevens lopen zonder een geneste kaart mee in het mailber
   assert.match(contactStyle[1], /background:\s*transparent;/);
   assert.match(contactStyle[1], /box-shadow:\s*none;/);
   assert.doesNotMatch(contactStyle[1], /border:\s*1px|rgba\(255,255,255/);
+  const websiteLinkStyle = page.match(/\.detail-mail-contact-link\[href\^="http"\]\s*\{([^}]*)\}/);
+  assert.ok(websiteLinkStyle, 'websitehandtekeningen hebben een eigen leesbare linkstijl');
+  assert.match(websiteLinkStyle[1], /color:\s*inherit;/);
+  assert.match(websiteLinkStyle[1], /font-style:\s*italic;/);
   assert.ok(summaryLabelStyle, 'contactdossierlabelstijl ontbreekt');
   assert.match(summaryLabelStyle[1], /color:\s*var\(--text-dark\);/);
   assert.doesNotMatch(summaryLabelStyle[1], /var\(--crimson\)/);

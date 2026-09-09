@@ -100,3 +100,65 @@ test('ook zonder citaat wordt een bewezen reserveringsvoetnoot eenmaal als leesb
   assert.equal((html.match(/href="https:\/\/booking.example\/reserveren"/g) || []).length, 1);
   assert.doesNotMatch(html, /\[2\]|Links:|------/);
 });
+
+test('hoofdmail en dossier verwijderen app-reclame en de bijbehorende streep ook zonder standaardgroet', () => {
+  const authored = 'Dag Martijn,\n\nLeuk gedaan!\nWat is je telefoonnummer?\n\nGrt.\nRobin Voorbeeld';
+  for (const footer of [
+    'Verzonden vanaf Outlook voor Android [https://aka.ms/AAb9ysg]',
+    'Verzonden vanaf Outlook voor Android [[https://aka.ms/AAb9ysg](https://aka.ms/AAb9ysg)]',
+    'Verzonden vanaf Outlook voor Android\n[https://aka.ms/AAb9ysg]',
+    'Sent from Outlook for iOS',
+    'Get Outlook for Android [https://aka.ms/ghei36]',
+    'Verzonden vanaf mijn iPhone',
+    'Sent from my iPad',
+  ]) for (const accountEmail of ['serve@softora.nl', 'martijn@softora.nl']) for (const source of ['gmail', 'strato', 'instantly']) {
+    const body = `${authored}\n\n${footer}\n\n--------------------------------------------------------------------------------\n\nVan: Martijn van de Ven\nVerstuurd: donderdag, september 3, 2026 7:52:51 a.m.\nAan: robin@example.nl\nOnderwerp: Kleine vraag\n\nOude mail.`;
+    const message = { body, accountEmail, source, direction: 'received', email: 'robin@example.nl' };
+    const root = presentation.getRootPresentation(body, message);
+    const thread = presentation.getThreadPresentation(message, message);
+    for (const result of [root, thread]) {
+      assert.equal(result.body, authored, `${source}/${accountEmail}/${footer}`);
+      assert.equal(result.signatureMatched, false);
+    }
+    assert.equal(message.body, body, 'bronbericht wordt niet gewijzigd');
+  }
+});
+
+test('app-footer verdwijnt ook uit een herkende handtekening zonder naam, telefoon of website te verliezen', () => {
+  const body = 'Akkoord.\n\nMet vriendelijke groet,\nRobin Voorbeeld\nTel: 06-12345678\nwww.example.nl\n\nVerzonden vanaf Outlook voor Android [https://aka.ms/AAb9ysg]\n\n________________________________';
+  const message = { body, direction: 'received', from: 'Robin Voorbeeld', email: 'robin@example.nl' };
+  const result = presentation.getThreadPresentation(message, message);
+  assert.equal(result.body, 'Akkoord.');
+  assert.match(result.contactHtml, /Robin Voorbeeld/);
+  assert.match(result.contactHtml, /href="tel:0612345678"/);
+  assert.match(result.contactHtml, /href="https:\/\/www.example.nl\/"/);
+  assert.doesNotMatch(result.contactHtml, /Outlook|aka\.ms|_{3}/);
+});
+
+test('uitgaande berichtweergave ruimt alleen de automatische app-footer op', () => {
+  const authored = 'Mijn reactie.\n\nServé\nTel: 06-12345678';
+  const message = { direction: 'sent', body: `${authored}\n\nSent from Outlook for Android [https://aka.ms/AAb9ysg]` };
+  assert.equal(presentation.getThreadPresentation(message, message, { sent: true }).body, authored);
+});
+
+test('inhoudelijke Outlook-tekst, persoonlijke links, contactgegevens en losse scheidingslijnen blijven intact', () => {
+  for (const body of [
+    'Ik heb dit verzonden vanaf Outlook voor Android, kun je de bijlage lezen?',
+    'Onze handleiding zegt:\nVerzonden vanaf Outlook voor Android\nDit is de tekst die je moet aanpassen.',
+    'Groet\nRobin\nVerzonden vanaf Outlook voor Android: bel mij op 06-12345678',
+    'Groet\nRobin\nVerzonden vanaf Outlook voor Android [https://www.example.nl/afspraak]',
+    'Groet\nRobin\nVerzonden vanaf Outlook voor Android\nTel: 06-12345678',
+    'Eerste onderwerp.\n--------------------\nTweede onderwerp.',
+    'Dit is inhoud.\n--------------------',
+    'Bekijk deze link:\nhttps://aka.ms/AAb9ysg\n--------------------',
+    'Ongewijzigd\r\nzonder automatische footer.',
+  ]) assert.equal(signature.stripClientFooter(body), body);
+});
+
+test('clientfilter verandert geen geciteerde bronregels of de grens naar een eerder bericht', () => {
+  const quote = 'Op 9 sep 2026 om 12:00 schreef Robin Voorbeeld:\n> Een oud bericht.\n> Sent from Outlook for Android [https://aka.ms/AAb9ysg]';
+  assert.equal(signature.stripClientFooter(`Mijn antwoord.\n\n${quote}`), `Mijn antwoord.\n\n${quote}`);
+  const cleaned = signature.stripClientFooter(`Mijn antwoord.\n\nSent from Outlook for Android [https://aka.ms/AAb9ysg]\n\n${quote}`);
+  assert.ok(cleaned.endsWith(quote));
+  assert.equal((cleaned.match(/Sent from Outlook/g) || []).length, 1);
+});

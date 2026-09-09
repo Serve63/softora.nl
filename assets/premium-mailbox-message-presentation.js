@@ -24,6 +24,10 @@
       return { body: '', contact: emptyContact(), signatureMatched: false };
     }
 
+    function cleanClientFooter(value) {
+      return typeof signature?.stripClientFooter === 'function' ? signature.stripClientFooter(value) : value;
+    }
+
     function getSentAuthoredBody(value) {
       const parsed = options.splitQuotedReply(value);
       const firstSegment = Array.isArray(parsed && parsed.segments) ? parsed.segments[0] : null;
@@ -63,7 +67,7 @@
         options.isSentMessageByProvenance(message, mail && mail.accountEmail) ||
         message && message.copyContext && message.copyContext.evidenceKnown === true
       ) {
-        return { body: getSentAuthoredBody(body), contact: emptyContact(), signatureMatched: false };
+        return { body: cleanClientFooter(getSentAuthoredBody(body)), contact: emptyContact(), signatureMatched: false };
       }
       const hasMessageContext = Boolean(message && typeof message === 'object' && !Array.isArray(message));
       const parsedSignature = hasMessageContext
@@ -82,9 +86,10 @@
         typeof options.splitQuotedReply === 'function'
         ? options.splitQuotedReply(provenBody)
         : null;
-      const sourceSafeBody = parsedDisplayBody && typeof parsedDisplayBody.authored === 'string'
+      const displayBody = parsedDisplayBody && typeof parsedDisplayBody.authored === 'string'
         ? parsedDisplayBody.authored
         : provenBody;
+      const sourceSafeBody = hasMessageContext ? cleanClientFooter(displayBody) : displayBody;
       if (!message || typeof message !== 'object' || Array.isArray(message)) {
         return { body: sourceSafeBody, contact: emptyContact(), signatureMatched: false };
       }
