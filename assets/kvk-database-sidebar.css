@@ -22,7 +22,7 @@
 .kvk-database-shell .kvk-sidebar-toggle svg { width: 15px; height: 15px; }
 @media (min-width: 901px) {
   .kvk-database-shell.is-sidebar-collapsed > .sidebar { display: none !important; }
-  .kvk-database-shell.is-sidebar-collapsed > .kvk-database-shell__content {
+  .kvk-database-shell.is-sidebar-collapsed[data-sidebar-shell="canonical"] > main.kvk-database-shell__content {
     width: 100% !important;
     margin-left: 0 !important;
   }
