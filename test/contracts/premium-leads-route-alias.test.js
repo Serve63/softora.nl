@@ -28,7 +28,7 @@ test('premium leads stays available while coldmailing management routes return t
 
 test('premium sidebar navigation normalizes old leads links to the clean route', () => {
   const root = path.join(__dirname, '../..');
-  const themeSource = fs.readFileSync(path.join(root, 'assets/personnel-theme.js'), 'utf8');
+  const themeSource = fs.readFileSync(path.join(root, 'assets/personnel-theme.js'), 'utf8') + fs.readFileSync(path.join(root, 'assets/premium-sidebar-links.js'), 'utf8');
 
   assert.match(themeSource, /function isLeadsPagePath\(path\) \{/);
   assert.match(themeSource, /if \(href === "\/premium-ai-coldmailing"\) return "\/premium-leads";/);

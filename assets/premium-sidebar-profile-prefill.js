@@ -40,7 +40,7 @@
             if (hashRaw === "pinterest") return "ads_pinterest";
             if (hashRaw === "linkedin") return "ads_linkedin";
             if (hashRaw === "twitter") return "ads_twitter";
-            return "ads_trustoo";
+            return "ads_google";
         }
         if (p.indexOf("/premium-socialmedia") === 0) {
             if (hashRaw === "facebook") return "social_facebook";
