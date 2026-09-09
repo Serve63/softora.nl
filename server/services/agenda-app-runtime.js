@@ -1,3 +1,4 @@
+const { registerAgendaMcpRoutes } = require('../routes/agenda-mcp');
 const { registerAgendaRetellRoutes } = require('../routes/agenda-retell');
 const { registerAgendaMutationRoutes } = require('../routes/agenda');
 const { registerAgendaReadRoutes } = require('../routes/agenda-read');
@@ -19,6 +20,7 @@ function createAgendaAppRuntime(app, deps = {}) {
   registerAgendaRetellRoutes(app, retellRouteDeps);
   registerAgendaReadRoutes(app, readRouteDeps);
   registerAgendaMutationRoutes(app, mutationRouteDeps);
+  registerAgendaMcpRoutes(app, { readRouteDeps, mutationRouteDeps });
 
   return {
     agendaInterestedLeadReadService,
