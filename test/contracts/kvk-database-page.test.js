@@ -504,7 +504,7 @@ test('kvk database keeps last-hour deltas in six cards without the removed revie
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260909b/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260910a/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260909c/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);

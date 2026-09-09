@@ -57,6 +57,7 @@ test('kvk database metrics render current last-hour and grade values without ano
     unusable_grades: { 1: 24_412, 2: 30, 3: 121 },
     last_60_minutes: {
       treated: 12,
+      successful_found: 2,
       usable: 6,
       with_website: 5,
       without_website: 1,
@@ -84,7 +85,7 @@ test('kvk database metrics render current last-hour and grade values without ano
   assert.equal(elements['companies-successful-found'].textContent, '6.993');
   assert.equal(
     elements['companies-successful-found-last60'].nodes['.stat-delta-number'].textContent,
-    '+6',
+    '+2',
   );
   assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+12');
   assert.equal(elements['companies-usable-last60'].nodes['.stat-delta-number'].textContent, '+6');
@@ -207,4 +208,29 @@ test('metrics keep updating when the review card is absent', () => {
   assert.doesNotThrow(() => controller.renderMetrics());
   assert.equal(treated.textContent, '32.518');
   assert.equal(successful.textContent, '7.146');
+});
+
+
+test('a no-contact discovery and older approvals do not create another successful discovery', () => {
+  const successful = createElement(['.stat-delta-number', '.stat-delta-label']);
+  const usable = createElement(['.stat-delta-number', '.stat-delta-label']);
+  const elements = { 'companies-successful-found-last60': successful, 'companies-usable-last60': usable };
+  let activity = { treated: 1, successful_found: 0, usable: 2 };
+  const controller = createController({
+    document: { getElementById: id => elements[id] || null },
+    getSnapshot: () => ({ generatedAt: '2026-09-09T22:10:00Z', state: { last_60_minutes: activity } }),
+    now: () => Date.parse('2026-09-09T22:11:00Z'),
+  });
+  controller.renderMetrics();
+  assert.equal(successful.nodes['.stat-delta-number'].textContent, '0');
+  assert.equal(usable.nodes['.stat-delta-number'].textContent, '+2');
+  activity = { treated: 1, successful_found: 1, usable: 1 };
+  controller.renderMetrics();
+  assert.equal(successful.nodes['.stat-delta-number'].textContent, '+1');
+  activity = { successful_found: -1, usable: 0 };
+  controller.renderMetrics();
+  assert.equal(successful.nodes['.stat-delta-number'].textContent, '-1');
+  activity = { luna_max_found: 0, usable: 2 };
+  controller.renderMetrics();
+  assert.equal(successful.nodes['.stat-delta-number'].textContent, '0');
 });
