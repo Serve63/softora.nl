@@ -27,7 +27,7 @@ test('handtekeningfilter behoudt alle nummerregels die niet in de contactkaart z
     const body = ['Mijn antwoord.', '', 'Groet', 'Voorbeeld', line].join('\n');
     const parsed = signature.parseIncoming(body, { from: 'Andere Naam', email: 'info@example.nl' });
     const visible = parsed.bodyLines.join('\n') + signature.renderContactCard(parsed.contact);
-    assert.ok(visible.includes(line) || visible.includes(line.replace(/^(?:Tel|Mobiel): /, '')), line);
+    assert.ok(visible.includes(line) || visible.includes(line.replace(/^(?:(?:Tel|Telefoon|Mobiel): |[☎📞]\s*)/, '')), line);
   }
 });
 
@@ -151,7 +151,7 @@ test('mailbox verwart losse datums en bedrijfsnummers niet met een telefoonnumme
   assert.deepEqual(signature.parseIncoming(bodyOnly).bodyLines, bodyOnly.split('\n'));
 });
 
-test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend telefoon en adres', () => {
+test('mailbox maakt de JT-handtekening leesbaar met naam, website, e-mail, telefoon en adres', () => {
   const body = [
     'Ziet er zeker gaaf uit!',
     '',
@@ -181,6 +181,8 @@ test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend tele
     phone: '+31 97010269099',
     phoneHref: 'tel:+3197010269099',
     addressLines: ['Nieuwe Baan 1', '5076 SV Haaren', 'Nederland'],
+    beforeLines: ['Jeroen Sterke', 'JT-performance', 'http://www.jt-performance.nl', 'service@jt-performance.nl'],
+    preservedLines: ['Chamber off commerce:', '17122606', 'Tax Number', 'NL001751168B24'],
   });
 
   const html = signature.renderContactCard(parsed.contact);
@@ -191,7 +193,11 @@ test('mailbox verwijdert het exacte JT-signatureblok en bewaart uitsluitend tele
   assert.match(html, /href="tel:\+3197010269099"/);
   assert.match(html, /Nieuwe Baan 1, 5076 SV Haaren, Nederland/);
   assert.doesNotMatch(html, /detail-mail-contact-title|>\s*Contactgegevens\s*<|<br>/i);
-  assert.doesNotMatch(html, /JT-performance|jt-performance\.nl|Chamber|17122606|Tax Number|NL001751168B24/);
+  assert.match(html, /Jeroen Sterke/);
+  assert.match(html, /href="http:\/\/www\.jt-performance\.nl\/"/);
+  assert.match(html, /href="mailto:service@jt-performance\.nl"/);
+  for (const value of ['Chamber off commerce:', '17122606', 'Tax Number', 'NL001751168B24']) assert.ok(html.includes(value), value);
+  assert.doesNotMatch(html, /tel:17122606/);
 });
 
 test('mailbox behandelt natuurlijke zinnen en losse contactlabels zonder signoff fail-open', () => {
@@ -285,6 +291,8 @@ test('mailbox verwijdert Lia haar footer na een Gmail-quote maar bewaart haar pe
     phone: '06 33688506',
     phoneHref: 'tel:0633688506',
     addressLines: ['Haarensteijnstraat 23', '5076 CM Haaren'],
+    beforeLines: ['LIA HESEMANS redactie & training', 'eindredactie | auteursbegeleiding | schrijftraining', 'From: lia@example.nl'],
+    preservedLines: ['M. de Vries', 'I [www.stroomvantaal-popup.nl](http://www.stroomvantaal-popup.nl)'],
   });
   assert.doesNotMatch(parsed.bodyLines.join('\n'), /LIA HESEMANS|eindredactie|lia@example\.nl|M\. de Vries|stroomvantaal-popup\.nl\]\(/);
 
@@ -364,6 +372,7 @@ test('mailbox slaat een ambigue M-naam over en bewaart een latere echte M-telefo
     phone: '06 12345678',
     phoneHref: 'tel:0612345678',
     addressLines: [],
+    beforeLines: ['M. de Vries'],
   });
 });
 
@@ -382,6 +391,7 @@ test('mailbox bewaart een expliciete telefoonwaarde met toestel veilig maar zond
     phone: '020 123 45 67 toestel 89',
     phoneHref: '',
     addressLines: [],
+    beforeLines: ['Klantenservice'],
   });
   assert.match(html, /<dt>Telefoon:<\/dt><dd><span class="detail-mail-contact-value">020 123 45 67 toestel 89<\/span><\/dd>/);
   assert.doesNotMatch(html, /href=/);
@@ -491,7 +501,7 @@ test('mailbox herkent CRLF en non-breaking spaces in een gecombineerde handteken
   assert.deepEqual(parsed.contact.addressLines, ['Dorpsstraat 4', '1234 AB Utrecht', 'Nederland']);
 });
 
-test('mailbox verwijdert een muzikale standaardhandtekening en bewaart uitsluitend het telefoonnummer', () => {
+test('mailbox bewaart naam, contactlinks en aanvullende tekst van een muzikale handtekening', () => {
   const authoredLines = [
     'Hallo Serve,',
     '',
@@ -521,13 +531,19 @@ test('mailbox verwijdert een muzikale standaardhandtekening en bewaart uitsluite
     phone: '06 - 29 03 73 59',
     phoneHref: 'tel:0629037359',
     addressLines: [],
+    beforeLines: ['Niels van Kollenburg'],
+    preservedLines: ['E. info@nielsvankollenburg.nl', 'W. nielsvankollenburg.nl', 'Klik hier voor meer info'],
   });
 
   const html = signature.renderContactCard(parsed.contact);
   assert.equal((html.match(/class="detail-mail-contact-item"/g) || []).length, 1);
   assert.match(html, /<dt>Telefoon:<\/dt>/);
   assert.match(html, /href="tel:0629037359">06 - 29 03 73 59<\/a>/);
-  assert.doesNotMatch(html, /Adres:|Niels van Kollenburg|info@nielsvankollenburg\.nl|nielsvankollenburg\.nl|Klik hier/i);
+  assert.doesNotMatch(html, /Adres:/);
+  assert.match(html, /Niels van Kollenburg/);
+  assert.match(html, /href="mailto:info@nielsvankollenburg\.nl"/);
+  assert.match(html, /href="https:\/\/nielsvankollenburg\.nl\/"/);
+  assert.match(html, /Klik hier voor meer info/);
 });
 
 test('mailbox herkent ook Muzikale groeten als zelfstandige signoff zonder zinnen fout te markeren', () => {
