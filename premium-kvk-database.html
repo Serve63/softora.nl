@@ -11,11 +11,11 @@
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-frame.css?v=20260824a">
   <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260818a">
-  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260809f">
+  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260909a">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
-  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260824a">
-  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260825a">
+  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909a">
+  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909a">
   <script src="/assets/settings-module-routes.js?v=20260824c" defer></script>
   <script src="/assets/settings-module-back.js?v=20260814b" defer></script>
 </head>
@@ -68,6 +68,8 @@
         </div>
         <div class="stat-delta" id="companies-successful-found-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
+      <div class="stat-new-group" role="group" aria-labelledby="stat-new-group-label">
+        <p id="stat-new-group-label" class="stat-new-group-label">Nieuw. Nog niet gebruikt</p>
       <article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-usable-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bruikbare bedrijven" title="Bekijk alle bruikbare bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
@@ -98,6 +100,7 @@
         </div>
         <div class="stat-delta" id="companies-without-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
+      </div>
       <article class="stat-card stat-card-unusable kvk-stat-card-enhanced" aria-label="Onbruikbare bedrijven per reviewgrade">
         <strong id="companies-unusable" class="kvk-visually-hidden" aria-hidden="true">0</strong>
         <div class="unusable-grade-grid">
@@ -142,9 +145,16 @@
     <section class="workspace-grid">
       <aside class="panel planning-panel" data-collapsible="planning">
         <div class="panel-heading split-heading">
-          <div>
-            <p class="eyebrow">Locaties</p>
-            <h2>Planning</h2>
+          <div class="planning-heading">
+            <div>
+              <p class="eyebrow">Locaties</p>
+              <h2>Planning</h2>
+            </div>
+            <ul class="planning-legend" aria-label="Betekenis van de vinkjes">
+              <li><span aria-hidden="true">✓</span><span class="kvk-visually-hidden">1 vinkje: </span>KVK-gegevens</li>
+              <li><span aria-hidden="true">✓✓</span><span class="kvk-visually-hidden">2 vinkjes: </span>Volledig onderzocht</li>
+              <li><span aria-hidden="true">✓✓✓</span><span class="kvk-visually-hidden">3 vinkjes: </span>Gecontroleerd</li>
+            </ul>
           </div>
           <div class="heading-actions">
             <div class="table-tools">
@@ -183,10 +193,10 @@
   </main>
 
   <script id="kvkSnapshot" type="application/json">{}</script>
-  <script src="/assets/kvk-database.js?v=20260804a"></script>
+  <script src="/assets/kvk-database.js?v=20260909a"></script>
   <script src="/assets/kvk-database-total-found.js?v=20260809e"></script>
-  <script src="/assets/kvk-database-metrics.js?v=20260804d"></script>
-  <script src="/assets/kvk-database-luna-errors.js?v=20260804b"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20260909a"></script>
+  <script src="/assets/kvk-database-luna-errors.js?v=20260909a"></script>
   <script src="/assets/kvk-database-control.js?v=20260813b"></script>
 </body>
 </html>

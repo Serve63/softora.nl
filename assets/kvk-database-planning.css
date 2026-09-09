@@ -33,6 +33,38 @@
   min-height: 0;
 }
 
+.planning-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  min-width: 0;
+}
+
+.planning-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #7d7980;
+  font-size: 0.6rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+.planning-legend li {
+  white-space: nowrap;
+}
+
+.planning-legend [aria-hidden="true"] {
+  margin-right: 4px;
+  color: #317864;
+  letter-spacing: -2px;
+}
+
 @media (max-width: 760px) {
   .planning-panel {
     height: 220px;

@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { getLast60Minutes } = require('../../assets/kvk-database-metrics');
 
 const DEFAULT_STATE_KEY_SUFFIX = 'kvk_database_snapshot_v1';
 const MAX_SNAPSHOT_BYTES = 7_500_000;
@@ -177,11 +178,18 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     const successfulFound = normalizeCount(
       payload?.successfulFoundTracker?.total ?? getSuccessfulFoundCount(storedSnapshot)
     );
-    const snapshot = storedSnapshot
+    let snapshot = storedSnapshot
       ? withSuccessfulFoundCount(storedSnapshot, successfulFound)
       : null;
     if (!snapshot || typeof snapshot !== 'object') {
       return res.status(404).json({ ok: false, error: 'Nog geen live KVK snapshot opgeslagen.' });
+    }
+
+    if (snapshot.state.last_60_minutes) {
+      snapshot = {
+        ...snapshot,
+        state: { ...snapshot.state, last_60_minutes: getLast60Minutes(snapshot, now()) },
+      };
     }
 
     return res.status(200).json({
