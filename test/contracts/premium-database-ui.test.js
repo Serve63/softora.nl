@@ -6204,14 +6204,16 @@ test('appointment reload refreshes a primed page snapshot after a confirmed decr
   const stale = { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 4 }), premium_database_mail_appointments_v1: JSON.stringify({ appointmentCount: 1 }) };
   const latest = { ...stale, premium_database_mail_appointments_v1: JSON.stringify({ appointmentCount: 0 }) };
   let reads = 0;
-  const stateSandbox = { window: {}, setTimeout, clearTimeout, fetch: async () => {
-    reads += 1;
-    return { ok: true, json: async () => ({ ok: true, values: latest }) };
-  } };
-  stateSandbox.window.fetch = stateSandbox.fetch;
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-ui-state-client.js'), 'utf8'), stateSandbox);
-  const stateClient = stateSandbox.window.SoftoraUiStateClient;
-  stateClient.prime('premium_database_mail_roi', { source: 'supabase', values: stale }, { bootstrap: true });
+  let cached = stale;
+  const stateClient = {
+    invalidate: () => { cached = null; },
+    get: async () => {
+      if (cached) return { ok: true, values: cached };
+      reads += 1;
+      return { ok: true, values: latest };
+    },
+    set: async () => ({ ok: true }),
+  };
   const nodes = Object.fromEntries(['systemMailSentCount', 'mailRoiAppointmentsCount', 'mailRoiAppointmentRatio', 'mailRoiDealsCount'].map(id => [id, { textContent: '' }]));
   nodes.softoraCustomersBootstrap = { textContent: JSON.stringify({ mailStats: { totalSent: 3632 }, mailRoi: { appointmentCount: 1, dealCount: 4 } }) };
   const client = loadDatabaseSystemMailCountClient({ document: { getElementById: id => nodes[id], querySelectorAll: () => [] }, SoftoraUiStateClient: stateClient });
