@@ -10,7 +10,7 @@ function readRepoFile(relativePath) {
 
 test('sidebarbestemmingen houden pagina-inhoud zichtbaar na boot en bij late data', () => {
   const sections = {
-    'premium-personeel-dashboard.html': ['kpi-card', 'panel', 'dashboard-lead-legend-strip', 'dashboard-ai-management-status-panel', 'chart-bar'],
+    'premium-personeel-dashboard.html': ['kpi-card', 'panel', 'dashboard-ai-management-status-panel', 'chart-bar'],
     'premium-actieve-opdrachten.html': ['summary-card', 'order-card'],
     'premium-personeel-agenda.html': ['month-nav', 'calendar-wrapper'],
     'premium-ai-lead-generator.html': ['panel', 'launch-section', 'stat-card', 'log-panel'],

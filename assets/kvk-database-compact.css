@@ -23,7 +23,7 @@
 
   .app-shell {
     display: grid;
-    grid-template-rows: 30px 42px 106px minmax(0, max-content) minmax(184px, 1fr);
+    grid-template-rows: 30px 42px 106px repeat(2, minmax(0, 1fr));
     gap: 9px;
     height: 100dvh;
     min-height: 0;
@@ -181,5 +181,18 @@
 
   .planning-panel .search-field input {
     height: 27px;
+  }
+}
+
+/* Give both expanded panels the same space in the normal page flow too. */
+@media (max-width: 1180px) {
+  .latest-treated-panel:not(.is-collapsed),
+  .workspace-grid > .planning-panel:not(.is-collapsed) {
+    height: 320px;
+    min-height: 0;
+  }
+
+  .latest-treated-panel:not(.is-collapsed) .table-frame {
+    max-height: none;
   }
 }

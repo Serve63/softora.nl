@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
   <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909b">
-  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909b">
+  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909c">
   <script src="/assets/settings-module-routes.js?v=20260824c" defer></script>
   <script src="/assets/settings-module-back.js?v=20260814b" defer></script>
 </head>
@@ -28,18 +28,12 @@
         <h1>Bedrijven Scraper</h1>
       </div>
       <div class="header-controls">
-        <div id="database-fill-toggle" class="database-fill-toggle" role="status" aria-live="polite" aria-label="Database vullen staat uit.">
-          <span class="database-fill-toggle__caption">Database vullen</span>
-          <span class="database-fill-toggle__track" aria-hidden="true">
-            <span class="database-fill-toggle__thumb"></span>
-          </span>
-        </div>
         <span id="last-refresh-time" class="kvk-visually-hidden">--</span>
       </div>
     </header>
 
     <section class="stats-grid" aria-label="Scraper status">
-      <article id="companies-total-card" class="stat-card stat-card-primary stat-card-directory kvk-stat-card-enhanced">
+      <article id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-total-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven" title="Bekijk alle bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>

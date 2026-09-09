@@ -95,7 +95,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
   assert.match(pageSource, /id="companies-treated"/);
-  assert.match(pageSource, /id="companies-total-card"/);
+  assert.match(pageSource, /id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced"/);
+  assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*stat-card-primary/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*role="link"/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*tabindex=/);
   assert.match(pageSource, /<button id="companies-total-open"[^>]*aria-label="Bekijk alle bedrijven"[^>]*title="Bekijk alle bedrijven"/);
@@ -444,16 +445,16 @@ test('kvk database hides the page scrollbar without disabling scrolling', () => 
   assert.match(planningStyleSource, /\.planning-panel \.location-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*block/);
 });
 
-test('kvk database keeps the wide desktop dashboard inside one viewport', () => {
+test('kvk database balances activity and planning equally inside one desktop viewport', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
 
-  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909b/);
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909c/);
   assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
   assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{[^}]*min-height:\s*0\s*!important;[^}]*overflow:\s*hidden\s*!important/);
-  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 106px minmax\(0, max-content\) minmax\(184px, 1fr\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
+  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 106px repeat\(2, minmax\(0, 1fr\)\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /\.latest-treated-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*margin:\s*0/);
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
@@ -544,16 +545,13 @@ test('kvk database shows completed locations crossed out with usable company tot
   assert.match(controlStyles, /text-decoration: line-through/);
 });
 
-test('kvk database renders a read-only live worker status controlled only by Codex chat', () => {
+test('kvk database omits the fill status widget and keeps worker control read-only', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
   const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 
-  assert.match(pageSource, /id="database-fill-toggle"/);
-  assert.match(pageSource, /id="database-fill-toggle"[^>]*role="status"/);
-  assert.doesNotMatch(pageSource, /<button id="database-fill-toggle"/);
-  assert.match(pageSource, /database-fill-toggle__caption">Database vullen/);
+  assert.doesNotMatch(pageSource, /database-fill-toggle|Database vullen/);
   assert.match(pageSource, /id="last-refresh-time" class="kvk-visually-hidden"/);
   assert.doesNotMatch(pageSource, /Tijd sinds laatste refresh/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
