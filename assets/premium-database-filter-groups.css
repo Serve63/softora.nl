@@ -182,7 +182,7 @@
     border: 1px solid #e0ddd8;
     border-radius: 8px;
     background: #fff;
-    padding: 8px 10px;
+    padding: 8px 6px;
 }
 
 .mail-roi-card--today {
@@ -235,7 +235,7 @@
     line-height: 1.15;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    white-space: nowrap;
+    white-space: normal;
 }
 
 .mail-roi-row {
