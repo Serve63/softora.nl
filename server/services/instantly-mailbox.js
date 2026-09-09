@@ -741,7 +741,7 @@ function createInstantlyMailboxService(deps = {}) {
           selectedOwner,
         });
         const pendingThreadHydrations = Array.from(threadCandidates.entries())
-          .filter(([key]) => {
+          .filter(([key, candidate]) => {
             const indexedMessages = indexedThreadMessages.get(key) || [];
             const hasMissingThreadMember = indexedMessages.length <= 1;
             const needsExactProviderBody = indexedMessages.some((message) => (
@@ -752,7 +752,7 @@ function createInstantlyMailboxService(deps = {}) {
                 (message.providerOriginalBodyEvidenceKnown !== true && providerApi.canReadLeads())
               )
             ));
-            return providerApi.canAudit(key) && (hasMissingThreadMember || needsExactProviderBody);
+            return providerApi.canAudit(key, candidate.providerMessageId) && (hasMissingThreadMember || needsExactProviderBody);
           })
           .slice(0, normalizedConfig.richBodyAuditLimit);
         let historyDeferred = false;
@@ -779,7 +779,7 @@ function createInstantlyMailboxService(deps = {}) {
             if (error?.status !== 429) throw error;
             historyDeferred = true; break;
           }
-          providerApi.noteAudit(key);
+          providerApi.noteAudit(key, candidate.providerMessageId);
           stored += hydrated.stored;
         }
         await providerApi.persistAudits();

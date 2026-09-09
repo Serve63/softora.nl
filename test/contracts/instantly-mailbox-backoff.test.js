@@ -64,6 +64,7 @@ test('audit backoff is durable and expires without pretending an unavailable sou
   const next = harness({ values: h.values }); await next.api.refreshPolicy();
   assert.equal(next.api.canAudit('serve|thread1'), false);
   assert.equal(next.api.canAudit('martijn|thread1'), true);
+  assert.equal(next.api.canAudit('serve|thread1', 'new-reply'), true);
   next.advance(15 * 60_000 + 1);
   assert.equal(next.api.canAudit('serve|thread1'), true);
 });

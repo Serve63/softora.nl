@@ -1,5 +1,5 @@
 'use strict';
-const { createHash } = require('node:crypto');
+const { createHash, createHmac } = require('node:crypto');
 const SCOPE = 'instantly_mailbox_sync';
 const WINDOW_MS = 60_000;
 const READ_BUDGET = 18;
@@ -15,14 +15,15 @@ function retryDelayMs(value, nowMs) {
 
 function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTimeout,
   getUiStateValues, setUiStateValues, now, logger, createError }) {
-  const fingerprint = hash(config.apiBaseUrl + '|' + config.apiKey);
+  // Namespace cooldowns by the opaque API credential; this is not a password verifier.
+  const fingerprint = createHmac('sha256', config.apiKey).update(`mailbox-read-policy-v1|${config.apiBaseUrl}`).digest('hex').slice(0, 24);
   const rateKey = `read_cooldown_${fingerprint}`;
   const leadKey = `lead_scope_cooldown_${fingerprint}`;
   let policy = {}, lastPolicyRead = -Infinity, policyPromise, readStarts = [];
   const pendingAudits = {};
   const time = () => now().getTime();
   const until = (key) => Number(policy[key]) || 0;
-  const auditKey = (key) => `thread_audit_${fingerprint}_${hash(key)}`;
+  const auditKey = (key, messageId = '') => `thread_audit_${fingerprint}_${hash(`${key}|${messageId}`)}`;
 
   async function refreshPolicy() {
     if (time() - lastPolicyRead < 10_000) return;
@@ -97,8 +98,8 @@ function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTime
   }
   return { request, refreshPolicy, assertAvailable, canReadLeads,
     canStartAudit: () => remainingReads() >= 6 && until(rateKey) <= time(),
-    canAudit: (key) => until(auditKey(key)) <= time(),
-    noteAudit: (key) => { const name = auditKey(key); pendingAudits[name] = time() + AUDIT_BACKOFF_MS; policy[name] = pendingAudits[name]; },
+    canAudit: (key, messageId) => until(auditKey(key, messageId)) <= time(),
+    noteAudit: (key, messageId) => { const name = auditKey(key, messageId); pendingAudits[name] = time() + AUDIT_BACKOFF_MS; policy[name] = pendingAudits[name]; },
     persistAudits: async () => { if (Object.keys(pendingAudits).length) { const patch = { ...pendingAudits }; await persist(patch); for (const key of Object.keys(patch)) delete pendingAudits[key]; } },
   };
 }
