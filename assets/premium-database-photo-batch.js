@@ -32,13 +32,13 @@
   // User-selected medium estimate: EUR 0.04 per design, including input and VAT.
   function formatOutputEstimate(count) {
     const amount = Math.max(0, Number(count) || 0) * 0.04;
-    return "ca. " + formatEuroCost(amount);
+    return formatEuroCost(amount);
   }
 
   function formatGenerationCost(generation) {
     const cost = generation && generation.cost;
     if (!cost || cost.basis !== "reported-image-usage" || cost.currency !== "USD" || !Number.isFinite(cost.amountUsd) || cost.amountUsd < 0) return "beeldkosten niet beschikbaar";
-    return "ca. " + formatEuroCost(usdToEuroIncludingVat(cost.amountUsd));
+    return formatEuroCost(usdToEuroIncludingVat(cost.amountUsd));
   }
 
   function createCostReporter(options) {

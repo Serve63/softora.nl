@@ -14,7 +14,7 @@ test('opening a Sunburst batch shows the selected medium total estimate for both
   });
   controller.open();
   assert.equal(nodes.photoBatchAllCount.textContent, '100 bedrijven');
-  assert.equal(nodes.photoBatchSummary.textContent, '10 bedrijven · ca. €0,40');
+  assert.equal(nodes.photoBatchSummary.textContent, '10 bedrijven · €0,40');
 });
 
 
