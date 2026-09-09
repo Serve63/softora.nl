@@ -54,3 +54,16 @@ test('coldmail reconciliation preserves all-time totals but not a corrected time
   assert.equal(result.stats.authoritativeStatsStale, true);
   assert.equal(result.stats.authoritativeStatsStaleReason, 'cumulative_total_regressed');
 });
+
+test('bounce fallback is independent of sent statistics and survives the Amsterdam day boundary', () => {
+  const previous = { stats: { dateKey: '2026-09-08', reliable: false, bounceStatsReliable: true, bounceStatsModel: 'complete-mailbox-recipient-v2', bounceStatsUpdatedAt: '2026-09-08T21:59:00Z', bounceTypes: { hard: 42 }, bouncesToday: 5 } };
+  const fresh = { stats: { dateKey: '2026-09-09', reliable: true, systemTotalSent: 3582, bounceStatsReliable: false, bounceTypes: { hard: 38 }, bouncesToday: 0 } };
+  const result = preserveReliableColdmailLiveStats(fresh, previous, '2026-09-09');
+  assert.equal(result.stats.bounceTypes.hard, 42);
+  assert.equal(result.stats.bouncesToday, 0);
+  assert.equal(result.stats.bounceStatsUpdatedAt, previous.stats.bounceStatsUpdatedAt);
+  assert.equal(result.stats.bounceStatsStale, true);
+  assert.equal(result.stats.systemTotalSent, 3582);
+  const corrected = { stats: { ...fresh.stats, bounceStatsReliable: true, bounceStatsModel: 'complete-mailbox-recipient-v2', bounceStatsUpdatedAt: '2026-09-08T22:01:00Z', bounceTypes: { hard: 41 } } };
+  assert.equal(preserveReliableColdmailLiveStats(corrected, result, '2026-09-09').stats.bounceTypes.hard, 41);
+});

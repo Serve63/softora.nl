@@ -1,3 +1,4 @@
+const { createMailboxStatsMessagesRepository } = require('../repositories/mailbox-stats-messages');
 const { createHash } = require('crypto');
 const { normalizeWebdesignJobRetryPayload, buildWebdesignJobPayload } = require('./webdesign-job-payload');
 
@@ -1101,90 +1102,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
-  async function listMailboxMessages(options = {}) {
-    const accountEmails = Array.from(new Set(
-      (Array.isArray(options.accountEmails) ? options.accountEmails : [])
-        .map((email) => normalizeString(email).toLowerCase())
-        .filter(Boolean)
-    ));
-    const folders = Array.from(new Set(
-      (Array.isArray(options.folders) && options.folders.length ? options.folders : ['inbox'])
-        .map((folder) => normalizeString(folder).toLowerCase())
-        .filter(Boolean)
-    ));
-    const maxRows = Math.max(1, Math.min(20000, Number(options.maxRows) || 5000));
-    const bounceCandidatesOnly = options.bounceCandidatesOnly === true;
-    const cacheKey = [
-      'mailbox-messages',
-      accountEmails.join(','),
-      folders.join(','),
-      maxRows,
-      bounceCandidatesOnly ? 'bounce-candidates' : 'all',
-    ].join('|');
-
-    function isBounceCandidate(row) {
-      const sender = normalizeString(row && row.sender_email).toLowerCase();
-      const subject = normalizeString(row && row.subject).toLowerCase();
-      const preview = normalizeString(row && row.preview).toLowerCase();
-      return /^(?:mailer-daemon|postmaster)@/.test(sender) ||
-        /(?:returned mail|delivery status notification|delivery failure|delivery failed|could not send message|undeliver)/.test(`${subject}\n${preview}`);
-    }
-
-    function mailboxMessageTime(row) {
-      const parsed = Date.parse(normalizeString(row && (row.date || row.internal_date)));
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-
-    return cachedRead(cacheKey, async () => {
-      const selectedColumns = bounceCandidatesOnly
-        ? 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,deleted_at'
-        : 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at';
-      const loadRows = (accountEmail = '') => run('list-mailbox-messages', (client) => {
-        let query = client
-          .from(TABLES.mailboxMessages)
-          .select(selectedColumns)
-          .is('deleted_at', null);
-        if (accountEmail && typeof query.eq === 'function') query = query.eq('account_email', accountEmail);
-        else if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
-        if (folders.length && typeof query.in === 'function') query = query.in('folder', folders);
-        if (typeof query.order === 'function') query = query.order('date', { ascending: false });
-        if (typeof query.limit === 'function') query = query.limit(maxRows);
-        return query;
-      }, {
-        timeoutMs: dataOpsReadQueryTimeoutMs,
-        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
-        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
-      });
-
-      if (bounceCandidatesOnly && accountEmails.length) {
-        // De gecombineerde ILIKE/OR-scan liep op productie over de hele mailbox-tabel
-        // en gaf na een timeout onterecht nul bounces. Account-queries gebruiken de
-        // bestaande mailbox-index en blijven klein; pas daarna filteren we lokaal.
-        const results = await Promise.all(accountEmails.map((accountEmail) => loadRows(accountEmail)));
-        if (results.some((result) => !result.ok)) return null;
-        const seen = new Set();
-        return results
-          .flatMap((result) => result.data || [])
-          .filter(isBounceCandidate)
-          .sort((left, right) => mailboxMessageTime(right) - mailboxMessageTime(left))
-          .filter((row) => {
-            const key = normalizeString(row && row.message_id) ? `${normalizeString(row && row.account_email).toLowerCase()}|message:${normalizeString(row && row.message_id).toLowerCase()}` :
-              normalizeString(row && row.message_key) || `${normalizeString(row && row.account_email)}|${normalizeString(row && row.folder)}|${normalizeString(row && row.uid)}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          })
-          .slice(0, maxRows);
-      }
-
-      const result = await loadRows();
-      return result.ok ? result.data || [] : null;
-    }, {
-      bypassReadCache: options.bypassReadCache,
-      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
-    });
-  }
+  const { listMailboxMessages } = createMailboxStatsMessagesRepository({
+    cachedRead, run, TABLES, normalizeString, dataOpsReadQueryTimeoutMs,
+  });
 
   async function replaceCustomers(customers, meta = {}) {
     const rows = dedupeCustomerRowsForReplace(
