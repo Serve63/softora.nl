@@ -1,0 +1,107 @@
+.settings-overview-grid, :is(#screen-extra, .screen-extra) > :last-child, .settings-extra-grid, .extra-modules-grid, .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; width: min(100%, calc(4 * 320px + 3 * 24px)); align-items: stretch; }
+.settings-overview-grid > *, #screen-extra > :last-child > *, .screen-extra > :last-child > *, .settings-extra-grid > *, .extra-modules-grid > *, .modules-grid > * { width: 100%; min-width: 0; }
+/* Reserve the final category geometry before deferred JavaScript arrives. */
+#screen-overzicht .settings-overview-grid { grid-template-columns: repeat(2,minmax(0,280px)); gap:20px; justify-content:start; max-width:calc(2 * 280px + 20px); }
+#screen-overzicht .settings-overview-grid > .tegel { width:280px; min-width:0; aspect-ratio:1 / 1; }
+@media (max-width:720px) {
+  #screen-overzicht .settings-overview-grid { grid-template-columns:minmax(0,1fr); max-width:100%; }
+  #screen-overzicht .settings-overview-grid > .tegel { width:100%; }
+}
+.tegel {
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 30px 26px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  width: 280px;
+  font: inherit;
+  color: inherit;
+  text-align: left; text-decoration: none;
+  box-shadow: 0 8px 24px rgba(26, 26, 46, 0.04);
+}
+
+.tegel::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--crimson);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+
+.tegel:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+  border-color: rgba(139, 34, 82, 0.28);
+}
+
+.tegel:hover::after {
+  transform: scaleX(1);
+}
+
+.tegel-icon-wrap {
+  width: 48px;
+  height: 48px;
+  background: rgba(139, 34, 82, 0.08);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tegel-icon-wrap svg {
+  width: 22px;
+  height: 22px;
+  color: var(--crimson);
+}
+
+.tegel-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tegel-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.tegel-arrow {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: var(--border);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.tegel:hover .tegel-arrow {
+  color: var(--crimson);
+  transform: translateX(3px);
+}
+
+.tegel-count {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  background: rgba(139, 34, 82, 0.08);
+  padding: 3px 10px;
+  border-radius: 20px;
+  align-self: flex-start;
+}
+

@@ -5,7 +5,8 @@ const path = require('node:path');
 const extraModules = require('../../assets/premium-extra-modules.js');
 
 test('premium instellingen gebruikt delegated actions zonder inline handlers', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '../../assets/premium-settings-tiles.css'), 'utf8');
   const userManagementSource = fs.readFileSync(
     path.join(__dirname, '../../assets/premium-user-management.js'),
     'utf8'
@@ -112,7 +113,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
   assert.match(source, /premium-extra-modules\.js\?v=20260811a/);
   assert.match(source, /settings-module-routes\.js\?v=20260909a/);
-  assert.match(source, /premium-user-management\.js\?v=20260909b/);
+  assert.match(source, /premium-user-management\.js\?v=20260909c/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(moduleRoutesSource, /label: 'Winnen'[\s\S]*label: 'Database'[\s\S]*label: "Servé's gezondheidsdossier"/);

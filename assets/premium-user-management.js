@@ -314,7 +314,8 @@ function mountExtraSettingsCategory() {
   var tileParent = personnelTile.parentElement;
   if (tileParent) tileParent.classList.add('settings-tile-grid');
 
-  var extraTile = document.createElement('button');
+  var extraTile = overviewScreen.querySelector('[data-settings-extra-open]') || document.createElement('button');
+  extraTile.replaceChildren();
   extraTile.type = 'button';
   extraTile.className = 'tegel';
   extraTile.setAttribute('data-settings-extra-open', 'true');
