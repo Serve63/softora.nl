@@ -84,3 +84,17 @@ test('browser back and forward synchronize the settings category without reloadi
   handlers.hashchange();
   assert.deepEqual(screens, ['screen-extra', 'screen-overzicht']);
 });
+
+
+test('settings response reserves both category tiles before deferred scripts run', () => {
+  const page = fs.readFileSync(path.join(root, 'premium-instellingen.html'), 'utf8');
+  const overview = page.slice(page.indexOf('id="screen-overzicht"'), page.indexOf('id="screen-personeel"'));
+  assert.equal((overview.match(/class="tegel"/g) || []).length, 2);
+  assert.ok(overview.indexOf('data-settings-extra-open') < overview.indexOf('data-settings-action="open-pin"'));
+  const { EXTRA_MODULES } = require('../../assets/settings-module-routes');
+  assert.match(overview, new RegExp('data-settings-extra-count>' + EXTRA_MODULES.length + ' onderdelen'));
+  assert.match(fs.readFileSync(path.join(root, 'assets/premium-settings-tiles.css'), 'utf8'), /#screen-overzicht \.settings-overview-grid[^}]+grid-template-columns: repeat\(2,minmax\(0,280px\)\)/);
+  assert.match(fs.readFileSync(path.join(root, 'assets/premium-settings-tiles.css'), 'utf8'), /#screen-overzicht \.settings-overview-grid > \.tegel[^}]+aspect-ratio:1 \/ 1/);
+  const source = fs.readFileSync(path.join(root, 'assets/premium-user-management.js'), 'utf8');
+  assert.match(source, /overviewScreen\.querySelector\('\[data-settings-extra-open\]'\) \|\| document\.createElement/);
+});
