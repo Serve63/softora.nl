@@ -41,6 +41,77 @@ function createInMemoryService(overrides = {}) {
   };
 }
 
+async function startLunaMaxPair() {
+  const fixture = createInMemoryService();
+  const headers = { authorization: 'Bearer worker-token' };
+  await fixture.service.sendCommandControlResponse(
+    { headers, body: { enabled: true, activeWorkerKeys: ['vuller', 'controle'] } },
+    createJsonResponse()
+  );
+  for (const workerKey of ['vuller', 'controle']) {
+    await fixture.service.sendReportWorkerResponse({ headers, body: {
+      workerKey, workerState: 'running', model: 'gpt-5.6-luna', reasoningEffort: 'max',
+      queuePending: true, workerProgressAt: '2026-07-26T20:30:00.000Z',
+    } }, createJsonResponse());
+  }
+  return { ...fixture, headers };
+}
+
+test('Luna Max survives reasoning or compaction beyond 150 seconds but expires after ten minutes', async () => {
+  const { service, headers, setNow } = await startLunaMaxPair();
+  setNow('2026-07-26T20:34:00.000Z');
+  const duringReasoning = createJsonResponse();
+  await service.sendPollControlResponse({ headers }, duringReasoning);
+  assert.equal(duringReasoning.payload.control.enabled, true);
+  assert.equal(duringReasoning.payload.control.workers.controle.stale, false);
+  assert.equal(duringReasoning.payload.control.workers.controle.workerState, 'running');
+
+  setNow('2026-07-26T20:40:01.000Z');
+  const expired = createJsonResponse();
+  await service.sendPollControlResponse({ headers }, expired);
+  assert.equal(expired.payload.control.enabled, false);
+  assert.match(expired.payload.control.automaticStopReason, /heartbeat is verlopen/);
+});
+
+test('Luna Max heartbeat grace does not waive the real database progress deadline', async () => {
+  const { service, headers, setNow } = await startLunaMaxPair();
+  for (const at of ['20:38:00', '20:46:00', '20:54:00']) {
+    setNow(`2026-07-26T${at}.000Z`);
+    for (const workerKey of ['vuller', 'controle']) {
+      await service.sendReportWorkerResponse({ headers, body: {
+        workerKey, workerState: 'running', model: 'gpt-5.6-luna', reasoningEffort: 'max',
+        queuePending: true, workerProgressAt: '2026-07-26T20:30:00.000Z',
+      } }, createJsonResponse());
+    }
+  }
+  setNow('2026-07-26T21:00:01.000Z');
+  const response = createJsonResponse();
+  await service.sendReportWorkerResponse({ headers, body: {
+    workerKey: 'vuller', workerState: 'running', model: 'gpt-5.6-luna', reasoningEffort: 'max',
+    queuePending: true, workerProgressAt: '2026-07-26T20:30:00.000Z',
+  } }, response);
+  assert.equal(response.payload.control.enabled, false);
+  assert.match(response.payload.control.automaticStopReason, /geen opgeslagen databasevoortgang/);
+});
+
+test('Luna Max errors and explicit stop still take effect immediately during heartbeat grace', async () => {
+  for (const action of ['error', 'stop']) {
+    const { service, headers, setNow } = await startLunaMaxPair();
+    setNow('2026-07-26T20:34:00.000Z');
+    const response = createJsonResponse();
+    if (action === 'error') {
+      await service.sendReportWorkerResponse({ headers, body: {
+        workerKey: 'controle', workerState: 'error', model: 'gpt-5.6-luna', reasoningEffort: 'max',
+        workerMessage: 'Bronnen tijdelijk onbereikbaar',
+      } }, response);
+      assert.match(response.payload.control.automaticStopReason, /door een fout gestopt/);
+    } else {
+      await service.sendCommandControlResponse({ headers, body: { enabled: false } }, response);
+    }
+    assert.equal(response.payload.control.enabled, false);
+  }
+});
+
 test('kvk database control defaults fail closed to disabled', async () => {
   const { service } = createInMemoryService();
   const response = createJsonResponse();
