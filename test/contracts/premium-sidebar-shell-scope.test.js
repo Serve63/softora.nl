@@ -8,6 +8,30 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('Extra-modules keren buiten hun inhoudsframe terug naar de volledige instellingenpagina', () => {
+  const routes = require('../../assets/settings-module-routes');
+  const { initialize } = require('../../assets/settings-module-back');
+  for (const entry of routes.getLinkedModules()) {
+    let mounted;
+    const host = { replaceChildren(link) { mounted = link; } };
+    const document = {
+      querySelectorAll() { return [host]; },
+      querySelector() { return mounted || null; },
+      createElement(tag) { return { tag, setAttribute(key, value) { this[key] = value; } }; },
+    };
+    initialize({ SoftoraSettingsModuleRoutes: routes, location: { pathname: entry.paths[0] } }, document);
+    assert.equal(mounted.tag, 'a');
+    assert.equal(mounted.href, '/premium-instellingen#extra');
+    assert.equal(mounted.target, '_top', `${entry.label} must leave the embedded module`);
+    const firstLink = mounted;
+    initialize({ SoftoraSettingsModuleRoutes: routes, location: { pathname: entry.paths[0] } }, document);
+    assert.equal(mounted, firstLink, 'reinitialization keeps the existing link');
+    for (const file of entry.files) {
+      assert.match(readRepoFile(file), /settings-module-back\.js\?v=20260909a/);
+    }
+  }
+});
+
 test('sidebarbestemmingen houden pagina-inhoud zichtbaar na boot en bij late data', () => {
   const sections = {
     'premium-personeel-dashboard.html': ['kpi-card', 'panel', 'dashboard-ai-management-status-panel', 'chart-bar'],

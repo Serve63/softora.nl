@@ -46,7 +46,7 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
       assert.match(source, /settings-module-back\.css\?v=20260818a/, file);
       assert.match(source, new RegExp(`settings-module-routes\\.js\\?v=${routesVersion}`), file);
-      assert.match(source, /settings-module-back\.js\?v=20260814b/, file);
+      assert.match(source, /settings-module-back\.js\?v=20260909a/, file);
       assert.equal((source.match(/class="settings-module-back"/g) || []).length, 0, file);
     });
   });
@@ -108,7 +108,7 @@ test('locked en unlocked Winnen blijven één veilige gedeelde uitweg houden', (
   assert.equal((locked.match(/data-settings-module-back-host/g) || []).length, 1);
   assert.doesNotMatch(locked, /momentum-access-close|Toegangsscherm sluiten/);
   assert.match(locked, /settings-module-routes\.js\?v=20260818b/);
-  assert.match(locked, /settings-module-back\.js\?v=20260814b/);
+  assert.match(locked, /settings-module-back\.js\?v=20260909a/);
   assert.equal((unlocked.match(/data-settings-module-back-host/g) || []).length, 1);
   assert.doesNotMatch(unlocked, /momentum-settings-back/);
 });
