@@ -381,16 +381,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            opacity: 0;
-            transform: translateY(15px);
-            animation: fadeUp 0.5s var(--ease-out-expo) forwards;
         }
-
-        .summary-card:nth-child(1) { animation-delay: 0.1s; }
-        .summary-card:nth-child(2) { animation-delay: 0.15s; }
-        .summary-card:nth-child(3) { animation-delay: 0.2s; }
-
-        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
 
         .summary-label {
             font-family: 'Oswald', sans-serif;
@@ -567,18 +558,9 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             transition: all 0.3s var(--ease-out-expo);
-            opacity: 0;
-            transform: translateY(15px);
-            animation: fadeUp 0.5s var(--ease-out-expo) forwards;
             position: relative;
             overflow: hidden;
         }
-
-        .order-card:nth-child(1) { animation-delay: 0.25s; }
-        .order-card:nth-child(2) { animation-delay: 0.3s; }
-        .order-card:nth-child(3) { animation-delay: 0.35s; }
-        .order-card:nth-child(4) { animation-delay: 0.4s; }
-        .order-card:nth-child(5) { animation-delay: 0.45s; }
 
         .order-card:hover {
             border-color: rgba(139,34,82,0.3);

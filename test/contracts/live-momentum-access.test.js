@@ -137,7 +137,7 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.equal((html.match(/data-momentum-access-digit=/g) || []).length, 10);
   assert.match(html, /live-momentum-access\.css\?v=20260828a/);
   assert.match(html, /settings-module-routes\.js\?v=20260818b/);
-  assert.match(html, /settings-module-back\.js\?v=20260814b/);
+  assert.match(html, /settings-module-back\.js\?v=20260909a/);
   assert.equal((html.match(/data-settings-module-back-host/g) || []).length, 1);
   assert.doesNotMatch(html, /momentum-access-close|Toegangsscherm sluiten/);
   assert.match(html, /live-momentum-access\.js\?v=20260804a/);

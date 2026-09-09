@@ -8,6 +8,59 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('Extra-modules keren buiten hun inhoudsframe terug naar de volledige instellingenpagina', () => {
+  const routes = require('../../assets/settings-module-routes');
+  const { initialize } = require('../../assets/settings-module-back');
+  for (const entry of routes.getLinkedModules()) {
+    let mounted;
+    const host = { replaceChildren(link) { mounted = link; } };
+    const document = {
+      querySelectorAll() { return [host]; },
+      querySelector() { return mounted || null; },
+      createElement(tag) { return { tag, setAttribute(key, value) { this[key] = value; } }; },
+    };
+    initialize({ SoftoraSettingsModuleRoutes: routes, location: { pathname: entry.paths[0] } }, document);
+    assert.equal(mounted.tag, 'a');
+    assert.equal(mounted.href, '/premium-instellingen#extra');
+    assert.equal(mounted.target, '_top', `${entry.label} must leave the embedded module`);
+    const firstLink = mounted;
+    initialize({ SoftoraSettingsModuleRoutes: routes, location: { pathname: entry.paths[0] } }, document);
+    assert.equal(mounted, firstLink, 'reinitialization keeps the existing link');
+    for (const file of entry.files) {
+      assert.match(readRepoFile(file), /settings-module-back\.js\?v=20260909a/);
+    }
+  }
+});
+
+test('sidebarbestemmingen houden pagina-inhoud zichtbaar na boot en bij late data', () => {
+  const sections = {
+    'premium-personeel-dashboard.html': ['kpi-card', 'panel', 'dashboard-ai-management-status-panel', 'chart-bar'],
+    'premium-actieve-opdrachten.html': ['summary-card', 'order-card'],
+    'premium-personeel-agenda.html': ['month-nav', 'calendar-wrapper'],
+    'premium-ai-lead-generator.html': ['panel', 'launch-section', 'stat-card', 'log-panel'],
+  };
+  for (const [file, classes] of Object.entries(sections)) {
+    const source = readRepoFile(file);
+    for (const className of classes) {
+      // Check all base rules, including responsive overrides. Static cards must
+      // not depend on an animation finishing, or replay when boot is released.
+      const rules = [...source.matchAll(new RegExp(`\\.${className}\\s*\\{([^}]+)\\}`, 'g'))];
+      assert.ok(rules.length, `${file}: ${className} styles exist`);
+      for (const [, declarations] of rules) {
+        assert.doesNotMatch(declarations, /opacity:\s*0(?:\s|;)|visibility:\s*hidden|transform:\s*translate|animation(?:-name)?:/,
+          `${file}: ${className} must render in its final position without an entrance animation`);
+      }
+    }
+  }
+  const dashboard = readRepoFile('premium-personeel-dashboard.html');
+  assert.doesNotMatch(dashboard, /growBar|is-animate|chartHydrated/);
+  assert.match(dashboard, /dataset\.chartSignature === nextSignature/);
+  const generator = readRepoFile('premium-ai-lead-generator.html');
+  assert.match(generator, /\.site-dialog\s*\{[^}]*animation: fadeUp 0\.2s/);
+  assert.match(generator, /\.log-entry\s*\{[^}]*animation: fadeUp 0\.3s/);
+  assert.match(readRepoFile('premium-personeel-agenda.html'), /\.modal-overlay\.show \.modal \{ transform: translateY\(0\); \}/);
+});
+
 function extractSidebarSections(source) {
   const asideMatch = source.match(/<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>([\s\S]*?)<\/aside>/);
   assert.ok(asideMatch, 'pagina hoort een statische premium-sidebar te hebben');
