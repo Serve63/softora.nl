@@ -1071,7 +1071,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ? await mailboxIndexStore.listUnthreadedSentCandidatesForConversations({
           targets: unthreadedTargets,
           limit: Math.min(3000, unthreadedTargets.length * 3),
-        }).catch(() => [])
+        })
       : [];
     stage('unthreaded');
     const conversationsWithHistoricalReplies = attachTargetedUnthreadedSentMessages(

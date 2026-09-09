@@ -43,6 +43,7 @@ function rowContainsRecipientEmail(row, recipientEmails, normalizeString) {
 }
 
 function createMailboxIndexTargetedLookups({
+  parseDateIso,
   run,
   runPriorityRead,
   tableName,
@@ -53,6 +54,49 @@ function createMailboxIndexTargetedLookups({
   normalizeMessageRow,
   listMatchingMessagesForAccounts,
 } = {}) {
+  async function listUnthreadedSentCandidatesForConversations({ targets = [], limit = 1000 } = {}) {
+    const normalizedTargets = (Array.isArray(targets) ? targets : [])
+      .map((target) => ({
+        conversation_id: normalizeString(target && target.conversationId),
+        account_email: normalizeEmail(target && target.accountEmail),
+        counterparty_email: normalizeEmail(target && target.counterpartyEmail),
+        canonical_subject: normalizeString(target && target.canonicalSubject).toLowerCase(),
+        latest_inbound_at: parseDateIso(target && target.latestInboundAt),
+      }))
+      .filter((target) => (
+        target.conversation_id &&
+        target.account_email &&
+        target.counterparty_email &&
+        target.canonical_subject &&
+        target.latest_inbound_at
+      ));
+    if (!normalizedTargets.length) return [];
+    // This evidence determines whether a conversation still needs an answer.
+    // A failed read must never become a successful empty result or snapshot.
+    const result = await runPriorityRead('list-unthreaded-sent-candidates', (client) =>
+      client.rpc('softora_find_mailbox_unthreaded_sent_candidates', {
+        p_targets: normalizedTargets,
+        p_limit: Math.max(1, Math.min(3000, Number(limit) || 1000)),
+      })
+    );
+    if (!result.ok || !Array.isArray(result.data)) {
+      const error = new Error('Verzonden antwoorden konden niet volledig worden gecontroleerd.');
+      error.code = 'MAILBOX_REPLY_ACTIVITY_UNAVAILABLE';
+      error.status = 503;
+      throw error;
+    }
+    return (Array.isArray(result.data) ? result.data : [])
+      .map((row) => {
+        const message = row && row.message && typeof row.message === 'object' ? row.message : null;
+        if (!message) return null;
+        return {
+          targetConversationId: normalizeString(row.target_conversation_id),
+          message: normalizeMessageRow(message, { includeBody: true }),
+        };
+      })
+      .filter(Boolean);
+  }
+
   async function listMessagesBySenderEmailsForAccounts({
     accountEmails = [],
     folder = 'inbox',
@@ -193,6 +237,7 @@ function createMailboxIndexTargetedLookups({
   }
 
   return {
+    listUnthreadedSentCandidatesForConversations,
     getOldestMatchingMessageUid,
     listCampaignSeedMessagesForAccount,
     listMessagesByRecipientEmailsForAccounts,

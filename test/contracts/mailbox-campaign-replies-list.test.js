@@ -89,7 +89,7 @@ test('ontbrekende, verouderde of oncontroleerbare snapshots vallen terug op de c
   }
 });
 
-test('snelle snapshot wist de verzendsamenvatting wanneer het bijbehorende antwoord niet meer zichtbaar is', async () => {
+test('een verdwenen fysieke antwoordrij wordt canonical gecontroleerd voordat een snapshot de antwoordstatus wist', async () => {
   const receivedAt = '2026-09-03T07:35:54.000Z';
   const replyAt = '2026-09-03T10:12:08.000Z';
   const messages = [{ id: 'root', messageKey: 'root', accountEmail: 'serve@softora.nl',
@@ -98,7 +98,7 @@ test('snelle snapshot wist de verzendsamenvatting wanneer het bijbehorende antwo
   const raw = serializeMailboxCampaignSnapshot({ ok: true, messages });
   assert.equal(parseMailboxCampaignSnapshot(raw).messages[0].latestOutboundAt, replyAt);
   for (const replyState of [null, { deleted_at: replyAt }, { generation_superseded_at: replyAt }]) {
-    const { list } = snapshotFixture({
+    const { list, calls } = snapshotFixture({
       getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: raw } }),
       mailboxIndexStore: { listMessageStatesByKeys: async () => [
         { message_key: 'root', account_email: 'serve@softora.nl' },
@@ -106,9 +106,9 @@ test('snelle snapshot wist de verzendsamenvatting wanneer het bijbehorende antwo
       ] },
     });
     const result = await list({ owner: 'serve', hydrateBodies: false, preferSnapshot: true });
-    assert.equal(result.messages[0].latestOutboundAt, '');
-    assert.equal(result.messages[0].latestInboundAt, receivedAt);
-    assert.deepEqual(result.messages[0].threadMessages, []);
+    assert.equal(result.fromSnapshot, undefined);
+    assert.equal(calls.canonical, 1);
+    assert.deepEqual(result.messages, [], 'ontbrekende of verborgen mail wordt nooit uit oude cache hersteld');
   }
 });
 

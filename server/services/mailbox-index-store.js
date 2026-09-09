@@ -995,42 +995,6 @@ function createMailboxIndexStore(deps = {}) {
     return normalizeMessageRow(result.data, { includeBody: true });
   }
 
-  async function listUnthreadedSentCandidatesForConversations({ targets = [], limit = 1000 } = {}) {
-    const normalizedTargets = (Array.isArray(targets) ? targets : [])
-      .map((target) => ({
-        conversation_id: normalizeString(target && target.conversationId),
-        account_email: normalizeEmail(target && target.accountEmail),
-        counterparty_email: normalizeEmail(target && target.counterpartyEmail),
-        canonical_subject: normalizeString(target && target.canonicalSubject).toLowerCase(),
-        latest_inbound_at: parseDateIso(target && target.latestInboundAt),
-      }))
-      .filter((target) => (
-        target.conversation_id &&
-        target.account_email &&
-        target.counterparty_email &&
-        target.canonical_subject &&
-        target.latest_inbound_at
-      ));
-    if (!normalizedTargets.length) return [];
-    const result = await run('list-unthreaded-sent-candidates', (client) =>
-      client.rpc('softora_find_mailbox_unthreaded_sent_candidates', {
-        p_targets: normalizedTargets,
-        p_limit: Math.max(1, Math.min(3000, Number(limit) || 1000)),
-      })
-    );
-    if (!result.ok) return [];
-    return (Array.isArray(result.data) ? result.data : [])
-      .map((row) => {
-        const message = row && row.message && typeof row.message === 'object' ? row.message : null;
-        if (!message) return null;
-        return {
-          targetConversationId: normalizeString(row.target_conversation_id),
-          message: normalizeMessageRow(message, { includeBody: true }),
-        };
-      })
-      .filter(Boolean);
-  }
-
   async function upsertMessages({
     accountEmail,
     folder = 'inbox',
@@ -1104,6 +1068,7 @@ function createMailboxIndexStore(deps = {}) {
   });
   const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
   const targetedLookups = createMailboxIndexTargetedLookups({
+    parseDateIso,
     run,
     runPriorityRead,
     tableName: MAILBOX_INDEX_TABLES.messages,
@@ -1168,7 +1133,6 @@ function createMailboxIndexStore(deps = {}) {
     listStoredMessageIdsByMessageIdsForAccounts: createMailboxStoredMessageEvidenceLookup({ run, runPriorityRead, normalizeEmail, normalizeFolder, normalizeString }),
     listSentCandidatesForQuotedReplies,
     listMessagesReferencingMessageIdsForAccounts,
-    listUnthreadedSentCandidatesForConversations,
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,

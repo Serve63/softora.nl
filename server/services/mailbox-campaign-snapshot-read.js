@@ -61,14 +61,20 @@ function createMailboxCampaignSnapshotRead({ getUiStateValues, mailboxIndexStore
           starred: Boolean(state.starred),
         };
       }
-      const messages = candidates.flatMap((message) => {
+      const messages = [];
+      for (const message of candidates) {
         const root = reconcile(message);
-        if (!root) return [];
+        if (!root) continue;
         const visible = { ...root, threadMessages: message.threadMessages
           .map((entry) => reconcile(entry, message.accountEmail)).filter(Boolean) };
-        // Removed or superseded messages must not survive as status evidence.
-        return [{ ...visible, ...resolveConversationActivity(visible) }];
-      });
+        const activity = resolveConversationActivity(visible);
+        // A missing physical row can have an active copy in a newer generation.
+        // Resolve that through the canonical index before declaring an answer
+        // absent; never revive the obsolete row or publish an unanswered flash.
+        if ((Date.parse(message.latestOutboundAt || '') || 0) >
+            (Date.parse(activity.latestOutboundAt || '') || 0)) return null;
+        messages.push({ ...visible, ...activity });
+      }
       return {
         ok: true,
         owner: selectedOwner,
