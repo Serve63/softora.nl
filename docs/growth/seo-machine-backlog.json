@@ -186,9 +186,11 @@
       },
       "nextAction": "Valideer actuele vraagvormen en werk een systeemneutrale acceptatiematrix uit met primaire gebruiker, data-eigenaar en proceseigenaar als menselijke beslissers."
     },
-    {
-      "id": "crm-migration-002",
-      "status": "ready",
+  {
+    "id": "crm-migration-002",
+    "status": "shipped",
+    "shippedAt": "2026-09-09",
+    "shippedPath": "/kennisbank/crm-migratie-stappenplan",
       "path": "/kennisbank/crm-migratie-stappenplan",
       "contentType": "kennisbank",
       "cluster": "software-crm",
@@ -262,8 +264,8 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Controleer buyer questions en werk een concrete maar systeemneutrale migratiechecklist uit."
-    },
+    "nextAction": "Controleer op D14, D28 en D56 indexatie, non-branded migratievragen en de route naar /crm-systeem-op-maat; herschrijf niet binnen de cooldown zonder aantoonbaar technisch of claimdefect."
+  },
     {
       "id": "crm-implementation-003",
       "status": "shipped",
@@ -2861,6 +2863,94 @@
         ]
       },
       "nextAction": "Herbevestig Nederlandse beheervragen en directe leveranciersdocumentatie; werk daarna een systeemneutraal bronregister uit zonder automatische actualiteit of foutloos antwoordgedrag te claimen."
+    },
+    {
+      "id": "crm-migration-proposal-034",
+      "status": "ready",
+      "path": "/blog/crm-migratie-offerte-vergelijken",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "crm migratie offerte vergelijken",
+      "intent": "CRM-migratievoorstellen op gelijke scope, datarisico, verantwoordelijkheden en acceptatiebewijs vergelijken",
+      "intentClass": "buying",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Leveranciers- en offertebeslissing na interne migratievoorbereiding en vóór opdrachtverlening",
+      "demandEvidence": [
+        {
+          "type": "serp",
+          "source": "Nederlandse Google-SERP voor crm migratie offerte vergelijken",
+          "observedAt": "2026-09-09",
+          "detail": "De exacte Nederlandse zoekvraag toont vergelijkingstaal rond dataselectie en -opschoning, koppelingen, implementatiefasen, training, eenmalige versus terugkerende kosten en nazorg. De organische resultaten richten zich vooral op CRM-pakketkeuze; een systeemneutrale offertevergelijking voor de migratieopdracht blijft een afzonderlijke MKB-beslistaak."
+        },
+        {
+          "type": "buyer-task-and-cluster-gap",
+          "source": "Softora CRM-contentinventaris na publicatie van het CRM-migratiestappenplan",
+          "observedAt": "2026-09-09",
+          "detail": "Het migratiestappenplan bereidt intern scope, mapping, proefmigratie, cutover en rollback voor. De bestaande algemene softwareoffertegids vergelijkt maatwerkontwikkeling. Geen huidige route zet twee CRM-migratievoorstellen op dezelfde dataset, uitzonderingen, verantwoordelijkheden, acceptatie en nazorg naast elkaar."
+        }
+      ],
+      "competitorPatterns": [
+        "CRM-pakketten vergelijken op functies en licentieprijs zonder de afzonderlijke migratiescope gelijk te trekken",
+        "Een totaalbedrag tonen zonder recordtypen, historische data, bijlagen, opschoning, uitzonderingen en koppelingen expliciet te begrenzen",
+        "Go-live noemen zonder proefmigratie, acceptatie-eigenaar, herstelpad en nazorg als controleerbare leveringen te beschrijven"
+      ],
+      "overlap": {
+        "checkedAt": "2026-09-09",
+        "closestPaths": [
+          "/kennisbank/crm-migratie-stappenplan",
+          "/blog/maatwerk-software-offerte-beoordelen",
+          "/blog/crm-systeem-kosten-mkb"
+        ],
+        "decision": "distinct",
+        "rationale": "Het migratiestappenplan organiseert de interne uitvoering, de softwareoffertegids vergelijkt een brede maatwerkopdracht en de CRM-kostengids maakt totale kosten zichtbaar. Deze kandidaat bezit uitsluitend de gelijkgezette vergelijking van twee of meer CRM-migratievoorstellen op scope, data, uitzonderingen, verantwoordelijkheden, acceptatie en nazorg."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.2,
+      "brief": {
+        "title": "CRM migratie offertes vergelijken op scope en bewijs",
+        "metaDescription": "Vergelijk CRM-migratieoffertes op dezelfde data, mapping, koppelingen, proefmigratie, acceptatie, rollback, nazorg en verantwoordelijkheden.",
+        "h1": "Hoe vergelijk je offertes voor een CRM migratie?",
+        "outline": [
+          "Geef iedere partij dezelfde broninventaris, recordtypen en uitzonderingen",
+          "Scheid opschoning, mapping, koppelingen, proefmigratie en cutover",
+          "Leg vast wie data, acceptatie, fouten, training en herstel bezit",
+          "Vergelijk aannames, uitsluitingen, meerwerk en terugkerende kosten",
+          "Laat acceptatiebewijs, rollback en nazorg de opdrachtgrens bepalen"
+        ],
+        "buyerQuestions": [
+          "Welke migratieonderdelen moeten expliciet in iedere CRM-offerte staan?",
+          "Hoe vergelijk je voorstellen wanneer leveranciers andere aannames en recordlimieten gebruiken?",
+          "Welk bewijs, herstelpad en nazorg hoort vóór opdrachtverlening te zijn afgesproken?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/crm-migratie-stappenplan",
+          "/blog/crm-systeem-kosten-mkb"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/kennisbank/crm-migratie-stappenplan"
+        ],
+        "conversionPath": "Van een gelijkgezette migratie-offertematrix naar een scopegesprek over een controleerbare CRM-overgang.",
+        "claimRisk": "Geen leverancier, prijs, doorlooptijd, foutloosheid, nul downtime of juridisch oordeel beloven; vergelijk alleen expliciete scope en controleerbaar bewijs.",
+        "visualConcepts": [
+          "Twee migratievoorstellen boven dezelfde broninventaris met aparte vakken voor data, koppelingen, proef, cutover en nazorg",
+          "Offerte-acceptatiepoort die aannames, uitsluitingen, eigenaar, bewijs en rollback per voorstel controleert"
+        ],
+        "structuredData": [
+          "Article",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Herbevestig de Nederlandse vraag met verse GSC- en adviserende providerdata wanneer deze kandidaat wordt geselecteerd; gebruik primaire privacy- en beveiligingsbronnen en vergelijk geen leveranciers zonder actuele controleerbare offertegrondslag."
     }
   ]
 }

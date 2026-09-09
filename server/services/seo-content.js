@@ -1240,7 +1240,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
       Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
+      Object.freeze({ label: 'CRM migratie stappenplan', href: '/kennisbank/crm-migratie-stappenplan', availableFrom: '2026-09-09' }),
     ]),
   }),
   Object.freeze({
