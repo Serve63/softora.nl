@@ -1980,10 +1980,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-calm-roi-type/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
-  assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
+  assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?id="systemMailSentTodayCount"[\s\S]*?class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Harde bounces<\/div>[\s\S]*?id="systemMailBouncesTodayCount"/);
-  assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
+  assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: center;/);
   assert.doesNotMatch(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
