@@ -137,12 +137,12 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260824a/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909a/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260909a/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -384,10 +384,46 @@ test('kvk database shows every Searcher result and only material Controller corr
   assert.match(html, /0612345678/);
   assert.match(html, /Searcher/);
   assert.match(html, /Luna 5\.6 Max/);
+  assert.match(html, /href="https:\/\/voorbeeld\.nl"[^>]*>voorbeeld\.nl<\/a>/);
+  assert.doesNotMatch(html, />https?:\/\//i);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 
   assert.equal(lunaErrors.activityStatus({ review_finding: 'missed_usable' }), 'Onterecht afgekeurd');
   assert.equal(lunaErrors.activityStatus({ review_finding: 'incorrect_approval' }), 'Onterecht goedgekeurd');
+});
+
+test('scraper website labels hide HTTP and HTTPS while preserving working link destinations', () => {
+  const { activityRowHtml } = require('../../assets/kvk-database-luna-errors');
+  for (const [website, href, label] of [
+    ['https://www.voorbeeld.nl/pad', 'https://www.voorbeeld.nl/pad', 'www.voorbeeld.nl/pad'],
+    ['http://voorbeeld.nl/', 'http://voorbeeld.nl/', 'voorbeeld.nl/'],
+    ['voorbeeld.nl', 'https://voorbeeld.nl', 'voorbeeld.nl'],
+  ]) {
+    const html = activityRowHtml({ website });
+    assert.ok(html.includes(`href="${href}"`));
+    assert.ok(html.includes(`>${label}</a>`));
+    assert.doesNotMatch(html, />https?:\/\//i);
+  }
+});
+
+test('planning explains its three cumulative checkmark stages beside the heading', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  assert.match(html, /class="planning-heading"[\s\S]*?<h2>Planning<\/h2>[\s\S]*?class="planning-legend"/);
+  assert.match(html, /1 vinkje: <\/span>KVK-gegevens/);
+  assert.match(html, /2 vinkjes: <\/span>Volledig onderzocht/);
+  assert.match(html, /3 vinkjes: <\/span>Gecontroleerd/);
+});
+
+test('unused company totals and website subcategories form one labelled group', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const group = html.slice(html.indexOf('<div class="stat-new-group"'), html.indexOf('<article class="stat-card stat-card-unusable'));
+  assert.match(group, /role="group" aria-labelledby="stat-new-group-label"/);
+  assert.match(group, />Nieuw\. Nog niet gebruikt<\/p>/);
+  assert.equal((group.match(/<article /g) || []).length, 3);
+  for (const id of ['companies-usable', 'companies-with-website', 'companies-without-website']) {
+    assert.ok(group.includes(`id="${id}"`));
+  }
+  assert.doesNotMatch(group, /id="companies-successful-found"|id="companies-treated"/);
 });
 
 test('kvk database hides the page scrollbar without disabling scrolling', () => {
@@ -409,12 +445,12 @@ test('kvk database keeps the wide desktop dashboard inside one viewport', () => 
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
 
-  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260825a/);
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909a/);
   assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
   assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{[^}]*min-height:\s*0\s*!important;[^}]*overflow:\s*hidden\s*!important/);
-  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 82px minmax\(0, 1fr\) 184px;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
+  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 100px minmax\(0, 1fr\) 184px;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /\.latest-treated-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*margin:\s*0/);
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*184px;[^}]*min-height:\s*0/);
@@ -461,9 +497,9 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804d/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260809f/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260909a/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);
   assert.match(metricsSource, /companies-treated/);

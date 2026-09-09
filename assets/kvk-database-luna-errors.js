@@ -87,7 +87,8 @@
     const text = String(value || '').trim();
     if (!text) return 'Niet gevonden';
     const href = /^https?:\/\//i.test(text) ? text : `https://${text}`;
-    return `<a class="website-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
+    const label = text.replace(/^https?:\/\//i, '');
+    return `<a class="website-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
   }
 
   function activityRowHtml(activity) {
