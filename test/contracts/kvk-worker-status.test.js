@@ -12,13 +12,26 @@ test('worker summary counts search and both review lanes with their models', () 
 });
 
 test('disabled, stale, waiting, stalled and pre-request workers are not currently active', () => {
-  for (const update of [{ workerHeartbeatAt: new Date(now - 150001).toISOString() }, { workerState: 'waiting' }, { stale: true }, { stalled: true }, { queuePending: false }]) {
+  for (const update of [{ workerHeartbeatAt: new Date(now - 600001).toISOString() }, { workerState: 'waiting' }, { stale: true }, { stalled: true }, { queuePending: false }]) {
     assert.equal(summarize({ enabled: true, workers: { vuller: { ...worker, ...update } } }, {}, now)[0].active, 0);
   }
   assert.equal(summarize({ enabled: false, workers: { vuller: worker } }, {}, now)[0].active, 0);
   assert.equal(summarize({ enabled: true, requestedAt: new Date(now + 1000).toISOString(), workers: { vuller: worker } }, {}, now)[0].active, 0);
   assert.equal(summarize({ unavailable: true, workers: { vuller: worker } }, {}, now)[0].active, null);
   assert.equal(summarize(null, {}, now)[0].active, null);
+});
+
+test('native Luna Max thinking remains active within the same finite grace as the server', () => {
+  const thinking = { ...worker, workerHeartbeatAt: new Date(now - 300000).toISOString() };
+  assert.equal(summarize({ enabled: true, workers: { vuller: thinking } }, {}, now)[0].active, 1);
+  for (const update of [{ model: 'gpt-5.6-sol' }, { reasoningEffort: 'high' }, { model: '' }, { workerState: 'error' }, { stale: true }, { stalled: true }]) {
+    assert.equal(summarize({ enabled: true, workers: { vuller: { ...thinking, ...update } } }, { vuller: worker }, now)[0].active, 0);
+  }
+});
+
+test('only selected lanes contribute activity or model labels', () => {
+  const result = summarize({ enabled: true, activeWorkerKeys: ['vuller', 'controle'], workers: { vuller: worker, controle: worker, goedgekeurd: { ...worker, model: 'gpt-5.6-sol' } } }, {}, now);
+  assert.deepEqual(result[1], { kind: 'controllers', active: 1, models: ['Luna Max'] });
 });
 
 test('configured intelligence remains visible while workers are stopped', () => {
