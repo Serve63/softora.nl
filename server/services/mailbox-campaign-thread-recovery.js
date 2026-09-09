@@ -1119,7 +1119,7 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
     });
     const sentCandidates = await (targets.length &&
       mailboxIndexStore && typeof mailboxIndexStore.listSentCandidatesForQuotedReplies === 'function'
-      ? mailboxIndexStore.listSentCandidatesForQuotedReplies({ targets, limitPerTarget: 10 }).catch(() => [])
+      ? mailboxIndexStore.listSentCandidatesForQuotedReplies({ targets, limitPerTarget: 10 })
       : Promise.resolve([]));
     const recoveredFromSent = attachQuotedOriginalSentMessages(recoveryCandidates, sentCandidates);
     const legacyCandidates = recoveredFromSent.filter(isQuotedSentRecoveryCandidate);

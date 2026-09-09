@@ -1,3 +1,5 @@
+const { requireMailboxEvidenceRows, readMailboxEvidenceBatches } = require('./mailbox-read-evidence');
+
 function createMailboxQuotedSentCandidateLookup(options = {}) {
   const {
     run,
@@ -26,7 +28,7 @@ function createMailboxQuotedSentCandidateLookup(options = {}) {
 
     const safeLimitPerTarget = Math.max(1, Math.min(25, Number(limitPerTarget) || 10));
     const rowsByKey = new Map();
-    for (const target of normalizedTargets) {
+    const batches = await readMailboxEvidenceBatches(normalizedTargets, async (target) => {
       const result = await run(
         `list-sent-candidates-for-quoted-reply:${target.accountEmail}:${target.recipientEmail}`,
         (client) => {
@@ -45,8 +47,10 @@ function createMailboxQuotedSentCandidateLookup(options = {}) {
             .limit(safeLimitPerTarget);
         }
       );
-      if (!result.ok) return [];
-      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+      return requireMailboxEvidenceRows(result?.ok ? result.data : null, 'quoted-sent-candidates');
+    });
+    for (const rows of batches) {
+      rows.forEach((row) => {
         const key = normalizeString(row && row.message_key);
         if (key && !rowsByKey.has(key)) rowsByKey.set(key, row);
       });

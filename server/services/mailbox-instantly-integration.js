@@ -325,6 +325,7 @@ async function markInstantlyMessageRead({
 }
 
 async function mergeCampaignReplies({
+  includeSnapshotMessages = true,
   baseReplies,
   snapshotBaseReplies = baseReplies,
   instantlyMailboxService,
@@ -374,8 +375,10 @@ async function mergeCampaignReplies({
       };
     }
   }
+  const readOwners = !includeSnapshotMessages && knownOwners.includes(selectedOwner)
+    ? configuredOwners.filter((candidate) => candidate === selectedOwner) : configuredOwners;
   const allInstantlyReplies = instantlyMailboxService?.isConfigured?.()
-    ? (await Promise.all(configuredOwners.map((candidate) => (
+    ? (await Promise.all(readOwners.map((candidate) => (
         instantlyMailboxService.listOwnerConversations(candidate, {
           limit: Number(limit || 100) || 100,
         })
@@ -425,13 +428,14 @@ async function listMailboxCampaignReplySets({
   limit,
   owner,
   hydrateBodies = true,
+  includeSnapshotMessages = true,
 }) {
   const normalizedLimit = Number(limit || 100) || 100;
   if (typeof mailboxCampaignRepliesService?.listRepliesWithSnapshot === 'function') {
     const result = await mailboxCampaignRepliesService.listRepliesWithSnapshot({
       limit: normalizedLimit,
       owner,
-      snapshotLimit: 200,
+      snapshotLimit: includeSnapshotMessages ? 200 : 0,
       hydrateBodies,
     });
     return {
