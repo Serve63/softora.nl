@@ -2,7 +2,6 @@ const { parseDocument } = require('htmlparser2');
 
 const SKIPPED_TAGS = new Set([
   'head',
-  'img',
   'noscript',
   'script',
   'style',
@@ -52,7 +51,29 @@ function normalizeRenderedMailboxText(value) {
     .trim();
 }
 
-function parseProviderHtml(value) {
+function decodeMailboxEntities(value) {
+  const raw = String(value || '');
+  if (!raw.includes('&')) return raw;
+  const document = parseDocument(raw.replace(/</g, '&lt;').replace(/>/g, '&gt;'), { decodeEntities: true });
+  return document.children.map((node) => node.data || '').join('').replace(/\u00a0/g, ' ');
+}
+
+function isMailboxHtml(value) {
+  return /<\/?(?:html|body|head|div|p|br|a|span|table|tbody|tr|td|th|blockquote|img|b|strong|i|em|ul|ol|li|h[1-6]|section|article|font|hr|style|script)(?:\s[^<>]*|\s*\/?)>/i.test(String(value || ''));
+}
+
+function safeProviderLink(value) {
+  try { return ['http:', 'https:', 'mailto:', 'tel:'].includes(new URL(value).protocol); }
+  catch (_) { return false; }
+}
+
+function imageLabel(node) {
+  const attributes = node.attribs || {};
+  if (['width', 'height'].some((key) => /^(?:0|1)(?:px)?$/.test(String(attributes[key] || '')))) return '';
+  return normalizeText(attributes.alt);
+}
+
+function parseProviderHtml(value, { includeImageLabels = false } = {}) {
   const html = normalizeText(value);
   if (!html) {
     return {
@@ -89,6 +110,7 @@ function parseProviderHtml(value) {
   function readPlainText(node) {
     if (!node) return '';
     if (node.type === 'text') return String(node.data || '');
+    if (String(node.name || '').toLowerCase() === 'img') return imageLabel(node);
     if (SKIPPED_TAGS.has(String(node.name || '').toLowerCase())) return '';
     return (Array.isArray(node.children) ? node.children : [])
       .map(readPlainText)
@@ -103,6 +125,11 @@ function parseProviderHtml(value) {
     }
     const tag = String(node.name || '').toLowerCase();
     if (SKIPPED_TAGS.has(tag)) return;
+    if (tag === 'img') {
+      const label = imageLabel(node);
+      if (includeImageLabels && label) append(`\n[image: ${label}]\n`);
+      return;
+    }
     if (tag === 'br') {
       append('\n');
       return;
@@ -116,6 +143,10 @@ function parseProviderHtml(value) {
       ) {
         append(`${label} [${href}]`);
         if (!webdesignLinkUrl) webdesignLinkUrl = href;
+      } else if (safeProviderLink(href)) {
+        const readableLabel = label || href;
+        const labelIsTarget = readableLabel === href || href === `mailto:${readableLabel}` || href === `tel:${readableLabel}`;
+        append(labelIsTarget ? readableLabel : `[${readableLabel.replace(/[\[\]]/g, '')}](${href.replace(/\(/g, '%28').replace(/\)/g, '%29')})`);
       } else {
         append(label);
       }
@@ -137,6 +168,8 @@ function parseProviderHtml(value) {
 }
 
 module.exports = {
+  decodeMailboxEntities,
+  isMailboxHtml,
   isExactSoftoraWebdesignUrl,
   parseProviderHtml,
 };

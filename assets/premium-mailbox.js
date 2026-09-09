@@ -23,7 +23,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
-const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|hier|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[\s*(?:\[(https?:\/\/[^\]\s<>"']+)\]\((https?:\/\/[^\)\s<>"']+)\)|(https?:\/\/[^\]\s<>"']+))\s*\]/gi;
 function countCharacter(value, character) { return String(value || '').split(character).length - 1; }
 function splitUrlTrailingPunctuation(value) {
   let url = String(value || '');
@@ -65,23 +64,9 @@ function renderMailboxUrls(value) {
   return html;
 }
 function renderLinkedMailboxText(value, options) {
-  const text = String(value == null ? '' : value);
-  let html = '';
-  let lastIndex = 0;
-  text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, markdownLabelUrl, markdownTargetUrl, plainUrl, offset) => {
-    const url = markdownTargetUrl || plainUrl;
-    const nestedUrlMatches = !markdownLabelUrl || markdownLabelUrl === markdownTargetUrl;
-    html += renderMailboxUrls(text.slice(lastIndex, offset));
-    if (nestedUrlMatches && isSafeMailBodyUrl(url) && window.SoftoraMailboxDisplay.isLabelledUrlMatch(label, url, options)) {
-      html += window.SoftoraMailboxDisplay.renderLabelledUrlAnchor(url, label, escapeHtml);
-    } else {
-      html += /^(?:deze link|hier)$/i.test(String(label || '').trim()) ? escapeHtml(match) : renderMailboxUrls(match);
-    }
-    lastIndex = offset + match.length;
-    return match;
+  return window.SoftoraMailboxDisplay.renderLinkedMailboxText(value, options, {
+    escapeHtml, isSafeUrl: isSafeMailBodyUrl, renderUrls: renderMailboxUrls,
   });
-  html += renderMailboxUrls(text.slice(lastIndex));
-  return window.SoftoraMailboxDisplay.applySenderCtaLinks(html, text, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl });
 }
 function normalizeMailboxEmail(value) { return String(value || '').trim().toLowerCase(); }
 function getMailboxAccountEmails() { return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter((email) => window.SoftoraMailboxCampaignInbox?.isCampaignAccount(email)); }

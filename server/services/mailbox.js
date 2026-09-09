@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const { decodeMailboxEntities, isMailboxHtml, parseProviderHtml } = require('./mailbox-provider-rich-body');
 const {
   FOLDER_ALIASES,
   appendSentMessage,
@@ -125,15 +126,7 @@ const OWNED_MAILBOX_DOMAINS = new Set(['softora.nl']);
 const IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
 const INLINE_DISPLAY_IMAGE_TYPES = /^image\/(?:png|jpe?g|webp|gif)$/i;
 
-function decodeBasicHtmlEntities(value) {
-  return String(value || '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>');
-}
+function decodeBasicHtmlEntities(value) { return decodeMailboxEntities(value); }
 
 function escapeHtml(value) {
   return String(value || '')
@@ -162,27 +155,7 @@ function normalizeContentId(value) {
     .toLowerCase();
 }
 
-function htmlToReadableText(value) {
-  return decodeBasicHtmlEntities(value)
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<img\b[^>]*>/gi, (tag) => {
-      if (/(?:width=["']?1["']?|height=["']?1["']?)/i.test(tag)) return ' ';
-      const alt = getHtmlAttribute(tag, 'alt');
-      return alt ? `\n[image: ${alt}]\n` : ' ';
-    })
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(?:p|div|section|article|tr|li|h[1-6])>/gi, '\n')
-    .replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_match, href, label) => {
-      const text = htmlToReadableText(label).trim();
-      const url = String(href || '').trim();
-      if (!text) return url;
-      if (!url || text === url) return text;
-      return `${text} [${url}]`;
-    })
-    .replace(/<[^>]+>/g, ' ');
-}
+function htmlToReadableText(value) { return parseProviderHtml(value, { includeImageLabels: true }).body; }
 
 function buildMailboxBodyImages(parsed = {}) {
   const html = String(parsed.html || '');
@@ -477,7 +450,7 @@ function removeDuplicateMailboxSignatureLeadLines(lines) {
 
 function sanitizeMailboxDisplayText(value) {
   const raw = String(value || '');
-  const source = /<\/?[a-z][\s\S]*>/i.test(raw) ? htmlToReadableText(raw) : decodeBasicHtmlEntities(raw);
+  const source = isMailboxHtml(raw) ? htmlToReadableText(raw) : decodeBasicHtmlEntities(raw);
   const lines = source
     .replace(/\r\n?/g, '\n')
     .replace(/\u200B/g, '')
@@ -514,7 +487,7 @@ function createMailboxService(deps = {}) {
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createTransport = (config) => nodemailer.createTransport(config),
     createImapClient = (config) => new ImapFlow(config),
-    parseMailSource = (source) => simpleParser(source),
+    parseMailSource = (source) => simpleParser(source, { skipHtmlToText: true }),
     getOpenAiApiKey = () => '',
     openAiApiBaseUrl = 'https://api.openai.com/v1',
     openAiModel = 'gpt-5.5-pro',

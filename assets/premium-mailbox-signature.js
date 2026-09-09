@@ -531,8 +531,8 @@
     // A full, standalone default footer must terminate the authored text.
     // Ordinary mentions, custom links and any later meaningful text fail open.
     if (index < 0 || !isFooter(lines[index])) {
-      const collapsed = /^(.*\S)[ \t]+((?:Verzonden vanaf mijn|Sent from my) (?:iPhone|iPad|Android|(?:Samsung )?Galaxy)\.?)$/i.exec(lines[index] || '');
-      if (collapsed && !/[:"“”]$/.test(collapsed[1]) && !/^(?:>)/.test(collapsed[1])) {
+      const collapsed = /^(.*\S)([ \t]*)((?:Verzonden vanaf mijn|Sent from my) (?:iPhone|iPad|Android|(?:Samsung )?Galaxy)\.?)$/i.exec(lines[index] || '');
+      if (collapsed && (collapsed[2] || /(?:\bMvg|Met vriendelijke groet|Kind regards|Best regards)/i.test(collapsed[1])) && !/[:"“”]$/.test(collapsed[1]) && !/^(?:>)/.test(collapsed[1])) {
         return trimOuterBlankLines([...lines.slice(0, index), collapsed[1], ...lines.slice(end)]).join('\n');
       }
       return String(value == null ? '' : value);
