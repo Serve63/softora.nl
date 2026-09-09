@@ -56,13 +56,16 @@
 }
 
 .planning-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
 }
 
-.planning-legend [aria-hidden="true"] {
-  margin-right: 4px;
-  color: #317864;
-  letter-spacing: -2px;
+.planning-legend-checks {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 @media (max-width: 760px) {
