@@ -1,3 +1,4 @@
+const { rateLimit } = require('express-rate-limit');
 const { PREFIX } = require('../security/agenda-mcp-oauth');
 const { TOOLS, createAgendaMcpTools } = require('../services/agenda-mcp-tools');
 function registerAgendaMcpRoutes(app, deps) {
@@ -6,7 +7,7 @@ function registerAgendaMcpRoutes(app, deps) {
   const tools = createAgendaMcpTools({ ...deps, repo: oauth.repo });
   app.get(`${PREFIX}/mcp`, (_req, res) => res.status(405).set('Allow', 'POST').end());
   app.delete(`${PREFIX}/mcp`, (_req, res) => res.status(405).set('Allow', 'POST').end());
-  app.post(`${PREFIX}/mcp`, async (req, res) => {
+  app.post(`${PREFIX}/mcp`, rateLimit({ windowMs: 60000, limit: 120 }), async (req, res) => {
     res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
     if (req.headers.origin && req.headers.origin !== 'https://www.softora.nl') return res.status(403).json({ error: 'Forbidden origin' });
     const b = req.body;

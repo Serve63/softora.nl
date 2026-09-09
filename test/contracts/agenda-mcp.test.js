@@ -82,3 +82,13 @@ test('uncertain mutations never execute twice', async () => {
   await assert.rejects(tools.call('create_appointment', args, auth), /timeout/);
   const again = await tools.call('create_appointment', args, auth); assert.equal(again.isError, true); assert.equal(calls, 1);
 });
+test('MCP authentication attempts are rate limited on the endpoint itself', async t => {
+  const app = express(); app.use(express.json());
+  app.locals.softoraAgendaMcpOAuth = { repo: {}, authenticate: async () => null, challenge: res => res.status(401).json({ error: 'unauthorized' }) };
+  registerAgendaMcpRoutes(app, {});
+  const server = app.listen(0, '127.0.0.1'); await new Promise(r => server.once('listening', r)); t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}${PREFIX}/mcp`;
+  let response;
+  for (let i = 0; i <= 120; i++) response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
+  assert.equal(response.status, 429);
+});
