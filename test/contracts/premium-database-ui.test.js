@@ -1973,9 +1973,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.doesNotMatch(topRightHtml, /<div class="top-right"><div class="search">/);
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
-    /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/
+  assert.match(pageSource, /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-readable-labels/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-mail-alignment/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
@@ -2431,7 +2431,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-readable-labels/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-mail-alignment/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -6254,12 +6254,14 @@ test('database metric labels are readable and stay on one line', () => {
 });
 
 
-test("sent list omits controls and table search precedes company sorting", () => {
+test("sent list omits controls and first heading contains only search", () => {
   const pageSource = fs.readFileSync(path.join(__dirname, "../../premium-database.html"), "utf8");
   const tableCss = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
   assert.match(pageSource, /showSentActions = showOutreachActionColumn && state.activeStatus !== "verstuurd"/);
   assert.match(tableCss, /#databaseTable\.sent-list-mode th:nth-child\(8\), #databaseTable\.sent-list-mode td:nth-child\(8\) \{ display: none; \}/);
-  assert.match(pageSource, /class="company-heading">[\s\S]*?id="q"[\s\S]*?data-sort-key="naam">Bedrijf/);
+  assert.match(pageSource, /class="company-heading">[\s\S]*?id="q"/);
+  assert.doesNotMatch(pageSource, /data-sort-key="naam">Bedrijf/);
+  assert.match(tableCss, /#databaseTable tbody td:nth-child\(3\) \{ text-align: center; \}/);
   assert.equal((pageSource.match(/id="q"/g) || []).length, 1);
   assert.match(tableCss, /#databaseTable tbody td \{ white-space: nowrap; \}/);
 });
