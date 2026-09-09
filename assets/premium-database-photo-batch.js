@@ -102,13 +102,6 @@
     let mode = "custom";
     let cachedTargetCount = null;
     ensureInputFocusStyles();
-    if (typeof document !== "undefined" && !document.getElementById("photoBatchPricingNote")) {
-      const note = document.createElement("p");
-      note.id = "photoBatchPricingNote";
-      note.className = "photo-batch-summary";
-      note.textContent = PRICING_NOTE;
-      nodes.photoBatchSummary.insertAdjacentElement("afterend", note);
-    }
 
     function getTargetCount(options) {
       if (!options || !options.force) {
@@ -129,10 +122,10 @@
       nodes.photoBatchChoiceButtons.forEach(function (optionNode) {
         optionNode.classList.toggle("is-active", optionNode.dataset.photoBatchMode === mode);
       });
-      nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total) + " · " + (Number.isFinite(costEur) ? formatCost(total * costEur) : formatOutputEstimate(total));
+      nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total);
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
       nodes.photoBatchSummary.textContent = message || (selectedCount
-        ? "Selectie: " + formatPhotoBatchCount(selectedCount) + " · " + (Number.isFinite(selectedCost) ? formatCost(selectedCost) : formatOutputEstimate(selectedCount))
+        ? formatPhotoBatchCount(selectedCount) + " · " + (Number.isFinite(selectedCost) ? formatCost(selectedCost) : formatOutputEstimate(selectedCount))
         : "Vul minimaal 1 in.");
     }
 
