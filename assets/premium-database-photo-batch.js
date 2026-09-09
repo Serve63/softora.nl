@@ -18,7 +18,7 @@
     if (typeof document === "undefined" || document.getElementById(FOCUS_STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = FOCUS_STYLE_ID;
-    style.textContent = ".photo-batch-input:focus{outline:2px solid rgba(139,34,82,.42);outline-offset:2px;border-color:var(--crimson)}.photo-batch-input::selection{background:rgba(139,34,82,.2);color:var(--dark)}";
+    style.textContent = ".photo-batch-input:focus{outline:none;box-shadow:none;border-color:var(--crimson)}.photo-batch-input::selection{background:rgba(139,34,82,.2);color:var(--dark)}";
     document.head.appendChild(style);
   }
 

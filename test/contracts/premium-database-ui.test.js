@@ -2422,7 +2422,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-modal-costs/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-clean-input/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
@@ -6275,4 +6275,11 @@ test("mail statistics fill the row and match the options height", () => {
 test("table headings are centered except the company search heading", () => {
   const css = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
   assert.match(css, /#databaseTable thead th:not\(:first-child\) \{ text-align: center; \}/);
+});
+
+test("webdesign count disables autocomplete and uses one focus border", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../../premium-database.html"), "utf8");
+  const script = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-photo-batch.js"), "utf8");
+  assert.match(html, /id="photoBatchLimitInput"[^>]*autocomplete="off" autocorrect="off" spellcheck="false"/);
+  assert.match(script, /\.photo-batch-input:focus\{outline:none;box-shadow:none;border-color:var\(--crimson\)\}/);
 });
