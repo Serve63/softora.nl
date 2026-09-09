@@ -138,13 +138,13 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909b/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260909a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -449,7 +449,7 @@ test('kvk database balances activity and planning equally inside one desktop vie
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
 
-  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909d/);
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909e/);
   assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
   assert.match(compactStyleSource, /\.latest-treated-panel tbody tr:not\(\.empty-row\)\s*\{\s*height:\s*var\(--kvk-panel-row-height\)/);
@@ -458,7 +458,7 @@ test('kvk database balances activity and planning equally inside one desktop vie
 
   assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{[^}]*min-height:\s*0\s*!important;[^}]*overflow:\s*hidden\s*!important/);
-  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 106px repeat\(2, minmax\(0, 1fr\)\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
+  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*42px 106px repeat\(2, minmax\(0, 1fr\)\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /\.latest-treated-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*margin:\s*0/);
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
@@ -505,7 +505,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260909a/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260909b/);
   assert.match(metricsSource, /companies-successful-found/);
@@ -591,7 +591,7 @@ test('kvk framed content uses the same solid background as the surrounding page'
 
   assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260824a/);
   assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260824a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
   assert.match(
     frameStyleSource,
     /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{\s*background:\s*#f4f1ed !important;/
@@ -650,4 +650,12 @@ test('online KVK directory tables are server-only and protected by RLS', () => {
   );
   assert.match(searchMigrationSource, /create extension if not exists pg_trgm with schema extensions;/i);
   assert.match(searchMigrationSource, /using gin \(search_text extensions\.gin_trgm_ops\);/i);
+});
+
+test('KVK header shows worker status without a settings back link and total found has a matching footer', () => {
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
+  assert.match(pageSource, /class="header-controls">\s*<div id="kvk-worker-status"/);
+  assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
+  assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
 });

@@ -46,28 +46,12 @@
 
   .app-shell {
     display: grid;
-    grid-template-rows: 30px 42px 106px repeat(2, minmax(0, 1fr));
+    grid-template-rows: 42px 106px repeat(2, minmax(0, 1fr));
     gap: 9px;
     height: 100dvh;
     min-height: 0;
     padding: 10px 0;
     overflow: hidden;
-  }
-
-  [data-settings-module-back-host] {
-    min-height: 0;
-    margin: 0;
-  }
-
-  .settings-module-back {
-    min-height: 30px;
-    font-size: 0.66rem;
-  }
-
-  .settings-module-back svg {
-    width: 12px;
-    height: 12px;
-    flex-basis: 12px;
   }
 
   .page-header {
@@ -218,4 +202,28 @@
   .latest-treated-panel:not(.is-collapsed) .table-frame {
     max-height: none;
   }
+}
+
+.kvk-worker-status {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  text-transform: none;
+}
+
+.kvk-worker-status__group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: right;
+  line-height: 1.2;
+  font-size: 0.66rem;
+}
+
+.kvk-worker-status__group strong { color: var(--ink); font-weight: 700; }
+.kvk-worker-status__group span { color: var(--muted); font-size: 0.6rem; }
+
+@media (max-width: 700px) {
+  .kvk-worker-status { gap: 16px; flex-wrap: wrap; }
+  .kvk-worker-status__group { text-align: left; }
 }

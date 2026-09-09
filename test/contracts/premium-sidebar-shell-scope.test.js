@@ -27,7 +27,11 @@ test('Extra-modules keren buiten hun inhoudsframe terug naar de volledige instel
     initialize({ SoftoraSettingsModuleRoutes: routes, location: { pathname: entry.paths[0] } }, document);
     assert.equal(mounted, firstLink, 'reinitialization keeps the existing link');
     for (const file of entry.files) {
-      assert.match(readRepoFile(file), /settings-module-back\.js\?v=20260909a/);
+      if (file === 'premium-kvk-database.html') {
+        assert.doesNotMatch(readRepoFile(file), /settings-module-back/);
+      } else {
+        assert.match(readRepoFile(file), /settings-module-back\.js\?v=20260909a/);
+      }
     }
   }
 });
@@ -577,7 +581,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(pageSource, /class="main-content kvk-database-shell__content"/);
   assert.match(pageSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.doesNotMatch(pageSource, /settings-module-route-header|data-settings-module-back-host/);
-  assert.match(dashboardSource, /<main class="app-shell">\s*<span data-settings-module-back-host><\/span>\s*<header class="page-header">/);
+  assert.match(dashboardSource, /<main class="app-shell">\s*<header class="page-header">/);
   assert.equal((pageSource.match(/background:\s*#f4f1ed/g) || []).length, 3);
   assert.doesNotMatch(pageSource, /background:\s*#f8f7f4/);
   assert.match(themeSource, /pathname === "\/kvk-database"/);

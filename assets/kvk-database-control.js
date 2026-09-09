@@ -79,6 +79,7 @@
   }
 
   function renderControl() {
+    window.SoftoraKvkWorkerStatus?.update(state.control);
     if (!fillButton) return;
     const { enabled, workerState, workerMessage, workers = {} } = state.control;
     const running = ['starting', 'running', 'waiting'].includes(workerState);
@@ -112,7 +113,7 @@
       renderControl();
     } catch (error) {
       state.control = {
-        ...state.control,
+        unavailable: true,
         enabled: false,
         workerState: 'error',
         workerMessage: error.message || String(error),

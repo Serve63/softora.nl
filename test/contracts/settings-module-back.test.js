@@ -42,6 +42,10 @@ test('ieder doelbestand heeft exact één gedeelde host en dezelfde componentass
   routes.getLinkedModules().forEach((module) => {
     module.files.forEach((file) => {
       const source = read(file);
+      if (file === 'premium-kvk-database.html') {
+        assert.doesNotMatch(source, /settings-module-back|settings-module-routes/);
+        return;
+      }
       const routesVersion = file === 'premium-wereldmap.html' ? '20260906b' : file === 'premium-world-watcher.html' ? '20260906a' : file === 'premium-flynow.html' ? '20260905a' : file === 'premium-kvk-database.html' ? '20260824c' : '20260818b';
       assert.equal((source.match(/data-settings-module-back-host/g) || []).length, 1, file);
       assert.match(source, /settings-module-back\.css\?v=20260818a/, file);
@@ -98,7 +102,8 @@ test('Instellingen-link staat in de titelkolom en nooit in de rechter actiegroep
   assert.match(health, /<div>\s*<span data-settings-module-back-host><\/span>\s*<p class="health-eyebrow">/);
   assert.match(revenue, /<div class="hero-copy">\s*<span data-settings-module-back-host><\/span>\s*<p class="eyebrow">/);
   assert.match(locked, /<header class="momentum-access-header">\s*<span data-settings-module-back-host><\/span>\s*<span class="momentum-access-brand">/);
-  assert.match(database, /<main class="app-shell">\s*<span data-settings-module-back-host><\/span>\s*<header class="page-header">/);
+  assert.match(database, /<main class="app-shell">\s*<header class="page-header">/);
+  assert.doesNotMatch(database, /data-settings-module-back-host/);
 });
 
 test('locked en unlocked Winnen blijven één veilige gedeelde uitweg houden', () => {
