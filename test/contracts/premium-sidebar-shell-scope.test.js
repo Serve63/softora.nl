@@ -78,7 +78,7 @@ const staticSidebarPages = [
 test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmodus', () => {
   const pageSource = readRepoFile('live-momentum.html');
   const accessSource = readRepoFile('live-momentum-access.html');
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const focusSource = readRepoFile('assets/live-momentum-focus-mode.js');
 
   assert.match(pageSource, /data-sidebar-shell="canonical"/);
@@ -104,7 +104,7 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
 });
 
 test('Winnen blijft deep-link-only en wordt door geen premium-sidebarvariant zichtbaar gemaakt', () => {
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const pageSource = readRepoFile('live-momentum.html');
   const accessSource = readRepoFile('live-momentum-access.html');
 
@@ -126,7 +126,7 @@ test('Winnen blijft deep-link-only en wordt door geen premium-sidebarvariant zic
 });
 
 test('PDF blijft deep-link-only en is uit elke premium-sidebarbron verwijderd', () => {
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const htmlPagesSource = readRepoFile('server/services/html-pages.js');
   const pdfPageSource = readRepoFile('premium-pdfs.html');
   const smokeSource = readRepoFile('test/smoke/pages.smoke.test.js');
@@ -217,7 +217,7 @@ test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => 
 
 test('gezondheidsdossier blijft bereikbaar zonder item in de premium-sidebar', () => {
   const pageSource = readRepoFile('premium-gezondheidsdossier.html');
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const settingsLink = pageSource.match(/<a [^>]*data-sidebar-key="settings"[^>]*>/);
 
   assert.ok(settingsLink, 'gezondheidsdossier mist de instellingenlink');
@@ -234,7 +234,7 @@ test('verborgen premium-sidebar-items behouden hun deep-link pagina en onderligg
     ['websitegenerator', 'premium-websitegenerator.html', '/premium-websitegenerator'],
     ['bookkeeping', 'premium-boekhouding.html', '/premium-boekhouding'],
   ];
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
 
   for (const [key, pageFile, href] of hiddenItems) {
     const pageSource = readRepoFile(pageFile);
@@ -246,7 +246,7 @@ test('verborgen premium-sidebar-items behouden hun deep-link pagina en onderligg
 
 test('OMZETWERK behoudt de canonical premium-sidebar en markeert Instellingen actief', () => {
   const pageSource = readRepoFile('premium-omzetwerk.html');
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
 
   assert.match(pageSource, /<body data-omzetwerk-page>/);
@@ -278,7 +278,7 @@ test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar'
 
 test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
-  const themeJsSource = readRepoFile('assets/personnel-theme.js');
+  const themeJsSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const stabilitySource = readRepoFile('assets/premium-sidebar-stability.css');
   const stabilityJsSource = readRepoFile('assets/premium-sidebar-stability.js');
   const autopilotSource = readRepoFile('assets/premium-sidebar-autopilot.css');
@@ -460,7 +460,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
   assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909b'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909b'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a'/);
@@ -517,7 +517,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   const directoryShellSource = readRepoFile('premium-kvk-company-directory-shell.html');
   const directoryStyleSource = readRepoFile('assets/kvk-database-total-found.css');
   const directoryScriptSource = readRepoFile('assets/kvk-database-total-found.js');
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
 
   assert.match(pageSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
@@ -721,7 +721,7 @@ test('premium vaste lasten centreert bootloader in het zichtbare hoofdvlak', () 
 
 test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mailweergave', () => {
   const pageSource = readRepoFile('premium-mailbox.html');
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const mobileCssSource = readRepoFile('assets/premium-mailbox-mobile.css');
 
   assert.match(pageSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>/);
@@ -916,7 +916,7 @@ test('static premium sidebars ship the database link in html', () => {
 });
 
 test('static premium sidebar logo links to the clean public homepage', () => {
-  const themeJsSource = readRepoFile('assets/personnel-theme.js');
+  const themeJsSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
 
   assert.match(
     themeJsSource,
@@ -996,7 +996,7 @@ test('websitegenerator layout gebruikt dezelfde sidebarbreedte als de premium sh
 test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw', () => {
   const shellSource = readRepoFile('premium-lead-radar-shell.html');
   const canonicalSource = readRepoFile('premium-personeel-dashboard.html');
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
@@ -1025,7 +1025,7 @@ test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw',
     'Lead Radar hoort via dezelfde runtimebron aan de bestaande sidebar te worden toegevoegd'
   );
   assert.match(sidebarLinksSource, /function getLeadRadarSidebarLink\(\)/);
-  assert.match(themeSource, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
+  assert.match(themeSource, /getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
   assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "overzicht", window\.SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\), \["database"\]\)/);
   assert.match(themeSource, /pathname === "\/lead-radar"/);
   assert.match(themeSource, /if \(p === "\/lead-radar"\) return "lead_radar"/);
@@ -1166,14 +1166,15 @@ test('static premium sidebars share the same section order and public labels', (
 });
 
 test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar', () => {
-  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
   const pageSource = readRepoFile('premium-samenvatten.html');
 
   assert.match(themeSource, /if \(p\.indexOf\("\/premium-samenvatten"\) === 0\) return "summarize"/);
   assert.match(sidebarLinksSource, /function getSummarizeSidebarLink\(\)[\s\S]*key:\s*'summarize'[\s\S]*href:\s*'\/premium-samenvatten'[\s\S]*label:\s*'Samenvatten'/);
-  assert.match(sidebarLinksSource, /Object\.freeze\(\{ getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink \}\)/);
-  assert.match(themeSource, /getMailboxSidebarLink\(\),\s*window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\),/);
+  assert.ok(Object.isFrozen(require('../../assets/premium-sidebar-links')));
+  assert.equal(typeof require('../../assets/premium-sidebar-links').renderPremiumSidebarNavigation, 'function');
+  assert.match(themeSource, /getMailboxSidebarLink\(\),\s*getSummarizeSidebarLink\(\),/);
   assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "beheer", window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\), \["websitegenerator", "seo", "qr_code", "packages"\]\)/);
   const comingSoonKeys = themeSource.match(/const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
   assert.doesNotMatch(comingSoonKeys, /"summarize"/);
@@ -1184,7 +1185,7 @@ test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar',
 });
 
 test('unified premium sidebar splits ad channels from social media channels', () => {
-  const themeJsSource = readRepoFile('assets/personnel-theme.js');
+  const themeJsSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
 
   assert.match(themeJsSource, /sidebar-section-label\\">ADVERTENTIE'S</);
   assert.match(themeJsSource, /sidebar-section-label">Socialmedia</);

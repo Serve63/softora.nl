@@ -17,7 +17,7 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a';
 const PREMIUM_PERSONNEL_THEME_VERSION = '20260909b';
-const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909a';
+const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909b';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
 const PREMIUM_SIDEBAR_LINKS_VERSION = '20260909a';
@@ -702,7 +702,7 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   function optimizeHtmlDelivery(html, fileName, authState, options = {}) {
-    let renderedHtml = removeInternalPremiumSidebarLinks(renderPremiumSidebarShell(String(html || ''), authState))
+    let renderedHtml = removeInternalPremiumSidebarLinks(renderPremiumSidebarShell(String(html || ''), authState, fileName))
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
 

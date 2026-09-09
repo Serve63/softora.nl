@@ -776,7 +776,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   const shell = readRepoFile('premium-lead-radar-shell.html');
   const page = readRepoFile('premium-lead-radar.html');
   const script = readRepoFile('assets/lead-radar.js');
-  const theme = readRepoFile('assets/personnel-theme.js');
+  const theme = readRepoFile('assets/personnel-theme.js') + readRepoFile('assets/premium-sidebar-links.js');
   const sidebarLinks = readRepoFile('assets/premium-sidebar-links.js');
   const routing = readRepoFile('server/config/page-routing.js');
   assert.match(shell, /src="\/premium-lead-radar\?softora_sidebar_content=1"/);
@@ -784,7 +784,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(shell, /assets\/lead-radar-sidebar\.js/);
   assert.doesNotMatch(shell, /data-sidebar-key="lead_radar"/);
   assert.match(sidebarLinks, /function getLeadRadarSidebarLink\(\)/);
-  assert.match(theme, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
+  assert.match(theme, /getLeadRadarSidebarLink\(\),\s*getDatabaseSidebarLink\(\)/);
   assert.match(theme, /ensureStaticSidebarLink\(sidebar, "overzicht", window\.SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\), \["database"\]\)/);
   assert.match(
     theme,
@@ -864,7 +864,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
 
 test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar geladen', () => {
   const htmlPages = readRepoFile('server/services/html-pages.js');
-  const theme = readRepoFile('assets/personnel-theme.js');
+  const theme = readRepoFile('assets/personnel-theme.js') + readRepoFile('assets/premium-sidebar-links.js');
   const vercel = readRepoFile('vercel.json');
   const envExample = readRepoFile('.env.example');
   assert.match(htmlPages, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909b'/);

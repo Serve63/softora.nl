@@ -27,6 +27,7 @@ for (const fileName of modulePages) {
     const res = { setHeader() {}, status(code) { this.statusCode = code; return this; }, send(body) { this.body = body; } };
     await coordinator.sendSeoManagedHtmlPageResponse({ originalUrl: '/' + fileName, query: {} }, res, () => {}, fileName);
     assert.equal(res.statusCode, 200);
+    assert.match(res.body, /<body\b[^>]*data-sidebar-nav-ready="1"/);
     const sidebar = res.body.match(/<aside\b[^>]*data-static-sidebar="1"[^>]*>([\s\S]*?)<\/aside>/)?.[1];
     assert.ok(sidebar, 'navigation must exist before deferred scripts execute');
     for (const key of ['dashboard', 'database', 'customers', 'settings', 'lead_radar', 'summarize']) assert.match(sidebar, new RegExp(`data-sidebar-key="${key}"`));
@@ -117,5 +118,39 @@ test('server normalizes legacy lock and envelope icons to one idempotent mailbox
     assert.match(output, /href="\/mailbox"/);
     assert.doesNotMatch(output, /sidebar-link-lock|coming-soon|aria-disabled|tabindex|old-envelope/);
     assert.equal(render(output, { authenticated: true, role: 'admin' }), output);
+  }
+});
+
+
+for (const role of ['admin', 'employee']) {
+  test(`all static page templates deliver identical navigation icons and states for ${role}`, () => {
+    const { renderPremiumSidebarNavigation } = require('../../assets/premium-sidebar-links');
+    const session = { authenticated: true, role };
+    const render = createPremiumSidebarShell();
+    const expected = renderPremiumSidebarNavigation(session, '');
+    const files = fs.readdirSync(root).filter(name => name.endsWith('.html'));
+    let pages = 0;
+    for (const file of files) {
+      const source = fs.readFileSync(path.join(root, file), 'utf8');
+      if (!/<aside\b[^>]*data-static-sidebar="1"/.test(source)) continue;
+      const output = render(source, session);
+      const sidebar = output.match(/<aside\b[^>]*data-static-sidebar="1"[^>]*>([\s\S]*?)<\/aside>/)?.[1];
+      const navigation = sidebar?.match(/<nav\b[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+      assert.equal(navigation?.replace(/ magnetic active/g, ' magnetic'), expected, file);
+      assert.equal(render(output, session), output, file + ' must be idempotent');
+      pages++;
+    }
+    assert.ok(pages >= 29, 'cover every existing static sidebar template');
+  });
+}
+
+
+test('empty module hosts receive their correct active item from the server', () => {
+  const render = createPremiumSidebarShell();
+  const session = { authenticated: true, role: 'admin' };
+  for (const [file, key] of [['premium-samenvatten.html', 'summarize'], ['premium-world-watcher.html', 'settings'], ['premium-lead-radar-shell.html', 'lead_radar']]) {
+    const output = render('<aside class="sidebar"></aside>', session, file);
+    const active = output.match(/<a\b[^>]*class="sidebar-link magnetic active"[^>]*data-sidebar-key="([^"]+)"/);
+    assert.equal(active?.[1], key);
   }
 });

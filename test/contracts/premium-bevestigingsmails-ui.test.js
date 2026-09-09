@@ -204,7 +204,7 @@ test('premium bevestigingsmails stays internal and is absent from the shared sid
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const themePath = path.join(__dirname, '../../assets/personnel-theme.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
-  const themeSource = fs.readFileSync(themePath, 'utf8');
+  const themeSource = fs.readFileSync(themePath, 'utf8') + fs.readFileSync(path.join(__dirname, '../../assets/premium-sidebar-links.js'), 'utf8');
   const comingSoonKeysMatch = themeSource.match(
     /const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[([\s\S]*?)\]\);/
   );
