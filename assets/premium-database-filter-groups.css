@@ -585,3 +585,5 @@
 #databaseTable th:nth-child(7), #databaseTable td:nth-child(7) { width: 12%; }
 
 #databaseTable thead th:not(:first-child) { text-align: center; }
+
+#databaseTable tbody td:nth-child(3) { text-align: center; }
