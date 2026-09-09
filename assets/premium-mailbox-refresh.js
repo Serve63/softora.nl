@@ -207,7 +207,17 @@
       }
     }
 
+    const requestCooldowns = new Map();
+    function readRetryAfterMs(response, data) {
+      const raw = String(response.headers?.get?.('retry-after') || '').trim();
+      const delay = /^\d+(?:\.\d+)?$/.test(raw) ? Number(raw) * 1000 : Date.parse(raw) - getNow();
+      return Math.max(0, Number(data?.retryAfterMs) || 0, Number.isFinite(delay) ? delay : 0,
+        Number(response.status) === 429 ? 60_000 : 0);
+    }
     async function requestJson(url, init, signal) {
+      if ((requestCooldowns.get(url) || 0) > getNow()) {
+        throw Object.assign(new Error('De provider wacht op het volgende toegestane controlemoment.'), { status: 429, retryable: false });
+      }
       let lastError = null;
       for (let attempt = 0; attempt < REFRESH_MAX_ATTEMPTS; attempt += 1) {
         if (signal?.aborted) throw createAbortError();
@@ -218,7 +228,9 @@
             if (response.ok && typeof data?.ok === 'boolean') return { response, data, url };
             const error = new Error(data?.detail || data?.error || 'Mailbox vernieuwen mislukt');
             error.status = response.status;
-            error.retryable = response.ok || isRetryableStatus(response.status);
+            const retryAfterMs = readRetryAfterMs(response, data);
+            if (retryAfterMs) requestCooldowns.set(url, getNow() + retryAfterMs);
+            error.retryable = !retryAfterMs && (response.ok || isRetryableStatus(response.status));
             throw error;
           }, signal);
         } catch (error) {

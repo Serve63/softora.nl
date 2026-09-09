@@ -14,6 +14,7 @@ const {
 const { normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
+const { createInstantlyMailboxApi } = require('./instantly-mailbox-api');
 const { acquireInstantlyMailboxSyncLock } = require('./instantly-mailbox-sync-lock');
 const { finalizeInstantlyAcceptedReply } = require('./mailbox-instantly-reply-acceptance');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
@@ -173,6 +174,10 @@ function createInstantlyMailboxService(deps = {}) {
   const accountOwnership = normalizeAccountOwnership(config.accountOwners);
   const campaignOwnership = normalizeCampaignOwnership(config.campaignOwners);
   let syncPromiseByOwner = new Map();
+  const providerApi = createInstantlyMailboxApi({ config: normalizedConfig, assertConfigured,
+    fetchJsonWithTimeout, getUiStateValues, setUiStateValues, now, logger,
+    createError: createInstantlyMailboxError });
+  const apiRequest = providerApi.request;
 
   function getConfiguredAccounts(owner = '') {
     const selectedOwner = normalizeOwner(owner);
@@ -367,36 +372,6 @@ function createInstantlyMailboxService(deps = {}) {
     };
   }
 
-  async function apiRequest(path, { method = 'GET', query = {}, body } = {}) {
-    assertConfigured();
-    const url = new URL(`${normalizedConfig.apiBaseUrl}/${normalizeText(path).replace(/^\/+/, '')}`);
-    Object.entries(query).forEach(([key, value]) => {
-      if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, String(value));
-    });
-    const options = {
-      method,
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${normalizedConfig.apiKey}`,
-      },
-    };
-    if (body !== undefined) {
-      options.headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify(body);
-    }
-    const { response, data } = await fetchJsonWithTimeout(url.toString(), options, 20_000);
-    if (!response?.ok) {
-      const status = Number(response?.status) || 502;
-      const detail = normalizeText(data?.message || data?.error || data?.detail);
-      throw createInstantlyMailboxError(
-        detail || `Instantly gaf HTTP ${status}.`,
-        status === 429 ? 'INSTANTLY_RATE_LIMITED' : 'INSTANTLY_API_FAILED',
-        status === 429 ? 429 : 502,
-        { mailboxProviderResponseReceived: true, providerStatus: status }
-      );
-    }
-    return data;
-  }
 
   async function hydrateThread({ threadId, accountEmail, owner, indexedMessages = [] }) {
     const exactThreadId = normalizeText(threadId);
@@ -507,6 +482,7 @@ function createInstantlyMailboxService(deps = {}) {
         });
         continue;
       }
+      if (!providerApi.canReadLeads()) { enrichedMessages.push(rawMessage); continue; }
       const leadId = extractLeadId(rawMessage);
       const leadCacheKey = leadId || `${normalizeText(rawMessage.campaign_id)}|${recipientEmail}`;
       try {
@@ -668,6 +644,8 @@ function createInstantlyMailboxService(deps = {}) {
       }
       const syncKey = getSyncStateKey(selectedOwner);
       const state = await mailboxIndexStore.getSyncState({ accountEmail: syncKey, folder: 'instantly' });
+      await providerApi.refreshPolicy();
+      providerApi.assertAvailable();
       const recentSync = buildRecentSyncResult({ state, owner: selectedOwner, accounts, minIntervalMs: options.minIntervalMs, nowMs: now().getTime() });
       if (recentSync) return recentSync;
       const lock = await acquireInstantlyMailboxSyncLock(mailboxIndexStore, {
@@ -771,13 +749,15 @@ function createInstantlyMailboxService(deps = {}) {
               message.originalCampaignOutbound === true &&
               (
                 message.providerBodyHtmlEvidenceKnown !== true ||
-                message.providerOriginalBodyEvidenceKnown !== true
+                (message.providerOriginalBodyEvidenceKnown !== true && providerApi.canReadLeads())
               )
             ));
-            return hasMissingThreadMember || needsExactProviderBody;
+            return providerApi.canAudit(key) && (hasMissingThreadMember || needsExactProviderBody);
           })
           .slice(0, normalizedConfig.richBodyAuditLimit);
+        let historyDeferred = false;
         for (const [key, candidate] of pendingThreadHydrations) {
+          if (!providerApi.canStartAudit()) { historyDeferred = true; break; }
           const indexedMessages = indexedThreadMessages.get(key) || [];
           const hasMissingThreadMember = indexedMessages.length <= 1;
           const needsExactProviderBody = indexedMessages.some((message) => (
@@ -789,14 +769,20 @@ function createInstantlyMailboxService(deps = {}) {
             )
           ));
           if (!hasMissingThreadMember && !needsExactProviderBody) continue;
-          const hydrated = await hydrateThread({
+          let hydrated;
+          try { hydrated = await hydrateThread({
             threadId: candidate.providerThreadId,
             accountEmail: candidate.providerAccountEmail,
             owner: selectedOwner,
             indexedMessages,
-          });
+          }); } catch (error) {
+            if (error?.status !== 429) throw error;
+            historyDeferred = true; break;
+          }
+          providerApi.noteAudit(key);
           stored += hydrated.stored;
         }
+        await providerApi.persistAudits();
         const finished = await mailboxIndexStore.finishSync?.({
           accountEmail: syncKey,
           folder: 'instantly',
@@ -816,7 +802,8 @@ function createInstantlyMailboxService(deps = {}) {
           seen,
           stored,
           pages: page,
-          partial: Boolean(cursor),
+          partial: Boolean(cursor) || historyDeferred,
+          historyDeferred,
           syncedAt: now().toISOString(),
         };
       } catch (error) {
