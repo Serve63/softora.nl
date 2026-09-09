@@ -238,7 +238,7 @@
 
   function normalizeSignatureLines(lines, messageContext) {
     const evidence = buildSenderEvidence(messageContext);
-    return lines.flatMap((value) => {
+    return stripClientFooter(lines.join('\n'), { signature: true }).split('\n').flatMap((value) => {
       let line = normalizeWhitespace(value);
       if (/^[-*_•\s]+$/.test(line)) return [];
       line = line.replace(/^\*+(?=\p{L})/u, '').replace(/\*+$/, '').trim();
@@ -397,6 +397,41 @@
     return result;
   }
 
+  function isClientPromotionLink(value) {
+    const line = normalizeWhitespace(value);
+    const urls = line.match(/https?:\/\/[^\s\[\]()<>]+/gi) || [];
+    return urls.length > 0 && urls.every((url) => /^https:\/\/aka\.ms\/[a-z0-9]+\/?$/i.test(url)) &&
+      !line.replace(/https?:\/\/[^\s\[\]()<>]+/gi, '').replace(/[\[\]()<>\s]/g, '');
+  }
+
+  function isAutomaticClientFooter(value) {
+    const line = normalizeWhitespace(value);
+    const outlook = /^(?:(?:verzonden (?:vanaf|vanuit)|sent from) outlook (?:voor|for)|get outlook for|download outlook voor) (?:android|ios|windows|mac)(.*)$/i.exec(line);
+    if (outlook) return !outlook[1].trim() || isClientPromotionLink(outlook[1]);
+    return /^(?:verzonden vanaf mijn|sent from my) (?:iphone|ipad|android|(?:samsung )?galaxy)\.?$/i.test(line);
+  }
+
+  function stripClientFooter(value, options = {}) {
+    const body = normalizeBody(value);
+    const lines = body.split('\n');
+    // Keep quote boundaries and their source text intact. This also runs after
+    // quote splitting, so an orphan Outlook separator cannot remain on screen.
+    const end = options.signature === true ? lines.length : findDirectBodyEnd(body, lines);
+    let index = end - 1;
+    const skipSpacing = () => {
+      while (index >= 0 && (!normalizeWhitespace(lines[index]) || /^\s*[-_=]{3,}\s*$/.test(lines[index]))) index -= 1;
+    };
+    skipSpacing();
+    if (index >= 0 && isClientPromotionLink(lines[index])) {
+      index -= 1;
+      skipSpacing();
+    }
+    // A full, standalone default footer must terminate the authored text.
+    // Ordinary mentions, custom links and any later meaningful text fail open.
+    if (index < 0 || !isAutomaticClientFooter(lines[index])) return String(value == null ? '' : value);
+    return trimOuterBlankLines([...lines.slice(0, index), ...lines.slice(end)]).join('\n');
+  }
+
   function parseIncoming(body, messageContext) {
     const normalizedBody = normalizeBody(body);
     const lines = normalizedBody ? normalizedBody.split('\n') : [];
@@ -483,7 +518,7 @@
     return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening">${beforeLines.map(renderLine).join('')}${fieldsHtml}${preservedHtml}</address>`;
   }
 
-  const api = { parseIncoming, renderContactCard };
+  const api = { parseIncoming, renderContactCard, stripClientFooter };
   if (global) global.SoftoraMailboxSignature = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
