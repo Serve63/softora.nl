@@ -57,7 +57,7 @@
     const line = normalizeWhitespace(value);
     if (!line || /^>/.test(line)) return false;
     if (line === '--') return true;
-    const parts = line.split(/\s*(?:\/|\|)\s*/).filter(Boolean);
+    const parts = line.split(/\s*(?:\/|\||,)\s*/).filter(Boolean);
     return Boolean(parts.length && parts.every((part) => SIGNOFF_PHRASES.has(normalizeSignoffPart(part))));
   }
   function isStrongSignatureSeparator(value) {
@@ -226,7 +226,7 @@
   function signatureReferenceLinks(body) {
     const references = new Map();
     for (const line of normalizeBody(body).split('\n')) {
-      const match = /^\s*\[(\d{1,3})\]\s*:?\s+(\S+)\s*$/.exec(line);
+      const match = /^\s*\[(\d{1,3})\]\s*:?\s+((?!\[)\S+)\s*$/.exec(line);
       if (!match) continue;
       const href = safeContactHref(match[2]);
       // Conflicting definitions cannot prove which destination belongs to a label.
@@ -234,6 +234,52 @@
       else if (!references.has(match[1])) references.set(match[1], href);
     }
     return references;
+  }
+
+  function resolveContactLink(value, references = new Map()) {
+    const line = normalizeWhitespace(value);
+    const markdown = /^(?:[A-Z][.:]?\s+)?\[([^\[\]]+)\]\(([^\s]+)\)$/i.exec(line);
+    const numbered = /^([^\[\]]+?)\s+\[(\d{1,3})\]$/.exec(line);
+    const annotated = /^([^\[\]]+?)\s+\[(https?:\/\/[^\s\]]+)\]$/i.exec(line);
+    const raw = line.replace(/^(?:[-•]|(?:website|web|w|i|e(?:-?mail)?|from)[.:]?)\s+/i, '');
+    const href = safeContactHref(markdown?.[2] || annotated?.[2] || (numbered && references.get(numbered[2])) || raw);
+    const label = String(markdown?.[1] || annotated?.[1] || numbered?.[1] || raw)
+      .replace(/^[-•]\s*/, '').replace(/^[*_]+|[*_]+$/g, '').trim();
+    return { href, label };
+  }
+
+  function expandReferenceClusters(lines, references) {
+    return lines.flatMap((line) => {
+      if (!/^\s*(?:\[\d{1,3}\]\s*)+$/.test(line)) return [line];
+      const markers = line.match(/\[\d{1,3}\]/g) || [];
+      return markers.map((marker) => references.get(marker.slice(1, -1)) || marker);
+    });
+  }
+
+  function removeOwnedReferenceDefinitions(lines, signatureStart, signatureEnd, references, quotedSegments) {
+    const definition = (line) => /^\s*\[(\d{1,3})\]\s*:?\s+(?!\[)\S+\s*$/.exec(line);
+    const signatureText = lines.slice(signatureStart, signatureEnd).filter((line) => !definition(line)).join('\n');
+    const outsideText = lines.filter((line, index) => (
+      (index < signatureStart || index >= signatureEnd) && !definition(line) &&
+      !quotedSegments.some((segment) => index >= segment.start && index < segment.end)
+    )).join('\n');
+    const owned = new Set((signatureText.match(/\[\d{1,3}\]/g) || [])
+      .filter((marker) => references.get(marker.slice(1, -1)) && !outsideText.includes(marker))
+      .map((marker) => marker.slice(1, -1)));
+    const removed = new Set();
+    lines.forEach((line, index) => {
+      if (owned.has(definition(line)?.[1]) && !quotedSegments.some((segment) => index >= segment.start && index < segment.end)) removed.add(index);
+    });
+    lines.forEach((line, index) => {
+      if (!/^(?:Links|References|Referenties):?$/i.test(line.trim())) return;
+      let end = index + 1;
+      while (end < lines.length && (!lines[end].trim() || /^[-_=]+$/.test(lines[end].trim()) || definition(lines[end]))) end += 1;
+      const definitions = lines.slice(index + 1, end).map((value, offset) => definition(value) ? index + offset + 1 : -1).filter((value) => value >= 0);
+      if (definitions.length && definitions.every((value) => removed.has(value))) {
+        for (let cursor = index; cursor < end; cursor += 1) removed.add(cursor);
+      }
+    });
+    return removed;
   }
 
   function normalizeSignatureLines(lines, messageContext) {
@@ -328,31 +374,32 @@
     return /^(?:volg (?:ons|mij)|follow (?:us|me))\s*:?[.!]?$/i.test(value);
   }
 
-  function isSignaturePromotion(value, socialSection) {
+  function isSignaturePromotion(value, socialSection, references) {
     const label = signaturePromotionLabel(value);
     if (/^(?:maak (?:hier )?(?:je|uw|een) reservering|reserveer (?:hier|nu)|boek (?:hier|nu)|book (?:here|now)|make (?:a|your) reservation)\s*[.!:»›→]*$/i.test(label)) return true;
     const parts = normalizeWhitespace(value).split(/\s*[|·•]\s*/);
     return parts.every((part) => {
-      const link = /^\[([^\[\]]+)\]\(([^\s]+)\)$/.exec(part);
-      const href = safeContactHref(link ? link[2] : part);
-      if (href && /^(?:www\.)?(?:instagram\.com|facebook\.com|linkedin\.com|twitter\.com|x\.com|youtube\.com|tiktok\.com|pinterest\.com)$/i.test(new URL(href).hostname) &&
-        (!link || /^(?:instagram|facebook|linkedin|twitter|x|youtube|tiktok|pinterest)(?:\s+.+)?$/i.test(signaturePromotionLabel(part)))) return true;
+      const { href, label: linkLabel } = resolveContactLink(part, references);
+      const plainUrl = Boolean(safeContactHref(part));
+      if (href && /^(?:(?:www|m|mobile)\.)?(?:instagram\.com|facebook\.com|linkedin\.com|twitter\.com|x\.com|youtube\.com|tiktok\.com|pinterest\.com)$/i.test(new URL(href).hostname) &&
+        (plainUrl || /^@[\w.-]+$/.test(linkLabel) || /^(?:instagram|facebook|linkedin|twitter|x|youtube|tiktok|pinterest)(?:\s+.+)?$/i.test(linkLabel))) return true;
+      if (plainUrl && /\/(?:bedrijfsfilm|company-video|corporate-video)(?:[-/]|$)/i.test(new URL(href).pathname)) return true;
       const profile = /^(?:instagram|facebook|linkedin|twitter|x|youtube|tiktok|pinterest)\s*:?\s+(.+)$/i.exec(signaturePromotionLabel(part));
       if (!profile) return false;
       return /^@[\w.-]+$/.test(profile[1]) || Boolean(safeContactHref(profile[1])) ||
-        ((socialSection || parts.length > 1) && /^[\p{Lu}\d][\p{L}\p{N} .'’&_-]{0,90}$/u.test(profile[1]));
+        ((socialSection || parts.length > 1) && /^[\p{L}\d][\p{L}\p{N} .'’&_-]{0,90}$/u.test(profile[1]));
     });
   }
 
   function preserveUnrepresentedLines(signatureLines, contact, values, references) {
+    const referenceLines = signatureLines;
+    signatureLines = expandReferenceClusters(signatureLines, references);
     const beforeLines = [];
     const preservedLines = [];
     const representedValues = Object.values(values).filter(Boolean).map(cleanFieldValue);
     representedValues.push(...contact.addressLines);
-    const linkedReferences = new Set(signatureLines.flatMap((line) => {
-      const match = /^.+\s+\[(\d{1,3})\]$/.exec(line);
-      return match && references.get(match[1]) ? [match[1]] : [];
-    }));
+    const linkedReferences = new Set(referenceLines.filter((line) => !/^\[\d+\]\s*:?\s+(?!\[)\S+\s*$/.test(line))
+      .flatMap((line) => line.match(/\[\d{1,3}\]/g) || []).map((marker) => marker.slice(1, -1)).filter((id) => references.get(id)));
     let sawField = false;
     let socialSection = false;
     for (let index = 0; index < signatureLines.length; index += 1) {
@@ -360,7 +407,7 @@
       if (!line || isStandaloneSignoff(line)) continue;
       const referenceId = (value) => /^\s*\[(\d{1,3})\]\s*:?\s+\S+\s*$/.exec(value)?.[1];
       if (linkedReferences.has(referenceId(line))) continue;
-      if (/^(?:Links|References):?$/i.test(line)) {
+      if (/^(?:Links|References|Referenties):?$/i.test(line)) {
         const tail = signatureLines.slice(index + 1).filter(Boolean);
         if (tail.length && tail.every((value) => linkedReferences.has(referenceId(value)))) continue;
       }
@@ -371,22 +418,23 @@
         (compactAddress.street && contact.addressLines.includes(compactAddress.street) && contact.addressLines.includes(compactAddress.postcodeCity));
       if (represented) sawField = true;
       if (!represented) {
-        const reference = /^(.*?)\s+\[(\d{1,3})\]$/.exec(line);
-        if (reference) {
-          const href = references.get(reference[2]);
-          const label = reference[1].replace(/^[-•]\s*/, '');
-          if (href) line = `[${label}](${href})`;
-          else if (safeContactHref(label) || /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(label)) line = label;
+        const unresolved = /^([^\[\]]+?)\s+\[(\d{1,3})\]$/.exec(line);
+        if (unresolved && !references.get(unresolved[2])) {
+          const label = unresolved[1].replace(/^[-•]\s*/, '');
+          if (safeContactHref(label) || /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(label)) line = label;
         }
         if (isSignatureSocialHeading(signaturePromotionLabel(line))) {
           socialSection = true;
           continue;
         }
-        if (isSignaturePromotion(line, socialSection)) continue;
+        const parts = line.split(/\s*[|·•]\s*/);
+        const retained = parts.filter((part) => !isSignaturePromotion(part, socialSection || parts.length > 1, references));
+        if (!retained.length) continue;
+        if (retained.length !== parts.length) line = retained.join(' | ');
         socialSection = false;
         // Preserve all remaining information, including names, roles, extra phones,
         // unknown numbers and prose. Only exact represented values are deduplicated.
-        const target = sawField || numericText(line) ? preservedLines : beforeLines;
+        const target = sawField || numericText(line.replace(/\[\d{1,3}\]/g, '')) ? preservedLines : beforeLines;
         if (![...beforeLines, ...preservedLines].includes(line)) target.push(line);
       }
     }
@@ -421,6 +469,9 @@
     const { beforeLines, preservedLines } = preserveUnrepresentedLines(signatureLines, contact, values, references);
     if (beforeLines.length) contact.beforeLines = beforeLines;
     if (preservedLines.length) contact.preservedLines = preservedLines;
+    const used = [...beforeLines, ...preservedLines].flatMap((line) => line.match(/\[\d{1,3}\]/g) || []);
+    const linkReferences = used.filter((marker) => references.get(marker.slice(1, -1))).map((marker) => [marker.slice(1, -1), references.get(marker.slice(1, -1))]);
+    if (linkReferences.length) contact.linkReferences = Object.fromEntries(linkReferences);
     return contact;
   }
 
@@ -451,23 +502,56 @@
     // Keep quote boundaries and their source text intact. This also runs after
     // quote splitting, so an orphan Outlook separator cannot remain on screen.
     const end = options.signature === true ? lines.length : findDirectBodyEnd(body, lines);
+    const references = signatureReferenceLinks(body);
+    const isFooter = (line) => isAutomaticClientFooter(String(line).replace(/\[(\d{1,3})\]/g, (marker, id) => (
+      references.get(id) && isClientPromotionLink(references.get(id)) ? `[${references.get(id)}]` : marker
+    )));
+    if (options.signature === true) {
+      const removed = new Set();
+      lines.forEach((line, index) => {
+        if (!isFooter(line)) return;
+        removed.add(index);
+        removeOwnedReferenceDefinitions(lines, index, index + 1, references, []).forEach((owned) => removed.add(owned));
+      });
+      if (removed.size) return trimOuterBlankLines(lines.filter((_line, index) => !removed.has(index))).join('\n');
+    }
     let index = end - 1;
     const skipSpacing = () => {
       while (index >= 0 && (!normalizeWhitespace(lines[index]) || /^\s*[-_=]{3,}\s*$/.test(lines[index]))) index -= 1;
     };
     skipSpacing();
+    // A numeric link appendix may belong to the default footer itself.
+    if (/^\s*\[\d{1,3}\]\s+https:\/\/aka\.ms\//i.test(lines[index] || '')) {
+      while (index >= 0 && (!lines[index].trim() || /^[-_=]{3,}$/.test(lines[index].trim()) || /^(?:Links|References|Referenties):$/i.test(lines[index].trim()) || /^\s*\[\d{1,3}\]\s+https:\/\/aka\.ms\/[a-z0-9]+\/?\s*$/i.test(lines[index]))) index -= 1;
+    }
     if (index >= 0 && isClientPromotionLink(lines[index])) {
       index -= 1;
       skipSpacing();
     }
     // A full, standalone default footer must terminate the authored text.
     // Ordinary mentions, custom links and any later meaningful text fail open.
-    if (index < 0 || !isAutomaticClientFooter(lines[index])) return String(value == null ? '' : value);
+    if (index < 0 || !isFooter(lines[index])) {
+      const collapsed = /^(.*\S)[ \t]+((?:Verzonden vanaf mijn|Sent from my) (?:iPhone|iPad|Android|(?:Samsung )?Galaxy)\.?)$/i.exec(lines[index] || '');
+      if (collapsed && !/[:"“”]$/.test(collapsed[1]) && !/^(?:>)/.test(collapsed[1])) {
+        return trimOuterBlankLines([...lines.slice(0, index), collapsed[1], ...lines.slice(end)]).join('\n');
+      }
+      return String(value == null ? '' : value);
+    }
+    const footerMarkers = lines[index].match(/\[\d{1,3}\]/g) || [];
+    const appendixMarkers = lines.slice(index + 1, end).flatMap((line) => /^\s*(\[\d{1,3}\])\s+\S+/.exec(line)?.[1] || []);
+    if (appendixMarkers.some((marker) => !footerMarkers.includes(marker) || lines.slice(0, index).join('\n').includes(marker))) {
+      return trimOuterBlankLines(lines.filter((_line, cursor) => cursor !== index)).join('\n');
+    }
     return trimOuterBlankLines([...lines.slice(0, index), ...lines.slice(end)]).join('\n');
   }
 
   function parseIncoming(body, messageContext) {
-    const normalizedBody = normalizeBody(body);
+    const senderEvidence = buildSenderEvidence(messageContext);
+    const normalizedBody = normalizeBody(body).split('\n').flatMap((line) => {
+      const split = /^(.+?[,!])\s+(.+)$/.exec(line);
+      return split && isStandaloneSignoff(split[1]) && valueMatchesSenderEvidence(split[2], senderEvidence)
+        ? [split[1], split[2]] : [line];
+    }).join('\n');
     const lines = normalizedBody ? normalizedBody.split('\n') : [];
     const quotedSegments = findQuotedSegments(normalizedBody);
     const directBodyEnd = findDirectBodyEnd(normalizedBody, lines, quotedSegments);
@@ -483,23 +567,27 @@
       return { bodyLines: lines, contact: emptyContact(), matched: false };
     }
     for (let index = directBodyEnd - 1; signatureStart < 0 && index >= 0; index -= 1) {
-      if (isStandaloneSignoff(lines[index])) {
+      if (isStandaloneSignoff(lines[index]) || (/^grt\.?$/i.test(lines[index].trim()) && linesMatchSenderEvidence(lines.slice(index + 1, directBodyEnd), senderEvidence))) {
         signatureStart = index;
         break;
       }
     }
     if (signatureStart < 0) {
+      signatureStart = lines.findIndex((line, index) => index < directBodyEnd && index > 0 &&
+        !lines[index - 1].trim() && valueMatchesSenderEvidence(line, senderEvidence) &&
+        lines.slice(index + 1, Math.min(directBodyEnd, index + 6)).some((value) => matchField(value) || safeContactHref(value)));
+    }
+    if (signatureStart < 0) {
       return { bodyLines: lines, contact: emptyContact(), matched: false };
     }
     const signatureLines = lines.slice(signatureStart, signatureEnd);
+    const references = signatureReferenceLinks(normalizedBody);
+    const removedDefinitions = removeOwnedReferenceDefinitions(lines, signatureStart, signatureEnd, references, quotedSegments);
     return {
-      bodyLines: trimOuterBlankLines(postQuoteSignature
-        ? lines.slice(0, signatureStart)
-        : [
-            ...lines.slice(0, signatureStart),
-            ...lines.slice(directBodyEnd),
-          ]),
-      contact: extractContact(signatureLines, messageContext, signatureReferenceLinks(messageContext?.body || normalizedBody)),
+      bodyLines: trimOuterBlankLines(lines.filter((_line, index) => (
+        (index < signatureStart || index >= signatureEnd) && !removedDefinitions.has(index)
+      ))),
+      contact: extractContact(signatureLines, messageContext, references),
       matched: true,
     };
   }
@@ -527,11 +615,11 @@
     if (!phone && !addressLines.length && !preservedLines.length && !beforeLines.length) return '';
     const escapeValue = (value) => escapeMarkup(value).replace(/=/g, '&#61;');
     function renderLine(line) {
-      const markdown = /^(?:[A-Z][.:]?\s+)?\[([^\[\]]+)\]\(([^\s]+)\)$/i.exec(line);
+      const link = resolveContactLink(line, new Map(Object.entries(source.linkReferences || {})));
       const raw = line.replace(/^(?:[-•]|(?:website|web|w|i|e(?:-?mail)?|from)[.:]?)\s+/i, '');
       const email = /^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(raw) ? raw : '';
-      const href = markdown ? safeContactHref(markdown[2]) : safeContactHref(raw) || (email ? `mailto:${email}` : '');
-      const label = markdown ? markdown[1] : raw;
+      const href = link.href || (email ? `mailto:${email}` : '');
+      const label = link.label;
       const content = href
         ? `<a class="detail-mail-contact-link" href="${escapeValue(href)}"${/^https?:/.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeValue(label)}</a>`
         : escapeValue(line);

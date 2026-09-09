@@ -196,7 +196,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260907a/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260909c/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260909d/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260909a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
@@ -222,8 +222,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260909c'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260909c') < page.indexOf('premium-mailbox-message-presentation.js?v=20260909a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260907a') < page.indexOf('premium-mailbox-signature.js?v=20260909d'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260909d') < page.indexOf('premium-mailbox-message-presentation.js?v=20260909a'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260909a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
