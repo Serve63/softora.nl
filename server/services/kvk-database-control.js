@@ -90,6 +90,11 @@ function createKvkDatabaseControlService(deps = {}) {
   function normalizeControlRequest(payload = {}) {
     return {
       enabled: payload.enabled === true,
+      activeWorkerKeys: Array.isArray(payload.activeWorkerKeys)
+        && payload.activeWorkerKeys.length > 0
+        && payload.activeWorkerKeys.every((key) => WORKER_KEYS.has(key))
+        ? [...new Set(payload.activeWorkerKeys)]
+        : [...WORKER_KEYS],
       revision: Math.max(0, Number(payload.revision || 0)),
       requestedAt: normalizeString(payload.requestedAt || ''),
       updatedAt: normalizeString(payload.updatedAt || ''),
@@ -118,6 +123,9 @@ function createKvkDatabaseControlService(deps = {}) {
   }
 
   function effectiveWorker(control, worker) {
+    if (!control.activeWorkerKeys.includes(worker.workerKey)) {
+      return { ...worker, workerState: 'idle', workerMessage: 'Niet geselecteerd voor deze run.', currentBatch: '', stale: false, stalled: false };
+    }
     if (!control.enabled) return { ...worker, stale: false };
     const requestedAt = Date.parse(control.requestedAt || '');
     const heartbeatAt = Date.parse(worker.workerHeartbeatAt || '');
@@ -185,7 +193,7 @@ function createKvkDatabaseControlService(deps = {}) {
   }
 
   function combinedControl(control, workers) {
-    const workerList = Object.values(workers);
+    const workerList = control.activeWorkerKeys.map((key) => workers[key]);
     const heartbeatValues = workerList
       .map((worker) => worker.workerHeartbeatAt)
       .filter(Boolean)
@@ -197,7 +205,7 @@ function createKvkDatabaseControlService(deps = {}) {
       ...control,
       workerState: control.automaticStopReason && control.automaticStopWasFailure
         ? 'error'
-        : combinedWorkerState(workers, control.enabled),
+        : combinedWorkerState(Object.fromEntries(workerList.map((worker) => [worker.workerKey, worker])), control.enabled),
       workerMessage: control.automaticStopReason || workerList
         .map((worker) => worker.workerMessage || `${WORKER_LABELS[worker.workerKey]}: ${worker.workerState}`)
         .join(' • '),
@@ -214,7 +222,7 @@ function createKvkDatabaseControlService(deps = {}) {
     const startGraceExpired = !Number.isFinite(requestedAt)
       || currentTime - requestedAt > workerStaleAfterMs;
 
-    const workerList = Object.values(workers);
+    const workerList = control.activeWorkerKeys.map((key) => workers[key]);
     const hasCurrentHeartbeat = (worker) => {
       const heartbeatAt = Date.parse(worker.workerHeartbeatAt || '');
       return Number.isFinite(heartbeatAt)
@@ -230,7 +238,7 @@ function createKvkDatabaseControlService(deps = {}) {
       };
     }
 
-    for (const worker of Object.values(workers)) {
+    for (const worker of workerList) {
       const label = WORKER_LABELS[worker.workerKey];
       const heartbeatAt = Date.parse(worker.workerHeartbeatAt || '');
       const heartbeatMissing = !Number.isFinite(heartbeatAt);
@@ -379,11 +387,20 @@ function createKvkDatabaseControlService(deps = {}) {
     if (typeof req?.body?.enabled !== 'boolean') {
       return res.status(400).json({ ok: false, error: 'enabled moet true of false zijn.' });
     }
+    if (req.body.activeWorkerKeys !== undefined && (
+      !Array.isArray(req.body.activeWorkerKeys)
+      || req.body.activeWorkerKeys.length === 0
+      || req.body.activeWorkerKeys.some((key) => !WORKER_KEYS.has(key))
+      || new Set(req.body.activeWorkerKeys).size !== req.body.activeWorkerKeys.length
+    )) {
+      return res.status(400).json({ ok: false, error: 'activeWorkerKeys moet unieke geldige worker-lanes bevatten.' });
+    }
     const current = await readControl();
     if (!current.ok) return res.status(503).json({ ok: false, error: current.error });
     const updatedAt = now().toISOString();
     const controlRequest = normalizeControlRequest({
       enabled: req.body.enabled,
+      activeWorkerKeys: req.body.activeWorkerKeys ?? current.control.activeWorkerKeys,
       revision: current.control.revision + 1,
       requestedAt: updatedAt,
       updatedAt,
@@ -438,6 +455,9 @@ function createKvkDatabaseControlService(deps = {}) {
     }
     const beforeReport = await readControl();
     if (!beforeReport.ok) return res.status(503).json({ ok: false, error: beforeReport.error });
+    if (beforeReport.control.enabled && !beforeReport.control.activeWorkerKeys.includes(workerKey)) {
+      return res.status(409).json({ ok: false, error: 'Deze worker is niet geselecteerd voor deze run.' });
+    }
     const updatedAt = now().toISOString();
     const worker = normalizeWorker({
       workerState,

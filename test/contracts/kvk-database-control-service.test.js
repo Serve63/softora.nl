@@ -428,3 +428,50 @@ test('worker reports preserve model and reasoning effort in the read-only status
   assert.equal(response.payload.control.workers.controle.model, 'gpt-5.6-sol');
   assert.equal(response.payload.control.workers.controle.reasoningEffort, 'xhigh');
 });
+
+
+test('an explicit two-worker run ignores the unselected lane and retains heartbeat safety', async () => {
+  const { service, setNow } = createInMemoryService();
+  const headers = { authorization: 'Bearer worker-token' };
+  const start = createJsonResponse();
+  await service.sendCommandControlResponse({ headers, body: { enabled: true, activeWorkerKeys: ['vuller', 'controle'] } }, start);
+  assert.deepEqual(start.payload.control.activeWorkerKeys, ['vuller', 'controle']);
+  assert.equal(start.payload.control.workers.goedgekeurd.workerState, 'idle');
+  setNow('2026-07-26T20:32:00.000Z');
+  for (const workerKey of ['vuller', 'controle']) {
+    const report = createJsonResponse();
+    await service.sendReportWorkerResponse({ headers, body: { workerKey, workerState: 'running', queuePending: true, workerProgressAt: '2026-07-26T20:32:00.000Z' } }, report);
+    assert.equal(report.statusCode, 200);
+  }
+  setNow('2026-07-26T20:33:00.000Z');
+  const status = createJsonResponse();
+  await service.sendGetControlResponse({}, status);
+  assert.equal(status.payload.control.enabled, true);
+  assert.equal(status.payload.control.workerState, 'running');
+  const unselected = createJsonResponse();
+  await service.sendReportWorkerResponse({ headers, body: { workerKey: 'goedgekeurd', workerState: 'running' } }, unselected);
+  assert.equal(unselected.statusCode, 409);
+  setNow('2026-07-26T20:34:31.000Z');
+  const expired = createJsonResponse();
+  await service.sendGetControlResponse({}, expired);
+  assert.equal(expired.payload.control.enabled, false);
+  assert.match(expired.payload.control.automaticStopReason, /heartbeat is verlopen/);
+  assert.deepEqual(expired.payload.control.activeWorkerKeys, ['vuller', 'controle']);
+});
+
+test('worker selection rejects invalid values without writes and persists across stop and restart', async () => {
+  const { service, getStoredRow } = createInMemoryService();
+  const headers = { authorization: 'Bearer worker-token' };
+  for (const activeWorkerKeys of [[], ['unknown'], ['vuller', 'vuller'], 'vuller', null]) {
+    const response = createJsonResponse();
+    await service.sendCommandControlResponse({ headers, body: { enabled: true, activeWorkerKeys } }, response);
+    assert.equal(response.statusCode, 400);
+    assert.equal(getStoredRow(service.controlStateKey), null);
+  }
+  for (const body of [{ enabled: true, activeWorkerKeys: ['vuller', 'controle'] }, { enabled: false }, { enabled: true }]) {
+    const response = createJsonResponse();
+    await service.sendCommandControlResponse({ headers, body }, response);
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.payload.control.activeWorkerKeys, ['vuller', 'controle']);
+  }
+});
