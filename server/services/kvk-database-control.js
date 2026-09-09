@@ -20,6 +20,7 @@ function createKvkDatabaseControlService(deps = {}) {
     controlReadTimeoutMs = 15_000,
     controlWriteTimeoutMs = 30_000,
     workerStaleAfterMs = 150_000,
+    lunaMaxWorkerStaleAfterMs = 10 * 60_000,
     workerProgressStaleAfterMs = 30 * 60_000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -122,6 +123,14 @@ function createKvkDatabaseControlService(deps = {}) {
     };
   }
 
+  function heartbeatStaleAfterMs(worker) {
+    // Native Luna Max reasoning and compaction can exceed the ordinary heartbeat
+    // interval. Keep a finite liveness deadline and the separate progress gate.
+    return worker.model === 'gpt-5.6-luna' && worker.reasoningEffort === 'max'
+      ? Math.max(workerStaleAfterMs, lunaMaxWorkerStaleAfterMs)
+      : workerStaleAfterMs;
+  }
+
   function effectiveWorker(control, worker) {
     if (!control.activeWorkerKeys.includes(worker.workerKey)) {
       return { ...worker, workerState: 'idle', workerMessage: 'Niet geselecteerd voor deze run.', currentBatch: '', stale: false, stalled: false };
@@ -140,7 +149,7 @@ function createKvkDatabaseControlService(deps = {}) {
       };
     }
     const heartbeatAgeMs = Math.max(0, now().getTime() - heartbeatAt);
-    if (heartbeatAgeMs > workerStaleAfterMs) {
+    if (heartbeatAgeMs > heartbeatStaleAfterMs(worker)) {
       return {
         ...worker,
         workerState: 'waiting',
@@ -249,7 +258,7 @@ function createKvkDatabaseControlService(deps = {}) {
         }
         continue;
       }
-      if (Number.isFinite(heartbeatAt) && currentTime - heartbeatAt > workerStaleAfterMs) {
+      if (Number.isFinite(heartbeatAt) && currentTime - heartbeatAt > heartbeatStaleAfterMs(worker)) {
         return { reason: `${label} is gestopt: de heartbeat is verlopen.`, wasFailure: true };
       }
 
