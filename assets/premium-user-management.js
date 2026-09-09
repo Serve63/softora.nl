@@ -373,7 +373,7 @@ function mountExtraSettingsCategory() {
     'tegel-desc',
     'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
   );
-  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '8 onderdelen');
   extraTile.addEventListener('click', function () {
     window.location.hash = 'extra';
     extraGrid.hidden = false;
