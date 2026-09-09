@@ -5,9 +5,10 @@ const { parseProviderHtml } = require('../../server/services/mailbox-provider-ri
 const { sanitizeMailboxDisplayText, createMailboxService } = require('../../server/services/mailbox');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const path = require('node:path');
 const scope = { URL };
-vm.runInNewContext(fs.readFileSync(require.resolve('../../assets/premium-mailbox-display.js'), 'utf8'), scope);
-const script = fs.readFileSync(require.resolve('../../assets/premium-mailbox.js'), 'utf8');
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-display.js'), 'utf8'), scope);
+const script = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
 const renderer = { URL, window: { SoftoraMailboxDisplay: scope.SoftoraMailboxDisplay } };
 vm.runInNewContext(script.slice(script.indexOf('"use strict";'), script.indexOf('function normalizeMailboxEmail')) + '\nthis.render = renderLinkedMailboxText;', renderer);
 
