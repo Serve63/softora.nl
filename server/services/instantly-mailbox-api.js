@@ -1,5 +1,6 @@
 'use strict';
 const { createHash, createHmac } = require('node:crypto');
+const { READ_OPTIONS } = require('./instantly-mailbox-state');
 const SCOPE = 'instantly_mailbox_sync';
 const WINDOW_MS = 60_000;
 const READ_BUDGET = 18;
@@ -29,7 +30,11 @@ function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTime
     if (time() - lastPolicyRead < 10_000) return;
     if (policyPromise) return policyPromise;
     policyPromise = (async () => {
-      const state = await getUiStateValues(SCOPE);
+      const state = await getUiStateValues(SCOPE, READ_OPTIONS);
+      if (!state || !state.values || (state.source && state.source !== 'supabase')) {
+        throw createError('Instantly-leesbeleid kon niet betrouwbaar worden gelezen.', 'INSTANTLY_READ_POLICY_UNAVAILABLE', 503,
+          { mailboxProviderResponseReceived: false, externalEffect: false });
+      }
       for (const [key, value] of Object.entries(state?.values || {})) {
         policy[key] = Math.max(until(key), Number(value) || 0);
       }
@@ -39,7 +44,10 @@ function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTime
   }
   async function persist(patch) {
     Object.assign(policy, patch);
-    try { await setUiStateValues(SCOPE, patch, { source: 'instantly-mailbox-sync', actor: 'Instantly mailbox' }); }
+    try {
+      const saved = await setUiStateValues(SCOPE, patch, { source: 'instantly-mailbox-sync', actor: 'Instantly mailbox' });
+      if (!saved) throw new Error('Instantly-leesbeleid is niet duurzaam opgeslagen.');
+    }
     catch (error) { logger.warn('[InstantlyMailbox][ReadBackoffPersistence]', error?.message || error); }
   }
   function rateError(blockedUntil, code = 'INSTANTLY_RATE_LIMITED') {

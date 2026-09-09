@@ -50,6 +50,17 @@ test('a failed tip check never turns known history into a complete answer', asyn
   }), { status: 503 });
 });
 
+test('a returned Sent seed whose references were already queried completes without a false depth error', async () => {
+  const sentParent = mail('parent', 'root');
+  let calls = 0;
+  const result = await listExactSentDescendants({
+    seedMessages: [mail('reply', 'parent'), sentParent], allowedAccountEmails: [accountEmail],
+    mailboxIndexStore: { listMessagesReferencingMessageIdsForAccounts: async () => { calls += 1; return [sentParent]; } },
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(result.map(row => row.id), ['parent']);
+});
+
 test('wide frontiers are split without dropping references at the repository ID cap', async () => {
   const queried = [];
   await listExactSentDescendants({
