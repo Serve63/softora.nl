@@ -2001,7 +2001,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--sent"/);
   assert.match(pageSource, /class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--deals"/);
-  assert.match(pageSource, /class="mail-roi-label">€850 klanten<\/div>/);
+  assert.match(pageSource, /class="mail-roi-label">Klanten<\/div>/);
   assert.match(pageSource, /id="mailRoiDealsCount"/);
   assert.match(pageSource, /data-mail-roi-action="-1"/);
   assert.match(pageSource, /data-mail-roi-action="1"/);
