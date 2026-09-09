@@ -92,3 +92,11 @@ test('dezelfde opmaak in gewone inhoud, quotes of een andere afzender wordt niet
   assert.equal(other.contact.phone, '');
   assert.match(signature.renderContactCard(other.contact), /Robin VoorbeeldTel: 06-12345678www.example.nl/);
 });
+
+test('ook zonder citaat wordt een bewezen reserveringsvoetnoot eenmaal als leesbare link getoond', () => {
+  const parsed = signature.parseIncoming('Akkoord.\n\nGroet,\nVoorbeeld\nReserveer hier [2]\n\nLinks:\n------\n[2] https://booking.example/reserveren');
+  const html = signature.renderContactCard(parsed.contact);
+  assert.match(html, />Reserveer hier<\/a>/);
+  assert.equal((html.match(/href="https:\/\/booking.example\/reserveren"/g) || []).length, 1);
+  assert.doesNotMatch(html, /\[2\]|Links:|------/);
+});

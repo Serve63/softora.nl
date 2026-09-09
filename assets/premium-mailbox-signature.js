@@ -322,10 +322,20 @@
     const preservedLines = [];
     const representedValues = Object.values(values).filter(Boolean).map(cleanFieldValue);
     representedValues.push(...contact.addressLines);
+    const linkedReferences = new Set(signatureLines.flatMap((line) => {
+      const match = /^.+\s+\[(\d{1,3})\]$/.exec(line);
+      return match && references.get(match[1]) ? [match[1]] : [];
+    }));
     let sawField = false;
-    for (const value of signatureLines) {
-      let line = normalizeWhitespace(value);
+    for (let index = 0; index < signatureLines.length; index += 1) {
+      let line = normalizeWhitespace(signatureLines[index]);
       if (!line || isStandaloneSignoff(line)) continue;
+      const referenceId = (value) => /^\s*\[(\d{1,3})\]\s*:?\s+\S+\s*$/.exec(value)?.[1];
+      if (linkedReferences.has(referenceId(line))) continue;
+      if (/^(?:Links|References):?$/i.test(line)) {
+        const tail = signatureLines.slice(index + 1).filter(Boolean);
+        if (tail.length && tail.every((value) => linkedReferences.has(referenceId(value)))) continue;
+      }
       const field = matchField(line);
       const compactAddress = extractCompactDutchAddress([line]);
       const represented = representedValues.includes(cleanFieldValue(line)) ||
