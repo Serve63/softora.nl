@@ -74,6 +74,7 @@
     const source = message && typeof message === 'object' ? message : {};
     const body = String(source.body || '').trim();
     if (source.bodyLoaded === true && (body || source.hasBody === false)) return 4;
+    if (body && source.bodyLoaded !== false && source.bodyTruncated === false && source.bodyImagesTruncated !== true) return 4;
     if (body && source.bodyTruncated !== true && source.bodyImagesTruncated !== true) return 3;
     if (body) return 2;
     return source.hasBody ? 1 : 0;
