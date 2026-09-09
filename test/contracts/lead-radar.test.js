@@ -867,7 +867,7 @@ test('Lead Radar wordt via de centrale HTML-deliverylaag in de premium-sidebar g
   const theme = readRepoFile('assets/personnel-theme.js');
   const vercel = readRepoFile('vercel.json');
   const envExample = readRepoFile('.env.example');
-  assert.match(htmlPages, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909a'/);
+  assert.match(htmlPages, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909b'/);
   assert.doesNotMatch(htmlPages, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(theme, /SoftoraPremiumSidebarLinks\.getLeadRadarSidebarLink\(\)/);
   assert.doesNotMatch(vercel, /"path": "\/api\/lead-radar\/cron"/);

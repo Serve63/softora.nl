@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { getLeadRadarSidebarLink, getSummarizeSidebarLink } = require('../../assets/premium-sidebar-links');
+const { getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink } = require('../../assets/premium-sidebar-links');
 
 function normalizeSidebarLinks(html) {
   return html.replace(/(<aside\b[^>]*data-static-sidebar="1"[^>]*>)([\s\S]*?)(<\/aside>)/gi, (_match, open, body, close) => {
@@ -9,6 +9,12 @@ function normalizeSidebarLinks(html) {
       const anchor = `<a href="${link.href}" class="sidebar-link magnetic" data-sidebar-key="${link.key}">${link.icon}<span class="sidebar-link-text">${link.label}</span></a>`;
       body = body.replace(new RegExp(`<a\\b[^>]*data-sidebar-key="${beforeKey}"`), match => anchor + match);
     }
+    const mailbox = getMailboxSidebarLink();
+    body = body.replace(/<a\b([^>]*data-sidebar-key="mailbox"[^>]*)>[\s\S]*?<\/a>/gi, (_anchor, attributes) => {
+      const attrs = attributes.replace(/\s(?:href|aria-disabled|tabindex)="[^"]*"/gi, '')
+        .replace(/\s*sidebar-link--coming-soon/g, '');
+      return `<a${attrs} href="${mailbox.href}">${mailbox.icon}<span class="sidebar-link-text">${mailbox.label}</span></a>`;
+    });
     return open + body + close;
   });
 }

@@ -16,11 +16,11 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260909a';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20260909b';
 const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909a';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
-const PREMIUM_SIDEBAR_LINKS_VERSION = '20260818a';
+const PREMIUM_SIDEBAR_LINKS_VERSION = '20260909a';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
@@ -728,6 +728,7 @@ function createHtmlPageCoordinator(options = {}) {
         }
       }
     }
+    renderedHtml = renderedHtml.replace(/assets\/premium-sidebar-links\.js\?v=[^"'\s>]+/g, `assets/premium-sidebar-links.js?v=${PREMIUM_SIDEBAR_LINKS_VERSION}`);
     renderedHtml = renderedHtml.replace(/assets\/personnel-theme\.css\?v=[^"\'\s>]+/g, `assets/personnel-theme.css?v=${PREMIUM_PERSONNEL_THEME_VERSION}`);
     renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });
 

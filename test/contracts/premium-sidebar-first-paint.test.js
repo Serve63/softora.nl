@@ -8,6 +8,7 @@ const { createPremiumSidebarShell } = require('../../server/services/premium-sid
 const root = path.join(__dirname, '../..');
 
 const modulePages = [
+  'premium-mailbox.html', 'premium-personeel-dashboard.html', 'premium-instellingen.html',
   'premium-samenvatten.html', 'premium-world-watcher.html', 'premium-flynow.html',
   'premium-wereldmap.html', 'live-momentum.html', 'live-momentum-access.html',
   'premium-kvk-database-shell.html', 'premium-kvk-company-directory-shell.html',
@@ -29,11 +30,16 @@ for (const fileName of modulePages) {
     const sidebar = res.body.match(/<aside\b[^>]*data-static-sidebar="1"[^>]*>([\s\S]*?)<\/aside>/)?.[1];
     assert.ok(sidebar, 'navigation must exist before deferred scripts execute');
     for (const key of ['dashboard', 'database', 'customers', 'settings', 'lead_radar', 'summarize']) assert.match(sidebar, new RegExp(`data-sidebar-key="${key}"`));
+    const mailbox = sidebar.match(/<a\b[^>]*data-sidebar-key="mailbox"[^>]*>([\s\S]*?)<\/a>/)?.[1];
+    const { getMailboxSidebarLink } = require('../../assets/premium-sidebar-links');
+    assert.equal(mailbox, getMailboxSidebarLink().icon + '<span class="sidebar-link-text">Mailbox</span>');
     assert.match(sidebar, />Layout Test</);
     assert.doesNotMatch(sidebar, /data-sidebar-key="(?:agenda|coldmailing|bookkeeping|pdfs|websitegenerator)"/);
     assert.ok(res.body.indexOf('id="softora-premium-sidebar-critical"') < res.body.indexOf('assets/personnel-theme.css'));
     assert.match(res.body, /scrollbar-gutter:auto !important/);
     assert.match(res.body, /premium-sidebar-mobile\.css\?v=/);
+    assert.doesNotMatch(res.body, /premium-sidebar-links\.js\?v=20260818a/);
+    assert.match(res.body, /premium-sidebar-links\.js\?v=20260909a/);
     assert.match(res.body, /function prefillPremiumSidebarActiveState/);
   });
 }
@@ -97,4 +103,19 @@ test('settings response reserves both category tiles before deferred scripts run
   assert.match(fs.readFileSync(path.join(root, 'assets/premium-settings-tiles.css'), 'utf8'), /#screen-overzicht \.settings-overview-grid > \.tegel[^}]+aspect-ratio:1 \/ 1/);
   const source = fs.readFileSync(path.join(root, 'assets/premium-user-management.js'), 'utf8');
   assert.match(source, /overviewScreen\.querySelector\('\[data-settings-extra-open\]'\) \|\| document\.createElement/);
+});
+
+
+test('server normalizes legacy lock and envelope icons to one idempotent mailbox link', () => {
+  const render = createPremiumSidebarShell();
+  const { getMailboxSidebarLink } = require('../../assets/premium-sidebar-links');
+  for (const legacy of ['<span class="sidebar-link-lock"><svg></svg></span>', '<svg><path d="old-envelope"/></svg>']) {
+    const input = '<aside class="sidebar" data-static-sidebar="1"><a href="/premium-mailbox" class="sidebar-link magnetic sidebar-link--coming-soon active" data-sidebar-key="mailbox" aria-disabled="true" tabindex="-1">' + legacy + '<span class="sidebar-link-text">Mailbox</span></a></aside>';
+    const output = render(input, { authenticated: true, role: 'admin' });
+    assert.ok(output.includes(getMailboxSidebarLink().icon));
+    assert.match(output, /class="sidebar-link magnetic active"/);
+    assert.match(output, /href="\/mailbox"/);
+    assert.doesNotMatch(output, /sidebar-link-lock|coming-soon|aria-disabled|tabindex|old-envelope/);
+    assert.equal(render(output, { authenticated: true, role: 'admin' }), output);
+  }
 });

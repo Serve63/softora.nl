@@ -459,7 +459,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909a'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909b'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909a'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
@@ -726,9 +726,11 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
 
   assert.match(pageSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>/);
   assert.match(pageSource, /data-sidebar-key="mailbox"[^>]*>[\s\S]*<span class="sidebar-link-text">Mailbox<\/span>/);
-  assert.match(themeSource, /function getMailboxSidebarLink\(\)[\s\S]*key:\s*"mailbox",[\s\S]*href:\s*"\/mailbox",[\s\S]*label:\s*"Mailbox",[\s\S]*sidebar-link-mailbox-icon[\s\S]*m3 8 9 6 9-6/);
+  assert.match(readRepoFile('assets/premium-sidebar-links.js'), /function getMailboxSidebarLink\(\)[\s\S]*key:\s*"mailbox",[\s\S]*href:\s*"\/mailbox",[\s\S]*label:\s*"Mailbox",[\s\S]*sidebar-link-mailbox-icon[\s\S]*m3 8 9 6 9-6/);
   assert.match(themeSource, /function activateMailboxSidebarLink\(sidebar\)[\s\S]*insertAdjacentHTML\("afterbegin", mailboxLink\.icon\)[\s\S]*label\.textContent = mailboxLink\.label/);
   assert.match(themeSource, /getMailboxSidebarLink\(\),/);
+  assert.match(themeSource, /return window\.SoftoraPremiumSidebarLinks\.getMailboxSidebarLink\(\)/);
+  assert.match(themeSource, /querySelector\(":scope > \.sidebar-link-mailbox-icon"\)/);
   assert.doesNotMatch(themeSource, /label:\s*"Coldmail Inbox"/);
   assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
   assert.doesNotMatch(pageSource, /\.mail-sidebar\s*\{/);
@@ -1170,7 +1172,7 @@ test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar',
 
   assert.match(themeSource, /if \(p\.indexOf\("\/premium-samenvatten"\) === 0\) return "summarize"/);
   assert.match(sidebarLinksSource, /function getSummarizeSidebarLink\(\)[\s\S]*key:\s*'summarize'[\s\S]*href:\s*'\/premium-samenvatten'[\s\S]*label:\s*'Samenvatten'/);
-  assert.match(sidebarLinksSource, /Object\.freeze\(\{ getLeadRadarSidebarLink, getSummarizeSidebarLink \}\)/);
+  assert.match(sidebarLinksSource, /Object\.freeze\(\{ getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink \}\)/);
   assert.match(themeSource, /getMailboxSidebarLink\(\),\s*window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\),/);
   assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "beheer", window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\), \["websitegenerator", "seo", "qr_code", "packages"\]\)/);
   const comingSoonKeys = themeSource.match(/const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
