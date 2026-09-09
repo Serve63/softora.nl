@@ -99,3 +99,11 @@ test('footeropruiming wist geen definitie die nog bij inhoudelijke tekst hoort',
   assert.match(result, /De documentatie staat in \[1\]/);
   assert.match(result, /\[1\] https:\/\/aka.ms\/AAb9ysg/);
 });
+
+test('samengeplakte Galaxy-footer verdwijnt zonder afzender of inhoud weg te nemen', () => {
+  for (const text of ['Hoi MartijnBedankt voor je voorstel.MvgRob', 'Dag Serve,Bedankt voor de moeite.Met vriendelijke groetSjef']) {
+    assert.equal(render(text + 'Verzonden vanaf mijn Galaxy').body, text);
+  }
+  const literal = 'Deze tekst bevat VerzendinformatieVerzonden vanaf mijn Galaxy';
+  assert.equal(render(literal).body, literal);
+});

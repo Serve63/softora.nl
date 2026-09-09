@@ -317,6 +317,50 @@
     return /^deze link$/i.test(normalizedLabel) ? `deze ${anchor}` : anchor;
   }
 
+const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|hier|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[\s*(?:\[(https?:\/\/[^\]\s<>"']+)\]\((https?:\/\/[^\)\s<>"']+)\)|(https?:\/\/[^\]\s<>"']+))\s*\]/gi;
+function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl, renderUrls: renderMailboxUrls }) {
+  const text = String(value == null ? '' : value);
+  let html = '';
+  let lastIndex = 0;
+  text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, markdownLabelUrl, markdownTargetUrl, plainUrl, offset) => {
+    const url = markdownTargetUrl || plainUrl;
+    const nestedUrlMatches = !markdownLabelUrl || markdownLabelUrl === markdownTargetUrl;
+    html += renderMailboxUrls(text.slice(lastIndex, offset));
+    if (nestedUrlMatches && isSafeMailBodyUrl(url) && isLabelledUrlMatch(label, url, options)) {
+      html += renderLabelledUrlAnchor(url, label, escapeHtml);
+    } else {
+      html += /^(?:deze link|hier)$/i.test(String(label || '').trim()) ? escapeHtml(match) : renderMailboxUrls(match);
+    }
+    lastIndex = offset + match.length;
+    return match;
+  });
+  html += renderMailboxUrls(text.slice(lastIndex));
+  return applySenderCtaLinks(html, text, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl });
+}
+
+  function renderLinkedMailboxText(value, options, helpers) {
+    const text = String(value == null ? '' : value);
+    const { escapeHtml, isSafeUrl } = helpers;
+    const renderRest = (part) => renderAnnotatedMailboxText(part, options, helpers);
+    const pattern = /(?<!\[)\[([^\[\]\r\n]+)\]\(([^\s<>"']+)\)/g;
+    let html = '', lastIndex = 0;
+    text.replace(pattern, (match, rawLabel, url, offset) => {
+      const italic = /^\*[^*]+\*$/.test(rawLabel);
+      const label = italic ? rawLabel.slice(1, -1) : rawLabel;
+      const reservedCta = /^(?:deze link|hier)$/i.test(label) && isSoftoraWebdesignUrl(url);
+      html += renderRest(text.slice(lastIndex, offset));
+      if (isSafeUrl(url) && (!reservedCta || isLabelledUrlMatch(label, url, options))) {
+        const anchor = renderLabelledUrlAnchor(url, label, escapeHtml);
+        html += italic ? `<em>${anchor}</em>` : anchor;
+      } else {
+        html += escapeHtml(match);
+      }
+      lastIndex = offset + match.length;
+      return match;
+    });
+    return html + renderRest(text.slice(lastIndex));
+  }
+
   function renderDetailBody(mail, content) {
     const source = mail && typeof mail === 'object' ? mail : {};
     const loadError = String(source.bodyLoadError || '').trim();
@@ -372,5 +416,7 @@
     formatMailDate,
     renderLabelledUrlAnchor,
     renderDetailBody,
+    renderLinkedMailboxText,
   };
+  if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
 })(typeof window !== 'undefined' ? window : globalThis);
