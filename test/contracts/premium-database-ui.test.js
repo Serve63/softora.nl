@@ -458,7 +458,7 @@ test('premium database has a compact company search without the old result count
 
   assert.match(
     pageSource,
-    /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…">[\s\S]*<\/div><\/div>\s*<\/div>/
+    /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/
   );
   assert.match(filterBarCssBlock, /align-items: center;/);
   assert.doesNotMatch(filterBarCssBlock, /align-items: flex-end;/);
@@ -1966,19 +1966,19 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
   assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">-- resultaten<\/span><\/button>/);
   assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
-  assert.match(pageSource, /<div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…">/);
+  assert.match(pageSource, /<div class="table-search"><div class="search">[\s\S]*id="q" aria-label="Zoek bedrijf in mailsysteem"/);
   const topRightHtml = pageSource.slice(
     pageSource.indexOf('<div class="top-right">'),
     pageSource.indexOf('<div class="status-banner"')
   );
   assert.doesNotMatch(topRightHtml, /<div class="top-right"><div class="search">/);
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
-  assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<\/div><\/div>\s*<\/div>/);
+    /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-calm-roi-type/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-compact-table/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
-  assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
+  assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?id="systemMailSentTodayCount"[\s\S]*?class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Harde bounces<\/div>[\s\S]*?id="systemMailBouncesTodayCount"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
@@ -1992,10 +1992,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-label">Vandaag verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"/);
   assert.match(pageSource, /class="mail-roi-label">Harde bounces<\/div>/);
-  assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot"/);
-  assert.match(pageSource, /class="mail-roi-label">Autopilot<\/div>/);
-  assert.match(pageSource, /id="databaseAutopilotToggle"/);
-  assert.match(pageSource, /id="databaseAutopilotToggleLabel">Laden/);
+  assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
+  assert.doesNotMatch(pageSource, /class="mail-roi-label">Autopilot<\/div>/);
+  assert.doesNotMatch(pageSource, /id="databaseAutopilotToggle"/);
+  assert.doesNotMatch(pageSource, /id="databaseAutopilotToggleLabel">Laden/);
   assert.match(pageSource, /id="systemMailSentTodayCount"/);
   assert.match(pageSource, /id="systemMailBouncesTodayCount"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--sent"/);
@@ -2093,7 +2093,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
-  assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…">/);
+  assert.match(pageSource, /<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
   assert.doesNotMatch(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
   assert.doesNotMatch(pageSource, /id="m-branche"/);
@@ -2147,7 +2147,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
-  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "verstuurd" \? resultCountText : "Acties"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
+  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "verstuurd" \? resultCountText : "Acties"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showSentActions; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
   assert.match(pageSource, /renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
@@ -2157,7 +2157,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /<td colspan=\\"6\\">/);
   assert.match(pageSource, /setDatabaseTableBodyHtml\("<tr><td colspan=\\"6\\"><div class=\\"tbl-empty\\">" \+ getEmptyTableMessage\(\) \+ "<\/div><\/td><\/tr>"\);/);
   assert.doesNotMatch(pageSource, /Geen bedrijven gevonden\./);
-  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
+  assert.match(pageSource, /showSentActions \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_SCOPE = "premium_database_photos";/);
   assert.match(pageSource, /const CUSTOMER_PHOTO_KEY = "softora_database_photos_v1";/);
@@ -2431,7 +2431,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-calm-roi-type/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-compact-table/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -4660,8 +4660,8 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.doesNotMatch(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
-  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer, \{ hideMailButton: outreachController\.hasInstantlyOutreachSignal\(customer\) \}\)/);
-  assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
+  assert.match(pageSource, /showSentActions \? outreachController\.renderActions\(customer, \{ hideMailButton: outreachController\.hasInstantlyOutreachSignal\(customer\) \}\)/);
+  assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showSentActions \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
   assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(6\), table\.outreach-action-mode tbody td:nth-child\(6\) \{ width: 24%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
@@ -6251,4 +6251,15 @@ test('database metric labels stay compact on one line', () => {
   assert.match(label, /font-size: 8px;/);
   assert.match(label, /white-space: nowrap;/);
   assert.match(filterGroupsCssSource, /font: 500 \.9rem\/1 "Oswald"/);
+});
+
+
+test("sent list omits controls and table search precedes company sorting", () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, "../../premium-database.html"), "utf8");
+  const tableCss = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
+  assert.match(pageSource, /showSentActions = showOutreachActionColumn && state.activeStatus !== "verstuurd"/);
+  assert.match(tableCss, /#databaseTable\.sent-list-mode th:nth-child\(8\), #databaseTable\.sent-list-mode td:nth-child\(8\) \{ display: none; \}/);
+  assert.match(pageSource, /class="company-heading">[\s\S]*?id="q"[\s\S]*?data-sort-key="naam">Bedrijf/);
+  assert.equal((pageSource.match(/id="q"/g) || []).length, 1);
+  assert.match(tableCss, /#databaseTable tbody td \{ white-space: nowrap; \}/);
 });
