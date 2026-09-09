@@ -230,12 +230,12 @@
     margin-bottom: 5px;
     color: #6b6b6b;
     font-family: "Oswald", sans-serif;
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 500;
     line-height: 1.15;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    white-space: normal;
+    white-space: nowrap;
 }
 
 .mail-roi-row {
@@ -247,7 +247,7 @@
 
 .mail-roi-value {
     color: #1a1a1a;
-    font: 500 1.05rem/1 "Oswald", sans-serif;
+    font: 500 .9rem/1 "Oswald", sans-serif;
 }
 
 .mail-roi-autopilot-toggle {
@@ -261,7 +261,7 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    font: 600 11px/1 "Oswald", sans-serif;
+    font: 500 10px/1 "Oswald", sans-serif;
     letter-spacing: .04em;
     text-transform: uppercase;
     cursor: pointer;
