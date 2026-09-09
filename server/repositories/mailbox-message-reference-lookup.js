@@ -1,3 +1,4 @@
+const { readMailboxEvidenceBatches, createMailboxReadLimiter } = require('./mailbox-read-evidence');
 const MAILBOX_MESSAGE_REFERENCE_LOOKUP_BATCH_SIZE = 25;
 const MAILBOX_MESSAGE_REFERENCE_LOOKUP_PAGE_SIZE = 1000;
 const MAILBOX_MESSAGE_REFERENCE_LOOKUP_MAX_IDS = 2000;
@@ -13,6 +14,8 @@ function createMailboxMessageReferenceLookup(deps = {}) {
     normalizeFolder,
     normalizeMessageRow,
   } = deps;
+
+  const limitRead = createMailboxReadLimiter(3);
 
   function normalizeMessageReferenceId(value) {
     return normalizeString(value)
@@ -67,18 +70,13 @@ function createMailboxMessageReferenceLookup(deps = {}) {
     // Account ownership is an exact database predicate. The reference-text
     // query is candidate discovery only; exact token matching below prevents
     // substring matches from creating a false thread.
-    for (const accountEmail of normalizedAccounts) {
-      for (
-        let batchOffset = 0;
-        batchOffset < normalizedMessageIds.length;
-        batchOffset += MAILBOX_MESSAGE_REFERENCE_LOOKUP_BATCH_SIZE
-      ) {
-        const batch = normalizedMessageIds.slice(
-          batchOffset,
-          batchOffset + MAILBOX_MESSAGE_REFERENCE_LOOKUP_BATCH_SIZE
-        );
+    const targets = normalizedAccounts.flatMap((accountEmail) => Array.from(
+      { length: Math.ceil(normalizedMessageIds.length / MAILBOX_MESSAGE_REFERENCE_LOOKUP_BATCH_SIZE) },
+      (_, index) => ({ accountEmail, batchOffset: index * MAILBOX_MESSAGE_REFERENCE_LOOKUP_BATCH_SIZE })
+    ));
+    const batches = await readMailboxEvidenceBatches(targets, ({ accountEmail, batchOffset }) => limitRead(async () => {
+        const batch = normalizedMessageIds.slice(batchOffset, batchOffset + MAILBOX_MESSAGE_REFERENCE_LOOKUP_BATCH_SIZE);
         const candidateFilter = buildCandidateFilter(batch);
-        if (!candidateFilter) continue;
         for (let pageOffset = 0; ; pageOffset += MAILBOX_MESSAGE_REFERENCE_LOOKUP_PAGE_SIZE) {
           const result = await read(
             `list-messages-referencing-message-id:${normalizedFolder}:${accountEmail}:${batchOffset}:${pageOffset}`,
@@ -94,8 +92,8 @@ function createMailboxMessageReferenceLookup(deps = {}) {
               .order('message_key', { ascending: false })
               .range(pageOffset, pageOffset + MAILBOX_MESSAGE_REFERENCE_LOOKUP_PAGE_SIZE - 1)
           );
-          if (!result.ok) return null;
-          const page = Array.isArray(result.data) ? result.data : [];
+          if (!result?.ok || !Array.isArray(result.data)) return false;
+          const page = result.data;
           page.forEach((row) => {
             if (normalizeEmail(row && row.account_email) !== accountEmail) return;
             const exactReferences = new Set([
@@ -108,8 +106,9 @@ function createMailboxMessageReferenceLookup(deps = {}) {
           });
           if (page.length < MAILBOX_MESSAGE_REFERENCE_LOOKUP_PAGE_SIZE) break;
         }
-      }
-    }
+        return true;
+    }));
+    if (batches.some((complete) => !complete)) return null;
 
     return Array.from(rowsByKey.values())
       .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))

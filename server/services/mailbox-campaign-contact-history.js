@@ -60,41 +60,28 @@ async function loadMailboxCampaignContactHistory({
     ...sortMessagesNewestFirst(messages),
     ...sortMessagesNewestFirst(seedSentMessages),
   ]);
-  let targetedIncomingMessages = [];
-  if (campaignParticipantEmails.length &&
-      typeof mailboxIndexStore.listMessagesBySenderEmailsForAccounts === 'function') {
-    const batches = await Promise.all(incomingFolders.map((folder) =>
-      mailboxIndexStore.listMessagesBySenderEmailsForAccounts({
-        accountEmails: campaignMailboxAccounts,
-        folder,
-        senderEmails: campaignParticipantEmails,
-        limit: incomingLimit,
-        priorityRead: true,
-      })
-    ));
-    if (batches.some((batch) => !Array.isArray(batch))) {
-      const error = new Error('Mailbox-index voor campagne-incoming kon niet worden gelezen.');
-      error.status = 503;
-      throw error;
-    }
-    targetedIncomingMessages = batches.flat();
+  const [incomingBatches, targetedSentMessages] = await Promise.all([
+    campaignParticipantEmails.length && typeof mailboxIndexStore.listMessagesBySenderEmailsForAccounts === 'function'
+      ? Promise.all(incomingFolders.map((folder) => mailboxIndexStore.listMessagesBySenderEmailsForAccounts({
+          accountEmails: campaignMailboxAccounts, folder, senderEmails: campaignParticipantEmails,
+          limit: incomingLimit, priorityRead: true,
+        })))
+      : [],
+    campaignParticipantEmails.length && typeof mailboxIndexStore.listMessagesByRecipientEmailsForAccounts === 'function'
+      ? mailboxIndexStore.listMessagesByRecipientEmailsForAccounts({
+          accountEmails: campaignMailboxAccounts, folder: 'sent', recipientEmails: campaignParticipantEmails,
+          limit: sentLimit, priorityRead: true,
+        })
+      : [],
+  ]);
+  if (incomingBatches.some((batch) => !Array.isArray(batch)) || !Array.isArray(targetedSentMessages)) {
+    const label = incomingBatches.some((batch) => !Array.isArray(batch)) ? 'incoming' : 'uitgaande contactberichten';
+    const error = new Error(`Mailbox-index voor campagne-${label} kon niet worden gelezen.`);
+    error.status = 503;
+    throw error;
   }
-  let targetedSentMessages = [];
-  if (campaignParticipantEmails.length &&
-      typeof mailboxIndexStore.listMessagesByRecipientEmailsForAccounts === 'function') {
-    targetedSentMessages = await mailboxIndexStore.listMessagesByRecipientEmailsForAccounts({
-      accountEmails: campaignMailboxAccounts,
-      folder: 'sent',
-      recipientEmails: campaignParticipantEmails,
-      limit: sentLimit,
-      priorityRead: true,
-    });
-    if (!Array.isArray(targetedSentMessages)) {
-      const error = new Error('Mailbox-index voor campagne-uitgaande contactberichten kon niet worden gelezen.');
-      error.status = 503;
-      throw error;
-    }
-  }
+  const targetedIncomingMessages = incomingBatches.flat();
+
   return {
     messages: dedupeCampaignMessages([
       ...messages,
