@@ -3,10 +3,13 @@
  * personnel-theme.js, zodat de sidebar niet eerst op een oude alias/hash staat en daarna springt.
  * Moet dezelfde sleutel en velden gebruiken als personnel-theme.js (PREMIUM_SIDEBAR_SESSION_STORAGE_KEY).
  */
-(function () {
+(function (initialize) {
+    if (typeof module === 'object' && module.exports) module.exports = { initialize };
+    else initialize(window, document, sessionStorage);
+})(function (window, document, sessionStorage) {
     var STORAGE_KEY = "softora_premium_sidebar_session_v1";
     var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
-    var NAV_STATE_TTL_MS = 1000 * 30;
+    var NAV_STATE_TTL_MS = 1000 * 60 * 60 * 24;
     var persistedSessionSnapshot = null;
 
     function readCookieValue(name) {
@@ -418,4 +421,4 @@
         shouldEnrichSession: shouldEnrichSession,
         shouldPreferPersistedSession: shouldPreferPersistedSession
     };
-})();
+});

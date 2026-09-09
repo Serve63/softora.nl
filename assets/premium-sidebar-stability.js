@@ -1,6 +1,9 @@
-(function () {
+(function (initialize) {
+    if (typeof module === 'object' && module.exports) module.exports = { initialize };
+    else initialize(window, document);
+})(function (window, document) {
     var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
-    var NAV_STATE_MAX_AGE_SECONDS = 30;
+    var NAV_STATE_MAX_AGE_SECONDS = 60 * 60 * 24;
     function isPremiumPath() {
         var path = String(window.location.pathname || "").toLowerCase();
         return path.indexOf("/premium-") === 0 || path === "/mailbox" || path === "/lead-radar" || path === "/winnen" || path === "/live-momentum" || path === "/live-momentum.html";
@@ -25,12 +28,13 @@
     function persistSidebarNavState(sidebar, targetHref) {
         var nav = getSidebarNav(sidebar);
         if (!nav) return;
-        writeCookieValue(NAV_STATE_KEY, JSON.stringify({
+        var state = JSON.stringify({
             scrollTop: Math.max(0, Number(nav.scrollTop) || 0),
             scrollLeft: Math.max(0, Number(nav.scrollLeft) || 0),
             targetHref: String(targetHref || ""),
             savedAt: Date.now(),
-        }), NAV_STATE_MAX_AGE_SECONDS);
+        });
+        writeCookieValue(NAV_STATE_KEY, state, NAV_STATE_MAX_AGE_SECONDS);
     }
 
     function normalizeTarget(url) {
@@ -102,6 +106,9 @@
     function bindSidebarStability() {
         if (!isPremiumPath() || document.documentElement.dataset.premiumSidebarPersistentNav === "1") return;
         document.documentElement.dataset.premiumSidebarPersistentNav = "1";
+        window.addEventListener("pagehide", function () {
+            persistSidebarNavState(getSidebar(), window.location.href);
+        });
         document.addEventListener("click", handleSidebarNavigationStart, true);
         document.addEventListener("keydown", function (event) {
             if (event.key !== "Enter" && event.key !== " ") return;
@@ -114,4 +121,4 @@
     } else {
         bindSidebarStability();
     }
-})();
+});
