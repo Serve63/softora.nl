@@ -19,5 +19,7 @@
     };
   }
 
-  window.SoftoraPremiumSidebarLinks = Object.freeze({ getLeadRadarSidebarLink, getSummarizeSidebarLink });
+  const api = Object.freeze({ getLeadRadarSidebarLink, getSummarizeSidebarLink });
+  if (typeof window !== 'undefined') window.SoftoraPremiumSidebarLinks = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
 }());

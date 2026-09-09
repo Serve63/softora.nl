@@ -29,6 +29,9 @@
 
     function resolvePremiumSidebarActiveKey() {
         var p = String((window.location && window.location.pathname) || "").toLowerCase();
+        if (p === "/lead-radar") return "lead_radar";
+        if (p.indexOf("/premium-samenvatten") === 0) return "summarize";
+        if (/^\/(?:premium-(?:world-watcher|flynow|wereldmap|gezondheidsdossier|kvk-database)|kvk-database)(?:\.html)?$/.test(p)) return "settings";
         if (p === "/winnen" || p === "/live-momentum" || p === "/live-momentum.html") return "live_momentum";
         var hashRaw = String((window.location && window.location.hash) || "").replace(/^#/, "").toLowerCase();
         if (p.indexOf("/premium-advertenties") === 0) {

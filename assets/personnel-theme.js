@@ -488,6 +488,7 @@
 
     function getSidebarActiveKey(path) {
         const p = String(path || "").toLowerCase();
+        if (/^\/(?:premium-(?:world-watcher|flynow|wereldmap|gezondheidsdossier|kvk-database)|kvk-database)(?:\.html)?$/.test(p)) return "settings";
         const hashRaw =
             typeof window !== "undefined" && window.location && window.location.hash
                 ? String(window.location.hash || "").replace(/^#/, "").toLowerCase()
@@ -540,7 +541,6 @@
         if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
         return p === "/winnen" || p === "/live-momentum" || p === "/live-momentum.html" ? "live_momentum" : "dashboard";
     }
-
     function renderSidebarLink(link, activeKey) {
         const isActive = link.key === activeKey;
         const isComingSoon = PREMIUM_SIDEBAR_COMING_SOON_KEYS.has(String(link.key || "").trim());
@@ -983,18 +983,18 @@
         }
         return nextLink;
     }
-
     function resetStaticSidebarLink(linkEl, link) {
         if (!linkEl || !link || !link.key) return null;
         linkEl.classList.add("sidebar-link", "magnetic");
         linkEl.setAttribute("data-sidebar-key", link.key);
         linkEl.setAttribute("href", link.href);
-        linkEl.innerHTML = `${link.icon}<span class="sidebar-link-text">${link.label}</span>`;
+        const markup = `${link.icon}<span class="sidebar-link-text">${link.label}</span>`;
+        if (linkEl.innerHTML === markup) return linkEl;
+        linkEl.innerHTML = markup;
         linkEl.removeAttribute("data-sidebar-nav-init");
         linkEl.removeAttribute("data-sidebar-href");
         return linkEl;
     }
-
     function removeSidebarLinkByKey(sidebar, key) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         sidebar.querySelectorAll(`[data-sidebar-key="${String(key || "").trim()}"]`).forEach(function (link) {

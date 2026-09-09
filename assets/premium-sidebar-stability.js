@@ -68,6 +68,7 @@
     }
 
     function handleSidebarNavigationStart(event) {
+        if (event.type === "click" && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
         if (!isPremiumPath()) return;
         var sidebar = getSidebar();
         if (!sidebar || !event.target) return;
@@ -80,6 +81,11 @@
         }
         var href = getAnchorTarget(anchor);
         if (!href) return;
+        if (window.location.pathname === "/premium-instellingen" && href === "/premium-instellingen" && window.location.hash) {
+            event.preventDefault();
+            window.location.hash = "";
+            return;
+        }
         if (isCurrentTarget(href)) {
             event.preventDefault();
             event.stopImmediatePropagation();
