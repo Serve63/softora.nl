@@ -16,7 +16,6 @@ test('de Extra-catalogus is de centrale route-inventory voor Instellingen-module
     '/winnen',
     '/kvk-database',
     '/premium-gezondheidsdossier',
-    '/premium-omzetwerk',
     '/premium-world-watcher',
     '/premium-flynow',
     '/premium-wereldmap',
