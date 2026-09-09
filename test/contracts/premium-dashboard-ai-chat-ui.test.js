@@ -22,10 +22,7 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   assert.match(pageSource, /bubble\.innerHTML = renderAssistantMarkdown\(item\.content\);/);
   assert.match(pageSource, /Hoi, ik ben Ruben Nijhuis\./);
   assert.match(pageSource, /actuele read-only context/);
-  assert.match(
-    pageSource,
-    /class="dashboard-lead-legend-strip"[\s\S]*class="lead-type-legend"[\s\S]*Bedrijfssoftware[\s\S]*Voicesoftware[\s\S]*Chatbots/s
-  );
+  assert.doesNotMatch(pageSource, /dashboard-lead-legend-strip|lead-type-legend|Legenda voor kleur productlijn/);
   assert.match(pageSource, /class="dashboard-ai-management-status-panel"/);
   assert.match(pageSource, /Dit is AI aan het doen/);
   assert.doesNotMatch(pageSource, /AI geeft ieder uur 1 update over haar plan/);
@@ -39,10 +36,6 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   assert.match(
     pageSource,
     /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-ai-management-status-panel \{[\s\S]*display:\s*block;[\s\S]*order:\s*5;[\s\S]*margin-top:\s*1\.5rem;/s
-  );
-  assert.match(
-    pageSource,
-    /html\[data-ai-management-mode="software"\] \.premium-boot-shell > \.dashboard-lead-legend-strip \{[\s\S]*order:\s*2;[\s\S]*margin-bottom:\s*1\.5rem;/s
   );
   assert.match(
     pageSource,
