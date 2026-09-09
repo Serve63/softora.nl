@@ -53,11 +53,11 @@ test('kvk database metrics render current last-hour and grade values without ano
   };
   const scraperState = {
     treated: 32_116,
-    successful_found: 6_993,
+    declared_usable: 6_993,
     unusable_grades: { 1: 24_412, 2: 30, 3: 121 },
     last_60_minutes: {
       treated: 12,
-      successful_found: 2,
+      declared_usable: 2,
       usable: 6,
       with_website: 5,
       without_website: 1,
@@ -203,31 +203,43 @@ test('metrics keep updating when the review card is absent', () => {
   const successful = createElement();
   const controller = createController({
     document: { getElementById: (id) => ({ 'companies-treated': treated, 'companies-successful-found': successful })[id] || null },
-    getSnapshot: () => ({ state: { treated: 32518, successful_found: 7146, unusable_grades: { '1': 24173, '2': 1199 } } }),
+    getSnapshot: () => ({ state: { treated: 32518, declared_usable: 7146, unusable_grades: { '1': 24173, '2': 1199 } } }),
   });
   assert.doesNotThrow(() => controller.renderMetrics());
   assert.equal(treated.textContent, '32.518');
   assert.equal(successful.textContent, '7.146');
 });
 
+test('review cards partition treated companies and never trust the old candidate count', () => {
+  const ids = ['companies-treated', 'companies-successful-found', 'companies-declared-unusable', 'companies-control-room'];
+  const elements = Object.fromEntries(ids.map(id => [id, createElement()]));
+  let state = { treated: 12, successful_found: 10, declared_usable: 3, declared_unusable: 2, control_room: 7 };
+  const controller = createController({ document: { getElementById: id => elements[id] || null }, getSnapshot: () => ({ state }) });
+  controller.renderMetrics();
+  assert.deepEqual(ids.map(id => elements[id].textContent), ['12', '3', '2', '7']);
+  state = { treated: 12, successful_found: 10 };
+  controller.renderMetrics();
+  assert.equal(elements['companies-successful-found'].textContent, '0');
+});
 
-test('a no-contact discovery and older approvals do not create another successful discovery', () => {
+
+test('new declarations use review decisions and do not reuse the available-stock counter', () => {
   const successful = createElement(['.stat-delta-number', '.stat-delta-label']);
   const usable = createElement(['.stat-delta-number', '.stat-delta-label']);
   const elements = { 'companies-successful-found-last60': successful, 'companies-usable-last60': usable };
-  let activity = { treated: 1, successful_found: 0, usable: 2 };
+  let activity = { treated: 1, declared_usable: 2, usable: 2 };
   const controller = createController({
     document: { getElementById: id => elements[id] || null },
     getSnapshot: () => ({ generatedAt: '2026-09-09T22:10:00Z', state: { last_60_minutes: activity } }),
     now: () => Date.parse('2026-09-09T22:11:00Z'),
   });
   controller.renderMetrics();
-  assert.equal(successful.nodes['.stat-delta-number'].textContent, '0');
+  assert.equal(successful.nodes['.stat-delta-number'].textContent, '+2');
   assert.equal(usable.nodes['.stat-delta-number'].textContent, '+2');
-  activity = { treated: 1, successful_found: 1, usable: 1 };
+  activity = { treated: 1, declared_usable: 1, usable: 1 };
   controller.renderMetrics();
   assert.equal(successful.nodes['.stat-delta-number'].textContent, '+1');
-  activity = { successful_found: -1, usable: 0 };
+  activity = { declared_usable: -1, usable: 0 };
   controller.renderMetrics();
   assert.equal(successful.nodes['.stat-delta-number'].textContent, '-1');
   activity = { luna_max_found: 0, usable: 2 };

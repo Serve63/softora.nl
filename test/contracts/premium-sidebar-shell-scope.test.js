@@ -602,7 +602,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260910b/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
@@ -622,11 +622,37 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
-  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
+  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20260910b/);
   assert.match(directoryScriptSource, /params\.get\(SIDEBAR_CONTENT_PARAM\) === '1'/);
   assert.match(directoryScriptSource, /browserWindow\.location\?\.assign\(directoryContentPageUrl\(category\)\)/);
   assert.match(directoryContentSource, /href="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.doesNotMatch(directoryContentSource, /target="_top"/);
+});
+
+test('scraper sidebar can collapse and reopen while other page shells stay unchanged', () => {
+  const { mount } = require('../../assets/kvk-database-sidebar');
+  let collapsed;
+  let click;
+  const attributes = {};
+  const shell = { classList: { toggle(_name, enabled) { collapsed = enabled; } } };
+  const button = { dataset: {}, setAttribute(key, value) { attributes[key] = value; }, addEventListener(_name, fn) { click = fn; } };
+  const history = { state: { retained: true }, replaceState(state) { this.state = state; } };
+  const window = { history, document: { querySelector() { return shell; }, getElementById() { return button; } } };
+  mount(window);
+  assert.equal(collapsed, false);
+  click();
+  assert.equal(collapsed, true);
+  assert.equal(attributes['aria-expanded'], 'false');
+  assert.deepEqual(history.state, { retained: true, kvkSidebarCollapsed: true });
+  click();
+  assert.equal(collapsed, false);
+  assert.equal(attributes['aria-label'], 'Sidebar inklappen');
+  const scraper = readRepoFile('premium-kvk-database-shell.html');
+  assert.match(scraper, /kvk-database-sidebar\.js\?v=20260910a/);
+  for (const file of canonicalPages.filter(file => file !== 'premium-kvk-database-shell.html')) {
+    assert.doesNotMatch(readRepoFile(file), /kvk-database-sidebar\.(js|css)/);
+  }
+  assert.doesNotThrow(() => mount({ document: { querySelector() { return null; }, getElementById() { return null; } } }));
 });
 
 test('premium dashboard keeps its first-paint boot overlay in the shell contract', () => {

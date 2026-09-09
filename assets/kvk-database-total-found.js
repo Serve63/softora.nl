@@ -32,10 +32,28 @@
       loadingLabel: 'Behandelde bedrijven laden…',
     },
     'succesvol-gevonden': {
-      title: 'Succesvol gevonden bedrijven',
-      intro: 'Alle bedrijven die succesvol als bruikbare kandidaat zijn gevonden.',
-      totalLabel: 'Succesvol gevonden',
-      loadingLabel: 'Succesvol gevonden bedrijven laden…',
+      title: 'Bruikbaar verklaarde bedrijven',
+      intro: 'Alle bedrijven die door de controleur zijn goedgekeurd, ook als ze al zijn gebruikt.',
+      totalLabel: 'Bruikbaar verklaard',
+      loadingLabel: 'Goedgekeurde bedrijven laden…',
+    },
+    'bruikbaar-verklaard': {
+      title: 'Bruikbaar verklaarde bedrijven',
+      intro: 'Alle bedrijven die door de controleur zijn goedgekeurd, ook als ze al zijn gebruikt.',
+      totalLabel: 'Bruikbaar verklaard',
+      loadingLabel: 'Goedgekeurde bedrijven laden…',
+    },
+    'onbruikbaar-verklaard': {
+      title: 'Onbruikbaar verklaarde bedrijven',
+      intro: 'Alle bedrijven die na onderzoek door de controleur definitief zijn afgekeurd.',
+      totalLabel: 'Onbruikbaar verklaard',
+      loadingLabel: 'Afgekeurde bedrijven laden…',
+    },
+    controlekamer: {
+      title: 'Controlekamer',
+      intro: 'Alle onderzochte bedrijven die nog op een definitief oordeel wachten, inclusief oudere onbevestigde vondsten.',
+      totalLabel: 'Controlekamer',
+      loadingLabel: 'Controlekamer laden…',
     },
     bruikbaar: {
       title: 'Bruikbare bedrijven',
@@ -71,7 +89,9 @@
   const DASHBOARD_DIRECTORY_BUTTONS = Object.freeze({
     'companies-total-open': 'all',
     'companies-treated-open': 'behandeld',
-    'companies-successful-found-open': 'succesvol-gevonden',
+    'companies-successful-found-open': 'bruikbaar-verklaard',
+    'companies-declared-unusable-open': 'onbruikbaar-verklaard',
+    'companies-control-room-open': 'controlekamer',
     'companies-usable-open': 'bruikbaar',
     'companies-with-website-open': 'met-website',
     'companies-without-website-open': 'zonder-werkende-website',
@@ -121,10 +141,15 @@
     if (reviewFinding === 'incorrect_approval' || usableReviewOutcome === 'rejected_to_control') {
       return { label: 'Onterecht goedgekeurd', className: 'is-unusable' };
     }
-    if (leadStatus === 'usable') return { label: 'Bruikbaar', className: 'is-usable' };
+    if (leadStatus === 'usable') {
+      return company?.usable_review_state === 'verified'
+        ? { label: 'Bruikbaar verklaard', className: 'is-usable' }
+        : { label: 'Wacht op controle', className: 'is-pending' };
+    }
     if (leadStatus === 'unusable') {
       const reason = String(company?.unusable_reason || '').trim();
-      const label = UNUSABLE_LABELS[reason] || 'Onbruikbaar';
+      const final = Number(company?.unusable_review_grade || 0) >= 2;
+      const label = `${final ? 'Afgekeurd' : 'Controle'} · ${UNUSABLE_LABELS[reason] || 'Onbruikbaar'}`;
       return {
         label,
         className: reason === 'stopped' ? 'is-stopped' : 'is-unusable',
@@ -143,7 +168,9 @@
     const website = String(company?.website || '').trim();
     if (!website) return `<span class="pending-value">${escapeHtml(missingLabel(company))}</span>`;
     const href = /^https?:\/\//i.test(website) ? website : `https://${website}`;
-    return `<a class="website-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(website)}</a>`;
+    let label = website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
+    try { label = new URL(href).hostname.replace(/^www\./i, ''); } catch { /* Keep a readable legacy value. */ }
+    return `<a class="website-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
   }
 
   function locationLabel(company) {

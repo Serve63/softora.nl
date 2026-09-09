@@ -12,6 +12,9 @@ const DIRECTORY_CATEGORIES = Object.freeze({
   all: 'all',
   behandeld: 'behandeld',
   'succesvol-gevonden': 'succesvol-gevonden',
+  'bruikbaar-verklaard': 'bruikbaar-verklaard',
+  'onbruikbaar-verklaard': 'onbruikbaar-verklaard',
+  controlekamer: 'controlekamer',
   bruikbaar: 'bruikbaar',
   'met-website': 'met-website',
   'zonder-werkende-website': 'zonder-werkende-website',
@@ -154,8 +157,14 @@ function createKvkCompanyDirectoryService(deps = {}) {
     if (category === DIRECTORY_CATEGORIES.behandeld) {
       return request.in('lead_status', ['usable', 'unusable']);
     }
-    if (category === DIRECTORY_CATEGORIES['succesvol-gevonden']) {
-      return request.eq('lead_status', 'usable');
+    if (['succesvol-gevonden', 'bruikbaar-verklaard'].includes(category)) {
+      return request.eq('lead_status', 'usable').eq('usable_review_state', 'verified');
+    }
+    if (category === DIRECTORY_CATEGORIES['onbruikbaar-verklaard']) {
+      return request.eq('lead_status', 'unusable').gte('unusable_review_grade', 2);
+    }
+    if (category === DIRECTORY_CATEGORIES.controlekamer) {
+      return request.or('and(lead_status.eq.usable,usable_review_state.neq.verified),and(lead_status.eq.unusable,unusable_review_grade.lt.2)');
     }
     if (category === DIRECTORY_CATEGORIES.bruikbaar) {
       return request
@@ -174,6 +183,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
     if (category === DIRECTORY_CATEGORIES['zonder-werkende-website']) {
       return request
         .eq('lead_status', 'usable')
+        .eq('usable_review_state', 'verified')
         .eq('premium_database_transferred', false)
         .in('website_status', ['no_website', 'not_working']);
     }
