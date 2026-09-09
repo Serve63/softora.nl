@@ -15,6 +15,7 @@ const { createDataOpsHealthReporter } = require('./data-ops-health');
 const { createSportschoolLogbookStore } = require('./sportschool-logbook-store');
 
 const RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
+  premium_mailbox_preferences: 4000,
   premium_live_momentum: 12000,
   premium_coldmail_autopilot: 12000,
   premium_coldmail_send_guard: 25000,
@@ -28,6 +29,11 @@ const RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE = Object.freeze(
         preferSupabaseRestRead: true,
         ignoreSupabaseRestFailureCooldown: true,
         suppressSupabaseRestFailureCooldown: true,
+        ...(scope === 'premium_mailbox_preferences' ? {
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressReadFailureLog: true,
+        } : {}),
       }),
     ])
   )
@@ -343,4 +349,6 @@ function createUiSeoRuntime(deps = {}) {
 
 module.exports = {
   createUiSeoRuntime,
+  RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
+  RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE,
 };
