@@ -195,7 +195,7 @@
                 lastRenderedMailCount = lastRenderedMailCount === null ? totalSent : Math.max(lastRenderedMailCount, totalSent);
             }
             if (dealCount !== null && !roiDirtySinceLoad) roiDealsCount = dealCount;
-            if (!roiDirtySinceLoad) roiAppointmentsCount = clampDealCount(roi.appointmentCount);
+            if (!roiAppointmentsDirty) roiAppointmentsCount = clampDealCount(roi.appointmentCount);
         } catch (_error) {
             /* De live refresh blijft de veilige fallback. */
         }
@@ -250,6 +250,9 @@
             roiStateLoadPromise = Promise.resolve(roiDealsCount);
             return roiStateLoadPromise;
         }
+        // The HTML bootstrap may predate a confirmed +/- change in another request.
+        // Always reconcile these editable values with a fresh central read.
+        if (typeof client.invalidate === "function") client.invalidate(ROI_STATE_SCOPE);
         roiStateLoadPromise = client.get(ROI_STATE_SCOPE).then(function (state) {
             const values = state && state.values && typeof state.values === "object" ? state.values : {};
             const storedCount = parseStoredDealCount(values[ROI_STATE_KEY]);
