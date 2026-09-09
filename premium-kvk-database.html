@@ -11,11 +11,11 @@
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-frame.css?v=20260824a">
   <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260818a">
-  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260909a">
+  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260909b">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
-  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909a">
-  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909a">
+  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909b">
+  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909b">
   <script src="/assets/settings-module-routes.js?v=20260824c" defer></script>
   <script src="/assets/settings-module-back.js?v=20260814b" defer></script>
 </head>
@@ -151,18 +151,12 @@
               <h2>Planning</h2>
             </div>
             <ul class="planning-legend" aria-label="Betekenis van de vinkjes">
-              <li><span aria-hidden="true">✓</span><span class="kvk-visually-hidden">1 vinkje: </span>KVK-gegevens</li>
-              <li><span aria-hidden="true">✓✓</span><span class="kvk-visually-hidden">2 vinkjes: </span>Volledig onderzocht</li>
-              <li><span aria-hidden="true">✓✓✓</span><span class="kvk-visually-hidden">3 vinkjes: </span>Gecontroleerd</li>
+              <li><span class="planning-legend-checks" aria-hidden="true"><span class="status-box is-done">✓</span></span><span class="kvk-visually-hidden">1 vinkje: </span>KVK-gegevens</li>
+              <li><span class="planning-legend-checks" aria-hidden="true"><span class="status-box is-done">✓</span><span class="status-box is-done">✓</span></span><span class="kvk-visually-hidden">2 vinkjes: </span>Volledig onderzocht</li>
+              <li><span class="planning-legend-checks" aria-hidden="true"><span class="status-box is-done">✓</span><span class="status-box is-done">✓</span><span class="status-box is-done">✓</span></span><span class="kvk-visually-hidden">3 vinkjes: </span>Gecontroleerd &amp; volledig af</li>
             </ul>
           </div>
           <div class="heading-actions">
-            <div class="table-tools">
-              <label class="search-field">
-                <span>Zoeken</span>
-                <input id="planning-search-input" type="search" placeholder="Land, provincie, gemeente of locatie">
-              </label>
-            </div>
             <button class="collapse-toggle" type="button" aria-label="Planning inklappen" aria-expanded="true"></button>
           </div>
         </div>
