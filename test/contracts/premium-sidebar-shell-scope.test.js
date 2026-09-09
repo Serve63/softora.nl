@@ -649,6 +649,9 @@ test('scraper sidebar can collapse and reopen while other page shells stay uncha
   assert.equal(attributes['aria-label'], 'Sidebar inklappen');
   const scraper = readRepoFile('premium-kvk-database-shell.html');
   assert.match(scraper, /kvk-database-sidebar\.js\?v=20260910a/);
+  const styles = readRepoFile('assets/kvk-database-sidebar.css');
+  assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.kvk-database-shell\.is-sidebar-collapsed > \.sidebar \{ display: none !important; \}/);
+  assert.doesNotMatch(styles, /translateX\(-100%\)/);
   for (const file of canonicalPages.filter(file => file !== 'premium-kvk-database-shell.html')) {
     assert.doesNotMatch(readRepoFile(file), /kvk-database-sidebar\.(js|css)/);
   }

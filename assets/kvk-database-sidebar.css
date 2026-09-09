@@ -20,22 +20,15 @@
 .kvk-database-shell .kvk-sidebar-toggle:hover { background: #f8f3f5; }
 .kvk-database-shell .kvk-sidebar-toggle:focus-visible { outline: 2px solid #8b2252; outline-offset: 3px; }
 .kvk-database-shell .kvk-sidebar-toggle svg { width: 15px; height: 15px; }
-.kvk-database-shell.is-sidebar-collapsed > .sidebar {
-  transform: translateX(-100%) !important;
-  visibility: hidden !important;
-  pointer-events: none;
-}
-.kvk-database-shell.is-sidebar-collapsed > .kvk-database-shell__content {
-  width: 100% !important;
-  margin-left: 0 !important;
+@media (min-width: 901px) {
+  .kvk-database-shell.is-sidebar-collapsed > .sidebar { display: none !important; }
+  .kvk-database-shell.is-sidebar-collapsed > .kvk-database-shell__content {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
 }
 .kvk-database-shell.is-sidebar-collapsed .kvk-sidebar-toggle { left: 0; }
 .kvk-database-shell.is-sidebar-collapsed .kvk-sidebar-toggle svg { transform: rotate(180deg); }
 @media (max-width: 900px) {
   .kvk-database-shell .kvk-sidebar-toggle { display: none; }
-  .kvk-database-shell.is-sidebar-collapsed > .sidebar {
-    transform: none !important;
-    visibility: visible !important;
-    pointer-events: auto;
-  }
 }
