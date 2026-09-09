@@ -107,8 +107,6 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
     'companies-usable-open',
     'companies-with-website-open',
     'companies-without-website-open',
-    'companies-control-open',
-    'companies-definitive-open',
   ]) {
     assert.match(pageSource, new RegExp(`id="${buttonId}"`));
   }
@@ -138,13 +136,13 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809e/);
-  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909b/);
+  assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260909a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -449,7 +447,7 @@ test('kvk database balances activity and planning equally inside one desktop vie
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
 
-  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909d/);
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909e/);
   assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
   assert.match(compactStyleSource, /\.latest-treated-panel tbody tr:not\(\.empty-row\)\s*\{\s*height:\s*var\(--kvk-panel-row-height\)/);
@@ -458,7 +456,7 @@ test('kvk database balances activity and planning equally inside one desktop vie
 
   assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{[^}]*min-height:\s*0\s*!important;[^}]*overflow:\s*hidden\s*!important/);
-  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 106px repeat\(2, minmax\(0, 1fr\)\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
+  assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*42px 106px repeat\(2, minmax\(0, 1fr\)\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /\.latest-treated-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*margin:\s*0/);
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
@@ -487,7 +485,7 @@ test('kvk database refreshes live counters while the page stays open', () => {
   assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
 });
 
-test('kvk database restores the last-hour deltas and unusable grade activity', () => {
+test('kvk database keeps last-hour deltas in six cards without the removed review card', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const metricsSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.js'), 'utf8');
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
@@ -498,22 +496,22 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.match(pageSource, /id="companies-usable-last60"/);
   assert.match(pageSource, /id="companies-with-website-last60"/);
   assert.match(pageSource, /id="companies-without-website-last60"/);
-  assert.match(pageSource, /id="companies-unusable-grade-1"/);
-  assert.match(pageSource, /id="companies-unusable-grade-2"/);
-  assert.match(pageSource, /<span>Controle<\/span>/);
-  assert.match(pageSource, /<span>Definitief<\/span>/);
+  assert.doesNotMatch(pageSource, /id="companies-unusable-grade-1"/);
+  assert.doesNotMatch(pageSource, /id="companies-unusable-grade-2"/);
+  assert.doesNotMatch(pageSource, /<span>Controle<\/span>/);
+  assert.doesNotMatch(pageSource, /<span>Definitief<\/span>/);
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909a/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260909a/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260909b/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260909b/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260909c/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);
   assert.match(metricsSource, /companies-treated/);
   assert.match(metricsSource, /scraperState\.treated/);
   assert.match(metricsSource, /MutationObserver/);
-  assert.match(metricsStyles, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
+  assert.match(metricsStyles, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
   assert.doesNotMatch(pageSource, /id="luna-max-found-last60"/);
@@ -525,8 +523,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.match(metricsSource, /count > 0 \? '\+' : ''/);
   assert.match(metricsStyles, /\.stat-delta-number/);
   assert.match(metricsStyles, /\.unusable-grade-delta-removed/);
-  const definitiveDeltaMarkup = pageSource.match(/<small id="companies-unusable-grade-2-last60">([\s\S]*?)<\/small>/)?.[1] || '';
-  assert.doesNotMatch(definitiveDeltaMarkup, /unusable-grade-delta-removed/);
+  assert.doesNotMatch(pageSource, /companies-control-open|companies-definitive-open|unusable-grade-grid/);
   assert.match(metricsSource, /elements\.unusableGrade2Last60,[\s\S]*?false,/);
 });
 
@@ -591,7 +588,7 @@ test('kvk framed content uses the same solid background as the surrounding page'
 
   assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260824a/);
   assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260824a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260813b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
   assert.match(
     frameStyleSource,
     /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{\s*background:\s*#f4f1ed !important;/
@@ -650,4 +647,12 @@ test('online KVK directory tables are server-only and protected by RLS', () => {
   );
   assert.match(searchMigrationSource, /create extension if not exists pg_trgm with schema extensions;/i);
   assert.match(searchMigrationSource, /using gin \(search_text extensions\.gin_trgm_ops\);/i);
+});
+
+test('KVK header shows worker status without a settings back link and total found has a matching footer', () => {
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
+  assert.match(pageSource, /class="header-controls">\s*<div id="kvk-worker-status"/);
+  assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
+  assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
 });

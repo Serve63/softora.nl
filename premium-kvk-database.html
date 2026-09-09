@@ -10,24 +10,21 @@
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-frame.css?v=20260824a">
-  <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260818a">
-  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260909b">
+  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260909c">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
-  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909b">
-  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909d">
-  <script src="/assets/settings-module-routes.js?v=20260824c" defer></script>
-  <script src="/assets/settings-module-back.js?v=20260909a" defer></script>
+  <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909c">
+  <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909e">
 </head>
 <body>
   <main class="app-shell">
-    <span data-settings-module-back-host></span>
     <header class="page-header">
       <div>
         <p class="brand">Softora Database</p>
         <h1>Bedrijven Scraper</h1>
       </div>
       <div class="header-controls">
+        <div id="kvk-worker-status" class="kvk-worker-status" aria-label="Actieve databasewerkers" aria-live="polite"></div>
         <span id="last-refresh-time" class="kvk-visually-hidden">--</span>
       </div>
     </header>
@@ -37,10 +34,11 @@
         <button id="companies-total-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven" title="Bekijk alle bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
-        <div class="stat-main stat-main-full">
+        <div class="stat-main">
           <span>Totaal Gevonden</span>
           <strong id="companies-total">0</strong>
         </div>
+        <div class="stat-delta"><span class="stat-delta-label">Alles gevonden</span></div>
       </article>
       <article class="stat-card stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-treated-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle behandelde bedrijven" title="Bekijk alle behandelde bedrijven">
@@ -95,27 +93,6 @@
         <div class="stat-delta" id="companies-without-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
       </div>
-      <article class="stat-card stat-card-unusable kvk-stat-card-enhanced" aria-label="Onbruikbare bedrijven per reviewgrade">
-        <strong id="companies-unusable" class="kvk-visually-hidden" aria-hidden="true">0</strong>
-        <div class="unusable-grade-grid">
-          <div class="unusable-grade-directory">
-            <button id="companies-control-open" class="stat-card-directory__open stat-card-directory__open--grade" type="button" aria-label="Bekijk alle bedrijven in controle" title="Bekijk alle bedrijven in controle">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-            </button>
-            <span>Controle</span>
-            <strong id="companies-unusable-grade-1">0</strong>
-            <small id="companies-unusable-grade-1-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span><span class="unusable-grade-delta-removed">-0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
-          </div>
-          <div class="unusable-grade-directory">
-            <button id="companies-definitive-open" class="stat-card-directory__open stat-card-directory__open--grade" type="button" aria-label="Bekijk alle definitief afgekeurde bedrijven" title="Bekijk alle definitief afgekeurde bedrijven">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-            </button>
-            <span>Definitief</span>
-            <strong id="companies-unusable-grade-2">0</strong>
-            <small id="companies-unusable-grade-2-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
-          </div>
-        </div>
-      </article>
     </section>
 
     <section class="panel data-panel wide-data-panel capped-data-panel latest-treated-panel" data-collapsible="latest-activity">
@@ -159,6 +136,7 @@
       </aside>
 
       <div hidden aria-hidden="true">
+        <strong id="companies-unusable">0</strong>
         <span id="table-eyebrow"></span>
         <span id="table-title"></span>
         <input id="search-input" type="search" tabindex="-1">
@@ -181,10 +159,12 @@
   </main>
 
   <script id="kvkSnapshot" type="application/json">{}</script>
-  <script src="/assets/kvk-database.js?v=20260909a"></script>
+  <script src="/assets/kvk-database-worker-status.js?v=20260909a"></script>
+  <script src="/assets/kvk-database-location-progress.js?v=20260909a"></script>
+  <script src="/assets/kvk-database.js?v=20260909-progress"></script>
   <script src="/assets/kvk-database-total-found.js?v=20260809e"></script>
-  <script src="/assets/kvk-database-metrics.js?v=20260909a"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20260909b"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260909a"></script>
-  <script src="/assets/kvk-database-control.js?v=20260813b"></script>
+  <script src="/assets/kvk-database-control.js?v=20260909a"></script>
 </body>
 </html>

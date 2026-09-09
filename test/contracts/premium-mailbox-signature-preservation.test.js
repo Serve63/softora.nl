@@ -21,8 +21,8 @@ const cases = [
     name: 'hotelcontact met pictogrammen en een reserveringsvoetnoot achter het citaat',
     from: 'Hotel Voorbeeld', email: 'info@hotel.example',
     body: 'Dank, ik stuur het door.\n\nVriendelijke groet,\n\nJamie Voorbeeld\nHotel Voorbeeld\n\n📍 Dorpsstraat 2-1 | 1234 AB Voorbeeldstad\n📞 013 123 45 67\n\nMaak hier je reservering [2]\n\nVolg ons:\nInstagram @hotelvoorbeeld | LinkedIn Hotel Voorbeeld\n\nServé Creusen schreef op 2026-09-09 11:02:\n> Oude ontwerptekst [1]\n\nLinks:\n------\n[1] https://www.softora.nl/webdesign/voorbeeld\n[2] https://booking.example/hotel/nl/%20',
-    expected: ['Jamie Voorbeeld', 'Hotel Voorbeeld', 'href="tel:0131234567"', 'Dorpsstraat 2-1, 1234 AB Voorbeeldstad', 'href="https://booking.example/hotel/nl/%20"', '>Maak hier je reservering</a>', 'Instagram @hotelvoorbeeld'],
-    absent: /\[2\]|Oude ontwerptekst|webdesign\/voorbeeld/,
+    expected: ['Jamie Voorbeeld', 'Hotel Voorbeeld', 'href="tel:0131234567"', 'Dorpsstraat 2-1, 1234 AB Voorbeeldstad'],
+    absent: /\[2\]|Oude ontwerptekst|webdesign\/voorbeeld|Maak hier je reservering|booking\.example|Volg ons|Instagram|LinkedIn/,
   },
 ];
 
@@ -65,9 +65,9 @@ test('alle nuttige extra tekst blijft behouden en een onbekend nummer wordt geen
 
 test('onbewezen, conflicterende en onveilige linkreferenties blijven tekst zonder actieve bestemming', () => {
   for (const appendix of ['', '\n[2] javascript:alert(1)', '\n[2] https://one.example\n[2] https://two.example']) {
-    const parsed = signature.parseIncoming(`Akkoord.\n\nGroet,\nVoorbeeld\nReserveer hier [2]\n\nOp wo 9 sep 2026 om 09:59 schreef Servé Creusen :\n> Oude tekst${appendix}`);
+    const parsed = signature.parseIncoming(`Akkoord.\n\nGroet,\nVoorbeeld\nHandleiding openen [2]\n\nOp wo 9 sep 2026 om 09:59 schreef Servé Creusen :\n> Oude tekst${appendix}`);
     const html = signature.renderContactCard(parsed.contact);
-    assert.match(html, /Reserveer hier \[2\]/);
+    assert.match(html, /Handleiding openen \[2\]/);
     assert.doesNotMatch(html, /href=/);
   }
   const html = signature.renderContactCard({ beforeLines: ['[klik](javascript:alert(1))', '<img src=x onerror=alert(1)>', '[site](https://user:secret@example.nl)'], addressLines: [] });
@@ -93,12 +93,27 @@ test('dezelfde opmaak in gewone inhoud, quotes of een andere afzender wordt niet
   assert.match(signature.renderContactCard(other.contact), /Robin VoorbeeldTel: 06-12345678www.example.nl/);
 });
 
-test('ook zonder citaat wordt een bewezen reserveringsvoetnoot eenmaal als leesbare link getoond', () => {
+test('ook zonder citaat verdwijnt een reserveringsoproep met zijn technische voetnoot', () => {
   const parsed = signature.parseIncoming('Akkoord.\n\nGroet,\nVoorbeeld\nReserveer hier [2]\n\nLinks:\n------\n[2] https://booking.example/reserveren');
   const html = signature.renderContactCard(parsed.contact);
-  assert.match(html, />Reserveer hier<\/a>/);
-  assert.equal((html.match(/href="https:\/\/booking.example\/reserveren"/g) || []).length, 1);
+  assert.match(html, /Voorbeeld/);
+  assert.doesNotMatch(html, /Reserveer hier|booking\.example|href=/);
   assert.doesNotMatch(html, /\[2\]|Links:|------/);
+});
+
+test('promotie verdwijnt uit de handtekening terwijl alle contactgegevens en inhoudelijke links blijven', () => {
+  const body = 'De reservering is bevestigd. Bekijk onze Instagram voor het besproken voorbeeld.\n\nGroet,\nJamie Voorbeeld\nHotel Voorbeeld\n[*Maak hier je reservering*](https://booking.example/reserveren)\nVolg ons:\n[Instagram](https://instagram.com/hotelvoorbeeld) | [LinkedIn](https://linkedin.com/company/hotelvoorbeeld)\nhttps://facebook.com/hotelvoorbeeld\nTel: 013 123 45 67\nDorpsstraat 2-1 | 1234 AB Voorbeeldstad\nwww.hotel.example\n[Besproken voorbeeld](https://instagram.com/p/voorbeeld)';
+  const parsed = signature.parseIncoming(body);
+  const html = signature.renderContactCard(parsed.contact);
+  assert.equal(parsed.bodyLines.join('\n').trim(), body.split('\n\nGroet,')[0]);
+  for (const expected of ['Jamie Voorbeeld', 'Hotel Voorbeeld', 'tel:0131234567', 'Dorpsstraat 2-1, 1234 AB Voorbeeldstad', 'https://www.hotel.example/', 'Besproken voorbeeld', 'https://instagram.com/p/voorbeeld']) assert.ok(html.includes(expected), expected);
+  assert.doesNotMatch(html, /Maak hier|booking\.example|Volg ons|hotelvoorbeeld|facebook\.com/);
+});
+
+test('reserveringsoproepen en socialmediagegevens in berichtinhoud worden niet weggefilterd', () => {
+  const authored = 'Dit is de voorgestelde tekst:\nMaak hier je reservering\nVolg ons:\nInstagram @hotelvoorbeeld | LinkedIn Hotel Voorbeeld';
+  const parsed = signature.parseIncoming(`${authored}\n\nGroet,\nJamie Voorbeeld\nTel: 013 123 45 67`);
+  assert.equal(parsed.bodyLines.join('\n').trim(), authored);
 });
 
 test('hoofdmail en dossier verwijderen app-reclame en de bijbehorende streep ook zonder standaardgroet', () => {
