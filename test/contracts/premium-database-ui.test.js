@@ -1978,7 +1978,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<\/div><\/div>\s*<\/div>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-compact-roi-b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-calm-roi-type/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
@@ -2434,7 +2434,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-compact-roi-b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-calm-roi-type/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -6234,4 +6234,13 @@ test('database places eight compact metrics next to filters and search on its ow
   order.slice(1).forEach((id, i) => assert.ok(pageSource.indexOf(`id="${id}"`) > pageSource.indexOf(`id="${order[i]}"`)));
   assert.match(filterGroupsCssSource, /\.page-shell \.filter-bar \{ display: grid;/);
   assert.match(filterGroupsCssSource, /\.filter-search\s*\{\s*grid-column: 1 \/ -1;/);
+});
+
+
+test('database metric labels stay compact on one line', () => {
+  const filterGroupsCssSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-filter-groups.css'), 'utf8');
+  const label = filterGroupsCssSource.match(/^\.mail-roi-label\s*\{[^}]*\}/m)[0];
+  assert.match(label, /font-size: 8px;/);
+  assert.match(label, /white-space: nowrap;/);
+  assert.match(filterGroupsCssSource, /font: 500 \.9rem\/1 "Oswald"/);
 });
