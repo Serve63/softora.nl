@@ -380,8 +380,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260909a/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260909a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260909b/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260909b/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.css\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.js\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-dashboard-ai-chat-scope\.js\?v=20260611a/);
@@ -1308,6 +1308,6 @@ test('Lead Radar delivery initialiseert de premium sidebar precies één keer en
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /<body data-sidebar-nav-ready="1">/);
   assert.equal((res.body.match(/assets\/lead-radar-sidebar\.js\?v=/g) || []).length, 0);
-  assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20260909a/g) || []).length, 1);
-  assert.match(res.body, /assets\/personnel-theme\.js\?v=20260909b/);
+  assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20260909b/g) || []).length, 1);
+  assert.match(res.body, /assets\/personnel-theme\.js\?v=20260909c/);
 });

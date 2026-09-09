@@ -328,8 +328,6 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
-  assert.match(themeSource, /font-family:\s*'SoftoraSidebarOswald';[\s\S]*font-display:\s*block;[\s\S]*oswald-latin\.woff2\?v=20260409a/);
-  assert.match(themeSource, /font-family:\s*'SoftoraSidebarInter';[\s\S]*font-display:\s*block;[\s\S]*inter-latin\.woff2\?v=20260409a/);
   assert.match(themeSource, /@view-transition\s*\{[\s\S]*navigation:\s*none;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*view-transition-name:\s*softora-premium-sidebar;/);
   assert.match(themeSource, /::view-transition-old\(softora-premium-sidebar\),[\s\S]*::view-transition-new\(softora-premium-sidebar\)\s*\{[\s\S]*animation-duration:\s*1ms !important;/);
@@ -459,11 +457,11 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909b'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909b'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909c'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909c'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
@@ -1257,4 +1255,48 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260908-publish/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
+});
+
+
+test('sidebar fonts arrive in the blocking stylesheet without another network font dependency', () => {
+  const css = readRepoFile('assets/premium-sidebar-fonts.css');
+  const theme = readRepoFile('assets/personnel-theme.css');
+  const html = readRepoFile('server/services/html-pages.js');
+  assert.match(theme, /@import url\('premium-sidebar-fonts\.css\?v=20260909a'\)/);
+  assert.match(html, /<link rel="stylesheet" href="\/assets\/premium-sidebar-fonts\.css\?v=20260909a">/);
+  assert.doesNotMatch(theme, /@font-face/);
+  assert.doesNotMatch(html, /@font-face\{font-family:'SoftoraSidebar/);
+  for (const [family, font] of [['Inter', 'inter'], ['Oswald', 'oswald']]) {
+    const block = css.split("font-family: 'SoftoraSidebar" + family + "';")[1].split('}')[0];
+    assert.match(block, /font-display: block;/);
+    const encoded = block.match(/url\('data:font\/woff2;base64,([^']+)'\)/)[1];
+    assert.deepEqual(Buffer.from(encoded, 'base64'), fs.readFileSync(path.join(__dirname, '../../assets/fonts/' + font + '-latin.woff2')));
+    assert.doesNotMatch(block, /url\(['"]?\//);
+  }
+});
+
+
+test('sidebar scroll survives module/tile navigation and more than thirty seconds before returning', () => {
+  const events = {};
+  const nav = { scrollTop: 155, scrollLeft: 24 };
+  const sidebar = { querySelector: (selector) => selector === '.sidebar-nav' ? nav : null,
+    querySelectorAll: () => [], setAttribute() {} };
+  const document = { readyState: 'complete', cookie: '', documentElement: { dataset: {} },
+    querySelector: () => sidebar, addEventListener() {} };
+  const window = { location: { pathname: '/premium-instellingen', href: '/premium-instellingen#extra', hash: '#extra' },
+    addEventListener: (name, listener) => { events[name] = listener; } };
+  const sessionStorage = { getItem: () => null };
+  require('../../assets/premium-sidebar-stability').initialize(window, document);
+  // A module tile or browser history can leave without a sidebar click.
+  events.pagehide();
+  const key = 'softora_premium_sidebar_nav_state_v1';
+  const state = JSON.parse(decodeURIComponent(document.cookie.split(';')[0].slice(key.length + 1)));
+  assert.equal(state.scrollTop, 155);
+  assert.equal(state.scrollLeft, 24);
+  state.savedAt -= 120000;
+  document.cookie = key + '=' + encodeURIComponent(JSON.stringify(state));
+  nav.scrollTop = nav.scrollLeft = 0;
+  require('../../assets/premium-sidebar-profile-prefill').initialize(window, document, sessionStorage);
+  assert.equal(nav.scrollTop, 155);
+  assert.equal(nav.scrollLeft, 24);
 });
