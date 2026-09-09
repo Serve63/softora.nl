@@ -3,6 +3,7 @@ const path = require('path');
 const { applyPublicSeoHeadDefaults } = require('./public-seo');
 const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 const { createPremiumSidebarShell } = require('./premium-sidebar-shell');
+const { renderPremiumSettingsShell } = require('./premium-settings-shell');
 
 const LOCAL_FONT_VERSION = '20260409a';
 const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
@@ -701,7 +702,7 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   function optimizeHtmlDelivery(html, fileName, authState, options = {}) {
-    let renderedHtml = removeInternalPremiumSidebarLinks(renderPremiumSidebarShell(String(html || ''), authState, fileName))
+    let renderedHtml = removeInternalPremiumSidebarLinks(renderPremiumSidebarShell(fileName === 'premium-instellingen.html' ? renderPremiumSettingsShell(String(html || '')) : String(html || ''), authState, fileName))
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
 

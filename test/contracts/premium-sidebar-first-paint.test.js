@@ -154,3 +154,47 @@ test('empty module hosts receive their correct active item from the server', () 
     assert.equal(active?.[1], key);
   }
 });
+
+test('Extra is server-rendered from the shared module list before deferred personnel code', () => {
+  const { renderPremiumSettingsShell } = require('../../server/services/premium-settings-shell');
+  const { EXTRA_MODULES } = require('../../assets/settings-module-routes');
+  const html = renderPremiumSettingsShell(fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8'));
+  assert.equal((html.match(/id="screen-extra"/g) || []).length, 1);
+  assert.equal((html.match(/data-settings-extra-href=/g) || []).length, EXTRA_MODULES.filter(item => item.unlocked && item.href).length);
+  assert.equal((html.match(/data-settings-extra-locked="true"/g) || []).length, EXTRA_MODULES.filter(item => !item.unlocked).length);
+  assert.ok(html.indexOf('id="screen-extra"') < html.indexOf('assets/premium-user-management.js'));
+  assert.ok(html.indexOf("window.addEventListener('hashchange', sync)") < html.indexOf('id="screen-personeel"'));
+  assert.equal(renderPremiumSettingsShell(html), html);
+});
+
+test('Extra deep link, open and back work synchronously without personnel JavaScript', () => {
+  const vm = require('node:vm');
+  const createScreen = active => {
+    const classes = new Set(active ? ['active'] : []);
+    return { dataset: {}, classList: { add: name => classes.add(name), remove: name => classes.delete(name), contains: name => classes.has(name) } };
+  };
+  const extra = createScreen(false), overview = createScreen(true), personnel = createScreen(false);
+  const events = {};
+  const document = {
+    querySelector: () => extra,
+    getElementById: () => overview,
+    querySelectorAll: () => [extra, overview, personnel].filter(screen => screen.classList.contains('active')),
+    addEventListener: (name, listener) => { events[name] = listener; }
+  };
+  const window = {
+    location: { hash: '#extra', pathname: '/premium-instellingen', search: '' },
+    history: { pushState: (_state, _title, url) => { window.location.hash = url; }, replaceState: () => { window.location.hash = ''; } },
+    addEventListener: (name, listener) => { events[name] = listener; }
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-settings-first-paint.js'), 'utf8'), { window, document });
+  assert.equal(extra.classList.contains('active'), true);
+  assert.equal(overview.classList.contains('active'), false);
+  assert.equal(personnel.classList.contains('active'), false);
+  const click = attribute => events.click({ preventDefault() {}, target: { closest: () => ({ hasAttribute: name => name === attribute }) } });
+  click('data-settings-extra-back');
+  assert.equal(overview.classList.contains('active'), true);
+  assert.equal(extra.classList.contains('active'), false);
+  click('data-settings-extra-open');
+  assert.equal(extra.classList.contains('active'), true);
+  assert.equal(overview.classList.contains('active'), false);
+});
