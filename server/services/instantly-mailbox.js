@@ -765,7 +765,7 @@ function createInstantlyMailboxService(deps = {}) {
             message.originalCampaignOutbound === true &&
             (
               message.providerBodyHtmlEvidenceKnown !== true ||
-              message.providerOriginalBodyEvidenceKnown !== true
+              (message.providerOriginalBodyEvidenceKnown !== true && providerApi.canReadLeads())
             )
           ));
           if (!hasMissingThreadMember && !needsExactProviderBody) continue;
