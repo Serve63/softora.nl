@@ -449,9 +449,13 @@ test('kvk database balances activity and planning equally inside one desktop vie
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
 
-  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909c/);
+  assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909d/);
   assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(compactStyleSource, /@media \(min-width:\s*1181px\)/);
+  assert.match(compactStyleSource, /\.latest-treated-panel tbody tr:not\(\.empty-row\)\s*\{\s*height:\s*var\(--kvk-panel-row-height\)/);
+  assert.match(compactStyleSource, /\.planning-panel \.location-list\s*\{\s*grid-auto-rows:\s*var\(--kvk-panel-row-height\);\s*align-content:\s*start/);
+  assert.match(compactStyleSource, /\.planning-panel \.location-button\s*\{\s*height:\s*calc\(var\(--kvk-panel-row-height\) - 1px\);\s*min-height:\s*calc\(var\(--kvk-panel-row-height\) - 1px\)/);
+
   assert.match(compactStyleSource, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
   assert.match(compactStyleSource, /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{[^}]*min-height:\s*0\s*!important;[^}]*overflow:\s*hidden\s*!important/);
   assert.match(compactStyleSource, /\.app-shell\s*\{[^}]*grid-template-rows:\s*30px 42px 106px repeat\(2, minmax\(0, 1fr\)\);[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden/);

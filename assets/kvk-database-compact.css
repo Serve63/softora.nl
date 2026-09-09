@@ -7,7 +7,30 @@
   box-shadow: none;
 }
 
+/* Keep activity rows and planning rows on the same vertical rhythm. */
+:root {
+  --kvk-panel-row-height: 39px;
+}
+
+.latest-treated-panel tbody tr:not(.empty-row) {
+  height: var(--kvk-panel-row-height);
+}
+
+.planning-panel .location-list {
+  grid-auto-rows: var(--kvk-panel-row-height);
+  align-content: start;
+}
+
+.planning-panel .location-button {
+  height: calc(var(--kvk-panel-row-height) - 1px);
+  min-height: calc(var(--kvk-panel-row-height) - 1px);
+}
+
 @media (min-width: 1181px) {
+  :root {
+    --kvk-panel-row-height: 37px;
+  }
+
   html,
   body {
     height: 100%;
