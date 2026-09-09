@@ -52,7 +52,7 @@ function createAgendaMcpOAuth({ sessionSecret, getResolvedPremiumAuthState, prem
   const challenge = res => res.set('WWW-Authenticate', `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/integrations/agenda/mcp", scope="agenda:read"`).status(401).json({ error: 'unauthorized' });
   function register(app, limiter) {
     const wrap = fn => async (req, res) => {
-      res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex' });
+      res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'same-origin', 'X-Robots-Tag': 'noindex' });
       try { if (!sessionSecret) return res.status(503).json({ error: 'temporarily_unavailable' }); await fn(req, res); }
       catch { if (!res.headersSent) res.status(503).json({ error: 'temporarily_unavailable' }); }
     };
@@ -82,6 +82,8 @@ function createAgendaMcpOAuth({ sessionSecret, getResolvedPremiumAuthState, prem
       if (!auth.user || !auth.isAdmin || auth.hydrationUnavailable) return res.status(403).send('Alleen een actief Full Access-account kan de agenda koppelen.');
       const consent = random();
       await repo.put(hash(consent), 'consent', { clientId: q.client_id, redirect: q.redirect_uri, challenge: q.code_challenge, state: q.state, scope, resource: RESOURCE, userId: auth.userId, authVersion: Number(auth.user.authVersion || 1) }, 600);
+      // Permit only the validated OAuth callback after the same-origin form POST.
+      res.set('Content-Security-Policy', `default-src 'none'; base-uri 'none'; form-action 'self' ${q.redirect_uri}; frame-ancestors 'none'; object-src 'none'`);
       res.type('html').send(`<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Softora Agenda koppelen</title><body><main><h1>Softora Agenda koppelen</h1><p>Ingelogd als ${escape(auth.email)}.</p><p>Deze koppeling geeft ChatGPT of Codex toegang tot de gedeelde Softora-agenda van Servé en Martijn.</p><p>${scope.includes('agenda:write') ? 'Afspraken bekijken, toevoegen en handmatige afspraken wijzigen.' : 'Alleen afspraken bekijken.'} Geen toegang tot mailbox, wachtwoorden of andere Softora-onderdelen.</p><p>Terug naar: ${escape(new URL(q.redirect_uri).origin)}</p><form method="post" action="${PREFIX}/authorize"><input type="hidden" name="consent" value="${consent}"><button name="decision" value="allow">Agenda koppelen</button><button name="decision" value="deny">Annuleren</button></form></main></body></html>`);
     }));
     app.post(`${PREFIX}/authorize`, wrap(async (req, res) => {

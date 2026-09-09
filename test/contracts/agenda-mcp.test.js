@@ -38,9 +38,15 @@ test('OAuth consent, PKCE, single-use codes, revocation and MCP authorization wo
   const params = new URLSearchParams({ client_id: client.client_id, redirect_uri: 'https://chatgpt.com/connector_platform_oauth_redirect', resource: RESOURCE, response_type: 'code', code_challenge_method: 'S256', code_challenge: challenge, state: 'test-state', scope: 'agenda:read agenda:write' });
   const path = PREFIX + '/authorize?' + params;
   assert.match((await fetch(base + path, { redirect: 'manual' })).headers.get('location'), /^\/premium-personeel-login/);
-  const page = await (await fetch(base + path, { headers: { 'x-test-login': '1' } })).text();
+  const consentResponse = await fetch(base + path, { headers: { 'x-test-login': '1' } });
+  // no-referrer makes browser form POST Origin opaque (null), rejecting real consent.
+  assert.equal(consentResponse.headers.get('referrer-policy'), 'same-origin');
+  assert.match(consentResponse.headers.get('content-security-policy'), /form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect;/);
+  assert.match(consentResponse.headers.get('content-security-policy'), /default-src 'none'/);
+  const page = await consentResponse.text();
   const consent = /name="consent" value="([^"]+)"/.exec(page)[1];
   assert.equal((await post(PREFIX + '/authorize', { consent, decision: 'allow' }, { origin: 'https://evil.example', 'x-test-login': '1' })).status, 403);
+  assert.equal((await post(PREFIX + '/authorize', { consent, decision: 'allow' }, { origin: 'null', 'x-test-login': '1' })).status, 403);
   const allowed = await post(PREFIX + '/authorize', { consent, decision: 'allow' }, { origin: BASE, 'x-test-login': '1' });
   const callback = new URL(allowed.headers.get('location')); assert.equal(callback.searchParams.get('iss'), BASE);
   const payload = { grant_type: 'authorization_code', client_id: client.client_id, code: callback.searchParams.get('code'), code_verifier: verifier, resource: RESOURCE, redirect_uri: params.get('redirect_uri') };
