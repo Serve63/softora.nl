@@ -2049,6 +2049,63 @@ test('chatbot-acceptatietest maakt bron, grenzen, acties, herstel en go-no-go co
   ]);
 });
 
+test('CRM-migratiegids maakt selectie, proefmigratie, cutover en rollback controleerbaar', () => {
+  const now = new Date('2026-09-09T12:00:00.000Z');
+  const item = getSeoContentItem('kennisbank', 'crm-migratie-stappenplan', { now });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const dataQualityHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('kennisbank', 'wat-is-crm-datakwaliteit', { now }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.publishedAt, '2026-09-09');
+  assert.equal(item.updatedAt, '2026-09-09');
+  assert.equal(item.growthEventKind, 'new_url');
+  assert.equal(item.targetMoneyPage, '/crm-systeem-op-maat');
+  assert.equal(item.sources.length, 2);
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.keywordEvidence.locale.locId, 2528);
+  assert.equal(item.keywordEvidence.locale.language, 'Dutch');
+  assert.ok(item.informationGain.includes('zeven bewijssets'));
+  assert.equal(item.sections.filter((section) => /^Stap [1-7]:/.test(section.heading)).length, 7);
+  assert.equal(item.faq.length, 0);
+  assert.equal(item.secondaryImage, undefined);
+  assert.equal(item.image.sourceType, 'trainedAlgorithmicMedia');
+
+  const heroPath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  assert.deepEqual(readJpegDimensions(heroPath), { width: 1600, height: 900 });
+  assert.ok(fs.statSync(heroPath).size < 500 * 1024);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 0);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/crm-migratie-stappenplan">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="900">/);
+  assert.match(html, /"@type":"Article"/);
+  assert.match(html, /"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/crm-migratie-controlebrug-softora\.jpg"/);
+  assert.match(html, /"datePublished":"2026-09-09"/);
+  assert.match(html, /Stap 5: voer een representatieve proefmigratie uit/);
+  assert.match(html, /Stap 7: definieer go\/no-go en rollback vóór de livegang/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM-systeem op maat<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-crm-datakwaliteit">CRM-datakwaliteit<\/a>/);
+  assert.match(html, /href="\/kennisbank\/wat-is-een-crm-integratie">gids over een CRM-integratie<\/a>/);
+  assert.match(
+    dataQualityHtml,
+    /href="\/kennisbank\/crm-migratie-stappenplan"><span>CRM migratie stappenplan<\/span><\/a>/
+  );
+  assert.match(html, /geen belofte van nul downtime, foutloze data of gegarandeerde tijdwinst/i);
+  assert.doesNotMatch(html, /wij (?:garanderen|beloven)|is gegarandeerd|zonder downtime|wij verwijderen automatisch|AI beslist zelfstandig/i);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now })
+    .find((entry) => entry.path === '/kennisbank/crm-migratie-stappenplan');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/crm-migratie-controlebrug-softora.jpg',
+  ]);
+});
+
 test('live seo content links only to public or stable pages', () => {
   const now = new Date('2026-05-20T12:00:00.000Z');
   const liveContentPaths = new Set(getSeoContentPublicPaths({ now }));
