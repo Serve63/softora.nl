@@ -317,6 +317,33 @@
     return (String(value || '').match(/\p{Nd}/gu) || []).join('');
   }
 
+  function signaturePromotionLabel(value) {
+    const line = normalizeWhitespace(value);
+    const markdown = /^\[([^\[\]]+)\]\([^\s]+\)$/.exec(line);
+    return (markdown ? markdown[1] : line).replace(/\s*\[\d{1,3}\]$/, '')
+      .replace(/^[*_-]+|[*_]+$/g, '').trim();
+  }
+
+  function isSignatureSocialHeading(value) {
+    return /^(?:volg (?:ons|mij)|follow (?:us|me))\s*:?[.!]?$/i.test(value);
+  }
+
+  function isSignaturePromotion(value, socialSection) {
+    const label = signaturePromotionLabel(value);
+    if (/^(?:maak (?:hier )?(?:je|uw|een) reservering|reserveer (?:hier|nu)|boek (?:hier|nu)|book (?:here|now)|make (?:a|your) reservation)\s*[.!:»›→]*$/i.test(label)) return true;
+    const parts = normalizeWhitespace(value).split(/\s*[|·•]\s*/);
+    return parts.every((part) => {
+      const link = /^\[([^\[\]]+)\]\(([^\s]+)\)$/.exec(part);
+      const href = safeContactHref(link ? link[2] : part);
+      if (href && /^(?:www\.)?(?:instagram\.com|facebook\.com|linkedin\.com|twitter\.com|x\.com|youtube\.com|tiktok\.com|pinterest\.com)$/i.test(new URL(href).hostname) &&
+        (!link || /^(?:instagram|facebook|linkedin|twitter|x|youtube|tiktok|pinterest)(?:\s+.+)?$/i.test(signaturePromotionLabel(part)))) return true;
+      const profile = /^(?:instagram|facebook|linkedin|twitter|x|youtube|tiktok|pinterest)\s*:?\s+(.+)$/i.exec(signaturePromotionLabel(part));
+      if (!profile) return false;
+      return /^@[\w.-]+$/.test(profile[1]) || Boolean(safeContactHref(profile[1])) ||
+        ((socialSection || parts.length > 1) && /^[\p{Lu}\d][\p{L}\p{N} .'’&_-]{0,90}$/u.test(profile[1]));
+    });
+  }
+
   function preserveUnrepresentedLines(signatureLines, contact, values, references) {
     const beforeLines = [];
     const preservedLines = [];
@@ -327,6 +354,7 @@
       return match && references.get(match[1]) ? [match[1]] : [];
     }));
     let sawField = false;
+    let socialSection = false;
     for (let index = 0; index < signatureLines.length; index += 1) {
       let line = normalizeWhitespace(signatureLines[index]);
       if (!line || isStandaloneSignoff(line)) continue;
@@ -350,6 +378,12 @@
           if (href) line = `[${label}](${href})`;
           else if (safeContactHref(label) || /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(label)) line = label;
         }
+        if (isSignatureSocialHeading(signaturePromotionLabel(line))) {
+          socialSection = true;
+          continue;
+        }
+        if (isSignaturePromotion(line, socialSection)) continue;
+        socialSection = false;
         // Preserve all remaining information, including names, roles, extra phones,
         // unknown numbers and prose. Only exact represented values are deduplicated.
         const target = sawField || numericText(line) ? preservedLines : beforeLines;
