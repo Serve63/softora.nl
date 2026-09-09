@@ -15,9 +15,9 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260909b';
-const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909b';
+const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20260909c';
+const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909c';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
 const PREMIUM_SIDEBAR_LINKS_VERSION = '20260909a';
@@ -54,12 +54,11 @@ html[data-softora-sidebar-content-frame="1"] .premium-boot-loader,
 html[data-softora-sidebar-content-frame="1"] .monthly-costs-boot-loader{left:0 !important;}
 </style>`;
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
+  '<link rel="stylesheet" href="/assets/premium-sidebar-fonts.css?v=20260909a">',
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
   `<script src="/assets/premium-sidebar-links.js?v=${PREMIUM_SIDEBAR_LINKS_VERSION}" defer></script>`,
   ...LOCAL_FONT_PRELOAD_LINKS,
   `<style id="softora-premium-sidebar-critical">
-@font-face{font-family:'SoftoraSidebarInter';font-style:normal;font-weight:300 700;font-display:block;src:url('/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
-@font-face{font-family:'SoftoraSidebarOswald';font-style:normal;font-weight:400 700;font-display:block;src:url('/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
 :root{--premium-sidebar-width:320px;--premium-sidebar-font-sans:'SoftoraSidebarInter','Inter',system-ui,sans-serif;--premium-sidebar-font-display:'SoftoraSidebarOswald','Oswald',sans-serif;}
 @view-transition{navigation:none;}
 .sidebar[data-static-sidebar="1"]{width:var(--premium-sidebar-width,320px) !important;display:flex !important;flex-direction:column !important;background:#fff !important;border-right:1px solid rgba(0,0,0,.08) !important;padding:19px 0 0 !important;opacity:1 !important;visibility:visible !important;transform:none !important;translate:none !important;contain:layout paint style !important;font-family:var(--premium-sidebar-font-sans) !important;font-size:14px !important;line-height:1.2 !important;letter-spacing:0 !important;font-synthesis:none !important;view-transition-name:softora-premium-sidebar !important;}

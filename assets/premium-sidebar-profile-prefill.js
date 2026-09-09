@@ -6,7 +6,7 @@
 (function () {
     var STORAGE_KEY = "softora_premium_sidebar_session_v1";
     var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
-    var NAV_STATE_TTL_MS = 1000 * 30;
+    var NAV_STATE_TTL_MS = 1000 * 60 * 60 * 24;
     var persistedSessionSnapshot = null;
 
     function readCookieValue(name) {
