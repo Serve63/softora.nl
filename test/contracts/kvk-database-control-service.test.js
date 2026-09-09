@@ -417,3 +417,14 @@ test('kvk database control validates browser and worker payloads', async () => {
   );
   assert.equal(invalidWorkerKey.statusCode, 400);
 });
+
+test('worker reports preserve model and reasoning effort in the read-only status', async () => {
+  const { service } = createInMemoryService();
+  const response = createJsonResponse();
+  await service.sendReportWorkerResponse({ headers: { authorization: 'Bearer worker-token' }, body: {
+    workerKey: 'controle', workerState: 'idle', model: 'gpt-5.6-sol', reasoningEffort: 'xhigh',
+  } }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload.control.workers.controle.model, 'gpt-5.6-sol');
+  assert.equal(response.payload.control.workers.controle.reasoningEffort, 'xhigh');
+});
