@@ -1975,7 +1975,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-mail-alignment/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-sent-no-count/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
@@ -2147,7 +2147,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
-  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "verstuurd" \? resultCountText : "Acties"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showSentActions; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
+  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "verstuurd" \? "" : "Acties"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showSentActions; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
   assert.match(pageSource, /renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
@@ -2431,7 +2431,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-mail-alignment/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-sent-no-count/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -6284,4 +6284,9 @@ test("webdesign count disables autocomplete and uses one focus border", () => {
   const script = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-photo-batch.js"), "utf8");
   assert.match(html, /id="photoBatchLimitInput"[^>]*autocomplete="off" autocorrect="off" spellcheck="false"/);
   assert.match(script, /\.photo-batch-input:focus\{outline:none;box-shadow:none;border-color:var\(--crimson\)\}/);
+});
+
+test("sent list removes the result count column completely", () => {
+  const css = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
+  assert.match(css, /#databaseTable\.sent-list-mode th:nth-child\(6\), #databaseTable\.sent-list-mode td:nth-child\(6\) \{ display: none; \}/);
 });
