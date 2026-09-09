@@ -161,6 +161,7 @@ test('Extra is server-rendered from the shared module list before deferred perso
   const html = renderPremiumSettingsShell(fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8'));
   assert.equal((html.match(/id="screen-extra"/g) || []).length, 1);
   assert.equal((html.match(/data-settings-extra-href=/g) || []).length, EXTRA_MODULES.filter(item => item.unlocked && item.href).length);
+  assert.equal((html.match(/target="_top" data-settings-extra-href=/g) || []).length, EXTRA_MODULES.filter(item => item.unlocked && item.href).length);
   assert.equal((html.match(/data-settings-extra-locked="true"/g) || []).length, EXTRA_MODULES.filter(item => !item.unlocked).length);
   assert.ok(html.indexOf('id="screen-extra"') < html.indexOf('assets/premium-user-management.js'));
   assert.ok(html.indexOf("window.addEventListener('hashchange', sync)") < html.indexOf('id="screen-personeel"'));
