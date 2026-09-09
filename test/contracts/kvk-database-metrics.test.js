@@ -196,3 +196,15 @@ test('an open page expires activity without a new snapshot and resumes with fres
   controller.renderMetrics();
   assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+2');
 });
+
+test('metrics keep updating when the review card is absent', () => {
+  const treated = createElement();
+  const successful = createElement();
+  const controller = createController({
+    document: { getElementById: (id) => ({ 'companies-treated': treated, 'companies-successful-found': successful })[id] || null },
+    getSnapshot: () => ({ state: { treated: 32518, successful_found: 7146, unusable_grades: { '1': 24173, '2': 1199 } } }),
+  });
+  assert.doesNotThrow(() => controller.renderMetrics());
+  assert.equal(treated.textContent, '32.518');
+  assert.equal(successful.textContent, '7.146');
+});

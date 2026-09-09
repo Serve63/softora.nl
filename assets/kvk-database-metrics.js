@@ -136,8 +136,8 @@
       renderLast60Delta(elements.withWebsite, last60.with_website);
       renderLast60Delta(elements.withoutWebsite, last60.without_website);
 
-      elements.unusableGrade1.textContent = numberFormat.format(Number(unusableGrades['1'] || 0));
-      elements.unusableGrade2.textContent = numberFormat.format(
+      if (elements.unusableGrade1) elements.unusableGrade1.textContent = numberFormat.format(Number(unusableGrades['1'] || 0));
+      if (elements.unusableGrade2) elements.unusableGrade2.textContent = numberFormat.format(
         sumCounts(unusableGrades['2'], unusableGrades['3']),
       );
       renderUnusableGradeLast60(
