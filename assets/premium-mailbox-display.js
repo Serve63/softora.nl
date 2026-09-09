@@ -418,4 +418,5 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
     renderDetailBody,
     renderLinkedMailboxText,
   };
+  if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -3,14 +3,16 @@ const assert = require('node:assert/strict');
 const { simpleParser } = require('mailparser');
 const { parseProviderHtml } = require('../../server/services/mailbox-provider-rich-body');
 const { sanitizeMailboxDisplayText, createMailboxService } = require('../../server/services/mailbox');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const path = require('node:path');
-const scope = { URL };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-display.js'), 'utf8'), scope);
-const script = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
-const renderer = { URL, window: { SoftoraMailboxDisplay: scope.SoftoraMailboxDisplay } };
-vm.runInNewContext(script.slice(script.indexOf('"use strict";'), script.indexOf('function normalizeMailboxEmail')) + '\nthis.render = renderLinkedMailboxText;', renderer);
+const display = require('../../assets/premium-mailbox-display');
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+})[character]);
+const helpers = {
+  escapeHtml,
+  isSafeUrl: (value) => { try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch (_) { return false; } },
+  renderUrls: escapeHtml,
+};
+const renderer = { render: (value, options) => display.renderLinkedMailboxText(value, options, helpers) };
 
 const html = '<p>Lees <a href="https://example.nl/handleiding?a=1&amp;b=2">de handleiding</a>.</p><p>Met vriendelijke groet,<br>Jos&#233; Voorbeeld<br>Tel: &#48;612345678<br><a href="https://example.nl"><img alt="Website" src="https://example.nl/logo.png"></a></p>';
 const source = (body, contentType = 'text/html; charset=utf-8') => Buffer.from(`From: Jose <jose@example.nl>\r\nTo: serve@softora.nl\r\nSubject: Vraag\r\nMessage-ID: <body-parity@example.nl>\r\nMIME-Version: 1.0\r\nContent-Type: ${contentType}\r\n\r\n${body}`);
