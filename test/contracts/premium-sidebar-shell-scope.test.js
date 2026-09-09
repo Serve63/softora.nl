@@ -357,7 +357,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(stabilityJsSource, /anchor\.getAttribute\("aria-disabled"\) === "true"/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-flow-section::before\s*\{[\s\S]*top:\s*59px !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*transform:\s*none !important;[\s\S]*overflow-anchor:\s*none !important;[\s\S]*overscroll-behavior:\s*contain !important;/);
-  assert.match(themeSource, /\.sidebar-nav\s*\{[\s\S]*overflow-anchor:\s*none !important;[\s\S]*scrollbar-gutter:\s*stable !important;/);
+  assert.match(themeSource, /\.sidebar-nav\s*\{[\s\S]*overflow-anchor:\s*none !important;[\s\S]*scrollbar-gutter:\s*auto !important;/);
   assert.match(themeSource, /\.sidebar,\s*\.sidebar \*,\s*\.sidebar \*::before,\s*\.sidebar \*::after\s*\{[\s\S]*transition:\s*none !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*contain:\s*layout paint style !important;/);
   assert.match(themeJsSource, /function resetPremiumSidebarMotionState\(sidebar, options\) \{/);
@@ -449,6 +449,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /function readCookieValue\(name\) \{/);
   assert.match(prefillSource, /function prefillPremiumSidebarScrollState\(\) \{/);
   assert.match(prefillSource, /nav\.scrollTop = Math\.max\(0, scrollTop\);/);
+  assert.match(prefillSource, /nav\.scrollLeft = Math\.max\(0, Number\(state\.scrollLeft\) \|\| 0\);/);
   assert.match(prefillSource, /avatarEl\.replaceChildren\(\);/);
   assert.doesNotMatch(prefillSource, /avatarEl\.innerHTML\s*=/);
   assert.match(prefillSource, /function mergeSessions\(primarySession, fallbackSession\) \{/);
@@ -458,11 +459,11 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260818b'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260824a'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909a'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
@@ -475,6 +476,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /res\.setHeader\('X-Frame-Options', 'SAMEORIGIN'\);/);
   assert.match(htmlPagesSource, /frame-ancestors 'self'/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);
+  assert.match(htmlPagesSource, /premium-sidebar-mobile\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.js\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.js\?v=/);

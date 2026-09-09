@@ -1,5 +1,4 @@
 @import url('softora-dossier-loader.css');
-
 @font-face {
     font-family: 'SoftoraSidebarInter';
     font-style: normal;
@@ -209,7 +208,7 @@
     min-height: 0 !important;
     overflow-anchor: none !important;
     overscroll-behavior: contain !important;
-    scrollbar-gutter: stable !important;
+    scrollbar-gutter: auto !important;
 }
 
 .sidebar-section {
@@ -1298,6 +1297,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
 .dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
 .dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell {
     min-width: 0 !important;
+    box-sizing: border-box !important;
 }
 
 .dashboard-layout[data-sidebar-shell="canonical"] > .main-content,

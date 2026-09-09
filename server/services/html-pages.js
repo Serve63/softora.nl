@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { applyPublicSeoHeadDefaults } = require('./public-seo');
 const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
+const { createPremiumSidebarShell } = require('./premium-sidebar-shell');
 
 const LOCAL_FONT_VERSION = '20260409a';
 const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
@@ -14,15 +15,16 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260818a';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260818b';
-const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260824a';
+const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909a';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20260909a';
+const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909a';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
 const PREMIUM_SIDEBAR_LINKS_VERSION = '20260818a';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
+  `<link rel="stylesheet" href="/assets/premium-sidebar-mobile.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
   `<link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}">`,
   `<script src="/assets/premium-sidebar-stability.js?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}" defer></script>`,
   `<script src="/assets/premium-sidebar-autopilot.js?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}" defer></script>`,
@@ -63,7 +65,7 @@ const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
 .sidebar[data-static-sidebar="1"]{width:var(--premium-sidebar-width,320px) !important;display:flex !important;flex-direction:column !important;background:#fff !important;border-right:1px solid rgba(0,0,0,.08) !important;padding:19px 0 0 !important;opacity:1 !important;visibility:visible !important;transform:none !important;translate:none !important;contain:layout paint style !important;font-family:var(--premium-sidebar-font-sans) !important;font-size:14px !important;line-height:1.2 !important;letter-spacing:0 !important;font-synthesis:none !important;view-transition-name:softora-premium-sidebar !important;}
 .sidebar[data-static-sidebar="1"],.sidebar[data-static-sidebar="1"] *,.sidebar[data-static-sidebar="1"] *::before,.sidebar[data-static-sidebar="1"] *::after{box-sizing:border-box !important;transition:none !important;animation-duration:.001ms !important;animation-delay:0ms !important;}
 .sidebar[data-static-sidebar="1"] .sidebar-logo{display:block !important;padding:0 24px !important;margin:0 0 11px !important;font-family:var(--premium-sidebar-font-display) !important;font-size:25px !important;font-weight:700 !important;line-height:1 !important;letter-spacing:.02em !important;color:#8b2252 !important;text-transform:uppercase !important;text-decoration:none !important;white-space:nowrap !important;font-synthesis:none !important;}
-.sidebar[data-static-sidebar="1"] .sidebar-nav{flex:1 1 auto !important;min-height:0 !important;overflow-y:auto !important;overflow-x:hidden !important;scrollbar-width:none !important;-ms-overflow-style:none !important;scrollbar-gutter:auto !important;overscroll-behavior:contain !important;}
+.sidebar[data-static-sidebar="1"] .sidebar-nav{padding:0 !important;flex:1 1 auto !important;min-height:0 !important;overflow-y:auto !important;overflow-x:hidden !important;scrollbar-width:none !important;-ms-overflow-style:none !important;scrollbar-gutter:auto !important;overscroll-behavior:contain !important;}
 .sidebar[data-static-sidebar="1"] .sidebar-nav::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important;}
 .sidebar[data-static-sidebar="1"] .sidebar-section{margin-bottom:6px !important;}
 .sidebar[data-static-sidebar="1"] .sidebar-section-label{padding:0 24px !important;margin:0 0 2px !important;font-family:var(--premium-sidebar-font-display) !important;font-size:10px !important;font-weight:500 !important;line-height:1.35 !important;letter-spacing:.13em !important;color:#9599a8 !important;text-transform:uppercase !important;}
@@ -90,6 +92,8 @@ const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
 .sidebar[data-static-sidebar="1"] .logout-btn svg{width:17px !important;height:17px !important;}
 @media (min-width:901px){
 html,body{min-height:100vh;}
+html{scrollbar-gutter:stable;}
+.dashboard-layout[data-sidebar-shell="canonical"]{width:100% !important;min-width:0 !important;}
 ::view-transition-group(softora-premium-sidebar),::view-transition-old(softora-premium-sidebar),::view-transition-new(softora-premium-sidebar),::view-transition-old(root),::view-transition-new(root){animation-duration:1ms !important;animation-delay:0ms !important;mix-blend-mode:normal !important;}
 .sidebar[data-static-sidebar="1"]{position:fixed !important;inset:0 auto 0 0 !important;height:100vh !important;min-height:100vh !important;max-height:100vh !important;z-index:40 !important;overflow:hidden !important;}
 .main,.page-shell,.main-content,.dashboard-layout[data-sidebar-shell="canonical"]>.main-content{margin-left:var(--premium-sidebar-width,320px) !important;}
@@ -203,6 +207,7 @@ function createHtmlPageCoordinator(options = {}) {
     isProduction = process.env.NODE_ENV === 'production',
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;
+  const renderPremiumSidebarShell = createPremiumSidebarShell(pagesDir);
 
   function getSafePublicPageDependencyWaitMs() {
     return Math.max(0, Math.min(10000, Number(publicPageDependencyWaitMs) || 0));
@@ -697,7 +702,7 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   function optimizeHtmlDelivery(html, fileName, authState, options = {}) {
-    let renderedHtml = String(html || '')
+    let renderedHtml = removeInternalPremiumSidebarLinks(renderPremiumSidebarShell(String(html || ''), authState))
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
 
@@ -723,6 +728,7 @@ function createHtmlPageCoordinator(options = {}) {
         }
       }
     }
+    renderedHtml = renderedHtml.replace(/assets\/personnel-theme\.css\?v=[^"\'\s>]+/g, `assets/personnel-theme.css?v=${PREMIUM_PERSONNEL_THEME_VERSION}`);
     renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });
 
     const publicHeroImagePreload = PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE[fileName];

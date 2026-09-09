@@ -255,15 +255,7 @@ function goTo(id) {
   });
   document.getElementById(id).classList.add('active');
   if (id === 'screen-personeel') {
-    var bootApi = window.SoftoraPremiumBoot;
-    if (bootApi && typeof bootApi.setShellBooting === 'function') {
-      bootApi.setShellBooting(true);
-    }
-    refreshTeam().finally(function () {
-      if (bootApi && typeof bootApi.setShellBooting === 'function') {
-        bootApi.setShellBooting(false);
-      }
-    });
+    refreshTeam();
   }
 }
 
@@ -373,7 +365,7 @@ function mountExtraSettingsCategory() {
     'tegel-desc',
     'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
   );
-  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '8 onderdelen');
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', extraItemsForRender.length + ' onderdelen');
   extraTile.addEventListener('click', function () {
     window.location.hash = 'extra';
     extraGrid.hidden = false;
@@ -1033,6 +1025,7 @@ function showToast(msg) {
 }
 
 mountExtraSettingsCategory();
+window.SoftoraSettingsNavigation.initialize(window, goTo);
 
 (async function bootstrapPersoneelManager() {
   try {

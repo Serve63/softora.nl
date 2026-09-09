@@ -27,6 +27,7 @@
         if (!nav) return;
         writeCookieValue(NAV_STATE_KEY, JSON.stringify({
             scrollTop: Math.max(0, Number(nav.scrollTop) || 0),
+            scrollLeft: Math.max(0, Number(nav.scrollLeft) || 0),
             targetHref: String(targetHref || ""),
             savedAt: Date.now(),
         }), NAV_STATE_MAX_AGE_SECONDS);
@@ -68,6 +69,7 @@
     }
 
     function handleSidebarNavigationStart(event) {
+        if (event.type === "click" && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
         if (!isPremiumPath()) return;
         var sidebar = getSidebar();
         if (!sidebar || !event.target) return;
@@ -80,6 +82,11 @@
         }
         var href = getAnchorTarget(anchor);
         if (!href) return;
+        if (window.location.pathname === "/premium-instellingen" && href === "/premium-instellingen" && window.location.hash) {
+            event.preventDefault();
+            window.location.hash = "";
+            return;
+        }
         if (isCurrentTarget(href)) {
             event.preventDefault();
             event.stopImmediatePropagation();
