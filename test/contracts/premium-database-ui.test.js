@@ -1975,7 +1975,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
     /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-compact-table/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-aligned-cards/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
@@ -2431,7 +2431,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-compact-table/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-aligned-cards/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -6262,4 +6262,17 @@ test("sent list omits controls and table search precedes company sorting", () =>
   assert.match(pageSource, /class="company-heading">[\s\S]*?id="q"[\s\S]*?data-sort-key="naam">Bedrijf/);
   assert.equal((pageSource.match(/id="q"/g) || []).length, 1);
   assert.match(tableCss, /#databaseTable tbody td \{ white-space: nowrap; \}/);
+});
+
+test("mail statistics fill the row and match the options height", () => {
+  const css = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
+  assert.match(css, /\.page-shell \.status-filter \{ min-height: 60px; align-items: center;/);
+  assert.match(css, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\); grid-template-areas: none; gap: 8px;/);
+  assert.match(css, /\.page-shell \.mail-roi-card \{ grid-area: auto; min-width: 0; min-height: 60px;/);
+  assert.match(css, /repeat\(auto-fit, minmax\(136px, 1fr\)\)/);
+});
+
+test("table headings are centered except the company search heading", () => {
+  const css = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
+  assert.match(css, /#databaseTable thead th:not\(:first-child\) \{ text-align: center; \}/);
 });
