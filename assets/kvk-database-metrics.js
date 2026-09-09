@@ -130,7 +130,7 @@
           ),
         );
       }
-      renderLast60Delta(elements.successfulFoundLast60, last60.usable);
+      renderLast60Delta(elements.successfulFoundLast60, last60.successful_found ?? last60.luna_max_found ?? 0);
       renderLast60Delta(elements.treated, last60.treated);
       renderLast60Delta(elements.usable, last60.usable);
       renderLast60Delta(elements.withWebsite, last60.with_website);
