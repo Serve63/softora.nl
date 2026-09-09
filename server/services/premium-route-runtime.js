@@ -1,3 +1,5 @@
+const { createAgendaMcpOAuth } = require('../security/agenda-mcp-oauth');
+const { rateLimit } = require('express-rate-limit');
 const { registerPremiumAuthRoutes } = require('../routes/premium-auth');
 const { registerPremiumUserManagementRoutes } = require('../routes/premium-users');
 const { registerLiveMomentumAccessRoutes } = require('../routes/live-momentum-access');
@@ -60,6 +62,10 @@ function createPremiumRouteRuntime(deps = {}) {
     coordinator: premiumAuthRouteCoordinator,
     premiumLoginRateLimiter,
   });
+
+  app.locals ||= {};
+  app.locals.softoraAgendaMcpOAuth = createAgendaMcpOAuth({ sessionSecret, getResolvedPremiumAuthState, premiumUsersStore });
+  app.locals.softoraAgendaMcpOAuth.register(app, rateLimit({ windowMs: 60000, limit: 120 }));
 
   app.use('/api', requirePremiumApiAccess);
 
