@@ -1,0 +1,58 @@
+.modal.photo-batch-modal {
+  width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 28px;
+  border: 1px solid rgba(20, 24, 45, .08);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(20, 24, 45, .18);
+}
+.photo-batch-modal .modal-title { margin-bottom: 22px; }
+.photo-batch-options { display: grid; min-width: 0; gap: 10px; }
+.photo-batch-option {
+  width: 100%; min-width: 0; box-sizing: border-box;
+  display: grid; grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center; gap: 12px;
+  min-height: 64px; padding: 14px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card-soft); color: var(--dark);
+  font-family: 'Inter', sans-serif; text-align: left; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.photo-batch-option::before {
+  content: ''; width: 16px; height: 16px; box-sizing: border-box;
+  border: 1.5px solid var(--light); border-radius: 50%; background: var(--card);
+}
+.photo-batch-option span { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.photo-batch-option strong {
+  min-width: 0; max-width: 110px; overflow-wrap: anywhere;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  color: var(--mid); text-align: right; font-variant-numeric: tabular-nums;
+}
+.photo-batch-option:hover { border-color: rgba(139, 34, 82, .35); }
+.photo-batch-option:focus-visible { outline: 2px solid var(--crimson); outline-offset: 3px; }
+.photo-batch-option.is-active { border-color: var(--crimson); background: rgba(139, 34, 82, .055); }
+.photo-batch-option.is-active::before { border: 5px solid var(--crimson); }
+.photo-batch-input {
+  width: 76px; min-width: 0; box-sizing: border-box;
+  padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--card); color: var(--dark); text-align: right;
+  font: 600 14px 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+}
+.photo-batch-summary {
+  margin-top: 20px; padding: 16px 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--dark); font-size: 16px; font-weight: 600;
+  line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+.photo-batch-summary::before {
+  content: 'Totaal'; display: block; margin-bottom: 4px;
+  color: var(--mid); font-size: 12px; font-weight: 500;
+}
+.photo-batch-modal .mbtns { margin-top: 22px; gap: 10px; }
+.photo-batch-modal .mbtn { min-height: 44px; border-radius: 8px; }
+@media (max-width: 480px) {
+  .modal.photo-batch-modal { padding: 22px; }
+  .photo-batch-option { gap: 9px; padding: 12px; }
+  .photo-batch-option strong { max-width: 86px; }
+  .photo-batch-input { width: 64px; }
+}

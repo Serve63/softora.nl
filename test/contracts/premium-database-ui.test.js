@@ -2023,8 +2023,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="\[0-9\]\*"/);
   assert.doesNotMatch(pageSource, /id="photoBatchLimitInput" type="number"/);
   assert.match(pageSource, /id="photoBatchSummary" aria-live="polite"/);
-  assert.match(pageSource, /\.photo-batch-option\.is-active/);
-  assert.match(pageSource, /\.photo-batch-option strong\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
+  const photoBatchCss = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.css'), 'utf8');
+  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20260909a/);
+  assert.match(photoBatchCss, /\.photo-batch-option\.is-active/);
+  assert.match(photoBatchCss, /overflow-wrap: anywhere/);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.js'), 'utf8'), /photoBatchPricingNote|Vooraf: geschatte beeldprijs/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
   assert.match(pageSource, /function renderPhotoBatchHeader\(customers, pending, eligibleCountOverride, resultText\)/);
@@ -2420,7 +2423,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-short-costs/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-modal-costs/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
