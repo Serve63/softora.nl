@@ -8,6 +8,13 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('the shared deferred sidebar script keeps partial documents out of the first paint', () => {
+  const source = readRepoFile('server/services/html-pages.js');
+  const critical = source.split('const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [')[1].split('].join')[0];
+  assert.match(critical, /<script src="\/assets\/premium-sidebar-links\.js\?v=\$\{PREMIUM_SIDEBAR_LINKS_VERSION\}" defer blocking="render"><\/script>/);
+  assert.match(source, /injectSnippetAfterHeadOpen\(\s*renderedHtml,\s*PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
+});
+
 test('Extra-modules keren buiten hun inhoudsframe terug naar de volledige instellingenpagina', () => {
   const routes = require('../../assets/settings-module-routes');
   const { initialize } = require('../../assets/settings-module-back');
@@ -955,14 +962,12 @@ test('static premium sidebars ship the klanten link in html', () => {
   }
 });
 
-test('static premium sidebars ship the database link in html', () => {
+test('all rendered premium sidebars use Mailsysteem from the first response', () => {
+  const render = require('../../server/services/premium-sidebar-shell').createPremiumSidebarShell();
   for (const relativePath of staticSidebarPages) {
-    const pageSource = readRepoFile(relativePath);
-    assert.match(
-      pageSource,
-      /href="\/premium-database"[\s\S]*<span class="sidebar-link-text">Database<\/span>/,
-      `${relativePath} hoort Database direct in de sidebar html te hebben`
-    );
+    const html = render(readRepoFile(relativePath), { authenticated: true, role: 'admin' }, relativePath);
+    assert.match(html, /href="\/premium-database"[^>]*>[\s\S]*?<span class="sidebar-link-text">Mailsysteem<\/span>/);
+    assert.doesNotMatch(html, /data-sidebar-key="database"[^>]*>[\s\S]*?<span class="sidebar-link-text">Database<\/span>/);
   }
 });
 
@@ -1307,7 +1312,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-boot\.js\?v=20260908a/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260908-publish/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
 });
 
 

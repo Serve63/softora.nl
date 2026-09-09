@@ -21,7 +21,7 @@ const PREMIUM_PERSONNEL_THEME_VERSION = '20260909c';
 const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909c';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
-const PREMIUM_SIDEBAR_LINKS_VERSION = '20260909a';
+const PREMIUM_SIDEBAR_LINKS_VERSION = '20260909d';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
@@ -57,7 +57,8 @@ html[data-softora-sidebar-content-frame="1"] .monthly-costs-boot-loader{left:0 !
 const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [
   '<link rel="stylesheet" href="/assets/premium-sidebar-fonts.css?v=20260909a">',
   `<script id="softora-personnel-first-paint">(function(){try{document.documentElement.setAttribute("data-personnel-loading","true");document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>`,
-  `<script src="/assets/premium-sidebar-links.js?v=${PREMIUM_SIDEBAR_LINKS_VERSION}" defer></script>`,
+  // Keep the previous document painted until the new shell and main have parsed.
+  `<script src="/assets/premium-sidebar-links.js?v=${PREMIUM_SIDEBAR_LINKS_VERSION}" defer blocking="render"></script>`,
   ...LOCAL_FONT_PRELOAD_LINKS,
   `<style id="softora-premium-sidebar-critical">
 :root{--premium-sidebar-width:320px;--premium-sidebar-font-sans:'SoftoraSidebarInter','Inter',system-ui,sans-serif;--premium-sidebar-font-display:'SoftoraSidebarOswald','Oswald',sans-serif;}

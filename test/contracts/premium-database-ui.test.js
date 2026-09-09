@@ -444,7 +444,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260616a/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -458,7 +458,7 @@ test('premium database has a compact company search without the old result count
 
   assert.match(
     pageSource,
-    /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><\/div>\s*<\/div>/
+    /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…">[\s\S]*<\/div><\/div>\s*<\/div>/
   );
   assert.match(filterBarCssBlock, /align-items: center;/);
   assert.doesNotMatch(filterBarCssBlock, /align-items: flex-end;/);
@@ -1855,7 +1855,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount/);
   assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);/);
   assert.match(pageSource, /const canonicalInventoryStatus = window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalInventoryStatus\(state\);/);
-  assert.match(pageSource, /if \(canonicalInventoryStatus !== "ready"\) \{[\s\S]*getCanonicalResultCountText\(state, 0\)[\s\S]*setDatabaseTableBodyHtml\("<tr><td colspan=\\"9\\"><div class=\\"tbl-empty\\">" \+ escapeHtml\(inventoryMessage\)/);
+  assert.match(pageSource, /if \(canonicalInventoryStatus !== "ready"\) \{[\s\S]*getCanonicalResultCountText\(state, 0\)[\s\S]*setDatabaseTableBodyHtml\("<tr><td colspan=\\"8\\"><div class=\\"tbl-empty\\">" \+ escapeHtml\(inventoryMessage\)/);
   assert.match(pageSource, /const resultCountText = blockForMailReadyPending \? "-- resultaten" : window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalResultCountText\(state, visibleResultCount\);/);
   assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
   assert.doesNotMatch(pageSource, /Mailklare data laden\.\.\./);
@@ -1936,7 +1936,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const instantlySyncScriptSource = fs.readFileSync(instantlySyncScriptPath, 'utf8');
   const massResearchScriptSource = fs.readFileSync(massResearchScriptPath, 'utf8');
 
-  assert.match(pageSource, /<title>Softora \| Database<\/title>/);
+  assert.match(pageSource, /<title>Softora \| Mailsysteem<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
   assert.match(pageSource, /--bg: #080808;/);
   assert.match(pageSource, /--card: #0d0d0d;/);
@@ -1944,24 +1944,21 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
-  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14\.285%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(2\), tbody td:nth-child\(2\) \{ width: 14\.285%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 14\.285%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(4\), tbody td:nth-child\(4\) \{ width: 14\.285%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 14\.285%;/);
-  assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 14\.285%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 14\.285%;/);
-  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{[\s\S]*min-width: 118px;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
-  assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(7\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(7\), table:not\(\.outreach-action-mode\) thead th:nth-child\(9\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(9\) \{ display: none; \}/);
-  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{[\s\S]*width: 5%;[\s\S]*min-width: 56px;[\s\S]*text-align: center;/);
+  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 16\.666%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(2\), tbody td:nth-child\(2\) \{ width: 16\.666%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 16\.666%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(4\), tbody td:nth-child\(4\) \{ width: 16\.666%;/);
+  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 16\.666%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(7\), tbody td:nth-child\(7\) \{ width: 16\.666%;/);
+  assert.match(pageSource, /thead th:nth-child\(7\), tbody td:nth-child\(7\) \{[\s\S]*min-width: 118px;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
+  assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(6\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(6\), table:not\(\.outreach-action-mode\) thead th:nth-child\(8\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(8\) \{ display: none; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{[\s\S]*width: 5%;[\s\S]*min-width: 56px;[\s\S]*text-align: center;/);
   assert.match(pageSource, /\.photo-drop \{[\s\S]*width: 34px;[\s\S]*height: 34px;/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*width: 14px;[\s\S]*height: 14px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
   assert.match(pageSource, /#photoHeader \{[\s\S]*overflow: visible;[\s\S]*text-overflow: clip;[\s\S]*white-space: nowrap;/);
   assert.match(pageSource, /#photoHeader \.photo-header-title \{[\s\S]*display: inline-flex;[\s\S]*min-width: 94px;/);
   assert.match(pageSource, /\.company-edit/);
-  assert.match(pageSource, /\.company-edit \{[\s\S]*width: 22px;[\s\S]*height: 22px;[\s\S]*border: none;[\s\S]*background: none;[\s\S]*color: var\(--light\);/);
-  assert.match(pageSource, /\.company-edit:hover \{[\s\S]*color: var\(--crimson\);/);
   assert.match(pageSource, /\.photo-remove/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*position: absolute;[\s\S]*right: 2px;/);
   assert.match(pageSource, /\.toast\s*\{[\s\S]*background: #111;[\s\S]*color: #fff;[\s\S]*font-weight: 700;[\s\S]*max-width: min\(340px, calc\(100vw - 48px\)\);/);
@@ -1969,7 +1966,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
   assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">-- resultaten<\/span><\/button>/);
   assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
-  assert.match(pageSource, /<div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
+  assert.match(pageSource, /<div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…">/);
   const topRightHtml = pageSource.slice(
     pageSource.indexOf('<div class="top-right">'),
     pageSource.indexOf('<div class="status-banner"')
@@ -2077,7 +2074,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton"/);
   assert.doesNotMatch(pageSource, /class="result-count-icon"/);
-  assert.match(pageSource, /<div class="page-title">Database<\/div>/);
+  assert.match(pageSource, /<div class="page-title">Mailsysteem<\/div>/);
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
   assert.doesNotMatch(pageSource, /id="addButton"/);
@@ -2096,7 +2093,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
-  assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
+  assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…">/);
   assert.doesNotMatch(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
   assert.doesNotMatch(pageSource, /id="m-branche"/);
@@ -2110,7 +2107,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /activeBranch/);
   assert.doesNotMatch(pageSource, /<th data-sort-key="branche">Branche<\/th>/);
   assert.match(pageSource, /<th data-sort-key="email">Mailadres<\/th>/);
-  assert.match(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
+  assert.doesNotMatch(pageSource, /<th data-sort-key="tel">Telefoonnummer<\/th>/);
   assert.match(pageSource, /<th data-sort-key="dom">Website<\/th>/);
   assert.doesNotMatch(pageSource, /<th>Kanaal<\/th>/);
   assert.doesNotMatch(pageSource, /<th>Gebruikte kanalen<\/th>/);
@@ -2120,14 +2117,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /aria-label=\\"Website openen: " \+ escapeHtml\(websiteValue\)/);
   assert.match(pageSource, /class=\\"website-open-icon\\"/);
   assert.match(pageSource, /class=\\"c-mid website-cell\\"/);
-  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 14\.285%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
+  assert.match(pageSource, /thead th:nth-child\(4\), tbody td:nth-child\(4\) \{ width: 16\.666%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
   assert.doesNotMatch(pageSource, /target=\\"_blank\\" rel=\\"noopener\\">" \+ escapeHtml\(websiteValue\) \+ "<\/a>"/);
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
-  assert.match(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
+  assert.doesNotMatch(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
   assert.match(pageSource, /formatPhoneNumber\(raw && \(raw\.tel \|\| raw\.telefoon \|\| raw\.contactPhone\)\)/);
   assert.match(pageSource, /tel: normalizeString\(nodes\.modalPhone\.value\) \|\| "—",/);
-  assert.match(pageSource, /class=\\"company-edit\\"/);
-  assert.match(pageSource, /data-edit-id=\\"/);
+  assert.doesNotMatch(pageSource, /class=\\"company-edit\\"/);
+  assert.doesNotMatch(pageSource, /data-edit-id=\\"/);
   assert.doesNotMatch(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /<th id="outreachActionHeader" hidden>Acties<\/th>/);
   assert.match(pageSource, /<th id="photoHeader"><span class="photo-header-title" id="photoHeaderTitle"><span id="photoHeaderLabel">Foto's<\/span> <span id="photoHeaderCount">\(--\)<\/span><\/span><button class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">-- resultaten<\/span><\/button><\/th>/);
@@ -2139,7 +2136,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function hydrateDatabaseAuthSession\(\)/);
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
-  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
+  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd", showPhotoColumn = !showOutreachActionColumn/);
   assert.doesNotMatch(pageSource, /function isAvailableColdmailCandidate\(/);
   assert.doesNotMatch(pageSource, /function getAvailableColdmailCandidates\(/);
   assert.doesNotMatch(pageSource, /isAvailableColdmailDisplayCandidate/);
@@ -2150,15 +2147,15 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
-  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
+  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "verstuurd" \? resultCountText : "Acties"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
   assert.match(pageSource, /renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
   assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
   assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /logDatabaseMediaDebug\("render-table", \{ activeStatus: state\.activeStatus, databaseCount: state\.klanten\.length, filteredCount: visibleCustomers\.length, renderedCount: filtered\.length, photoHeaderCount: photoHeaderCount/);
-  assert.match(pageSource, /<td colspan=\\"7\\">/);
-  assert.match(pageSource, /setDatabaseTableBodyHtml\("<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">" \+ getEmptyTableMessage\(\) \+ "<\/div><\/td><\/tr>"\);/);
+  assert.match(pageSource, /<td colspan=\\"6\\">/);
+  assert.match(pageSource, /setDatabaseTableBodyHtml\("<tr><td colspan=\\"6\\"><div class=\\"tbl-empty\\">" \+ getEmptyTableMessage\(\) \+ "<\/div><\/td><\/tr>"\);/);
   assert.doesNotMatch(pageSource, /Geen bedrijven gevonden\./);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
@@ -2174,7 +2171,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2297,19 +2294,19 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /\.photo-drop\[data-photo-error=\\"true\\"\] \.photo-drop-image,\.photo-drop\[data-photo-error=\\"true\\"\] \.photo-drop-loader\{display:none\}/);
   assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
   assert.match(webdesignActionScriptSource, /photo-drop-image\{width:100%;height:100%;object-fit:cover;display:block;opacity:0;/);
-  assert.match(webdesignActionScriptSource, /\.photo-cell\{display:grid;grid-template-columns:34px 34px 22px 22px 22px 18px;align-items:center;justify-content:start;gap:4px;width:172px;min-width:172px;line-height:0\}/);
-  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:172px;min-width:172px\}/);
+  assert.match(webdesignActionScriptSource, /\.photo-cell\{display:grid;grid-template-columns:34px 34px 22px 18px;align-items:center;justify-content:start;gap:4px;width:120px;min-width:120px;line-height:0\}/);
+  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:120px;min-width:120px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
-  assert.match(webdesignPreviewScriptSource, /const DIAMOND_ICON = "<svg class=\\"photo-diamond-icon\\"/);
-  assert.match(webdesignPreviewScriptSource, /const VIDEO_ICON = "<svg class=\\"photo-video-icon\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /const DIAMOND_ICON = "<svg class=\\"photo-diamond-icon\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /const VIDEO_ICON = "<svg class=\\"photo-video-icon\\"/);
   assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\/" \+ escapeHtml\(slug\) \+ "\\"/);
   assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
-  assert.match(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(cinematicHref\) \+ "\\"/);
-  assert.match(webdesignPreviewScriptSource, /data-cinematic-customer-id=\\"/);
-  assert.match(webdesignPreviewScriptSource, /aria-label=\\"Start cinematic websiteflow\\"/);
-  assert.match(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(videoHref\) \+ "\\"/);
-  assert.match(webdesignPreviewScriptSource, /data-company-website-video-id=\\"/);
-  assert.match(webdesignPreviewScriptSource, /aria-label=\\"Bekijk websitevideo\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(cinematicHref\) \+ "\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /data-cinematic-customer-id=\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /aria-label=\\"Start cinematic websiteflow\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(videoHref\) \+ "\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /data-company-website-video-id=\\"/);
+  assert.doesNotMatch(webdesignPreviewScriptSource, /aria-label=\\"Bekijk websitevideo\\"/);
   assert.ok(webdesignPreviewScriptSource.includes('return "/bedrijven/" + encodeURIComponent(normalizeString(id)) + "/video";'));
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
@@ -2427,8 +2424,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-modal-costs/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
@@ -2580,7 +2577,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -2620,7 +2617,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260908-design-eligibility/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
@@ -2716,7 +2713,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -2772,7 +2769,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
   assert.match(pageSource, /syncRows: syncCustomersFromRows/);
   assert.match(pageSource, /syncKey: CUSTOMER_DB_SYNC_KEY/);
-  assert.match(pageSource, /const availableImportController = window\.SoftoraDatabaseAvailableImport\.createController\(\{ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage \}\); availableImportController\.bind\(\);/);
+  assert.doesNotMatch(pageSource, /const availableImportController = window\.SoftoraDatabaseAvailableImport\.createController\(\{ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage \}\); availableImportController\.bind\(\);/);
   assert.doesNotMatch(pageSource, /function renderAvailableImportControls\(\) \{/);
   assert.match(pageSource, /function renderPage\(\) \{ renderTable\(\); \}/);
   assert.match(pageSource, /function mapCsvRowToCustomer\(headers, row, index, options\) \{/);
@@ -3165,20 +3162,9 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-public-preview-id="customer-1"/);
   assert.match(html, /aria-label="Open openbare previewpagina"/);
-  assert.match(html, /class="photo-diamond-badge photo-cinematic-link"/);
-  assert.match(html, /href="\/premium-cinematic-website\?customerId=customer-1&company=Aagje%20van%20Os"/);
-  assert.match(html, /target="_blank"/);
-  assert.match(html, /data-cinematic-customer-id="customer-1"/);
-  assert.match(html, /aria-label="Start cinematic websiteflow"/);
-  assert.match(html, /class="photo-video-link"/);
-  assert.match(html, /href="\/bedrijven\/customer-1\/video"/);
-  assert.match(html, /data-company-website-video-id="customer-1"/);
-  assert.match(html, /aria-label="Bekijk websitevideo"/);
+  assert.doesNotMatch(html, /photo-diamond|photo-cinematic|photo-video|data-company-website-video-id/);
   assert.match(html, /class="lead-delete-button"/);
   assert.match(html, /data-delete-lead-id="customer-1"/);
-  assert.ok(html.indexOf('class="photo-diamond-badge photo-cinematic-link"') > html.indexOf('class="photo-compare-link"'));
-  assert.ok(html.indexOf('class="photo-video-link"') > html.indexOf('class="photo-diamond-badge photo-cinematic-link"'));
-  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-video-link"'));
   assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
 });
 
@@ -4609,7 +4595,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters">\s*<span class="status-filter-label">Algemeen<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true">\s*<span class="status-filter-label">[\s\S]*status-filter-lock-icon[\s\S]*Coldcalling<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik<\/button>\s*<\/span>\s*<\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><button class="sf-btn" data-s="verstuurd" type="button">Verstuurd<\/button><\/span><\/div>/
   );
   assert.match(pageSource, /activeStatus: "beschikbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
@@ -4668,17 +4654,17 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"afgehaakt\\"/);
   assert.doesNotMatch(webdesignActionSource, /data-outreach-status=\\"geen_interesse\\"/);
   assert.match(webdesignActionSource, /Mail bekijken/);
-  assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(7\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(7\), table:not\(\.outreach-action-mode\) thead th:nth-child\(9\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(9\) \{ display: none; \}/);
-  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(6\), table\.outreach-action-mode tbody td:nth-child\(6\) \{ display: none; \}/);
-  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ display: none; \}/);
+  assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(6\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(6\), table:not\(\.outreach-action-mode\) thead th:nth-child\(8\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(8\) \{ display: none; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(5\), table\.outreach-action-mode tbody td:nth-child\(5\) \{ display: none; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\), table\.outreach-action-mode tbody td:nth-child\(7\) \{ display: none; \}/);
   assert.match(pageSource, /document\.getElementById\("databaseTable"\)\.classList\.toggle\("outreach-action-mode", showOutreachActionColumn\); document\.getElementById\("statusHeader"\)\.hidden = showOutreachActionColumn/);
   assert.doesNotMatch(pageSource, /renderUsedChannelTags\(customer\),\s*"\<\/div\>\<\/td\>",\s*"\<td\>\<div class=\\"s-wrap/);
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
-  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer, \{ hideMailButton: state\.activeStatus === "instantly" \}\)/);
+  assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer, \{ hideMailButton: outreachController\.hasInstantlyOutreachSignal\(customer\) \}\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
-  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
-  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\), table\.outreach-action-mode tbody td:nth-child\(7\) \{ width: 24%; text-align: center; \}/);
-  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
+  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(6\), table\.outreach-action-mode tbody td:nth-child\(6\) \{ width: 24%; text-align: center; \}/);
+  assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
   assert.match(webdesignActionSource, /function isTrackedOutreachCustomer\(customer\)/);
   assert.match(webdesignActionSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) === "gemaild"/);
@@ -4706,7 +4692,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="interesse" type="button">Interesse<\/button>/);
-  assert.match(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>/);
   assert.match(pageSource, /<option value="interesse">Interesse<\/option>/);
   assert.match(pageSource, /<option value="afgehaakt">Afgehaakt<\/option>/);
   assert.match(pageSource, /const DATABASE_STATUS_OPTIONS = \[[^\]]*"interesse"[^\]]*\];/);
@@ -4717,6 +4703,28 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /afgehaakt: "Afgehaakt"/);
   assert.match(pageSource, /\.s-interesse \.s-label \{ color: var\(--green\); font-weight: 700; \}/);
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
+});
+
+test('Verstuurd includes mailed and transferred contacts regardless of later status, excluding calls alone', () => {
+  const controller = loadDatabaseOutreachClient().createController({
+    state: { klanten: [] }, nodes: {}, escapeHtml: String,
+    normalizeDatabaseStatus: value => String(value || ''),
+  });
+  const contacts = [
+    { id: 'available', status: 'prospect' },
+    { id: 'ready', status: 'benaderbaar' },
+    { id: 'called', status: 'gebeld', lastColdcallAt: '2026-09-09' },
+    { id: 'mailed', status: 'gemaild' },
+    { id: 'replied', status: 'interesse', lastColdmailSentAt: '2026-09-08' },
+    { id: 'transferred', status: 'prospect', lastColdmailProvider: 'instantly' },
+    { id: 'transferred-customer', status: 'klant', instantlyLeadId: 'lead-1' },
+    { id: 'both', status: 'gemaild', instantlyLeadId: 'lead-2' },
+  ];
+  const mailed = item => item.status === 'gemaild' || Boolean(item.lastColdmailSentAt);
+  const selected = contacts.filter(item => controller.matchesStatusFilter(item, 'verstuurd', () => true, mailed));
+  assert.deepEqual(selected.map(item => item.id), ['mailed', 'replied', 'transferred', 'transferred-customer', 'both']);
+  assert.match(controller.renderMeta(contacts[5], true), /Overgezet naar Instantly/);
+  assert.doesNotMatch(controller.renderMeta(contacts[5], true), /Verstuurd vanaf/);
 });
 
 test('premium database outreach days column keeps benaderd rows after 25 days', () => {
@@ -6096,7 +6104,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260616a/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);

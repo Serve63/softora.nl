@@ -140,10 +140,10 @@ test('scrollframes bewegen vloeiend omlaag en eindigen met één doorlopende ter
   assert.ok(largestStep < 31, `scrollsprong te groot: ${largestStep}`);
 });
 
-test('film-icoon navigeert uitsluitend intern in hetzelfde tabblad', () => {
+test('Mailsysteem laat het film-icoon weg en behoudt de interne videoroute', () => {
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-database-webdesign-preview.js'), 'utf8');
   assert.match(source, /return "\/bedrijven\/" \+ encodeURIComponent\(normalizeString\(id\)\) \+ "\/video"/);
-  assert.match(source, /aria-label=\\"Bekijk websitevideo\\" title=\\"Bekijk websitevideo\\"/);
+  assert.doesNotMatch(source, /aria-label=\\"Bekijk websitevideo\\" title=\\"Bekijk websitevideo\\"/);
   assert.doesNotMatch(source, /photo-video-link[^\n]+target=\\"_blank\\"/);
   assert.doesNotMatch(source, /photo-cinematic-video-link/);
   assert.match(source, /if \(link\) event\.stopPropagation\(\)/);

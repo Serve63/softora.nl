@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
     <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-    <title>Softora | Database</title>
+    <title>Softora | Mailsysteem</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
     <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260909-calm-roi-type"><link rel="stylesheet" href="assets/premium-database-photo-batch.css?v=20260909a">
     <script>
@@ -400,14 +400,13 @@
             text-overflow: ellipsis;
         }
 
-        thead th:nth-child(1), tbody td:nth-child(1) { width: 14.285%; }
-        thead th:nth-child(2), tbody td:nth-child(2) { width: 14.285%; }
-        thead th:nth-child(3), tbody td:nth-child(3) { width: 14.285%; }
-        thead th:nth-child(4), tbody td:nth-child(4) { width: 14.285%; }
-        thead th:nth-child(5), tbody td:nth-child(5) { width: 14.285%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; }
-        thead th:nth-child(6), tbody td:nth-child(6) { width: 14.285%; }
-        table:not(.outreach-action-mode) thead th:nth-child(7), table:not(.outreach-action-mode) tbody td:nth-child(7), table:not(.outreach-action-mode) thead th:nth-child(9), table:not(.outreach-action-mode) tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(6), table.outreach-action-mode tbody td:nth-child(6) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { width: 24%; text-align: center; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { width: 5%; min-width: 56px; text-align: center; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 14.285%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeader .photo-header-title[hidden], #photoHeader .photo-header-results-button[hidden] { display: none; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(9), tbody td:nth-child(9) { width: 5%; text-align: center; }
+        thead th:nth-child(1), tbody td:nth-child(1) { width: 16.666%; }
+        thead th:nth-child(2), tbody td:nth-child(2) { width: 16.666%; }
+        thead th:nth-child(3), tbody td:nth-child(3) { width: 16.666%; }
+        thead th:nth-child(4), tbody td:nth-child(4) { width: 16.666%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; }
+        thead th:nth-child(5), tbody td:nth-child(5) { width: 16.666%; }
+        table:not(.outreach-action-mode) thead th:nth-child(6), table:not(.outreach-action-mode) tbody td:nth-child(6), table:not(.outreach-action-mode) thead th:nth-child(8), table:not(.outreach-action-mode) tbody td:nth-child(8) { display: none; } table.outreach-action-mode thead th:nth-child(5), table.outreach-action-mode tbody td:nth-child(5) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { display: none; } table.outreach-action-mode thead th:nth-child(6), table.outreach-action-mode tbody td:nth-child(6) { width: 24%; text-align: center; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { width: 5%; min-width: 56px; text-align: center; }
+        thead th:nth-child(7), tbody td:nth-child(7) { width: 16.666%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeader .photo-header-title[hidden], #photoHeader .photo-header-results-button[hidden] { display: none; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(8), tbody td:nth-child(8) { width: 5%; text-align: center; }
 
         thead th:hover {
             color: var(--dark);
@@ -446,29 +445,6 @@
             min-width: 0;
         }
 
-        .company-edit {
-            width: 22px;
-            height: 22px;
-            border: none;
-            background: none;
-            color: var(--light);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            flex: 0 0 auto;
-            cursor: pointer;
-            padding: 0;
-            transition: color .15s ease;
-        }
-
-        .company-edit:hover {
-            color: var(--crimson);
-        }
-
-        .company-edit svg {
-            width: 13px;
-            height: 13px;
-        }
 
         .c-mid {
             color: var(--mid);
@@ -517,7 +493,7 @@
         }
 
         .photo-cell {
-            display: grid; grid-template-columns: 34px 34px 22px 22px 22px 18px; align-items: center; justify-content: start; gap: 4px; width: 172px; min-width: 172px;
+            display: grid; grid-template-columns: 34px 34px 22px 18px; align-items: center; justify-content: start; gap: 4px; width: 120px; min-width: 120px;
             line-height: 0;
         }
 
@@ -1246,7 +1222,7 @@
                 <div class="page-content">
                     <div class="top">
                         <div class="top-left">
-                            <div class="page-title">Database</div>
+                            <div class="page-title">Mailsysteem</div>
                             <div class="page-sub" id="top-sub"></div>
                         </div>
 
@@ -1256,8 +1232,8 @@
 
                     <div class="filter-bar">
                         <div class="status-filter">
-                            <div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters"><span class="status-filter-label">Algemeen</span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><span class="status-filter-pills"><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><span class="status-filter-pills"><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></span></div>
-                        </div><div class="top-right"><div class="filter-metrics" aria-label="Database statistieken"><div class="mail-roi-calculator" aria-label="Mail ROI calculator"><div class="mail-roi-cards"><div class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"><div class="mail-roi-label">Autopilot</div><button class="mail-roi-autopilot-toggle" id="databaseAutopilotToggle" type="button" aria-pressed="false" aria-busy="true" disabled><span class="mail-roi-autopilot-dot" aria-hidden="true"></span><span id="databaseAutopilotToggleLabel">Laden</span></button></div><div class="mail-roi-card mail-roi-card--today"><div class="mail-roi-label">Vandaag verstuurd</div><div class="mail-roi-value" id="systemMailSentTodayCount">--</div></div><div class="mail-roi-card mail-roi-card--bounces"><div class="mail-roi-label">Harde bounces</div><div class="mail-roi-value" id="systemMailBouncesTodayCount">--</div></div><div class="mail-roi-card mail-roi-card--sent"><div class="mail-roi-label">Mails verstuurd</div><div class="mail-roi-value" id="systemMailSentCount">--</div></div><div class="mail-roi-card mail-roi-card--appointments"><div class="mail-roi-label">Afspraken</div><div class="mail-roi-row"><div class="mail-roi-value" id="mailRoiAppointmentsCount">0</div><div class="mail-roi-stepper" aria-label="Aantal afspraken aanpassen"><button class="mail-roi-step-button" type="button" data-mail-roi-metric="appointments" data-mail-roi-action="-1" aria-label="Afspraak eraf">&minus;</button><span class="mail-roi-step-divider" aria-hidden="true"></span><button class="mail-roi-step-button" type="button" data-mail-roi-metric="appointments" data-mail-roi-action="1" aria-label="Afspraak erbij">+</button></div></div></div><div class="mail-roi-card mail-roi-card--appointment-ratio"><div class="mail-roi-label">Afspraak per mail</div><div class="mail-roi-value" id="mailRoiAppointmentRatio">&mdash;</div></div><div class="mail-roi-card mail-roi-card--deals"><div class="mail-roi-label">€850 klanten</div><div class="mail-roi-row"><div class="mail-roi-value" id="mailRoiDealsCount">0</div><div class="mail-roi-stepper" aria-label="Aantal klanten aanpassen"><button class="mail-roi-step-button" type="button" data-mail-roi-action="-1" aria-label="Klant eraf">&minus;</button><span class="mail-roi-step-divider" aria-hidden="true"></span><button class="mail-roi-step-button" type="button" data-mail-roi-action="1" aria-label="Klant erbij">+</button></div></div></div><div class="mail-roi-card mail-roi-card--ratio"><div class="mail-roi-label">Klant per mails</div><div class="mail-roi-value" id="mailRoiRatio">&mdash;</div></div></div></div></div></div><div class="filter-search"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="q" placeholder="Zoek bedrijf in database…"></div></div>
+                            <div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties</span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar</button><button class="sf-btn" data-s="verstuurd" type="button">Verstuurd</button></span></div>
+                        </div><div class="top-right"><div class="filter-metrics" aria-label="Database statistieken"><div class="mail-roi-calculator" aria-label="Mail ROI calculator"><div class="mail-roi-cards"><div class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"><div class="mail-roi-label">Autopilot</div><button class="mail-roi-autopilot-toggle" id="databaseAutopilotToggle" type="button" aria-pressed="false" aria-busy="true" disabled><span class="mail-roi-autopilot-dot" aria-hidden="true"></span><span id="databaseAutopilotToggleLabel">Laden</span></button></div><div class="mail-roi-card mail-roi-card--today"><div class="mail-roi-label">Vandaag verstuurd</div><div class="mail-roi-value" id="systemMailSentTodayCount">--</div></div><div class="mail-roi-card mail-roi-card--bounces"><div class="mail-roi-label">Harde bounces</div><div class="mail-roi-value" id="systemMailBouncesTodayCount">--</div></div><div class="mail-roi-card mail-roi-card--sent"><div class="mail-roi-label">Mails verstuurd</div><div class="mail-roi-value" id="systemMailSentCount">--</div></div><div class="mail-roi-card mail-roi-card--appointments"><div class="mail-roi-label">Afspraken</div><div class="mail-roi-row"><div class="mail-roi-value" id="mailRoiAppointmentsCount">0</div><div class="mail-roi-stepper" aria-label="Aantal afspraken aanpassen"><button class="mail-roi-step-button" type="button" data-mail-roi-metric="appointments" data-mail-roi-action="-1" aria-label="Afspraak eraf">&minus;</button><span class="mail-roi-step-divider" aria-hidden="true"></span><button class="mail-roi-step-button" type="button" data-mail-roi-metric="appointments" data-mail-roi-action="1" aria-label="Afspraak erbij">+</button></div></div></div><div class="mail-roi-card mail-roi-card--appointment-ratio"><div class="mail-roi-label">Afspraak per mail</div><div class="mail-roi-value" id="mailRoiAppointmentRatio">&mdash;</div></div><div class="mail-roi-card mail-roi-card--deals"><div class="mail-roi-label">€850 klanten</div><div class="mail-roi-row"><div class="mail-roi-value" id="mailRoiDealsCount">0</div><div class="mail-roi-stepper" aria-label="Aantal klanten aanpassen"><button class="mail-roi-step-button" type="button" data-mail-roi-action="-1" aria-label="Klant eraf">&minus;</button><span class="mail-roi-step-divider" aria-hidden="true"></span><button class="mail-roi-step-button" type="button" data-mail-roi-action="1" aria-label="Klant erbij">+</button></div></div></div><div class="mail-roi-card mail-roi-card--ratio"><div class="mail-roi-label">Klant per mails</div><div class="mail-roi-value" id="mailRoiRatio">&mdash;</div></div></div></div></div></div><div class="filter-search"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="q" placeholder="Zoek bedrijf in mailsysteem…"></div></div>
                     </div>
 
                     <div class="tbl-wrap">
@@ -1268,7 +1244,6 @@
                                         <th data-sort-key="naam">Bedrijf</th>
                                         <th data-sort-key="stad">Adres</th>
                                         <th data-sort-key="email">Mailadres</th>
-                                        <th data-sort-key="tel">Telefoonnummer</th>
                                         <th data-sort-key="dom">Website</th>
                                         <th data-sort-key="status" id="statusHeader">Status</th>
                                         <th id="outreachActionHeader" hidden>Acties</th>
@@ -1398,8 +1373,8 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260909-modal-costs"></script>
-    <script src="assets/premium-database-webdesign-asset-state.js?v=20260908-design-eligibility"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-webdesign-action.js?v=20260908-design-eligibility"></script><script src="assets/premium-database-webdesign-preview.js?v=20260714b"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
-    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606d"></script><script src="assets/premium-database-boot.js?v=20260908a"></script><script src="assets/premium-database-system-mail-count.js?v=20260909-bounces-appointments-b"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260908-design-eligibility"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-webdesign-action.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-webdesign-preview.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
+    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260908a"></script><script src="assets/premium-database-system-mail-count.js?v=20260909-bounces-appointments-b"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260616b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
@@ -2021,7 +1996,7 @@
         }
         function hasActiveDatabaseSearch() { return Boolean(normalizeSearchValue(state.query)); }
         function getSortedCustomers(customers) {
-            return (state.activeStatus === "benaderd" || state.activeStatus === "instantly") ? outreachController.sortByRecentOutreach(customers, parseDateValue, normalizeSearchValue) : (customers || []);
+            return (state.activeStatus === "benaderd" || state.activeStatus === "instantly" || state.activeStatus === "verstuurd") ? outreachController.sortByRecentOutreach(customers, parseDateValue, normalizeSearchValue) : (customers || []);
         }
         function isDatabaseMediaDebugEnabled() { try { return window.SoftoraDatabaseMediaDebug === true || new URLSearchParams(window.location.search || "").get("debugMedia") === "1"; } catch (error) { return false; } }
         function logDatabaseMediaDebug(eventName, payload) { if (!isDatabaseMediaDebugEnabled() || !window.console || typeof window.console.info !== "function") return; window.console.info("[premium-database:media]", eventName, payload || {}); }
@@ -2110,7 +2085,7 @@
         function renderTable() {
             const previousAssetCache = databaseRenderRuntime.activeAssetCache; databaseRenderRuntime.activeAssetCache = new WeakMap();
             try {
-            const showOutreachActionColumn = state.activeStatus === "benaderd" || state.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn; const canonicalInventoryStatus = window.SoftoraDatabaseMailReadySnapshot.getCanonicalInventoryStatus(state); if (canonicalInventoryStatus !== "ready") { const resultCountText = window.SoftoraDatabaseMailReadySnapshot.getCanonicalResultCountText(state, 0), inventoryMessage = canonicalInventoryStatus === "unavailable" ? window.SoftoraDatabaseResilience.unavailableMessage : "Database laden..."; nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar."; window.SoftoraDatabaseSystemMailCount.render([], { dataLoading: true, normalizeString: normalizeString, isColdmailTestCompany: isColdmailTestCompany, outreachController: outreachController, databaseContactStatus: databaseContactStatus }); document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = databaseSourceFilter.getHeaderLabel(state.activeStatus); renderPhotoBatchHeader([], true, undefined, resultCountText); nodes.photoHeaderCount.textContent = "(--)"; updateLoadMoreControl(0, 0); setDatabaseTableBodyHtml("<tr><td colspan=\"9\"><div class=\"tbl-empty\">" + escapeHtml(inventoryMessage) + "</div></td></tr>"); return; }
+            const showOutreachActionColumn = state.activeStatus === "benaderd" || state.activeStatus === "instantly" || state.activeStatus === "verstuurd", showPhotoColumn = !showOutreachActionColumn; const canonicalInventoryStatus = window.SoftoraDatabaseMailReadySnapshot.getCanonicalInventoryStatus(state); if (canonicalInventoryStatus !== "ready") { const resultCountText = window.SoftoraDatabaseMailReadySnapshot.getCanonicalResultCountText(state, 0), inventoryMessage = canonicalInventoryStatus === "unavailable" ? window.SoftoraDatabaseResilience.unavailableMessage : "Database laden..."; nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar."; window.SoftoraDatabaseSystemMailCount.render([], { dataLoading: true, normalizeString: normalizeString, isColdmailTestCompany: isColdmailTestCompany, outreachController: outreachController, databaseContactStatus: databaseContactStatus }); document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("outreachActionHeader").textContent = state.activeStatus === "verstuurd" ? resultCountText : "Acties"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = databaseSourceFilter.getHeaderLabel(state.activeStatus); renderPhotoBatchHeader([], true, undefined, resultCountText); nodes.photoHeaderCount.textContent = "(--)"; updateLoadMoreControl(0, 0); setDatabaseTableBodyHtml("<tr><td colspan=\"8\"><div class=\"tbl-empty\">" + escapeHtml(inventoryMessage) + "</div></td></tr>"); return; }
             const mailReadyPending = isMailReadyCalculationPending(), baseFiltered = getSortedCustomers(getFilteredCustomers()), visibleCustomers = getVisibleTableCustomers(baseFiltered), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers.length;
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar.";
@@ -2120,12 +2095,12 @@
             const photoHeaderCount = getPhotoHeaderCount(visibleCustomers, showPhotoColumn);
             const visibleResultCount = window.SoftoraDatabaseMailReadySnapshot.getDisplayCount(state, visibleCustomers.length);
             const resultCountText = blockForMailReadyPending ? "-- resultaten" : window.SoftoraDatabaseMailReadySnapshot.getCanonicalResultCountText(state, visibleResultCount);
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = databaseSourceFilter.getHeaderLabel(state.activeStatus); const eligiblePhotoCount = state.activeStatus === "beschikbaar" && !blockForMailReadyPending ? visibleCustomers.filter(isWebdesignPhotoEligible).length : undefined; renderPhotoBatchHeader(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText); nodes.photoHeaderCount.textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("outreachActionHeader").textContent = state.activeStatus === "verstuurd" ? resultCountText : "Acties"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = databaseSourceFilter.getHeaderLabel(state.activeStatus); const eligiblePhotoCount = state.activeStatus === "beschikbaar" && !blockForMailReadyPending ? visibleCustomers.filter(isWebdesignPhotoEligible).length : undefined; renderPhotoBatchHeader(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText); nodes.photoHeaderCount.textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: visibleCustomers.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), photoRestoreFailed: Boolean(state.photoRestoreFailed), items: buildDatabaseMediaDebugItems(filtered) });
 
             updateLoadMoreControl(visibleCustomers.length, filtered.length);
             if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { setDatabaseTableBodyHtml(""); updateLoadMoreControl(0, 0); return; } if (!visibleCustomers.length) {
-                setDatabaseTableBodyHtml("<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + getEmptyTableMessage() + "</div></td></tr>");
+                setDatabaseTableBodyHtml("<tr><td colspan=\"6\"><div class=\"tbl-empty\">" + getEmptyTableMessage() + "</div></td></tr>");
                 updateLoadMoreControl(0, 0);
                 return;
             }
@@ -2141,13 +2116,12 @@
                 const statusLabel = contextualStatus ? contextualStatus.label : (((showOutreachActionColumn && outreachController.isTrackedOutreachCustomer(customer)) || outreachController.isWebdesignOutreachCustomer(customer)) ? outreachController.getStatusLabel(outreachController.getEffectiveStatus(customer)) : getStatusLabel(customer.status));
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
-                        "<td><div class=\"company-cell\"><button class=\"company-edit\" type=\"button\" data-edit-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Bedrijfsgegevens aanpassen\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg></button><div><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div>" + outreachController.renderMeta(customer, showOutreachActionColumn && outreachController.isTrackedOutreachCustomer(customer)) + "</div></div></td>",
+                        "<td><div class=\"company-cell\"><div><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div>" + outreachController.renderMeta(customer, showOutreachActionColumn && outreachController.isTrackedOutreachCustomer(customer)) + "</div></div></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
-                        "<td class=\"c-mid\">" + escapeHtml(formatPhoneNumber(customer.tel)) + "</td>",
                         "<td class=\"c-mid website-cell\">" + websiteHtml + "</td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(statusClassName) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
-                        "<td class=\"c-light\">" + (showOutreachActionColumn ? outreachController.renderActions(customer, { hideMailButton: state.activeStatus === "instantly" }) : "") + "</td>",
+                        "<td class=\"c-light\">" + (showOutreachActionColumn ? outreachController.renderActions(customer, { hideMailButton: outreachController.hasInstantlyOutreachSignal(customer) }) : "") + "</td>",
                         "<td>" + (showPhotoColumn ? renderWebsitePhotoDrop(customer) : "") + "</td><td class=\"c-light days-cell\">" + (showOutreachActionColumn ? outreachController.renderDaysSinceSent(customer) : "") + "</td>",
                     "</tr>"
                 ].join("");
@@ -2845,7 +2819,6 @@
             syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS,
             realBusinessButton: null
         });
-        const availableImportController = window.SoftoraDatabaseAvailableImport.createController({ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage }); availableImportController.bind();
         const databaseDeepSearchController = window.SoftoraDatabaseDeepSearchLoader.createController({ scriptUrls: DATABASE_LAZY_SCRIPT_URLS, nodes: nodes, getUiState: fetchUiStateGetWithFallback, setUiState: fetchUiStateSetWithFallback, scope: CUSTOMER_DB_SCOPE, stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY, importRows: importCustomersFromRows, recordApiCost: recordApiCostEvent, getCustomers: function () { return state.klanten; }, setStatusMessage: setStatusMessage, toast: toast });
         if (nodes.query) nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
