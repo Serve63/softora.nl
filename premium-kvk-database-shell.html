@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
   <script src="/assets/premium-sidebar-links.js?v=20260818a" defer></script>
   <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
+  <link rel="stylesheet" href="/assets/kvk-database-sidebar.css?v=20260910a">
+  <script src="/assets/kvk-database-sidebar.js?v=20260910a" defer></script>
   <style>
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; overflow: hidden; background: #f4f1ed; }
@@ -43,7 +45,10 @@
 </head>
 <body>
   <div class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical">
-    <aside class="sidebar" data-sidebar-ready="false" aria-label="Premium navigatie"></aside>
+    <aside class="sidebar" data-sidebar-ready="false" id="kvk-database-sidebar" aria-label="Premium navigatie"></aside>
+    <button id="kvk-sidebar-toggle" class="kvk-sidebar-toggle" type="button" aria-label="Sidebar inklappen" aria-controls="kvk-database-sidebar" aria-expanded="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>
+    </button>
     <main class="main-content kvk-database-shell__content" aria-label="Bedrijven Scraper">
       <iframe
         class="kvk-database-shell__frame"

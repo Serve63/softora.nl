@@ -1,5 +1,5 @@
 .stats-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   align-items: end;
   padding-top: 24px;
 }
@@ -57,9 +57,10 @@
   white-space: nowrap;
 }
 
-.stat-card-successful-found .stat-main > span {
+.stat-card-decision .stat-main > span {
   font-size: 0.55rem;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
 }
 
 .stat-delta {

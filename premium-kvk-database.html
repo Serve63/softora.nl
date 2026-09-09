@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-frame.css?v=20260824a">
-  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260909c">
+  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260910b">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
   <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909c">
@@ -50,15 +50,35 @@
         </div>
         <div class="stat-delta" id="companies-treated-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card stat-card-successful-found stat-card-directory kvk-stat-card-enhanced">
-        <button id="companies-successful-found-open" class="stat-card-directory__open" type="button" aria-label="Bekijk succesvol gevonden bedrijven" title="Bekijk succesvol gevonden bedrijven">
+      <article class="stat-card stat-card-successful-found stat-card-decision stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-successful-found-open" class="stat-card-directory__open" type="button" aria-label="Bekijk bruikbaar verklaarde bedrijven" title="Bekijk bruikbaar verklaarde bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
         <div class="stat-main">
-          <span>Succesvol Gevonden</span>
+          <span>Bruikbaar verklaard</span>
           <strong id="companies-successful-found">0</strong>
         </div>
         <div class="stat-delta" id="companies-successful-found-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
+      </article>
+      <article class="stat-card stat-card-declared-unusable stat-card-decision stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-declared-unusable-open" class="stat-card-directory__open" type="button" aria-label="Bekijk onbruikbaar verklaarde bedrijven" title="Bekijk onbruikbaar verklaarde bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <div class="stat-main">
+          <span>Onbruikbaar verklaard</span>
+          <strong id="companies-declared-unusable">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-declared-unusable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
+      </article>
+      <article class="stat-card stat-card-control-room stat-card-decision stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-control-room-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven in de Controlekamer" title="Bekijk alle bedrijven in de Controlekamer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <div class="stat-main">
+          <span>Controlekamer</span>
+          <strong id="companies-control-room">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-control-room-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
       <div class="stat-new-group" role="group" aria-labelledby="stat-new-group-label">
         <p id="stat-new-group-label" class="stat-new-group-label">Nieuw. Nog niet gebruikt</p>
@@ -162,8 +182,8 @@
   <script src="/assets/kvk-database-worker-status.js?v=20260909b"></script>
   <script src="/assets/kvk-database-location-progress.js?v=20260909a"></script>
   <script src="/assets/kvk-database.js?v=20260909-progress"></script>
-  <script src="/assets/kvk-database-total-found.js?v=20260809e"></script>
-  <script src="/assets/kvk-database-metrics.js?v=20260910a"></script>
+  <script src="/assets/kvk-database-total-found.js?v=20260910b"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20260910b"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260909a"></script>
   <script src="/assets/kvk-database-control.js?v=20260909a"></script>
 </body>

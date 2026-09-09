@@ -89,6 +89,10 @@
       treatedTotal: documentRef.getElementById('companies-treated'),
       successfulFound: documentRef.getElementById('companies-successful-found'),
       successfulFoundLast60: documentRef.getElementById('companies-successful-found-last60'),
+      declaredUnusable: documentRef.getElementById('companies-declared-unusable'),
+      declaredUnusableLast60: documentRef.getElementById('companies-declared-unusable-last60'),
+      controlRoom: documentRef.getElementById('companies-control-room'),
+      controlRoomLast60: documentRef.getElementById('companies-control-room-last60'),
       treated: documentRef.getElementById('companies-treated-last60'),
       usable: documentRef.getElementById('companies-usable-last60'),
       withWebsite: documentRef.getElementById('companies-with-website-last60'),
@@ -125,12 +129,15 @@
       if (elements.successfulFound) {
         elements.successfulFound.textContent = numberFormat.format(
           Number(
-            scraperState.successful_found ??
-              sumCounts(scraperState.with_website, scraperState.without_website),
+            scraperState.declared_usable ?? 0,
           ),
         );
       }
-      renderLast60Delta(elements.successfulFoundLast60, last60.successful_found ?? last60.luna_max_found ?? 0);
+      if (elements.declaredUnusable) elements.declaredUnusable.textContent = numberFormat.format(Number(scraperState.declared_unusable ?? 0));
+      if (elements.controlRoom) elements.controlRoom.textContent = numberFormat.format(Number(scraperState.control_room ?? 0));
+      renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable ?? 0);
+      renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable ?? 0);
+      renderLast60Delta(elements.controlRoomLast60, last60.control_room ?? 0);
       renderLast60Delta(elements.treated, last60.treated);
       renderLast60Delta(elements.usable, last60.usable);
       renderLast60Delta(elements.withWebsite, last60.with_website);

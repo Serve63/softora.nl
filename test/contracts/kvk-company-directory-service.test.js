@@ -220,7 +220,30 @@ test('online KVK directory applies one exact server-side category to rows and to
   });
 });
 
-test('without-working-website includes unused rows before approval and hides transferred rows', async () => {
+test('review categories include used approvals, final rejections and both pending queues', async () => {
+  const filters = [];
+  const request = {
+    select() { return this; }, order() { return this; }, limit() { return this; },
+    eq(...args) { filters.push(['eq', ...args]); return this; },
+    gte(...args) { filters.push(['gte', ...args]); return this; },
+    or(...args) { filters.push(['or', ...args]); return this; },
+    then(resolve) { return Promise.resolve({ data: [], error: null }).then(resolve); },
+  };
+  const service = createKvkCompanyDirectoryService({ getSupabaseClient: () => ({ from: () => request }) });
+  for (const category of ['bruikbaar-verklaard', 'succesvol-gevonden']) {
+    filters.length = 0;
+    assert.equal((await service.fetchDirectoryRows({ category })).ok, true);
+    assert.deepEqual(filters, [['eq', 'lead_status', 'usable'], ['eq', 'usable_review_state', 'verified']]);
+  }
+  filters.length = 0;
+  await service.fetchDirectoryRows({ category: 'onbruikbaar-verklaard' });
+  assert.deepEqual(filters, [['eq', 'lead_status', 'unusable'], ['gte', 'unusable_review_grade', 2]]);
+  filters.length = 0;
+  await service.fetchDirectoryRows({ category: 'controlekamer' });
+  assert.deepEqual(filters, [['or', 'and(lead_status.eq.usable,usable_review_state.neq.verified),and(lead_status.eq.unusable,unusable_review_grade.lt.2)']]);
+});
+
+test('without-working-website requires approval and hides transferred rows', async () => {
   const filters = [];
   const request = {
     select() { return this; },
@@ -247,13 +270,14 @@ test('without-working-website includes unused rows before approval and hides tra
   assert.equal(result.ok, true);
   assert.deepEqual(filters, [
     ['eq', 'lead_status', 'usable'],
+    ['eq', 'usable_review_state', 'verified'],
     ['eq', 'premium_database_transferred', false],
     ['in', 'website_status', ['no_website', 'not_working']],
   ]);
   assert.equal(
     filters.some(([, column]) => column === 'usable_review_state'),
-    false,
-    'pending approval must not hide an otherwise unused company without a working website'
+    true,
+    'only verified companies belong in the available website buckets'
   );
 });
 
