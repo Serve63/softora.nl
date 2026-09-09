@@ -81,7 +81,7 @@ async function listExactSentDescendants({
       if (!frontierByAccount.has(accountEmail)) frontierByAccount.set(accountEmail, []);
       frontierByAccount.get(accountEmail).push(messageId);
     });
-    if (!frontierByAccount.size) break;
+    if (!frontierByAccount.size) { frontier = []; break; }
 
     const nextFrontier = [];
     const requests = [...frontierByAccount].flatMap(([accountEmail, messageIds]) => Array.from(

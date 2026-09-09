@@ -3,26 +3,52 @@ const assert = require('node:assert/strict');
 const { createInstantlyMailboxApi, retryDelayMs } = require('../../server/services/instantly-mailbox-api');
 const { buildRecentSyncResult } = require('../../server/services/instantly-mailbox-sync-cadence');
 const refresh = require('../../assets/premium-mailbox-refresh');
+const { createInstantlyStateFixture } = require('../helpers/instantly-mailbox-state');
 
 function harness({ values = {}, response = { ok: true }, data = {}, fetch, key = 'test' } = {}) {
   let time = Date.parse('2026-09-09T12:00:00Z');
   const calls = [], writes = [];
+  const durable = createInstantlyStateFixture(values);
   const api = createInstantlyMailboxApi({
     config: { apiBaseUrl: 'https://api.example.test', apiKey: key },
     now: () => new Date(time), assertConfigured() {}, logger: { warn() {} },
     createError: (message, code, status, extra) => Object.assign(new Error(message), { code, status, ...extra }),
-    getUiStateValues: async () => ({ values }),
-    setUiStateValues: async (_scope, patch) => { writes.push(patch); Object.assign(values, patch); },
+    getUiStateValues: (...args) => durable.store.getUiStateValues(...args),
+    setUiStateValues: async (...args) => { writes.push(args[1]); return durable.store.setUiStateValues(...args); },
     fetchJsonWithTimeout: async (...args) => { calls.push(args); return fetch ? fetch(...args) : { response, data }; },
   });
-  return { api, calls, writes, values, advance: (ms) => { time += ms; } };
+  return { api, calls, writes, values, durable, advance: (ms) => { time += ms; } };
 }
+
+test('continuation and audit writes preserve permission and rate cooldowns through the real UI store', async () => {
+  const h = harness({ response: { ok: false, status: 403 }, data: { message: 'Missing scope: leads:read' } });
+  await assert.rejects(h.api.request('leads/one'), { providerStatus: 403 });
+  await h.durable.store.setUiStateValues('instantly_mailbox_sync', { cursor_serve: 'page-serve', min_timestamp_serve: '2026-09-09' });
+  h.api.noteAudit('serve|one'); await h.api.persistAudits();
+  await h.durable.store.setUiStateValues('instantly_mailbox_sync', { cursor_martijn: 'page-martijn' });
+  const next = harness({ values: h.values });
+  await assert.rejects(next.api.request('leads/two'), { code: 'INSTANTLY_LEADS_READ_UNAVAILABLE' });
+  assert.equal(next.calls.length, 0);
+  assert.equal(h.values.cursor_serve, 'page-serve');
+  assert.equal(h.values.cursor_martijn, 'page-martijn');
+  assert.equal(next.api.canAudit('serve|one'), false);
+});
+
+test('unavailable durable policy refuses provider reads without blocking sends', async () => {
+  const h = harness(); h.durable.setUnavailable(true);
+  await assert.rejects(h.api.request('emails'), { code: 'INSTANTLY_READ_POLICY_UNAVAILABLE', externalEffect: false });
+  assert.equal(h.calls.length, 0);
+  await h.api.request('emails/reply', { method: 'POST', body: { test: true } });
+  assert.equal(h.calls.length, 1);
+});
 
 test('429 Retry-After survives a new service instance and blocks both owners before another provider read', async () => {
   const first = harness({ response: { ok: false, status: 429, headers: { get: () => '120' } } });
   await assert.rejects(first.api.request('emails', { query: { eaccount: 'serve@example.test' } }), { retryAfterMs: 120_000, providerStatus: 429 });
   await assert.rejects(first.api.request('emails', { query: { eaccount: 'martijn@example.test' } }), { status: 429, externalEffect: false });
   assert.equal(first.calls.length, 1);
+  await first.durable.store.setUiStateValues('instantly_mailbox_sync', { cursor_martijn: 'next-page' });
+  first.api.noteAudit('serve|rate-limited-thread'); await first.api.persistAudits();
   const next = harness({ values: first.values });
   await assert.rejects(next.api.request('emails'), { status: 429 });
   assert.equal(next.calls.length, 0);

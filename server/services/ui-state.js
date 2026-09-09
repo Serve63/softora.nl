@@ -1,3 +1,4 @@
+const { INSTANTLY_MAILBOX_SYNC_SCOPE, patchInstantlyMailboxState } = require('./instantly-mailbox-state');
 const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_UI_STATE_VALUE_MAX_LENGTH = 200000;
@@ -520,6 +521,10 @@ function createUiStateStore(deps = {}) {
 
     if (!isSupabaseConfigured()) {
       return null;
+    }
+
+    if (normalizedScope === INSTANTLY_MAILBOX_SYNC_SCOPE) {
+      return patchInstantlyMailboxState({ getUiStateValues, compareAndSwapUiStateValues }, sanitizedValues, meta);
     }
 
     try {
