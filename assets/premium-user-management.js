@@ -1025,12 +1025,7 @@ function showToast(msg) {
 }
 
 mountExtraSettingsCategory();
-// Categories are local UI. Session/team requests must never blank this screen.
-if (window.SoftoraPremiumBoot) window.SoftoraPremiumBoot.setShellBooting(false);
-window.addEventListener('hashchange', function () {
-  if (window.location.hash === '#extra') goTo('screen-extra');
-  else if (document.getElementById('screen-extra')?.classList.contains('active')) goTo('screen-overzicht');
-});
+window.SoftoraSettingsNavigation.initialize(window, goTo);
 
 (async function bootstrapPersoneelManager() {
   try {

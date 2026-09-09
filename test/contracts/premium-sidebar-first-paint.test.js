@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const { initialize } = require('../../assets/premium-settings-navigation');
 const { createHtmlPageCoordinator } = require('../../server/services/html-pages');
 const { createPremiumSidebarShell } = require('../../server/services/premium-sidebar-shell');
 const root = path.join(__dirname, '../..');
@@ -57,33 +57,30 @@ test('empty-host rendering preserves page hooks and never adds owner navigation 
   assert.equal(render('<main>Public page</main>'), '<main>Public page</main>');
 });
 
-test('settings categories are released before an unresolved session request', () => {
+test('settings categories are released without a session or network dependency', () => {
   const source = fs.readFileSync(path.join(root, 'assets/premium-user-management.js'), 'utf8');
-  const bootstrap = source.slice(source.lastIndexOf('\nmountExtraSettingsCategory();'));
+  assert.match(source, /mountExtraSettingsCategory\(\);\s*window\.SoftoraSettingsNavigation\.initialize\(window, goTo\);\s*\(async function bootstrapPersoneelManager/);
+  const page = fs.readFileSync(path.join(root, 'premium-instellingen.html'), 'utf8');
+  assert.ok(page.indexOf('premium-settings-navigation.js') < page.indexOf('premium-user-management.js'));
   const events = [];
-  const context = {
-    mountExtraSettingsCategory: () => events.push('categories'),
-    window: { SoftoraPremiumBoot: { setShellBooting: value => events.push(value) }, addEventListener() {} },
-    fetchJson: () => { events.push('session'); return new Promise(() => {}); },
+  const target = {
+    SoftoraPremiumBoot: { setShellBooting: value => events.push(value) }, addEventListener() {},
+    fetch: () => { throw new Error('categories must not need the network'); },
   };
-  vm.runInNewContext(bootstrap, context);
-  assert.deepEqual(events, ['categories', false, 'session']);
+  initialize(target, () => {});
+  assert.deepEqual(events, [false]);
 });
 
 test('browser back and forward synchronize the settings category without reloading', () => {
-  const source = fs.readFileSync(path.join(root, 'assets/premium-user-management.js'), 'utf8');
-  const bootstrap = source.slice(source.lastIndexOf('\nmountExtraSettingsCategory();'));
   const screens = [];
   const handlers = {};
-  const context = {
-    mountExtraSettingsCategory() {}, goTo: screen => screens.push(screen),
+  const target = {
     document: { getElementById: () => ({ classList: { contains: () => true } }) },
-    window: { location: { hash: '#extra' }, addEventListener: (name, handler) => { handlers[name] = handler; } },
-    fetchJson: () => new Promise(() => {}),
+    location: { hash: '#extra' }, addEventListener: (name, handler) => { handlers[name] = handler; },
   };
-  vm.runInNewContext(bootstrap, context);
+  initialize(target, screen => screens.push(screen));
   handlers.hashchange();
-  context.window.location.hash = '';
+  target.location.hash = '';
   handlers.hashchange();
   assert.deepEqual(screens, ['screen-extra', 'screen-overzicht']);
 });
