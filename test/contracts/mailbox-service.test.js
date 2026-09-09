@@ -546,6 +546,8 @@ test('selected owner response stays isolated while durable snapshot retains both
   assert.equal(res.statusCode, 200);
   assert.deepEqual(localReplyOptions, { limit: 100, owner: 'serve' });
   assert.deepEqual(res.body.messages.map((message) => message.id), ['ramon']);
+  assert.equal(savedSnapshot, '', 'een eigenaarread vervangt de gedeelde snapshot niet');
+  await service.listCampaignReplies({ limit: 100, includeSnapshotMessages: true, hydrateBodies: false });
   const persisted = parseMailboxCampaignSnapshot(savedSnapshot);
   assert.deepEqual(
     persisted.messages.map((message) => [message.id, message.providerOwner]),
@@ -571,7 +573,7 @@ test('campagnelijst kan alleen metadata ophalen terwijl bestaande callers volled
     assert.equal(res.statusCode, 200);
   }
   assert.deepEqual(reads.map((options) => options.hydrateBodies), [true, false]);
-  assert.ok(reads.every((options) => options.owner === 'serve' && options.snapshotLimit === 200));
+  assert.ok(reads.every((options) => options.owner === 'serve' && options.snapshotLimit === 0));
 });
 
 test('campaign-replies route verbindt het optionele snelle eigenaarpad met de bestaande index en snapshot', async () => {
@@ -3978,6 +3980,8 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   ]);
   assert.equal(customerLookup.bypassReadFailureCooldown, true);
   assert.deepEqual(hydratedReplyIds, ['inbox:91', 'inbox:42', 'inbox:77']);
+  assert.equal(snapshotWrite, null, 'de gewone lijst wacht niet op het schrijven van een snapshot');
+  await service.listCampaignReplies({ limit: 100, includeSnapshotMessages: true });
   assert.equal(snapshotWrite.scope, 'premium_mailbox_campaign_snapshot');
   assert.equal(snapshotWrite.meta.source, 'mailbox-campaign-replies');
   const persistedSnapshot = JSON.parse(
