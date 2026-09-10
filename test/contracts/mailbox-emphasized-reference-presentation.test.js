@@ -1,7 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
+const { parseDocument, DomUtils } = require('htmlparser2');
 const signature = require('../../assets/premium-mailbox-signature');
 const quoted = require('../../assets/premium-mailbox-quoted-thread');
 const presentation = require('../../assets/premium-mailbox-message-presentation').create({
@@ -11,9 +10,7 @@ const presentation = require('../../assets/premium-mailbox-message-presentation'
   getDirectParentMessageIds: () => [],
   splitQuotedReply: quoted.splitQuotedThread,
 });
-const displayScope = { URL };
-vm.runInNewContext(fs.readFileSync(require.resolve('../../assets/premium-mailbox-display'), 'utf8'), displayScope);
-const { renderLinkedMailboxText } = displayScope.SoftoraMailboxDisplay;
+const { renderLinkedMailboxText } = require('../../assets/premium-mailbox-display');
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const render = (s) => s.split('\n').map((line) => renderLinkedMailboxText(line, {}, {
   escapeHtml, isSafeUrl: (url) => /^https?:\/\//.test(url), renderUrls: escapeHtml,
@@ -47,7 +44,7 @@ test('embedded marketing response preserves authored emphasis and PDF citation, 
     for (const value of ['Jamie Voorbeeld', 'Hotel Voorbeeld', 'tel:0131234567', 'Dorpsstraat 2-1', '1234 AB Voorbeeldstad', 'href="https://www.example.nl/"']) {
       assert.ok(result.contactHtml.includes(value), value);
     }
-    assert.doesNotMatch(result.contactHtml.replace(/<[^>]+>/g, ''), /[_*]|Links:|booking|Instagram|LinkedIn|reservering|\[\d+\]/);
+    assert.doesNotMatch(DomUtils.textContent(parseDocument(result.contactHtml)), /[_*]|Links:|booking|Instagram|LinkedIn|reservering|\[\d+\]/);
   }
 });
 
