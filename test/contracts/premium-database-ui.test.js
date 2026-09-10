@@ -6258,7 +6258,7 @@ test('database metric labels are readable and stay on one line', () => {
 test("sent list omits controls and first heading contains only search", () => {
   const pageSource = fs.readFileSync(path.join(__dirname, "../../premium-database.html"), "utf8");
   const tableCss = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
-  assert.match(pageSource, /showSentActions = showOutreachActionColumn && state.activeStatus !== "verstuurd"/);
+  assert.match(pageSource, /showSentActions = state.activeStatus === "benaderd"/);
   assert.match(tableCss, /#databaseTable\.sent-list-mode th:nth-child\(8\), #databaseTable\.sent-list-mode td:nth-child\(8\) \{ display: none; \}/);
   assert.match(pageSource, /class="company-heading">[\s\S]*?id="q"/);
   assert.doesNotMatch(pageSource, /data-sort-key="naam">Bedrijf/);
@@ -6290,4 +6290,10 @@ test("webdesign count disables autocomplete and uses one focus border", () => {
 test("sent list removes the result count column completely", () => {
   const css = fs.readFileSync(path.join(__dirname, "../../assets/premium-database-filter-groups.css"), "utf8");
   assert.match(css, /#databaseTable\.sent-list-mode th:nth-child\(6\), #databaseTable\.sent-list-mode td:nth-child\(6\) \{ display: none; \}/);
+});
+
+ test('Instantly hides action and day columns using the sent list layout', () => {
+  const page = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  assert.ok(page.includes('classList.toggle("sent-list-mode", state.activeStatus === "verstuurd" || state.activeStatus === "instantly")'));
+  assert.ok(page.includes('showSentActions = state.activeStatus === "benaderd"'));
 });
