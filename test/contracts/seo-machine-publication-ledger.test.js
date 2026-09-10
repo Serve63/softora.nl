@@ -198,7 +198,7 @@ test('content growth actions have an explicit machine-readable event plan', () =
       ],
       [
         '/blog/website-offerte-vergelijken',
-        '2026-08-30',
+        '2026-09-10',
         'other_growth_action',
         'scheduled',
       ],
@@ -231,12 +231,9 @@ test('website-migratiepublicatie staat eenmaal als nieuwe URL in het machineplan
   assert.equal(events[0].publicationLane, 'editorial');
 });
 
-test('websitebriefing en ondersteunende offerte-optimalisatie blijven aparte gebeurtenissen', () => {
+test('websitebriefing blijft de aparte nieuwe-url-gebeurtenis van 30 augustus', () => {
   const events = getSeoMachinePublicationPlan({ now: new Date('2026-08-30T16:00:00.000Z') })
-    .filter((event) => [
-      '/blog/website-briefing-maken-mkb',
-      '/blog/website-offerte-vergelijken',
-    ].includes(event.path) && event.eventAt === '2026-08-30');
+    .filter((event) => event.path === '/blog/website-briefing-maken-mkb');
 
   assert.deepEqual(events.map((event) => [
     event.path,
@@ -245,7 +242,20 @@ test('websitebriefing en ondersteunende offerte-optimalisatie blijven aparte geb
     event.publicationLane,
   ]), [
     ['/blog/website-briefing-maken-mkb', 'new_url', '2026-08-30', 'editorial'],
-    ['/blog/website-offerte-vergelijken', 'other_growth_action', '2026-08-30', 'editorial'],
+  ]);
+});
+
+test('websiteofferteverbetering registreert een aparte groei-ingreep op 10 september', () => {
+  const events = getSeoMachinePublicationPlan({ now: new Date('2026-09-10T16:00:00.000Z') })
+    .filter((event) => event.path === '/blog/website-offerte-vergelijken' && event.eventAt === '2026-09-10');
+
+  assert.deepEqual(events.map((event) => [
+    event.path,
+    event.publicationKind,
+    event.eventAt,
+    event.publicationLane,
+  ]), [
+    ['/blog/website-offerte-vergelijken', 'other_growth_action', '2026-09-10', 'editorial'],
   ]);
 });
 

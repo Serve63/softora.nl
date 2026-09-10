@@ -258,10 +258,10 @@ const WEBSITE_BRIEFING_CONTENT_ITEM = Object.freeze({
         'Bepaal wat bij oplevering wordt overgedragen: beheeraccounts, domein- en hostingtoegang, analytics, bronbestanden, content, documentatie, back-up- en herstelroute en waar relevant exportmogelijkheden. Leg daarnaast vast wie na livegang updates, monitoring, kleine wijzigingen en incidenten behandelt. De precieze juridische rechten horen in de overeenkomst; de briefing moet wel voorkomen dat noodzakelijk beheer pas na de keuze wordt ontdekt.',
         Object.freeze({
           text:
-            'Stuur pas daarna dezelfde briefing naar leveranciers en vergelijk voorstellen op dezelfde beslissingen, open vragen en bewijslast. De checklist voor websiteoffertes helpt om scope, verantwoordelijkheden, acceptatie en beheer naast elkaar te zetten. Een leverancier mag een betere route voorstellen, maar moet dan expliciet maken welk briefingbesluit verandert en wat dat doet met prijs, risico en planning.',
+            'Stuur pas daarna dezelfde briefing naar leveranciers en vergelijk voorstellen op dezelfde beslissingen, open vragen en bewijslast. De zevenveldenmatrix voor websiteoffertes zet doel en routes, scope, content, techniek, meten, acceptatie en overdracht op één gelijke basis. Een leverancier mag een betere route voorstellen, maar moet dan expliciet maken welk briefingbesluit verandert en wat dat doet met prijs, risico en planning.',
           links: Object.freeze([
             Object.freeze({
-              anchor: 'checklist voor websiteoffertes',
+              anchor: 'zevenveldenmatrix voor websiteoffertes',
               href: '/blog/website-offerte-vergelijken',
             }),
           ]),
