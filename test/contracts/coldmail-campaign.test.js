@@ -1011,7 +1011,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
     provider: 'softora',
     channel: 'coldmail',
     keyType: 'email',
-    maxRows: 5_000,
+    maxRows: 20_000, requireComplete: true,
   });
   assert.equal(result.stats.sentToday, 2);
   assert.equal(result.stats.systemSentToday, 2);
@@ -1019,6 +1019,10 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.sentLast24h, 4);
   assert.equal(result.stats.personalMailboxSentToday, 2);
   assert.equal(result.stats.databaseTotalSent, 3);
+  const register = await service.getColdmailSentRegister();
+  assert.equal(register.recipients.length, result.stats.systemTotalSent);
+  assert.equal(new Set(register.recipients.map(row => row.key)).size, 2);
+  assert.ok(register.recipients.every(row => row.senderEmail && !Object.hasOwn(row, 'payload')));
   assert.equal(result.stats.centralGuardTotalSent, 2);
   assert.equal(result.stats.systemTotalSent, 2);
   assert.equal(result.stats.totalSent, 2);
