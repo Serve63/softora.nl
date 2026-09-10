@@ -340,6 +340,11 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
 
   function renderLinkedMailboxText(value, options, helpers) {
     const text = String(value == null ? '' : value);
+    const emphasis = /^([*_]{1,2})([^*_\n].*?)\1$/.exec(text.trim());
+    if (emphasis) {
+      const tag = emphasis[1].length === 2 ? 'strong' : 'em';
+      return `<${tag}>${renderLinkedMailboxText(emphasis[2].trim(), options, helpers)}</${tag}>`;
+    }
     const { escapeHtml, isSafeUrl } = helpers;
     const renderRest = (part) => renderAnnotatedMailboxText(part, options, helpers);
     const pattern = /(?<!\[)\[([^\[\]\r\n]+)\]\(([^\s<>"']+)\)/g;
@@ -350,8 +355,9 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
       const reservedCta = /^(?:deze link|hier)$/i.test(label) && isSoftoraWebdesignUrl(url);
       html += renderRest(text.slice(lastIndex, offset));
       if (isSafeUrl(url) && (!reservedCta || isLabelledUrlMatch(label, url, options))) {
-        const anchor = renderLabelledUrlAnchor(url, label, escapeHtml);
-        html += italic ? `<em>${anchor}</em>` : anchor;
+        const numeric = /^\d{1,3}$/.test(label);
+        const anchor = renderLabelledUrlAnchor(url, numeric ? `[${label}]` : label, escapeHtml);
+        html += numeric ? `<sup>${anchor}</sup>` : italic ? `<em>${anchor}</em>` : anchor;
       } else {
         html += escapeHtml(match);
       }
@@ -418,5 +424,6 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
     renderDetailBody,
     renderLinkedMailboxText,
   };
+  if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
 })(typeof window !== 'undefined' ? window : globalThis);

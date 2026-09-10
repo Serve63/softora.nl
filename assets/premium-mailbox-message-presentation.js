@@ -89,7 +89,10 @@
       const displayBody = parsedDisplayBody && typeof parsedDisplayBody.authored === 'string'
         ? parsedDisplayBody.authored
         : provenBody;
-      const sourceSafeBody = hasMessageContext ? cleanClientFooter(displayBody) : displayBody;
+      const cleanedBody = hasMessageContext ? cleanClientFooter(displayBody) : displayBody;
+      const sourceSafeBody = hasMessageContext && presentationOptions.stripDetectedQuotes === true &&
+        typeof signature?.formatBodyReferences === 'function'
+        ? signature.formatBodyReferences(cleanedBody, body) : cleanedBody;
       if (!message || typeof message !== 'object' || Array.isArray(message)) {
         return { body: sourceSafeBody, contact: emptyContact(), signatureMatched: false };
       }

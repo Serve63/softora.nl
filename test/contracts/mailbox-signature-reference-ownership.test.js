@@ -46,10 +46,11 @@ test('een cluster met slechts twee verwijzingen is geen referentiedefinitie', ()
   assert.doesNotMatch(result.html, /facebook|\[1\]|\[2\]/);
 });
 
-test('inhoudelijke bronverwijzingen houden hun definitie als de handtekening dezelfde voetnoot gebruikt', () => {
+test('inhoudelijke bronverwijzingen en handtekening houden elk hun klikbare bestemming', () => {
   const result = render('Lees de voorwaarden [1].' + signoff + 'Website [1]' + quote + '\nLinks:\n-----\n[1] https://example.nl');
   assert.match(result.body, /Lees de voorwaarden \[1\]/);
-  assert.match(result.body, /\[1\] https:\/\/example.nl/);
+  assert.match(result.body, /\[1\]\(https:\/\/example.nl\/\)/);
+  assert.doesNotMatch(result.body, /Links:|-----/);
   assert.match(result.html, /href="https:\/\/example.nl\/"/);
 });
 

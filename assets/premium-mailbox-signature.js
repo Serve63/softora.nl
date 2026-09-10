@@ -54,7 +54,7 @@
       .trim();
   }
   function isStandaloneSignoff(value) {
-    const line = normalizeWhitespace(value);
+    const line = unwrapLineEmphasis(normalizeWhitespace(value));
     if (!line || /^>/.test(line)) return false;
     if (line === '--') return true;
     const parts = line.split(/\s*(?:\/|\||,)\s*/).filter(Boolean);
@@ -62,6 +62,9 @@
   }
   function isStrongSignatureSeparator(value) {
     return normalizeWhitespace(value) === '--';
+  }
+  function unwrapLineEmphasis(value) {
+    return String(value || '').replace(/^([*_]{1,2})([^*_].*?)\1$/, '$2').trim();
   }
   function getQuotedThreadApi() {
     if (global && global.SoftoraMailboxQuotedThread) return global.SoftoraMailboxQuotedThread;
@@ -236,6 +239,40 @@
     return references;
   }
 
+  function findGeneratedReferenceAppendix(body) {
+    const lines = normalizeBody(body).split('\n');
+    const start = lines.findIndex((line, index) => (
+      /^(?:Links|References|Referenties):$/i.test(line.trim()) &&
+      /^[-_=]{3,}$/.test((lines[index + 1] || '').trim()) &&
+      lines.slice(index + 2).some((value) => /^\s*\[\d{1,3}\]\s*:?\s+\S+\s*$/.test(value)) &&
+      lines.slice(index + 2).every((value) => !value.trim() || /^\s*\[\d{1,3}\]\s*:?\s+\S+\s*$/.test(value))
+    ));
+    return start < 0 ? null : { start, lines };
+  }
+
+  function formatBodyReferences(value, originalBody) {
+    const source = findGeneratedReferenceAppendix(originalBody);
+    if (!source) return value;
+    const references = signatureReferenceLinks(originalBody);
+    const sourceText = source.lines.slice(0, source.start).join('\n');
+    const proven = new Map([...references].filter(([id, href]) => href && sourceText.includes(`[${id}]`)));
+    const appendix = findGeneratedReferenceAppendix(value);
+    const lines = normalizeBody(value).split('\n');
+    const bodyLines = appendix ? lines.slice(0, appendix.start) : lines;
+    // Resolve only standalone numeric markers, never Markdown destinations or
+    // literal code. Ambiguous/unsafe definitions retain their original text.
+    const body = bodyLines.map((line) => line.split(/(`[^`]*`|https?:\/\/\S+|\[[^\]\n]+\]\([^\s]+\))/g)
+      .map((part, index) => index % 2 ? part : part.replace(/(?<![\[\\])\[(\d{1,3})\](?![\](])/g, (marker, id) => (
+        proven.has(id) ? `[${id}](${proven.get(id).replace(/\(/g, '%28').replace(/\)/g, '%29')})` : marker
+      ))).join('')).join('\n').trim();
+    if (!appendix) return body;
+    const remaining = lines.slice(appendix.start + 2).filter((line) => (
+      line.trim() && (!proven.has(/^\s*\[(\d{1,3})\]/.exec(line)?.[1]) ||
+        new RegExp(`\\[${/^\s*\[(\d{1,3})\]/.exec(line)?.[1]}\\](?!\\()`).test(body))
+    ));
+    return remaining.length ? `${body}\n\n${lines[appendix.start]}\n${lines[appendix.start + 1]}\n${remaining.join('\n')}` : body;
+  }
+
   function resolveContactLink(value, references = new Map()) {
     const line = normalizeWhitespace(value);
     const markdown = /^(?:[A-Z][.:]?\s+)?\[([^\[\]]+)\]\(([^\s]+)\)$/i.exec(line);
@@ -287,7 +324,7 @@
     return stripClientFooter(lines.join('\n'), { signature: true }).split('\n').flatMap((value) => {
       let line = normalizeWhitespace(value);
       if (/^[-*_•\s]+$/.test(line)) return [];
-      line = line.replace(/^\*+(?=\p{L})/u, '').replace(/\*+$/, '').trim();
+      line = unwrapLineEmphasis(line).replace(/^\*+(?=\p{L})/u, '').replace(/\*+$/, '').trim();
       line = line.replace(/^[📞☎☏]\uFE0F?\s*/u, 'Tel: ').replace(/^📍\s*/u, '');
       // Only split an attached name when the actual sender identity supports it.
       const joined = /^(.+?)(?=(?:Tel(?:efoon)?|Phone|Mobiel|Mobile)\.?\s*:\s*(?:\+|\d))/i.exec(line);
@@ -556,7 +593,9 @@
     const quotedSegments = findQuotedSegments(normalizedBody);
     const directBodyEnd = findDirectBodyEnd(normalizedBody, lines, quotedSegments);
     let signatureStart = -1;
-    let signatureEnd = directBodyEnd;
+    // A generated link appendix belongs to the whole message, including authored
+    // citations. Never swallow its definitions into the contact card.
+    let signatureEnd = Math.min(directBodyEnd, findGeneratedReferenceAppendix(normalizedBody)?.start ?? lines.length);
     let postQuoteSignature = false;
     const postQuoteSignatureStart = findPostQuoteSignatureStart(lines, quotedSegments, messageContext);
     if (postQuoteSignatureStart >= 0) {
@@ -566,7 +605,7 @@
     } else if (hasPostQuoteSignatureSeparator(lines, directBodyEnd)) {
       return { bodyLines: lines, contact: emptyContact(), matched: false };
     }
-    for (let index = directBodyEnd - 1; signatureStart < 0 && index >= 0; index -= 1) {
+    for (let index = signatureEnd - 1; signatureStart < 0 && index >= 0; index -= 1) {
       if (isStandaloneSignoff(lines[index]) || (/^grt\.?$/i.test(lines[index].trim()) && linesMatchSenderEvidence(lines.slice(index + 1, directBodyEnd), senderEvidence))) {
         signatureStart = index;
         break;
@@ -640,7 +679,7 @@
     return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening">${beforeLines.map(renderLine).join('')}${fieldsHtml}${preservedHtml}</address>`;
   }
 
-  const api = { parseIncoming, renderContactCard, stripClientFooter };
+  const api = { parseIncoming, renderContactCard, stripClientFooter, formatBodyReferences };
   if (global) global.SoftoraMailboxSignature = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
