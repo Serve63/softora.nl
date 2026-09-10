@@ -428,6 +428,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     if (recipientEmails.length > MAX_EXACT_RECIPIENT_EMAIL_FILTERS) return null;
     if (hasRecipientEmailFilter && !recipientEmails.length) return [];
     const client = getClient();
+    if (!client && options.requireComplete) throw new Error('Central recipient store unavailable');
     if (!client) return hasRecipientEmailFilter ? null : [];
     const maxRows = hasRecipientEmailFilter
       ? recipientEmails.length + 1
@@ -440,7 +441,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     const buildQuery = () => {
       let query = client
         .from(table)
-        .select(selectColumns, hasRecipientEmailFilter ? { count: 'exact' } : undefined)
+        .select(selectColumns, (hasRecipientEmailFilter || options.requireComplete) ? { count: 'exact' } : undefined)
         .eq('status', status)
         .eq('permanent', true);
       if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
@@ -448,7 +449,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
       if (keyType && query && typeof query.eq === 'function') query = query.eq('key_type', keyType);
       if (hasRecipientEmailFilter) query = query.in('key_value', recipientEmails);
       if (updatedSince && query && typeof query.gte === 'function') query = query.gte('updated_at', updatedSince);
-      if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+      if (query && typeof query.order === 'function') query = query.order(options.requireComplete ? 'guard_key' : 'updated_at', { ascending: Boolean(options.requireComplete) });
       return query;
     };
     const rows = [];
@@ -460,7 +461,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
         const to = Math.min(maxRows - 1, from + pageSize - 1);
         const { data, error, count } = await buildQuery().range(from, to);
         if (error) throw error;
-        if (hasRecipientEmailFilter) {
+        if (hasRecipientEmailFilter || options.requireComplete) {
           const parsedCount = count === null || count === undefined ? Number.NaN : Number(count);
           if (!Number.isFinite(parsedCount)
             || (exactResultCount !== null && exactResultCount !== parsedCount)) return null;
@@ -474,13 +475,14 @@ function createOutboundRecipientGuardStore(deps = {}) {
       const query = firstQuery && typeof firstQuery.limit === 'function' ? firstQuery.limit(maxRows) : firstQuery;
       const { data, error, count } = await query;
       if (error) throw error;
-      if (hasRecipientEmailFilter) {
+      if (hasRecipientEmailFilter || options.requireComplete) {
         const parsedCount = count === null || count === undefined ? Number.NaN : Number(count);
         if (!Number.isFinite(parsedCount)) return null;
         exactResultCount = parsedCount;
       }
       rows.push(...(Array.isArray(data) ? data : []));
     }
+    if (options.requireComplete && (rows.length >= maxRows || exactResultCount !== rows.length || new Set(rows.map(row => row.guard_key)).size !== rows.length)) throw new Error('Central recipient read incomplete');
     const exactRowKeys = new Set();
     if (hasRecipientEmailFilter) {
       const requestedRecipients = new Set(recipientEmails);

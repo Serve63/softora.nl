@@ -2,7 +2,7 @@
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
     const ROI_APPOINTMENTS_KEY = "premium_database_mail_appointments_v1";
-    const COLDMAIL_STATS_URL = "/api/coldmailing/stats";
+    const COLDMAIL_STATS_URL = "/api/coldmailing/stats?includeRecipients=1";
     const TODAY_SENT_REFRESH_MS = 60000;
     let roiControlsBound = false;
     let roiSaveLifecycleBound = false;
@@ -476,6 +476,10 @@
             const payload = result.payload;
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
+            if (window.SoftoraDatabaseSentRegister) {
+                window.SoftoraDatabaseSentRegister.accept(stats.sentRegister);
+                lastStatsMailCount = stats.sentRegister.total; lastRenderedMailCount = stats.sentRegister.total;
+            }
             const sentToday = readTodaySentCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
@@ -486,8 +490,10 @@
                     : Math.max(lastStatsMailCount, systemMailCount);
                 renderSystemMailCount(systemMailCount, false);
             }
+            if (window.SoftoraDatabaseSentRegister) window.dispatchEvent(new Event("softora:sent-register"));
             return sentToday;
         }).catch(function (error) {
+            if (window.SoftoraDatabaseSentRegister) { window.SoftoraDatabaseSentRegister.markFailed(); window.dispatchEvent(new Event("softora:sent-register")); }
             renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
             renderHardBouncesCount(lastHardBouncesCount, lastHardBouncesCount === null);
             renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);

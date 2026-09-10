@@ -885,8 +885,8 @@
 
         function matchesStatusFilter(customer, activeStatus, hasUsedColdCalling, hasUsedColdMailing) {
             const status = normalizeString(activeStatus);
-            if (status === "instantly") return isInstantlyTabCustomer(customer);
-            if (status === "verstuurd") return hasInstantlyOutreachSignal(customer) || (typeof hasUsedColdMailing === "function" && hasUsedColdMailing(customer));
+            if (status === "instantly") return hasInstantlyOutreachSignal(customer);
+            if (status === "verstuurd") return false; // Delivered recipients are read from the central sent register.
             if (status === "benaderd") {
                 const usedColdCalling = typeof hasUsedColdCalling === "function" && hasUsedColdCalling(customer);
                 const usedColdMailing = typeof hasUsedColdMailing === "function" && hasUsedColdMailing(customer);
