@@ -369,7 +369,7 @@ function registerColdmailingRoutes(app, deps = {}) {
       if (typeof res.setHeader === 'function') {
         res.setHeader('Cache-Control', 'no-store, private');
       }
-      res.json(await coldmailCampaignService.getColdmailLiveStats());
+      res.json(await require('../services/coldmail-sent-register-response').getColdmailStatsResponse(coldmailCampaignService, _req.query && _req.query.includeRecipients === '1'));
     } catch (error) {
       res.status(500).json({
         ok: false,

@@ -1346,7 +1346,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-boot\.js\?v=20260908a/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260908-publish/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260910-sent-register/);
 });
 
 

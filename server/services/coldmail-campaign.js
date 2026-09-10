@@ -3300,6 +3300,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function summarizeColdmailCentralGuardLiveStats(groups, options = {}) {
     const recipientCounts = {};
+    const recipients = new Map();
     const todayRecipientCounts = {};
     const timezone =
       normalizeString(options.timezone || options.timeZone) ||
@@ -3307,7 +3308,6 @@ function createColdmailCampaignService(deps = {}) {
     const todayKey = getColdmailAutopilotDateKey(now(), timezone);
     let lastSentAt = '';
     let lastSenderEmail = '';
-
     (Array.isArray(groups) ? groups : []).forEach((group) => {
       if (!isSoftoraColdmailCentralGuardGroup(group)) return;
       const source = normalizeString(group && group.source).toLowerCase();
@@ -3328,9 +3328,12 @@ function createColdmailCampaignService(deps = {}) {
         recipientCompanyKey: group.recipient_company_key || group.recipientCompanyKey || group.recipient_company || group.recipientCompany,
       });
       setColdmailRecipientCount(recipientCounts, recipientKey, 1);
-
       const sentAt = resolveColdmailGuardSentAt(group);
       const sentAtMs = parseTimestampMs(sentAt);
+      if (recipientKey && (!recipients.has(recipientKey) || sentAtMs > parseTimestampMs(recipients.get(recipientKey).sentAt))) recipients.set(recipientKey, {
+        key: recipientKey, email: normalizeEmailAddress(group.recipient_email || group.recipientEmail),
+        company: normalizeString(group.recipient_company || group.recipientCompany), customerId: normalizeString(group.recipient_id || group.recipientId),
+        senderEmail, sentAt });
       if (sentAtMs && (!lastSentAt || sentAtMs > parseTimestampMs(lastSentAt))) {
         lastSentAt = sentAt;
         lastSenderEmail = senderEmail;
@@ -3342,17 +3345,15 @@ function createColdmailCampaignService(deps = {}) {
         setColdmailRecipientCount(todayRecipientCounts, recipientKey, 1);
       }
     });
-
     return {
       available: true, sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL,
-      recipientCounts,
+      recipientCounts, recipients: Array.from(recipients.values()),
       todayRecipientCounts,
       unkeyedTotalSent: 0,
       lastSentAt,
       lastSenderEmail,
     };
   }
-
   async function loadColdmailCentralGuardStats() {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') {
       return {
@@ -3366,8 +3367,9 @@ function createColdmailCampaignService(deps = {}) {
         provider: 'softora',
         channel: 'coldmail',
         keyType: 'email',
-        maxRows: 5_000,
+        maxRows: 20_000, requireComplete: true,
       });
+      if (!Array.isArray(groups) || groups.length >= 20_000) throw new Error('Sent register incomplete');
       return summarizeColdmailCentralGuardLiveStats(groups);
     } catch (error) {
       logger.warn('[ColdmailLiveStats][central-guard]', error && error.message ? error.message : error);
@@ -3378,7 +3380,6 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
   }
-
   async function refreshCurrentDayColdmailStats(payload) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') return payload;
     try {
@@ -9259,8 +9260,7 @@ function createColdmailCampaignService(deps = {}) {
     isSmtpMailConfigured,
     isLikelyValidEmail,
     getColdmailCampaignRecipients,
-    getColdmailLiveStats,
-    getColdmailPreviewImage,
+    getColdmailLiveStats, getColdmailSentRegister: loadColdmailCentralGuardStats, getColdmailPreviewImage,
     getColdmailAutopilotStatus,
     getColdmailUnsubscribePreview,
     listColdmailReplyFollowUps,

@@ -606,7 +606,7 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
   await systemMailCountClient.refreshTodaySentCount();
 
   assert.equal(nodes.systemMailSentCount.textContent, '6');
-  assert.equal(requestedUrls[0], '/api/coldmailing/stats');
+  assert.equal(requestedUrls[0], '/api/coldmailing/stats?includeRecipients=1');
   assert.equal(requestedOptions[0].cache, 'no-store');
   assert.equal(nodes.mailRoiDealsCount.textContent, '0');
   assert.equal(nodes.mailRoiRatio.textContent, '—');
@@ -691,7 +691,7 @@ test('premium database mail ROI calculator toont vandaag verstuurd en uitsluiten
   assert.equal(nodes.systemMailSentTodayCount.textContent, '31');
   assert.equal(nodes.systemMailBouncesTodayCount.textContent, '3');
   assert.equal(nodes.systemMailSentCount.textContent, '355');
-  assert.equal(requestedUrls[0], '/api/coldmailing/stats');
+  assert.equal(requestedUrls[0], '/api/coldmailing/stats?includeRecipients=1');
 });
 
 test('premium database bootstrap toont nooit het algemene bouncetotaal als harde bounces', () => {
@@ -2041,7 +2041,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /renderSystemMailCount\(lastStatsMailCount, lastStatsMailCount === null\)/);
   assert.doesNotMatch(systemMailCountScriptSource, /Math\.max\(rememberedCount \|\| 0, calculatedCount\)/);
   assert.match(systemMailCountScriptSource, /function renderRoiCalculator\(mailCount, isLoading\)/);
-  assert.match(systemMailCountScriptSource, /const COLDMAIL_STATS_URL = "\/api\/coldmailing\/stats";/);
+  assert.match(systemMailCountScriptSource, /const COLDMAIL_STATS_URL = "\/api\/coldmailing\/stats\?includeRecipients=1";/);
   assert.match(systemMailCountScriptSource, /function refreshTodaySentCount\(\)/);
   assert.match(systemMailCountScriptSource, /const ROI_STATE_SCOPE = "premium_database_mail_roi";/);
   assert.match(systemMailCountScriptSource, /const ROI_STATE_KEY = "premium_database_mail_roi_v1";/);
@@ -2171,7 +2171,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2424,7 +2424,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-clean-input/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -2432,7 +2432,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-sent-no-count/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260910-sent-register/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2577,7 +2577,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -2617,7 +2617,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260909-mailsysteem/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
@@ -2713,7 +2713,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260909-bounces-appointments-b"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260910a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260910-sent-register"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -4595,7 +4595,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><button class="sf-btn" data-s="verstuurd" type="button">Verstuurd<\/button><\/span><\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><button class="sf-btn" data-s="verstuurd" type="button">Verstuurd<\/button><button class="sf-btn" data-s="instantly" type="button">Instantly<\/button><\/span><\/div>/
   );
   assert.match(pageSource, /activeStatus: "beschikbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
@@ -4639,7 +4639,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="klant" type="button">Klant<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>/);
-  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>/);
+  assert.match(pageSource, /<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, />Beide<\/span>/);
   assert.doesNotMatch(pageSource, />Overig<\/span>/);
@@ -4705,7 +4705,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
 });
 
-test('Verstuurd includes mailed and transferred contacts regardless of later status, excluding calls alone', () => {
+test('Verstuurd cannot infer delivery from customer flags; Instantly retains all transfers', () => {
   const controller = loadDatabaseOutreachClient().createController({
     state: { klanten: [] }, nodes: {}, escapeHtml: String,
     normalizeDatabaseStatus: value => String(value || ''),
@@ -4722,7 +4722,8 @@ test('Verstuurd includes mailed and transferred contacts regardless of later sta
   ];
   const mailed = item => item.status === 'gemaild' || Boolean(item.lastColdmailSentAt);
   const selected = contacts.filter(item => controller.matchesStatusFilter(item, 'verstuurd', () => true, mailed));
-  assert.deepEqual(selected.map(item => item.id), ['mailed', 'replied', 'transferred', 'transferred-customer', 'both']);
+  assert.deepEqual(selected.map(item => item.id), []);
+  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['transferred', 'transferred-customer', 'both']);
   assert.match(controller.renderMeta(contacts[5], true), /Overgezet naar Instantly/);
   assert.doesNotMatch(controller.renderMeta(contacts[5], true), /Verstuurd vanaf/);
 });
