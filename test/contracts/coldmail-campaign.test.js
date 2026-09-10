@@ -1022,6 +1022,8 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   const register = await service.getColdmailSentRegister();
   assert.equal(register.recipients.length, result.stats.systemTotalSent);
   assert.equal(new Set(register.recipients.map(row => row.key)).size, 2);
+  assert.deepEqual(register.recipients.map(row => row.email).sort(), ['guard-only@example.test', 'ruben@example.test']);
+  assert.ok(!register.recipients.some(row => row.email === 'instantly-guard@example.test'));
   assert.ok(register.recipients.every(row => row.senderEmail && !Object.hasOwn(row, 'payload')));
   assert.equal(result.stats.centralGuardTotalSent, 2);
   assert.equal(result.stats.systemTotalSent, 2);
