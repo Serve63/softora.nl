@@ -284,7 +284,16 @@
             : standaloneSender
               ? 'sender-header'
               : 'quote-prefix';
-      segments.push(buildSegment(lines, index, end, marker, replyHeader));
+      let start = index;
+      // Outlook's rule introduces its header cluster, even without the words
+      // "Original message". Include it only when that following cluster proves
+      // the boundary; ordinary authored separators remain untouched.
+      if (headerCluster && !replyHeader) {
+        let previous = index - 1;
+        while (previous >= 0 && !lines[previous].trim()) previous -= 1;
+        if (/^\s*[-_=]{3,}\s*$/.test(lines[previous] || '')) start = previous;
+      }
+      segments.push(buildSegment(lines, start, end, marker, replyHeader));
       index = Math.max(index, end - 1);
     }
     return { lines, segments };
