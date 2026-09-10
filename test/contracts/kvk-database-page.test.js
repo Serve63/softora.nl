@@ -71,7 +71,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260910b/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -83,7 +83,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
 });
 
 test('directory links keep their target but display only the site name and a real review status', () => {
@@ -91,8 +91,12 @@ test('directory links keep their target but display only the site name and a rea
   const company = { lead_status: 'usable', usable_review_state: 'pending', website: 'https://www.example.nl/contact?source=test' };
   const row = list.companyRowHtml(company);
   assert.match(row, /href="https:\/\/www\.example\.nl\/contact\?source=test"[^>]*>example\.nl<\/a>/);
-  assert.equal(list.companyStatus(company).label, 'Wacht op controle');
-  assert.equal(list.companyStatus({ ...company, usable_review_state: 'verified' }).label, 'Bruikbaar verklaard');
+  for (const usable_review_state of ['pending', 'verified', 'not_required', null]) {
+    assert.equal(list.companyStatus({ ...company, usable_review_state }).label, 'Bruikbaar verklaard');
+  }
+  assert.equal(list.companyStatus({ ...company, usable_review_outcome: 'rejected_to_control' }).label, 'Bruikbaar verklaard');
+  assert.match(list.companyStatus({ lead_status: 'unusable', unusable_review_grade: 1 }).label, /^Controle/);
+  assert.match(list.companyStatus({ lead_status: 'unusable', unusable_review_grade: 2 }).label, /^Afgekeurd/);
   for (const [button, category] of [
     ['companies-successful-found-open', 'bruikbaar-verklaard'],
     ['companies-declared-unusable-open', 'onbruikbaar-verklaard'],
@@ -160,7 +164,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
