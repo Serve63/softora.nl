@@ -170,13 +170,11 @@ function createKvkCompanyDirectoryService(deps = {}) {
     if (category === DIRECTORY_CATEGORIES.bruikbaar) {
       return request
         .eq('lead_status', 'usable')
-        .eq('usable_review_state', 'verified')
         .eq('premium_database_transferred', false);
     }
     if (category === DIRECTORY_CATEGORIES['met-website']) {
       return request
         .eq('lead_status', 'usable')
-        .eq('usable_review_state', 'verified')
         .eq('premium_database_transferred', false)
         .eq('website_status', 'found')
         .neq('website', '');
@@ -184,7 +182,6 @@ function createKvkCompanyDirectoryService(deps = {}) {
     if (category === DIRECTORY_CATEGORIES['zonder-werkende-website']) {
       return request
         .eq('lead_status', 'usable')
-        .eq('usable_review_state', 'verified')
         .eq('premium_database_transferred', false)
         .in('website_status', ['no_website', 'not_working']);
     }

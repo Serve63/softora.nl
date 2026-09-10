@@ -71,7 +71,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -83,7 +83,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
 });
 
 test('directory links keep their target but display only the site name and a real review status', () => {
@@ -164,7 +164,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
