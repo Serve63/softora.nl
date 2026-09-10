@@ -596,14 +596,22 @@ test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inko
 
   assert.equal(item.image.src, '/assets/seo-content/website-offerte-vergelijkingsmatrix-softora.jpg');
   assert.equal(item.secondaryImage.src, '/assets/seo-content/website-offerte-oplevering-toegang-softora.jpg');
+  assert.equal(item.qualityVersion, 2);
   assert.equal(item.growthEventKind, 'other_growth_action');
-  assert.equal(item.growthEventAt, '2026-08-30');
+  assert.equal(item.growthEventAt, '2026-09-10');
+  assert.equal(item.keywordEvidence.status, 'ready');
+  assert.equal(item.keywordEvidence.callsUsed, 6);
+  assert.deepEqual(item.keywordEvidence.locale, { locId: 2528, language: 'Dutch', verified: true });
+  assert.ok(item.sources.length >= 2);
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
   assert.match(html, /width="1600" height="1000" loading="lazy"/);
   assert.match(html, /wanneer je een <a href="\/website-laten-maken">website laat maken<\/a>/);
   assert.match(html, /headings, <a href="\/kennisbank\/wat-is-interne-linkstructuur">interne links<\/a>/);
-  assert.match(html, /"dateModified":"2026-08-30"/);
+  assert.match(html, /"dateModified":"2026-09-10"/);
+  assert.match(html, /Normaliseer iedere offerte naar zeven beslisvelden/);
+  assert.match(html, /eenmalige bouw, terugkerende licenties en beheer, variabel werk en interne inzet/);
+  assert.match(html, /voldoende bewijs, blokkerende onduidelijkheid of bewust geaccepteerde afwijking/);
   assert.match(costHtml, /href="\/blog\/website-offerte-vergelijken"/);
   assert.match(comparisonHtml, /href="\/blog\/website-offerte-vergelijken"/);
 });
@@ -1782,7 +1790,7 @@ test('websitebriefing maakt opdracht, eigenaarschap en acceptatie vóór offerte
   assert.match(html, /maak een beslisregister, geen verlanglijst/);
   assert.match(html, /Kopieer deze minimale briefingstructuur/);
   assert.match(html, /href="\/website-laten-maken">website laat maken<\/a>/);
-  assert.match(html, /href="\/blog\/website-offerte-vergelijken">checklist voor websiteoffertes<\/a>/);
+  assert.match(html, /href="\/blog\/website-offerte-vergelijken">zevenveldenmatrix voor websiteoffertes<\/a>/);
   assert.match(html, /href="\/kennisbank\/website-migratie-zonder-seo-verlies">website migreren<\/a>/);
   assert.match(html, /https:\/\/wa\.me\/31643262792/);
   assert.match(proposalHtml, /href="\/blog\/website-briefing-maken-mkb">websitebriefing<\/a>/);
