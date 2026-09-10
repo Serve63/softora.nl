@@ -196,8 +196,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
-  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260910a/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260910a/);
+  assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260910b/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260910b/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260909a/);
@@ -222,9 +222,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260910a'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260910a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260910a'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260910a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260910b'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260910b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260910b'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260910b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260905b'));
@@ -611,6 +611,86 @@ function loadMailboxHelpersForTest(options = {}) {
 function renderMailboxBodyForTest(body, images, options) {
   return loadMailboxHelpersForTest().renderMailBody(body, images, options);
 }
+
+function renderRawHydratedMailboxCardsForTest(body, from = 'Robin Voorbeeld') {
+  const mailbox = loadMailboxHelpersForTest();
+  const message = mailbox.normalizeMailboxApiMessage({
+    id: 'inbox:artifact-hydration', folder: 'inbox', direction: 'received',
+    accountEmail: 'serve@softora.nl', email: 'robin@example.nl', from,
+    receivedAt: '2026-09-10T12:58:00.000Z', body: 'Voorlopige inhoud.', hasBody: true,
+  });
+  // Detail and timeline hydration replace bodies after initial API normalization.
+  Object.assign(message, { body, bodyLoaded: true, bodyLoading: false, bodyTruncated: false, threadMessages: [] });
+  const rootHtml = mailbox.renderMailBody(message.body, [], { mail: message, replyMailId: message.id });
+  const anchor = {
+    id: 'inbox:artifact-anchor', folder: 'inbox', direction: 'received',
+    accountEmail: 'serve@softora.nl', email: 'robin@example.nl', from,
+    receivedAt: '2026-09-10T13:58:00.000Z', body: 'Nieuwste bericht.',
+    hasBody: true, bodyLoaded: true, threadMessages: [message],
+  };
+  const historyHtml = mailbox.renderMailBody(anchor.body, [], { mail: anchor, replyMailId: anchor.id });
+  assert.equal(message.body, body, 'rendering mag de gehydrateerde brontekst niet wijzigen');
+  return [rootHtml, historyHtml];
+}
+
+test('gehydrateerde inkomende hoofd- en historiekaarten ruimen linkartefacten en automatische beeldtekst op, ook in contactkaarten', () => {
+  const { parseDocument, DomUtils } = require('htmlparser2');
+  const body = [
+    'Hoi Servé,',
+    'Dit antwoord en de gegevens van onze accountmanager blijven belangrijk.',
+    'Accountmanager: Sam Ander',
+    'E-mail: sam@third-party.example<mailto:sam@third-party.example>',
+    'Telefoon: 088 123 45 67',
+    '',
+    'Robin Voorbeeld',
+    'Telefoon: 06 12345678',
+    'www.example.nl<http://www.example.nl>',
+    '[Afbeelding met Graphics, Lettertype, schermopname, logo Automatisch gegenereerde beschrijving]',
+  ].join('\n');
+  for (const from of ['Robin Voorbeeld', 'robin@example.nl']) {
+    for (const html of renderRawHydratedMailboxCardsForTest(body, from)) {
+      const document = parseDocument(html);
+      const text = DomUtils.textContent(document);
+      const websiteLinks = DomUtils.findAll((node) => node.name === 'a' && /^http:\/\/www\.example\.nl\/?$/.test(node.attribs?.href || ''), document.children);
+      assert.equal(websiteLinks.length, 1, `${from}: website moet precies eenmaal klikbaar zijn`);
+      assert.equal(DomUtils.textContent(websiteLinks[0]), 'www.example.nl');
+      assert.equal((text.match(/www\.example\.nl/g) || []).length, 1);
+      assert.doesNotMatch(text, /<mailto:|<http:|Automatisch gegenereerde beschrijving|Afbeelding met Graphics/);
+      for (const value of ['Dit antwoord en de gegevens van onze accountmanager blijven belangrijk.', 'Sam Ander', 'sam@third-party.example', '088 123 45 67', 'Robin Voorbeeld', '06 12345678']) {
+        assert.ok(text.includes(value), `${from}: ${value} moet behouden blijven`);
+      }
+      if (from === 'Robin Voorbeeld') assert.match(html, /detail-mail-contact-card/);
+    }
+  }
+});
+
+test('inkomende hoofd- en historiekaarten behouden afwijkende linkdoelen en zelfgeschreven afbeeldingsbeschrijvingen', () => {
+  const { parseDocument, DomUtils } = require('htmlparser2');
+  const body = [
+    'Controleer het verschil tussen deze adressen:',
+    'www.example.nl<https://different.example/handleiding>',
+    'sam@example.nl<mailto:team@different.example>',
+    'https://example.nl/CaseSensitive<https://example.nl/casesensitive>',
+    '[Afbeelding met een maatvoering die bij de bestelling hoort]',
+    'Mijn uitleg: Automatisch gegenereerde beschrijving is de tekst die de leverancier toont.',
+    '',
+    'Met vriendelijke groet,',
+    'Robin Voorbeeld',
+    'Telefoon: 06 12345678',
+    '[Afbeelding met het bedrijfsgebouw en de toegang aan de achterzijde]',
+  ].join('\n');
+  for (const html of renderRawHydratedMailboxCardsForTest(body)) {
+    const text = DomUtils.textContent(parseDocument(html));
+    for (const value of [
+      'www.example.nl', 'https://different.example/handleiding',
+      'sam@example.nl', 'team@different.example',
+      'https://example.nl/CaseSensitive', 'https://example.nl/casesensitive',
+      '[Afbeelding met een maatvoering die bij de bestelling hoort]',
+      'Mijn uitleg: Automatisch gegenereerde beschrijving is de tekst die de leverancier toont.',
+      '[Afbeelding met het bedrijfsgebouw en de toegang aan de achterzijde]',
+    ]) assert.ok(text.includes(value), `${value} mag niet als automatisch artefact verdwijnen`);
+  }
+});
 
 function getMailLinesOutsideMessageCards(html) {
   const { parseDocument, DomUtils } = require('htmlparser2');
@@ -9817,7 +9897,7 @@ test('premium mailbox ruimt Martijns Gmail-handtekening net zo schoon op als Ser
   assert.doesNotMatch(html, />--</);
   assert.match(
     html,
-    /Website: <a href="http:\/\/www\.pianokeyboardleraar\.nl" target="_blank" rel="noopener noreferrer">www\.pianokeyboardleraar\.nl<\/a>/
+    /Website: <a class="detail-mail-contact-link" href="http:\/\/www\.pianokeyboardleraar\.nl" target="_blank" rel="noopener noreferrer">www\.pianokeyboardleraar\.nl<\/a>/
   );
   assert.doesNotMatch(html, /\[http:\/\/www\.pianokeyboardleraar\.nl\]/);
 });

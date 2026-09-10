@@ -68,8 +68,39 @@
   }
 
   function isGeneratedImageDescriptionLine(value) {
-    const line = String(value || '').replace(/^\s*(?:>\s*)+/, '').trim();
-    return /^\[?\s*(?:afbeelding|image)\s+met\b[\s\S]*\b(?:automatisch\s+gegenereerde\s+beschrijving|automatically\s+generated\s+description)\s*\]?$/i.test(line);
+    const line = String(value || '').replace(/^\s*(?:>\s*)+/, '').trim()
+      .replace(/^\[image:\s*([^\n]+)\]$/i, '$1');
+    return /^\[?\s*(?:afbeelding|image)\s+(?:met|with|containing)\b[^\r\n]*\b(?:automatisch\s+gegenereerde\s+beschrijving|automatically\s+generated\s+description)\s*\]?$/i.test(line);
+  }
+
+  function normalizeAngleLinkAnnotations(value) {
+    return String(value == null ? '' : value).replace(
+      /([^\s<>]+)[ \t]*<(https?:\/\/[^\s<>]+|mailto:[^\s<>]+)>/gi,
+      (annotation, label, target) => {
+        try {
+          const destination = new URL(target);
+          if (destination.username || destination.password) return annotation;
+          if (destination.protocol === 'mailto:') {
+            return !destination.search && !destination.hash &&
+              /^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(label) &&
+              label.toLowerCase() === destination.pathname.toLowerCase() ? label : annotation;
+          }
+          if (!/^(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]|$)/i.test(label)) return annotation;
+          const labelled = new URL(/^https?:\/\//i.test(label) ? label : `${destination.protocol}//${label}`);
+          // URL parsing normalizes hosts/default ports, but preserves case in
+          // paths, queries and fragments. Different destinations stay visible.
+          if (labelled.href !== destination.href || /[\[\]"']/.test(label)) return annotation;
+          const href = destination.href.replace(/\(/g, '%28').replace(/\)/g, '%29');
+          return `[${label}](${href})`;
+        } catch (_) { return annotation; }
+      }
+    );
+  }
+
+  function normalizePresentationText(value) {
+    return String(value == null ? '' : value).split(/\r?\n/)
+      .filter((line) => !isGeneratedImageDescriptionLine(line))
+      .map(normalizeAngleLinkAnnotations).join('\n');
   }
 
   function collapseDuplicateAnnotations(line) {
@@ -312,7 +343,10 @@
     const normalizedLabel = String(label || '').trim();
     const isWebdesignCta = /^(?:deze link|hier)$/i.test(normalizedLabel);
     const anchorLabel = /^deze link$/i.test(normalizedLabel) ? 'link' : normalizedLabel;
-    const anchorClass = isWebdesignCta ? ' class="detail-mail-cta-link"' : '';
+    const annotation = `${normalizedLabel}<${url}>`;
+    const isWebsiteLabel = normalizeAngleLinkAnnotations(annotation) !== annotation;
+    const anchorClass = isWebdesignCta ? ' class="detail-mail-cta-link"'
+      : isWebsiteLabel ? ' class="detail-mail-contact-link"' : '';
     const anchor = `<a${anchorClass} href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anchorLabel)}</a>`;
     return /^deze link$/i.test(normalizedLabel) ? `deze ${anchor}` : anchor;
   }
@@ -339,7 +373,7 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
 }
 
   function renderLinkedMailboxText(value, options, helpers) {
-    const text = String(value == null ? '' : value);
+    const text = normalizeAngleLinkAnnotations(value);
     const emphasis = /^([*_]{1,2})([^*_\n].*?)\1$/.exec(text.trim());
     if (emphasis) {
       const tag = emphasis[1].length === 2 ? 'strong' : 'em';
@@ -406,6 +440,8 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
     formatDetailSubject,
     isSentMessage,
     isGeneratedImageDescriptionLine,
+    normalizeAngleLinkAnnotations,
+    normalizePresentationText,
     isCidArtifactLine,
     isGmailSignatureAssetUrl,
     isLabelledUrlMatch,
@@ -424,6 +460,5 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
     renderDetailBody,
     renderLinkedMailboxText,
   };
-  if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
 })(typeof window !== 'undefined' ? window : globalThis);
