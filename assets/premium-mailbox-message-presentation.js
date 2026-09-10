@@ -15,6 +15,12 @@
     const signature = options.signature || global.SoftoraMailboxSignature || (
       typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-signature.js') : null
     );
+    function cleanPresentation(presentation) {
+      const display = options.display || global.SoftoraMailboxDisplay || (
+        typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-display.js') : null
+      );
+      return { ...presentation, body: display?.normalizePresentationText?.(presentation.body) ?? presentation.body };
+    }
 
     function emptyContact() {
       return { phone: '', phoneHref: '', addressLines: [] };
@@ -113,9 +119,9 @@
     function getThreadPresentation(message, mail, state = {}) {
       const presentation = state.loading
         ? emptyPresentation()
-        : getSourceSafeMessagePresentation(message, mail, undefined, {
+        : cleanPresentation(getSourceSafeMessagePresentation(message, mail, undefined, {
             stripDetectedQuotes: !state.sent,
-          });
+          }));
       const contactHtml = !state.sent && !state.loading && !state.loadError
         ? signature?.renderContactCard?.(presentation.contact, state.escapeHtml) || ''
         : '';
@@ -126,9 +132,9 @@
       // Root cards hide embedded history just like incoming timeline cards.
       // Split before rendering, so quote appendices cannot escape the card
       // while the canonical parent message is still being hydrated.
-      const presentation = getSourceSafeMessagePresentation(mail, mail, String(value || ''), {
+      const presentation = cleanPresentation(getSourceSafeMessagePresentation(mail, mail, String(value || ''), {
         stripDetectedQuotes: Boolean(mail && typeof mail === 'object' && !Array.isArray(mail)),
-      });
+      }));
       let contactInserted = false;
       return {
         ...presentation,

@@ -642,15 +642,19 @@
 
   function renderContactCard(contact) {
     const source = contact && typeof contact === 'object' ? contact : {};
+    const display = global && global.SoftoraMailboxDisplay || (
+      typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-display.js') : null
+    );
+    const readableLines = (lines) => (Array.isArray(lines) ? lines : [])
+      .flatMap((line) => String(display?.normalizePresentationText?.(line) ?? line).split('\n'))
+      .map(normalizeWhitespace).filter(Boolean);
     const phone = cleanFieldValue(source.phone);
     const phoneHref = buildPhoneHref(phone);
     const addressLines = (Array.isArray(source.addressLines) ? source.addressLines : [])
       .map(cleanFieldValue)
       .filter(Boolean);
-    const preservedLines = (Array.isArray(source.preservedLines) ? source.preservedLines : [])
-      .map(normalizeWhitespace).filter(Boolean);
-    const beforeLines = (Array.isArray(source.beforeLines) ? source.beforeLines : [])
-      .map(normalizeWhitespace).filter(Boolean);
+    const preservedLines = readableLines(source.preservedLines);
+    const beforeLines = readableLines(source.beforeLines);
     if (!phone && !addressLines.length && !preservedLines.length && !beforeLines.length) return '';
     const escapeValue = (value) => escapeMarkup(value).replace(/=/g, '&#61;');
     function renderLine(line) {
