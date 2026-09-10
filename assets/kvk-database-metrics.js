@@ -81,6 +81,25 @@
     if (labelNode) labelNode.textContent = 'laatste 60 min';
   }
 
+  function renderControlRoomLast60(element, activity) {
+    if (!element) return;
+    const counts = {};
+    for (const [key, sign, label] of [
+      ['added', '+', 'Binnengekomen'], ['removed', '−', 'Afgehandeld'],
+    ]) {
+      const raw = activity?.[key];
+      const count = raw === null || raw === undefined ? NaN : Number(raw);
+      counts[key] = Number.isFinite(count) && count >= 0 ? count : null;
+      const node = element.querySelector(`.stat-delta-${key}`);
+      if (node) {
+        const formatted = counts[key] === null ? '—' : numberFormat.format(counts[key]);
+        node.textContent = `${sign}${formatted}`;
+        node.setAttribute('aria-label', `${label}: ${counts[key] === null ? 'onbekend' : formatted}`);
+      }
+    }
+    element.classList.toggle('is-zero', counts.added === 0 && counts.removed === 0);
+  }
+
   function createController(deps = {}) {
     const documentRef = deps.document;
     const getSnapshot = typeof deps.getSnapshot === 'function' ? deps.getSnapshot : () => null;
@@ -137,7 +156,7 @@
       if (elements.controlRoom) elements.controlRoom.textContent = numberFormat.format(Number(scraperState.control_room ?? 0));
       renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable ?? 0);
       renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable ?? 0);
-      renderLast60Delta(elements.controlRoomLast60, last60.control_room ?? 0);
+      renderControlRoomLast60(elements.controlRoomLast60, last60.control_room_activity);
       renderLast60Delta(elements.treated, last60.treated);
       renderLast60Delta(elements.usable, last60.usable);
       renderLast60Delta(elements.withWebsite, last60.with_website);

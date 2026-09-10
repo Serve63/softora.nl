@@ -7,7 +7,7 @@ const {
 } = require('../../assets/kvk-database-metrics');
 
 function createTextNode() {
-  return { textContent: '', hidden: false };
+  return { textContent: '', hidden: false, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
 }
 
 function createElement(selectors = []) {
@@ -30,6 +30,33 @@ function createElement(selectors = []) {
     nodes,
   };
 }
+
+test('control room shows gross arrivals and departures even when the net change is zero', () => {
+  const flow = createElement(['.stat-delta-added', '.stat-delta-removed']);
+  const now = Date.parse('2026-09-10T11:00:00Z');
+  let snapshot = { generatedAt: new Date(now).toISOString(), state: {
+    last_60_minutes: { control_room: 0, control_room_activity: { added: 12, removed: 12 } },
+  } };
+  const controller = createController({
+    document: { getElementById(id) { return id === 'companies-control-room-last60' ? flow : null; } },
+    getSnapshot: () => snapshot, now: () => now,
+  });
+  controller.renderMetrics();
+  assert.equal(flow.nodes['.stat-delta-added'].textContent, '+12');
+  assert.equal(flow.nodes['.stat-delta-removed'].textContent, '−12');
+  assert.equal(flow.nodes['.stat-delta-removed'].attributes['aria-label'], 'Afgehandeld: 12');
+  assert.equal(flow.classList.contains('is-zero'), false);
+  snapshot.generatedAt = new Date(now - 3600_000).toISOString();
+  controller.renderMetrics();
+  assert.equal(flow.nodes['.stat-delta-added'].textContent, '+0');
+  assert.equal(flow.nodes['.stat-delta-removed'].textContent, '−0');
+  assert.equal(flow.classList.contains('is-zero'), true);
+  snapshot = { generatedAt: new Date(now).toISOString(), state: { last_60_minutes: { control_room: -8 } } };
+  controller.renderMetrics();
+  assert.equal(flow.nodes['.stat-delta-added'].textContent, '+—');
+  assert.equal(flow.nodes['.stat-delta-removed'].textContent, '−—');
+  assert.equal(flow.classList.contains('is-zero'), false);
+});
 
 test('kvk database metrics render current last-hour and grade values without another snapshot request', () => {
   const deltaSelectors = ['.stat-delta-number', '.stat-delta-label'];
