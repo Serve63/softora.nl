@@ -33,13 +33,13 @@
     },
     'succesvol-gevonden': {
       title: 'Bruikbaar verklaarde bedrijven',
-      intro: 'Alle bedrijven die door de controleur zijn goedgekeurd, ook als ze al zijn gebruikt.',
+      intro: 'Alle bedrijven die bruikbaar zijn bevonden, direct vanaf de eerste goedkeuring en ook als ze al zijn gebruikt.',
       totalLabel: 'Bruikbaar verklaard',
       loadingLabel: 'Goedgekeurde bedrijven laden…',
     },
     'bruikbaar-verklaard': {
       title: 'Bruikbaar verklaarde bedrijven',
-      intro: 'Alle bedrijven die door de controleur zijn goedgekeurd, ook als ze al zijn gebruikt.',
+      intro: 'Alle bedrijven die bruikbaar zijn bevonden, direct vanaf de eerste goedkeuring en ook als ze al zijn gebruikt.',
       totalLabel: 'Bruikbaar verklaard',
       loadingLabel: 'Goedgekeurde bedrijven laden…',
     },
@@ -51,7 +51,7 @@
     },
     controlekamer: {
       title: 'Controlekamer',
-      intro: 'Alle onderzochte bedrijven die nog op een definitief oordeel wachten, inclusief oudere onbevestigde vondsten.',
+      intro: 'Alle eerst afgekeurde bedrijven die nog door de controleur worden nagekeken, inclusief eerdere afwijzingen.',
       totalLabel: 'Controlekamer',
       loadingLabel: 'Controlekamer laden…',
     },
@@ -136,15 +136,13 @@
 
   function companyStatus(company) {
     const leadStatus = String(company?.lead_status || '').trim();
+    if (leadStatus === 'usable') {
+      return { label: 'Bruikbaar verklaard', className: 'is-usable' };
+    }
     const reviewFinding = String(company?.review_finding || '').trim();
     const usableReviewOutcome = String(company?.usable_review_outcome || '').trim();
     if (reviewFinding === 'incorrect_approval' || usableReviewOutcome === 'rejected_to_control') {
       return { label: 'Onterecht goedgekeurd', className: 'is-unusable' };
-    }
-    if (leadStatus === 'usable') {
-      return company?.usable_review_state === 'verified'
-        ? { label: 'Bruikbaar verklaard', className: 'is-usable' }
-        : { label: 'Wacht op controle', className: 'is-pending' };
     }
     if (leadStatus === 'unusable') {
       const reason = String(company?.unusable_reason || '').trim();
