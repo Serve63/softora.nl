@@ -4595,7 +4595,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><\/span><\/div><div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal"><span class="status-filter-label">Verstuurd<\/span><span class="status-filter-pills"><button class="sf-btn" data-s="instantly" type="button">Instantly<\/button><button class="sf-btn" data-s="verstuurd" type="button">Softora<\/button><\/span><\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><\/span><\/div><div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal"><span class="status-filter-label">Verstuurd<\/span><span class="status-filter-pills"><button class="sf-btn" data-s="verstuurd" type="button">Softora<\/button><button class="sf-btn" data-s="instantly" type="button">Instantly<\/button><\/span><\/div>/
   );
   assert.match(pageSource, /activeStatus: "beschikbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
