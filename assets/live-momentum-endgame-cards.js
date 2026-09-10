@@ -81,7 +81,8 @@
     { id: 'sponserdominatie-ltv-haaren', title: 'Sponserdominatie LTV Haaren', imageId: 'sponserdominatie-ltv-haaren' },
     { id: 'sponserdominatie-haarensklokje', title: 'Sponserdominatie Haarensklokje', imageId: 'sponserdominatie-haarensklokje' },
     { id: 'lopende-sponserdominatie-post', title: 'Lopende Sponserdominatie Post', imageId: 'lopende-sponserdominatie-post' },
-    { id: 'fb-ads-getest-microplasticsvrij-codex', title: 'FB ads getest op Microplasticsvrij.nl via CODEX', imageId: 'fb-ads-getest-microplasticsvrij-codex' },
+    { id: 'fb-ads-getest-microplasticsvrij-codex', title: 'FB ADS Microplasticvrij.nl', imageId: 'fb-ads-getest-microplasticsvrij-codex' },
+    { id: 'checkpoint-2026', title: '2026...', type: 'checkpoint', imageId: 'checkpoint-2026' },
     { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
     { id: 'lijpe-instagram-feed-2035', title: 'Lijpe Instagram feed', subtitle: '3 posts · 6 slides', timeframe: 2035, imageId: 'lijpe-instagram-feed' },
     { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
@@ -95,9 +96,10 @@
     { id: '2035', title: '2035...', type: 'destination', imageId: '2035' }
   ];
   const ORIGIN_CARD_ID = 'oktober-2024';
+  const CHECKPOINT_2026_CARD_ID = 'checkpoint-2026';
   const CHECKPOINT_CARD_ID = 'checkpoint-2028';
   const DESTINATION_CARD_ID = '2035';
-  const FIXED_CARD_IDS = [ORIGIN_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID];
+  const FIXED_CARD_IDS = [ORIGIN_CARD_ID, CHECKPOINT_2026_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID];
   const LEGACY_MISSION_ID = 'eigen-automaat-rijden';
   const DEFAULT_CARD_ORDER = CARD_CATALOG.map((card) => card.id);
 
@@ -114,7 +116,7 @@
       const missionOrder = requestedMissionOrder.concat(remainingOrder);
       const through2028 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe !== 2035);
       const through2035 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe === 2035);
-      return [ORIGIN_CARD_ID, ...through2028, CHECKPOINT_CARD_ID, ...through2035, DESTINATION_CARD_ID];
+      return [ORIGIN_CARD_ID, ...through2028, CHECKPOINT_2026_CARD_ID, CHECKPOINT_CARD_ID, ...through2035, DESTINATION_CARD_ID];
     }
     const requestedThrough2028 = requestedOrder
       .slice(0, requestedCheckpointIndex)
@@ -128,6 +130,7 @@
       ORIGIN_CARD_ID,
       ...requestedThrough2028,
       ...missingThrough2028,
+      CHECKPOINT_2026_CARD_ID,
       CHECKPOINT_CARD_ID,
       ...requestedThrough2035,
       ...missingThrough2035,
@@ -160,11 +163,13 @@
   function getDisplayOrder(value) {
     const normalized = normalizeState(value);
     const checkpointIndex = normalized.__order.indexOf(CHECKPOINT_CARD_ID);
-    const through2028 = normalized.__order.slice(1, checkpointIndex);
+    const through2028 = normalized.__order.slice(1, checkpointIndex)
+      .filter((id) => id !== CHECKPOINT_2026_CARD_ID);
     const through2035 = normalized.__order.slice(checkpointIndex + 1, -1);
     return [
       ORIGIN_CARD_ID,
       ...groupByCompletion(through2028, normalized),
+      CHECKPOINT_2026_CARD_ID,
       CHECKPOINT_CARD_ID,
       ...groupByCompletion(through2035, normalized),
       DESTINATION_CARD_ID
@@ -290,7 +295,7 @@
       specialLabel.textContent = card.type === 'origin'
         ? 'HIER BEGON HET'
         : card.type === 'checkpoint'
-          ? 'OP NAAR 2035'
+          ? card.id === CHECKPOINT_2026_CARD_ID ? 'OP NAAR 2028' : 'OP NAAR 2035'
           : 'UITGESPEELD..';
       artwork.classList.add(`end-game-card-photo--${card.type}`);
       artwork.append(image, shade, top, title, specialLabel);
@@ -340,7 +345,9 @@
       slot.setAttribute('aria-label', isOrigin
         ? 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.'
         : isCheckpoint
-          ? 'Checkpoint: 2028. Op naar 2035. Deze kaart staat vast tussen de doelen tot 2028 en de doelen tot 2035.'
+          ? card.id === CHECKPOINT_2026_CARD_ID
+            ? 'Checkpoint: 2026. Op naar 2028. Deze kaart staat vast tussen de lopende doelen en het 2028-checkpoint.'
+            : 'Checkpoint: 2028. Op naar 2035. Deze kaart staat vast tussen de doelen tot 2028 en de doelen tot 2035.'
           : 'Eindpunt: 2035. Uitgespeeld. Deze kaart staat vast op de laatste positie.');
     } else {
       slot.tabIndex = 0;

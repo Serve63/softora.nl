@@ -6,7 +6,7 @@ const path = require('node:path');
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
   '2030.png', '2035.png', 'alle-formaten-scheermesjes.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
-  'de-driehoek-aanspreken.png', 'dertig-dagen-streak.png',
+  'checkpoint-2026.png', 'de-driehoek-aanspreken.png', 'dertig-dagen-streak.png',
   'eigen-automaat-rijden.png', 'eigen-boot.png', 'eigen-cinema.png', 'eigen-kantoor.png',
   'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fb-ads-getest-microplasticsvrij-codex.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
   'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png', 'gezondheidscenter.png',
@@ -53,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260831a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260906b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260910a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -530,14 +530,16 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(card\.subtitle\) artwork\.append\(subtitle\)/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' \}/);
   assert.match(endGameCardsJs, /\{ id: 'huis-miljoen-plus-2035', title: 'Huis van €1 miljoen\+ kopen', timeframe: 2035, imageId: 'huis-miljoen-plus' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'checkpoint-2026', title: '2026\.\.\.', type: 'checkpoint', imageId: 'checkpoint-2026' \}/);
   assert.match(endGameCardsJs, /\{ id: 'checkpoint-2028', title: '2028\.\.\.', type: 'checkpoint', imageId: '2030' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'fb-ads-getest-microplasticsvrij-codex', title: 'FB ADS Microplasticvrij\.nl', imageId: 'fb-ads-getest-microplasticsvrij-codex' \}/);
   assert.match(endGameCardsJs, /\{ id: '2035', title: '2035\.\.\.', type: 'destination', imageId: '2035' \}/);
   assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…', type: 'origin' \}/);
-  assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.through2028, CHECKPOINT_CARD_ID, \.\.\.through2035, DESTINATION_CARD_ID\]/);
-  assert.match(endGameCardsJs, /const FIXED_CARD_IDS = \[ORIGIN_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID\]/);
+  assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.through2028, CHECKPOINT_2026_CARD_ID, CHECKPOINT_CARD_ID, \.\.\.through2035, DESTINATION_CARD_ID\]/);
+  assert.match(endGameCardsJs, /const FIXED_CARD_IDS = \[ORIGIN_CARD_ID, CHECKPOINT_2026_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID\]/);
   assert.match(endGameCardsJs, /dataset\.endGameCardFixed = 'true'/);
   assert.match(endGameCardsJs, /card\.type === 'checkpoint'[\s\S]*\? 'CHECKPOINT'/);
-  assert.match(endGameCardsJs, /\? 'OP NAAR 2035'[\s\S]*: 'UITGESPEELD\.\.'/);
+  assert.match(endGameCardsJs, /card\.id === CHECKPOINT_2026_CARD_ID \? 'OP NAAR 2028' : 'OP NAAR 2035'/);
   assert.doesNotMatch(endGameCardsJs, /WIE BEN IK DAN/);
   assert.match(endGameCardsJs, /if \(!isFixed\) article\.append\(createCompletionOverlay\(\), createActions\(card, state\.completed\)\)/);
   assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
@@ -557,7 +559,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     '5 dagen streak', '10 dagen streak', '20 dagen streak', '50 dagen streak', '100 dagen streak', '365 dagen streak',
     'Lijpe Instagram feed', '3 posts · 6 slides', 'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
-    'Huis van €1 miljoen+ kopen', '2028...', '2035...', 'Oktober 2024…'
+    'Huis van €1 miljoen+ kopen', 'FB ADS Microplasticvrij.nl', '2026...', '2028...', '2035...', 'Oktober 2024…'
   ].forEach((title) => assert.equal(endGameCardsJs.includes(title), true, `missing card title: ${title}`));
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'toggle-complete'/);
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'remove'/);
@@ -836,7 +838,7 @@ test('Kantoor A en Kantoor B worden in die volgorde toegevoegd zonder bestaande 
     __order: oldPersistedOrder,
     'ruben-zet-toto': { completed: true, deleted: false }
   })));
-  const checkpointIndex = normalized.__order.indexOf('checkpoint-2028');
+  const checkpointIndex = normalized.__order.indexOf('checkpoint-2026');
 
   assert.deepEqual(normalized.__order.slice(checkpointIndex - 2, checkpointIndex), ids);
   assert.deepEqual(normalized['ruben-zet-toto'], { completed: true, deleted: false });
@@ -905,7 +907,7 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
   assert.deepEqual(initial['silence-controle'], { completed: false, deleted: false });
   assert.deepEqual(initial['softora-gpt-af'], { completed: true, deleted: false });
   assert.equal(initial.__order.filter((id) => id === 'silence-controle').length, 1);
-  assert.equal(initial.__order.indexOf('silence-controle'), initial.__order.indexOf('checkpoint-2028') - 1);
+  assert.equal(initial.__order.indexOf('silence-controle'), initial.__order.indexOf('checkpoint-2026') - 1);
 
   const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
     ...initial,
@@ -941,7 +943,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   }]);
   assert.equal(missionNumber, 68);
   assert.equal(cardIndex, firstStreakIndex - 1);
-  assert.equal(firstStreakIndex, checkpointIndex - 13);
+  assert.equal(firstStreakIndex, checkpointIndex - 14);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'funnel-sites-live')
@@ -954,7 +956,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   assert.deepEqual(initial['funnel-sites-live'], { completed: false, deleted: false });
   assert.deepEqual(initial['silence-controle'], { completed: true, deleted: false });
   assert.equal(initial.__order.filter((id) => id === 'funnel-sites-live').length, 1);
-  assert.equal(initial.__order.indexOf('funnel-sites-live'), initial.__order.indexOf('checkpoint-2028') - 1);
+  assert.equal(initial.__order.indexOf('funnel-sites-live'), initial.__order.indexOf('checkpoint-2026') - 1);
 
   const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
     ...initial,
@@ -979,7 +981,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
   const funnelSitesIndex = catalog.findIndex((card) => card.id === 'funnel-sites-live');
   const checkpointIndex = catalog.findIndex((card) => card.id === 'checkpoint-2028');
 
-  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 7), expected);
+  assert.deepEqual(catalog.slice(funnelSitesIndex + 1, checkpointIndex - 8), expected);
   assert.deepEqual(expected.map((card) => (
     catalog.slice(0, catalog.findIndex((item) => item.id === card.id) + 1)
       .filter((item) => !['origin', 'checkpoint', 'destination'].includes(item.type))
@@ -993,7 +995,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
     'funnel-sites-live': { completed: true, deleted: false },
     __order: oldPersistedOrder
   })));
-  const migratedCheckpointIndex = migrated.__order.indexOf('checkpoint-2028');
+  const migratedCheckpointIndex = migrated.__order.indexOf('checkpoint-2026');
 
   assert.deepEqual(migrated['funnel-sites-live'], { completed: true, deleted: false });
   assert.deepEqual(migrated.__order.filter((id) => oldPersistedOrder.includes(id)), oldPersistedOrder);
@@ -1028,7 +1030,7 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
     imageId: 'bestaanszekerheid-bedrijf'
   }]);
   assert.equal(missionNumber, 75);
-  assert.equal(cardIndex, checkpointIndex - 7);
+  assert.equal(cardIndex, checkpointIndex - 8);
 
   const oldPersistedOrder = catalog
     .filter((card) => card.id !== 'loondienst')
@@ -1041,7 +1043,7 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
   assert.deepEqual(migrated['loondienst'], { completed: false, deleted: false });
   assert.deepEqual(migrated['honderd-dagen-streak'], { completed: true, deleted: false });
   assert.equal(migrated.__order.filter((id) => id === 'loondienst').length, 1);
-  assert.equal(migrated.__order.indexOf('loondienst'), migrated.__order.indexOf('checkpoint-2028') - 1);
+  assert.equal(migrated.__order.indexOf('loondienst'), migrated.__order.indexOf('checkpoint-2026') - 1);
 
   const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
     ...migrated,
@@ -1074,7 +1076,7 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
     title: 'De Driehoek aanspreken'
   }]);
   assert.equal(missionNumber, 76);
-  assert.equal(cardIndex, checkpointIndex - 6);
+  assert.equal(cardIndex, checkpointIndex - 7);
   assert.equal(
     fs.existsSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards/de-driehoek-aanspreken.png')),
     true
@@ -1093,7 +1095,7 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
   assert.equal(migrated.__order.filter((id) => id === 'de-driehoek-aanspreken').length, 1);
   assert.equal(
     migrated.__order.indexOf('de-driehoek-aanspreken'),
-    migrated.__order.indexOf('checkpoint-2028') - 1
+    migrated.__order.indexOf('checkpoint-2026') - 1
   );
 
   const completedReload = JSON.parse(JSON.stringify(api.normalizeState({
@@ -1106,7 +1108,7 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
 
 test('sponserdominatie cards migrate once without changing existing progress', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
-  const expected = [['sponserdominatie-nemelaer', 'Sponserdominatie Nemelaer', 'sponserdominatie-nemelaer'], ['sponserdominatie-ltv-haaren', 'Sponserdominatie LTV Haaren', 'sponserdominatie-ltv-haaren'], ['sponserdominatie-haarensklokje', 'Sponserdominatie Haarensklokje', 'sponserdominatie-haarensklokje'], ['lopende-sponserdominatie-post', 'Lopende Sponserdominatie Post', 'lopende-sponserdominatie-post'], ['fb-ads-getest-microplasticsvrij-codex', 'FB ads getest op Microplasticsvrij.nl via CODEX', 'fb-ads-getest-microplasticsvrij-codex']];
+  const expected = [['sponserdominatie-nemelaer', 'Sponserdominatie Nemelaer', 'sponserdominatie-nemelaer'], ['sponserdominatie-ltv-haaren', 'Sponserdominatie LTV Haaren', 'sponserdominatie-ltv-haaren'], ['sponserdominatie-haarensklokje', 'Sponserdominatie Haarensklokje', 'sponserdominatie-haarensklokje'], ['lopende-sponserdominatie-post', 'Lopende Sponserdominatie Post', 'lopende-sponserdominatie-post'], ['fb-ads-getest-microplasticsvrij-codex', 'FB ADS Microplasticvrij.nl', 'fb-ads-getest-microplasticsvrij-codex']];
   const ids = expected.map(([id]) => id);
   const oldOrder = api.CARD_CATALOG.filter(card => !ids.includes(card.id)).map(card => card.id);
   const state = api.normalizeState({ loondienst: { completed: true, deleted: false }, __order: oldOrder });
@@ -1129,4 +1131,37 @@ test('the five new missions each have a distinct generated photo', () => {
   const crypto = require('node:crypto');
   const hashes = ids.map(id => crypto.createHash('sha256').update(fs.readFileSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards', id + '.png'))).digest('hex'));
   assert.equal(new Set(hashes).size, 5);
+});
+
+test('checkpoint 2026 uses the supplied portrait and stays fixed before checkpoint 2028', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const checkpoint2026 = api.CARD_CATALOG.filter((card) => card.id === 'checkpoint-2026');
+  const checkpoint2026Index = api.CARD_CATALOG.findIndex((card) => card.id === 'checkpoint-2026');
+  const checkpoint2028Index = api.CARD_CATALOG.findIndex((card) => card.id === 'checkpoint-2028');
+
+  assert.deepEqual(checkpoint2026, [{
+    id: 'checkpoint-2026',
+    title: '2026...',
+    type: 'checkpoint',
+    imageId: 'checkpoint-2026'
+  }]);
+  assert.equal(checkpoint2026Index, checkpoint2028Index - 1);
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards/checkpoint-2026.png')),
+    true
+  );
+
+  const oldOrder = api.CARD_CATALOG
+    .filter((card) => card.id !== 'checkpoint-2026')
+    .map((card) => card.id);
+  const migrated = api.normalizeState({
+    'fb-ads-getest-microplasticsvrij-codex': { completed: true, deleted: false },
+    __order: oldOrder
+  });
+
+  assert.deepEqual(migrated['checkpoint-2026'], { completed: false, deleted: false });
+  assert.deepEqual(migrated['fb-ads-getest-microplasticsvrij-codex'], { completed: true, deleted: false });
+  assert.equal(migrated.__order.filter((id) => id === 'checkpoint-2026').length, 1);
+  assert.equal(migrated.__order.indexOf('checkpoint-2026'), migrated.__order.indexOf('checkpoint-2028') - 1);
+  assert.ok(api.getDisplayOrder(migrated).indexOf('checkpoint-2026') < api.getDisplayOrder(migrated).indexOf('checkpoint-2028'));
 });
