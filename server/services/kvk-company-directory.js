@@ -158,13 +158,14 @@ function createKvkCompanyDirectoryService(deps = {}) {
       return request.in('lead_status', ['usable', 'unusable']);
     }
     if (['succesvol-gevonden', 'bruikbaar-verklaard'].includes(category)) {
-      return request.eq('lead_status', 'usable').eq('usable_review_state', 'verified');
+      return request.eq('lead_status', 'usable');
     }
     if (category === DIRECTORY_CATEGORIES['onbruikbaar-verklaard']) {
       return request.eq('lead_status', 'unusable').gte('unusable_review_grade', 2);
     }
     if (category === DIRECTORY_CATEGORIES.controlekamer) {
-      return request.or('and(lead_status.eq.usable,usable_review_state.neq.verified),and(lead_status.eq.unusable,unusable_review_grade.lt.2)');
+      return request.eq('lead_status', 'unusable')
+        .or('unusable_review_grade.lt.2,unusable_review_grade.is.null');
     }
     if (category === DIRECTORY_CATEGORIES.bruikbaar) {
       return request

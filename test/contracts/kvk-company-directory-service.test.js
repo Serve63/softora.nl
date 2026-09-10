@@ -220,7 +220,7 @@ test('online KVK directory applies one exact server-side category to rows and to
   });
 });
 
-test('review categories include used approvals, final rejections and both pending queues', async () => {
+test('review categories include every usable company and keep only first rejections in control room', async () => {
   const filters = [];
   const request = {
     select() { return this; }, order() { return this; }, limit() { return this; },
@@ -233,14 +233,17 @@ test('review categories include used approvals, final rejections and both pendin
   for (const category of ['bruikbaar-verklaard', 'succesvol-gevonden']) {
     filters.length = 0;
     assert.equal((await service.fetchDirectoryRows({ category })).ok, true);
-    assert.deepEqual(filters, [['eq', 'lead_status', 'usable'], ['eq', 'usable_review_state', 'verified']]);
+    assert.deepEqual(filters, [['eq', 'lead_status', 'usable']]);
   }
   filters.length = 0;
   await service.fetchDirectoryRows({ category: 'onbruikbaar-verklaard' });
   assert.deepEqual(filters, [['eq', 'lead_status', 'unusable'], ['gte', 'unusable_review_grade', 2]]);
   filters.length = 0;
   await service.fetchDirectoryRows({ category: 'controlekamer' });
-  assert.deepEqual(filters, [['or', 'and(lead_status.eq.usable,usable_review_state.neq.verified),and(lead_status.eq.unusable,unusable_review_grade.lt.2)']]);
+  assert.deepEqual(filters, [
+    ['eq', 'lead_status', 'unusable'],
+    ['or', 'unusable_review_grade.lt.2,unusable_review_grade.is.null'],
+  ]);
 });
 
 test('without-working-website requires approval and hides transferred rows', async () => {
