@@ -602,7 +602,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
@@ -622,7 +622,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
-  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20260910c/);
+  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
   assert.match(directoryScriptSource, /params\.get\(SIDEBAR_CONTENT_PARAM\) === '1'/);
   assert.match(directoryScriptSource, /browserWindow\.location\?\.assign\(directoryContentPageUrl\(category\)\)/);
   assert.match(directoryContentSource, /href="\/premium-kvk-database\?softora_sidebar_content=1"/);

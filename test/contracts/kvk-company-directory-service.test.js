@@ -246,7 +246,7 @@ test('review categories include every usable company and keep only first rejecti
   ]);
 });
 
-test('without-working-website requires approval and hides transferred rows', async () => {
+test('unused inventory includes pending approvals and hides transferred rows', async () => {
   const filters = [];
   const request = {
     select() { return this; },
@@ -273,14 +273,13 @@ test('without-working-website requires approval and hides transferred rows', asy
   assert.equal(result.ok, true);
   assert.deepEqual(filters, [
     ['eq', 'lead_status', 'usable'],
-    ['eq', 'usable_review_state', 'verified'],
     ['eq', 'premium_database_transferred', false],
     ['in', 'website_status', ['no_website', 'not_working']],
   ]);
   assert.equal(
     filters.some(([, column]) => column === 'usable_review_state'),
-    true,
-    'only verified companies belong in the available website buckets'
+    false,
+    'review state must not hide unused usable companies'
   );
 });
 

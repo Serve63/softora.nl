@@ -57,19 +57,19 @@
     },
     bruikbaar: {
       title: 'Bruikbare bedrijven',
-      intro: 'Alle volledig gecontroleerde bedrijven die klaarstaan voor de Premium Database.',
+      intro: 'Alle bruikbare bedrijven die nog niet zijn gebruikt.',
       totalLabel: 'Bruikbaar',
       loadingLabel: 'Bruikbare bedrijven laden…',
     },
     'met-website': {
       title: 'Bedrijven met website',
-      intro: 'Alle bruikbare bedrijven met een bevestigde werkende website.',
+      intro: 'Alle bruikbare, nog niet gebruikte bedrijven met een werkende website.',
       totalLabel: 'Mét website',
       loadingLabel: 'Bedrijven met website laden…',
     },
     'zonder-werkende-website': {
       title: 'Bedrijven zonder werkende website',
-      intro: 'Alle bruikbare bedrijven zonder gevonden werkende website.',
+      intro: 'Alle bruikbare, nog niet gebruikte bedrijven zonder werkende website.',
       totalLabel: 'Zonder werkende website',
       loadingLabel: 'Bedrijven zonder werkende website laden…',
     },
