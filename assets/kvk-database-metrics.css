@@ -97,6 +97,35 @@
   color: var(--muted) !important;
 }
 
+.stat-delta.stat-delta-flow {
+  flex-wrap: wrap;
+  column-gap: 4px;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.stat-delta-flow > span {
+  font-size: inherit;
+}
+
+.stat-delta-added,
+.stat-delta-removed {
+  display: inline !important;
+}
+
+.stat-delta-added {
+  color: #8b3b32 !important;
+}
+
+.stat-delta-removed {
+  color: var(--green) !important;
+}
+
+.stat-delta.is-zero .stat-delta-added,
+.stat-delta.is-zero .stat-delta-removed {
+  color: var(--muted) !important;
+}
+
 .unusable-grade-grid {
   display: grid;
   flex: 1;
