@@ -587,3 +587,8 @@
 #databaseTable thead th:not(:first-child) { text-align: center; }
 
 #databaseTable tbody td:nth-child(3) { text-align: center; }
+
+/* Separate preparation options from the two outbound channels. */
+.page-shell .status-filter--groups { padding: 0; border: 0; background: transparent; gap: 8px; align-items: stretch; }
+.status-filter--groups > .status-filter-group { min-height: 60px; padding: 7px 5px; justify-content: center; border: 1px solid #e8e6e1; border-radius: 10px; background: #fff; }
+.status-filter--groups .status-filter-pills { flex-wrap: nowrap; }

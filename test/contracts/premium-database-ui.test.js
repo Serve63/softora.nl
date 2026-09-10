@@ -1975,7 +1975,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-sent-no-count/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260910-provider-groups/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
@@ -2431,7 +2431,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260909-sent-no-count/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260910-provider-groups/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260910-sent-register/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -4595,7 +4595,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><button class="sf-btn" data-s="verstuurd" type="button">Verstuurd<\/button><button class="sf-btn" data-s="instantly" type="button">Instantly<\/button><\/span><\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><\/span><\/div><div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal"><span class="status-filter-label">Verstuurd<\/span><span class="status-filter-pills"><button class="sf-btn" data-s="instantly" type="button">Instantly<\/button><button class="sf-btn" data-s="verstuurd" type="button">Softora<\/button><\/span><\/div>/
   );
   assert.match(pageSource, /activeStatus: "beschikbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
