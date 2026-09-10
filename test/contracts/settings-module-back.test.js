@@ -31,7 +31,7 @@ test('de Extra-catalogus is de centrale route-inventory voor Instellingen-module
 
   const settings = read('premium-instellingen.html');
   const renderer = read('assets/premium-user-management.js');
-  assert.match(settings, /settings-module-routes\.js\?v=20260909a/);
+  assert.match(settings, /settings-module-routes\.js\?v=20260910a/);
   assert.match(renderer, /SoftoraSettingsModuleRoutes/);
   assert.match(renderer, /moduleRoutes\.EXTRA_MODULES\.slice\(\)/);
   assert.match(renderer, /window\.location\.hash === '#extra'/);
