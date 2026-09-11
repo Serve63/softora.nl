@@ -55,7 +55,7 @@
   }
 
   .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-photo-image {
-    transform: scale(1.15);
+    transform: scale(1);
     transform-origin: center top;
   }
 }
