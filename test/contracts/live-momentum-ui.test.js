@@ -45,7 +45,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260911a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-office-details\.css\?v=20260820a"/);
-  assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260911a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260911b"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-subtitle\.css\?v=20260809a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-vakantieradar\.css\?v=20260810a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260904b"/);
@@ -53,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260911a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260911a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260911b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -241,7 +241,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(endGameNumbersCss, /\.end-game-card-slot--origin > \.end-game-goal-card,[\s\S]*\.end-game-card-slot--checkpoint > \.end-game-goal-card,[\s\S]*min-height:\s*clamp\(330px, 38vh, 385px\);[\s\S]*border:\s*2px solid rgba\(218, 175, 89, \.88\)/);
   assert.match(checkpointCss, /\.end-game-card-photo--checkpoint::after\s*\{[\s\S]*border-color:\s*rgba\(224, 187, 105, \.92\);/);
   assert.match(checkpointCss, /\.end-game-card-checkpoint-label\s*\{[\s\S]*color:\s*#fff1ca;/);
-  assert.match(checkpointCss, /@media \(min-width:\s*901px\)[\s\S]*\.end-game-card-slot\[data-end-game-card-id="checkpoint-2026"\] \.end-game-card-photo-image\s*\{[\s\S]*transform:\s*translateY\(3rem\) scale\(1\.08\);/);
+  assert.match(checkpointCss, /@media \(min-width:\s*901px\)[\s\S]*\.end-game-card-slot\[data-end-game-card-id="checkpoint-2026"\] \.end-game-card-photo-image\s*\{[\s\S]*transform:\s*scale\(1\.15\);[\s\S]*transform-origin:\s*center top;/);
+  assert.doesNotMatch(checkpointCss, /checkpoint-2026[\s\S]*translateY\(3rem\)/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot--checkpoint\s*\{[\s\S]*cursor:\s*grab;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot--checkpoint\.is-card-dragging\s*\{[\s\S]*cursor:\s*grabbing;/);
   assert.doesNotMatch(endGameNumbersCss, /drop-shadow|0 18px 40px|0 0 24px/);
@@ -488,7 +489,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(card\.officeDetail\) artwork\.append\(officeDetail\)/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /const imageId = card\.imageId \|\| card\.id/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260911a/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260911b/);
   assert.match(endGameCardsJs, /\{ id: 'jurisalem-af', title: 'Jurisalem af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'nieuwe-fiets', title: 'Nieuwe fiets' \}/);
   assert.match(endGameCardsJs, /\{ id: 'dertig-dagen-streak', title: '30 dagen streak' \}/);
