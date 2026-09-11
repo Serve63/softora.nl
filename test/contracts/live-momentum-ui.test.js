@@ -53,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260911a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260911b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260911c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -489,7 +489,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(card\.officeDetail\) artwork\.append\(officeDetail\)/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /const imageId = card\.imageId \|\| card\.id/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260911b/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{imageId\}\.png\?v=20260911c/);
   assert.match(endGameCardsJs, /\{ id: 'jurisalem-af', title: 'Jurisalem af' \}/);
   assert.match(endGameCardsJs, /\{ id: 'nieuwe-fiets', title: 'Nieuwe fiets' \}/);
   assert.match(endGameCardsJs, /\{ id: 'dertig-dagen-streak', title: '30 dagen streak' \}/);
