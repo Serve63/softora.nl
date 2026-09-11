@@ -14,7 +14,7 @@
 }
 
 .end-game-card-photo--checkpoint .end-game-card-photo-shade {
-  background: linear-gradient(180deg, rgba(22, 17, 7, .92) 0%, rgba(31, 23, 8, .3) 31%, rgba(12, 10, 4, .03) 57%, rgba(31, 24, 9, .66) 80%, rgba(15, 11, 4, .96) 100%);
+  background: linear-gradient(180deg, rgba(22, 17, 7, .48) 0%, rgba(31, 23, 8, .14) 31%, rgba(12, 10, 4, .03) 57%, rgba(31, 24, 9, .66) 80%, rgba(15, 11, 4, .96) 100%);
 }
 
 .end-game-card-photo--checkpoint::after {
@@ -37,7 +37,7 @@
 
 @media (min-width: 901px) {
   .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-photo-image {
-    transform: translateY(3rem) scale(1.08);
+    transform: scale(1.15);
     transform-origin: center top;
   }
 }
