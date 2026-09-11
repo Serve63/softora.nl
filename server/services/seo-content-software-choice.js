@@ -186,6 +186,12 @@ const SOFTWARE_CHOICE_CONTENT_ITEM = Object.freeze({
       paragraphs: Object.freeze([
         'Breng voor de eerste werksessie één route mee, inclusief systemen, rollen, uitzonderingen, dubbel werk en gewenste uitkomst. Voeg drie voorbeelden toe van situaties waarin de huidige werkwijze goed gaat en drie waarin zij faalt of buiten het systeem verdergaat. Daarmee kan een aanbieder eerlijker aangeven welk deel met standaardinrichting werkt, waar een koppeling volstaat en waar maatwerk logisch kan zijn.',
         Object.freeze({
+          text: 'Heb je de oplossingsroute gekozen en liggen er voorstellen? Ga dan softwareoffertes op scope en acceptatie vergelijken. Gebruik de gekozen componenten en proefscenario’s als gezamenlijke basis en laat ontbrekende migratie-, beheer- of exitafspraken aanvullen voordat je totaalprijzen naast elkaar zet.',
+          links: Object.freeze([
+            Object.freeze({ anchor: 'softwareoffertes op scope en acceptatie vergelijken', href: '/blog/maatwerk-software-offerte-beoordelen', availableFrom: '2026-09-11' }),
+          ]),
+        }),
+        Object.freeze({
           text: 'Softora kan de componentkaart, proefscope, gegevensroute en acceptatiescenario’s samen met je uitwerken. Het doel is een beheersbare keuze die past bij het echte proces, niet een vooraf bepaalde voorkeur voor maatwerk of een vooraf vastgelegde tijdwinst. Start gesprek wanneer je één route wilt vergelijken voordat meerdere pakketten of functies tegelijk worden gekocht.',
           links: Object.freeze([
             Object.freeze({

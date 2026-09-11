@@ -586,6 +586,34 @@ test('nieuwe softwareoffertegids gebruikt precies twee eigen inhoudelijke beelde
   assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
 });
 
+test('softwareoffertegids geeft een toetsbare terugvraag en contextuele vervolgroutes zonder nieuwe URL', () => {
+  const item = getSeoContentItem('blog', 'maatwerk-software-offerte-beoordelen');
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const comparison = buildSeoContentArticleHtml(getSeoContentItem('vergelijkingen', 'maatwerk-software-vs-standaard-software'));
+
+  assert.equal(item.publishedAt, '2026-07-17');
+  assert.equal(item.updatedAt, '2026-09-11');
+  assert.equal(item.growthEventKind, 'other_growth_action');
+  assert.equal(item.growthEventAt, '2026-09-11');
+  assert.equal(item.title, 'Maatwerk software offerte beoordelen: 6 controlepunten');
+  assert.deepEqual(item.sections.slice(0, 6).map((section) => section.heading), [
+    'Maak eerst dezelfde scope vergelijkbaar',
+    'Vraag om concrete acceptatiecriteria',
+    'Controleer data, koppelingen en toegang',
+    'Maak beheer en wijzigingen zichtbaar',
+    'Beoordeel aanpak en samenwerking, niet alleen uren',
+    'Gebruik een gewogen beslismatrix',
+  ]);
+  assert.match(item.description, /Maak open posten expliciet/);
+  assert.match(item.summary, /vergelijk een open post niet alsof die is inbegrepen/);
+  assert.match(html, /proefmigratie met controle van aantallen en foutregels/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat laten uitwerken<\/a>/);
+  assert.match(html, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software">standaardsoftware, een hybride koppeling of maatwerk<\/a>/);
+  assert.match(comparison, /href="\/blog\/maatwerk-software-offerte-beoordelen">softwareoffertes op scope en acceptatie vergelijken<\/a>/);
+  assert.ok(html.indexOf(item.summary) < html.indexOf('<figure class="artikel-img">'));
+  assert.match(html, /"dateModified":"2026-09-11"/);
+});
+
 test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inkomende links', () => {
   const item = getSeoContentItem('blog', 'website-offerte-vergelijken');
   const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
