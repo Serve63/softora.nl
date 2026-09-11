@@ -54,9 +54,14 @@
   transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }
 .end-game-card-slot--origin,
-.end-game-card-slot--checkpoint,
 .end-game-card-slot--destination {
   cursor: default;
+}
+.end-game-card-slot--checkpoint {
+  cursor: grab;
+}
+.end-game-card-slot--checkpoint.is-card-dragging {
+  cursor: grabbing;
 }
 .end-game-card-slot:focus-visible {
   border-radius: 10px;

@@ -34,3 +34,10 @@
   color: #fff5dc;
   text-shadow: 0 3px 12px rgba(0, 0, 0, .92);
 }
+
+@media (min-width: 901px) {
+  .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-photo-image {
+    transform: translateY(3rem) scale(1.08);
+    transform-origin: center top;
+  }
+}
