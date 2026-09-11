@@ -197,6 +197,12 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
+        '/blog/maatwerk-software-offerte-beoordelen',
+        '2026-09-11',
+        'other_growth_action',
+        'scheduled',
+      ],
+      [
         '/blog/website-offerte-vergelijken',
         '2026-09-10',
         'other_growth_action',
