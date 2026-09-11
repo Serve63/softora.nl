@@ -103,6 +103,20 @@ function validAutomationPrompt() {
   ].join(' ');
 }
 
+function softoraOnlyPrompt() {
+  return validAutomationPrompt()
+    .replace('SEO_PORTFOLIO_POLICY=all_sites_each_cycle', 'SEO_PORTFOLIO_POLICY=softora_only_until_reenabled')
+    .replace('SEO_ACADEMY_CONTENT_POLICY=blogs_only', 'SEO_ACADEMY_CONTENT_POLICY=paused_offline')
+    .replace('Read docs/growth/seo-machine-sites.json.', '')
+    .replace('Run node scripts/seo-machine-portfolio.js begin before sites.', '')
+    .replace('Local work is never a live publication.', '')
+    .replace('Run node scripts/seo-machine-portfolio.js finish after all sites.', '')
+    + ' Process only siteId=softora. The nine sites are paused until Serve explicitly re-enables them in a new instruction.'
+    + ' Leave their existing local files and portfolio states untouched.'
+    + ' Do not require 10/10 completion and do not finish or advance the portfolio coordinator while this override is active.'
+    + ' While paused, do not call record-softora, do not advance to another site and do not finish the portfolio cycle.';
+}
+
 function ubersuggestSmokeOutcomes() {
   return Object.fromEntries(REQUIRED_UBERSUGGEST_TOOLS.map((tool) => [tool, {
     status: tool.endsWith('keyword_suggestions') ? 'ok_empty' : 'ok',
@@ -858,6 +872,55 @@ test('v8 audit refuses an unmigrated legacy run limit before incrementing the co
     'start-run', '--thread', 'thread-1', '--invocation-at', '2026-08-28T08:15:00+02:00',
   ], { memoryPath, ...paths }), /THREAD_POLICY_MIGRATION_REQUIRED/);
   assert.equal(fs.readFileSync(memoryPath, 'utf8'), before);
+});
+
+test('Softora-only audit starts and closes one run without changing portfolio state or permitting an unverified publication', () => {
+  const memoryPath = prepareOperationalState(createMemory());
+  const paths = createAutomationConfig(memoryPath, { prompt: softoraOnlyPrompt() });
+  assert.equal(auditAutomationInstallation({ memoryPath, ...paths }).status, 'ready');
+  const invocationAt = '2026-09-11T06:32:55.828Z';
+  const started = runAutomationStateCli([
+    'start-run', '--thread', 'thread-1', '--invocation-at', invocationAt,
+  ], { memoryPath, ...paths });
+  assert.ok(started);
+  assert.equal(inspectAutomationState(memoryPath).rotation.completedRunsInActiveThread, 7);
+  assert.throws(() => finishAutomationRun({
+    memoryPath, threadId: 'thread-1', invocationAt, finishedAt: '2026-09-11T07:00:00.000Z',
+    outcome: 'published', publicEffect: 'live', evidence: 'No release gates have run.',
+  }), /PUBLISHED_GATES_INCOMPLETE/);
+  const receipt = finishAutomationRun({
+    memoryPath, threadId: 'thread-1', invocationAt, finishedAt: '2026-09-11T07:00:00.000Z',
+    outcome: 'completed_no_publication', publicEffect: 'none', evidence: 'Operational scope repair only; no content published.',
+  });
+  assert.equal(receipt.runNumber, 7);
+  assert.equal(inspectAutomationState(memoryPath).lifecycle.activeRun, null);
+});
+
+test('scope audit rejects mixed, duplicated and unsafe paused policies before mutating the run counter', () => {
+  const invalidPrompts = [
+    softoraOnlyPrompt().replace('paused_offline', 'blogs_only'),
+    validAutomationPrompt().replace('blogs_only', 'paused_offline'),
+    softoraOnlyPrompt() + ' SEO_PORTFOLIO_POLICY=all_sites_each_cycle',
+    softoraOnlyPrompt() + ' SEO_ACADEMY_CONTENT_POLICY=paused_offline',
+    softoraOnlyPrompt() + ' Run node scripts/seo-machine-portfolio.js begin.',
+    softoraOnlyPrompt() + ' Run node scripts/seo-machine-portfolio.js finish.',
+    softoraOnlyPrompt().replace('Leave their existing local files and portfolio states untouched.', ''),
+    softoraOnlyPrompt().replace('Never buy credits', ''),
+    softoraOnlyPrompt().replace('Never use Qwen', ''),
+    softoraOnlyPrompt().replace('seo:reviews:check', ''),
+    softoraOnlyPrompt().replace('--page-experience reports/seo-agent/page-experience.json', ''),
+    validAutomationPrompt().replace('Run node scripts/seo-machine-portfolio.js finish after all sites.', ''),
+  ];
+  for (const prompt of invalidPrompts) {
+    const memoryPath = prepareOperationalState(createMemory());
+    const paths = createAutomationConfig(memoryPath, { prompt });
+    const before = fs.readFileSync(memoryPath, 'utf8');
+    assert.equal(auditAutomationInstallation({ memoryPath, ...paths }).status, 'invalid');
+    assert.throws(() => runAutomationStateCli([
+      'start-run', '--thread', 'thread-1', '--invocation-at', '2026-09-11T06:32:55.828Z',
+    ], { memoryPath, ...paths }), /Automation-installatie ongeldig/);
+    assert.equal(fs.readFileSync(memoryPath, 'utf8'), before);
+  }
 });
 
 test('v8 audit rejects stale rotation instructions and a missing same-thread marker', () => {

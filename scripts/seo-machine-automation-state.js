@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { isSeoAutomationExcludedPath } = require('../server/services/seo-machine-route-policy');
-const { AUTOMATION_PROMPT_VERSION, REQUIRED_PROMPT_MARKERS, FORBIDDEN_PROMPT_MARKERS } = require('../server/services/seo-machine-prompt-contract');
+const { AUTOMATION_PROMPT_VERSION, REQUIRED_PROMPT_MARKERS, FORBIDDEN_PROMPT_MARKERS, inspectPromptScope } = require('../server/services/seo-machine-prompt-contract');
 const { validatePageExperienceReceipt } = require('../server/services/seo-machine-page-experience');
 const ROTATION_BLOCK = 'SEO_THREAD_ROTATION_STATE';
 const UBERSUGGEST_BLOCK = 'SEO_UBERSUGGEST_STATE';
@@ -594,7 +594,9 @@ function auditAutomationInstallation({
     ) {
       errors.push(`Ubersuggest data-smoke is niet bewezen voor de actieve task; ontbrekend: ${missingSmokeTools.join(', ') || 'status/task-bewijs'}.`);
     }
-    for (const marker of REQUIRED_PROMPT_MARKERS) {
+    const promptScope = inspectPromptScope(config.prompt);
+    errors.push(...promptScope.errors);
+    for (const marker of promptScope.requiredMarkers) {
       if (!marker.pattern.test(String(config.prompt || ''))) missingPromptMarkers.push(marker.label);
     }
     for (const marker of FORBIDDEN_PROMPT_MARKERS) {

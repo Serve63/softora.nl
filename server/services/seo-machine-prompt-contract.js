@@ -54,4 +54,38 @@ const FORBIDDEN_PROMPT_MARKERS = Object.freeze([
   Object.freeze({ label: 'edge_extension_identity', pattern: /family=edge/i }),
 ]);
 
-module.exports = { AUTOMATION_PROMPT_VERSION, REQUIRED_PROMPT_MARKERS, FORBIDDEN_PROMPT_MARKERS };
+const PORTFOLIO_MARKER_LABELS = new Set([
+  'portfolio_daily_coverage', 'academy_blog_scope', 'portfolio_registry',
+  'portfolio_durable_queue', 'portfolio_local_truth', 'portfolio_all_sites_finish',
+]);
+const SOFTORA_ONLY_MARKERS = Object.freeze([
+  { label: 'softora_only_execution', pattern: /Process only siteId=softora\./ },
+  { label: 'paused_sites_untouched', pattern: /Leave their existing local files and portfolio states untouched\./ },
+  { label: 'explicit_academy_reenable', pattern: /until Serve explicitly re-enables them in a new instruction\./ },
+  { label: 'paused_portfolio_lifecycle', pattern: /Do not require 10\/10 completion and do not finish or advance the portfolio coordinator while this override is active\./ },
+  { label: 'softora_only_finish', pattern: /do not call record-softora, do not advance to another site and do not finish the portfolio cycle\./ },
+]);
+
+function inspectPromptScope(prompt) {
+  const text = String(prompt || '');
+  const values = (key) => [...text.matchAll(new RegExp(`\\b${key}=([a-z_]+)`, 'g'))].map((match) => match[1]);
+  const portfolio = values('SEO_PORTFOLIO_POLICY');
+  const academy = values('SEO_ACADEMY_CONTENT_POLICY');
+  const softoraOnly = portfolio.length === 1 && portfolio[0] === 'softora_only_until_reenabled';
+  const paired = portfolio.length === 1 && academy.length === 1 && (
+    (softoraOnly && academy[0] === 'paused_offline')
+    || (portfolio[0] === 'all_sites_each_cycle' && academy[0] === 'blogs_only')
+  );
+  const errors = paired ? [] : ['Automationprompt heeft een ontbrekende, dubbele of tegenstrijdige portfolio/academy-scope.'];
+  if (softoraOnly && /node scripts\/seo-machine-portfolio\.js (?:begin|finish)\b/.test(text)) {
+    errors.push('Softora-only prompt mag geen portfolio begin/finish-commando bevatten.');
+  }
+  return {
+    errors,
+    requiredMarkers: softoraOnly
+      ? [...REQUIRED_PROMPT_MARKERS.filter((marker) => !PORTFOLIO_MARKER_LABELS.has(marker.label)), ...SOFTORA_ONLY_MARKERS]
+      : REQUIRED_PROMPT_MARKERS,
+  };
+}
+
+module.exports = { AUTOMATION_PROMPT_VERSION, REQUIRED_PROMPT_MARKERS, FORBIDDEN_PROMPT_MARKERS, inspectPromptScope };

@@ -864,6 +864,21 @@ test('SEO reading navigation cannot weaken the contact-route quality gate', () =
   assert.match(gates, /untracked-conversion-link/);
 });
 
+test('SEO scope override keeps every non-portfolio publication safeguard', () => {
+  const { inspectPromptScope, REQUIRED_PROMPT_MARKERS } = require('../../server/services/seo-machine-prompt-contract');
+  const scope = inspectPromptScope('SEO_PORTFOLIO_POLICY=softora_only_until_reenabled SEO_ACADEMY_CONTENT_POLICY=paused_offline');
+  assert.deepEqual(scope.errors, []);
+  const labels = new Set(scope.requiredMarkers.map((marker) => marker.label));
+  for (const marker of REQUIRED_PROMPT_MARKERS) {
+    if (!marker.label.startsWith('portfolio_') && marker.label !== 'academy_blog_scope') {
+      assert.ok(labels.has(marker.label), marker.label);
+    }
+  }
+  assert.ok(labels.has('paused_sites_untouched'));
+  assert.ok(labels.has('paused_portfolio_lifecycle'));
+  assert.ok(labels.has('softora_only_finish'));
+});
+
 test('SEO experience and attribution changes preserve publication, source and contact requirements', () => {
   const state = require('../../scripts/seo-machine-automation-state');
   const liveScript = readRepoFile('scripts/check-seo-machine-live-route.js');
