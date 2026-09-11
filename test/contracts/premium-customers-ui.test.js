@@ -10,7 +10,7 @@ test('premium customers page bootstraps customer rows before async sync runs', (
   const loadStateSource = fs.readFileSync(loadStatePath, 'utf8');
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
-  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911a/);
   assert.match(pageSource, /assets\/premium-customers-load-state\.js\?v=20260824a/);
   assert.match(pageSource, /customerLoadState\.fetchCanonicalCustomers\(window\.fetch\.bind\(window\)\)/);
   assert.match(pageSource, /<option value="website">Website<\/option>/);
@@ -38,7 +38,10 @@ test('premium customers page supports toegewezen aan in table, modal and order i
 
   assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
   assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
-  assert.match(pageSource, /<th>Betaalde prijs<\/th>/);
+  assert.match(pageSource, /<th>Afgesproken prijs<\/th>/);
+  assert.doesNotMatch(pageSource, /<th>Betaalde prijs<\/th>/);
+  assert.match(rendererSource, /createCell\("Afgesproken prijs", "service-cell"\)/);
+  assert.doesNotMatch(rendererSource, /createCell\("Betaalde prijs", "service-cell"\)/);
   assert.doesNotMatch(pageSource, /<th>Status<\/th>/);
   assert.doesNotMatch(rendererSource, /createCell\("Status"/);
   assert.doesNotMatch(rendererSource, /status-text/);
@@ -48,7 +51,7 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /<option value="Serve">Servé<\/option>/);
   assert.match(pageSource, /<option value="Martijn">Martijn<\/option>/);
   assert.match(pageSource, /fieldResponsible: document\.getElementById\("fieldResponsible"\),/);
-  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911a/);
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /claimedBy: normalizeString\(item && \(item\.claimedBy \|\| item\.leadOwnerName \|\| item\.leadOwnerFullName\)\),/);
@@ -61,7 +64,7 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.doesNotMatch(pageSource, /leaderboard-card/);
   assert.doesNotMatch(pageSource, /leaderboardList/);
   assert.doesNotMatch(pageSource, /function updateLeaderboard\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260824a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-customers-renderers\.js\?v=20260911a"><\/script>/);
   assert.match(pageSource, /window\.SoftoraCustomersRenderers\.renderRows\(nodes\.body, filtered, \{/);
   assert.doesNotMatch(rendererSource, /renderLeaderboard/);
   assert.match(rendererSource, /createCell\("Betaaldatum", "muted-cell cell-date"\)/);
@@ -85,7 +88,7 @@ test('premium customers onderhoudsprijs is alleen actief wanneer onderhoud ja is
   assert.match(pageSource, /for="fieldMaintenanceEnabled">Onderhoud\?<\/label>/);
   assert.match(pageSource, /id="fieldMaintenanceEnabled" name="onderhoudActief" required/);
   assert.match(pageSource, /<option value="Nee" selected>Nee<\/option><option value="Ja">Ja<\/option>/);
-  assert.match(pageSource, /id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49">/);
+  assert.match(pageSource, /id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="0\.01" placeholder="49\.00">/);
   assert.match(pageSource, /fieldMaintenanceEnabled: document\.getElementById\("fieldMaintenanceEnabled"\),/);
   assert.match(pageSource, /function normalizeMaintenanceEnabled\(raw, type, amount\)/);
   assert.match(pageSource, /onderhoudActief: onderhoudActief,/);
@@ -110,7 +113,10 @@ test('premium customers modal uses Softora custom dropdowns instead of native br
     assert.match(pageSource, new RegExp(`<select class="form-select" id="${fieldId}"[\\s\\S]*?data-custom-select="true"`));
   });
   assert.doesNotMatch(pageSource, /id="fieldStatus"/);
-  assert.match(pageSource, /<label class="form-label" for="fieldWebsiteAmount">Betaalde prijs \(EUR\)<\/label>/);
+  assert.match(pageSource, /<label class="form-label" for="fieldWebsiteAmount">Afgesproken prijs \(EUR\)<\/label>/);
+  assert.match(pageSource, /id="fieldAmount" name="bedrag" type="number" min="0" step="0\.01" placeholder="1500\.00">/);
+  assert.match(pageSource, /id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="0\.01" placeholder="1500\.00">/);
+  assert.match(pageSource, /minimumFractionDigits: 2,\s*maximumFractionDigits: 2/);
   assert.match(pageSource, /status: "Betaald",/);
   assert.match(pageSource, /function isPaidCustomerRecord\(raw\)/);
   assert.match(pageSource, /if \(!paidDate && order\.status !== "betaald"\) return;/);
@@ -128,7 +134,7 @@ test('premium customers page preserves the shared database lifecycle status', ()
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const loadStateSource = fs.readFileSync(loadStatePath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260428a/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911a/);
   assert.match(pageSource, /normalizeCustomerDatabaseStatus/);
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /isCustomerLifecycleRecord/);

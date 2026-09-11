@@ -1079,7 +1079,7 @@
                                     <th>Klant</th>
                                     <th>Telefoonnummer</th>
                                     <th>Service</th>
-                                    <th>Betaalde prijs</th>
+                                    <th>Afgesproken prijs</th>
                                     <th>Onderhoud</th>
                                     <th>Toegewezen aan</th>
                                     <th>Actief</th>
@@ -1137,19 +1137,19 @@
 
                     <div class="form-group">
                         <label class="form-label" for="fieldAmount">Bedrag (EUR)</label>
-                        <input class="form-input" id="fieldAmount" name="bedrag" type="number" min="0" step="1" placeholder="1500">
+                        <input class="form-input" id="fieldAmount" name="bedrag" type="number" min="0" step="0.01" placeholder="1500.00">
                     </div>
 
                     <div class="form-group" id="websiteAmountGroup">
-                        <label class="form-label" for="fieldWebsiteAmount">Betaalde prijs (EUR)</label>
-                        <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="1" placeholder="1500">
+                        <label class="form-label" for="fieldWebsiteAmount">Afgesproken prijs (EUR)</label>
+                        <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="0.01" placeholder="1500.00">
                     </div>
 
                     <div class="form-group"><label class="form-label" for="fieldMaintenanceEnabled">Onderhoud?</label><select class="form-select" id="fieldMaintenanceEnabled" name="onderhoudActief" required data-custom-select="true"><option value="Nee" selected>Nee</option><option value="Ja">Ja</option></select></div>
 
                     <div class="form-group" id="maintenanceAmountGroup">
                         <label class="form-label" for="fieldMaintenanceAmount">Onderhoud per maand (EUR)</label>
-                        <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49">
+                        <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="0.01" placeholder="49.00">
                     </div>
 
                     <div class="form-group">
@@ -1193,8 +1193,8 @@
     </div>
 
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
-    <script src="assets/premium-customers-renderers.js?v=20260824a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script>
+    <script src="assets/premium-customers-renderers.js?v=20260911a"></script>
+    <script src="assets/premium-customers-core.js?v=20260911a"></script>
     <script src="assets/premium-customers-store.js?v=20260824a"></script>
     <script src="assets/premium-customers-load-state.js?v=20260824a"></script>
     <script>
@@ -1390,8 +1390,8 @@
             return new Intl.NumberFormat("nl-NL", {
                 style: "currency",
                 currency: "EUR",
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             }).format(amount);
         }
 

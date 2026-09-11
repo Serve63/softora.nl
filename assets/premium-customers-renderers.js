@@ -109,7 +109,7 @@
         cell.textContent = cellConfig[2];
         row.appendChild(cell);
       });
-      const priceCell = createCell("Betaalde prijs", "service-cell");
+      const priceCell = createCell("Afgesproken prijs", "service-cell");
       priceCell.appendChild(createPriceContent(customer, helpers));
       row.appendChild(priceCell);
       const maintenanceCell = createCell("Onderhoud", "service-cell");

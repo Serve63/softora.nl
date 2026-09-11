@@ -90,7 +90,7 @@
         if (value === null || value === undefined || value === "") return null;
         const amount = Number(value);
         if (!Number.isFinite(amount) || amount < 0) return null;
-        return Math.round(amount);
+        return Math.round((amount + Number.EPSILON) * 100) / 100;
     }
 
     function normalizeCustomerService(raw) {
