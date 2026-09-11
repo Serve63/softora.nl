@@ -39,10 +39,13 @@ test('premium customers core keeps service and lifecycle contracts stable', () =
     'bedrijfssoftware',
     'voicesoftware',
     'chatbot',
+    'combinatie',
   ]);
   assert.equal(customersCore.normalizeCustomerService({ service: 'chatbot' }), 'chatbot');
+  assert.equal(customersCore.normalizeCustomerService({ service: 'Combinatie' }), 'combinatie');
   assert.equal(customersCore.normalizeCustomerService({ service: 'unknown' }), 'website');
   assert.equal(customersCore.formatCustomerServiceLabel('voicesoftware'), 'Voicesoftware');
+  assert.equal(customersCore.formatCustomerServiceLabel('combinatie'), 'Combinatie');
   assert.equal(customersCore.normalizeCustomerReview({ review: 'Ja' }), 'Ja');
   assert.equal(customersCore.normalizeCustomerReview({ review: 'Nee' }), 'Nee');
   assert.equal(customersCore.normalizeCustomerDatabaseStatus({ databaseStatus: 'afspraak' }), 'afspraak');

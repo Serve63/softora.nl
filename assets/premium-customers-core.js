@@ -9,7 +9,7 @@
 })(typeof window !== "undefined" ? window : globalThis, function () {
     "use strict";
 
-    const CUSTOMER_SERVICE_OPTIONS = Object.freeze(["website", "bedrijfssoftware", "voicesoftware", "chatbot"]);
+    const CUSTOMER_SERVICE_OPTIONS = Object.freeze(["website", "bedrijfssoftware", "voicesoftware", "chatbot", "combinatie"]);
     const CUSTOMER_DATABASE_STATUSES = Object.freeze([
         "nieuw",
         "prospect",
@@ -105,6 +105,7 @@
         if (key === "bedrijfssoftware") return "Bedrijfssoftware";
         if (key === "voicesoftware") return "Voicesoftware";
         if (key === "chatbot") return "Chatbot";
+        if (key === "combinatie") return "Combinatie";
         return key.charAt(0).toUpperCase() + key.slice(1);
     }
 
