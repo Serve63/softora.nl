@@ -36,6 +36,24 @@
 }
 
 @media (min-width: 901px) {
+  .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-photo {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-kicker {
+    align-self: flex-start;
+  }
+
+  .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-name {
+    margin-right: auto;
+    text-align: left;
+  }
+
+  .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-special-label {
+    align-self: center;
+  }
+
   .end-game-card-slot[data-end-game-card-id="checkpoint-2026"] .end-game-card-photo-image {
     transform: scale(1.15);
     transform-origin: center top;

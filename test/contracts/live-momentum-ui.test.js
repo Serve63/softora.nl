@@ -45,7 +45,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260911a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-office-details\.css\?v=20260820a"/);
-  assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260911b"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260911c"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-subtitle\.css\?v=20260809a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-vakantieradar\.css\?v=20260810a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260904b"/);
@@ -242,6 +242,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(checkpointCss, /\.end-game-card-photo--checkpoint::after\s*\{[\s\S]*border-color:\s*rgba\(224, 187, 105, \.92\);/);
   assert.match(checkpointCss, /\.end-game-card-checkpoint-label\s*\{[\s\S]*color:\s*#fff1ca;/);
   assert.match(checkpointCss, /@media \(min-width:\s*901px\)[\s\S]*\.end-game-card-slot\[data-end-game-card-id="checkpoint-2026"\] \.end-game-card-photo-image\s*\{[\s\S]*transform:\s*scale\(1\.15\);[\s\S]*transform-origin:\s*center top;/);
+  assert.match(checkpointCss, /checkpoint-2026[\s\S]*\.end-game-card-photo\s*\{[\s\S]*align-items:\s*flex-start;[\s\S]*text-align:\s*left;/);
+  assert.match(checkpointCss, /checkpoint-2026[\s\S]*\.end-game-card-special-label\s*\{[\s\S]*align-self:\s*center;/);
   assert.doesNotMatch(checkpointCss, /checkpoint-2026[\s\S]*translateY\(3rem\)/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot--checkpoint\s*\{[\s\S]*cursor:\s*grab;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot--checkpoint\.is-card-dragging\s*\{[\s\S]*cursor:\s*grabbing;/);
