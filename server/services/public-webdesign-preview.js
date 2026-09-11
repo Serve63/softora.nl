@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { OUTBOUND_SENDER_PROFILE_KEYS } = require('./outbound-sender-identity');
 const { listSentQuarantinedPreviewEntries } = require('./public-webdesign-preview-quarantine');
-
+const { guardPublicPreviewResponse } = require('./public-webdesign-preview-revocations');
 const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
@@ -1812,9 +1812,9 @@ function createPublicWebdesignPreviewService(options = {}) {
   }
 
   return {
-    getConceptPageResponse,
-    getPreviewPageResponse,
-    getPreviewAssetResponse,
+    getConceptPageResponse: guardPublicPreviewResponse(getConceptPageResponse, { buildNotFoundHtml }),
+    getPreviewPageResponse: guardPublicPreviewResponse(getPreviewPageResponse, { buildNotFoundHtml }),
+    getPreviewAssetResponse: guardPublicPreviewResponse(getPreviewAssetResponse, { asset: true }),
     resolvePreview,
   };
 }

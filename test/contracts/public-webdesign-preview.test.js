@@ -1180,6 +1180,43 @@ test('public webdesign preview resolves current database ids through customer id
   assert.equal(preview.mockupSource, 'https://cdn.softora.test/aagje-current-mockup.jpg');
 });
 
+test('public webdesign preview keeps customer-requested revocations offline across every public entry point', async () => {
+  let reads = 0;
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      reads += 1;
+      throw new Error('revoked previews must fail before storage reads');
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        reads += 1;
+        throw new Error('revoked previews must fail before customer reads');
+      },
+      async listDesignPhotosWithSignedUrls() {
+        reads += 1;
+        throw new Error('revoked previews must fail before photo reads');
+      },
+    },
+  });
+
+  const requests = [
+    ['getConceptPageResponse', { params: { companySlug: 'portivio-technology-b-v' }, query: {} }],
+    ['getPreviewPageResponse', { params: { companySlug: 'ander-bedrijf' }, query: { cid: 'kvk-30138458' } }],
+    ['getPreviewAssetResponse', { params: { companySlug: 'ander-bedrijf', assetType: 'webdesign' }, query: { cid: 'kvk-98956612' } }],
+    ['getConceptPageResponse', { params: { customerId: 'adriaan-van-dam-fotografie' }, query: {} }],
+  ];
+
+  for (const [method, request] of requests) {
+    const response = createResponseRecorder();
+    await service[method](request, response);
+    assert.equal(response.statusCode, 404, method);
+    assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate', method);
+    assert.match(String(response.body), /Preview image unavailable|Deze preview is niet beschikbaar/, method);
+  }
+
+  assert.equal(reads, 0);
+});
+
 test('public webdesign preview isoleert ui-state fallback cooldowns van premium dashboard scopes', async () => {
   const reads = [];
   const service = createPublicWebdesignPreviewService({
