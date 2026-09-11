@@ -95,6 +95,38 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^2<script>/);
 });
 
+test('customers page bootstrap bewaart afgesproken bedragen tot op de cent', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      if (scope !== 'premium_customers_database') return null;
+      return {
+        values: {
+          softora_customers_premium_v1: JSON.stringify([
+            {
+              id: 'klant-decimaal',
+              naam: 'Marco Broeders',
+              bedrijf: 'Administratieportaal BV',
+              telefoon: '0411-850887',
+              type: 'Website + onderhoud',
+              website: 'administratieportaal.nl',
+              websiteBedrag: '1550.00',
+              onderhoudActief: 'Ja',
+              onderhoudPerMaand: '37.50',
+              status: 'Betaald',
+              datum: '2026-09-11',
+            },
+          ]),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.customers[0].websiteBedrag, 1550);
+  assert.equal(payload.customers[0].onderhoudPerMaand, 37.5);
+});
+
 test('dashboard bootstrap toont direct dezelfde jaaromzet en actuele maandinkomsten als de client', () => {
   const service = createCustomersPageBootstrapService({
     now: () => new Date('2026-09-03T12:00:00.000Z'),

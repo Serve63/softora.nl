@@ -26,6 +26,13 @@ test('premium customers core keeps responsible owner labels stable', () => {
   );
 });
 
+test('premium customers core preserves customer amounts to cents', () => {
+  assert.equal(customersCore.normalizeOptionalAmount('37.50'), 37.5);
+  assert.equal(customersCore.normalizeOptionalAmount('1550.00'), 1550);
+  assert.equal(customersCore.normalizeOptionalAmount('37.505'), 37.51);
+  assert.equal(customersCore.normalizeOptionalAmount('-0.01'), null);
+});
+
 test('premium customers core keeps service and lifecycle contracts stable', () => {
   assert.deepEqual(customersCore.CUSTOMER_SERVICE_OPTIONS, [
     'website',
