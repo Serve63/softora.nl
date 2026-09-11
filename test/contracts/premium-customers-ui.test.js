@@ -10,10 +10,11 @@ test('premium customers page bootstraps customer rows before async sync runs', (
   const loadStateSource = fs.readFileSync(loadStatePath, 'utf8');
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
-  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911a/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911b/);
   assert.match(pageSource, /assets\/premium-customers-load-state\.js\?v=20260824a/);
   assert.match(pageSource, /customerLoadState\.fetchCanonicalCustomers\(window\.fetch\.bind\(window\)\)/);
   assert.match(pageSource, /<option value="website">Website<\/option>/);
+  assert.match(pageSource, /<option value="combinatie">Combinatie<\/option>/);
   assert.match(pageSource, /function readCustomersBootstrapPayload\(\)/);
   assert.match(pageSource, /document\.getElementById\("softoraCustomersBootstrap"\)/);
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
@@ -51,7 +52,7 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /<option value="Serve">Servé<\/option>/);
   assert.match(pageSource, /<option value="Martijn">Martijn<\/option>/);
   assert.match(pageSource, /fieldResponsible: document\.getElementById\("fieldResponsible"\),/);
-  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911a/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911b/);
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /claimedBy: normalizeString\(item && \(item\.claimedBy \|\| item\.leadOwnerName \|\| item\.leadOwnerFullName\)\),/);
@@ -134,7 +135,7 @@ test('premium customers page preserves the shared database lifecycle status', ()
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const loadStateSource = fs.readFileSync(loadStatePath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911a/);
+  assert.match(pageSource, /assets\/premium-customers-core\.js\?v=20260911b/);
   assert.match(pageSource, /normalizeCustomerDatabaseStatus/);
   assert.match(pageSource, /SoftoraPremiumCustomersCore/);
   assert.match(pageSource, /isCustomerLifecycleRecord/);

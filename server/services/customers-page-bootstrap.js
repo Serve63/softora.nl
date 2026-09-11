@@ -241,7 +241,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     'Dec',
   ];
 
-  const CUSTOMER_SERVICE_OPTIONS = ['website', 'bedrijfssoftware', 'voicesoftware', 'chatbot'];
+  const CUSTOMER_SERVICE_OPTIONS = ['website', 'bedrijfssoftware', 'voicesoftware', 'chatbot', 'combinatie'];
 
   function normalizeCustomerService(raw) {
     const rawSvc = normalizeString(raw && raw.service).toLowerCase();

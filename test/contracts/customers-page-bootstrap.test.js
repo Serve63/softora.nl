@@ -108,6 +108,7 @@ test('customers page bootstrap bewaart afgesproken bedragen tot op de cent', asy
               bedrijf: 'Administratieportaal BV',
               telefoon: '0411-850887',
               type: 'Website + onderhoud',
+              service: 'Combinatie',
               website: 'administratieportaal.nl',
               websiteBedrag: '1550.00',
               onderhoudActief: 'Ja',
@@ -125,6 +126,7 @@ test('customers page bootstrap bewaart afgesproken bedragen tot op de cent', asy
 
   assert.equal(payload.customers[0].websiteBedrag, 1550);
   assert.equal(payload.customers[0].onderhoudPerMaand, 37.5);
+  assert.equal(payload.customers[0].service, 'combinatie');
 });
 
 test('dashboard bootstrap toont direct dezelfde jaaromzet en actuele maandinkomsten als de client', () => {
