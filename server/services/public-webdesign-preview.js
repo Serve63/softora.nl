@@ -51,6 +51,14 @@ const PUBLIC_PREVIEW_PROFILES = Object.freeze({
     photoSource: '/assets/martijn-van-de-ven-profile.png?v=20260609a',
   }),
 });
+// Customer-requested revocations. Keep these identifiers here so every public
+// preview entry point (HTML and assets, slug and cid variants) fails closed.
+const PUBLIC_PREVIEW_REVOKED_IDENTIFIERS = Object.freeze([
+  'kvk-98956612',
+  'portivio-technology-b-v',
+  'kvk-30138458',
+  'adriaan-van-dam-fotografie',
+]);
 let sharpModule = null;
 const publicPreviewResolutionCache = new Map();
 const publicPreviewAssetCache = new Map();
@@ -145,6 +153,23 @@ const {
 
 function normalizeString(value) {
   return String(value || '').trim();
+}
+
+function isPublicPreviewRevokedIdentifier(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  return Boolean(normalized && PUBLIC_PREVIEW_REVOKED_IDENTIFIERS.includes(normalized));
+}
+
+function isPublicPreviewRequestRevoked(req) {
+  const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+  const params = req && req.params && typeof req.params === 'object' ? req.params : {};
+  return [
+    query.cid,
+    query.customerId,
+    query.id,
+    params.companySlug,
+    params.customerId,
+  ].some(isPublicPreviewRevokedIdentifier);
 }
 
 function getPublicPreviewCacheEntry(cache, key) {
@@ -1711,6 +1736,12 @@ function createPublicWebdesignPreviewService(options = {}) {
   }
 
   async function getPreviewPageResponse(req, res) {
+    if (isPublicPreviewRequestRevoked(req)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return res.status(404).send(buildNotFoundHtml());
+    }
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
     const diagnostics = createPublicPreviewDiagnostics();
     const preview = await resolveFirstPreview([
@@ -1735,6 +1766,12 @@ function createPublicWebdesignPreviewService(options = {}) {
   }
 
   async function getConceptPageResponse(req, res) {
+    if (isPublicPreviewRequestRevoked(req)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return res.status(404).send(buildNotFoundHtml());
+    }
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
     const params = req && req.params && typeof req.params === 'object' ? req.params : {};
     const routeIdentifier = params.companySlug || params.customerId;
@@ -1772,6 +1809,10 @@ function createPublicWebdesignPreviewService(options = {}) {
   }
 
   async function getPreviewAssetResponse(req, res) {
+    if (isPublicPreviewRequestRevoked(req)) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return res.status(404).send('Preview image unavailable');
+    }
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
     const params = req && req.params && typeof req.params === 'object' ? req.params : {};
     const routeIdentifier = params.companySlug || params.customerId;
