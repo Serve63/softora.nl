@@ -6,6 +6,182 @@ const SOFTWARE_PROPOSAL_CONTENT_ITEM = Object.freeze({
       'Beoordeel een maatwerk software offerte vóór je tekent: vergelijk scope, acceptatie, data, beheer, samenwerking en kosten. Maak open posten expliciet.',
     category: 'Bedrijfssoftware',
     intent: 'Koopintentie',
+    qualityVersion: 2,
+    primaryIntent: 'Ontvangen maatwerksoftware-offertes beoordelen vóór opdrachtverlening',
+    buyerTask: 'Scope, acceptatiebewijs, gegevens, beheer en open kostenposten vergelijkbaar maken voordat je tekent',
+    funnelStage: 'decision',
+    targetMoneyPage: '/bedrijfssoftware-op-maat',
+    uniqueClusterRole: 'Leveranciersvoorstellen toetsen na de oplossingskeuze; geen budgetraming, softwaredefinitie of AI-specifieke offertevergelijking.',
+    informationGain: 'Zes concrete offertecontroles verbinden gelijke scope, toetsbare acceptatie, migratie en toegang, beheer, samenwerking en gewogen beoordeling met een terugvraag die onderdeel, ontbrekend bewijs en akkoordmoment expliciet maakt.',
+    sources: Object.freeze([
+      Object.freeze({
+        title: 'PIANOo: Maatwerksoftware — broncode en onderhoud bij overheidsinkoop',
+        url: 'https://www.pianoo.nl/nl/sectoren/ict/ict-categorieen/maatwerksoftware',
+        observedAt: '2026-09-11',
+      }),
+    ]),
+    keywordEvidence: Object.freeze({
+      "version": 1,
+      "researchedAt": "2026-09-11",
+      "status": "ready",
+      "provider": "ubersuggest",
+      "locale": {
+        "locId": 2528,
+        "language": "Dutch",
+        "verified": true
+      },
+      "seeds": [
+        "maatwerk software offerte",
+        "maatwerk software"
+      ],
+      "tools": [
+        "keyword_suggestions",
+        "google_suggestions",
+        "keyword_overview",
+        "serp_analysis"
+      ],
+      "callsUsed": 6,
+      "calls": [
+        {
+          "tool": "keyword_suggestions",
+          "observedAt": "2026-09-11",
+          "arguments": {
+            "keywords": [
+              "maatwerk software offerte"
+            ],
+            "language": "nl",
+            "locId": 2528
+          },
+          "purpose": "Nederlandse vraagtaal en ontbrekend exact-term bewijs toetsen naast verse GSC-paginarijen; zie beperkingen voor Global/noData en cache."
+        },
+        {
+          "tool": "google_suggestions",
+          "observedAt": "2026-09-11",
+          "arguments": {
+            "keywords": [
+              "maatwerk software offerte"
+            ],
+            "language": "nl",
+            "country": "nl"
+          },
+          "purpose": "Nederlandse vraagtaal en ontbrekend exact-term bewijs toetsen naast verse GSC-paginarijen; zie beperkingen voor Global/noData en cache."
+        },
+        {
+          "tool": "keyword_overview",
+          "observedAt": "2026-09-11",
+          "arguments": {
+            "keyword": "maatwerk software offerte",
+            "language": "nl",
+            "locId": 2528
+          },
+          "purpose": "Nederlandse vraagtaal en ontbrekend exact-term bewijs toetsen naast verse GSC-paginarijen; zie beperkingen voor Global/noData en cache."
+        },
+        {
+          "tool": "serp_analysis",
+          "observedAt": "2026-09-11",
+          "arguments": {
+            "keyword": "maatwerk software offerte",
+            "language": "nl",
+            "locId": 2528,
+            "limit": 5
+          },
+          "purpose": "Nederlandse vraagtaal en ontbrekend exact-term bewijs toetsen naast verse GSC-paginarijen; zie beperkingen voor Global/noData en cache."
+        },
+        {
+          "tool": "keyword_overview",
+          "observedAt": "2026-09-11",
+          "arguments": {
+            "keyword": "maatwerk software",
+            "language": "nl",
+            "locId": 2528
+          },
+          "purpose": "Nederlandse vraagtaal en ontbrekend exact-term bewijs toetsen naast verse GSC-paginarijen; zie beperkingen voor Global/noData en cache."
+        },
+        {
+          "tool": "serp_analysis",
+          "observedAt": "2026-09-11",
+          "arguments": {
+            "keyword": "maatwerk software",
+            "language": "nl",
+            "locId": 2528,
+            "limit": 5
+          },
+          "purpose": "Nederlandse vraagtaal en ontbrekend exact-term bewijs toetsen naast verse GSC-paginarijen; zie beperkingen voor Global/noData en cache."
+        }
+      ],
+      "primaryIntent": "Ontvangen maatwerksoftware-offertes op gelijke scope en bewijs beoordelen.",
+      "provisionalPrimaryTerm": "maatwerk software offerte",
+      "secondaryBuyerLanguage": [
+        "maatwerk software kosten",
+        "maatwerk software laten maken"
+      ],
+      "buyerQuestions": [
+        "Welke scope en acceptatie zijn inbegrepen?",
+        "Hoe vergelijk ik open kostenposten en beheer?",
+        "Welk bewijs vraag ik vóór akkoord?"
+      ],
+      "dominantPageTypes": [
+        "offertevergelijking",
+        "kosten-en-scopegids",
+        "commerciële dienstenpagina"
+      ],
+      "serpFeatures": [
+        "organic_results"
+      ],
+      "limitations": [
+        "Ubersuggest is adviserend: verse GSC-paginarijen en actuele Nederlandse openbare zoekresultaten dragen de keuze.",
+        "Exacte overview bevestigt Netherlands/Dutch; volume0 betekent no_measurable_provider_volume, niet geen vraag.",
+        "Exacte SERP Global/null/noData is verworpen als Nederlands bewijs. Brede SERP Netherlands/Dutch is cache2026-07-20, dus geen actuele exact-term ranglijst.",
+        "Google-suggesties zijn aangevraagd nl/nl; dubbelen en geen afzonderlijke effectieve locale.",
+        "Breed volume390 en CPC33.49 bewijzen geen exacte offerte-vraag, verkeer, leads of omzet.",
+        "PIANOo gaat over overheidsinkoop: broncode/onderhoudsvragen zijn relevant; ARBIT-rechten worden niet naar MKB-contracten vertaald."
+      ],
+      "terms": [
+        {
+          "phrase": "maatwerk software offerte",
+          "disposition": "used",
+          "reason": "Bestaande koperstaak staat natuurlijk in titel en direct antwoord; verse pagina-zichtbaarheid zonder bewezen klikwinst.",
+          "metrics": {
+            "volume": 0,
+            "seoDifficulty": 12,
+            "cpc": 0
+          },
+          "volumeInterpretation": "no_measurable_provider_volume",
+          "observedIn": [
+            "keyword_overview"
+          ]
+        },
+        {
+          "phrase": "maatwerk software kosten",
+          "disposition": "covered_semantically",
+          "reason": "Prijsbasis en open posten horen bij deze taak; apart budgetartikel blijft onderscheiden.",
+          "observedIn": [
+            "google_suggestions"
+          ]
+        },
+        {
+          "phrase": "maatwerk software laten maken",
+          "disposition": "covered_semantically",
+          "reason": "Concrete vervolgstap naar bestaande dienst; geen overlappende nieuwe landingspagina.",
+          "observedIn": [
+            "google_suggestions"
+          ]
+        },
+        {
+          "phrase": "maatwerk software engels",
+          "disposition": "rejected",
+          "reason": "Vertaalintentie past niet bij Nederlandse koperstaak.",
+          "observedIn": [
+            "google_suggestions"
+          ]
+        }
+      ],
+      "decision": {
+        "owner": "softora_control_plane",
+        "ubersuggest": "advisory_only",
+        "rationale": "Sterkste GSC-pagina’s recent veranderd; verbeter bestaande offerte-ingang. Live QA corrigeert oude automatische teksttoevoeging; geen nieuwe URL of brede native-content rewrite."
+      }
+    }),
     publishedAt: '2026-07-17',
     updatedAt: '2026-09-11',
     growthEventKind: 'other_growth_action',

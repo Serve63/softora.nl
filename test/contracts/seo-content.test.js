@@ -595,6 +595,11 @@ test('softwareoffertegids geeft een toetsbare terugvraag en contextuele vervolgr
   assert.equal(item.updatedAt, '2026-09-11');
   assert.equal(item.growthEventKind, 'other_growth_action');
   assert.equal(item.growthEventAt, '2026-09-11');
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.keywordEvidence.callsUsed, 6);
+  assert.equal(item.sections.length, 6);
+  assert.deepEqual(item.faq, []);
+  assert.doesNotMatch(html, /Voor SEO is dat zwak|Welke content en interne links erbij horen|Hoe je dit blijft verbeteren na publicatie|WANNEER IS MAATWERK SOFTWARE OFFERTE/);
   assert.equal(item.title, 'Maatwerk software offerte beoordelen: 6 controlepunten');
   assert.deepEqual(item.sections.slice(0, 6).map((section) => section.heading), [
     'Maak eerst dezelfde scope vergelijkbaar',
