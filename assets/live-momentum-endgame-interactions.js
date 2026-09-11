@@ -52,9 +52,7 @@
       const draggedCard = dragState?.card;
       if (!draggedCard) return;
       const siblings = getCards().filter((card) => card !== draggedCard);
-      const dropTargets = siblings.filter((card) => (
-        card.dataset.endGameCardFixed !== 'true' || card.classList.contains('end-game-card-slot--checkpoint')
-      ));
+      const dropTargets = siblings.filter((card) => card.dataset.endGameCardFixed !== 'true');
       const fixedEndCard = siblings.find((card) => card.classList.contains('end-game-card-slot--destination')) || null;
       const insertBefore = dropTargets.find((card) => (
         clientX < card.getBoundingClientRect().left + (card.offsetWidth / 2)
@@ -157,8 +155,7 @@
       const index = cards.indexOf(card);
       const nextIndex = event.key === 'ArrowLeft' ? index - 1 : index + 1;
       const nextCard = cards[nextIndex];
-      const crossesCheckpoint = nextCard?.classList.contains('end-game-card-slot--checkpoint') === true;
-      if (nextIndex < 0 || nextIndex >= cards.length || (nextCard?.dataset.endGameCardFixed === 'true' && !crossesCheckpoint)) return;
+      if (nextIndex < 0 || nextIndex >= cards.length || nextCard?.dataset.endGameCardFixed === 'true') return;
       event.preventDefault();
       const previousPositions = new Map(cards.filter((item) => item !== card).map((item) => [item, item.getBoundingClientRect().left]));
       if (event.key === 'ArrowLeft') track.insertBefore(card, nextCard);
