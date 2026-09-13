@@ -108,6 +108,7 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
       ['/crm-systeem-op-maat', '2026-08-28', 'other_growth_action'],
       ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
       ['/ai-telefonist', '2026-08-23', 'other_growth_action'],
+      ['/chatbot-laten-maken', '2026-09-13', 'other_growth_action'],
     ]
   );
   assert.equal(events.every((event) => event.publicationLane === 'money_page'), true);
