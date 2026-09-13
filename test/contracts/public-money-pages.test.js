@@ -390,8 +390,24 @@ test('chatbot money page is focused on leads, support and clean follow-up', () =
   const source = readPage('premium-chatbot.html');
   const entry = getRegistryEntry('premium-chatbot.html');
 
-  assert.match(source, /<title>Chatbot laten maken voor leads en support \| Softora<\/title>/);
-  assert.match(source, /<h1 class="hero-title">Chatbot <br><em>die leads opvangt<\/em><\/h1>/);
+  assert.match(source, /<title>Chatbot laten maken voor het MKB \| Softora<\/title>/);
+  assert.match(source, /<h1 class="hero-title">Chatbot laten maken <br><em>voor je website<\/em><\/h1>/);
+  assert.match(source, /href="#eerste-chatbotscope"/);
+  assert.match(source, /id="eerste-chatbotscope"/);
+  assert.match(source, /een ingevuld gesprek is nog geen gekwalificeerde lead/);
+  assert.match(source, /href="\/blog\/chatbot-kosten-mkb"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-chatbot-overdracht"/);
+  assert.doesNotMatch(source, /<div class="stat-num">24\/7<\/div>/);
+  assert.match(source, /href="\/assets\/chatbot-buyer-scope\.css"/);
+  assert.match(source, /data-softora-contact-placement="header"/);
+  assert.match(source, /class="nav-start-btn content-header-contact">Contact/);
+  const scopeCss = fs.readFileSync(path.join(root, 'assets/chatbot-buyer-scope.css'), 'utf8');
+  assert.match(scopeCss, /font-size: 17px/);
+  assert.match(scopeCss, /a:focus-visible/);
+  assert.match(scopeCss, /min-height: 44px/);
+  const costGuide = require('../../server/services/seo-content-chatbot-kosten').CHATBOT_KOSTEN_CONTENT_ITEM;
+  assert.ok(costGuide.sections.some(section => section.paragraphs.some(paragraph =>
+    typeof paragraph === 'string' && paragraph.startsWith('Neem voor je eerste gesprek drie echte klantvragen mee'))));
   assert.match(source, /Leadkwalificatie/);
   assert.match(source, /FAQ en support/);
   assert.match(source, /Offerte-intakebot/);
@@ -409,8 +425,10 @@ test('chatbot money page is focused on leads, support and clean follow-up', () =
   );
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'Chatbot laten maken voor leads en support');
-  assert.match(entry.description, /leads kwalificeert/);
+  assert.equal(entry.title, 'Chatbot laten maken voor het MKB');
+  assert.match(entry.description, /menselijke overdracht, kosten en beheer/);
+  assert.equal(entry.lastmod, '2026-09-13');
+  assert.equal(entry.growthEventKind, 'other_growth_action');
   assert.ok(entry.relatedLinks.includes('/website-laten-maken'));
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-telefonist'));
