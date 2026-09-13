@@ -39,7 +39,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260901a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260901a"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260913a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -312,6 +312,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(mobileCss, /@supports \(-webkit-touch-callout:\s*none\)\s*\{\s*\.momentum-ios-statusbar-surface\s*\{[^}]*display:\s*block;[^}]*position:\s*fixed;[^}]*z-index:\s*0;[^}]*top:\s*0;[^}]*width:\s*100%;[^}]*height:\s*32px;[^}]*background-color:\s*#efe3e3;[^}]*pointer-events:\s*none;/);
   assert.match(mobileCss, /--momentum-safe-start:\s*max\(16px, env\(safe-area-inset-left\)\);/);
   assert.match(mobileCss, /padding:\s*max\(12px, env\(safe-area-inset-top\)\) var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
+  assert.match(mobileCss, /html body\[data-live-momentum-page\] \.dashboard-layout\.momentum-layout > \.sidebar\[data-static-sidebar="1"\]\s*\{[^}]*display:\s*grid !important;[^}]*grid-template-areas:\s*"logo profile";[^}]*gap:\s*0;[^}]*padding-bottom:\s*12px !important;/);
+  assert.match(mobileCss, /html body\[data-live-momentum-page\] \.dashboard-layout\.momentum-layout > \.sidebar\[data-static-sidebar="1"\] \.sidebar-nav\s*\{\s*display:\s*none !important;\s*\}/);
   assert.match(mobileCss, /\.momentum-mobile-nav\s*\{\s*display:\s*none;/);
   assert.match(mobileCss, /\.momentum-mobile-tabs,\s*\[data-settings-module-back-host\],\s*\.momentum-history-trigger,\s*\.momentum-video-trigger\s*\{\s*display:\s*none !important;/);
   assert.match(mobileCss, /\.momentum-mobile-summary\s*\{\s*display:\s*none;\s*\}/);
