@@ -21,4 +21,5 @@ a:focus-visible { outline: 3px solid #a62d65; outline-offset: 4px; }
 .chatbot-scope ul { padding-left: 24px; }
 .chatbot-scope li + li { margin-top: 12px; }
 .chatbot-scope a { color: #8b2252; text-underline-offset: 3px; }
-.dienst-thumb img, .example-img img { object-fit: contain; }
+.dienst-thumb img, .example-photo { object-fit: contain; }
+.example-card:hover .example-photo { transform: none; }
