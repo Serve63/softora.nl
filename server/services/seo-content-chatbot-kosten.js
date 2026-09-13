@@ -185,6 +185,7 @@ const CHATBOT_KOSTEN_CONTENT_ITEM = Object.freeze({
       heading: 'Bereid een scopegesprek voor met tien concrete antwoorden',
       paragraphs: Object.freeze([
         'Schrijf op welke klanttaak nu vertraging oplevert; welke vragen vaak terugkomen; welke bron leidend is; welke gegevens nodig zijn; welke uitkomst het gesprek moet hebben; welke actie de bot nooit zelfstandig mag doen; wanneer een mens overneemt; welk systeem informatie ontvangt; wie inhoud en gebruik beheert; en welk scenario als voldoende wordt geaccepteerd. Onbekende punten blijven zichtbaar als onderzoeksvraag.',
+        'Neem voor je eerste gesprek drie echte klantvragen mee, samen met de bronpagina die het antwoord onderbouwt en de gewenste vervolgstap. Geef per vraag aan of alleen een antwoord, een intake of een CRM-actie nodig is. Laat onnodige klantgegevens weg. Zo kan dezelfde kostenafbakening worden vertaald naar een concrete eerste websitechatbot, zonder alle mogelijke functies direct mee te bestellen.',
         Object.freeze({
           text:
             'Met deze antwoorden kan Softora een compacte eerste chatbotscope, afhankelijkheden en beslispoorten uitwerken. Het doel is niet om zoveel mogelijk gesprekken te automatiseren, maar om één nuttige route betrouwbaar te ondersteunen en de menselijke opvolging intact te houden. Bekijk chatbot laten maken of bespreek via Contact welke eerste klanttaak geschikt is om af te bakenen.',

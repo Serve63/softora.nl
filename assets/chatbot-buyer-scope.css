@@ -1,0 +1,25 @@
+/* Only loaded by the public chatbot service page. */
+.hero-sub, .section-sub, .dienst-desc, .step-desc, .example-desc,
+.why-desc, .cta-sub { font-size: 17px; }
+.dienst-list li { font-size: 16px; line-height: 1.6; }
+.hero-sub, .cta-sub { color: rgba(255, 255, 255, .9); }
+.hero-title em, .hero-eyebrow { color: #f5b9d5; }
+.btn-ghost { color: #fff; border-color: rgba(255, 255, 255, .65); background: rgba(10, 14, 25, .6); }
+.nav-start-btn, .btn-primary, .btn-ghost { min-height: 44px; }
+a:focus-visible { outline: 3px solid #a62d65; outline-offset: 4px; }
+.hero-btns a:focus-visible { outline-color: #fff; }
+.chatbot-scope {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 64px 24px 16px;
+  scroll-margin-top: 96px;
+  font-size: 17px;
+  line-height: 1.75;
+}
+.chatbot-scope h2 { font-size: clamp(26px, 4vw, 36px); line-height: 1.25; }
+.chatbot-scope p, .chatbot-scope ul { margin-top: 20px; }
+.chatbot-scope ul { padding-left: 24px; }
+.chatbot-scope li + li { margin-top: 12px; }
+.chatbot-scope a { color: #8b2252; text-underline-offset: 3px; }
+.dienst-thumb img, .example-photo { object-fit: contain; }
+.example-card:hover .example-photo { transform: none; }

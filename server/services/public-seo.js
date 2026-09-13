@@ -210,9 +210,12 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-chatbot.html',
     path: '/chatbot-laten-maken',
     legacyPaths: ['/premium-chatbot'],
-    title: 'Chatbot laten maken voor leads en support',
+    title: 'Chatbot laten maken voor het MKB',
     description:
-      'Laat een chatbot maken die websitebezoekers helpt, leads kwalificeert, veelgestelde vragen opvangt en gesprekken doorstuurt naar je team of CRM.',
+      'Laat een websitechatbot op maat bouwen voor klantvragen, intake of CRM-opvolging. Baken met Softora bronnen, menselijke overdracht, kosten en beheer af.',
+    lastmod: '2026-09-13',
+    growthEventKind: 'other_growth_action',
+    growthCluster: 'ai-contact',
     kind: 'service',
     serviceName: 'Chatbot laten maken',
     relatedLinks: [
