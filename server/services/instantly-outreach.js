@@ -15,6 +15,14 @@ const {
 const {
   OUTBOUND_SENDER_PROFILE_KEYS,
 } = require('./outbound-sender-identity');
+const {
+  getMissingReplacementCampaigns,
+  isCustomerConfirmedSent,
+  normalizeReplacementCampaigns,
+} = require('./instantly-campaign-replacement');
+const { createInstantlyCampaignReplacementApi } = require('./instantly-campaign-replacement-api');
+const { createInstantlyCampaignReplacementRuntime } = require('./instantly-campaign-replacement-runtime');
+const { createInstantlyWebhookState } = require('./instantly-webhook-state');
 const { buildInstantlyInsufficientUploadResult, buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
 const {
   protectWebsiteDomainInText,
@@ -2058,6 +2066,7 @@ function normalizeInstantlyConfig(config = {}) {
     apiKey: defaultNormalizeString(config.apiKey),
     apiBaseUrl: defaultNormalizeString(config.apiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/g, ''),
     defaultCampaignId: defaultNormalizeString(config.defaultCampaignId),
+    replacementCampaigns: normalizeReplacementCampaigns(config.replacementCampaigns),
     webhookSecret: defaultNormalizeString(config.webhookSecret),
     intervalMinutes: clampNumber(
       config.intervalMinutes,
@@ -2140,6 +2149,8 @@ function createInstantlyOutreachService(deps = {}) {
   } = deps;
 
   const config = normalizeInstantlyConfig(instantlyConfig);
+  const replacementCampaignApi = createInstantlyCampaignReplacementApi({ config, fetchJsonWithTimeout, createError: createInstantlyError, normalizeString });
+  const webhookState = createInstantlyWebhookState({ now, defaultCampaignId: config.defaultCampaignId, normalizeString, chooseStatus: chooseInstantlyStatus, buildSenderFields: buildInstantlySenderRowFields, mergeHistory, buildHistoryEntry, truncateText, normalizeContactStatus, canAdvanceContactStatus });
   let syncPromise = null;
   let operationPromise = null;
   let syncTimer = null;
@@ -2575,8 +2586,8 @@ function createInstantlyOutreachService(deps = {}) {
       senderEmail: sender.email,
       campaignId: options.campaignId,
       uploadId: options.uploadId,
-      status: 'queued',
-      permanent: true,
+      status: options.provisional === true ? 'reserved' : 'queued',
+      permanent: options.provisional !== true,
       payload: {
         campaignId: options.campaignId,
         uploadId: options.uploadId,
@@ -2876,8 +2887,9 @@ function createInstantlyOutreachService(deps = {}) {
     return byEmail;
   }
 
-  async function addLeadsToInstantly(leads) {
+  async function addLeadsToInstantly(leads, campaignId = config.defaultCampaignId) {
     (Array.isArray(leads) ? leads : []).forEach(assertInstantlyLeadReady);
+    const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
     const { response, data } = await fetchJsonWithTimeout(
       `${config.apiBaseUrl}/leads/add`,
       {
@@ -2887,7 +2899,7 @@ function createInstantlyOutreachService(deps = {}) {
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify({
-          campaign_id: config.defaultCampaignId,
+          campaign_id: cleanCampaignId,
           leads,
           skip_if_in_workspace: true,
           skip_if_in_campaign: true,
@@ -2909,9 +2921,10 @@ function createInstantlyOutreachService(deps = {}) {
     return data;
   }
 
-  async function deleteInstantlyLeadsByIds(leadIds) {
+  async function deleteInstantlyLeadsByIds(leadIds, campaignId = config.defaultCampaignId) {
     const ids = Array.from(new Set((Array.isArray(leadIds) ? leadIds : []).map(normalizeString).filter(Boolean)));
     if (!ids.length) return { count: 0 };
+    const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
     const { response, data } = await fetchJsonWithTimeout(
       `${config.apiBaseUrl}/leads`,
       {
@@ -2921,7 +2934,7 @@ function createInstantlyOutreachService(deps = {}) {
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify({
-          campaign_id: config.defaultCampaignId,
+          campaign_id: cleanCampaignId,
           ids,
         }),
       },
@@ -2944,7 +2957,7 @@ function createInstantlyOutreachService(deps = {}) {
     limit = DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT,
     campaignId = config.defaultCampaignId
   ) {
-    const safeLimit = clampNumber(limit, DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, 1, 5000);
+    const safeLimit = clampNumber(limit, DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, 1, 10000);
     const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
     const items = [];
     let startingAfter = '';
@@ -3133,16 +3146,21 @@ function createInstantlyOutreachService(deps = {}) {
       const syncedAt = normalizeString(row.instantlySyncedAt) || remote.timestampCreated || markedAt;
       const lastEventAt = remote.timestampLastContact || remote.timestampUpdated || syncedAt;
       const nextStatus = chooseInstantlyStatus(row.instantlyStatus, remote.status || 'synced');
+      const confirmedSent = ['sent', 'opened', 'reply_received', 'replied'].includes(nextStatus);
+      const confirmedSentAt = confirmedSent
+        ? normalizeString(remote.timestampLastContact) || lastEventAt || markedAt
+        : '';
       const historyEntry = buildHistoryEntry(
         {
-          type: 'gemaild',
-          label: 'Instantly-lead teruggevonden',
+          type: confirmedSent ? 'gemaild' : 'instantly_klaargezet',
+          label: confirmedSent ? 'Verstuurd via Instantly' : 'Klaargezet voor Instantly',
           actor,
           source: 'instantly-remote-reconcile',
           messageKey: `instantly-remote-reconcile:${item.campaignId}:${item.id}:${item.leadId}`,
           subject: 'Instantly reconciliatie',
-          preview:
-            'Lead stond al in de Instantly-campaign en is in Softora vastgezet zodat eigen mailboxen hem niet opnieuw pakken.',
+          preview: confirmedSent
+            ? 'Instantly heeft bevestigd dat deze lead is gemaild.'
+            : 'Lead staat in de Instantly-campagne en wordt pas als verstuurd geteld na een bevestigd verzendevent.',
         },
         { normalizeString, truncateText, now: () => new Date(markedAt) }
       );
@@ -3155,12 +3173,14 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyLastEventAt: lastEventAt,
         instantlyEmailSentAt:
           normalizeString(row.instantlyEmailSentAt) ||
-          (nextStatus === 'sent' || nextStatus === 'opened' || nextStatus === 'reply_received'
-            ? remote.timestampLastContact
-            : ''),
+          confirmedSentAt,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: nextStatus || 'synced',
-        ...buildInstantlyApproachedFields(row, syncedAt),
+        ...(confirmedSent ? {
+          ...buildInstantlyApproachedFields(row, confirmedSentAt),
+          lastMailSentAt: normalizeString(row.lastMailSentAt) || confirmedSentAt,
+          lastColdmailSentAt: normalizeString(row.lastColdmailSentAt) || confirmedSentAt,
+        } : { mail: true }),
         updatedAt: markedAt,
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
@@ -3447,9 +3467,14 @@ function createInstantlyOutreachService(deps = {}) {
     const recipientEntries = (Array.isArray(items) ? items : [])
       .map((item) => {
         const email = getRowEmail(item && item.row, normalizeString);
+        const sender = item && item.sender && typeof item.sender === 'object'
+          ? item.sender
+          : options.sender;
         return buildPermanentInstantlyRecipientGuard(item, {
           ...options,
           at,
+          campaignId: normalizeString(item && item.campaignId) || options.campaignId,
+          sender,
           leadId: leadIdByEmail.get(email) || normalizeString(options.leadId),
         });
       })
@@ -3479,7 +3504,7 @@ function createInstantlyOutreachService(deps = {}) {
           source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
           actor: normalizeString(options.actor),
           provider: 'instantly',
-          campaignId: normalizeString(options.campaignId),
+          campaignId: normalizeString(options.campaignId) || 'serve-martijn',
           uploadId: normalizeString(options.uploadId),
           entries,
           recipientEntries: mergedRecipientEntries,
@@ -3511,8 +3536,8 @@ function createInstantlyOutreachService(deps = {}) {
       if (!item) return row;
       const historyEntry = buildHistoryEntry(
         {
-          type: 'gemaild',
-          label: INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL,
+          type: 'instantly_klaargezet',
+          label: 'Klaargezet voor Instantly',
           actor: options.actor,
           source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
           messageKey: `${INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE}:${campaignId}:${uploadId}:${item.id}`,
@@ -3524,6 +3549,8 @@ function createInstantlyOutreachService(deps = {}) {
       );
       return {
         ...row,
+        instantlyPreviousStatus: normalizeString(row.status),
+        instantlyPreviousDatabaseStatus: normalizeString(row.databaseStatus),
         instantlyLeadId: normalizeString(row.instantlyLeadId),
         instantlyCampaignId: campaignId,
         instantlyStatus: chooseInstantlyStatus(row.instantlyStatus, 'queued'),
@@ -3544,7 +3571,7 @@ function createInstantlyOutreachService(deps = {}) {
         replyMailboxAccount: sender.email,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'queued',
-        ...buildInstantlyApproachedFields(row, preparedAt),
+        mail: true,
         updatedAt: preparedAt,
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
@@ -3685,7 +3712,7 @@ function createInstantlyOutreachService(deps = {}) {
     lastSyncResult = {
       ok: true,
       prepared: sendableRows.length,
-      markedBenaderd: sendableRows.length,
+      markedBenaderd: 0,
       permanentGuards: guardWrite.count,
       centralGuards: outboundReservation && outboundReservation.ok ? outboundReservation.count : 0,
       failed,
@@ -3724,18 +3751,20 @@ function createInstantlyOutreachService(deps = {}) {
       const instantlyLeadId = leadIdByEmail.get(email) || normalizeString(row.instantlyLeadId);
       const historyEntry = buildHistoryEntry(
         {
-          type: 'gemaild',
-          label: 'Lead via Instantly benaderd',
+          type: 'instantly_klaargezet',
+          label: 'Klaargezet voor Instantly',
           actor,
           source: 'instantly-sync',
           messageKey: `instantly-sync:${config.defaultCampaignId}:${item.id}`,
           subject: 'Instantly sync',
-          preview: 'Lead is aan de Instantly-campaign toegevoegd en in Softora als benaderd vastgezet.',
+          preview: 'Lead is aan de Instantly-campagne toegevoegd en wordt pas als verstuurd geteld na een bevestigd verzendevent.',
         },
         { normalizeString, truncateText, now }
       );
       return {
         ...row,
+        instantlyPreviousStatus: normalizeString(row.status),
+        instantlyPreviousDatabaseStatus: normalizeString(row.databaseStatus),
         instantlyLeadId,
         instantlyCampaignId: config.defaultCampaignId,
         instantlyStatus: chooseInstantlyStatus(row.instantlyStatus, 'synced'),
@@ -3754,7 +3783,7 @@ function createInstantlyOutreachService(deps = {}) {
         replyMailboxAccount: sender.email,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'synced',
-        ...buildInstantlyApproachedFields(row, syncedAt),
+        mail: true,
         updatedAt: syncedAt,
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
@@ -3853,8 +3882,8 @@ function createInstantlyOutreachService(deps = {}) {
 
   function isMarkedAsInstantlyApproached(row) {
     return (
+      isCustomerConfirmedSent(row) &&
       normalizeContactStatus(row && (row.databaseStatus || row.status), row) === 'gemaild' &&
-      normalizeContactStatus(row && row.outreachStatus, row) === 'gemaild' &&
       normalizeString(row && row.lastColdmailProvider).toLowerCase() === 'instantly'
     );
   }
@@ -3863,7 +3892,7 @@ function createInstantlyOutreachService(deps = {}) {
     const markedAt = now().toISOString();
     let marked = 0;
     const nextRows = (Array.isArray(rows) ? rows : []).map((row, index) => {
-      if (!hasActiveInstantlyOutreach(row)) return row;
+      if (!hasActiveInstantlyOutreach(row) || !isCustomerConfirmedSent(row)) return row;
       if (isMarkedAsInstantlyApproached(row)) return row;
       const currentStatus = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
       if (!canAdvanceContactStatus(currentStatus, 'gemaild')) return row;
@@ -3874,12 +3903,12 @@ function createInstantlyOutreachService(deps = {}) {
       const historyEntry = buildHistoryEntry(
         {
           type: 'gemaild',
-          label: 'Instantly-lead als benaderd bijgewerkt',
+          label: 'Verstuurd via Instantly',
           actor,
           source: 'instantly-sync',
           messageKey: `instantly-benaderd:${config.defaultCampaignId}:${id}`,
           subject: 'Instantly status',
-          preview: 'Lead stond al in Instantly en is in Softora als benaderd vastgezet.',
+          preview: 'Instantly heeft bevestigd dat deze lead is gemaild.',
         },
         { normalizeString, truncateText, now: () => new Date(markedAt) }
       );
@@ -3888,9 +3917,10 @@ function createInstantlyOutreachService(deps = {}) {
         ...row,
         instantlyCampaignId: normalizeString(row.instantlyCampaignId) || config.defaultCampaignId,
         instantlyLastEventAt: normalizeString(row.instantlyLastEventAt) || markedAt,
+        instantlyEmailSentAt: normalizeString(row.instantlyEmailSentAt) || normalizeString(row.lastColdmailSentAt) || markedAt,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: normalizeString(row.lastColdmailProviderStatus) || instantlyStatus,
-        ...buildInstantlyApproachedFields(row, markedAt),
+        ...buildInstantlyApproachedFields(row, normalizeString(row.instantlyEmailSentAt) || markedAt),
         updatedAt: markedAt,
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
@@ -4209,7 +4239,7 @@ function createInstantlyOutreachService(deps = {}) {
     lastSyncResult = {
       ok: true,
       synced: sendableRows.length,
-      markedBenaderd: existingApproached.marked + sendableRows.length,
+      markedBenaderd: existingApproached.marked,
       remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
       remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
       refreshedExistingVariables: existingVariableRefresh.refreshed,
@@ -4368,165 +4398,6 @@ function createInstantlyOutreachService(deps = {}) {
     return -1;
   }
 
-  function buildWebhookMessageKey(event) {
-    return [
-      'instantly',
-      event.eventType || 'event',
-      event.eventId || '',
-      event.leadId || event.email || event.customerId || '',
-      event.timestamp || '',
-    ]
-      .filter(Boolean)
-      .join(':');
-  }
-
-  function hasWebhookEvent(row, messageKey) {
-    const history = Array.isArray(row && row.hist) ? row.hist : [];
-    return Boolean(
-      messageKey &&
-        history.some((item) => normalizeString(item && item.messageKey) === normalizeString(messageKey))
-    );
-  }
-
-  function updateRowFromWebhook(row, event, actor) {
-    const date = event.timestamp && !Number.isNaN(Date.parse(event.timestamp)) ? new Date(event.timestamp).toISOString() : now().toISOString();
-    const messageKey = buildWebhookMessageKey(event);
-    const baseFields = {
-      instantlyLeadId: event.leadId || normalizeString(row.instantlyLeadId),
-      instantlyCampaignId: event.campaignId || normalizeString(row.instantlyCampaignId) || config.defaultCampaignId,
-      instantlyStatus: chooseInstantlyStatus(row.instantlyStatus, event.eventStatus),
-      instantlyLastEventAt: date,
-      lastColdmailProvider: 'instantly',
-      lastColdmailProviderStatus: event.eventStatus || event.eventType,
-      ...buildInstantlySenderRowFields(event.senderEmail, normalizeString),
-      updatedAt: date,
-    };
-    const history = (type, label, preview) =>
-      mergeHistory(
-        row,
-        buildHistoryEntry(
-          {
-            type,
-            label,
-            actor,
-            source: 'instantly-webhook',
-            messageKey,
-            subject: event.eventType,
-            preview,
-          },
-          { normalizeString, truncateText, now: () => new Date(date) }
-        ),
-        normalizeString
-      );
-    const currentStatus = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
-
-    if (event.eventStatus === 'sent') {
-      const nextStatus = canAdvanceContactStatus(currentStatus, 'gemaild') ? 'gemaild' : currentStatus;
-      return {
-        ...row,
-        ...baseFields,
-        status: nextStatus || row.status,
-        databaseStatus: nextStatus || row.databaseStatus,
-        mail: true,
-        lastMailSentAt: date,
-        lastColdmailSentAt: date,
-        instantlyEmailSentAt: date,
-        coldmailCampaignStartedAt: date,
-        campaignType: 'webdesign',
-        campaign_type: 'webdesign',
-        outreachCampaignType: 'webdesign',
-        outreach_campaign_type: 'webdesign',
-        coldmailSpecialAction: 'webdesign',
-        outreachStatus: 'benaderd',
-        actionRequired: false,
-        outreachActionRequired: false,
-        hist: history('gemaild', 'Mail verstuurd via Instantly', 'Instantly bevestigde dat de mail is verzonden.'),
-      };
-    }
-
-    if (event.eventStatus === 'opened') {
-      const openCount = Math.max(0, Number(row.coldmailOpenCount || row.outreachOpenCount || 0) || 0) + 1;
-      const firstOpenedAt = normalizeString(row.coldmailFirstOpenedAt || row.coldmailOpenedAt || row.outreachOpenedAt) || date;
-      return {
-        ...row,
-        ...baseFields,
-        coldmailOpened: true,
-        coldmailOpenedAt: firstOpenedAt,
-        coldmailFirstOpenedAt: firstOpenedAt,
-        coldmailLastOpenedAt: date,
-        coldmailOpenCount: openCount,
-        outreachOpenedAt: firstOpenedAt,
-        outreachOpenCount: openCount,
-        hist: history('mail_geopend', 'Instantly open geregistreerd', 'Instantly registreerde een open.'),
-      };
-    }
-
-    if (event.eventStatus === 'reply_received') {
-      return {
-        ...row,
-        ...baseFields,
-        lastColdmailReplyAt: date,
-        lastColdmailReplySubject: normalizeString(event.eventType),
-        lastColdmailReplyPreview: truncateText('Reactie ontvangen via Instantly.', 1000),
-        lastColdmailReplyMessageKey: messageKey,
-        outreachStatus: 'reactie_ontvangen',
-        actionRequired: true,
-        outreachActionRequired: true,
-        hist: history('reactie_ontvangen', 'Reactie ontvangen via Instantly', 'Instantly meldde een reply.'),
-      };
-    }
-
-    if (event.eventStatus === 'interested') {
-      const nextStatus = canAdvanceContactStatus(currentStatus, 'interesse') ? 'interesse' : currentStatus;
-      return {
-        ...row,
-        ...baseFields,
-        status: nextStatus || row.status,
-        databaseStatus: nextStatus || row.databaseStatus,
-        lastColdmailReplyAt: date,
-        outreachStatus: 'interesse',
-        actionRequired: false,
-        outreachActionRequired: false,
-        activeColdmailCampaignUntil: '',
-        coldmailCampaignEndsAt: '',
-        hist: history('interesse', 'Interesse gemeld via Instantly', 'Instantly markeerde deze lead als interested.'),
-      };
-    }
-
-    if (event.eventStatus === 'bounced' || event.eventStatus === 'unsubscribed') {
-      const nextStatus = canAdvanceContactStatus(currentStatus, 'geblokkeerd') ? 'geblokkeerd' : currentStatus;
-      const isUnsubscribed = event.eventStatus === 'unsubscribed';
-      return {
-        ...row,
-        ...baseFields,
-        mail: false,
-        canMail: false,
-        doNotMail: true,
-        status: nextStatus || row.status,
-        databaseStatus: nextStatus || row.databaseStatus,
-        coldmailBounceAt: isUnsubscribed ? row.coldmailBounceAt : date,
-        coldmailBounceType: isUnsubscribed ? row.coldmailBounceType : 'instantly',
-        coldmailUnsubscribedAt: isUnsubscribed ? date : row.coldmailUnsubscribedAt,
-        outreachStatus: 'geen_interesse',
-        actionRequired: false,
-        outreachActionRequired: false,
-        activeColdmailCampaignUntil: '',
-        coldmailCampaignEndsAt: '',
-        hist: history(
-          'geblokkeerd',
-          isUnsubscribed ? 'Afmelding via Instantly' : 'Bounce via Instantly',
-          isUnsubscribed ? 'Instantly meldde een unsubscribe.' : 'Instantly meldde een bounce.'
-        ),
-      };
-    }
-
-    return {
-      ...row,
-      ...baseFields,
-      hist: history('instantly_event', 'Instantly event ontvangen', `Event verwerkt: ${event.eventType}.`),
-    };
-  }
-
   async function handleInstantlyWebhook(req) {
     verifyWebhookSecret(req);
     const body = req && req.body && typeof req.body === 'object' ? req.body : {};
@@ -4550,8 +4421,8 @@ function createInstantlyOutreachService(deps = {}) {
       };
     }
 
-    const messageKey = buildWebhookMessageKey(event);
-    if (hasWebhookEvent(rows[index], messageKey)) {
+    const messageKey = webhookState.buildMessageKey(event);
+    if (webhookState.hasEvent(rows[index], messageKey)) {
       return {
         ok: true,
         processed: false,
@@ -4562,7 +4433,7 @@ function createInstantlyOutreachService(deps = {}) {
     }
 
     const nextRows = rows.slice();
-    nextRows[index] = updateRowFromWebhook(
+    nextRows[index] = webhookState.updateRow(
       rows[index],
       event,
       normalizeString(body.actor) || 'Instantly webhook'
@@ -4586,6 +4457,24 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
+  const campaignReplacement = createInstantlyCampaignReplacementRuntime({ config, now, createError: createInstantlyError, getUiStateValues, setUiStateValues, customerDbScope, customerDbKey, parseRows: parseDatabaseRows, buildRowsStateValues: buildCustomerRowsStateValues, collectEligibleRows, buildLead: buildInstantlyLead, loadPersonalizationContext, resolveSender: (owner) => resolveInstantlySenderProfile({ senderProfile: owner }, config, normalizeString), reserveRecipients: reserveSupabaseOutboundRecipientsForInstantly, outboundRecipientGuardStore, saveLegacyGuards: savePermanentInstantlyRecipientGuards, campaignApi: { ...replacementCampaignApi, listCampaignLeads: (campaignId, limit) => listInstantlyCampaignLeads(limit, campaignId), addCampaignLeads: (campaignId, leads) => addLeadsToInstantly(leads, campaignId), deleteCampaignLeads: (campaignId, leadIds) => deleteInstantlyLeadsByIds(leadIds, campaignId) }, normalizeString });
+
+  async function replaceInstantlyCampaigns(input = {}) {
+    replacementCampaignApi.assertConfigured();
+    return runExclusiveInstantlyOperation(async () => {
+      lastSyncResult = await campaignReplacement.replace(input);
+      return lastSyncResult;
+    });
+  }
+
+  async function refreshInstantlyDeliveryStatus(input = {}) {
+    replacementCampaignApi.assertConfigured();
+    return runExclusiveInstantlyOperation(async () => {
+      lastSyncResult = await campaignReplacement.refreshDeliveryStatus(input);
+      return lastSyncResult;
+    });
+  }
+
   function scheduleNextSync(delayMs = config.intervalMinutes * 60 * 1000) {
     if (syncTimer) {
       clearScheduledTask(syncTimer);
@@ -4598,7 +4487,10 @@ function createInstantlyOutreachService(deps = {}) {
     syncTimer = scheduleTask(() => {
       syncTimer = null;
       nextSyncAt = '';
-      void syncInstantlyLeads({ actor: 'Instantly autopilot', reconcileOnly: true })
+      const refresh = getMissingReplacementCampaigns(config.replacementCampaigns).length === 0
+        ? refreshInstantlyDeliveryStatus({ actor: 'Instantly verzendstatus' })
+        : syncInstantlyLeads({ actor: 'Instantly autopilot', reconcileOnly: true });
+      void refresh
         .catch((error) => {
           lastSyncResult = {
             ok: false,
@@ -4632,6 +4524,8 @@ function createInstantlyOutreachService(deps = {}) {
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
     const activeInstantlyRows = rows.filter((row) => hasActiveInstantlyOutreach(row)).length;
     const approachedInstantlyRows = rows.filter((row) => isMarkedAsInstantlyApproached(row)).length;
+    const instantlyReadyRows = rows.filter((row) => hasActiveInstantlyOutreach(row) && !isCustomerConfirmedSent(row)).length;
+    const instantlySentRows = rows.filter(isCustomerConfirmedSent).length;
     const priorColdmailInstantlyRiskRows = getPriorColdmailInstantlyRows(rows).length;
     return {
       ok: true,
@@ -4654,9 +4548,13 @@ function createInstantlyOutreachService(deps = {}) {
       requireWebdesignAssets: config.requireWebdesignAssets,
       prewarmPublicImageUrls: config.prewarmPublicImageUrls,
       defaultSenderEmail: config.defaultSenderEmail,
-      marksSyncedLeadsAsApproached: true,
+      marksSyncedLeadsAsApproached: false,
       activeInstantlyRows,
       approachedInstantlyRows,
+      instantlyReadyRows,
+      instantlySentRows,
+      replacementCampaignsConfigured: getMissingReplacementCampaigns(config.replacementCampaigns).length === 0,
+      replacementCampaigns: config.replacementCampaigns,
       priorColdmailInstantlyRiskRows,
       syncedToday: getDailySyncCount(rows),
       nextSyncAt,
@@ -4675,6 +4573,8 @@ function createInstantlyOutreachService(deps = {}) {
     handleInstantlyWebhook,
     isConfigured,
     prepareInstantlyUpload,
+    refreshInstantlyDeliveryStatus,
+    replaceInstantlyCampaigns,
     startAutopilot,
     stopAutopilot,
     syncInstantlyLeads,

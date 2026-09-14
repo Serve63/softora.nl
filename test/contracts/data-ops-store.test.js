@@ -854,11 +854,18 @@ function createSupabaseClientRecorder(currentCustomerIds = []) {
 
 function createSupabaseCustomerGuardRecorder(options = {}) {
   const currentCustomerIds = Array.isArray(options.currentCustomerIds) ? options.currentCustomerIds : [];
-  const existingGuardKeys = new Set(Array.isArray(options.existingGuardKeys) ? options.existingGuardKeys : []);
+  const existingGuardRows = new Map(
+    (Array.isArray(options.existingGuardRows) ? options.existingGuardRows : [])
+      .map((row) => [row.guard_key, { ...row }])
+  );
+  (Array.isArray(options.existingGuardKeys) ? options.existingGuardKeys : []).forEach((guardKey) => {
+    if (!existingGuardRows.has(guardKey)) existingGuardRows.set(guardKey, { guard_key: guardKey, status: 'sent' });
+  });
   const recorder = {
     upsertRows: [],
     deletedIds: [],
     insertedGuardRows: [],
+    promotedGuardRows: [],
     events: [],
   };
   const client = {
@@ -871,8 +878,8 @@ function createSupabaseCustomerGuardRecorder(options = {}) {
                 const idColumn = String(column || 'guard_key');
                 return Promise.resolve({
                   data: (Array.isArray(keys) ? keys : [])
-                    .filter((key) => existingGuardKeys.has(key))
-                    .map((key) => ({ [idColumn]: key })),
+                    .filter((key) => existingGuardRows.has(key))
+                    .map((key) => ({ ...existingGuardRows.get(key), [idColumn]: key })),
                   error: null,
                 });
               },
@@ -887,10 +894,29 @@ function createSupabaseCustomerGuardRecorder(options = {}) {
                 }
                 const inserted = Array.isArray(rows) ? rows : [rows];
                 recorder.insertedGuardRows.push(...inserted);
-                inserted.forEach((row) => existingGuardKeys.add(row.guard_key));
+                inserted.forEach((row) => existingGuardRows.set(row.guard_key, { ...row }));
                 const idColumn = String(column || 'guard_key');
                 return Promise.resolve({
                   data: inserted.map((row) => ({ [idColumn]: row.guard_key })),
+                  error: null,
+                });
+              },
+            };
+          },
+          upsert(rows, settings) {
+            assert.equal(settings.onConflict, 'guard_key');
+            return {
+              select(column) {
+                recorder.events.push('promote-guards');
+                if (options.upsertGuardError) {
+                  return Promise.resolve({ data: null, error: options.upsertGuardError });
+                }
+                const promoted = Array.isArray(rows) ? rows : [rows];
+                recorder.promotedGuardRows.push(...promoted);
+                promoted.forEach((row) => existingGuardRows.set(row.guard_key, { ...row }));
+                const idColumn = String(column || 'guard_key');
+                return Promise.resolve({
+                  data: promoted.map((row) => ({ [idColumn]: row.guard_key })),
                   error: null,
                 });
               },
@@ -1297,6 +1323,84 @@ test('data ops store writes outbound guards before saving sent customers', async
   assert.equal(recorder.insertedGuardRows.every((row) => row.permanent === true), true);
   assert.equal(recorder.insertedGuardRows.every((row) => row.provider === 'softora'), true);
   assert.equal(recorder.insertedGuardRows.every((row) => row.channel === 'coldmail'), true);
+});
+
+test('data ops store does not turn queued Instantly leads into sent guards', async () => {
+  const { client, recorder } = createSupabaseCustomerGuardRecorder({
+    currentCustomerIds: ['lead-queued'],
+  });
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-09-14T19:00:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.replaceCustomers([
+    {
+      id: 'lead-queued',
+      bedrijf: 'Wachtende Instantly lead',
+      email: 'queued@example.test',
+      website: 'https://queued.example.test',
+      status: 'gemaild',
+      databaseStatus: 'gemaild',
+      lastColdmailProvider: 'instantly',
+      lastColdmailProviderStatus: 'synced',
+      instantlyLeadId: 'instantly-queued-1',
+      instantlyCampaignId: 'campaign-serve',
+      instantlyStatus: 'synced',
+      instantlySyncedAt: '2026-09-14T18:00:00.000Z',
+      hist: [{ type: 'instantly_klaargezet', label: 'Klaargezet voor Instantly' }],
+    },
+  ], { source: 'instantly-campaign-replacement' });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(recorder.events, ['upsert-customers']);
+  assert.equal(recorder.insertedGuardRows.length, 0);
+  assert.equal(recorder.promotedGuardRows.length, 0);
+});
+
+test('data ops store promotes only confirmed Instantly recipient guards to sent', async () => {
+  const guardKeys = [
+    'company:bevestigde-instantly-lead',
+    'domain:confirmed-example-test',
+    'email:confirmed@example.test',
+    'id:lead-confirmed',
+  ];
+  const { client, recorder } = createSupabaseCustomerGuardRecorder({
+    currentCustomerIds: ['lead-confirmed'],
+    existingGuardRows: guardKeys.map((guardKey) => ({ guard_key: guardKey, status: 'queued' })),
+  });
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-09-14T19:00:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.replaceCustomers([
+    {
+      id: 'lead-confirmed',
+      bedrijf: 'Bevestigde Instantly lead',
+      email: 'confirmed@example.test',
+      website: 'https://confirmed.example.test',
+      status: 'gemaild',
+      databaseStatus: 'gemaild',
+      lastColdmailProvider: 'instantly',
+      lastColdmailProviderStatus: 'sent',
+      instantlyLeadId: 'instantly-sent-1',
+      instantlyCampaignId: 'campaign-serve',
+      instantlyStatus: 'sent',
+      instantlyEmailSentAt: '2026-09-14T18:30:00.000Z',
+    },
+  ], { source: 'instantly-delivery-reconcile' });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(recorder.events, ['promote-guards', 'upsert-customers']);
+  assert.equal(recorder.insertedGuardRows.length, 0);
+  assert.deepEqual(recorder.promotedGuardRows.map((row) => row.guard_key).sort(), guardKeys);
+  assert.equal(recorder.promotedGuardRows.every((row) => row.status === 'sent'), true);
+  assert.equal(recorder.promotedGuardRows.every((row) => row.provider === 'instantly'), true);
 });
 
 test('data ops store refuses to save sent customers when outbound guards fail', async () => {

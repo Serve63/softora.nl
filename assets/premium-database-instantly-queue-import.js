@@ -157,7 +157,7 @@
         const completedRows = Number.parseInt(currentUrl.searchParams.get(COMPLETION_PARAM) || "", 10);
         if (Number.isInteger(completedRows) && completedRows > 0) {
             setProgress(controls, completedRows.toLocaleString("nl-NL") + " sheetbedrijven geregistreerd.", false);
-            controls.instantlyButton.click();
+            global.dispatchEvent(new CustomEvent("softora:mail-ready-filter", { detail: { status: "benaderbaar" } }));
             currentUrl.searchParams.delete(COMPLETION_PARAM);
             global.history.replaceState(null, "", currentUrl.toString());
         }

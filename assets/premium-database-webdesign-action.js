@@ -880,7 +880,7 @@
             if (provider === "instantly") return true;
             return Boolean(normalizeString(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt));
         }
-
+        function isInstantlyConfirmedSent(customer) { return global.SoftoraDatabaseInstantlyStatus.isConfirmedSent(customer); } function isInstantlyReadyCustomer(customer) { return global.SoftoraDatabaseInstantlyStatus.isReady(customer, normalizeDatabaseStatus); }
         function hasPendingInstantlyQueue(customer) {
             return normalizeString(customer && customer.instantlyQueueStatus).toLowerCase() === "registered";
         }
@@ -893,7 +893,7 @@
 
         function matchesStatusFilter(customer, activeStatus, hasUsedColdCalling, hasUsedColdMailing) {
             const status = normalizeString(activeStatus);
-            if (status === "instantly") return hasInstantlyOutreachSignal(customer) || hasPendingInstantlyQueue(customer);
+            if (status === "instantly") return isInstantlyConfirmedSent(customer); if (status === "instantly-ready") return isInstantlyReadyCustomer(customer);
             if (status === "verstuurd") return false; // Delivered recipients are read from the central sent register.
             if (status === "benaderd") {
                 const usedColdCalling = typeof hasUsedColdCalling === "function" && hasUsedColdCalling(customer);
@@ -992,10 +992,9 @@
         function augmentSearchHaystack(customer) {
             return [getSentFromEmail(customer), getStatusLabel(getEffectiveStatus(customer)), hasPendingInstantlyQueue(customer) ? "klaargezet voor instantly" : "", isActionRequired(customer) ? "reactie ontvangen actie nodig" : ""].join(" ").toLowerCase();
         }
-
         function renderMeta(customer, forceOutreachMeta) {
-            if (hasInstantlyOutreachSignal(customer)) return "<div class=\"outreach-line\">Overgezet naar Instantly</div>";
-            if (hasPendingInstantlyQueue(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
+            if (isInstantlyConfirmedSent(customer)) return "<div class=\"outreach-line\">Verstuurd via Instantly</div>"; if (isInstantlyReadyCustomer(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
+            if (hasPendingInstantlyQueue(customer)) return "<div class=\"outreach-line\">Geregistreerd voor ontwerp</div>";
             if (!isWebdesignOutreachCustomer(customer) && !(forceOutreachMeta && isTrackedOutreachCustomer(customer))) return "";
             const sentAt = getSentAt(customer);
             return "<div class=\"outreach-line\">Verstuurd vanaf " + escapeHtml(getSentFromEmail(customer) || "onbekend mailadres") + (sentAt ? " · " + escapeHtml(formatDisplayDate(sentAt)) : "") + "</div>" + (isActionRequired(customer) ? "<span class=\"outreach-badge\">Reactie ontvangen</span>" : "");
@@ -1148,7 +1147,7 @@
         }
 
         ensureOutreachStyles();
-        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, hasInstantlyOutreachSignal: hasInstantlyOutreachSignal, hasPendingInstantlyQueue: hasPendingInstantlyQueue, isActionRequired: isActionRequired, isInstantlyTabCustomer: isInstantlyTabCustomer, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, matchesStatusFilter: matchesStatusFilter, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
+        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, hasInstantlyOutreachSignal: hasInstantlyOutreachSignal, hasPendingInstantlyQueue: hasPendingInstantlyQueue, isActionRequired: isActionRequired, isInstantlyConfirmedSent: isInstantlyConfirmedSent, isInstantlyReadyCustomer: isInstantlyReadyCustomer, isInstantlyTabCustomer: isInstantlyTabCustomer, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, matchesStatusFilter: matchesStatusFilter, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
     }
 
     global.SoftoraDatabaseOutreach = {

@@ -87,7 +87,12 @@ function registerInstantlyRoutes(app, deps = {}) {
 
   async function handlePrepareUpload(req, res) {
     try {
-      if (typeof instantlyOutreachService.prepareInstantlyUpload !== 'function') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const replaceMode = normalizeString(body.mode).toLowerCase() === 'replace';
+      const operation = replaceMode
+        ? instantlyOutreachService.replaceInstantlyCampaigns
+        : instantlyOutreachService.prepareInstantlyUpload;
+      if (typeof operation !== 'function') {
         res.status(404).json({
           ok: false,
           code: 'INSTANTLY_SAFE_UPLOAD_UNAVAILABLE',
@@ -95,8 +100,7 @@ function registerInstantlyRoutes(app, deps = {}) {
         });
         return;
       }
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const result = await instantlyOutreachService.prepareInstantlyUpload({
+      const result = await operation.call(instantlyOutreachService, {
         limit: body.limit,
         campaignId: body.campaignId || body.campaign || body.defaultCampaignId,
         uploadId: body.uploadId,
@@ -125,7 +129,12 @@ function registerInstantlyRoutes(app, deps = {}) {
 
   async function handleSync(req, res) {
     try {
-      if (typeof instantlyOutreachService.syncInstantlyLeads !== 'function') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const deliveryStatusOnly = body.deliveryStatusOnly === true;
+      if (
+        (deliveryStatusOnly && typeof instantlyOutreachService.refreshInstantlyDeliveryStatus !== 'function') ||
+        (!deliveryStatusOnly && typeof instantlyOutreachService.syncInstantlyLeads !== 'function')
+      ) {
         res.status(404).json({
           ok: false,
           code: 'INSTANTLY_SYNC_UNAVAILABLE',
@@ -133,21 +142,23 @@ function registerInstantlyRoutes(app, deps = {}) {
         });
         return;
       }
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const result = await instantlyOutreachService.syncInstantlyLeads({
-        campaignId: body.campaignId || body.campaign || body.defaultCampaignId,
-        senderProfile: body.senderProfile || body.senderProfileKey || body.profileKey,
-        senderEmail: body.senderEmail || body.sentFromEmail || body.mailboxAccount,
-        refreshExistingVariables: body.refreshExistingVariables === true,
-        refreshExistingLimit: body.refreshExistingLimit,
-        refreshExistingOnly: body.refreshExistingOnly === true,
-        reconcileOnly: true,
-        cleanupOnly: body.cleanupOnly === true,
-        actor:
-          normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
-          normalizeString(body.actor) ||
-          'Instantly sync',
-      });
+      const actor =
+        normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
+        normalizeString(body.actor) ||
+        'Instantly sync';
+      const result = deliveryStatusOnly
+        ? await instantlyOutreachService.refreshInstantlyDeliveryStatus({ actor, reconcileOnly: true })
+        : await instantlyOutreachService.syncInstantlyLeads({
+          campaignId: body.campaignId || body.campaign || body.defaultCampaignId,
+          senderProfile: body.senderProfile || body.senderProfileKey || body.profileKey,
+          senderEmail: body.senderEmail || body.sentFromEmail || body.mailboxAccount,
+          refreshExistingVariables: body.refreshExistingVariables === true,
+          refreshExistingLimit: body.refreshExistingLimit,
+          refreshExistingOnly: body.refreshExistingOnly === true,
+          reconcileOnly: true,
+          cleanupOnly: body.cleanupOnly === true,
+          actor,
+        });
       res.json(result);
     } catch (error) {
       res.status(error && error.status ? error.status : 400).json({
