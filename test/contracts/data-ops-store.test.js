@@ -1546,6 +1546,7 @@ test('data ops store reads and claims customer identity keys through the dedicat
   const calls = {
     selects: [],
     upserts: [],
+    clientOptions: [],
   };
   const identityRows = [
     {
@@ -1601,7 +1602,10 @@ test('data ops store reads and claims customer identity keys through the dedicat
   };
   const store = createSoftoraDataOpsStore({
     isSupabaseConfigured: () => true,
-    getSupabaseClient: () => client,
+    getSupabaseClient: (options = {}) => {
+      calls.clientOptions.push(options);
+      return client;
+    },
     now: () => new Date('2026-06-29T12:00:00.000Z'),
     logger: { error() {} },
   });
@@ -1628,6 +1632,9 @@ test('data ops store reads and claims customer identity keys through the dedicat
     onConflict: 'key_type,key_value',
     ignoreDuplicates: true,
   });
+  assert.equal(calls.clientOptions.at(-1).ignoreFailureCooldown, true);
+  assert.equal(calls.clientOptions.at(-1).suppressFailureCooldown, true);
+  assert.ok(calls.clientOptions.at(-1).timeoutMs >= 1000);
   assert.deepEqual(
     calls.upserts[0].rows.map((row) => `${row.key_type}:${row.key_value}:${row.customer_id}:${row.source}`),
     [
