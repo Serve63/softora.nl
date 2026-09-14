@@ -163,7 +163,12 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
+  assert.match(pageSource, /assets\/kvk-database-fast-progress\.js\?v=20260914a/);
+  const fastProgressSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-fast-progress.js'), 'utf8');
+  assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
+  assert.match(fastProgressSource, /const REFRESH_MS = 1000/);
+  assert.match(fastProgressSource, /renderLatestTreatedRows\(\)/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
@@ -530,7 +535,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260909-progress/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260910-flow/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260910-flow/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
@@ -630,6 +635,7 @@ test('kvk database APIs keep reads protected and expose only token-protected syn
   const requestContextSource = fs.readFileSync(path.join(repoRoot, 'server/security/request-context.js'), 'utf8');
 
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/snapshot'/);
+  assert.match(routesSource, /app\.get\('\/api\/kvk-database\/snapshot\/progress'/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/snapshot'/);
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/company-directory', requirePremiumAdminApiAccess/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/company-directory\/sync'/);

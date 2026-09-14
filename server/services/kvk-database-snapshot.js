@@ -2,7 +2,9 @@ const crypto = require('node:crypto');
 const { getLast60Minutes } = require('../../assets/kvk-database-metrics');
 
 const DEFAULT_STATE_KEY_SUFFIX = 'kvk_database_snapshot_v1';
+const DEFAULT_PROGRESS_KEY_SUFFIX = 'kvk_database_progress_v1';
 const MAX_SNAPSHOT_BYTES = 7_500_000;
+const MAX_PROGRESS_BYTES = 250_000;
 const DEFAULT_SNAPSHOT_READ_TIMEOUT_MS = 15_000;
 const DEFAULT_SNAPSHOT_WRITE_TIMEOUT_MS = 30_000;
 
@@ -21,6 +23,7 @@ function createKvkDatabaseSnapshotService(deps = {}) {
   } = deps;
 
   const snapshotStateKey = `${normalizeString(supabaseStateKey) || 'core'}:${DEFAULT_STATE_KEY_SUFFIX}`;
+  const progressStateKey = `${normalizeString(supabaseStateKey) || 'core'}:${DEFAULT_PROGRESS_KEY_SUFFIX}`;
 
   function constantTimeEquals(left, right) {
     const leftText = normalizeString(left);
@@ -63,6 +66,20 @@ function createKvkDatabaseSnapshotService(deps = {}) {
       if (body.state && typeof body.state === 'object' && !Array.isArray(body.state)) {
         return body;
       }
+    }
+    return null;
+  }
+
+  function getSubmittedProgress(body = {}) {
+    if (
+      body &&
+      typeof body === 'object' &&
+      !Array.isArray(body) &&
+      body.progress &&
+      typeof body.progress === 'object' &&
+      !Array.isArray(body.progress)
+    ) {
+      return body.progress;
     }
     return null;
   }
@@ -159,6 +176,25 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     return '';
   }
 
+  function validateProgress(progress) {
+    if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
+      return 'Voortgangssnapshot ontbreekt of is ongeldig.';
+    }
+    if (!progress.state || typeof progress.state !== 'object' || Array.isArray(progress.state)) {
+      return 'Voortgangssnapshot mist state.';
+    }
+    if (!Array.isArray(progress.latestTreated)) {
+      return 'Voortgangssnapshot mist latestTreated.';
+    }
+    if (progress.latestTreated.length > 10) {
+      return 'Voortgangssnapshot bevat meer dan 10 behandelde bedrijven.';
+    }
+    if (Buffer.byteLength(JSON.stringify(progress), 'utf8') > MAX_PROGRESS_BYTES) {
+      return `Voortgangssnapshot is te groot. Maximaal ${MAX_PROGRESS_BYTES} bytes.`;
+    }
+    return '';
+  }
+
   async function sendGetSnapshotResponse(_req, res) {
     const result = await fetchSupabaseRowByKeyViaRest(snapshotStateKey, 'payload,updated_at', {
       timeoutMs: snapshotReadTimeoutMs,
@@ -200,6 +236,61 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     });
   }
 
+  async function sendGetProgressResponse(_req, res) {
+    const result = await fetchSupabaseRowByKeyViaRest(progressStateKey, 'payload,updated_at', {
+      timeoutMs: snapshotReadTimeoutMs,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
+    if (!result || !result.ok) {
+      return res.status(503).json({
+        ok: false,
+        error: truncateText(result?.error || 'KVK voortgang kon niet worden geladen.', 500),
+      });
+    }
+    const row = Array.isArray(result.body) ? result.body[0] || null : result.body || null;
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : null;
+    const progress = payload?.progress;
+    const validationError = validateProgress(progress);
+    if (validationError) {
+      return res.status(404).json({ ok: false, error: 'Nog geen live KVK voortgang opgeslagen.' });
+    }
+    return res.status(200).json({
+      ok: true,
+      updatedAt: normalizeString(payload.updatedAt || row.updated_at || ''),
+      progress,
+    });
+  }
+
+  async function storeProgressResponse(progress, res) {
+    const validationError = validateProgress(progress);
+    if (validationError) {
+      return res.status(400).json({ ok: false, error: validationError });
+    }
+    const updatedAt = now().toISOString();
+    const payload = { progress, updatedAt };
+    const result = await upsertSupabaseRowViaRest(
+      { state_key: progressStateKey, payload, updated_at: updatedAt },
+      {
+        timeoutMs: snapshotWriteTimeoutMs,
+        ignoreFailureCooldown: true,
+        suppressFailureCooldown: true,
+      }
+    );
+    if (!result || !result.ok) {
+      return res.status(502).json({
+        ok: false,
+        error: truncateText(result?.error || 'KVK voortgang opslaan mislukt.', 500),
+      });
+    }
+    return res.status(200).json({
+      ok: true,
+      stateKey: progressStateKey,
+      updatedAt,
+      summary: summarizeSnapshot(progress),
+    });
+  }
+
   async function sendGetLocationStatsResponse(_req, res) {
     const result = await fetchSupabaseRowByKeyViaRest(snapshotStateKey, 'payload,updated_at', {
       timeoutMs: snapshotReadTimeoutMs,
@@ -235,6 +326,9 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     if (!hasValidSyncToken(req)) {
       return res.status(401).json({ ok: false, error: 'Ongeldig KVK sync-token.' });
     }
+
+    const progress = getSubmittedProgress(req.body || {});
+    if (progress) return storeProgressResponse(progress, res);
 
     const snapshot = getSubmittedSnapshot(req.body || {});
     const validationError = validateSnapshot(snapshot);
@@ -309,6 +403,8 @@ function createKvkDatabaseSnapshotService(deps = {}) {
   }
 
   return {
+    progressStateKey,
+    sendGetProgressResponse,
     sendGetLocationStatsResponse,
     sendGetSnapshotResponse,
     sendPostSnapshotResponse,
