@@ -2,8 +2,23 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
+  SENT_COUNT_MODEL,
   preserveReliableColdmailLiveStats,
 } = require('../../server/services/coldmail-live-stats-reconciliation');
+
+test('direction model upgrade corrects inflated totals only with reliable central evidence', () => {
+  const previous = { stats: { reliable: true, dateKey: '2026-09-14', systemTotalSent: 3856, sentToday: 67 } };
+  const fresh = { stats: { reliable: true, dateKey: '2026-09-14', systemTotalSent: 3855, sentToday: 66,
+    sentCountModel: SENT_COUNT_MODEL, authoritativeSource: 'central-outbound-recipient-guard' } };
+  assert.equal(preserveReliableColdmailLiveStats(fresh, previous, '2026-09-14').stats.systemTotalSent, 3855);
+  assert.equal(preserveReliableColdmailLiveStats(fresh, previous, '2026-09-14').stats.sentToday, 66);
+  for (const overrides of [{ reliable: false }, { authoritativeSource: 'fallback' }]) {
+    const result = preserveReliableColdmailLiveStats({ stats: { ...fresh.stats, ...overrides } }, previous, '2026-09-14');
+    assert.equal(result.stats.systemTotalSent, 3856);
+  }
+  const sameModel = { stats: { ...previous.stats, sentCountModel: SENT_COUNT_MODEL } };
+  assert.equal(preserveReliableColdmailLiveStats(fresh, sameModel, '2026-09-14').stats.systemTotalSent, 3856);
+});
 
 test('coldmail reconciliation preserves all-time totals but not a corrected timestamp-model day count', () => {
   const previous = {

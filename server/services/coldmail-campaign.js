@@ -18,7 +18,7 @@ const { createColdmailSendDurability } = require('./coldmail-send-provenance');
 const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation'); const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const { resolveColdmailStatsResponse } = require('./coldmail-live-stats-response');
-const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
+const { SENT_COUNT_MODEL, preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
 const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard'); const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
 const { assertOutboundRecipientsNotSuppressed } = require('../security/outbound-mail-suppression');
@@ -3293,7 +3293,7 @@ function createColdmailCampaignService(deps = {}) {
   function isSoftoraColdmailCentralGuardGroup(group) {
     const provider = normalizeString(group && group.provider).toLowerCase();
     const channel = normalizeString(group && group.channel).toLowerCase();
-    if (provider && provider !== 'softora') return false;
+    if ((provider && provider !== 'softora') || group?.payload?.sentStatsExcluded === true) return false;
     if (channel && channel !== 'coldmail') return false;
     return true;
   }
@@ -3498,7 +3498,7 @@ function createColdmailCampaignService(deps = {}) {
       ok: true,
       stats: {
         timezone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
-        dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE), sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL,
+        dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE), sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL, sentCountModel: SENT_COUNT_MODEL,
         source: centralGuardAvailable ? 'central-outbound-recipient-guard' : 'central-outbound-recipient-guard-unavailable',
         authoritativeSource: 'central-outbound-recipient-guard',
         reliable: centralGuardAvailable,
@@ -3636,7 +3636,7 @@ function createColdmailCampaignService(deps = {}) {
         cachedAtMs: Date.parse(normalizeString(durablePayload.stats && durablePayload.stats.updatedAt)) || now().getTime(),
         payload: durablePayload,
       };
-      if (durablePayload.stats.bounceStatsModel !== 'complete-mailbox-recipient-v2') return refreshColdmailLiveStats();
+      if (durablePayload.stats.bounceStatsModel !== 'complete-mailbox-recipient-v2' || durablePayload.stats.sentCountModel !== SENT_COUNT_MODEL) return refreshColdmailLiveStats();
       refreshColdmailLiveStats().catch((error) => {
         logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
       });

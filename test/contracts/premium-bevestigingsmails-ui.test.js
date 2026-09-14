@@ -182,7 +182,7 @@ test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaa
   assert.match(pageSource, /AI is momenteel hier niet mee bezig\./);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
-  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260611a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260914-17h"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260611b" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
   assert.match(managementSource, /Vandaag zijn er \$\{liveSentToday\} mails echt verzonden/);
@@ -742,7 +742,7 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260611a/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260914-17h/);
   assert.match(autopilotSource, /const BATCH_SIZE = 1;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
@@ -784,7 +784,7 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /if \(enabled\) \{/);
   assert.match(autopilotSource, /startHour: 7/);
   assert.match(autopilotSource, /startMinute: 0/);
-  assert.match(autopilotSource, /endHour: 22/);
+  assert.match(autopilotSource, /endHour: 17/);
   assert.match(autopilotSource, /endMinute: 0/);
   assert.match(autopilotSource, /minIntervalMinutes: 5/);
   assert.match(autopilotSource, /senderMinIntervalMinutes: 60/);

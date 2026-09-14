@@ -1906,7 +1906,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('status', ['sent', 'reserved'])
           .limit(keyChunk.length),
       {
-        timeoutMs: dataOpsReadQueryTimeoutMs,
+        timeoutMs: Math.max(1000, Math.min(30000, Number(options.timeoutMs) || dataOpsReadQueryTimeoutMs)),
         bypassReadFailureCooldown: options.bypassReadFailureCooldown,
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,

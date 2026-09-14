@@ -1,4 +1,5 @@
 const BOUNCE_MODEL = 'complete-mailbox-recipient-v2';
+const SENT_COUNT_MODEL = 'outbound-direction-v1';
 function preserveReliableBounceStats(payload, previousPayload) {
   const stats = payload && payload.stats || {};
   const previous = previousPayload && previousPayload.stats || {};
@@ -28,6 +29,9 @@ function preserveReliableColdmailLiveStats(payload, previousPayload, expectedDat
   if (!isReliableLiveTotals(previousPayload, expectedDateKey)) return payload;
   const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
   const previous = previousPayload.stats;
+  // A complete, direction-verified register can intentionally correct an older inflated cache.
+  if (isReliableLiveTotals(payload, expectedDateKey) && stats.sentCountModel === SENT_COUNT_MODEL &&
+      previous.sentCountModel !== SENT_COUNT_MODEL && stats.authoritativeSource === 'central-outbound-recipient-guard') return payload;
   const mergedStats = { ...stats };
   let changed = false;
   const cumulativeFields = [
@@ -74,4 +78,4 @@ function preserveReliableColdmailLiveStats(payload, previousPayload, expectedDat
   return changed ? { ...payload, stats: mergedStats } : payload;
 }
 
-module.exports = { preserveReliableColdmailLiveStats, preserveReliableBounceStats };
+module.exports = { SENT_COUNT_MODEL, preserveReliableColdmailLiveStats, preserveReliableBounceStats };
