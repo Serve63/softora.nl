@@ -205,7 +205,46 @@ function validateDesignStageMetadata(input, rowCount) {
 }
 
 function createInstantlyQueueRegistrationService(deps = {}) {
-  const { dataOpsStore = null, now = () => new Date() } = deps;
+  const {
+    dataOpsStore = null,
+    mailReadySnapshotService = null,
+    now = () => new Date(),
+  } = deps;
+
+  async function refreshMailReadyInventory() {
+    if (
+      !mailReadySnapshotService ||
+      typeof mailReadySnapshotService.invalidate !== 'function' ||
+      typeof mailReadySnapshotService.buildMailReadySnapshot !== 'function'
+    ) {
+      throw createRegistrationError(
+        'De Mailklaar-voorraad kan tijdelijk niet veilig worden ververst.',
+        'INSTANTLY_QUEUE_INVENTORY_REFRESH_UNAVAILABLE',
+        503
+      );
+    }
+    mailReadySnapshotService.invalidate();
+    try {
+      const snapshot = await mailReadySnapshotService.buildMailReadySnapshot({
+        limit: 1,
+        offset: 0,
+        includeFoundSnapshot: true,
+        allowStaleWhileRefreshing: false,
+      });
+      return {
+        generatedAt: normalizeString(snapshot && snapshot.generatedAt),
+        snapshotVersion: normalizeString(snapshot && snapshot.snapshotVersion),
+        mailReadyTotal: Math.max(0, Number(snapshot && snapshot.total) || 0),
+        availableTotal: Math.max(0, Number(snapshot && snapshot.availableTotal) || 0),
+      };
+    } catch (error) {
+      throw createRegistrationError(
+        'De ontwerpvoorraad is opgeslagen, maar de Mailklaar-weergave kon niet worden ververst.',
+        'INSTANTLY_QUEUE_INVENTORY_REFRESH_FAILED',
+        503
+      );
+    }
+  }
 
   async function registerBatch(input = {}) {
     const rawRows = Array.isArray(input.rows) ? input.rows : [];
@@ -366,6 +405,9 @@ function createInstantlyQueueRegistrationService(deps = {}) {
         throw createRegistrationError('Ontwerpbatch kon niet worden opgeslagen.', 'INSTANTLY_QUEUE_WRITE_FAILED', 502);
       }
     }
+    const inventory = input.refreshInventory === true
+      ? await refreshMailReadyInventory()
+      : null;
     return {
       ok: true,
       status: INSTANTLY_QUEUE_STATUS_DESIGN_PENDING,
@@ -374,6 +416,7 @@ function createInstantlyQueueRegistrationService(deps = {}) {
       alreadyStaged: emails.length - updates.length,
       sourceId: metadata.sourceId,
       fileDigest: metadata.fileDigest,
+      ...(inventory ? { inventory } : {}),
     };
   }
 

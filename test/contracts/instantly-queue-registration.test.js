@@ -76,6 +76,64 @@ test('Instantly queue moves an exact registered batch to design staging without 
   assert.equal(writes[0].meta.source, 'instantly-design-staging');
 });
 
+test('Instantly design staging can synchronously refresh the canonical inventory after the final batch', async () => {
+  const calls = [];
+  const row = {
+    id: 'queue-1',
+    bedrijf: 'Ontwerplead',
+    email: 'ontwerp@voorbeeld.nl',
+    status: 'prospect',
+    instantlyQueueStatus: 'design_pending',
+    instantlyQueueSource: 'database-vondsten-20260914',
+    instantlyQueueFileDigest: DIGEST,
+  };
+  const service = createInstantlyQueueRegistrationService({
+    dataOpsStore: {
+      async listUniqueCustomersByEmails() { return [row]; },
+      async upsertCustomers() { throw new Error('Een reeds gestagede rij mag niet opnieuw worden geschreven.'); },
+    },
+    mailReadySnapshotService: {
+      invalidate() { calls.push('invalidate'); },
+      async buildMailReadySnapshot(options) {
+        calls.push({ build: options });
+        return {
+          generatedAt: '2026-09-14T17:30:00.000Z',
+          snapshotVersion: 'sha256:inventory',
+          total: 518,
+          availableTotal: 13_357,
+        };
+      },
+    },
+  });
+
+  const result = await service.stageDesignBatch({
+    emails: ['ontwerp@voorbeeld.nl'],
+    sourceId: 'database-vondsten-20260914',
+    fileDigest: DIGEST,
+    refreshInventory: true,
+  });
+
+  assert.equal(result.staged, 0);
+  assert.equal(result.alreadyStaged, 1);
+  assert.deepEqual(calls, [
+    'invalidate',
+    {
+      build: {
+        limit: 1,
+        offset: 0,
+        includeFoundSnapshot: true,
+        allowStaleWhileRefreshing: false,
+      },
+    },
+  ]);
+  assert.deepEqual(result.inventory, {
+    generatedAt: '2026-09-14T17:30:00.000Z',
+    snapshotVersion: 'sha256:inventory',
+    mailReadyTotal: 518,
+    availableTotal: 13_357,
+  });
+});
+
 test('Instantly queue design staging fails closed on a different source', async () => {
   let wrote = false;
   const service = createInstantlyQueueRegistrationService({

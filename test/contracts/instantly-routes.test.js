@@ -157,6 +157,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
       emails: ['info@voorbeeld.nl'],
       sourceId: 'database-vondsten-20260914',
       fileDigest: 'a'.repeat(64),
+      refreshInventory: true,
     },
   };
   designStageRoute[2][0](designStageRequest, designStageResponse, () => {});
@@ -164,6 +165,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(designStageResponse.statusCode, 200);
   assert.deepEqual(designStageResponse.body, { ok: true, processed: 1, staged: 1 });
   assert.deepEqual(designStageInput.emails, ['info@voorbeeld.nl']);
+  assert.equal(designStageInput.refreshInventory, true);
   assert.equal(designStageInput.actor, 'serve@softora.nl');
   assert.equal(adminChecks, 4);
 });
