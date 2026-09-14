@@ -91,6 +91,20 @@ test('shared webdesign renderer escapes image metadata and supports one image', 
   assert.doesNotMatch(html, /softora-webdesign-image-stack|softora-desktop-image-pair|softora-mobile-image-pair/);
 });
 
+test('shared webdesign renderer can omit the duplicate caption for Instantly templates', () => {
+  const html = renderWebdesignImageSection(
+    { src: 'https://www.softora.nl/design.png', alt: 'Webdesign' },
+    {
+      mockupImage: { src: 'https://www.softora.nl/mockup.png', alt: 'Mockup' },
+      caption: 'Deze uitleg staat al in de mailtekst.',
+      hideCaption: true,
+    }
+  );
+
+  assert.equal((html.match(/<img\b/g) || []).length, 2);
+  assert.doesNotMatch(html, /softora-mockup-caption|Deze uitleg staat al in de mailtekst/);
+});
+
 test('mailbox and autopilot use the same shared webdesign image renderer', () => {
   const servicesDir = path.join(__dirname, '..', '..', 'server', 'services');
   const mailboxSource = fs.readFileSync(path.join(servicesDir, 'mailbox.js'), 'utf8');
