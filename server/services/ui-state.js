@@ -1,9 +1,11 @@
 const { INSTANTLY_MAILBOX_SYNC_SCOPE, patchInstantlyMailboxState } = require('./instantly-mailbox-state');
 const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
+const PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
 const DEFAULT_UI_STATE_VALUE_MAX_LENGTH = 200000;
 const COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH = 1000000;
 const JSON_UI_STATE_VALUE_MAX_LENGTH = 1000000;
+const PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_VALUE_MAX_LENGTH = 4000000;
 const COLDMAIL_SEND_GUARD_MAX_ENTRIES = 1000;
 const COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES = 3000;
 const DEFAULT_UI_STATE_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
@@ -229,6 +231,9 @@ function createUiStateStore(deps = {}) {
 
   function getUiStateValueMaxLength(key) {
     if (key === COLDMAIL_SEND_GUARD_KEY) return COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH;
+    if (key === PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_KEY) {
+      return PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_VALUE_MAX_LENGTH;
+    }
     if (isLikelyJsonStateKey(key)) return JSON_UI_STATE_VALUE_MAX_LENGTH;
     return DEFAULT_UI_STATE_VALUE_MAX_LENGTH;
   }
