@@ -508,9 +508,10 @@ test('premium database registers a complete CSV in the separate Instantly queue'
     telefoon: '0131234567',
   }]);
   assert.equal(importer.BATCH_SIZE, 200);
-  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260914a/);
+  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260914b/);
   assert.match(importerSource, /ENDPOINT = "\/api\/outreach\/provider-queue\/register"/);
-  assert.match(importerSource, /button\.textContent = "Sheet registreren"/);
+  assert.match(importerSource, /button\.textContent = "Uploaden"/);
+  assert.match(importerSource, /const pills = document\.querySelector\('\.status-filter-group--shared \.status-filter-pills'\)/);
   assert.match(importerSource, /global\.location\.assign\(nextUrl\.toString\(\)\)/);
   assert.doesNotMatch(importerSource, /(?:local|session)Storage/);
   assert.doesNotMatch(importerSource, /\/api\/outreach\/provider-upload/);
@@ -2001,7 +2002,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260910-provider-groups/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260914-kpi-fit/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
@@ -2457,7 +2458,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260910-provider-groups/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260914-kpi-fit/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260910-sent-register/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
