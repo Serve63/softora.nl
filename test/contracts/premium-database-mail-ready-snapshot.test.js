@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 
 const {
   COLDMAIL_SEND_GUARD_KEY,
@@ -798,6 +799,37 @@ test('premium database mail-ready snapshot persists compact full and bootstrap c
   assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).total, 120);
   assert.deepEqual(JSON.parse(fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY]).foundCustomerIds, ['ready-1', 'ready-2']);
   assert.deepEqual(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).foundCustomerIds, ['ready-1', 'ready-2']);
+});
+
+test('premium database mail-ready snapshot persists the complete current-scale design inventory', async () => {
+  const customers = Array.from({ length: 13957 }, (_, index) => {
+    const digest = createHash('sha256').update(`mail-ready-cache-${index}`).digest('hex');
+    return {
+      customer_id: `instantly_queue_${digest.slice(0, 24)}`,
+      company: `Bedrijf ${digest.slice(0, 20)}`,
+      email: `${digest.slice(0, 18)}@bedrijf-${digest.slice(18, 32)}.nl`,
+      website: `https://bedrijf-${digest.slice(0, 24)}.nl/`,
+      database_status: 'prospect',
+      payload: {
+        adres: `Straat ${index + 1}, ${String(1000 + (index % 8999)).padStart(4, '0')} AB Plaats ${digest.slice(0, 8)}`,
+        telefoon: `+316${digest.replace(/[^0-9]/g, '').padEnd(8, '7').slice(0, 8)}`,
+        instantlyQueueStatus: 'design_pending',
+      },
+    };
+  });
+  const { service, calls } = createService({ customers, photoFlags: [] });
+
+  const payload = await service.buildMailReadySnapshot({ limit: 1 });
+
+  assert.equal(payload.total, 0);
+  assert.equal(payload.availableTotal, 13957);
+  const fullWrite = calls.find((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE);
+  assert.ok(fullWrite);
+  const serialized = fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY];
+  assert.ok(serialized.length > 950000);
+  const restored = parseMailReadySnapshotCacheValue(serialized);
+  assert.equal(restored.availableTotal, 13957);
+  assert.equal(restored.availableCustomers.length, 13957);
 });
 
 test('premium database mail-ready snapshot waits for the central refresh after its memory cache expires', async () => {
