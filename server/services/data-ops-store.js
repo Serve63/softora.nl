@@ -1218,7 +1218,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       rows.push(row);
     });
     return rows.length
-      ? run('upsert-customer-identity-keys', (client) => client.from(TABLES.customerIdentityKeys).upsert(rows, { onConflict: 'key_type,key_value', ignoreDuplicates: true }))
+      ? run('upsert-customer-identity-keys', (client) => client.from(TABLES.customerIdentityKeys).upsert(rows, { onConflict: 'key_type,key_value', ignoreDuplicates: true }), getWriteOperationOptions())
       : { ok: true, data: [] };
   }
 
