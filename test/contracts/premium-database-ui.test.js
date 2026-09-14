@@ -163,6 +163,7 @@ function loadDatabaseWebdesignActionClient(options = {}) {
     requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
     fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ jobs: [] }) })),
     Image: options.Image || function Image() {},
+    SoftoraDatabaseInstantlyStatus: require('../../assets/premium-database-instantly-status'),
     URL,
   };
   const sandbox = { window: windowObject, fetch: windowObject.fetch };
@@ -230,6 +231,7 @@ function loadDatabaseOutreachClient(options = {}) {
     requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
     fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ jobs: [] }) })),
     Image: options.Image || function Image() {},
+    SoftoraDatabaseInstantlyStatus: require('../../assets/premium-database-instantly-status'),
     URL,
   };
   const sandbox = { window: windowObject, fetch: windowObject.fetch };
@@ -444,7 +446,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260616a/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -508,7 +510,7 @@ test('premium database registers a complete CSV in the separate Instantly queue'
     telefoon: '0131234567',
   }]);
   assert.equal(importer.BATCH_SIZE, 200);
-  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260914b/);
+  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260914c/);
   assert.match(importerSource, /ENDPOINT = "\/api\/outreach\/provider-queue\/register"/);
   assert.match(importerSource, /button\.textContent = "Uploaden"/);
   assert.match(importerSource, /const pills = document\.querySelector\('\.status-filter-group--shared \.status-filter-pills'\)/);
@@ -2141,7 +2143,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /id="addActionsMenu"/);
   assert.doesNotMatch(pageSource, /id="deepSearchButton"/);
   assert.doesNotMatch(pageSource, /id="manualAddButton"/);
-  assert.doesNotMatch(pageSource, /id="instantOutreachSyncButton"/);
+  assert.match(pageSource, /<details class="mail-ready-filter"><summary[^>]*id="mailReadyMenuButton"[^>]*>Mailklaar<\/summary>/);
+  assert.match(pageSource, /id="mailReadySoftoraCount">--<\/strong>/);
+  assert.match(pageSource, /id="mailReadyInstantlyCount">--<\/strong>/);
+  assert.match(pageSource, /id="instantOutreachSyncButton"[^>]*>Vervang wachtlijst<\/button>/);
   assert.doesNotMatch(pageSource, />Veilige Instantly CSV maken<\/span>/);
   assert.doesNotMatch(pageSource, />Reserveer eerst in Softora, download daarna CSV<\/span>/);
   assert.doesNotMatch(pageSource, />10 mockup-leads naar Instantly<\/button>/);
@@ -2194,18 +2199,18 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function hydrateDatabaseAuthSession\(\)/);
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
-  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd", showPhotoColumn = !showOutreachActionColumn/);
+  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd", showPhotoColumn = !showOutreachActionColumn/);
   assert.doesNotMatch(pageSource, /function isAvailableColdmailCandidate\(/);
   assert.doesNotMatch(pageSource, /function getAvailableColdmailCandidates\(/);
   assert.doesNotMatch(pageSource, /isAvailableColdmailDisplayCandidate/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
   assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.mailReadySnapshotLoaded[\s\S]*isSnapshotMailReadyCustomer\(customer\)[\s\S]*state\.availableSnapshotLoaded[\s\S]*isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return customers \|\| \[\];/);
-  assert.match(pageSource, /function getEmptyTableMessage\(\) \{[\s\S]*Geen mailklare bedrijven\.[\s\S]*Geen beschikbare bedrijven\.[\s\S]*Geen bedrijven in deze filter\./);
+  assert.match(pageSource, /function getEmptyTableMessage\(\) \{[\s\S]*Geen mailklare bedrijven voor Softora\.[\s\S]*Geen mailklare bedrijven in Instantly\.[\s\S]*Geen beschikbare bedrijven\.[\s\S]*Geen bedrijven in deze filter\./);
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
-  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "verstuurd" \? "" : "Acties"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showSentActions; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
+  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("outreachActionHeader"\)\.textContent = state\.activeStatus === "benaderd" \? "Acties" : ""; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showSentActions; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
   assert.match(pageSource, /renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
@@ -2229,7 +2234,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-instantly-status/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2482,7 +2487,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260909-clean-input/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260908-design-eligibility/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-instantly-status/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -2546,13 +2551,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.website-open-icon\s*\{[\s\S]*width: 15px;[\s\S]*height: 15px;/);
   assert.match(filterGroupsCssSource, /\.table-load-more\s*\{/);
   assert.match(filterGroupsCssSource, /\.load-more-btn\s*\{/);
-  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-exact-upload/);
-  assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = '\/api\/outreach\/provider-upload'/);
-  assert.doesNotMatch(instantlySyncScriptSource, /SYNC_ENDPOINT = '\/api\/outreach\/provider-sync'/);
+  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260914-auto-replace/);
+  assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = "\/api\/outreach\/provider-upload"/);
+  assert.match(instantlySyncScriptSource, /DELIVERY_SYNC_ENDPOINT = "\/api\/outreach\/provider-sync"/);
   assert.match(instantlySyncScriptSource, /Zet eerst genoeg mail-ready leads klaar/);
-  assert.match(instantlySyncScriptSource, /window\.location\.reload\(\)/);
-  assert.match(instantlySyncScriptSource, /Database wordt ververst/);
-  assert.match(instantlySyncScriptSource, /window\.alert\(text\)/);
+  assert.match(instantlySyncScriptSource, /mode: "replace"/);
+  assert.match(instantlySyncScriptSource, /deliveryStatusOnly: true/);
+  assert.match(instantlySyncScriptSource, /global\.location\.reload\(\)/);
+  assert.doesNotMatch(instantlySyncScriptSource, /window\.alert/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /const selectedCost = Number\.isFinite\(costEur\) \? selectedCount \* costEur : null;/);
@@ -2635,7 +2641,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-instantly-status/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -2675,7 +2681,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260910-sent-register/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-instantly-status/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
@@ -4653,7 +4659,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties"><span class="status-filter-label">Opties<\/span><span class="status-filter-pills"><button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button><button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button><\/span><\/div><div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal"><span class="status-filter-label">Verstuurd<\/span><span class="status-filter-pills"><button class="sf-btn" data-s="verstuurd" type="button">Softora<\/button><button class="sf-btn" data-s="instantly" type="button">Instantly<\/button><\/span><\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties">[\s\S]*data-s="beschikbaar"[^>]*>Beschikbaar<\/button>[\s\S]*id="mailReadyMenuButton"[^>]*>Mailklaar<\/summary>[\s\S]*data-mail-ready-status="benaderbaar">[\s\S]*>Softora<\/span>[\s\S]*id="mailReadySoftoraCount"[\s\S]*data-mail-ready-status="instantly-ready">[\s\S]*>Instantly<\/span>[\s\S]*id="mailReadyInstantlyCount"[\s\S]*id="instantlyReplacementCount"[\s\S]*id="instantOutreachSyncButton"[^>]*>Vervang wachtlijst<\/button>[\s\S]*<div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal">[\s\S]*data-s="verstuurd"[^>]*>Softora<\/button>[\s\S]*data-s="instantly"[^>]*>Instantly<\/button>/
   );
   assert.match(pageSource, /activeStatus: "beschikbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
@@ -4720,7 +4726,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
   assert.match(pageSource, /showSentActions \? outreachController\.renderActions\(customer, \{ hideMailButton: outreachController\.hasInstantlyOutreachSignal\(customer\) \}\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showSentActions \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
-  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(6\), table\.outreach-action-mode tbody td:nth-child\(6\) \{ width: 24%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
@@ -4763,7 +4769,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /\.s-afgehaakt \.s-label \{ color: var\(--red\); font-weight: 700; \}/);
 });
 
-test('Verstuurd cannot infer delivery from customer flags; Instantly retains all transfers', () => {
+test('Instantly separates waiting leads from confirmed deliveries', () => {
   const controller = loadDatabaseOutreachClient().createController({
     state: { klanten: [] }, nodes: {}, escapeHtml: String,
     normalizeDatabaseStatus: value => String(value || ''),
@@ -4778,14 +4784,16 @@ test('Verstuurd cannot infer delivery from customer flags; Instantly retains all
     { id: 'transferred-customer', status: 'klant', instantlyLeadId: 'lead-1' },
     { id: 'both', status: 'gemaild', instantlyLeadId: 'lead-2' },
     { id: 'queued', status: 'prospect', instantlyQueueStatus: 'registered' },
+    { id: 'confirmed', status: 'gemaild', instantlyLeadId: 'lead-sent', instantlyStatus: 'sent', instantlyEmailSentAt: '2026-09-10T08:00:00.000Z' },
   ];
   const mailed = item => item.status === 'gemaild' || Boolean(item.lastColdmailSentAt);
   const selected = contacts.filter(item => controller.matchesStatusFilter(item, 'verstuurd', () => true, mailed));
   assert.deepEqual(selected.map(item => item.id), []);
-  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['transferred', 'transferred-customer', 'both', 'queued']);
-  assert.match(controller.renderMeta(contacts[5], true), /Overgezet naar Instantly/);
+  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['confirmed']);
+  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly-ready')).map(item => item.id), ['transferred', 'both']);
+  assert.match(controller.renderMeta(contacts[5], true), /Klaargezet voor Instantly/);
   assert.doesNotMatch(controller.renderMeta(contacts[5], true), /Verstuurd vanaf/);
-  assert.match(controller.renderMeta(contacts[8], true), /Klaargezet voor Instantly/);
+  assert.match(controller.renderMeta(contacts[8], true), /Geregistreerd voor ontwerp/);
   assert.equal(controller.hasInstantlyOutreachSignal(contacts[8]), false);
   assert.equal(controller.hasPendingInstantlyQueue(contacts[8]), true);
 });
@@ -4853,7 +4861,8 @@ test('premium database outreach days column keeps benaderd rows after 25 days', 
   });
   assert.equal(instantlyFields.lastColdmailProvider, 'instantly');
   assert.equal(controller.hasInstantlyOutreachSignal(instantlyFields), true);
-  assert.equal(controller.matchesStatusFilter(instantlyFields, 'instantly', () => false, () => true), true);
+  assert.equal(controller.matchesStatusFilter(instantlyFields, 'instantly', () => false, () => true), false);
+  assert.equal(controller.matchesStatusFilter(instantlyFields, 'instantly-ready', () => false, () => true), true);
   assert.equal(controller.matchesStatusFilter(instantlyFields, 'benaderd', () => false, () => true), false);
   assert.deepEqual(
     controller.sortByRecentOutreach([
@@ -6167,7 +6176,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260616a/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);

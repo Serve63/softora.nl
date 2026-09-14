@@ -15,6 +15,8 @@ const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 const { createDataOpsCustomerLookups } = require('./data-ops-customer-lookups');
 const { createMailboxHistoricalOutboundRepository } = require('../repositories/mailbox-historical-outbound');
 const { filterDesignPhotoRowsForServing } = require('./design-photo-generation-policy');
+const { isCustomerConfirmedSent } = require('./instantly-campaign-replacement');
+const { syncOutboundGuardRows } = require('./data-ops-outbound-guard-sync');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
@@ -557,12 +559,20 @@ function createSoftoraDataOpsStore(deps = {}) {
         entry && entry.description,
         entry && entry.source,
       ].join(' ')).toLowerCase();
-      return /\b(gemaild|mail verstuurd|mail geopend|coldmail|cold mailing|instantly|email sent|email opened|open tracking)\b/.test(text);
+      return /\b(gemaild|mail verstuurd|mail geopend|email sent|email opened|open tracking|verstuurd via instantly)\b/.test(text);
     });
   }
 
   function hasOutboundSentCustomerSignal(row) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const provider = normalizeString(payload.lastColdmailProvider).toLowerCase();
+    const hasInstantlyQueueSignal = provider === 'instantly' || Boolean(normalizeString(
+      payload.instantlyLeadId ||
+      payload.instantlyCampaignId ||
+      payload.instantlyStatus ||
+      payload.instantlySyncedAt
+    ));
+    if (hasInstantlyQueueSignal && !isCustomerConfirmedSent(payload)) return false;
     const statuses = [
       row && row.database_status,
       row && row.lifecycle_status,
@@ -587,7 +597,6 @@ function createSoftoraDataOpsStore(deps = {}) {
       payload.outreachMessageId,
       payload.sentMessageId,
       payload.messageId,
-      payload.instantlyLeadId,
     ];
     if (messageFields.some((value) => normalizeString(value))) return true;
     return customerHistoryHasOutboundSentSignal(payload);
@@ -696,20 +705,20 @@ function createSoftoraDataOpsStore(deps = {}) {
     }));
   }
 
-  async function readExistingOutboundGuardKeys(guardKeys) {
+  async function readExistingOutboundGuards(guardKeys) {
     const keys = Array.from(new Set((Array.isArray(guardKeys) ? guardKeys : []).map(normalizeString).filter(Boolean)));
-    const existing = new Set();
+    const existing = new Map();
     for (let index = 0; index < keys.length; index += OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE) {
       const keyChunk = keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE);
       const result = await run(
         'list-existing-sent-outbound-recipient-guards',
-        (client) => client.from(TABLES.outboundRecipientGuards).select('guard_key').in('guard_key', keyChunk),
+        (client) => client.from(TABLES.outboundRecipientGuards).select('guard_key,status').in('guard_key', keyChunk),
         getWriteOperationOptions()
       );
       if (!result.ok) return result;
       (Array.isArray(result.data) ? result.data : []).forEach((row) => {
         const guardKey = normalizeString(row && row.guard_key);
-        if (guardKey) existing.add(guardKey);
+        if (guardKey) existing.set(guardKey, row);
       });
     }
     return { ok: true, data: existing };
@@ -724,24 +733,14 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
     if (!guardRowsByKey.size) return { ok: true, inserted: 0, expected: 0 };
 
-    const existing = await readExistingOutboundGuardKeys(Array.from(guardRowsByKey.keys()));
+    const existing = await readExistingOutboundGuards(Array.from(guardRowsByKey.keys()));
     if (!existing.ok) return existing;
-    const existingKeys = existing.data instanceof Set ? existing.data : new Set();
-    const missingRows = Array.from(guardRowsByKey.values()).filter((row) => !existingKeys.has(row.guard_key));
-    if (!missingRows.length) return { ok: true, inserted: 0, expected: guardRowsByKey.size };
-
-    let inserted = 0;
-    for (let index = 0; index < missingRows.length; index += 500) {
-      const chunk = missingRows.slice(index, index + 500);
-      const result = await run(
-        'insert-sent-outbound-recipient-guards',
-        (client) => client.from(TABLES.outboundRecipientGuards).insert(chunk).select('guard_key'),
-        getWriteOperationOptions()
-      );
-      if (!result.ok) return result;
-      inserted += Array.isArray(result.data) ? result.data.length : chunk.length;
-    }
-    return { ok: true, inserted, expected: guardRowsByKey.size };
+    return syncOutboundGuardRows({
+      guardRows: Array.from(guardRowsByKey.values()),
+      existingRows: existing.data,
+      insertRows: (chunk) => run('insert-sent-outbound-recipient-guards', (client) => client.from(TABLES.outboundRecipientGuards).insert(chunk).select('guard_key'), getWriteOperationOptions()),
+      promoteRows: (chunk) => run('promote-queued-outbound-recipient-guards-to-sent', (client) => client.from(TABLES.outboundRecipientGuards).upsert(chunk, { onConflict: 'guard_key' }).select('guard_key'), getWriteOperationOptions()),
+    });
   }
 
   function hasUsableCustomerIdentityKey(identityKey) {

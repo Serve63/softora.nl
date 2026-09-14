@@ -183,6 +183,14 @@ function createService(overrides = {}) {
         expectedCount: (Array.isArray(items) ? items.length : 0) * 4,
       };
     },
+    confirmReservation: async (reservationId, options) => {
+      outboundGuardCalls.push({ type: 'confirm', reservationId, options });
+      return { ok: true, count: 4 };
+    },
+    releaseReservation: async (reservationId) => {
+      outboundGuardCalls.push({ type: 'release', reservationId });
+      return { ok: true };
+    },
   };
   const service = createInstantlyOutreachService({
     instantlyConfig: {
@@ -192,6 +200,7 @@ function createService(overrides = {}) {
       apiKey: 'instantly-key',
       apiBaseUrl: 'https://api.instantly.test/api/v2',
       defaultCampaignId: 'campaign-1',
+      replacementCampaigns: overrides.replacementCampaigns || '',
       webhookSecret: 'webhook-secret',
       intervalMinutes: 15,
       batchSize: overrides.batchSize || 10,
@@ -352,7 +361,7 @@ test('instantly sync pushes eligible Softora leads only after central guard rese
   assert.equal(outboundGuardCalls[0].items[0].recipientEmail, 'ruben@example.test');
   assert.equal(outboundGuardCalls[0].options.provider, 'instantly');
   assert.equal(outboundGuardCalls[0].options.source, 'instantly-sync');
-  assert.equal(result.markedBenaderd, 2);
+  assert.equal(result.markedBenaderd, 0);
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads/add');
   assert.equal(fetchCalls[0].timeoutMs, 30_000);
@@ -413,12 +422,69 @@ test('instantly sync pushes eligible Softora leads only after central guard rese
   assert.equal(rows[0].instantlyLeadId, 'instantly-lead-1');
   assert.equal(rows[0].instantlyStatus, 'synced');
   assert.equal(rows[0].lastColdmailProvider, 'instantly');
-  assert.equal(rows[0].databaseStatus, 'gemaild');
-  assert.equal(rows[0].status, 'gemaild');
-  assert.equal(rows[0].outreachStatus, 'benaderd');
+  assert.equal(rows[0].status, 'prospect');
+  assert.equal(rows[0].databaseStatus, undefined);
+  assert.equal(rows[0].outreachStatus, undefined);
   assert.equal(rows[0].lastMailSentAt, undefined);
-  assert.equal(rows[2].databaseStatus, 'gemaild');
-  assert.equal(rows[2].outreachStatus, 'benaderd');
+  assert.equal(rows[2].databaseStatus, undefined);
+  assert.equal(rows[2].outreachStatus, undefined);
+});
+
+test('replacement wiring uploads exact leads to the Servé and Martijn campaigns without marking them sent', async () => {
+  const { service, fetchCalls, outboundGuardCalls, getRows } = createService({
+    replacementCampaigns: { serve: 'campaign-serve', martijn: 'campaign-martijn' },
+    rows: [
+      {
+        id: 'prospect-serve',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-martijn',
+        bedrijf: 'Slagerij Maan',
+        naam: 'Luna Slager',
+        email: 'luna@example.test',
+        website: 'https://slagerijmaan.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-serve': { id: 'prospect-serve', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+      'prospect-martijn': { id: 'prospect-martijn', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+    },
+  });
+
+  const result = await service.replaceInstantlyCampaigns({
+    actor: 'Test',
+    uploadId: 'replacement-wiring',
+    limit: 2,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.uploaded, 2);
+  assert.deepEqual(result.distribution, { serve: 1, martijn: 1 });
+  const addCalls = fetchCalls.filter((call) => call.url.endsWith('/leads/add'));
+  assert.equal(addCalls.length, 2);
+  assert.deepEqual(addCalls.map((call) => JSON.parse(call.options.body).campaign_id), ['campaign-serve', 'campaign-martijn']);
+  assert.equal(fetchCalls.filter((call) => /\/campaigns\/[^/]+\/activate$/.test(call.url)).length, 2);
+  assert.equal(outboundGuardCalls[0].type, 'reserve');
+  assert.equal(outboundGuardCalls[0].options.status, 'reserved');
+  assert.equal(outboundGuardCalls.at(-1).type, 'confirm');
+  assert.equal(outboundGuardCalls.at(-1).options.status, 'queued');
+  const rows = getRows();
+  assert.equal(rows[0].status, 'prospect');
+  assert.equal(rows[0].instantlyStatus, 'synced');
+  assert.equal(rows[0].instantlySenderProfileKey, 'serve');
+  assert.equal(rows[0].instantlyEmailSentAt, undefined);
+  assert.equal(rows[1].status, 'prospect');
+  assert.equal(rows[1].instantlyStatus, 'synced');
+  assert.equal(rows[1].instantlySenderProfileKey, 'martijn');
+  assert.equal(rows[1].lastColdmailSentAt, undefined);
 });
 
 test('instantly sync stops before Instantly API when the central outbound guard is unavailable', async () => {
@@ -486,7 +552,7 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
 
   assert.equal(result.ok, true);
   assert.equal(result.prepared, 2);
-  assert.equal(result.markedBenaderd, 2);
+  assert.equal(result.markedBenaderd, 0);
   assert.equal(result.permanentGuards, 2);
   assert.equal(result.campaignId, 'campaign-manual');
   assert.equal(result.fileName, 'softora-instantly-2-leads-upload-test.csv');
@@ -537,10 +603,11 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[0].instantlyStatus, 'queued');
   assert.equal(rows[0].instantlyQueueStatus, 'registered');
   assert.equal(rows[0].instantlyManualUploadId, 'upload-test');
-  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[0].databaseStatus, undefined);
   assert.equal(rows[1].lastColdmailProvider, 'instantly');
   assert.equal(rows[1].instantlyStatus, 'queued');
-  assert.equal(rows[1].databaseStatus, 'gemaild');
+  assert.equal(rows[1].status, 'prospect');
+  assert.equal(rows[1].databaseStatus, undefined);
 });
 
 test('safe Instantly upload can select only one exact registered sheet source', async () => {
@@ -1993,7 +2060,7 @@ test('instantly sync removes remote campaign leads that were already mailed outs
   assert.equal(rows[1].instantlyStatus, undefined);
 });
 
-test('instantly sync backfills remote campaign leads before normal mailbox sending can select them', async () => {
+test('instantly sync backfills remote campaign leads as queued without claiming they were sent', async () => {
   const { service, fetchCalls, getRows, writes } = createService({
     rows: [
       {
@@ -2036,9 +2103,9 @@ test('instantly sync backfills remote campaign leads before normal mailbox sendi
   assert.equal(rows[0].instantlyCampaignId, 'campaign-1');
   assert.equal(rows[0].instantlyStatus, 'synced');
   assert.equal(rows[0].lastColdmailProvider, 'instantly');
-  assert.equal(rows[0].status, 'gemaild');
-  assert.equal(rows[0].databaseStatus, 'gemaild');
-  assert.equal(rows[0].outreachStatus, 'benaderd');
+  assert.equal(rows[0].status, 'prospect');
+  assert.equal(rows[0].databaseStatus, undefined);
+  assert.equal(rows[0].outreachStatus, undefined);
 });
 
 test('instantly sync can run remote reconciliation without importing new leads', async () => {
@@ -2103,8 +2170,9 @@ test('instantly sync reads and writes chunked customer database state', async ()
     readChunkedStateValue(writes[1].values, 'softora_customers_premium_v1')
   );
   assert.equal(savedRows[0].instantlyStatus, 'synced');
-  assert.equal(savedRows[0].databaseStatus, 'gemaild');
-  assert.equal(savedRows[0].outreachStatus, 'benaderd');
+  assert.equal(savedRows[0].status, 'prospect');
+  assert.equal(savedRows[0].databaseStatus, undefined);
+  assert.equal(savedRows[0].outreachStatus, undefined);
   assert.equal(getRows()[0].lastColdmailProvider, 'instantly');
 });
 
@@ -2202,7 +2270,7 @@ test('instantly sync uses the active coldmail autopilot profile before fallback 
   assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot/);
 });
 
-test('instantly sync respects the daily cap and backfills existing Instantly rows as approached', async () => {
+test('instantly sync respects the daily cap without marking queued rows as sent', async () => {
   const { service, fetchCalls, getRows, writes } = createService({
     dailyCap: 1,
     rows: [
@@ -2229,11 +2297,11 @@ test('instantly sync respects the daily cap and backfills existing Instantly row
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'daily_cap_reached');
-  assert.equal(result.markedBenaderd, 1);
+  assert.equal(result.markedBenaderd, 0);
   assert.equal(fetchCalls.length, 0);
-  assert.equal(writes.length, 1);
-  assert.equal(getRows()[0].databaseStatus, 'gemaild');
-  assert.equal(getRows()[0].outreachStatus, 'benaderd');
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].databaseStatus, undefined);
+  assert.equal(getRows()[0].outreachStatus, undefined);
   assert.equal(getRows()[1].status, 'prospect');
 });
 
@@ -2268,7 +2336,7 @@ test('instantly sync counts the daily cap in Amsterdam time', async () => {
   assert.equal(fetchCalls.length, 0);
 });
 
-test('instantly status exposes the approached marker for production verification', async () => {
+test('instantly status separates queued leads from confirmed sends', async () => {
   const { service } = createService({
     rows: [
       {
@@ -2295,9 +2363,11 @@ test('instantly status exposes the approached marker for production verification
 
   const status = await service.getStatus();
 
-  assert.equal(status.marksSyncedLeadsAsApproached, true);
+  assert.equal(status.marksSyncedLeadsAsApproached, false);
   assert.equal(status.activeInstantlyRows, 2);
-  assert.equal(status.approachedInstantlyRows, 1);
+  assert.equal(status.approachedInstantlyRows, 0);
+  assert.equal(status.instantlyReadyRows, 2);
+  assert.equal(status.instantlySentRows, 0);
 });
 
 test('instantly email_sent webhook marks the Softora row as mailed', async () => {

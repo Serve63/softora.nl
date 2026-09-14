@@ -317,6 +317,7 @@ function loadRuntimeEnv(env = process.env) {
       apiKey: normalizeString(safeEnv.INSTANTLY_API_KEY || ''),
       apiBaseUrl: normalizeString(safeEnv.INSTANTLY_API_BASE_URL || 'https://api.instantly.ai/api/v2'),
       defaultCampaignId: normalizeString(safeEnv.INSTANTLY_DEFAULT_CAMPAIGN_ID || ''),
+      replacementCampaigns: normalizeString(safeEnv.INSTANTLY_REPLACEMENT_CAMPAIGNS_JSON || ''),
       webhookSecret: normalizeString(safeEnv.INSTANTLY_WEBHOOK_SECRET || ''),
       syncIntervalMinutes: readBoundedNumberEnv(
         safeEnv.INSTANTLY_SYNC_INTERVAL_MINUTES,

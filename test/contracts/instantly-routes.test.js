@@ -22,7 +22,9 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   const routes = [];
   let adminChecks = 0;
   let syncInput = null;
+  let deliverySyncInput = null;
   let uploadInput = null;
+  let replacementInput = null;
   let queueInput = null;
   let designStageInput = null;
   const app = {
@@ -45,9 +47,17 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
         syncInput = input;
         return { ok: true, skipped: true, reason: 'reconcile_only', synced: 0 };
       },
+      async refreshInstantlyDeliveryStatus(input) {
+        deliverySyncInput = input;
+        return { ok: true, checked: 18, updated: 2 };
+      },
       async prepareInstantlyUpload(input) {
         uploadInput = input;
         return { ok: true, prepared: 100 };
+      },
+      async replaceInstantlyCampaigns(input) {
+        replacementInput = input;
+        return { ok: true, uploaded: 101, distribution: { serve: 51, martijn: 50 } };
       },
       async getStatus() {
         return { ok: true, enabled: true };
@@ -133,6 +143,33 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(uploadInput.senderEmail, 'martijn@websoftora.com');
   assert.equal(uploadInput.actor, 'serve@softora.nl');
 
+  const replacementResponse = createResponseRecorder();
+  const replacementRequest = {
+    body: {
+      mode: 'replace',
+      limit: 101,
+      uploadId: 'replacement-1',
+    },
+  };
+  uploadRoute[2][0](replacementRequest, replacementResponse, () => {});
+  await uploadRoute[2][1](replacementRequest, replacementResponse);
+
+  assert.equal(replacementResponse.statusCode, 200);
+  assert.deepEqual(replacementResponse.body, { ok: true, uploaded: 101, distribution: { serve: 51, martijn: 50 } });
+  assert.equal(replacementInput.limit, 101);
+  assert.equal(replacementInput.uploadId, 'replacement-1');
+  assert.equal(replacementInput.actor, 'serve@softora.nl');
+
+  const deliveryResponse = createResponseRecorder();
+  const deliveryRequest = { body: { deliveryStatusOnly: true } };
+  syncRoute[2][0](deliveryRequest, deliveryResponse, () => {});
+  await syncRoute[2][1](deliveryRequest, deliveryResponse);
+
+  assert.equal(deliveryResponse.statusCode, 200);
+  assert.deepEqual(deliveryResponse.body, { ok: true, checked: 18, updated: 2 });
+  assert.equal(deliverySyncInput.reconcileOnly, true);
+  assert.equal(deliverySyncInput.actor, 'serve@softora.nl');
+
   const queueResponse = createResponseRecorder();
   const queueRequest = {
     body: {
@@ -167,5 +204,5 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.deepEqual(designStageInput.emails, ['info@voorbeeld.nl']);
   assert.equal(designStageInput.refreshInventory, true);
   assert.equal(designStageInput.actor, 'serve@softora.nl');
-  assert.equal(adminChecks, 4);
+  assert.equal(adminChecks, 6);
 });
