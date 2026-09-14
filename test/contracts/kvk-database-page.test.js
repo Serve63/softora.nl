@@ -71,7 +71,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260914a/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -83,7 +83,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260914a/);
 });
 
 test('directory links keep their target but display only the site name and a real review status', () => {
@@ -158,7 +158,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(pageSource, /id="latest-luna-errors-table-frame"/);
   assert.ok(
     pageSource.indexOf('<h2>Laatste 10 Behandeld</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
-    'De nieuwe Searcher-resultaten en Controleur-correcties horen boven Planning te staan'
+    'De nieuwe Robot-resultaten en Controleur-correcties horen boven Planning te staan'
   );
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
@@ -169,11 +169,11 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
   assert.match(fastProgressSource, /const REFRESH_MS = 1000/);
   assert.match(fastProgressSource, /renderLatestTreatedRows\(\)/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260910d/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260914a/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260914a/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -382,14 +382,14 @@ test('kvk planning stays compact without a separate scroll-status footer', () =>
   assert.doesNotMatch(styleSource, /planning-scroll-status/);
 });
 
-test('kvk database shows every Searcher result and only material Controller corrections', () => {
+test('kvk database shows every Robot result and only material Controller corrections', () => {
   const lunaErrors = require('../../assets/kvk-database-luna-errors.js');
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-luna-errors.js'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
 
   assert.match(scriptSource, /snapshot\?\.latestTreated/);
   assert.doesNotMatch(scriptSource, /snapshot\?\.latestLunaErrors/);
-  assert.match(scriptSource, /Nog geen nieuwe Searcher-resultaten of Controleur-correcties\./);
+  assert.match(scriptSource, /Nog geen nieuwe Robot-resultaten of Controleur-correcties\./);
   assert.match(scriptSource, /incorrect_approval: 'Onterecht goedgekeurd'/);
   assert.match(scriptSource, /missed_usable: 'Onterecht afgekeurd'/);
   assert.doesNotMatch(scriptSource, /Afwijzing bevestigd|Bruikbaar bevestigd/);
@@ -406,14 +406,14 @@ test('kvk database shows every Searcher result and only material Controller corr
     telefoonnummer: '0612345678',
     email: '',
     website: 'https://voorbeeld.nl',
-    found_by_role_label: 'Searcher',
+    found_by_role_label: 'Robot',
     found_by_model_label: 'Luna 5.6 Max',
     contact_checked_at: new Date().toISOString(),
   });
   assert.match(html, /Voorbeeld &amp; Zoon/);
   assert.match(html, /Geen mail/);
   assert.match(html, /0612345678/);
-  assert.match(html, /Searcher/);
+  assert.match(html, /Robot/);
   assert.match(html, /Luna 5\.6 Max/);
   assert.match(html, /href="https:\/\/voorbeeld\.nl"[^>]*>voorbeeld\.nl<\/a>/);
   assert.doesNotMatch(html, />https?:\/\//i);

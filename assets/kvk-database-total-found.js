@@ -27,7 +27,7 @@
     },
     behandeld: {
       title: 'Alle behandelde bedrijven',
-      intro: 'Alle bedrijven waarvoor de Searcher een eindstatus heeft bepaald.',
+      intro: 'Alle bedrijven waarvoor de Robot een eindstatus heeft bepaald.',
       totalLabel: 'Totaal behandeld',
       loadingLabel: 'Behandelde bedrijven laden…',
     },
