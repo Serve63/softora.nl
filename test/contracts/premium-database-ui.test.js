@@ -490,6 +490,32 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.equal(contactStatusClient.getColdmailSentAt({ lastColdmailSentAt: '2026-05-19T17:02:00Z' }), '2026-05-19T17:02:00Z');
 });
 
+test('premium database registers a complete CSV in the separate Instantly queue', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  const importerPath = path.join(__dirname, '../../assets/premium-database-instantly-queue-import.js');
+  const importerSource = fs.readFileSync(importerPath, 'utf8');
+  const importer = require(importerPath);
+  const parsed = importer.parseCsv([
+    'Bedrijf,Adres,Website,E-mail,Telefoon',
+    '"Bedrijf, met komma","Dorpsstraat 1, Tilburg",https://voorbeeld.nl,info@voorbeeld.nl,0131234567',
+  ].join('\n'));
+  assert.deepEqual(importer.mapRows(parsed), [{
+    sheetRow: 2,
+    bedrijf: 'Bedrijf, met komma',
+    adres: 'Dorpsstraat 1, Tilburg',
+    website: 'https://voorbeeld.nl',
+    email: 'info@voorbeeld.nl',
+    telefoon: '0131234567',
+  }]);
+  assert.equal(importer.BATCH_SIZE, 200);
+  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260914a/);
+  assert.match(importerSource, /ENDPOINT = "\/api\/outreach\/provider-queue\/register"/);
+  assert.match(importerSource, /button\.textContent = "Sheet registreren"/);
+  assert.match(importerSource, /global\.location\.assign\(nextUrl\.toString\(\)\)/);
+  assert.doesNotMatch(importerSource, /(?:local|session)Storage/);
+  assert.doesNotMatch(importerSource, /\/api\/outreach\/provider-upload/);
+});
+
 test('premium database mail counter keeps local diagnostics but does not render them as the live total', () => {
   const node = { textContent: '' };
   const systemMailCountClient = loadDatabaseSystemMailCountClient({
@@ -4719,13 +4745,17 @@ test('Verstuurd cannot infer delivery from customer flags; Instantly retains all
     { id: 'transferred', status: 'prospect', lastColdmailProvider: 'instantly' },
     { id: 'transferred-customer', status: 'klant', instantlyLeadId: 'lead-1' },
     { id: 'both', status: 'gemaild', instantlyLeadId: 'lead-2' },
+    { id: 'queued', status: 'prospect', instantlyQueueStatus: 'registered' },
   ];
   const mailed = item => item.status === 'gemaild' || Boolean(item.lastColdmailSentAt);
   const selected = contacts.filter(item => controller.matchesStatusFilter(item, 'verstuurd', () => true, mailed));
   assert.deepEqual(selected.map(item => item.id), []);
-  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['transferred', 'transferred-customer', 'both']);
+  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['transferred', 'transferred-customer', 'both', 'queued']);
   assert.match(controller.renderMeta(contacts[5], true), /Overgezet naar Instantly/);
   assert.doesNotMatch(controller.renderMeta(contacts[5], true), /Verstuurd vanaf/);
+  assert.match(controller.renderMeta(contacts[8], true), /Klaargezet voor Instantly/);
+  assert.equal(controller.hasInstantlyOutreachSignal(contacts[8]), false);
+  assert.equal(controller.hasPendingInstantlyQueue(contacts[8]), true);
 });
 
 test('premium database outreach days column keeps benaderd rows after 25 days', () => {

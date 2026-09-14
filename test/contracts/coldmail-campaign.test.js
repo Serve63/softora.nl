@@ -8194,6 +8194,33 @@ test('coldmail campaign keeps the dedicated Softora test row out of normal campa
   assert.equal(result.recipients[0].email, 'ruben@example.test');
 });
 
+test('coldmail campaign keeps Instantly queue registrations out of Softora sending', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'instantly-queue',
+        bedrijf: 'Instantly Wachtrij BV',
+        email: 'wachtrij@example.test',
+        status: 'prospect',
+        mail: true,
+        instantlyQueueStatus: 'registered',
+      },
+      {
+        id: 'softora-ready',
+        bedrijf: 'Softora Klaar BV',
+        email: 'klaar@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 10 });
+
+  assert.equal(result.selected, 1);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.id), ['softora-ready']);
+});
+
 test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', async () => {
   const parsedInbound = {
     messageId: '<incoming-1@example.test>',

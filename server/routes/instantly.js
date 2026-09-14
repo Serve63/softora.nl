@@ -1,6 +1,7 @@
 function registerInstantlyRoutes(app, deps = {}) {
   const {
     instantlyOutreachService,
+    instantlyQueueRegistrationService,
     instantlyMailboxService,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -8,6 +9,46 @@ function registerInstantlyRoutes(app, deps = {}) {
   } = deps;
 
   if (!instantlyOutreachService) return;
+
+  async function handleQueueRegistration(req, res) {
+    try {
+      if (!instantlyQueueRegistrationService || typeof instantlyQueueRegistrationService.registerBatch !== 'function') {
+        res.status(503).json({
+          ok: false,
+          code: 'INSTANTLY_QUEUE_REGISTRATION_UNAVAILABLE',
+          message: 'Instantly-wachtrijregistratie is tijdelijk niet beschikbaar.',
+        });
+        return;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await instantlyQueueRegistrationService.registerBatch({
+        rows: body.rows,
+        sourceId: body.sourceId,
+        fileDigest: body.fileDigest,
+        totalRows: body.totalRows,
+        batchIndex: body.batchIndex,
+        batchCount: body.batchCount,
+        actor:
+          normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
+          normalizeString(body.actor) ||
+          'Instantly sheetregistratie',
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(error && error.status ? error.status : 400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'INSTANTLY_QUEUE_REGISTRATION_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Instantly-wachtrij kon niet worden geregistreerd.',
+          500
+        ),
+        conflictCount: Number(error && error.conflictCount) || undefined,
+        conflicts: Array.isArray(error && error.conflicts) ? error.conflicts : undefined,
+        missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        sheetRow: Number(error && error.sheetRow) || undefined,
+      });
+    }
+  }
 
   async function handlePrepareUpload(req, res) {
     try {
@@ -155,6 +196,7 @@ function registerInstantlyRoutes(app, deps = {}) {
 
   app.post('/api/instantly/prepare-upload', requirePremiumAdminApiAccess, handlePrepareUpload);
   app.post('/api/outreach/provider-upload', requirePremiumAdminApiAccess, handlePrepareUpload);
+  app.post('/api/outreach/provider-queue/register', requirePremiumAdminApiAccess, handleQueueRegistration);
 
   app.get('/api/instantly/status', requirePremiumAdminApiAccess, handleStatus);
   app.get('/api/outreach/provider-status', requirePremiumAdminApiAccess, handleStatus);

@@ -1,5 +1,6 @@
 const { createHash } = require('crypto');
 const { normalizeContactStatus } = require('./customer-lifecycle');
+const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
 const {
   getIdentityKeyRows,
 } = require('./outbound-recipient-guard-store');
@@ -400,6 +401,7 @@ function isBasicMailLeadEligible(row = {}) {
   if (isColdmailTestCompany(row)) return false;
   if (!isLikelyColdmailAddress(getRowEmail(row))) return false;
   if (hasExplicitMailBlock(row)) return false;
+  if (hasPendingInstantlyQueue(row)) return false;
   if (rowHasInstantlySignal(row)) return false;
   if (rowHasColdmailSentSignal(row)) return false;
   return true;
@@ -408,6 +410,7 @@ function isBasicMailLeadEligible(row = {}) {
 function isActiveTransferredLead(row = {}) {
   if (!isKvkTransferRow(row)) return false;
   if (EXCLUDED_STATUSES.has(getRowStatus(row))) return false;
+  if (hasPendingInstantlyQueue(row)) return false;
   if (rowHasInstantlySignal(row)) return false;
   if (rowHasColdmailSentSignal(row)) return false;
   return Boolean(getRowId(row));

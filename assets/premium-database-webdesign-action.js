@@ -866,6 +866,10 @@
                 instantlySyncedAt: normalizeString(raw && raw.instantlySyncedAt),
                 instantlyLastEventAt: normalizeString(raw && raw.instantlyLastEventAt),
                 instantlyEmailSentAt: normalizeString(raw && raw.instantlyEmailSentAt),
+                instantlyQueueStatus: normalizeString(raw && raw.instantlyQueueStatus),
+                instantlyQueueRegisteredAt: normalizeString(raw && raw.instantlyQueueRegisteredAt),
+                instantlyQueueUpdatedAt: normalizeString(raw && raw.instantlyQueueUpdatedAt),
+                instantlyQueueSource: normalizeString(raw && raw.instantlyQueueSource),
                 statusUpdatedAt: normalizeString(raw && raw.statusUpdatedAt)
             };
         }
@@ -877,15 +881,19 @@
             return Boolean(normalizeString(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt));
         }
 
+        function hasPendingInstantlyQueue(customer) {
+            return normalizeString(customer && customer.instantlyQueueStatus).toLowerCase() === "registered";
+        }
+
         function isInstantlyTabCustomer(customer) {
-            if (!hasInstantlyOutreachSignal(customer)) return false;
+            if (!hasInstantlyOutreachSignal(customer) && !hasPendingInstantlyQueue(customer)) return false;
             const status = normalizeDatabaseStatus(customer && customer.status, customer);
             return ["klant", "interesse", "afspraak", "afgehaakt", "geblokkeerd", "geengehoor", "buiten"].indexOf(status) === -1;
         }
 
         function matchesStatusFilter(customer, activeStatus, hasUsedColdCalling, hasUsedColdMailing) {
             const status = normalizeString(activeStatus);
-            if (status === "instantly") return hasInstantlyOutreachSignal(customer);
+            if (status === "instantly") return hasInstantlyOutreachSignal(customer) || hasPendingInstantlyQueue(customer);
             if (status === "verstuurd") return false; // Delivered recipients are read from the central sent register.
             if (status === "benaderd") {
                 const usedColdCalling = typeof hasUsedColdCalling === "function" && hasUsedColdCalling(customer);
@@ -982,11 +990,12 @@
         }
 
         function augmentSearchHaystack(customer) {
-            return [getSentFromEmail(customer), getStatusLabel(getEffectiveStatus(customer)), isActionRequired(customer) ? "reactie ontvangen actie nodig" : ""].join(" ").toLowerCase();
+            return [getSentFromEmail(customer), getStatusLabel(getEffectiveStatus(customer)), hasPendingInstantlyQueue(customer) ? "klaargezet voor instantly" : "", isActionRequired(customer) ? "reactie ontvangen actie nodig" : ""].join(" ").toLowerCase();
         }
 
         function renderMeta(customer, forceOutreachMeta) {
             if (hasInstantlyOutreachSignal(customer)) return "<div class=\"outreach-line\">Overgezet naar Instantly</div>";
+            if (hasPendingInstantlyQueue(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
             if (!isWebdesignOutreachCustomer(customer) && !(forceOutreachMeta && isTrackedOutreachCustomer(customer))) return "";
             const sentAt = getSentAt(customer);
             return "<div class=\"outreach-line\">Verstuurd vanaf " + escapeHtml(getSentFromEmail(customer) || "onbekend mailadres") + (sentAt ? " · " + escapeHtml(formatDisplayDate(sentAt)) : "") + "</div>" + (isActionRequired(customer) ? "<span class=\"outreach-badge\">Reactie ontvangen</span>" : "");
@@ -1139,7 +1148,7 @@
         }
 
         ensureOutreachStyles();
-        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, hasInstantlyOutreachSignal: hasInstantlyOutreachSignal, isActionRequired: isActionRequired, isInstantlyTabCustomer: isInstantlyTabCustomer, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, matchesStatusFilter: matchesStatusFilter, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
+        return { applyAutomation: applyAutomation, augmentSearchHaystack: augmentSearchHaystack, getEffectiveStatus: getEffectiveStatus, getSentAt: getSentAt, getSentFromEmail: getSentFromEmail, getStatusLabel: getStatusLabel, hasInstantlyOutreachSignal: hasInstantlyOutreachSignal, hasPendingInstantlyQueue: hasPendingInstantlyQueue, isActionRequired: isActionRequired, isInstantlyTabCustomer: isInstantlyTabCustomer, isTrackedOutreachCustomer: isTrackedOutreachCustomer, isWebdesignOutreachCustomer: isWebdesignOutreachCustomer, matchesStatusFilter: matchesStatusFilter, normalizeCustomerFields: normalizeCustomerFields, renderActions: renderActions, renderDaysSinceSent: renderDaysSinceSent, renderMeta: renderMeta, renderReplyInfo: renderReplyInfo, sortByRecentOutreach: sortByRecentOutreach, updateStatus: updateStatus };
     }
 
     global.SoftoraDatabaseOutreach = {
