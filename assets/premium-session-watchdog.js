@@ -8,6 +8,7 @@
 
   var nativeFetch = window.fetch.bind(window);
   var redirecting = false;
+  var sessionCheckInFlight = null;
 
   function getCurrentPath() {
     var loc = window.location || {};
@@ -45,27 +46,41 @@
   }
 
   window.fetch = function softoraPremiumSessionFetch(input, init) {
-    return nativeFetch(input, init).then(function (response) {
-      if (isProtectedApiAuthFailure(input, response)) redirectToLogin();
+    return nativeFetch(input, init).then(async function (response) {
+      if (isProtectedApiAuthFailure(input, response)) {
+        await checkSessionStillActive();
+      }
       return response;
     });
   };
 
-  async function checkSessionStillActive() {
-    if (redirecting) return;
-    if (document.visibilityState === "hidden") return;
-    try {
-      var response = await nativeFetch("/api/auth/session", {
-        method: "GET",
-        credentials: "same-origin",
-        cache: "no-store"
-      });
-      if (!response.ok) return;
-      var payload = await response.json().catch(function () { return null; });
-      if (!payload || payload.authenticated !== true) redirectToLogin();
-    } catch (_) {
-      /* netwerkfout: laat de pagina met rust */
-    }
+  function checkSessionStillActive() {
+    if (redirecting || document.visibilityState === "hidden") return Promise.resolve(false);
+    if (sessionCheckInFlight) return sessionCheckInFlight;
+
+    sessionCheckInFlight = (async function () {
+      try {
+        var response = await nativeFetch("/api/auth/session", {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store"
+        });
+        if (!response.ok) return false;
+        var payload = await response.json().catch(function () { return null; });
+        if (!payload || payload.authenticated !== true) {
+          redirectToLogin();
+          return false;
+        }
+        return true;
+      } catch (_) {
+        /* netwerkfout: laat de pagina met rust */
+        return false;
+      }
+    })().finally(function () {
+      sessionCheckInFlight = null;
+    });
+
+    return sessionCheckInFlight;
   }
 
   window.addEventListener("focus", checkSessionStillActive);
