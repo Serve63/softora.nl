@@ -4794,7 +4794,8 @@ test('Instantly separates waiting leads from confirmed deliveries', () => {
   const selected = contacts.filter(item => controller.matchesStatusFilter(item, 'verstuurd', () => true, mailed));
   assert.deepEqual(selected.map(item => item.id), []);
   assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['confirmed', 'manual']);
-  assert.match(controller.renderMeta(contacts[10], true), /Handmatig als gemaild via Instantly gemarkeerd/);
+  assert.equal(controller.normalizeCustomerFields(contacts[10]).instantlyManualSentClassification, 'user-requested-unverified');
+  assert.match(controller.renderMeta({ ...contacts[10], ...controller.normalizeCustomerFields(contacts[10]) }, true), /Handmatig als gemaild via Instantly gemarkeerd/);
   assert.match(controller.renderMeta(contacts[9], true), /Verstuurd via Instantly/);
   assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly-ready')).map(item => item.id), ['transferred', 'both']);
   assert.equal(controller.matchesStatusFilter({ id: 'new-design', status: 'prospect', webdesignMailProvider: 'instantly', hasPhoto: true, hasMockup: true }, 'instantly-ready'), true);

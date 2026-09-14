@@ -862,6 +862,7 @@
                 instantlyLeadId: normalizeString(raw && raw.instantlyLeadId),
                 instantlyCampaignId: normalizeString(raw && raw.instantlyCampaignId),
                 instantlyStatus: normalizeString(raw && raw.instantlyStatus),
+                instantlyManualSentClassification: normalizeString(raw && raw.instantlyManualSentClassification),
                 instantlySyncedAt: normalizeString(raw && raw.instantlySyncedAt),
                 instantlyLastEventAt: normalizeString(raw && raw.instantlyLastEventAt),
                 instantlyEmailSentAt: normalizeString(raw && raw.instantlyEmailSentAt),
