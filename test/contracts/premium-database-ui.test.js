@@ -643,6 +643,37 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
   assert.equal(nodes.mailRoiRatio.textContent, '1 op 3');
 });
 
+test('premium database mail counter combines Softora with confirmed Instantly sends only', async () => {
+  const nodes = {
+    systemMailSentTodayCount: { textContent: '' },
+    systemMailBouncesTodayCount: { textContent: '' },
+    systemMailSentCount: { textContent: '', title: '' },
+    mailRoiAppointmentsCount: { textContent: '' },
+    mailRoiAppointmentRatio: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const client = loadDatabaseSystemMailCountClient({
+    document: { hidden: false, getElementById: (id) => nodes[id] || null, querySelectorAll: () => [] },
+    fetch: async () => ({ ok: true, json: async () => ({ ok: true, stats: { systemTotalSent: 100 } }) }),
+    setInterval: () => 0,
+  });
+  const customers = [
+    { email: 'sent@example.test', lastColdmailProvider: 'instantly', instantlyEmailSentAt: '2026-09-14T10:00:00Z' },
+    { email: 'opened@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'opened' },
+    { email: 'sent@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'reply_received' },
+    { email: 'queued@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'queued' },
+    { email: 'synced@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'synced' },
+  ];
+
+  assert.equal(client.getInstantlySystemMailSentCount(customers), 2);
+  client.render(customers, { dataLoading: false });
+  await client.refreshTodaySentCount();
+
+  assert.equal(nodes.systemMailSentCount.textContent, '102');
+  assert.equal(nodes.systemMailSentCount.title, 'Softora en bevestigde Instantly-verzendingen samen.');
+});
+
 test('premium database all-time mail counter never regresses after a partial 58 response', async () => {
   const nodes = {
     softoraCustomersBootstrap: {
@@ -2459,7 +2490,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260914-kpi-fit/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260910-sent-register/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260914-combined-providers/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2740,7 +2771,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260910a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260910-sent-register"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260910a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260914-combined-providers"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
