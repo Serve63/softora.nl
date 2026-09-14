@@ -7,6 +7,12 @@
   box-shadow: 0 24px 80px rgba(20, 24, 45, .18);
 }
 .photo-batch-modal .modal-title { margin-bottom: 22px; }
+.photo-batch-provider { display: grid; gap: 8px; margin-top: 18px; color: var(--dark); font: 600 13px 'Inter', sans-serif; }
+.photo-batch-provider__choices { display: flex; gap: 10px; }
+.photo-batch-provider__choices label { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.photo-batch-provider__choices label:has(input:checked) { border-color: var(--crimson); background: rgba(139, 34, 82, .055); }
+.photo-batch-provider__choices input { accent-color: var(--crimson); margin-right: 6px; }
+.photo-cell > .photo-drop:not(.photo-drop--mockup)[data-has-photo="false"]:not(.is-generating) { border: 0; background: transparent; cursor: default; }
 .photo-batch-options { display: grid; min-width: 0; gap: 10px; }
 .photo-batch-option {
   width: 100%; min-width: 0; box-sizing: border-box;

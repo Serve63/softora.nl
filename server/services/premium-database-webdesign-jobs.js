@@ -627,10 +627,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       naam: truncateText(normalizeString(raw.naam || raw.contact || raw.contactName), 160),
       tel: truncateText(normalizeString(raw.tel || raw.telefoon || raw.phone), 80),
       dom: truncateText(normalizeString(raw.dom || raw.domain), 180),
-      website: truncateText(normalizeString(raw.website || raw.websiteUrl || raw.url), 300),
+      website: truncateText(normalizeString(raw.website || raw.websiteUrl || raw.url), 300), webdesignMailProvider: normalizeString(raw.webdesignMailProvider).toLowerCase() === 'instantly' ? 'instantly' : 'softora',
     };
   }
-
   function normalizeSearchValue(value) {
     return normalizeString(value)
       .toLowerCase()
@@ -1106,7 +1105,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
               identityKey,
               ...buildWebdesignGenerationProvenance(job),
               websitePhotoName,
-              websiteMockupName,
+              websiteMockupName, webdesignMailProvider: customer.webdesignMailProvider,
               mockupRenderer: DEVICE_MOCKUP_RENDERER,
               mockupOrientation: 'upright',
               mockupQualityStatus: 'checked',
@@ -1177,7 +1176,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         mockupPhotoKey: mockupPhotoDataKey,
         mockupChunkCount: mockupChunks.length,
         websitePhotoName,
-        websiteMockupName,
+        websiteMockupName, webdesignMailProvider: customer.webdesignMailProvider,
         mockupRenderer: DEVICE_MOCKUP_RENDERER,
         mockupOrientation: 'upright',
         mockupQualityStatus: 'checked',
@@ -1217,7 +1216,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     job.status = 'running';
     job.startedAt = now();
     await persistJob(job);
-
     // The queue can wait behind persistence or another worker. Re-check at the
     // irreversible boundary so an expired job can never reach a paid provider.
     if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
@@ -1231,7 +1229,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
       },
     });
+    if (job.customer.webdesignMailProvider === 'instantly' && mailReadySnapshotService?.invalidate) mailReadySnapshotService.invalidate();
     if (
+      job.customer.webdesignMailProvider !== 'instantly' &&
       mailReadySnapshotService &&
       typeof mailReadySnapshotService.markCustomersMailReadyAfterAssetUpsert === 'function'
     ) {

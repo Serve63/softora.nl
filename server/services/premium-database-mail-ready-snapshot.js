@@ -286,7 +286,7 @@ function hasExplicitMailBlock(row = {}) {
 function normalizePhotoFlag(row = {}) {
   return {
     customerId: normalizeString(row.customerId || row.customer_id || row.id),
-    identityKey: normalizeString(row.identityKey || row.identity_key),
+    identityKey: normalizeString(row.identityKey || row.identity_key), webdesignMailProvider: normalizeString(row.webdesignMailProvider || row.legacy_meta?.webdesignMailProvider).toLowerCase(),
     hasPhoto: row.hasPhoto === true || normalizeString(row.storage_path || row.websitePhoto || row.photo) !== '',
     hasMockup:
       row.hasMockup === true ||
@@ -396,7 +396,7 @@ async function readLegacyColdmailGuardKeys(getUiStateValues, logger) {
 }
 
 function isBasicMailReadyCandidate(row = {}, photoFlag = {}) {
-  return isBasicMailLeadEligible(row) && Boolean(photoFlag.hasPhoto && photoFlag.hasMockup);
+  return isBasicMailLeadEligible(row) && photoFlag.webdesignMailProvider !== 'instantly' && Boolean(photoFlag.hasPhoto && photoFlag.hasMockup);
 }
 
 function isBasicMailLeadEligible(row = {}) {
@@ -441,7 +441,7 @@ function buildSnapshotCustomer(row = {}, photoFlag = {}) {
     updatedAt: getRowUpdatedAt(row) || normalizeString(photoFlag.updatedAt),
     hasPhoto: true,
     hasMockup: true,
-    websitePhotoAssetReady: true,
+    websitePhotoAssetReady: true, webdesignMailProvider: photoFlag.webdesignMailProvider || 'softora',
     websiteMockupAssetReady: true,
     mailReady: true,
     mailReadySnapshot: true,
@@ -645,7 +645,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       .filter((item) => isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildSnapshotCustomer(item.row, item.photoFlag));
     let availableRows = unguardedCandidates
-      .filter((item) => !rowHasColdcallingSignal(item.row))
+      .filter((item) => !rowHasColdcallingSignal(item.row) && !(item.photoFlag.webdesignMailProvider === 'instantly' && item.photoFlag.hasPhoto && item.photoFlag.hasMockup))
       .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag));
     availableRows = dedupeCustomerRows(availableRows.concat(

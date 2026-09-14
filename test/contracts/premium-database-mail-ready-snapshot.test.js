@@ -199,6 +199,7 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
     hasPhoto: true,
     hasMockup: true,
     websitePhotoAssetReady: true,
+    webdesignMailProvider: 'softora',
     websiteMockupAssetReady: true,
     mailReady: true,
     mailReadySnapshot: true,
@@ -221,6 +222,16 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE), true);
+});
+
+test('a design targeted at Instantly never enters the Softora send snapshot or free inventory', async () => {
+  const { service } = createService({
+    customers: [{ customer_id: 'instant-design', company: 'Instant Design', email: 'info@instant-design.nl', website: 'instant-design.nl', database_status: 'prospect' }],
+    photoFlags: [{ customerId: 'instant-design', hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly' }],
+  });
+  const snapshot = await service.buildMailReadySnapshot({ limit: 10 });
+  assert.equal(snapshot.total, 0);
+  assert.equal(snapshot.availableTotal, 0);
 });
 
 test('premium database snapshot version is deterministic across serverless clocks and row order', () => {
