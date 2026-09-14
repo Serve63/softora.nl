@@ -1864,7 +1864,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           return {
             customerId: normalizeString(row && row.customer_id),
             identityKey: normalizeString(row && row.identity_key),
-            hasPhoto: Boolean(normalizeString(row && row.storage_path)),
+            hasPhoto: Boolean(normalizeString(row && row.storage_path)), webdesignMailProvider: normalizeString(legacyMeta.webdesignMailProvider).toLowerCase(),
             hasMockup: Boolean(
               normalizeString(mockupMeta.storagePath) ||
                 normalizeString(legacyMeta.websiteMockupStoragePath) ||

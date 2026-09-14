@@ -123,6 +123,8 @@
         optionNode.classList.toggle("is-active", optionNode.dataset.photoBatchMode === mode);
       });
       nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total);
+      const provider = nodes.photoBatchModal.querySelector('input[name="photoBatchProvider"]:checked');
+      nodes.startPhotoBatchButton.disabled = !provider || !selectedCount;
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
       nodes.photoBatchSummary.textContent = message || (selectedCount
         ? formatPhotoBatchCount(selectedCount) + " · " + (Number.isFinite(selectedCost) ? formatCost(selectedCost) : formatOutputEstimate(selectedCount))
@@ -148,6 +150,7 @@
       }
 
       mode = "custom";
+      nodes.photoBatchModal.querySelectorAll('input[name="photoBatchProvider"]').forEach(function (input) { input.checked = false; });
       nodes.photoBatchLimitInput.value = String(Math.min(10, total));
       updateSummary();
       nodes.photoBatchModal.classList.add("on");
@@ -192,12 +195,15 @@
     function start() {
       const selection = resolveSelection();
       if (!selection) return;
+      const provider = nodes.photoBatchModal.querySelector('input[name="photoBatchProvider"]:checked');
+      if (!provider || !["softora", "instantly"].includes(provider.value)) { updateSummary("Kies eerst de mailprovider."); return; }
 
       close();
-      void generate(selection.limit, { silentProgress: true });
+      void generate(selection.limit, { silentProgress: true, mailProvider: provider.value });
     }
 
     function bind() {
+      nodes.photoBatchModal.querySelectorAll('input[name="photoBatchProvider"]').forEach(function (input) { input.addEventListener("change", updateSummary.bind(null, "")); });
       nodes.photoBatchOptions.addEventListener("click", function (event) {
         const optionNode = event.target.closest("[data-photo-batch-mode]");
         if (!optionNode || !nodes.photoBatchOptions.contains(optionNode)) return;

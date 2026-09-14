@@ -112,6 +112,7 @@
             return {
                 ...normalized,
                 websitePhoto: websitePhoto,
+                webdesignMailProvider: firstText(photo && photo.webdesignMailProvider, fallbackPhoto && fallbackPhoto.webdesignMailProvider, normalized.webdesignMailProvider),
                 websitePhotoName: firstText(photo && photo.websitePhotoName, fallbackPhoto && fallbackPhoto.websitePhotoName, normalized.websitePhotoName) || "Websitefoto",
                 websiteMockup: websiteMockup,
                 websiteMockupName: firstText(photo && photo.websiteMockupName, fallbackPhoto && fallbackPhoto.websiteMockupName, normalized.websiteMockupName) || (websiteMockup ? "Device mockup" : ""),

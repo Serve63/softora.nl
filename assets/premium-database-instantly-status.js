@@ -14,12 +14,19 @@
     function status(customer) { return text(customer && (customer.instantlyStatus || customer.lastColdmailProviderStatus)).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""); }
     function hasSignal(customer) { return Boolean(customer) && Boolean(text(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt || (text(customer.lastColdmailProvider).toLowerCase() === "instantly" ? "instantly" : ""))); }
     function isConfirmedSent(customer) { return Boolean(customer) && (Boolean(text(customer.instantlyEmailSentAt || customer.lastInstantlySentAt || customer.instantlySentAt)) || CONFIRMED.has(status(customer))); }
+    function hasDesign(customer) { return Boolean(customer && (customer.websitePhotoAssetReady === true || customer.hasPhoto === true || text(customer.websitePhoto)) && (customer.websiteMockupAssetReady === true || customer.hasMockup === true || text(customer.websiteMockup))); }
     function isReady(customer, normalizeDatabaseStatus) {
-        if (!hasSignal(customer) || isConfirmedSent(customer)) return false;
+        if ((!hasSignal(customer) && text(customer && customer.webdesignMailProvider).toLowerCase() !== "instantly") || !hasDesign(customer) || isConfirmedSent(customer)) return false;
         const databaseStatus = typeof normalizeDatabaseStatus === "function" ? normalizeDatabaseStatus(customer && customer.status, customer) : text(customer && customer.status).toLowerCase();
         const providerStatus = status(customer);
         return !FINISHED_DATABASE.has(databaseStatus) && !BLOCKED.has(providerStatus) && READY.has(providerStatus);
     }
 
-    return { hasSignal, isConfirmedSent, isReady, status };
+    function isWaitingForDesign(customer, normalizeDatabaseStatus) {
+        if (!hasSignal(customer) || hasDesign(customer) || isConfirmedSent(customer)) return false;
+        const databaseStatus = typeof normalizeDatabaseStatus === "function" ? normalizeDatabaseStatus(customer && customer.status, customer) : text(customer && customer.status).toLowerCase();
+        return !FINISHED_DATABASE.has(databaseStatus) && !BLOCKED.has(status(customer)) && READY.has(status(customer));
+    }
+
+    return { hasSignal, hasDesign, isConfirmedSent, isReady, isWaitingForDesign, status };
 });

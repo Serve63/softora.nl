@@ -32,7 +32,7 @@
     }
 
     function getHeaderLabel(activeStatus) {
-        return activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's";
+        return activeStatus === "benaderbaar" || activeStatus === "instantly-ready" ? "Mailklaar" : "Foto's";
     }
 
     function getContextualStatusPresentation(activeStatus, isCanonicalMailReady) {

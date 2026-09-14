@@ -629,7 +629,7 @@ test('premium database webdesign jobs persist status and generated photos throug
       body: {
         jobId: 'job_persist123456',
         websiteUrl: 'https://softora.nl',
-        customer: { id: 'customer-persist', bedrijf: 'Softora' },
+        customer: { id: 'customer-persist', bedrijf: 'Softora', webdesignMailProvider: 'instantly' },
       },
     },
     startRes
@@ -658,6 +658,7 @@ test('premium database webdesign jobs persist status and generated photos throug
   assert.equal(uploadedPhotos[0].entry.mockupRenderer, 'softora-server-device-v8');
   assert.equal(uploadedPhotos[0].entry.mockupOrientation, 'upright');
   assert.equal(uploadedPhotos[0].entry.mockupQualityStatus, 'checked');
+  assert.equal(uploadedPhotos[0].entry.legacyMeta.webdesignMailProvider, 'instantly');
   assert.equal(uploadedPhotos[0].meta.source, 'premium-database-webdesign-jobs');
 
   const resumedCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({

@@ -17,7 +17,6 @@
     const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
     const PHOTO_LOAD_CACHE_LIMIT = 2500;
-    const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
     const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\"></span>";
@@ -408,7 +407,8 @@
                     naam: target.naam,
                     tel: target.tel || target.telefoon,
                     dom: target.dom,
-                    website: target.website
+                    website: target.website,
+                    webdesignMailProvider: target.webdesignMailProvider
                 }
             };
         }
@@ -638,12 +638,11 @@
             const isPending = pendingIds.has(customer.id);
             const restoreBlocked = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending;
-            const canGenerate = !isPending && !restoreBlocked && isWebdesignPhotoEligible(customer);
             const inner = hasPhoto
                 ? (!hasPhotoSource || photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">")
-                : (isPending ? LOADING_ICON : LIGHTNING_ICON);
+                : (isPending ? LOADING_ICON : "");
             const remove = hasPhoto && hasPhotoSource ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
-            const ariaLabel = hasPhoto ? (!hasPhotoSource ? "Websitefoto beschikbaar; detaildata laadt op de achtergrond" : (photoFailed ? "Websitefoto kon niet geladen worden" : "Websitefoto bekijken")) : (isPending ? "Webdesign wordt gemaakt" : (restoreBlocked ? "Fotodata wordt op de achtergrond gecontroleerd" : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden")));
+            const ariaLabel = hasPhoto ? (!hasPhotoSource ? "Websitefoto beschikbaar; detaildata laadt op de achtergrond" : (photoFailed ? "Websitefoto kon niet geladen worden" : "Websitefoto bekijken")) : (isPending ? "Webdesign wordt gemaakt" : (restoreBlocked ? "Fotodata wordt op de achtergrond gecontroleerd" : "Maak webdesigns via de bulkactie"));
             const title = ariaLabel;
             const mockup = normalizeString(customer && customer.websiteMockup);
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
@@ -663,7 +662,7 @@
             const mockupTitle = hasMockup ? (!hasMockupSource ? "Device mockup laadt op de achtergrond" : (canGenerateMockup ? "Klik om device mockup opnieuw te maken" : mockupLabel)) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Mockup maken is mislukt. Klik om opnieuw te proberen." : (canGenerateMockup ? "Klik om device mockup te maken" : "Maak eerst een webdesign")));
             const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(mockupLoadKey) + "\" data-photo-loaded=\"" + (mockupLoaded || mockupFailed ? "true" : "false") + "\" data-photo-error=\"" + (mockupFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerateMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (hasMockup || canGenerateMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
             if ((hasPhoto && hasPhotoSource) || (hasMockup && hasMockupSource)) schedulePhotoDropHydration();
-            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded || photoFailed ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + (global.SoftoraDatabaseWebdesignPreview && typeof global.SoftoraDatabaseWebdesignPreview.renderLink === "function" ? global.SoftoraDatabaseWebdesignPreview.renderLink(customer, { escapeHtml: escapeHtml, show: hasPhoto && hasMockup && hasPhotoSource && hasMockupSource && !photoFailed && !mockupFailed }) : "") + (customer && customer.id ? "<button class=\"lead-delete-button\" type=\"button\" data-delete-lead-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Lead verwijderen\" title=\"Lead verwijderen\"><svg class=\"lead-delete-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"/><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"/></svg></button>" : "") + "</div>";
+            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + "\"" + (hasPhoto ? " role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\"" : "") + " data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded || photoFailed ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"false\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + (global.SoftoraDatabaseWebdesignPreview && typeof global.SoftoraDatabaseWebdesignPreview.renderLink === "function" ? global.SoftoraDatabaseWebdesignPreview.renderLink(customer, { escapeHtml: escapeHtml, show: hasPhoto && hasMockup && hasPhotoSource && hasMockupSource && !photoFailed && !mockupFailed }) : "") + (customer && customer.id ? "<button class=\"lead-delete-button\" type=\"button\" data-delete-lead-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Lead verwijderen\" title=\"Lead verwijderen\"><svg class=\"lead-delete-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"/><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"/></svg></button>" : "") + "</div>";
         }
 
         function waitForBatchYield() { return new Promise(function (resolve) { if (typeof global.requestAnimationFrame === "function") global.requestAnimationFrame(function () { resolve(); }); else global.setTimeout(resolve, 0); }); }
@@ -893,7 +892,7 @@
 
         function matchesStatusFilter(customer, activeStatus, hasUsedColdCalling, hasUsedColdMailing) {
             const status = normalizeString(activeStatus);
-            if (status === "instantly") return isInstantlyConfirmedSent(customer); if (status === "instantly-ready") return isInstantlyReadyCustomer(customer);
+            if (status === "instantly") return isInstantlyConfirmedSent(customer); if (status === "instantly-ready") return isInstantlyReadyCustomer(customer); if (status === "instantly-wachtlijst") return global.SoftoraDatabaseInstantlyStatus.isWaitingForDesign(customer, normalizeDatabaseStatus);
             if (status === "verstuurd") return false; // Delivered recipients are read from the central sent register.
             if (status === "benaderd") {
                 const usedColdCalling = typeof hasUsedColdCalling === "function" && hasUsedColdCalling(customer);

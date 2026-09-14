@@ -6,7 +6,8 @@ test('opening a Sunburst batch shows the selected medium total estimate for both
   const nodes = {
     generatePhotosButton: { disabled: false }, photoBatchChoiceButtons: [],
     photoBatchLimitInput: { value: '', focus() {} }, photoBatchAllCount: {}, photoBatchSummary: {},
-    photoBatchModal: { classList: { add() {} }, setAttribute() {} },
+    startPhotoBatchButton: {},
+    photoBatchModal: { classList: { add() {} }, setAttribute() {}, querySelectorAll: () => [], querySelector: () => null },
   };
   const controller = createController({
     nodes, costEur: null, formatEuroCost, getTargets: () => Array.from({ length: 100 }),
@@ -15,6 +16,30 @@ test('opening a Sunburst batch shows the selected medium total estimate for both
   controller.open();
   assert.equal(nodes.photoBatchAllCount.textContent, '100 bedrijven');
   assert.equal(nodes.photoBatchSummary.textContent, '10 bedrijven · €0,40');
+  assert.equal(nodes.startPhotoBatchButton.disabled, true);
+});
+
+test('batch generation requires an explicit provider and passes the chosen destination through', () => {
+  const provider = { value: 'instantly', checked: false, addEventListener(_event, callback) { this.onChange = callback; } };
+  const calls = [];
+  const nodes = {
+    generatePhotosButton: { disabled: false }, photoBatchChoiceButtons: [],
+    photoBatchLimitInput: { value: '', focus() {}, addEventListener() {} }, photoBatchAllCount: {}, photoBatchSummary: {},
+    startPhotoBatchButton: { addEventListener(_event, callback) { this.onStart = callback; } }, cancelPhotoBatchButton: { addEventListener() {} },
+    photoBatchOptions: { addEventListener() {} },
+    photoBatchModal: { classList: { add() {}, remove() {}, contains: () => true }, setAttribute() {}, addEventListener() {},
+      querySelectorAll: () => [provider], querySelector: () => provider.checked ? provider : null },
+  };
+  const controller = createController({ nodes, getTargets: () => Array.from({ length: 10 }), closeAddActions() {}, generate: (...args) => calls.push(args) });
+  controller.open();
+  controller.bind();
+  assert.equal(nodes.startPhotoBatchButton.disabled, true);
+  provider.checked = true;
+  provider.onChange();
+  assert.equal(nodes.startPhotoBatchButton.disabled, false);
+  nodes.photoBatchLimitInput.value = '10';
+  nodes.startPhotoBatchButton.onStart();
+  assert.deepEqual(calls, [[10, { silentProgress: true, mailProvider: 'instantly' }]]);
 });
 
 
