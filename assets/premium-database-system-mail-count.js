@@ -14,6 +14,7 @@
     let roiAppointmentsCount = 0;
     let roiAppointmentsDirty = false;
     let lastStatsMailCount = null;
+    let lastInstantlyMailCount = 0;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
@@ -168,6 +169,43 @@
         return (customers || []).reduce(function (total, customer) {
             return total + getCustomerSoftoraSystemMailSentCount(customer, helpers || {});
         }, 0);
+    }
+
+    function getInstantlySentAt(customer, helpers) {
+        const normalizeString = (helpers && helpers.normalizeString) || fallbackNormalizeString;
+        if (!customer) return "";
+        const provider = normalizeString(customer.lastColdmailProvider).toLowerCase();
+        const instantlySentAt = normalizeString(customer.instantlyEmailSentAt);
+        if (instantlySentAt) return instantlySentAt;
+        return provider === "instantly"
+            ? normalizeString(customer.lastColdmailSentAt || customer.lastMailSentAt)
+            : "";
+    }
+
+    function hasConfirmedInstantlySentSignal(customer, helpers) {
+        const options = helpers || {};
+        const normalizeString = options.normalizeString || fallbackNormalizeString;
+        const isTestCompany = typeof options.isColdmailTestCompany === "function" && options.isColdmailTestCompany(customer);
+        if (!customer || isTestCompany) return false;
+        if (getInstantlySentAt(customer, options)) return true;
+        const provider = normalizeString(customer.lastColdmailProvider).toLowerCase();
+        const status = normalizeString(customer.instantlyStatus || customer.lastColdmailProviderStatus)
+            .toLowerCase()
+            .replace(/[\s-]+/g, "_");
+        return provider === "instantly" && ["sent", "email_sent", "opened", "reply_received", "replied"].indexOf(status) !== -1;
+    }
+
+    function getInstantlySystemMailSentCount(customers, helpers) {
+        const recipientKeys = new Set();
+        (customers || []).forEach(function (customer, index) {
+            if (!hasConfirmedInstantlySentSignal(customer, helpers || {})) return;
+            recipientKeys.add(buildWebdesignRecipientKey(customer, helpers || {}) || "row:" + index);
+        });
+        return recipientKeys.size;
+    }
+
+    function getCombinedSystemMailCount() {
+        return lastStatsMailCount === null ? null : lastStatsMailCount + lastInstantlyMailCount;
     }
 
     function getRootDocument() {
@@ -478,7 +516,7 @@
             const stats = payload.stats || {};
             if (window.SoftoraDatabaseSentRegister) {
                 window.SoftoraDatabaseSentRegister.accept(stats.sentRegister);
-                lastStatsMailCount = stats.sentRegister.total; lastRenderedMailCount = stats.sentRegister.total;
+                lastStatsMailCount = stats.sentRegister.total;
             }
             const sentToday = readTodaySentCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
@@ -488,7 +526,7 @@
                 lastStatsMailCount = lastStatsMailCount === null
                     ? systemMailCount
                     : Math.max(lastStatsMailCount, systemMailCount);
-                renderSystemMailCount(systemMailCount, false);
+                renderSystemMailCount(getCombinedSystemMailCount(), false);
             }
             if (window.SoftoraDatabaseSentRegister) window.dispatchEvent(new Event("softora:sent-register"));
             return sentToday;
@@ -573,16 +611,22 @@
         applyBootstrapState();
         bindRoiControls();
         bindTodaySentRefresh();
+        if (!(helpers && helpers.dataLoading)) {
+            lastInstantlyMailCount = Math.max(lastInstantlyMailCount, getInstantlySystemMailSentCount(customers, helpers || {}));
+        }
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
         if (!element) return;
-        renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
+        element.title = "Softora en bevestigde Instantly-verzendingen samen.";
+        renderSystemMailCount(getCombinedSystemMailCount(), lastStatsMailCount === null);
     }
 
     window.SoftoraDatabaseSystemMailCount = {
         hasSoftoraSystemMailSignal: hasSoftoraSystemMailSignal,
         getCustomerSoftoraSystemMailSentCount: getCustomerSoftoraSystemMailSentCount,
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,
+        hasConfirmedInstantlySentSignal: hasConfirmedInstantlySentSignal,
+        getInstantlySystemMailSentCount: getInstantlySystemMailSentCount,
         getWebdesignMailSentStats: getWebdesignMailSentStats,
         loadPersistedDealCount: loadPersistedDealCount,
         refreshTodaySentCount: refreshTodaySentCount,
