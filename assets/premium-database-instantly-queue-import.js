@@ -85,13 +85,13 @@
 
     function createControls() {
         const instantlyButton = document.querySelector('.status-filter-group--sent [data-s="instantly"]');
-        const pills = instantlyButton && instantlyButton.closest(".status-filter-pills");
-        if (!pills || document.getElementById("instantlyQueueImportButton")) return null;
+        const pills = document.querySelector('.status-filter-group--shared .status-filter-pills');
+        if (!pills || !instantlyButton || document.getElementById("instantlyQueueImportButton")) return null;
         const button = document.createElement("button");
         button.id = "instantlyQueueImportButton";
         button.type = "button";
         button.className = "sf-btn";
-        button.textContent = "Sheet registreren";
+        button.textContent = "Uploaden";
         const input = document.createElement("input");
         input.id = "instantlyQueueImportFile";
         input.type = "file";
@@ -172,7 +172,7 @@
             registerFile(file, controls).catch(function (error) {
                 setProgress(controls, normalizeString(error && error.message) || "Registreren mislukt.", true);
                 controls.button.disabled = false;
-                controls.button.textContent = "Sheet registreren";
+                controls.button.textContent = "Uploaden";
                 controls.input.value = "";
             });
         });
