@@ -466,7 +466,7 @@ test('html page coordinator applies a strict path-specific CSP to the password r
     .map((match) => match[1])
     .sort();
   assert.deepEqual(renderedScriptSources, [
-    '/assets/premium-session-watchdog.js?v=20260818a',
+    '/assets/premium-session-watchdog.js?v=20260914a',
     'assets/premium-password-register-app.js',
     'assets/premium-password-register-autolock.js',
     'assets/premium-password-register-pin.js',
@@ -1192,8 +1192,8 @@ test('html page coordinator injects premium session watchdog on authenticated pr
   );
 
   assert.equal(res.statusCode, 200);
-  assert.match(res.body, /assets\/premium-session-watchdog\.js\?v=20260818a/);
-  assert.match(res.body, /<script src="\/assets\/premium-session-watchdog\.js\?v=20260818a" defer><\/script>\s*<\/head>/);
+  assert.match(res.body, /assets\/premium-session-watchdog\.js\?v=20260914a/);
+  assert.match(res.body, /<script src="\/assets\/premium-session-watchdog\.js\?v=20260914a" defer><\/script>\s*<\/head>/);
 });
 
 test('html page coordinator injects authenticated premium sidebar profile html before first paint', async () => {

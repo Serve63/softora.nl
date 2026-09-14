@@ -39,12 +39,18 @@ function loadWatchdogSandbox(fetchImpl) {
   return sandbox.window;
 }
 
-test('premium session watchdog redirects protected pages to login after api 401', async () => {
-  const windowRef = loadWatchdogSandbox(async () => ({
-    ok: false,
-    status: 401,
-    json: async () => ({ ok: false }),
-  }));
+test('premium session watchdog redirects after api 401 only when the session check is unauthenticated', async () => {
+  const windowRef = loadWatchdogSandbox(async (url) => url === '/api/auth/session'
+    ? {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, authenticated: false }),
+      }
+    : {
+        ok: false,
+        status: 401,
+        json: async () => ({ ok: false }),
+      });
 
   const response = await windowRef.fetch('/api/ui-state-get?scope=premium_customers_database');
 
@@ -53,6 +59,31 @@ test('premium session watchdog redirects protected pages to login after api 401'
     windowRef.location.replacedWith,
     '/premium-personeel-login?next=%2Fpremium-database%3Fstatus%3Dbenaderd%23rij-1&logout=1&expired=1'
   );
+});
+
+test('premium session watchdog keeps a valid session after an upstream provider 401', async () => {
+  const requests = [];
+  const windowRef = loadWatchdogSandbox(async (url) => {
+    requests.push(url);
+    if (url === '/api/auth/session') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, authenticated: true }),
+      };
+    }
+    return {
+      ok: false,
+      status: 401,
+      json: async () => ({ ok: false, code: 'INSTANTLY_API_REQUEST_FAILED' }),
+    };
+  });
+
+  const response = await windowRef.fetch('/api/outreach/provider-sync', { method: 'POST' });
+
+  assert.equal(response.status, 401);
+  assert.equal(windowRef.location.replacedWith, undefined);
+  assert.deepEqual(requests, ['/api/outreach/provider-sync', '/api/auth/session']);
 });
 
 test('premium session watchdog keeps non-api 401 responses on the current page', async () => {
