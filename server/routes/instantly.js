@@ -50,6 +50,40 @@ function registerInstantlyRoutes(app, deps = {}) {
     }
   }
 
+  async function handleQueueDesignStage(req, res) {
+    try {
+      if (!instantlyQueueRegistrationService || typeof instantlyQueueRegistrationService.stageDesignBatch !== 'function') {
+        res.status(503).json({
+          ok: false,
+          code: 'INSTANTLY_QUEUE_DESIGN_STAGE_UNAVAILABLE',
+          message: 'Instantly-ontwerpstaging is tijdelijk niet beschikbaar.',
+        });
+        return;
+      }
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await instantlyQueueRegistrationService.stageDesignBatch({
+        emails: body.emails,
+        sourceId: body.sourceId,
+        fileDigest: body.fileDigest,
+        actor:
+          normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
+          normalizeString(body.actor) ||
+          'Instantly ontwerpstaging',
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(error && error.status ? error.status : 400).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'INSTANTLY_QUEUE_DESIGN_STAGE_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Instantly-ontwerpstaging is mislukt.',
+          500
+        ),
+        conflictCount: Number(error && error.conflictCount) || undefined,
+      });
+    }
+  }
+
   async function handlePrepareUpload(req, res) {
     try {
       if (typeof instantlyOutreachService.prepareInstantlyUpload !== 'function') {
@@ -199,6 +233,7 @@ function registerInstantlyRoutes(app, deps = {}) {
   app.post('/api/instantly/prepare-upload', requirePremiumAdminApiAccess, handlePrepareUpload);
   app.post('/api/outreach/provider-upload', requirePremiumAdminApiAccess, handlePrepareUpload);
   app.post('/api/outreach/provider-queue/register', requirePremiumAdminApiAccess, handleQueueRegistration);
+  app.post('/api/outreach/provider-queue/stage-designs', requirePremiumAdminApiAccess, handleQueueDesignStage);
 
   app.get('/api/instantly/status', requirePremiumAdminApiAccess, handleStatus);
   app.get('/api/outreach/provider-status', requirePremiumAdminApiAccess, handleStatus);

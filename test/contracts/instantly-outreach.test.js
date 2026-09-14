@@ -1131,6 +1131,64 @@ test('safe Instantly upload stops before CSV when the central outbound guard is 
   assert.equal(getRows()[0].lastColdmailProvider, undefined);
 });
 
+test('safe Instantly upload does not reserve a partial batch when too few leads are eligible', async () => {
+  const calls = [];
+  const { service, writes, getRows } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'eligible-1',
+        bedrijf: 'Eerste Lead BV',
+        email: 'eerste@example.test',
+        website: 'https://eerste.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'missing-assets-2',
+        bedrijf: 'Tweede Lead BV',
+        email: 'tweede@example.test',
+        website: 'https://tweede.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'eligible-1': {
+        id: 'eligible-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ items, options });
+        return { ok: true, reservationId: 'must-not-run', count: items.length * 4, expectedCount: items.length * 4 };
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-partial',
+    limit: 2,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'insufficient_eligible_leads');
+  assert.equal(result.prepared, 0);
+  assert.equal(result.available, 1);
+  assert.equal(result.requested, 2);
+  assert.equal(result.csv, undefined);
+  assert.equal(calls.length, 0);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+  assert.equal(getRows()[1].lastColdmailProvider, undefined);
+});
+
 test('safe Instantly upload reserves the whole batch centrally before returning CSV', async () => {
   const calls = [];
   const { service, writes } = createService({

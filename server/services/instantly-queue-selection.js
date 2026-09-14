@@ -39,13 +39,29 @@ function isInstantlyQueueSelectionMatch(
     row && (row.instantlyQueueFileDigest || payload.instantlyQueueFileDigest)
   ).toLowerCase();
   return (
-    status === 'registered' &&
+    ['registered', 'design_pending'].includes(status) &&
     sourceId === selection.sourceId &&
     (!selection.fileDigest || fileDigest === selection.fileDigest)
   );
 }
 
+function buildInstantlyInsufficientUploadResult({ available, requested, failed, campaignId, finishedAt }) {
+  return {
+    ok: true,
+    skipped: true,
+    reason: available > 0 ? 'insufficient_eligible_leads' : 'no_eligible_leads',
+    message: `Zet eerst genoeg mail-ready leads klaar. Gevraagd: ${requested}, veilig klaar: ${available}.`,
+    prepared: 0,
+    available,
+    requested,
+    failed,
+    campaignId,
+    finishedAt,
+  };
+}
+
 module.exports = {
+  buildInstantlyInsufficientUploadResult,
   buildInstantlyQueueSelectionContext,
   isInstantlyQueueSelectionMatch,
 };

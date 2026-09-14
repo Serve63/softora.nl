@@ -15,7 +15,7 @@ const {
 const {
   OUTBOUND_SENDER_PROFILE_KEYS,
 } = require('./outbound-sender-identity');
-const { buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
+const { buildInstantlyInsufficientUploadResult, buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
 const {
   protectWebsiteDomainInText,
   renderTextWithUnlinkedWebsiteDomain,
@@ -3632,6 +3632,13 @@ function createInstantlyOutreachService(deps = {}) {
       leads = safeLeads;
     }
 
+    if (sendableRows.length < limit) {
+      lastSyncResult = buildInstantlyInsufficientUploadResult({
+        available: sendableRows.length, requested: limit, failed, campaignId, finishedAt: preparedAt,
+      });
+      return lastSyncResult;
+    }
+
     let outboundReservation = null;
     if (sendableRows.length) {
       outboundReservation = await reserveSupabaseOutboundRecipientsForInstantly(sendableRows, {
@@ -3658,19 +3665,9 @@ function createInstantlyOutreachService(deps = {}) {
     }
 
     if (sendableRows.length < limit) {
-      const available = sendableRows.length;
-      lastSyncResult = {
-        ok: true,
-        skipped: true,
-        reason: available > 0 ? 'insufficient_eligible_leads' : 'no_eligible_leads',
-        message: `Zet eerst genoeg mail-ready leads klaar. Gevraagd: ${limit}, veilig klaar: ${available}.`,
-        prepared: 0,
-        available,
-        requested: limit,
-        failed,
-        campaignId,
-        finishedAt: preparedAt,
-      };
+      lastSyncResult = buildInstantlyInsufficientUploadResult({
+        available: sendableRows.length, requested: limit, failed, campaignId, finishedAt: preparedAt,
+      });
       return lastSyncResult;
     }
 
