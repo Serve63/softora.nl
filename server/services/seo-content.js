@@ -691,61 +691,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
   }),
   Object.freeze({
     collection: 'blog',
-    slug: 'ai-automatisering-leadopvolging',
-    title: 'AI leadopvolging automatiseren: zo bouw je de flow',
-    description:
-      'Een praktische uitleg van een AI leadopvolging-flow, van intake en kwalificatie tot CRM-taak, samenvatting en menselijke controle.',
-    category: 'AI automatisering',
-    intent: 'Koopintentie',
-    publishedAt: '2026-05-28',
-    updatedAt: '2026-05-28',
-    readTime: '7 min',
-    summary:
-      'AI leadopvolging werkt het beste als de route achter de aanvraag duidelijk is: verzamelen, beoordelen, samenvatten en opvolgen.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Begin bij het moment waarop een lead binnenkomt',
-        paragraphs: Object.freeze([
-          'Een lead kan binnenkomen via formulier, chatbot, telefoon, mail of WhatsApp. Als die kanalen los blijven, ontstaat snel ruis. De eerste stap is daarom niet AI, maar één duidelijke route voor nieuwe aanvragen.',
-          'Die route bepaalt welke informatie minimaal nodig is: naam, bedrijf, vraag, urgentie, dienst, budgetindicatie en de gewenste vervolgstap.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Laat AI voorbereiden, niet blind beslissen',
-        paragraphs: Object.freeze([
-          Object.freeze({
-            text: 'AI kan een aanvraag samenvatten, ontbrekende informatie signaleren en een voorstel doen voor de volgende taak. Leg de criteria voor kwalificatie apart vast, zodat deze opvolgingsflow pas begint nadat de route en eigenaar controleerbaar zijn gekozen.',
-            links: Object.freeze([
-              Object.freeze({
-                anchor: 'criteria voor kwalificatie',
-                href: '/blog/ai-automatisering-leadkwalificatie-mkb',
-              }),
-            ]),
-          }),
-          'Voor belangrijke commerciële keuzes blijft menselijke controle verstandig. De beste flow laat AI voorbereiden en geeft het team daarna een helder beslismoment.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Koppel de uitkomst aan CRM of agenda',
-        paragraphs: Object.freeze([
-          'Een AI-flow is pas echt nuttig als het resultaat ergens landt. Denk aan een CRM-status, taak voor een medewerker, afspraakvoorstel of mailconcept.',
-          'Softora bouwt dit soort flows rondom het bestaande proces, zodat automatisering niet voelt als extra tool maar als versneller van opvolging.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
-      Object.freeze({
-        label: 'Wat is leadkwalificatie?',
-        href: '/kennisbank/wat-is-leadkwalificatie',
-        availableFrom: '2026-06-03',
-      }),
-    ]),
-  }),
-  Object.freeze({
-    collection: 'blog',
     slug: 'ai-telefonist-voor-afspraakintake',
     title: 'AI telefonist voor afspraakintake: waar moet je op letten?',
     description:
