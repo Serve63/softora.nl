@@ -550,6 +550,68 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[1].databaseStatus, 'gemaild');
 });
 
+test('safe Instantly upload can select only one exact registered sheet source', async () => {
+  const digest = 'a'.repeat(64);
+  const { service, getRows } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'other-prospect',
+        bedrijf: 'Andere lead',
+        naam: 'Andere lead',
+        email: 'other@example.test',
+        website: 'https://other.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'wrong-sheet',
+        bedrijf: 'Verkeerde sheet',
+        naam: 'Verkeerde sheet',
+        email: 'wrong@example.test',
+        website: 'https://wrong.test',
+        status: 'prospect',
+        mail: true,
+        instantlyQueueStatus: 'registered',
+        instantlyQueueSource: 'andere-sheet',
+        instantlyQueueFileDigest: digest,
+      },
+      {
+        id: 'matching-sheet',
+        bedrijf: 'Juiste sheet',
+        naam: 'Juiste sheet',
+        email: 'right@example.test',
+        website: 'https://right.test',
+        status: 'prospect',
+        mail: true,
+        instantlyQueueStatus: 'registered',
+        instantlyQueueSource: 'database-vondsten-20260914',
+        instantlyQueueFileDigest: digest,
+      },
+    ],
+    photoMap: {
+      'other-prospect': { id: 'other-prospect', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+      'wrong-sheet': { id: 'wrong-sheet', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+      'matching-sheet': { id: 'matching-sheet', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-sheet',
+    uploadId: 'upload-sheet',
+    limit: 1,
+    queueSourceId: 'database-vondsten-20260914',
+    queueFileDigest: digest,
+  });
+
+  assert.equal(result.prepared, 1);
+  assert.deepEqual(result.leads.map((lead) => lead.email), ['right@example.test']);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+  assert.equal(getRows()[1].lastColdmailProvider, undefined);
+  assert.equal(getRows()[2].lastColdmailProvider, 'instantly');
+});
+
 test('safe Instantly upload stores the explicit sender persona in CSV, guards and customer rows', async () => {
   const { service, writes, getRows, outboundGuardCalls } = createService({
     syncEnabled: false,
@@ -1067,6 +1129,64 @@ test('safe Instantly upload stops before CSV when the central outbound guard is 
   assert.equal(fetchCalls.length, 0);
   assert.equal(writes.length, 0);
   assert.equal(getRows()[0].lastColdmailProvider, undefined);
+});
+
+test('safe Instantly upload does not reserve a partial batch when too few leads are eligible', async () => {
+  const calls = [];
+  const { service, writes, getRows } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'eligible-1',
+        bedrijf: 'Eerste Lead BV',
+        email: 'eerste@example.test',
+        website: 'https://eerste.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'missing-assets-2',
+        bedrijf: 'Tweede Lead BV',
+        email: 'tweede@example.test',
+        website: 'https://tweede.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'eligible-1': {
+        id: 'eligible-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ items, options });
+        return { ok: true, reservationId: 'must-not-run', count: items.length * 4, expectedCount: items.length * 4 };
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-partial',
+    limit: 2,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'insufficient_eligible_leads');
+  assert.equal(result.prepared, 0);
+  assert.equal(result.available, 1);
+  assert.equal(result.requested, 2);
+  assert.equal(result.csv, undefined);
+  assert.equal(calls.length, 0);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+  assert.equal(getRows()[1].lastColdmailProvider, undefined);
 });
 
 test('safe Instantly upload reserves the whole batch centrally before returning CSV', async () => {

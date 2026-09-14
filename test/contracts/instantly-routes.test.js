@@ -24,6 +24,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   let syncInput = null;
   let uploadInput = null;
   let queueInput = null;
+  let designStageInput = null;
   const app = {
     get(path, ...handlers) {
       routes.push(['GET', path, handlers]);
@@ -57,6 +58,10 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
         queueInput = input;
         return { ok: true, processed: 1, registered: 1 };
       },
+      async stageDesignBatch(input) {
+        designStageInput = input;
+        return { ok: true, processed: 1, staged: 1 };
+      },
     },
   });
 
@@ -64,10 +69,12 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   const uploadRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-upload');
   const statusRoute = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-status');
   const queueRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-queue/register');
+  const designStageRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-queue/stage-designs');
   assert.ok(syncRoute, 'safe sync alias should be registered');
   assert.ok(uploadRoute, 'safe upload alias should be registered');
   assert.ok(statusRoute, 'safe status alias should be registered');
   assert.ok(queueRoute, 'safe queue registration route should be registered');
+  assert.ok(designStageRoute, 'safe queue design staging route should be registered');
 
   const response = createResponseRecorder();
   const request = {
@@ -106,6 +113,8 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
       limit: 100,
       campaignId: 'campaign-1',
       uploadId: 'upload-1',
+      queueSourceId: 'database-vondsten-20260914',
+      queueFileDigest: 'a'.repeat(64),
       senderProfile: 'martijn',
       senderEmail: 'martijn@websoftora.com',
     },
@@ -118,6 +127,8 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(uploadInput.limit, 100);
   assert.equal(uploadInput.campaignId, 'campaign-1');
   assert.equal(uploadInput.uploadId, 'upload-1');
+  assert.equal(uploadInput.queueSourceId, 'database-vondsten-20260914');
+  assert.equal(uploadInput.queueFileDigest, 'a'.repeat(64));
   assert.equal(uploadInput.senderProfile, 'martijn');
   assert.equal(uploadInput.senderEmail, 'martijn@websoftora.com');
   assert.equal(uploadInput.actor, 'serve@softora.nl');
@@ -139,5 +150,20 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.deepEqual(queueResponse.body, { ok: true, processed: 1, registered: 1 });
   assert.equal(queueInput.sourceId, 'database-vondsten-20260914');
   assert.equal(queueInput.actor, 'serve@softora.nl');
-  assert.equal(adminChecks, 3);
+
+  const designStageResponse = createResponseRecorder();
+  const designStageRequest = {
+    body: {
+      emails: ['info@voorbeeld.nl'],
+      sourceId: 'database-vondsten-20260914',
+      fileDigest: 'a'.repeat(64),
+    },
+  };
+  designStageRoute[2][0](designStageRequest, designStageResponse, () => {});
+  await designStageRoute[2][1](designStageRequest, designStageResponse);
+  assert.equal(designStageResponse.statusCode, 200);
+  assert.deepEqual(designStageResponse.body, { ok: true, processed: 1, staged: 1 });
+  assert.deepEqual(designStageInput.emails, ['info@voorbeeld.nl']);
+  assert.equal(designStageInput.actor, 'serve@softora.nl');
+  assert.equal(adminChecks, 4);
 });

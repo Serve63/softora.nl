@@ -3,6 +3,7 @@ const { normalizeContactStatus } = require('./customer-lifecycle');
 
 const MAX_INSTANTLY_QUEUE_BATCH_SIZE = 200;
 const INSTANTLY_QUEUE_STATUS_REGISTERED = 'registered';
+const INSTANTLY_QUEUE_STATUS_DESIGN_PENDING = 'design_pending';
 const INSTANTLY_QUEUE_SOURCE = 'instantly-sheet-registration';
 const FINAL_OUTREACH_STATUSES = new Set([
   'gemaild',
@@ -185,6 +186,24 @@ function validateBatchMetadata(input, rowCount) {
   return { sourceId, fileDigest, totalRows, batchIndex, batchCount };
 }
 
+function validateDesignStageMetadata(input, rowCount) {
+  const sourceId = normalizeString(input.sourceId).slice(0, 120);
+  const fileDigest = normalizeString(input.fileDigest).toLowerCase();
+  if (!sourceId || !/^[a-z0-9][a-z0-9._:-]{2,119}$/i.test(sourceId)) {
+    throw createRegistrationError('Een geldige bron-ID ontbreekt.', 'INSTANTLY_QUEUE_SOURCE_INVALID');
+  }
+  if (!/^[a-f0-9]{64}$/.test(fileDigest)) {
+    throw createRegistrationError('De SHA-256 vingerafdruk van het bronbestand ontbreekt.', 'INSTANTLY_QUEUE_DIGEST_INVALID');
+  }
+  if (!Number.isInteger(rowCount) || rowCount < 1 || rowCount > MAX_INSTANTLY_QUEUE_BATCH_SIZE) {
+    throw createRegistrationError(
+      `Gebruik per ontwerpbatch 1 tot ${MAX_INSTANTLY_QUEUE_BATCH_SIZE} e-mailadressen.`,
+      'INSTANTLY_QUEUE_BATCH_SIZE_INVALID'
+    );
+  }
+  return { sourceId, fileDigest };
+}
+
 function createInstantlyQueueRegistrationService(deps = {}) {
   const { dataOpsStore = null, now = () => new Date() } = deps;
 
@@ -291,11 +310,79 @@ function createInstantlyQueueRegistrationService(deps = {}) {
     };
   }
 
-  return { registerBatch };
+  async function stageDesignBatch(input = {}) {
+    const emails = Array.from(new Set((Array.isArray(input.emails) ? input.emails : []).map(normalizeEmail).filter(isValidEmail)));
+    const metadata = validateDesignStageMetadata(input, emails.length);
+    if (!dataOpsStore || typeof dataOpsStore.listUniqueCustomersByEmails !== 'function' || typeof dataOpsStore.upsertCustomers !== 'function') {
+      throw createRegistrationError('De centrale klantopslag is tijdelijk niet beschikbaar.', 'INSTANTLY_QUEUE_STORE_UNAVAILABLE', 503);
+    }
+    const existingRows = await dataOpsStore.listUniqueCustomersByEmails({
+      emails,
+      bypassReadCache: true,
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressTransientReadFailureLog: true,
+    });
+    if (!Array.isArray(existingRows) || existingRows.length !== emails.length) {
+      throw createRegistrationError(
+        'De volledige geregistreerde ontwerpbatch kon niet uniek worden gecontroleerd.',
+        'INSTANTLY_QUEUE_EXACT_LOOKUP_FAILED',
+        503
+      );
+    }
+    const byEmail = new Map(existingRows.map((row) => [normalizeEmail(row.email), row]));
+    const mismatches = emails.filter((email) => {
+      const row = byEmail.get(email) || {};
+      const status = normalizeString(row.instantlyQueueStatus).toLowerCase();
+      return (
+        !row.id ||
+        normalizeString(row.instantlyQueueSource) !== metadata.sourceId ||
+        normalizeString(row.instantlyQueueFileDigest).toLowerCase() !== metadata.fileDigest ||
+        ![INSTANTLY_QUEUE_STATUS_REGISTERED, INSTANTLY_QUEUE_STATUS_DESIGN_PENDING].includes(status) ||
+        hasActualInstantlyOutreach(row)
+      );
+    });
+    if (mismatches.length) {
+      throw createRegistrationError(
+        `${mismatches.length} bedrijven horen niet bij de exacte geregistreerde ontwerpbron.`,
+        'INSTANTLY_QUEUE_DESIGN_STAGE_CONFLICT',
+        409,
+        { conflictCount: mismatches.length }
+      );
+    }
+    const nowIso = now().toISOString();
+    const updates = existingRows
+      .filter((row) => normalizeString(row.instantlyQueueStatus).toLowerCase() !== INSTANTLY_QUEUE_STATUS_DESIGN_PENDING)
+      .map((row) => ({
+        ...row,
+        instantlyQueueStatus: INSTANTLY_QUEUE_STATUS_DESIGN_PENDING,
+        instantlyDesignStagedAt: normalizeString(row.instantlyDesignStagedAt) || nowIso,
+        instantlyQueueUpdatedAt: nowIso,
+        updatedAt: nowIso,
+      }));
+    if (updates.length) {
+      const saved = await dataOpsStore.upsertCustomers(updates, { source: 'instantly-design-staging' });
+      if (!saved || saved.ok === false) {
+        throw createRegistrationError('Ontwerpbatch kon niet worden opgeslagen.', 'INSTANTLY_QUEUE_WRITE_FAILED', 502);
+      }
+    }
+    return {
+      ok: true,
+      status: INSTANTLY_QUEUE_STATUS_DESIGN_PENDING,
+      processed: emails.length,
+      staged: updates.length,
+      alreadyStaged: emails.length - updates.length,
+      sourceId: metadata.sourceId,
+      fileDigest: metadata.fileDigest,
+    };
+  }
+
+  return { registerBatch, stageDesignBatch };
 }
 
 module.exports = {
   INSTANTLY_QUEUE_SOURCE,
+  INSTANTLY_QUEUE_STATUS_DESIGN_PENDING,
   INSTANTLY_QUEUE_STATUS_REGISTERED,
   MAX_INSTANTLY_QUEUE_BATCH_SIZE,
   createInstantlyQueueRegistrationService,

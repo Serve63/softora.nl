@@ -35,8 +35,73 @@ function buildInput(rows) {
 
 test('Instantly queue status is separate from actual Instantly outreach', () => {
   assert.equal(hasPendingInstantlyQueue({ instantlyQueueStatus: 'registered' }), true);
+  assert.equal(hasPendingInstantlyQueue({ instantlyQueueStatus: 'design_pending' }), false);
   assert.equal(hasPendingInstantlyQueue({ payload: { instantlyQueueStatus: 'registered' } }), true);
   assert.equal(hasPendingInstantlyQueue({ instantlyStatus: 'queued' }), false);
+});
+
+test('Instantly queue moves an exact registered batch to design staging without marking outreach', async () => {
+  const writes = [];
+  const rows = [
+    {
+      id: 'queue-1',
+      bedrijf: 'Ontwerplead',
+      email: 'ontwerp@voorbeeld.nl',
+      status: 'prospect',
+      instantlyQueueStatus: 'registered',
+      instantlyQueueSource: 'database-vondsten-20260914',
+      instantlyQueueFileDigest: DIGEST,
+    },
+  ];
+  const service = createInstantlyQueueRegistrationService({
+    now: () => new Date('2026-09-14T17:00:00.000Z'),
+    dataOpsStore: {
+      async listUniqueCustomersByEmails() { return rows; },
+      async upsertCustomers(updates, meta) { writes.push({ updates, meta }); return { ok: true }; },
+    },
+  });
+
+  const result = await service.stageDesignBatch({
+    emails: ['ontwerp@voorbeeld.nl'],
+    sourceId: 'database-vondsten-20260914',
+    fileDigest: DIGEST,
+  });
+
+  assert.equal(result.staged, 1);
+  assert.equal(result.status, 'design_pending');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].updates[0].instantlyQueueStatus, 'design_pending');
+  assert.equal(writes[0].updates[0].instantlyDesignStagedAt, '2026-09-14T17:00:00.000Z');
+  assert.equal(writes[0].updates[0].lastColdmailProvider, undefined);
+  assert.equal(writes[0].meta.source, 'instantly-design-staging');
+});
+
+test('Instantly queue design staging fails closed on a different source', async () => {
+  let wrote = false;
+  const service = createInstantlyQueueRegistrationService({
+    dataOpsStore: {
+      async listUniqueCustomersByEmails() {
+        return [{
+          id: 'queue-1',
+          email: 'ontwerp@voorbeeld.nl',
+          instantlyQueueStatus: 'registered',
+          instantlyQueueSource: 'andere-bron',
+          instantlyQueueFileDigest: DIGEST,
+        }];
+      },
+      async upsertCustomers() { wrote = true; return { ok: true }; },
+    },
+  });
+
+  await assert.rejects(
+    service.stageDesignBatch({
+      emails: ['ontwerp@voorbeeld.nl'],
+      sourceId: 'database-vondsten-20260914',
+      fileDigest: DIGEST,
+    }),
+    (error) => error.code === 'INSTANTLY_QUEUE_DESIGN_STAGE_CONFLICT' && error.status === 409
+  );
+  assert.equal(wrote, false);
 });
 
 test('Instantly queue normalizes all five verified sheet fields', () => {
