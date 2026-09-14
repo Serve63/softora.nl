@@ -550,6 +550,68 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[1].databaseStatus, 'gemaild');
 });
 
+test('safe Instantly upload can select only one exact registered sheet source', async () => {
+  const digest = 'a'.repeat(64);
+  const { service, getRows } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'other-prospect',
+        bedrijf: 'Andere lead',
+        naam: 'Andere lead',
+        email: 'other@example.test',
+        website: 'https://other.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'wrong-sheet',
+        bedrijf: 'Verkeerde sheet',
+        naam: 'Verkeerde sheet',
+        email: 'wrong@example.test',
+        website: 'https://wrong.test',
+        status: 'prospect',
+        mail: true,
+        instantlyQueueStatus: 'registered',
+        instantlyQueueSource: 'andere-sheet',
+        instantlyQueueFileDigest: digest,
+      },
+      {
+        id: 'matching-sheet',
+        bedrijf: 'Juiste sheet',
+        naam: 'Juiste sheet',
+        email: 'right@example.test',
+        website: 'https://right.test',
+        status: 'prospect',
+        mail: true,
+        instantlyQueueStatus: 'registered',
+        instantlyQueueSource: 'database-vondsten-20260914',
+        instantlyQueueFileDigest: digest,
+      },
+    ],
+    photoMap: {
+      'other-prospect': { id: 'other-prospect', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+      'wrong-sheet': { id: 'wrong-sheet', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+      'matching-sheet': { id: 'matching-sheet', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-sheet',
+    uploadId: 'upload-sheet',
+    limit: 1,
+    queueSourceId: 'database-vondsten-20260914',
+    queueFileDigest: digest,
+  });
+
+  assert.equal(result.prepared, 1);
+  assert.deepEqual(result.leads.map((lead) => lead.email), ['right@example.test']);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+  assert.equal(getRows()[1].lastColdmailProvider, undefined);
+  assert.equal(getRows()[2].lastColdmailProvider, 'instantly');
+});
+
 test('safe Instantly upload stores the explicit sender persona in CSV, guards and customer rows', async () => {
   const { service, writes, getRows, outboundGuardCalls } = createService({
     syncEnabled: false,

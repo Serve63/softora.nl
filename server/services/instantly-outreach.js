@@ -15,6 +15,7 @@ const {
 const {
   OUTBOUND_SENDER_PROFILE_KEYS,
 } = require('./outbound-sender-identity');
+const { buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
 const {
   protectWebsiteDomainInText,
   renderTextWithUnlinkedWebsiteDomain,
@@ -2652,14 +2653,13 @@ function createInstantlyOutreachService(deps = {}) {
   async function collectEligibleRows(rows, limit, context = {}) {
     const selectedRows = [];
     const failed = [];
-
     for (let index = 0; index < rows.length && selectedRows.length < limit; index += 1) {
       const row = rows[index];
       const id = getRowId(row, index, normalizeString);
       const email = getRowEmail(row, normalizeString);
       const company = getRowCompany(row, normalizeString);
       const status = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
-
+      if (!isInstantlyQueueSelectionMatch(row, context, normalizeString)) continue;
       if (!isLikelyValidEmail(email, normalizeString)) continue;
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
@@ -3588,7 +3588,7 @@ function createInstantlyOutreachService(deps = {}) {
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
-    const personalizationContext = await loadPersonalizationContext(rows, { sender });
+    const personalizationContext = buildInstantlyQueueSelectionContext(await loadPersonalizationContext(rows, { sender }), input, normalizeString, createInstantlyError);
     const { selectedRows, failed } = await collectEligibleRows(rows, limit, personalizationContext);
     let leads = [];
     let sendableRows = [];

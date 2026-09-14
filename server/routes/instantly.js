@@ -65,6 +65,8 @@ function registerInstantlyRoutes(app, deps = {}) {
         limit: body.limit,
         campaignId: body.campaignId || body.campaign || body.defaultCampaignId,
         uploadId: body.uploadId,
+        queueSourceId: body.queueSourceId,
+        queueFileDigest: body.queueFileDigest,
         senderProfile: body.senderProfile || body.senderProfileKey || body.profileKey,
         senderEmail: body.senderEmail || body.sentFromEmail || body.mailboxAccount,
         actor:
