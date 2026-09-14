@@ -23,6 +23,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   let adminChecks = 0;
   let syncInput = null;
   let uploadInput = null;
+  let queueInput = null;
   const app = {
     get(path, ...handlers) {
       routes.push(['GET', path, handlers]);
@@ -51,14 +52,22 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
         return { ok: true, enabled: true };
       },
     },
+    instantlyQueueRegistrationService: {
+      async registerBatch(input) {
+        queueInput = input;
+        return { ok: true, processed: 1, registered: 1 };
+      },
+    },
   });
 
   const syncRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-sync');
   const uploadRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-upload');
   const statusRoute = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-status');
+  const queueRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-queue/register');
   assert.ok(syncRoute, 'safe sync alias should be registered');
   assert.ok(uploadRoute, 'safe upload alias should be registered');
   assert.ok(statusRoute, 'safe status alias should be registered');
+  assert.ok(queueRoute, 'safe queue registration route should be registered');
 
   const response = createResponseRecorder();
   const request = {
@@ -112,4 +121,23 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(uploadInput.senderProfile, 'martijn');
   assert.equal(uploadInput.senderEmail, 'martijn@websoftora.com');
   assert.equal(uploadInput.actor, 'serve@softora.nl');
+
+  const queueResponse = createResponseRecorder();
+  const queueRequest = {
+    body: {
+      rows: [{ bedrijf: 'Voorbeeld', email: 'info@voorbeeld.nl' }],
+      sourceId: 'database-vondsten-20260914',
+      fileDigest: 'a'.repeat(64),
+      totalRows: 1,
+      batchIndex: 0,
+      batchCount: 1,
+    },
+  };
+  queueRoute[2][0](queueRequest, queueResponse, () => {});
+  await queueRoute[2][1](queueRequest, queueResponse);
+  assert.equal(queueResponse.statusCode, 200);
+  assert.deepEqual(queueResponse.body, { ok: true, processed: 1, registered: 1 });
+  assert.equal(queueInput.sourceId, 'database-vondsten-20260914');
+  assert.equal(queueInput.actor, 'serve@softora.nl');
+  assert.equal(adminChecks, 3);
 });

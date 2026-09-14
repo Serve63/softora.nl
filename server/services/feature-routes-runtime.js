@@ -57,6 +57,7 @@ const {
   createPremiumDatabaseMailReadySnapshotService,
 } = require('./premium-database-mail-ready-snapshot');
 const { createPremiumDatabaseCustomersPageCoordinator } = require('./premium-database-customers-page');
+const { createInstantlyQueueRegistrationService } = require('./instantly-queue-registration');
 const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
 const { createKvkDatabaseControlService } = require('./kvk-database-control');
 const { createKvkCompanyDirectoryService } = require('./kvk-company-directory');
@@ -121,6 +122,7 @@ function registerFeatureRoutes(app, deps = {}) {
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
   });
   const premiumDatabaseCustomersPageCoordinator = createPremiumDatabaseCustomersPageCoordinator({ dataOpsStore: deps.dataOpsStore });
+  const instantlyQueueRegistrationService = createInstantlyQueueRegistrationService({ dataOpsStore: deps.dataOpsStore });
   if (
     premiumDatabaseWebdesignJobsCoordinator &&
     typeof premiumDatabaseWebdesignJobsCoordinator.setMailReadySnapshotService === 'function'
@@ -244,6 +246,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerInstantlyRoutes(app, {
     ...instantly,
+    instantlyQueueRegistrationService,
     instantlyMailboxService: mailboxCoordinator?.instantlyMailboxService,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });

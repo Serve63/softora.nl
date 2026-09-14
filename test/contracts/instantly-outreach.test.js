@@ -461,6 +461,7 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
         website: 'https://bakkerijzon.test',
         status: 'prospect',
         mail: true,
+        instantlyQueueStatus: 'registered',
       },
       {
         id: 'prospect-2',
@@ -541,6 +542,7 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   const rows = getRows();
   assert.equal(rows[0].lastColdmailProvider, 'instantly');
   assert.equal(rows[0].instantlyStatus, 'queued');
+  assert.equal(rows[0].instantlyQueueStatus, 'registered');
   assert.equal(rows[0].instantlyManualUploadId, 'upload-test');
   assert.equal(rows[0].databaseStatus, 'gemaild');
   assert.equal(rows[1].lastColdmailProvider, 'instantly');

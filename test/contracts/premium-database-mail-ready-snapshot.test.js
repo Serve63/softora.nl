@@ -11,6 +11,7 @@ const {
   buildSnapshotVersion,
   createPremiumDatabaseMailReadySnapshotService,
   isActiveTransferredLead,
+  isBasicMailLeadEligible,
   isKvkTransferRow,
   parseMailReadySnapshotCacheValue,
 } = require('../../server/services/premium-database-mail-ready-snapshot');
@@ -92,6 +93,9 @@ test('premium database transfer snapshot only recognizes active unsent scraper r
   assert.equal(isActiveTransferredLead({ ...sourceRow, database_status: 'gemaild' }), false);
   assert.equal(isActiveTransferredLead({ ...sourceRow, payload: { ...sourceRow.payload, lastColdmailSentAt: '2026-08-04T10:00:00.000Z' } }), false);
   assert.equal(isActiveTransferredLead({ ...sourceRow, payload: { ...sourceRow.payload, lastColdmailProvider: 'instantly' } }), false);
+  assert.equal(isActiveTransferredLead({ ...sourceRow, payload: { ...sourceRow.payload, instantlyQueueStatus: 'registered' } }), false);
+  assert.equal(isBasicMailLeadEligible({ email: 'info@actief.nl', database_status: 'prospect', payload: {} }), true);
+  assert.equal(isBasicMailLeadEligible({ email: 'info@wachtrij.nl', database_status: 'prospect', payload: { instantlyQueueStatus: 'registered' } }), false);
 });
 
 test('premium database transfer snapshot excludes every customer covered by an outbound guard', async () => {

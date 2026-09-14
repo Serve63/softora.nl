@@ -20,7 +20,7 @@ const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshne
 const { resolveColdmailStatsResponse } = require('./coldmail-live-stats-response');
 const { preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
-const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard');
+const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard'); const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
 const { assertOutboundRecipientsNotSuppressed } = require('../security/outbound-mail-suppression');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const { markIncidentQuarantinedDesignPhotosAuthoritative, markMissingDesignPhotosAuthoritative } = require('./design-photo-generation-policy');
@@ -5702,7 +5702,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!isLikelyValidEmail(email)) return false;
     if (isEmailBlocked(email, blockedEmailKeys)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
-    if (!isTestRecipientRow(row, email) && hasActiveInstantlyColdmailOutreach(row)) return false;
+    if (!isTestRecipientRow(row, email) && (hasPendingInstantlyQueue(row) || hasActiveInstantlyColdmailOutreach(row))) return false;
     if (!isTestRecipientRow(row, email) && historicalOutboundMailboxGuard.hasPriorOutboundMailSignal(row)) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
