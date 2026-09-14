@@ -124,7 +124,7 @@
         : [];
       body.innerHTML = activities.length
         ? activities.map(activityRowHtml).join('')
-        : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe Searcher-resultaten of Controleur-correcties.</td></tr>';
+        : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe Robot-resultaten of Controleur-correcties.</td></tr>';
     }
 
     return { render };

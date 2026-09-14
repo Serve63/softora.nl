@@ -48,7 +48,7 @@
       const item = root.document.createElement('div');
       item.className = 'kvk-worker-status__group';
       const count = root.document.createElement('strong');
-      const label = group.kind === 'searchers' ? 'Searchers' : 'Controleurs';
+      const label = group.kind === 'searchers' ? 'Robots' : 'Controleurs';
       count.textContent = `${label}: ${group.active === null ? '—' : group.active} actief`;
       const model = root.document.createElement('span');
       model.textContent = group.models.join(' · ') || 'Model onbekend';
