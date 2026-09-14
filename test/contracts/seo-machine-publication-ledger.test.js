@@ -162,6 +162,12 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
+        '/blog/ai-automatisering-leadopvolging',
+        '2026-09-14',
+        'substantial_refresh',
+        'scheduled',
+      ],
+      [
         '/kennisbank/wat-is-een-conversiegerichte-website',
         '2026-09-06',
         'other_growth_action',
