@@ -50,10 +50,12 @@ const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
-const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je ook een mockup van het ontwerp op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'Zie je de afbeeldingen niet? Klik in je mail op ‘Afbeeldingen tonen’, of bekijk het webdesign via deze link.';
+const COLDMAIL_MOCKUP_CAPTION =
+  'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
+const COLDMAIL_IMAGE_VISIBILITY_PS =
+  'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*)?(?:zie je de afbeeldingen niet\?\s*klik in je mail op ['"‘’“”]?afbeeldingen tonen['"‘’“”]?,?\s*of bekijk het webdesign via deze link\.?|als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?)/i;
+  /(?:PS:\s*)?(?:zie je de afbeeldingen niet\?\s*klik in je mail op ['"‘’“”]?afbeeldingen tonen['"‘’“”]?,?\s*of bekijk het webdesign via deze link\.?|als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?|lukt het niet om de bijlage te openen\?\s*dan kun je het webdesign ook via deze link bekijken\s*🎨)/i;
 const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
@@ -97,13 +99,15 @@ const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
   '',
   'Afgelopen week kwam ik jullie website {{website}} tegen.',
   '',
-  'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je ziet het ontwerp hieronder direct in deze e-mail.',
+  'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
   '',
   'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
   '',
-  COLDMAIL_MOCKUP_CAPTION, '',
-  COLDMAIL_IMAGE_VISIBILITY_PS, '',
+  'Ik kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.',
+  '',
   'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wel lijkt het me tof om te horen wat je van het design vindt en wat er eventueel beter kan. Daar leer ik dan weer van!',
+  '',
+  COLDMAIL_IMAGE_VISIBILITY_PS,
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
@@ -1745,10 +1749,10 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
   if (!publicLink.href) {
     return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString).replace(/\n/g, '<br>')}</em>`;
   }
-  return `<em style="font-style:italic;">Zie je de afbeeldingen niet? Klik in je mail op ‘Afbeeldingen tonen’, of bekijk het webdesign via <a href="${escapeHtmlAttribute(
+  return `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${escapeHtmlAttribute(
     publicLink.href,
     normalizeString
-  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">deze link</a>.</em>`;
+  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">link</a> bekijken 🎨`;
 }
 
 function renderInstantlyWebdesignPreviewCtaHtmlLine(line, normalizeString = defaultNormalizeString, options = {}) {
@@ -1840,7 +1844,6 @@ function renderInstantlyImagePairHtml(
     {
       mockupImage: { src: cleanMockupUrl, alt: 'Mockup', dimensions: webdesignMockupDimensions },
       caption: normalizeString(caption) || COLDMAIL_MOCKUP_CAPTION,
-      hideCaption: true,
       margin: '24px 0 0 0',
     }
   );
@@ -1855,11 +1858,6 @@ function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeStrin
 function buildInstantlyEmailHtml(
   {
     baseText,
-    company,
-    webdesignImageUrl,
-    webdesignMockupUrl,
-    webdesignImageDimensions,
-    webdesignMockupDimensions,
     webdesignPublicUrl,
     websiteDomain,
   },
@@ -1869,17 +1867,7 @@ function buildInstantlyEmailHtml(
     webdesignPreviewUrl: webdesignPublicUrl,
     websiteDomain,
   });
-  const imageHtml = renderInstantlyImagePairHtml(
-    {
-      webdesignImageUrl,
-      webdesignMockupUrl,
-      webdesignImageDimensions,
-      webdesignMockupDimensions,
-    },
-    normalizeString
-  );
-  const content = `${bodyHtml}${imageHtml}`;
-  return wrapInstantlyEmailHtml(content, normalizeString);
+  return wrapInstantlyEmailHtml(bodyHtml, normalizeString);
 }
 
 function buildInstantlyCampaignTemplateText() {
@@ -1903,15 +1891,7 @@ function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeSt
     /\{\{softora_website_domain\}\}/g,
     renderUnlinkedWebsiteDomain('{{softora_website_domain}}', { protectPunctuation: false })
   );
-  const imageHtml = renderInstantlyImagePairHtml(
-    {
-      webdesignImageUrl: '{{softora_webdesign_image_url}}',
-      webdesignMockupUrl: '{{softora_webdesign_mockup_url}}',
-      caption: '{{softora_mockup_caption}}',
-    },
-    normalizeString
-  );
-  return wrapInstantlyEmailHtml(`${bodyHtml}${imageHtml}`, normalizeString);
+  return wrapInstantlyEmailHtml(bodyHtml, normalizeString);
 }
 
 function buildInstantlyCampaignTemplateInstructions() {
@@ -1920,9 +1900,9 @@ function buildInstantlyCampaignTemplateInstructions() {
     '',
     `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
     `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
-    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink en tekstvariabelen.',
+    '3. Upload daarna de CSV. De CSV levert per lead de juiste previewlink en tekstvariabelen.',
     '',
-    'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, anders toont Instantly de fotos/preview mogelijk niet.',
+    'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, zodat de goedgekeurde bijlagetekst daadwerkelijk wordt verzonden.',
   ].join('\n');
 }
 

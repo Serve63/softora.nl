@@ -54,7 +54,6 @@ test('production mail runtime uses direct source without loader monkey patches',
   assert.match(sharedRendererSource, /softora-unlinked-website-domain/);
   assert.match(sharedRendererSource, /display:inline-block;white-space:nowrap!important;/);
   assert.match(sharedRendererSource, /renderTextWithUnlinkedWebsiteDomain/);
-  assert.match(sharedRendererSource, /options\.hideCaption === true/);
 });
 
 test('temporary one-shot coldmail endpoint is removed from production', () => {
