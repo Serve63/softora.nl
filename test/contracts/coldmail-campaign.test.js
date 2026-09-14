@@ -1253,6 +1253,7 @@ test('coldmail live stats reconcile a stale durable zero with current-day centra
         totalSent: 1543,
         systemTotalSent: 1543,
         centralGuardTotalSent: 1543,
+        sentCountModel: 'outbound-direction-v1',
         bounceDeduplication: 'recipient-email', bounceStatsModel: 'complete-mailbox-recipient-v2',
         updatedAt: '2026-08-04T14:59:00.000Z',
       },
@@ -2418,7 +2419,7 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(getSendGuardState().entries.length, 2);
 });
 
-test('coldmail autopilot accepts a cron tick a few seconds before the exact interval boundary', async () => {
+test('coldmail autopilot absorbs 22 seconds of cron startup drift without losing a five-minute slot', async () => {
   const { service, sentMessages } = createService({
     rows: [{
       id: 'cron-jitter-prospect',
@@ -2460,9 +2461,9 @@ test('coldmail autopilot accepts a cron tick a few seconds before the exact inte
         sendJitterMinSeconds: 0,
         sendJitterMaxSeconds: 0,
       },
-      lastStartedAt: '2026-08-18T09:55:00.000Z',
+      lastStartedAt: '2026-08-18T09:55:22.000Z',
     },
-    now: () => new Date('2026-08-18T09:59:59.200Z'),
+    now: () => new Date('2026-08-18T10:00:00.000Z'),
   });
 
   const result = await service.runColdmailAutopilot({
@@ -3648,7 +3649,8 @@ test('coldmail autopilot skips a central sender cooldown lock and sends another 
   ), true);
 });
 
-test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', async () => {
+for (const startupDriftSeconds of [0, 22]) {
+test(`coldmail autopilot reaches 81 sends before 17:00 with ${startupDriftSeconds}s startup drift`, async () => {
   const senderEmails = [
     'serve@softora.nl',
     'martijn@softora.nl',
@@ -3733,7 +3735,7 @@ test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', a
 
   const workdayStartMs = Date.parse('2026-06-12T05:00:00.000Z');
   for (let tick = 0; tick < 120; tick += 1) {
-    const scheduledNow = new Date(workdayStartMs + tick * 5 * 60 * 1000);
+    const scheduledNow = new Date(workdayStartMs + tick * 5 * 60 * 1000 + (tick % 2) * startupDriftSeconds * 1000);
     if (currentNow.getTime() < scheduledNow.getTime()) {
       currentNow = scheduledNow;
     }
@@ -3778,6 +3780,8 @@ test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', a
     }
   });
 });
+
+}
 
 test('coldmail autopilot starts a new workday slot even with rolling history from yesterday', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
@@ -12311,4 +12315,19 @@ test('legacy bounce cache upgrades through targeted send proof while keeping ver
   assert.equal(result.stats.bounceTypes.hard, 1);
   assert.equal(result.stats.bounceStatsReliable, true);
   assert.equal(result.stats.bounceStatsModel, 'complete-mailbox-recipient-v2');
+});
+
+test('sent register excludes proven incoming ledger evidence without mixing Instantly into Softora', async () => {
+  const sent = { provider: 'softora', channel: 'coldmail', sender_email: 'serve@softora.nl',
+    recipient_email: 'customer@example.test', payload: { sentAt: '2026-09-14T08:00:00Z' } };
+  const { service } = createService({ now: () => new Date('2026-09-14T10:00:00Z'),
+    outboundRecipientGuardStore: { async listSentRecipientGroups() { return [sent,
+      { ...sent, recipient_email: 'reply@example.test', payload: { ...sent.payload, sentStatsExcluded: true } },
+      { ...sent, provider: 'instantly', recipient_email: 'instantly@example.test' },
+    ]; } },
+  });
+  const register = await service.getColdmailSentRegister();
+  assert.equal(register.recipients.length, 1);
+  assert.equal(Object.keys(register.todayRecipientCounts).length, 1);
+  assert.equal(register.recipients[0].email, 'customer@example.test');
 });

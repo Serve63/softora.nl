@@ -376,7 +376,11 @@ function legacyGuardEntriesToKeySet(entries = []) {
 async function readLegacyColdmailGuardKeys(getUiStateValues, logger) {
   if (typeof getUiStateValues !== 'function') return new Set();
   try {
-    const state = await getUiStateValues(COLDMAIL_SEND_GUARD_SCOPE);
+    const state = await getUiStateValues(COLDMAIL_SEND_GUARD_SCOPE, {
+      uiStateReadTimeoutMs: 10000, preferSupabaseRestRead: true,
+      ignoreSupabaseRestFailureCooldown: true, suppressSupabaseRestFailureCooldown: true,
+    });
+    if (!state || !state.values || typeof state.values !== 'object') throw new Error('Send guard state unavailable');
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const payload = parseColdmailGuardPayload(values[COLDMAIL_SEND_GUARD_KEY]);
     const entries = []
@@ -572,6 +576,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     if (!dataOpsStore || typeof dataOpsStore.listOutboundRecipientGuardKeys !== 'function') return new Set();
     try {
       const rows = await dataOpsStore.listOutboundRecipientGuardKeys(keys, {
+        timeoutMs: 10000,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
         suppressTransientReadFailureLog: true,
       });
       if (!Array.isArray(rows)) return null;

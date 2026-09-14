@@ -376,7 +376,7 @@
           weekdaysOnly: true,
           startHour: 7,
           startMinute: 0,
-          endHour: 22,
+          endHour: 17,
           endMinute: 0,
           minIntervalMinutes: 5,
           senderMinIntervalMinutes: 60,

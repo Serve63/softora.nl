@@ -167,7 +167,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
 
   function getClient() {
     if (!isSupabaseConfigured()) return null;
-    return getSupabaseClient();
+    return getSupabaseClient({ timeoutMs: 10000, ignoreFailureCooldown: true, suppressFailureCooldown: true });
   }
 
   function buildReservationId(source = 'outbound') {
