@@ -7,6 +7,7 @@ const { createUiStateStore } = require('../../server/services/ui-state');
 
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
+const PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
 
 function createFixture(overrides = {}) {
   const inMemoryUiStateByScope = new Map();
@@ -153,6 +154,33 @@ test('ui-state store refuses to persist broken JSON state values', async () => {
   assert.equal(loggerErrors.length, 1);
   assert.match(String(loggerErrors[0].join(' ')), /JsonIntegrity/);
   assert.match(String(loggerErrors[0].join(' ')), /ongeldige JSON/);
+});
+
+test('ui-state store persists the complete large premium database inventory snapshot', async () => {
+  const { restWrites, store } = createFixture({
+    client: null,
+  });
+  const largeSnapshot = JSON.stringify({
+    generatedAt: '2026-09-14T19:30:00.000Z',
+    available: [{ companyName: 'Robotvoorraad', payload: 'x'.repeat(1370000) }],
+    mailReady: [],
+  });
+
+  assert.ok(largeSnapshot.length > 1000000);
+  assert.ok(largeSnapshot.length < 4000000);
+  const result = await store.setUiStateValues('premium_database_mail_ready_snapshot_cache', {
+    [PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_KEY]: largeSnapshot,
+  }, {
+    source: 'contract-test',
+    actor: 'contract-test',
+  });
+
+  assert.ok(result);
+  assert.equal(restWrites.length, 1);
+  assert.equal(
+    restWrites[0].payload.values[PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_KEY],
+    largeSnapshot
+  );
 });
 
 test('ui-state store refuses oversized JSON state values instead of clipping them', async () => {
