@@ -108,6 +108,7 @@ const LEAD_QUALIFICATION_CONTENT_ITEM = Object.freeze({
           ]),
         }),
         'De kennisbankuitleg over leadkwalificatie beschrijft de basisbegrippen. Voor de automatisering heb je daarnaast een expliciet contract tussen de stappen nodig: welke invoer is geldig, welke status mag worden geschreven, wie mag overrulen en wanneer wordt niets verzonden. De klantintake kan informatie verzamelen, maar mag ontbrekende gegevens niet stilzwijgend invullen om een route alsnog passend te maken.',
+        'Geef de gekozen route mee als een uitvoerbare opvolgtaak: de oorspronkelijke aanvraag, de afgesproken actie, één eigenaar, een termijn en een stopregel. Laat de opvolgingsflow bevestigen dat de taak in het CRM staat; een goedgekeurde kwalificatie is nog geen uitgevoerde actie.',
       ]),
     }),
     Object.freeze({
