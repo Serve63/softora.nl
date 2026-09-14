@@ -15,6 +15,8 @@ test('direction model upgrade corrects inflated totals only with reliable centra
   for (const overrides of [{ reliable: false }, { authoritativeSource: 'fallback' }]) {
     const result = preserveReliableColdmailLiveStats({ stats: { ...fresh.stats, ...overrides } }, previous, '2026-09-14');
     assert.equal(result.stats.systemTotalSent, 3856);
+    assert.equal(result.stats.sentCountModel, undefined);
+    assert.equal(preserveReliableColdmailLiveStats(fresh, result, '2026-09-14').stats.systemTotalSent, 3855);
   }
   const sameModel = { stats: { ...previous.stats, sentCountModel: SENT_COUNT_MODEL } };
   assert.equal(preserveReliableColdmailLiveStats(fresh, sameModel, '2026-09-14').stats.systemTotalSent, 3856);

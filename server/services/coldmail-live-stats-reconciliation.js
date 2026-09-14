@@ -66,6 +66,7 @@ function preserveReliableColdmailLiveStats(payload, previousPayload, expectedDat
       mergedStats[field] = previous[field];
     });
     mergedStats.reliable = true;
+    mergedStats.sentCountModel = previous.sentCountModel;
     mergedStats.source = previous.source;
     mergedStats.authoritativeSource = previous.authoritativeSource;
     mergedStats.authoritativeStatsStale = true;
