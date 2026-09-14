@@ -666,14 +666,15 @@ test('premium database mail counter combines Softora with confirmed Instantly se
     { email: 'sent@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'reply_received' },
     { email: 'queued@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'queued' },
     { email: 'synced@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'synced' },
+    { email: 'manual@example.test', lastColdmailProvider: 'instantly', instantlyStatus: 'sent', instantlyManualSentClassification: 'user-requested-unverified' },
   ];
 
-  assert.equal(client.getInstantlySystemMailSentCount(customers), 2);
+  assert.equal(client.getInstantlySystemMailSentCount(customers), 3);
   client.render(customers, { dataLoading: false });
   await client.refreshTodaySentCount();
 
-  assert.equal(nodes.systemMailSentCount.textContent, '102');
-  assert.equal(nodes.systemMailSentCount.title, 'Softora en bevestigde Instantly-verzendingen samen.');
+  assert.equal(nodes.systemMailSentCount.textContent, '103');
+  assert.equal(nodes.systemMailSentCount.title, 'Softora en Instantly samen; handmatig als verzonden gemarkeerde records tellen mee.');
 });
 
 test('premium database all-time mail counter never regresses after a partial 58 response', async () => {
@@ -2236,7 +2237,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260915-manual-instantly/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2489,7 +2490,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260915-manual-instantly/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
@@ -2497,7 +2498,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260914-kpi-fit/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260914-combined-providers/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260915-manual-instantly/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2643,7 +2644,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260915-manual-instantly/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -2683,7 +2684,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260915-manual-instantly/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
@@ -2779,7 +2780,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260910a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260914-combined-providers"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260910a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260915-manual-instantly"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -4787,11 +4788,15 @@ test('Instantly separates waiting leads from confirmed deliveries', () => {
     { id: 'both', status: 'gemaild', instantlyLeadId: 'lead-2', hasPhoto: true, hasMockup: true },
     { id: 'queued', status: 'prospect', instantlyQueueStatus: 'registered' },
     { id: 'confirmed', status: 'gemaild', instantlyLeadId: 'lead-sent', instantlyStatus: 'sent', instantlyEmailSentAt: '2026-09-10T08:00:00.000Z' },
+    { id: 'manual', status: 'gemaild', instantlyLeadId: 'lead-manual', instantlyStatus: 'sent', instantlyManualSentClassification: 'user-requested-unverified' },
   ];
   const mailed = item => item.status === 'gemaild' || Boolean(item.lastColdmailSentAt);
   const selected = contacts.filter(item => controller.matchesStatusFilter(item, 'verstuurd', () => true, mailed));
   assert.deepEqual(selected.map(item => item.id), []);
-  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['confirmed']);
+  assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly')).map(item => item.id), ['confirmed', 'manual']);
+  assert.equal(controller.normalizeCustomerFields(contacts[10]).instantlyManualSentClassification, 'user-requested-unverified');
+  assert.match(controller.renderMeta({ ...contacts[10], ...controller.normalizeCustomerFields(contacts[10]) }, true), /Handmatig als gemaild via Instantly gemarkeerd/);
+  assert.match(controller.renderMeta(contacts[9], true), /Verstuurd via Instantly/);
   assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly-ready')).map(item => item.id), ['transferred', 'both']);
   assert.equal(controller.matchesStatusFilter({ id: 'new-design', status: 'prospect', webdesignMailProvider: 'instantly', hasPhoto: true, hasMockup: true }, 'instantly-ready'), true);
   assert.equal(controller.matchesStatusFilter({ id: 'unready', status: 'prospect', lastColdmailProvider: 'instantly', instantlyStatus: 'queued' }, 'instantly-wachtlijst'), true);

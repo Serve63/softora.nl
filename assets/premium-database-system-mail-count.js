@@ -617,7 +617,7 @@
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
         if (!element) return;
-        element.title = "Softora en bevestigde Instantly-verzendingen samen.";
+        element.title = "Softora en Instantly samen; handmatig als verzonden gemarkeerde records tellen mee.";
         renderSystemMailCount(getCombinedSystemMailCount(), lastStatsMailCount === null);
     }
 
