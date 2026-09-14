@@ -122,7 +122,10 @@ function registerFeatureRoutes(app, deps = {}) {
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
   });
   const premiumDatabaseCustomersPageCoordinator = createPremiumDatabaseCustomersPageCoordinator({ dataOpsStore: deps.dataOpsStore });
-  const instantlyQueueRegistrationService = createInstantlyQueueRegistrationService({ dataOpsStore: deps.dataOpsStore });
+  const instantlyQueueRegistrationService = createInstantlyQueueRegistrationService({
+    dataOpsStore: deps.dataOpsStore,
+    mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
+  });
   if (
     premiumDatabaseWebdesignJobsCoordinator &&
     typeof premiumDatabaseWebdesignJobsCoordinator.setMailReadySnapshotService === 'function'

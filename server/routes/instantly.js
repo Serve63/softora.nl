@@ -65,6 +65,7 @@ function registerInstantlyRoutes(app, deps = {}) {
         emails: body.emails,
         sourceId: body.sourceId,
         fileDigest: body.fileDigest,
+        refreshInventory: body.refreshInventory === true,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           normalizeString(body.actor) ||
