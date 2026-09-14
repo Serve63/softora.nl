@@ -992,7 +992,12 @@
             return [getSentFromEmail(customer), getStatusLabel(getEffectiveStatus(customer)), hasPendingInstantlyQueue(customer) ? "klaargezet voor instantly" : "", isActionRequired(customer) ? "reactie ontvangen actie nodig" : ""].join(" ").toLowerCase();
         }
         function renderMeta(customer, forceOutreachMeta) {
-            if (isInstantlyConfirmedSent(customer)) return "<div class=\"outreach-line\">Verstuurd via Instantly</div>"; if (isInstantlyReadyCustomer(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
+            if (isInstantlyConfirmedSent(customer)) {
+                return customer.instantlyManualSentClassification === "user-requested-unverified"
+                    ? "<div class=\"outreach-line\">Handmatig als gemaild via Instantly gemarkeerd</div>"
+                    : "<div class=\"outreach-line\">Verstuurd via Instantly</div>";
+            }
+            if (isInstantlyReadyCustomer(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
             if (hasPendingInstantlyQueue(customer)) return "<div class=\"outreach-line\">Geregistreerd voor ontwerp</div>";
             if (!isWebdesignOutreachCustomer(customer) && !(forceOutreachMeta && isTrackedOutreachCustomer(customer))) return "";
             const sentAt = getSentAt(customer);
