@@ -122,6 +122,48 @@ test('kvk database snapshot service stores token-protected snapshots with a summ
   assert.equal(savedOptions.suppressFailureCooldown, true);
 });
 
+test('kvk database snapshot service stores and reads a compact live progress row', async () => {
+  const progress = {
+    generatedAt: '2026-09-14T14:00:00+02:00',
+    state: { companies_found: 100, successful_found: 7, with_website: 4, without_website: 3, unusable: 2 },
+    companyTotals: { all: 100, usable: 7, with_website: 4, without_website: 3, unusable: 2 },
+    latestTreated: [{ kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld B.V.' }],
+  };
+  let storedRow = null;
+  const service = createKvkDatabaseSnapshotService({
+    supabaseStateKey: 'softora',
+    kvkDatabaseSyncToken: 'secret-token',
+    fetchSupabaseRowByKeyViaRest: async () => ({ ok: true, body: storedRow }),
+    upsertSupabaseRowViaRest: async (row) => { storedRow = row; return { ok: true }; },
+    now: () => new Date('2026-09-14T12:00:00.000Z'),
+  });
+  const post = createJsonResponse();
+  await service.sendPostSnapshotResponse(
+    { headers: { authorization: 'Bearer secret-token' }, body: { progress } },
+    post
+  );
+  assert.equal(post.statusCode, 200);
+  assert.equal(post.payload.stateKey, 'softora:kvk_database_progress_v1');
+  assert.equal(storedRow.payload.progress.latestTreated[0].kvk_nummer, '12345678');
+
+  const get = createJsonResponse();
+  await service.sendGetProgressResponse({}, get);
+  assert.equal(get.statusCode, 200);
+  assert.deepEqual(get.payload.progress, progress);
+});
+
+test('kvk database compact progress rejects oversized or structurally incomplete payloads', async () => {
+  const service = createKvkDatabaseSnapshotService({ kvkDatabaseSyncToken: 'secret-token' });
+  for (const progress of [{ state: {}, latestTreated: new Array(11).fill({}) }, { state: {} }]) {
+    const response = createJsonResponse();
+    await service.sendPostSnapshotResponse(
+      { headers: { authorization: 'Bearer secret-token' }, body: { progress } },
+      response
+    );
+    assert.equal(response.statusCode, 400);
+  }
+});
+
 test('kvk database snapshot service rejects sync posts without a valid token', async () => {
   const service = createKvkDatabaseSnapshotService({
     kvkDatabaseSyncToken: 'secret-token',
