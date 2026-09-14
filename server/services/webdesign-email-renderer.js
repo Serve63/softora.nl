@@ -146,13 +146,10 @@ function renderResponsiveImagePair(mainImage, mockupImage, options = {}) {
   if (!mainHtml || !mockupHtml) return '';
 
   const caption = normalizeString(options.caption) || WEBDESIGN_EMAIL_MOCKUP_CAPTION;
-  const captionHtml = options.hideCaption === true
-    ? ''
-    : `<p class="softora-mockup-caption" style="display:block;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#111827;font-weight:700;overflow-wrap:anywhere;word-break:normal;">${escapeHtml(
-        caption
-      )}</p>`;
   const margin = normalizeString(options.margin) || '24px 0 0 0';
-  return `\n<!-- ${WEBDESIGN_EMAIL_TEMPLATE_VERSION} --><div class="softora-webdesign-image-stack" style="display:block;margin:${margin};padding:0;width:100%;max-width:${EMAIL_CONTENT_MAX_WIDTH}px;overflow:visible;font-size:0;line-height:0;">${mainHtml}${captionHtml}${mockupHtml}</div>`;
+  return `\n<!-- ${WEBDESIGN_EMAIL_TEMPLATE_VERSION} --><div class="softora-webdesign-image-stack" style="display:block;margin:${margin};padding:0;width:100%;max-width:${EMAIL_CONTENT_MAX_WIDTH}px;overflow:visible;font-size:0;line-height:0;">${mainHtml}<p class="softora-mockup-caption" style="display:block;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#111827;font-weight:700;overflow-wrap:anywhere;word-break:normal;">${escapeHtml(
+    caption
+  )}</p>${mockupHtml}</div>`;
 }
 
 function renderWebdesignImageSection(mainImage, options = {}) {
