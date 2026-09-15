@@ -224,9 +224,9 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE), true);
 });
 
-test('a design targeted at Instantly never enters the Softora send snapshot or free inventory', async () => {
+test('an Instantly design from transferred inventory belongs to one category, never the Softora or available list', async () => {
   const { service } = createService({
-    customers: [{ customer_id: 'instant-design', company: 'Instant Design', email: 'info@instant-design.nl', website: 'instant-design.nl', database_status: 'prospect' }],
+    customers: [{ customer_id: 'instant-design', company: 'Instant Design', email: 'info@instant-design.nl', website: 'instant-design.nl', database_status: 'prospect', payload: { bronDatabase: 'Softora Bedrijven Scraper' } }],
     photoFlags: [{ customerId: 'instant-design', hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly' }],
   });
   const snapshot = await service.buildMailReadySnapshot({ limit: 10 });

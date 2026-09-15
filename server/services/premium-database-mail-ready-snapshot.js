@@ -630,7 +630,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag));
     availableRows = dedupeCustomerRows(availableRows.concat(
       unguardedTransferredCandidates
-        .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
+        .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag) &&
+          !(item.photoFlag.webdesignMailProvider === 'instantly' && item.photoFlag.hasPhoto && item.photoFlag.hasMockup))
         .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag))
     ));
     const computeMs = computeBeforeGuardsMs + (Date.now() - finalComputeStartMs);
