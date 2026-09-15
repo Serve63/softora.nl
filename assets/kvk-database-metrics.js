@@ -44,6 +44,31 @@
     }, 0);
   }
 
+  function nonNegativeCount(value) {
+    const count = Number(value);
+    return Number.isFinite(count) && count >= 0 ? count : null;
+  }
+
+  // "Bruikbaar" is partitioned by the two child cards: with a working website
+  // or without one. The producer can lag on state.with_website while usable and
+  // without_website are already current, so derive this subtotal from the two
+  // authoritative stock counters instead of allowing the card to freeze.
+  function getAvailableWithWebsiteCount(snapshot) {
+    const scraperState = snapshot?.state || {};
+    const companyTotals = snapshot?.companyTotals || {};
+    const usable = nonNegativeCount(scraperState.usable ?? companyTotals.usable);
+    const withoutWebsite = nonNegativeCount(
+      scraperState.without_website ?? companyTotals.without_website,
+    );
+    const reportedWithWebsite = nonNegativeCount(
+      scraperState.with_website ?? companyTotals.with_website,
+    );
+    if (usable !== null && withoutWebsite !== null && withoutWebsite <= usable) {
+      return usable - withoutWebsite;
+    }
+    return reportedWithWebsite ?? 0;
+  }
+
   function mergeGradeActivity(...activities) {
     const available = activities.filter((activity) => activity && typeof activity === 'object');
     if (!available.length) return undefined;
@@ -106,6 +131,7 @@
     const now = typeof deps.now === 'function' ? deps.now : Date.now;
     const elements = {
       treatedTotal: documentRef.getElementById('companies-treated'),
+      withWebsiteTotal: documentRef.getElementById('companies-with-website'),
       successfulFound: documentRef.getElementById('companies-successful-found'),
       successfulFoundLast60: documentRef.getElementById('companies-successful-found-last60'),
       declaredUnusable: documentRef.getElementById('companies-declared-unusable'),
@@ -131,6 +157,12 @@
       const unusableGradeLast60 = last60.unusable_grades || {};
       const unusableGradeActivity = last60.unusable_grade_activity || {};
 
+      if (elements.withWebsiteTotal) {
+        const withWebsiteText = numberFormat.format(getAvailableWithWebsiteCount(snapshot));
+        if (elements.withWebsiteTotal.textContent !== withWebsiteText) {
+          elements.withWebsiteTotal.textContent = withWebsiteText;
+        }
+      }
       if (elements.treatedTotal) {
         const treated = Number(
           scraperState.treated ??
@@ -191,6 +223,12 @@
       treatedObserver.observe(treatedTotal, { childList: true, characterData: true, subtree: true });
       controller.treatedObserver = treatedObserver;
     }
+    const withWebsiteTotal = deps.document.getElementById('companies-with-website');
+    if (withWebsiteTotal && typeof deps.window.MutationObserver === 'function') {
+      const withWebsiteObserver = new deps.window.MutationObserver(controller.renderMetrics);
+      withWebsiteObserver.observe(withWebsiteTotal, { childList: true, characterData: true, subtree: true });
+      controller.withWebsiteObserver = withWebsiteObserver;
+    }
     deps.window.setInterval(controller.renderMetrics, 1000);
     deps.window.addEventListener('focus', controller.renderMetrics);
     deps.document.addEventListener('visibilitychange', () => {
@@ -201,6 +239,7 @@
 
   return {
     createController,
+    getAvailableWithWebsiteCount,
     getLast60Minutes,
     renderLast60Delta,
     renderUnusableGradeLast60,
