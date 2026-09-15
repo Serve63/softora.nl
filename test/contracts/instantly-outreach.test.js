@@ -274,7 +274,19 @@ function createService(overrides = {}) {
     setUiStateValues: async (scope, values, meta) => {
       writes.push({ scope, values, meta });
       if (scope !== 'premium_customers_database') {
+        if (overrides.failGuardWrites) return null;
         scopeValues.set(scope, values);
+        return { ok: true };
+      }
+      if (overrides.failCustomerWrites) return null;
+      if (meta && meta.upsertOnly === true) {
+        const incoming = JSON.parse(readChunkedStateValue(values, 'softora_customers_premium_v1') || '[]');
+        const byId = new Map(rows.map((row) => [String(row && row.id), row]));
+        incoming.forEach((row) => {
+          if (row && typeof row === 'object' && row.id) byId.set(String(row.id), row);
+        });
+        rows = Array.from(byId.values());
+        customerValues = buildChunkedStatePatch('softora_customers_premium_v1', JSON.stringify(rows));
         return { ok: true };
       }
       customerValues = values;
@@ -2727,4 +2739,72 @@ test('automatic AirMail campaigns do not accept personal mailboxes even if legac
   assert.equal(result.reason, 'no_mailready_instantly_leads');
   assert.equal(harness.outboundGuardCalls.length, 0);
   assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+});
+
+test('automatic upload releases the provisional guard and writes no permanent guard when the local queue persist fails', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    failCustomerWrites: true,
+    rows: [{ id: 'queue-fail', bedrijf: 'Wachtrij Faal BV', email: 'queue-fail@company.test', website: 'https://queue-fail.test', mail: true, verantwoordelijk: 'Serve' }],
+    photoMap: { 'queue-fail': { id: 'queue-fail', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      : { response: { ok: true, status: 200 }, data: { status: 1 } },
+  });
+  await assert.rejects(() => harness.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_LOCAL_RESERVATION_FAILED' });
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+  assert.ok(harness.outboundGuardCalls.some((call) => call.type === 'reserve'));
+  assert.ok(harness.outboundGuardCalls.some((call) => call.type === 'release'));
+  assert.equal(harness.outboundGuardCalls.filter((call) => call.type === 'confirm').length, 0);
+  assert.equal(harness.writes.filter((write) => write.scope === 'premium_coldmail_send_guard').length, 0);
+  assert.equal(harness.getRows()[0].instantlyManualUploadId, undefined);
+});
+
+test('automatic upload rolls back the local queue mark and releases when the legacy guard write fails', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    failGuardWrites: true,
+    rows: [{ id: 'guard-fail', bedrijf: 'Guard Faal BV', email: 'guard-fail@company.test', website: 'https://guard-fail.test', mail: true, verantwoordelijk: 'Serve' }],
+    photoMap: { 'guard-fail': { id: 'guard-fail', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      : { response: { ok: true, status: 200 }, data: { status: 1 } },
+  });
+  await assert.rejects(() => harness.service.autoUploadMailReady(), { code: 'INSTANTLY_SAFE_GUARD_WRITE_FAILED' });
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+  assert.ok(harness.outboundGuardCalls.some((call) => call.type === 'release'));
+  assert.equal(harness.getRows()[0].instantlyManualUploadId, undefined);
+});
+
+test('automatic upload persists the local queue as a single-row upsert instead of a full replace', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [
+      { id: 'untouched', bedrijf: 'Onaangeroerd BV', email: 'untouched@company.test', website: 'https://untouched.test', mail: true },
+      { id: 'instantly-single', bedrijf: 'Instantly Enkel BV', email: 'single@company.test', website: 'https://single.test', mail: true, verantwoordelijk: 'Serve' },
+    ],
+    photoMap: {
+      untouched: { id: 'untouched', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'softora' },
+      'instantly-single': { id: 'instantly-single', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' },
+    },
+    fetchJsonWithTimeout: async (url) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } };
+      if (url.endsWith('/leads/add')) return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'single-lead', email: 'single@company.test', index: 0 }] } };
+      return { response: { ok: true, status: 200 }, data: { status: 1 } };
+    },
+  });
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+  assert.equal(result.uploaded, 1);
+  const queueWrites = harness.writes.filter((write) => write.scope === 'premium_customers_database' && write.meta && write.meta.source === 'instantly-auto-upload');
+  assert.equal(queueWrites.length, 1);
+  assert.equal(queueWrites[0].meta.upsertOnly, true);
+  assert.equal(harness.getRows().length, 2);
+  assert.equal(harness.getRows().find((row) => row.id === 'untouched').instantlyManualUploadId, undefined);
+  assert.ok(harness.getRows().find((row) => row.id === 'instantly-single').instantlyManualUploadId.startsWith('instantly-auto-'));
 });

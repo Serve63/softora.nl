@@ -33,6 +33,14 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     };
   const persistRows = async (loaded, rows, meta) =>
     setUiStateValues(customerDbScope, buildRowsStateValues(loaded && loaded.values, rows, customerDbKey), meta);
+  const persistSingleRow = async (singleRow, meta) => {
+    if (!singleRow || typeof singleRow !== 'object') return null;
+    return setUiStateValues(
+      customerDbScope,
+      buildRowsStateValues({}, [singleRow], customerDbKey),
+      { ...(meta && typeof meta === 'object' ? meta : {}), upsertOnly: true },
+    );
+  };
   const loadContext = async (rows, sender, input) => ({
     ...buildInstantlyQueueSelectionContext(await loadPersonalizationContext(rows, { senderProfile: sender && sender.key, senderEmail: sender && sender.email }), input, normalizeString, createError),
     mailProviderOnly: input && input.autoMailReadyOnly === true ? 'instantly' : '',
@@ -67,6 +75,8 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     config,
     getReadyPhoto,
     markPreparedRows,
+    persistSingleRow,
+    releaseReservation,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, source: 'instantly-auto-upload' }),
   });
   return { ...replacement, autoUpload: automatic.run };
