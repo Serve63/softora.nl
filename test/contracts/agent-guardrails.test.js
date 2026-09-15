@@ -20,7 +20,7 @@ const {
   listAddedBrowserStorageApis,
   listAddedTestWeakeningPatterns,
 } = require('../../scripts/lib/agent-guardrails-core');
-const { listExistingRepoFiles } = require('../../scripts/check-quality-lock');
+const { listExistingRepoFiles, listQualityLockViolations } = require('../../scripts/check-quality-lock');
 
 const repoRoot = path.resolve(__dirname, '../..');
 
@@ -68,6 +68,38 @@ test('websitevideo tooling blijft lokaal en expliciet startbaar', () => {
   assert.ok(packageJson.dependencies.playwright);
   assert.ok(packageJson.dependencies['ffmpeg-static']);
   assert.ok(packageJson.dependencies['ffprobe-static']);
+});
+
+test('critical gate requires real auth browser journeys and installs the browser before verification', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const verifySource = readRepoFile('scripts/verify-critical.js');
+  const lockSource = readRepoFile('scripts/check-quality-lock.js');
+  const workflow = readRepoFile('.github/workflows/verify-critical.yml');
+  assert.equal(packageJson.scripts['test:e2e:auth'], 'node --test test/e2e/premium-auth.browser.test.js');
+  assert.match(verifySource, /\['run', 'test:e2e:auth'\]/);
+  assert.match(lockSource, /'test:e2e:auth': 'node --test test\/e2e\/premium-auth\.browser\.test\.js'/);
+  const install = workflow.indexOf('npx --no-install playwright install --with-deps chromium --only-shell');
+  const verify = workflow.indexOf('run: npm run verify:critical');
+  assert.ok(install > 0 && verify > install);
+  const protocol = readRepoFile('docs/quality-protocol.md');
+  assert.match(protocol, /test:e2e:auth/);
+  assert.match(protocol, /testgegevens/);
+});
+
+test('quality lock rejects disabled or exclusive browser tests', () => {
+  const testPath = 'test/e2e/fixture.browser.test.js';
+  const weakeningSources = [
+    ...['only', 'skip'].map((method) => `test.${method}('fixture', () => {});`),
+    ['test("fixture", { ', 'skip', ': true }, () => {});'].join(''),
+  ];
+  for (const source of weakeningSources) {
+    const violations = listQualityLockViolations({ trackedFiles: [testPath], readFile: () => source });
+    assert.ok(violations.some((message) => message.includes(testPath) && message.includes('test-verzwakking')));
+  }
+  const allowed = listQualityLockViolations({
+    trackedFiles: [testPath], readFile: () => 'test("fixture", () => {});',
+  });
+  assert.equal(allowed.some((message) => message.includes(testPath) && message.includes('test-verzwakking')), false);
 });
 
 test('protected package metadata houdt de echte lokale mailbox-Postgrespoort vast', () => {

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="nl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lokale sessietest</title></head>
+<body>
+  <h1>Beveiligde sessietest</h1>
+  <p id="profile" role="status">Profiel wordt geladen</p>
+  <button id="refresh" type="button">Profiel vernieuwen</button>
+  <a href="/premium-personeel-login?logout=1">Uitloggen</a>
+  <script>
+    async function refreshProfile() {
+      const response = await fetch('/api/quality-profile', { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) return;
+      const profile = await response.json();
+      document.getElementById('profile').textContent = profile.displayName;
+    }
+    document.getElementById('refresh').addEventListener('click', refreshProfile);
+    window.addEventListener('load', refreshProfile);
+  </script>
+</body>
+</html>

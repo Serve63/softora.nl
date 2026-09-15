@@ -57,6 +57,14 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Houd runtime-compositie compact; grote setupblokken moeten naar kleinere modules zodat startup en debugging begrijpelijk blijven.
 - Pagina-assets horen gedeeld en cachebaar te zijn zodra inline scripts of styles substantieel worden.
 
+## Browsertests van authenticatie
+- `npm run test:e2e:auth` doorloopt de echte loginpagina, auth-routes, gebruikersopslaglogica, cookies, HTML- en API-toegangscontrole en sessiewatchdog in Chromium.
+- De suite controleert desktop en mobiel, een trage login met een tweede servercache, herladen en een nieuw tabblad, foutieve inloggegevens, onthouden, beide uitlogpaden, ingetrokken sessies en herstel na tijdelijke storingen.
+- Een afgeschermde testpagina en uitsluitend lokale testgegevens vervangen het dashboard en de externe opslagadapter. Dit bewijst de authenticatieketen; de volledige dashboard-, agenda- en mailboxflows vragen eigen browsertests.
+- De testserver start alleen de benodigde productiemodules, laadt geen `.env` en gebruikt geen externe providers. Browserverzoeken buiten het lokale testadres worden tegengehouden.
+- Installeer lokaal na `npm ci` de bij de lockfile passende browser met `npx --no-install playwright install chromium --only-shell`. CI installeert ook de Linux-systeemafhankelijkheden.
+- De suite is verplicht in `verify:critical`; ontbrekende browserbestanden of falende gebruikershandelingen laten de poort falen.
+
 ## Definition Of Done
 - Productiegedrag krijgt of behoudt contract- of smoke-testdekking.
 - `npm run check:guardrails` blijft groen.
