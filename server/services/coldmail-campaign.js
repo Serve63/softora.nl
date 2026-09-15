@@ -25,6 +25,10 @@ const { assertOutboundRecipientsNotSuppressed } = require('../security/outbound-
 const previewImageCache = require('./coldmail-preview-image-cache');
 const { markIncidentQuarantinedDesignPhotosAuthoritative, markMissingDesignPhotosAuthoritative } = require('./design-photo-generation-policy');
 const {
+  normalizePinnedRecipientLocationLines,
+  resolveRecipientPlace,
+} = require('./outreach-recipient-location');
+const {
   fitWebdesignPreviewForEmail,
   removeDecorativeWebdesignFrameForEmail,
 } = require('./coldmail-image-frame');
@@ -1134,25 +1138,6 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(row.naam || row.contact || row.contactName || row.clientName) || getRowCompany(row);
   }
 
-  const dutchProvinceSuffix =
-    '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
-  function cleanPlaceLabel(value) {
-    return normalizeString(value)
-      .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
-      .replace(new RegExp(`\\s*\\(${dutchProvinceSuffix}\\)\\s*$`, 'i'), '')
-      .replace(new RegExp(`\\s+${dutchProvinceSuffix}\\s*$`, 'i'), '')
-      .replace(/\b(Nederland|The Netherlands)\b/gi, '')
-      .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-  function isDutchProvinceLabel(value) {
-    return new RegExp(`^${dutchProvinceSuffix}$`, 'i').test(normalizeString(value));
-  }
-  function looksLikeStreetAddress(value) {
-    const text = normalizeString(value).toLowerCase();
-    return /\d/.test(text) && /(straat|weg|laan|plein|pad|dijk|hof|kade|markt|singel|steeg|gracht|boulevard|baan|akker|plantsoen|park)\b/.test(text);
-  }
   function formatKnownPlaceKey(value) {
     return normalizeString(value)
       .split(/\s+/)
@@ -1168,52 +1153,8 @@ function createColdmailCampaignService(deps = {}) {
       .find((key) => haystack.includes(normalizePlaceKey(key)));
     return placeKey ? formatKnownPlaceKey(placeKey) : '';
   }
-  function extractPlaceFromAddress(value) {
-    const text = normalizeString(value)
-      .replace(/\s+/g, ' ')
-      .replace(/\s*,\s*/g, ', ')
-      .trim();
-    if (!text) return '';
-    const postalMatch = text.match(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b\s+([A-Za-zÀ-ÿ'’.\- ]{2,})$/);
-    if (postalMatch) return cleanPlaceLabel(postalMatch[1]);
-    const parts = text.split(/[,\n;|]/).map(cleanPlaceLabel).filter(Boolean);
-    for (let index = parts.length - 1; index >= 0; index -= 1) {
-      const candidate = parts[index];
-      if (!candidate || looksLikeStreetAddress(candidate)) continue;
-      if (/^\d+$/.test(candidate)) continue;
-      const hasEarlierPlace = parts.slice(0, index).some((part) => part && !looksLikeStreetAddress(part) && !/^\d+$/.test(part));
-      if (hasEarlierPlace && isDutchProvinceLabel(candidate)) continue;
-      return candidate;
-    }
-    return looksLikeStreetAddress(text) ? findKnownPlaceLabel(text) : cleanPlaceLabel(text);
-  }
-
   function getRowCity(row) {
-    const explicit = [
-      row && row.plaats,
-      row && row.city,
-      row && row.gemeente,
-      row && row.locality,
-      row && row.town,
-      row && row.village,
-    ]
-      .map((value) => {
-        const cleaned = cleanPlaceLabel(value);
-        if (!cleaned) return '';
-        return looksLikeStreetAddress(cleaned) ? extractPlaceFromAddress(cleaned) : cleaned;
-      })
-      .find(Boolean);
-    if (explicit) return explicit;
-
-    const addressLikeValue = [
-      row && row.stad,
-      row && row.adres,
-      row && row.address,
-      row && row.location,
-    ]
-      .map(extractPlaceFromAddress)
-      .find(Boolean);
-    return addressLikeValue || '';
+    return resolveRecipientPlace(row, { normalizeString, findKnownPlaceLabel });
   }
 
   function normalizeWebsiteVariableValue(value) {
@@ -6157,7 +6098,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function ensurePinnedCityInMailText(text, city) {
-    const cleanText = normalizeString(text);
+    const cleanText = normalizeString(normalizePinnedRecipientLocationLines(text, city, { normalizeString }));
     const cleanCity = normalizeString(city);
     if (!cleanText || !cleanCity || /📍/.test(cleanText)) return cleanText;
     const trailingCityLine = new RegExp(`(^|\\n)\\s*${escapeRegexText(cleanCity)}\\s*$`, 'i');

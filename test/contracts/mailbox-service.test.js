@@ -728,7 +728,7 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
                 bedrijf: 'PCK B.V.',
                 naam: 'PCK',
                 email: 'info@pckbv.eu',
-                stad: 'Florijnstraat 13, 4861 BW Chaam',
+                stad: 'Energieweg, Udenhout, Noord-Brabant',
                 website: 'https://pckbv.eu',
               },
             ]),
@@ -796,13 +796,13 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
     sent[0].message.text,
     /Webdesign niet zichtbaar\? Check het hier 👈/
   );
-  assert.match(sent[0].message.text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Chaam/);
+  assert.match(sent[0].message.text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Udenhout/);
   assert.doesNotMatch(sent[0].message.text, /Martijn van de Ven/);
   assert.doesNotMatch(sent[0].message.text, /📍 Liempde/);
   assert.doesNotMatch(sent[0].message.text, /📍 Alphen/);
   assert.doesNotMatch(sent[0].message.text, /📍 \{\{stad\}\}/);
   assert.doesNotMatch(sent[0].message.text, /📍 \{\{afzenderPlaats\}\}/);
-  assert.doesNotMatch(sent[0].message.text, /Florijnstraat/);
+  assert.doesNotMatch(sent[0].message.text, /Energieweg|Noord-Brabant/);
   assert.doesNotMatch(sent[0].message.text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
   assert.match(
