@@ -87,10 +87,10 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
     legacyPaths: ['/premium-bedrijfssoftware'],
-    title: 'Bedrijfssoftware laten maken voor het MKB',
+    title: 'Bedrijfssoftware op maat laten maken | Softora',
     description:
-      'Laat bedrijfssoftware op maat bouwen voor CRM, planning, offertes of een klantportaal. Softora helpt je de eerste versie, koppelingen en het beheer af te bakenen.',
-    lastmod: '2026-09-05',
+      'Bedrijfssoftware op maat laten maken voor CRM, planning, offertes of een klantportaal. Softora helpt MKB-teams met scope, koppelingen en beheer.',
+    lastmod: '2026-09-15',
     growthEventKind: 'other_growth_action',
     growthCluster: 'software-crm',
     kind: 'service',
