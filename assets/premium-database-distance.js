@@ -6,6 +6,8 @@
   "use strict";
 
   const HAAREN_COORDS = Object.freeze({ lat: 51.6027, lng: 5.2222 });
+  // Persisted deep-search target indices use their own versioned order; do not migrate them here.
+  const OISTERWIJK_COORDS = { lat: 51.5792, lng: 5.1889 };
   const PLACE_COORD_ENTRIES = [
     ["oisterwijk", 51.5792, 5.1889],
     ["moergestel", 51.5456, 5.1778],
@@ -362,7 +364,7 @@
     const cacheKey = normalizeText(label);
     if (cacheKey && targetDistanceCache.has(cacheKey)) return targetDistanceCache.get(cacheKey);
     const coords = resolveTargetCoords(label);
-    return rememberCachedValue(targetDistanceCache, cacheKey, coords ? haversineKm(HAAREN_COORDS, coords) : Infinity);
+    return rememberCachedValue(targetDistanceCache, cacheKey, coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity);
   }
 
   function compareTargetLabelsByDistance(left, right) {
