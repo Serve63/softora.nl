@@ -1,3 +1,4 @@
+const { compareCustomersByDistance, getDistanceKm: getHaarenDistanceKm } = require('../../assets/premium-database-distance');
 const { loadMatchedColdmailBounceStats } = require('./coldmail-bounce-recipient-proof');
 const nodemailer = require('nodemailer');
 const crypto = require('node:crypto');
@@ -134,7 +135,6 @@ const {
   TEST_RECIPIENT_EMAILS,
   TEST_RECIPIENT_LOOKUP_EMAILS,
 } = require('../config/coldmail-campaign');
-
 let cachedColdmailPreviewSharp = null;
 function loadColdmailPreviewSharpModule() {
   if (cachedColdmailPreviewSharp) return cachedColdmailPreviewSharp;
@@ -5807,7 +5807,7 @@ function createColdmailCampaignService(deps = {}) {
 
     const failed = [];
     const eligibleRows = rows
-      .map((row, index) => ({ row, index, id: getRowId(row, index) }))
+      .map((row, index) => ({ row, index, id: getRowId(row, index) })).sort((left, right) => mode === 'mail' ? compareCustomersByDistance(left.row, right.row) : left.index - right.index)
       .filter(({ row }) =>
         mode === 'call'
           ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
@@ -5912,13 +5912,13 @@ function createColdmailCampaignService(deps = {}) {
       selected: resolved.selectedRows.length,
       safetyLimits: getColdmailSafetyLimits(),
       recipients: resolved.selectedRows.map((item) => {
-        const website = getRowDomain(item.row);
+        const website = getRowDomain(item.row), distanceKm = resolved.mode === 'call' ? getRowDistanceKm(item.row) : getHaarenDistanceKm(item.row);
         const recipient = {
           id: item.id,
           bedrijf: getRowCompany(item.row),
           email: getRowEmail(item.row),
           phone: getRowPhone(item.row),
-          distanceKm: Number.isFinite(getRowDistanceKm(item.row)) ? Math.round(getRowDistanceKm(item.row) * 10) / 10 : null,
+          distanceKm: Number.isFinite(distanceKm) ? Math.round(distanceKm * 10) / 10 : null,
         };
         if (website) recipient.website = website;
         return recipient;

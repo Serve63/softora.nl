@@ -1625,16 +1625,16 @@ test('coldmail campaign keeps the standard subject and body when variants are pr
   assert.equal(sentMessages.length, 3);
   assert.deepEqual(sentMessages.map((message) => message.subject), [
     'Nieuw webdesign gemaakt voor Bakkerij Zon',
-    'Nieuw webdesign gemaakt voor Lunchroom Maan',
     'Nieuw webdesign gemaakt voor Café Nova',
+    'Nieuw webdesign gemaakt voor Lunchroom Maan',
   ]);
   sentMessages.forEach((message) => {
     assert.match(message.text, /Ik kwam .* tegen en heb een nieuw webdesign gemaakt\./);
     assert.doesNotMatch(message.text, /Deze week zag ik|Vanuit enthousiasme/);
   });
   assert.match(stripEmailWordJoiners(sentMessages[0].text), /bakkerijzon\.nl/);
-  assert.match(stripEmailWordJoiners(sentMessages[1].text), /lunchroommaan\.nl/);
-  assert.match(stripEmailWordJoiners(sentMessages[2].text), /cafenova\.nl/);
+  assert.match(stripEmailWordJoiners(sentMessages[2].text), /lunchroommaan\.nl/);
+  assert.match(stripEmailWordJoiners(sentMessages[1].text), /cafenova\.nl/);
 });
 
 test('coldmail campaign does not add open tracking pixels to new outbound mail', async () => {
@@ -6404,7 +6404,7 @@ test('coldmail autopilot stores a compact failure reason summary after a partial
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
       {
-        id: 'missing-photo',
+        id: 'missing-photo', lat: 51.6027, lng: 5.2222,
         bedrijf: 'Geen Foto BV',
         naam: 'Ruben',
         website: 'geenfoto.nl',
@@ -8981,7 +8981,7 @@ test('coldmail campaign vult de preview aan wanneer een eerdere kandidaat afvalt
   const { service } = createService({
     rows: [
       {
-        id: 'bad-domain',
+        id: 'bad-domain', stad: 'Haaren',
         bedrijf: 'Slechte Domein BV',
         email: 'info@ongeldig.test',
         status: 'benaderbaar',
@@ -9046,7 +9046,7 @@ test('coldmail campaign recipient preview respects Oisterwijk radius', async () 
   assert.equal(result.radiusKm, 20);
   assert.equal(result.selected, 1);
   assert.equal(result.recipients[0].bedrijf, 'Oisterwijk Winkel');
-  assert.equal(result.recipients[0].distanceKm, 0);
+  assert.equal(result.recipients[0].distanceKm, 3.5); // Preview distance is now measured from Haaren.
 });
 
 test('coldmail campaign recipient preview does not filter by radius when radius is disabled', async () => {
@@ -9137,7 +9137,7 @@ test('coldmail campaign radius includes real customer database places near Oiste
   assert.equal(result.ok, true);
   assert.equal(result.radiusKm, 40);
   assert.equal(result.selected, 3);
-  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Chaam Winkel', 'Alphen Studio', 'Helvoirt Studio']);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Helvoirt Studio', 'Alphen Studio', 'Chaam Winkel']);
   assert.ok(result.recipients.every((recipient) => recipient.distanceKm <= 40));
 });
 
@@ -9638,7 +9638,7 @@ test('coldmail preview matches stored webdesigns with normalized company identit
   assert.equal(result.selected, 2);
   assert.deepEqual(
     result.recipients.map((recipient) => recipient.id),
-    ['fresh-jaghthuijs-id', 'fresh-zon-id']
+    ['fresh-zon-id', 'fresh-jaghthuijs-id']
   );
   assert.equal(result.failedItems.length, 0);
 });
@@ -11578,7 +11578,7 @@ test('coldmail campaign sends personal mailbox domains by default', async () => 
   assert.equal(result.failed, 0);
   assert.deepEqual(
     sentMessages.map((message) => message.to),
-    ['ruben@gmail.com', 'ruben@example.test']
+    ['ruben@example.test', 'ruben@gmail.com']
   );
 });
 
@@ -11624,7 +11624,7 @@ test('coldmail campaign caps personal mailbox domains separately from business d
   assert.equal(result.failed, 1);
   assert.deepEqual(
     sentMessages.map((message) => message.to),
-    ['ruben@gmail.com', 'ruben@example.test']
+    ['ruben@example.test', 'ruben@gmail.com']
   );
   assert.match(result.failedItems[0].error, /Persoonlijke mailbox-daglimiet/);
 });
