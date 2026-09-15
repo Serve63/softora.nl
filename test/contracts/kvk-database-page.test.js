@@ -515,6 +515,11 @@ test('kvk database refreshes live counters while the page stays open', () => {
   assert.match(scriptSource, /window\.addEventListener\("focus",\(\)=>refreshDashboardWhenVisible\(\{reloadTables:!0\}\)\)/);
   assert.match(scriptSource, /document\.addEventListener\("visibilitychange",\(\)=>refreshDashboardWhenVisible\(\{reloadTables:!0\}\)\)/);
   assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
+  assert.match(
+    scriptSource,
+    /l=Number\(state\.scraper\.usable\?\?activeSnapshot\?\.companyTotals\?\.usable\?\?n\+o\)/,
+    'de voorraadkaart moet de expliciete ongebruikte bruikbaar-teller gebruiken'
+  );
 });
 
 test('kvk database keeps last-hour deltas in eight cards with controller decisions', () => {
