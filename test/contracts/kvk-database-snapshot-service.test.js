@@ -152,6 +152,47 @@ test('kvk database snapshot service stores and reads a compact live progress row
   assert.deepEqual(get.payload.progress, progress);
 });
 
+test('kvk database progress endpoint serializes writes and rejects stale retries', async () => {
+  let storedRow = null;
+  let writes = 0;
+  const service = createKvkDatabaseSnapshotService({
+    supabaseStateKey: 'softora',
+    kvkDatabaseSyncToken: 'secret-token',
+    fetchSupabaseRowByKeyViaRest: async () => ({ ok: true, body: storedRow }),
+    upsertSupabaseRowViaRest: async (row) => {
+      writes += 1;
+      storedRow = row;
+      return { ok: true };
+    },
+    now: () => new Date('2026-09-15T12:00:00.000Z'),
+  });
+  const fresh = {
+    generatedAt: '2026-09-15T14:00:00+02:00',
+    state: { companies_found: 10, successful_found: 3 },
+    companyTotals: { all: 10, usable: 3 },
+    latestTreated: [],
+  };
+  const first = createJsonResponse();
+  await service.sendPostProgressResponse(
+    { headers: { authorization: 'Bearer secret-token' }, body: { progress: fresh } },
+    first
+  );
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.payload.accepted, true);
+
+  const stale = { ...fresh, generatedAt: '2026-09-15T13:59:59+02:00' };
+  const second = createJsonResponse();
+  await service.sendPostProgressResponse(
+    { headers: { authorization: 'Bearer secret-token' }, body: { progress: stale } },
+    second
+  );
+  assert.equal(second.statusCode, 200);
+  assert.equal(second.payload.accepted, false);
+  assert.equal(second.payload.stale, true);
+  assert.equal(second.payload.updatedAt, storedRow.payload.updatedAt);
+  assert.equal(writes, 1);
+});
+
 test('kvk database compact progress rejects oversized or structurally incomplete payloads', async () => {
   const service = createKvkDatabaseSnapshotService({ kvkDatabaseSyncToken: 'secret-token' });
   for (const progress of [{ state: {}, latestTreated: new Array(11).fill({}) }, { state: {} }]) {

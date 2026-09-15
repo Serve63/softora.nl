@@ -24,6 +24,7 @@ function createKvkDatabaseSnapshotService(deps = {}) {
 
   const snapshotStateKey = `${normalizeString(supabaseStateKey) || 'core'}:${DEFAULT_STATE_KEY_SUFFIX}`;
   const progressStateKey = `${normalizeString(supabaseStateKey) || 'core'}:${DEFAULT_PROGRESS_KEY_SUFFIX}`;
+  let progressWriteQueue = Promise.resolve();
 
   function constantTimeEquals(left, right) {
     const leftText = normalizeString(left);
@@ -195,6 +196,23 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     return '';
   }
 
+  function timestampMs(value) {
+    const parsed = Date.parse(normalizeString(value || ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function progressTimestamp(progress, fallback = '') {
+    return timestampMs(
+      progress?.generatedAt || progress?.updatedAt || progress?.state?.served_at || fallback
+    );
+  }
+
+  function queueProgressWrite(task) {
+    const next = progressWriteQueue.then(task, task);
+    progressWriteQueue = next.catch(() => undefined);
+    return next;
+  }
+
   async function sendGetSnapshotResponse(_req, res) {
     const result = await fetchSupabaseRowByKeyViaRest(snapshotStateKey, 'payload,updated_at', {
       timeoutMs: snapshotReadTimeoutMs,
@@ -267,28 +285,88 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     if (validationError) {
       return res.status(400).json({ ok: false, error: validationError });
     }
-    const updatedAt = now().toISOString();
-    const payload = { progress, updatedAt };
-    const result = await upsertSupabaseRowViaRest(
-      { state_key: progressStateKey, payload, updated_at: updatedAt },
-      {
-        timeoutMs: snapshotWriteTimeoutMs,
-        ignoreFailureCooldown: true,
-        suppressFailureCooldown: true,
+    return queueProgressWrite(async () => {
+      const storedResult = await fetchSupabaseRowByKeyViaRest(
+        progressStateKey,
+        'payload,updated_at',
+        {
+          timeoutMs: snapshotReadTimeoutMs,
+          ignoreFailureCooldown: true,
+          suppressFailureCooldown: true,
+        }
+      );
+      if (!storedResult || !storedResult.ok) {
+        return res.status(502).json({
+          ok: false,
+          error: truncateText(
+            storedResult?.error || 'Bestaande KVK voortgang kon niet worden geladen.',
+            500
+          ),
+        });
       }
-    );
-    if (!result || !result.ok) {
-      return res.status(502).json({
-        ok: false,
-        error: truncateText(result?.error || 'KVK voortgang opslaan mislukt.', 500),
+
+      const storedRow = Array.isArray(storedResult.body)
+        ? storedResult.body[0] || null
+        : storedResult.body || null;
+      const storedPayload =
+        storedRow?.payload && typeof storedRow.payload === 'object' ? storedRow.payload : null;
+      const storedProgress = storedPayload?.progress;
+      const storedUpdatedAt = normalizeString(storedPayload?.updatedAt || storedRow?.updated_at || '');
+      const incomingTime = progressTimestamp(progress);
+      const storedTime = progressTimestamp(storedProgress, storedUpdatedAt);
+
+      // A slow/retried request must never move the dashboard backwards. Keep
+      // the newest accepted row and acknowledge the old request so publishers
+      // do not retry it forever.
+      if (incomingTime > 0 && storedTime > 0 && incomingTime < storedTime) {
+        return res.status(200).json({
+          ok: true,
+          accepted: false,
+          stale: true,
+          stateKey: progressStateKey,
+          updatedAt: storedUpdatedAt,
+          summary: summarizeSnapshot(storedProgress),
+        });
+      }
+
+      const updatedAt = now().toISOString();
+      const payload = { progress, updatedAt };
+      const result = await upsertSupabaseRowViaRest(
+        { state_key: progressStateKey, payload, updated_at: updatedAt },
+        {
+          timeoutMs: snapshotWriteTimeoutMs,
+          ignoreFailureCooldown: true,
+          suppressFailureCooldown: true,
+        }
+      );
+      if (!result || !result.ok) {
+        return res.status(502).json({
+          ok: false,
+          error: truncateText(result?.error || 'KVK voortgang opslaan mislukt.', 500),
+        });
+      }
+      return res.status(200).json({
+        ok: true,
+        accepted: true,
+        stateKey: progressStateKey,
+        updatedAt,
+        summary: summarizeSnapshot(progress),
       });
-    }
-    return res.status(200).json({
-      ok: true,
-      stateKey: progressStateKey,
-      updatedAt,
-      summary: summarizeSnapshot(progress),
     });
+  }
+
+  async function sendPostProgressResponse(req, res) {
+    if (!getAcceptedTokens().length) {
+      return res.status(503).json({ ok: false, error: 'KVK sync-token is niet geconfigureerd.' });
+    }
+    if (!hasValidSyncToken(req)) {
+      return res.status(401).json({ ok: false, error: 'Ongeldig KVK sync-token.' });
+    }
+    const progress = getSubmittedProgress(req.body || {});
+    if (!progress) {
+      return res.status(400).json({ ok: false, error: 'Voortgangssnapshot ontbreekt of is ongeldig.' });
+    }
+    return storeProgressResponse(progress, res);
   }
 
   async function sendGetLocationStatsResponse(_req, res) {
@@ -405,6 +483,7 @@ function createKvkDatabaseSnapshotService(deps = {}) {
   return {
     progressStateKey,
     sendGetProgressResponse,
+    sendPostProgressResponse,
     sendGetLocationStatsResponse,
     sendGetSnapshotResponse,
     sendPostSnapshotResponse,

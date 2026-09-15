@@ -22,6 +22,14 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
       : res.status(503).json({ ok: false, error: 'KVK database voortgang is tijdelijk niet beschikbaar.' })
   );
 
+  app.post('/api/kvk-database/snapshot/progress', (req, res) =>
+    coordinator && typeof coordinator.sendPostProgressResponse === 'function'
+      ? coordinator.sendPostProgressResponse(req, res)
+      : coordinator && typeof coordinator.sendPostSnapshotResponse === 'function'
+        ? coordinator.sendPostSnapshotResponse(req, res)
+        : res.status(503).json({ ok: false, error: 'KVK database voortgang-sync is tijdelijk niet beschikbaar.' })
+  );
+
   app.post('/api/kvk-database/snapshot', (req, res) =>
     coordinator && typeof coordinator.sendPostSnapshotResponse === 'function'
       ? coordinator.sendPostSnapshotResponse(req, res)

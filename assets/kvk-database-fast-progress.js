@@ -8,6 +8,7 @@
 
   function mergeProgress(progress) {
     if (!progress || typeof progress !== 'object' || !progress.state) return false;
+    global.SoftoraKvkWorkerStatus?.updateSheetRobot(progress.sheetRobot || progress.sheet_robot);
     const generatedAt = String(progress.generatedAt || '');
     if (generatedAt && newestGeneratedAt && generatedAt < newestGeneratedAt) return false;
     newestGeneratedAt = generatedAt || newestGeneratedAt;

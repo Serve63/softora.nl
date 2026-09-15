@@ -164,7 +164,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
-  assert.match(pageSource, /assets\/kvk-database-fast-progress\.js\?v=20260914a/);
+  assert.match(pageSource, /assets\/kvk-database-fast-progress\.js\?v=20260915b/);
   const fastProgressSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-fast-progress.js'), 'utf8');
   assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
   assert.match(fastProgressSource, /const REFRESH_MS = 1000/);
@@ -636,6 +636,7 @@ test('kvk database APIs keep reads protected and expose only token-protected syn
 
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/snapshot'/);
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/snapshot\/progress'/);
+  assert.match(routesSource, /app\.post\('\/api\/kvk-database\/snapshot\/progress'/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/snapshot'/);
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/company-directory', requirePremiumAdminApiAccess/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/company-directory\/sync'/);
@@ -650,6 +651,7 @@ test('kvk database APIs keep reads protected and expose only token-protected syn
   assert.match(runtimeSource, /createKvkCompanyDirectoryService/);
   assert.match(runtimeSource, /registerKvkDatabaseRoutes/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'POST'/);
+  assert.match(authSource, /requestPath === '\/api\/kvk-database\/snapshot\/progress' && method === 'POST'/);
   assert.doesNotMatch(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'GET'/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/company-directory\/sync' && method === 'POST'/);
   assert.doesNotMatch(authSource, /requestPath === '\/api\/kvk-database\/company-directory' && method === 'GET'/);
@@ -659,6 +661,7 @@ test('kvk database APIs keep reads protected and expose only token-protected syn
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/poll'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/command'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/worker'/);
+  assert.match(requestContextSource, /'\/api\/kvk-database\/snapshot\/progress'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/company-directory\/sync'/);
 });
 
