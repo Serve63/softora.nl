@@ -194,11 +194,11 @@ function createService(overrides = {}) {
   };
   const service = createInstantlyOutreachService({
     instantlyConfig: {
-      enabled: true,
+      enabled: overrides.instantlyEnabled === undefined ? true : Boolean(overrides.instantlyEnabled),
       syncEnabled: overrides.syncEnabled === undefined ? true : overrides.syncEnabled,
       autoUploadEnabled: Boolean(overrides.autoUploadEnabled),
       schedulerEnabled: false,
-      apiKey: 'instantly-key',
+      apiKey: overrides.instantlyApiKey === undefined ? 'instantly-key' : overrides.instantlyApiKey,
       apiBaseUrl: 'https://api.instantly.test/api/v2',
       defaultCampaignId: 'campaign-1',
       replacementCampaigns: overrides.replacementCampaigns || '',
@@ -2574,6 +2574,12 @@ test('automatic upload selects only a designed Instantly lead and guards before 
 test('automatic Instantly upload cannot send without exact campaign config or central guard', async () => {
   const disabled = createService({ replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' } });
   await assert.rejects(() => disabled.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_DISABLED' });
+  const integrationDisabled = createService({ instantlyEnabled: false, autoUploadEnabled: true });
+  await assert.rejects(() => integrationDisabled.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_INTEGRATION_DISABLED' });
+  const missingApiKey = createService({ instantlyApiKey: '', autoUploadEnabled: true });
+  await assert.rejects(() => missingApiKey.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_API_KEY_MISSING' });
+  assert.equal(integrationDisabled.fetchCalls.length, 0);
+  assert.equal(missingApiKey.fetchCalls.length, 0);
   const withoutCampaigns = createService({ autoUploadEnabled: true, rows: [{ id: 'i', bedrijf: 'Instant', email: 'info@instant.test', website: 'https://instant.test', mail: true, webdesignMailProvider: 'instantly' }] });
   await assert.rejects(() => withoutCampaigns.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' });
   assert.equal(withoutCampaigns.fetchCalls.length, 0);
