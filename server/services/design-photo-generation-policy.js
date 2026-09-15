@@ -1,6 +1,7 @@
 const WEBDESIGN_VARIANT_V1 = 'v1-prompt-only';
 const WEBDESIGN_VARIANT_V2 = 'v2-visual-dna';
 const WEBDESIGN_GENERATION_POLICY = 'customer-website-only-v2';
+const { OUTBOUND_SENDER_PROFILE_KEYS } = require('./outbound-sender-identity');
 
 function normalizeWebdesignVariant(value) {
   return String(value || '').trim().toLowerCase() === WEBDESIGN_VARIANT_V2
@@ -9,10 +10,14 @@ function normalizeWebdesignVariant(value) {
 }
 
 function buildWebdesignGenerationProvenance(job = {}) {
+  const authenticatedEmail = String(job.ownerKey || '').split('::')[0].trim().toLowerCase();
+  const senderEmail = job.customer && job.customer.webdesignMailProvider === 'instantly' &&
+    OUTBOUND_SENDER_PROFILE_KEYS[authenticatedEmail] ? authenticatedEmail : '';
   return {
     generationPolicy: WEBDESIGN_GENERATION_POLICY,
     generationJobId: String(job.id || '').trim(),
     generationVariant: normalizeWebdesignVariant(job.variant),
+    ...(senderEmail ? { senderEmail } : {}),
     ...(job.generation ? { generation: job.generation } : {}),
   };
 }

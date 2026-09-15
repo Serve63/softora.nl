@@ -1367,6 +1367,32 @@ test('canonical mail-ready merge clears stale category flags from unmatched remo
   );
 });
 
+test('Instantly-ready designs remain visible in their own canonical category after a refresh', async () => {
+  const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('snapshot must load'); } } });
+  const state = { klanten: [], mailReadySnapshotLoaded: false, availableSnapshotLoaded: false, foundSnapshotLoaded: false };
+  let rows = [];
+  const config = {
+    state,
+    normalizeCustomer: (raw) => ({ ...raw }),
+    applyCustomerList: (customers) => { rows = client.reconcileCustomerList(state, customers); state.klanten = rows; },
+    fetchJsonWithTimeout: async () => ({ ok: true, json: async () => ({
+      ok: true, total: 0, customers: [], availableTotal: 0, availableCustomers: [],
+      instantlyReadyTotal: 1, instantlyReadyCustomers: [{ id: 'designed-instant', email: 'info@instant.test', status: 'prospect', hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly', instantlyReadySnapshot: true }],
+      foundTotal: 0, foundCustomerIds: [], generatedAt: '2026-09-15T15:00:00.000Z'
+    }) }),
+  };
+  assert.equal(await client.load(config), true);
+  assert.equal(state.instantlyReadySnapshotTotal, 1);
+  assert.deepEqual(rows.filter(client.isSnapshotInstantlyReadyCustomer).map((row) => row.id), ['designed-instant']);
+  assert.deepEqual(rows.filter(client.isSnapshotMailReadyCustomer), []);
+  assert.deepEqual(rows.filter(client.isSnapshotAvailableCustomer), []);
+  rows = client.reconcileCustomerList(state, [{ id: 'designed-instant', email: 'info@instant.test', hasPhoto: false, hasMockup: false }]);
+  assert.equal(rows[0].hasPhoto, true);
+  assert.equal(rows[0].hasMockup, true);
+  assert.equal(client.isSnapshotInstantlyReadyCustomer(rows[0]), true);
+  assert.equal(require('../../assets/premium-database-instantly-status.js').isReady(rows[0]), true);
+});
+
 test('canonical customer reconciliation survives later normalized refreshes and gates ready state on table truth', () => {
   const client = loadDatabaseMailReadySnapshotClient();
   const state = {
@@ -1790,7 +1816,7 @@ test('premium database applies remote customers once after guard and photo enric
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.match(pageSource, /const \[customerResult, orderResult\] = await Promise\.all\(\[window\.SoftoraPremiumDatabaseCustomers\.load\(/);
   assert.match(pageSource, /const customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten\);/);
-  assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\);/);
+  assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers, state\.instantlyReadySnapshotCustomers\);/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
   assert.doesNotMatch(pageSource, /const initialCustomers = [\s\S]*applyCustomerList\(getSortedCustomers/);
 });
@@ -1928,7 +1954,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
-  assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\);/);
+  assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers, state\.instantlyReadySnapshotCustomers\);/);
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\);[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotLoaded = false; state\.mailReadySnapshotTotal = null; applyCustomerList/);
   assert.doesNotMatch(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);

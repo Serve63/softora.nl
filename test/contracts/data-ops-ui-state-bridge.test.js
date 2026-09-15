@@ -337,6 +337,7 @@ test('data ops ui-state bridge reads photo rows as signed URLs without embedding
           fileName: 'demo.png',
           websiteMockupName: 'demo mockup.jpg',
           legacyMeta: {
+            senderEmail: 'martijn@softora.nl',
             mockup: {
               renderer: 'softora-native-device-v6',
               orientation: 'upright',
@@ -359,6 +360,7 @@ test('data ops ui-state bridge reads photo rows as signed URLs without embedding
   assert.equal(photoMap['cust-1'].websitePhotoUrl, signedUrl);
   assert.equal(photoMap['cust-1'].websiteMockupUrl, mockupSignedUrl);
   assert.equal(photoMap['cust-1'].websiteMockupName, 'demo mockup.jpg');
+  assert.equal(photoMap['cust-1'].senderEmail, 'martijn@softora.nl');
   assert.equal(photoMap['cust-1'].mockupRenderer, 'softora-native-device-v6');
   assert.equal(photoMap['cust-1'].mockupOrientation, 'upright');
   assert.equal(photoMap['cust-1'].mockupQualityStatus, 'checked');
