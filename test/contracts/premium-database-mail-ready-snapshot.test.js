@@ -232,6 +232,13 @@ test('a design targeted at Instantly never enters the Softora send snapshot or f
   const snapshot = await service.buildMailReadySnapshot({ limit: 10 });
   assert.equal(snapshot.total, 0);
   assert.equal(snapshot.availableTotal, 0);
+  assert.equal(snapshot.instantlyReadyTotal, 1);
+  assert.deepEqual(snapshot.instantlyReadyCustomers.map((customer) => customer.id), ['instant-design']);
+  assert.equal(snapshot.instantlyReadyCustomers[0].mailReadySnapshot, false);
+  assert.equal(snapshot.instantlyReadyCustomers[0].availableSnapshot, false);
+  const codec = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: 25000, formatVersion: 2 });
+  const cached = codec.parseMailReadySnapshotCacheValue(codec.serializeMailReadySnapshotCache(snapshot));
+  assert.deepEqual(cached.instantlyReadyCustomers.map((customer) => customer.id), ['instant-design']);
 });
 
 test('premium database snapshot version is deterministic across serverless clocks and row order', () => {
@@ -254,6 +261,12 @@ test('premium database snapshot version is deterministic across serverless clock
 
   assert.equal(first, sameContent);
   assert.notEqual(first, newCompany);
+  assert.notEqual(first, buildSnapshotVersion({
+    customers: [{ id: 'ready-a' }, { id: 'ready-b' }],
+    availableCustomers: [{ id: 'available-a' }],
+    instantlyReadyCustomers: [{ id: 'instant-new' }],
+    foundCustomerIds: ['found-a', 'found-b'],
+  }));
 });
 
 test('premium database durable snapshot compresses and restores more than the old 3000-row cap', () => {

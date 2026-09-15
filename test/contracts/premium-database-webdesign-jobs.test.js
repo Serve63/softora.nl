@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { buildWebdesignGenerationProvenance } = require('../../server/services/design-photo-generation-policy');
 
 const {
   buildDeviceMockupSvg,
@@ -18,6 +19,14 @@ const {
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==';
+
+test('Instantly photo provenance records only the authenticated approved generator, not a batch guess', () => {
+  const photo = buildWebdesignGenerationProvenance({ id: 'job-1', ownerKey: 'serve@softora.nl::user-a', customer: { webdesignMailProvider: 'instantly' } });
+  assert.equal(photo.senderEmail, 'serve@softora.nl');
+  assert.equal(buildWebdesignGenerationProvenance({ id: 'job-2', ownerKey: 'martijn@softora.nl::user-b', customer: { webdesignMailProvider: 'instantly' } }).senderEmail, 'martijn@softora.nl');
+  assert.equal(buildWebdesignGenerationProvenance({ id: 'job-3', ownerKey: 'other@softora.nl::user-c', customer: { webdesignMailProvider: 'instantly' } }).senderEmail, undefined);
+  assert.equal(buildWebdesignGenerationProvenance({ id: 'job-4', ownerKey: 'serve@softora.nl::user-a', customer: { webdesignMailProvider: 'softora' } }).senderEmail, undefined);
+});
 
 function createResponseRecorder() {
   return {
