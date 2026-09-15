@@ -185,6 +185,7 @@ test('a completed full sync cleans stale rows before publishing exact metadata',
 
 test('online KVK directory applies one exact server-side category to rows and totals', async () => {
   let readOptions = null;
+  let countOptions = null;
   const service = createKvkCompanyDirectoryService({
     fetchDirectoryRows: async (options) => {
       readOptions = options;
@@ -193,11 +194,15 @@ test('online KVK directory applies one exact server-side category to rows and to
         rows: [{ source_company_id: 301, bedrijfsnaam: 'Controle B.V.', kvk_nummer: '12345678' }],
       };
     },
+    fetchDirectoryCount: async (options) => {
+      countOptions = options;
+      return { ok: true, count: 24_360 };
+    },
     fetchDirectoryMeta: async () => ({
       ok: true,
       row: {
         total: 2_924_398,
-        category_totals: { controle: 24_360, definitief: 960 },
+        category_totals: { controle: 7, definitief: 960 },
         completed: true,
       },
     }),
@@ -218,6 +223,40 @@ test('online KVK directory applies one exact server-side category to rows and to
     limit: 100,
     category: DIRECTORY_CATEGORIES.controle,
   });
+  assert.deepEqual(countOptions, {
+    query: '',
+    category: DIRECTORY_CATEGORIES.controle,
+  });
+});
+
+test('stale producer category metadata cannot override the actual mirrored row count', async () => {
+  const service = createKvkCompanyDirectoryService({
+    fetchDirectoryRows: async () => ({
+      ok: true,
+      rows: [{ source_company_id: 901, bedrijfsnaam: 'Website B.V.', kvk_nummer: '11223344' }],
+    }),
+    fetchDirectoryCount: async () => ({ ok: true, count: 3_007 }),
+    fetchDirectoryMeta: async () => ({
+      ok: true,
+      row: {
+        total: 2_924_398,
+        category_totals: { 'met-website': 131 },
+        completed: true,
+        sync_generation: 'full-current',
+      },
+    }),
+  });
+  const response = createJsonResponse();
+
+  await service.sendGetDirectoryResponse(
+    { query: { categorie: 'met-website' } },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload.total, 3_007);
+  assert.equal(response.payload.total_is_exact, true);
+  assert.equal(response.payload.sync_generation, 'full-current');
 });
 
 test('review categories include every usable company and keep only first rejections in control room', async () => {
@@ -283,9 +322,35 @@ test('unused inventory includes pending approvals and hides transferred rows', a
   );
 });
 
-test('online KVK directory never shows a false zero while category metadata is being built', async () => {
+test('exact met-website count uses the same filters as the displayed rows', async () => {
+  const filters = [];
+  let selectOptions = null;
+  const request = {
+    select(_columns, options) { selectOptions = options; return this; },
+    eq(column, value) { filters.push(['eq', column, value]); return this; },
+    neq(column, value) { filters.push(['neq', column, value]); return this; },
+    then(resolve) { return Promise.resolve({ count: 3_007, error: null }).then(resolve); },
+  };
+  const service = createKvkCompanyDirectoryService({
+    getSupabaseClient: () => ({ from: () => request }),
+  });
+
+  const result = await service.fetchDirectoryCount({ category: 'met-website' });
+
+  assert.deepEqual(selectOptions, { count: 'exact', head: true });
+  assert.deepEqual(filters, [
+    ['eq', 'lead_status', 'usable'],
+    ['eq', 'premium_database_transferred', false],
+    ['eq', 'website_status', 'found'],
+    ['neq', 'website', ''],
+  ]);
+  assert.deepEqual(result, { ok: true, count: 3_007 });
+});
+
+test('exact category counts replace missing or stale producer category metadata', async () => {
   const service = createKvkCompanyDirectoryService({
     fetchDirectoryRows: async () => ({ ok: true, rows: [] }),
+    fetchDirectoryCount: async () => ({ ok: true, count: 3_162 }),
     fetchDirectoryMeta: async () => ({
       ok: true,
       row: { total: 2_924_398, category_totals: {}, completed: true },
@@ -298,9 +363,9 @@ test('online KVK directory never shows a false zero while category metadata is b
     response
   );
 
-  assert.equal(response.statusCode, 503);
-  assert.equal(response.payload.ok, false);
-  assert.match(response.payload.error, /categorie wordt nog opgebouwd/i);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.payload.total, 3_162);
+  assert.equal(response.payload.total_is_exact, true);
 });
 
 test('online KVK directory refuses oversized sync batches', async () => {
