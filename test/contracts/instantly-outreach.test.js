@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const sharp = require('sharp');
 
 const { createInstantlyOutreachService } = require('../../server/services/instantly-outreach');
+const { resolveInstantlyDesignOwner } = require('../../server/services/instantly-design-owner');
 const {
   buildChunkedStatePatch,
   readChunkedStateValue,
@@ -2538,7 +2539,7 @@ test('automatic upload selects only a designed Instantly lead and guards before 
     replacementCampaigns: campaigns,
     rows: [
       { id: 'softora-first', bedrijf: 'Softora-ontwerp', email: 'info@softora-first.test', website: 'https://softora-first.test', status: 'prospect', mail: true, webdesignMailProvider: 'softora' },
-      { id: 'instantly-next', bedrijf: 'Instantly-ontwerp', naam: 'Nina', email: 'info@instantly-next.test', website: 'https://instantly-next.test', status: 'prospect', mail: true },
+      { id: 'instantly-next', bedrijf: 'Instantly-ontwerp', naam: 'Nina', email: 'info@instantly-next.test', website: 'https://instantly-next.test', status: 'prospect', mail: true, verantwoordelijk: 'Servé Creusen' },
     ],
     photoMap: {
       'softora-first': { id: 'softora-first', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'softora' },
@@ -2569,6 +2570,53 @@ test('automatic upload selects only a designed Instantly lead and guards before 
   assert.equal(harness.getRows()[1].status, 'prospect', 'queued is not confirmed sent');
   assert.equal(harness.outboundGuardCalls[0].options.provisional, undefined);
   assert.equal(harness.outboundGuardCalls[0].options.permanent, false);
+});
+
+test('automatic upload routes the design owner to Martijn even when daily rotation would choose Servé', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const harness = createService({
+    autoUploadEnabled: true, replacementCampaigns: campaigns,
+    rows: [{ id: 'martijn-design', bedrijf: 'Martijn ontwerp', email: 'info@martijn-design.test', website: 'https://martijn-design.test', mail: true, verantwoordelijk: 'Team' }],
+    photoMap: { 'martijn-design': { id: 'martijn-design', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly', senderName: 'Martijn van de Ven' } },
+    coldmailingSettings: { senderEmail: 'serve@softora.nl', senders: {
+      'serve@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nServé Creusen' },
+      'martijn@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nMartijn van de Ven' },
+    } },
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Martijn van de Ven Softora.nl', status: 3 } };
+      if (url.endsWith('/leads/add')) {
+        const lead = JSON.parse(options.body).leads[0];
+        assert.equal(lead.custom_variables.softora_sender_name, 'Martijn van de Ven');
+        assert.equal(lead.email, 'info@martijn-design.test');
+        return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'martijn-lead', email: lead.email, index: 0 }] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { status: 1 } };
+    },
+  });
+  const result = await harness.service.autoUploadMailReady();
+  assert.equal(result.owner, 'martijn');
+  assert.equal(result.campaignId, campaigns.martijn);
+  assert.equal(result.uploaded, 1);
+  assert.equal(harness.getRows()[0].instantlyStatus, 'synced');
+  assert.equal(harness.outboundGuardCalls[0].options.payload.senderProfileKey, 'martijn');
+});
+
+test('automatic upload stops before reservation and provider API for missing or conflicting design senders', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  for (const ownerFields of [{ verantwoordelijk: 'Team' }, { verantwoordelijk: 'Serve', senderProfileKey: 'martijn' }]) {
+    const harness = createService({
+      autoUploadEnabled: true, replacementCampaigns: campaigns,
+      rows: [{ id: 'unresolved', bedrijf: 'Onduidelijk ontwerp', email: 'info@unresolved.test', website: 'https://unresolved.test', mail: true, ...ownerFields }],
+      photoMap: { unresolved: { id: 'unresolved', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    });
+    await assert.rejects(() => harness.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_DESIGN_SENDER_UNRESOLVED' });
+    assert.equal(harness.outboundGuardCalls.length, 0);
+    assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+    assert.equal(harness.writes.length, 0);
+  }
+  assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Team' }, { senderProfileKey: 'martijn' }), { owner: 'martijn', reason: '' });
+  assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Serve' }, { senderEmail: 'martijn@softora.nl' }), { owner: '', reason: 'conflicting_sender' });
+  assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Serve', replyMailboxAccount: 'martijnven123@gmail.com' }), { owner: '', reason: 'conflicting_sender' });
 });
 
 test('automatic Instantly upload cannot send without exact campaign config or central guard', async () => {
@@ -2606,7 +2654,7 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
     autoUploadEnabled: true,
     replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' },
     outboundRecipientGuardStore: null,
-    rows: [{ id: 'i', bedrijf: 'Instant', email: 'info@instant.test', website: 'https://instant.test', mail: true, webdesignMailProvider: 'instantly' }],
+    rows: [{ id: 'i', bedrijf: 'Instant', email: 'info@instant.test', website: 'https://instant.test', mail: true, webdesignMailProvider: 'instantly', verantwoordelijk: 'Serve' }],
     photoMap: { i: { id: 'i', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     fetchJsonWithTimeout: async (url) => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
   });
@@ -2621,7 +2669,7 @@ test('automatic Instantly upload appends without truncating an already large leg
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
-    rows: [{ id: 'new-auto', bedrijf: 'Nieuw ontwerp', email: 'new@instantly-new.test', website: 'https://instantly-new.test', mail: true }],
+    rows: [{ id: 'new-auto', bedrijf: 'Nieuw ontwerp', email: 'new@instantly-new.test', website: 'https://instantly-new.test', mail: true, verantwoordelijk: 'Serve' }],
     photoMap: { 'new-auto': { id: 'new-auto', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     coldmailSendGuard: { entries: originalEntries, recipientEntries: originalRecipients },
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
@@ -2641,7 +2689,7 @@ test('automatic Instantly upload resumes an already accepted lead without adding
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
-    rows: [{ id: 'accepted-auto', bedrijf: 'Al geaccepteerd', email: 'accepted@instantly-old.test', instantlyCampaignId: campaigns.serve,
+    rows: [{ id: 'accepted-auto', bedrijf: 'Al geaccepteerd', email: 'accepted@instantly-old.test', verantwoordelijk: 'Serve', instantlyCampaignId: campaigns.serve,
       instantlyManualUploadId: 'instantly-auto-20260915-serve', instantlyLeadId: 'accepted-lead', instantlyStatus: 'synced', instantlySyncedAt: '2026-09-15T08:00:00Z' }],
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
       ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
@@ -2651,6 +2699,19 @@ test('automatic Instantly upload resumes an already accepted lead without adding
   assert.equal(result.reason, 'accepted_campaign_reactivated');
   assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
   assert.ok(harness.fetchCalls.some((call) => call.url.includes('/activate')));
+});
+
+test('automatic upload never reactivates an accepted lead whose design owner conflicts with the campaign', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const harness = createService({
+    autoUploadEnabled: true, replacementCampaigns: campaigns,
+    rows: [{ id: 'wrong-owner', email: 'wrong-owner@company.test', verantwoordelijk: 'Martijn',
+      instantlyCampaignId: campaigns.serve, instantlyManualUploadId: 'instantly-auto-old-serve',
+      instantlyLeadId: 'accepted-wrong-owner', instantlyStatus: 'synced' }],
+  });
+  await assert.rejects(() => harness.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_ACCEPTED_DESIGN_SENDER_MISMATCH' });
+  assert.equal(harness.fetchCalls.filter((call) => call.url.includes('/activate') || call.url.endsWith('/leads/add')).length, 0);
+  assert.equal(harness.outboundGuardCalls.length, 0);
 });
 
 test('automatic AirMail campaigns do not accept personal mailboxes even if legacy sync allows them', async () => {

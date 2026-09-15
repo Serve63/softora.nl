@@ -14,6 +14,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     parseRows,
     buildRowsStateValues,
     collectEligibleRows,
+    getReadyPhoto,
     buildLead,
     loadPersonalizationContext,
     resolveSender,
@@ -64,6 +65,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
   const automatic = createInstantlyAutoUpload({
     ...shared,
     config,
+    getReadyPhoto,
     markPreparedRows,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, source: 'instantly-auto-upload' }),
   });

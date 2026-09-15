@@ -1,3 +1,5 @@
+const { resolveInstantlyDesignOwner } = require('./instantly-design-owner');
+
 const APPROVED_CAMPAIGNS = Object.freeze({
   serve: { id: '6ba410c6-d97a-4186-a414-83ba95022b1a', name: 'Servé Creusen Softora.nl' },
   martijn: { id: '9a603e82-7a50-46e2-855a-5a2990a9304b', name: 'Martijn van de Ven Softora.nl' },
@@ -39,6 +41,7 @@ function createInstantlyAutoUpload(deps = {}) {
     persistRows,
     loadContext,
     collectEligibleRows,
+    getReadyPhoto,
     buildLead,
     resolveSender,
     reserveRows,
@@ -77,14 +80,20 @@ function createInstantlyAutoUpload(deps = {}) {
   async function recoverAcceptedLeadCampaign(rows) {
     for (const owner of ['serve', 'martijn']) {
       const approved = assertApprovedCampaign(owner);
-      const hasAcceptedUnsentLead = rows.some((row) =>
+      const index = rows.findIndex((row) =>
         text(row && row.instantlyCampaignId) === approved.id &&
         text(row && row.instantlyManualUploadId).startsWith('instantly-auto-') &&
         text(row && row.instantlyLeadId) &&
         text(row && row.instantlyStatus).toLowerCase() === 'synced' &&
         !text(row && (row.instantlyEmailSentAt || row.lastInstantlySentAt || row.instantlySentAt))
       );
-      if (!hasAcceptedUnsentLead) continue;
+      if (index < 0) continue;
+      const photoContext = await loadContext(rows, null, { autoMailReadyOnly: true });
+      const designOwner = resolveInstantlyDesignOwner(rows[index], getReadyPhoto({ row: rows[index], index }, photoContext));
+      if (designOwner.owner !== owner) {
+        throw createError('Geaccepteerde Instantly-lead heeft geen bewezen afzender voor de gekozen campagne; activering gestopt.',
+          'INSTANTLY_AUTO_ACCEPTED_DESIGN_SENDER_MISMATCH', 503);
+      }
       const campaign = await readApprovedCampaign(owner);
       if (campaign.status !== 3) continue;
       await activateCampaign(approved.id);
@@ -121,14 +130,25 @@ function createInstantlyAutoUpload(deps = {}) {
     if (syncedToday >= config.dailyCap) {
       return { ok: true, skipped: true, reason: 'daily_cap', syncedToday, cap: config.dailyCap, finishedAt: at };
     }
-    const owner = syncedToday % 2 ? 'martijn' : 'serve';
+    const screeningContext = await loadContext(rows, null, { autoMailReadyOnly: true });
+    const selected = await collectEligibleRows(rows, 1, screeningContext);
+    const item = selected && selected.selectedRows && selected.selectedRows[0];
+    if (!item) {
+      return { ok: true, skipped: true, reason: 'no_mailready_instantly_leads', finishedAt: at };
+    }
+    const designOwner = resolveInstantlyDesignOwner(item.row, getReadyPhoto(item, screeningContext));
+    if (!designOwner.owner) {
+      throw createError('Afzender van dit Instantly-design ontbreekt of is tegenstrijdig; niets geüpload.',
+        'INSTANTLY_AUTO_DESIGN_SENDER_UNRESOLVED', 503);
+    }
+    const owner = designOwner.owner;
     const { approved, status } = await readApprovedCampaign(owner);
     const sender = resolveSender(owner);
     const context = await loadContext(rows, sender, { autoMailReadyOnly: true });
-    const selected = await collectEligibleRows(rows, 1, context);
-    const item = selected && selected.selectedRows && selected.selectedRows[0];
-    if (!item) {
-      return { ok: true, skipped: true, reason: 'no_mailready_instantly_leads', owner, finishedAt: at };
+    const reselected = await collectEligibleRows(rows, 1, context);
+    if (!reselected.selectedRows[0] || reselected.selectedRows[0].index !== item.index) {
+      throw createError('De lead veranderde tijdens de afzendercontrole; niets geüpload.',
+        'INSTANTLY_AUTO_DESIGN_SENDER_SELECTION_CHANGED', 503);
     }
     const lead = await buildLead(item, context);
     const uploadId = `instantly-auto-${at.replace(/[^0-9a-z]+/gi, '').slice(0, 15)}-${owner}`;
