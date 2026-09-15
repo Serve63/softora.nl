@@ -1,5 +1,5 @@
-const { createHash } = require('crypto');
 const { normalizeContactStatus } = require('./customer-lifecycle');
+const { createSnapshotRowHelpers } = require('./premium-database-snapshot-row-helpers');
 const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
 const {
   getIdentityKeyRows,
@@ -142,40 +142,7 @@ function isKvkTransferRow(row = {}) {
   return history.some((entry) => /^kvk-transfer:/i.test(normalizeString(entry && entry.messageKey)));
 }
 
-function dedupeCustomerRows(rows = []) {
-  const byId = new Map();
-  (Array.isArray(rows) ? rows : []).forEach((row) => {
-    const id = getRowId(row);
-    if (!id) return;
-    const current = byId.get(id);
-    if (!current) {
-      byId.set(id, row);
-      return;
-    }
-    const currentUpdatedAt = Date.parse(getRowUpdatedAt(current)) || 0;
-    const nextUpdatedAt = Date.parse(getRowUpdatedAt(row)) || 0;
-    if (nextUpdatedAt > currentUpdatedAt) byId.set(id, row);
-  });
-  return Array.from(byId.values());
-}
-
-function buildSnapshotVersion(data = {}) {
-  const normalizeIds = (rows) => Array.from(new Set(
-    (Array.isArray(rows) ? rows : [])
-      .map((row) => getRowId(row))
-      .filter(Boolean)
-  )).sort();
-  const identity = {
-    mailReady: normalizeIds(data.customers),
-    available: normalizeIds(data.availableCustomers),
-    found: Array.from(new Set(
-      (Array.isArray(data.foundCustomerIds) ? data.foundCustomerIds : [])
-        .map(normalizeString)
-        .filter(Boolean)
-    )).sort(),
-  };
-  return `sha256:${createHash('sha256').update(JSON.stringify(identity)).digest('hex')}`;
-}
+const { dedupeCustomerRows, buildSnapshotVersion } = createSnapshotRowHelpers({ getRowId, getRowUpdatedAt, normalizeString });
 
 function isColdmailTestCompany(row = {}) {
   return COLDMAIL_TEST_COMPANIES.has(normalizeCompanyKey(getRowCompany(row)));
@@ -464,6 +431,16 @@ function buildAvailableSnapshotCustomer(row = {}, photoFlag = {}) {
   };
 }
 
+function buildInstantlyReadySnapshotCustomer(row = {}, photoFlag = {}) {
+  return {
+    ...buildSnapshotCustomer(row, photoFlag),
+    mailReady: false,
+    mailReadySnapshot: false,
+    availableSnapshot: false,
+    instantlyReadySnapshot: true,
+  };
+}
+
 function enrichSnapshotCustomersWithSignedMedia(customers = [], signedRows = []) {
   const signedByCustomerId = new Map();
   (Array.isArray(signedRows) ? signedRows : []).forEach((row) => {
@@ -644,6 +621,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     let mailReadyRows = unguardedCandidates
       .filter((item) => isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildSnapshotCustomer(item.row, item.photoFlag));
+    let instantlyReadyRows = unguardedCandidates
+      .filter((item) => item.photoFlag.webdesignMailProvider === 'instantly' && item.photoFlag.hasPhoto && item.photoFlag.hasMockup)
+      .map((item) => buildInstantlyReadySnapshotCustomer(item.row, item.photoFlag));
     let availableRows = unguardedCandidates
       .filter((item) => !rowHasColdcallingSignal(item.row) && !(item.photoFlag.webdesignMailProvider === 'instantly' && item.photoFlag.hasPhoto && item.photoFlag.hasMockup))
       .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
@@ -658,12 +638,14 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const bootstrapCustomerIds = Array.from(new Set(
       mailReadyRows.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT)
         .concat(availableRows.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT))
+        .concat(instantlyReadyRows.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT))
         .map((customer) => normalizeString(customer && customer.id))
         .filter(Boolean)
     ));
     const signedMediaRows = await readBootstrapSignedMedia(bootstrapCustomerIds);
     mailReadyRows = enrichSnapshotCustomersWithSignedMedia(mailReadyRows, signedMediaRows);
     availableRows = enrichSnapshotCustomersWithSignedMedia(availableRows, signedMediaRows);
+    instantlyReadyRows = enrichSnapshotCustomersWithSignedMedia(instantlyReadyRows, signedMediaRows);
     const mediaMs = Date.now() - mediaStartMs;
     return {
       generatedAt: now().toISOString(),
@@ -671,6 +653,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       customers: mailReadyRows,
       availableTotal: availableRows.length,
       availableCustomers: availableRows,
+      instantlyReadyTotal: instantlyReadyRows.length,
+      instantlyReadyCustomers: instantlyReadyRows,
       foundCustomerIds,
       timings: {
         customersMs,
@@ -712,6 +696,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       ...data,
       total: Array.isArray(data && data.customers) ? data.customers.length : 0,
       availableTotal: Array.isArray(data && data.availableCustomers) ? data.availableCustomers.length : 0,
+      instantlyReadyTotal: Array.isArray(data && data.instantlyReadyCustomers) ? data.instantlyReadyCustomers.length : 0,
     };
     const fullValue = serializeMailReadySnapshotCache(snapshotData, SNAPSHOT_STORAGE_MAX_ROWS, { compress: true });
     const bootstrapValue = serializeMailReadySnapshotCache(snapshotData, MAIL_READY_BOOTSTRAP_ROW_LIMIT);
@@ -746,7 +731,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   function getBootstrapSnapshotCustomers(data = {}) {
     return (Array.isArray(data.customers) ? data.customers : [])
       .slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT)
-      .concat((Array.isArray(data.availableCustomers) ? data.availableCustomers : []).slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT));
+      .concat((Array.isArray(data.availableCustomers) ? data.availableCustomers : []).slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT))
+      .concat((Array.isArray(data.instantlyReadyCustomers) ? data.instantlyReadyCustomers : []).slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT));
   }
 
   function snapshotNeedsBootstrapSignedMedia(data = {}) {
@@ -781,6 +767,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
           version: SNAPSHOT_FORMAT_VERSION,
           customers: enrichSnapshotCustomersWithSignedMedia(data.customers, signedRows),
           availableCustomers: enrichSnapshotCustomersWithSignedMedia(data.availableCustomers, signedRows),
+          instantlyReadyCustomers: enrichSnapshotCustomersWithSignedMedia(data.instantlyReadyCustomers, signedRows),
           timings: {
             ...(data.timings && typeof data.timings === 'object' ? data.timings : {}),
             mediaRefreshMs: Date.now() - startedAtMs,
@@ -940,12 +927,14 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       generatedAt: now().toISOString(),
       customers: withoutRemoved(baseData.customers),
       availableCustomers: withoutRemoved(baseData.availableCustomers),
+      instantlyReadyCustomers: withoutRemoved(baseData.instantlyReadyCustomers),
       ...(Array.isArray(baseData.foundCustomerIds) ? {
         foundCustomerIds: baseData.foundCustomerIds.filter((customerId) => !removedIds.has(normalizeString(customerId))),
       } : {}),
     };
     nextData.total = nextData.customers.length;
     nextData.availableTotal = nextData.availableCustomers.length;
+    nextData.instantlyReadyTotal = nextData.instantlyReadyCustomers.length;
 
     const persisted = await persistDurableSnapshotData(nextData);
     snapshotDataCache = { cachedAtMs: nowMs(), data: nextData };
@@ -977,7 +966,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     }
 
     const sourceCustomers = (Array.isArray(baseData.customers) ? baseData.customers : [])
-      .concat(Array.isArray(baseData.availableCustomers) ? baseData.availableCustomers : []);
+      .concat(Array.isArray(baseData.availableCustomers) ? baseData.availableCustomers : [])
+      .concat(Array.isArray(baseData.instantlyReadyCustomers) ? baseData.instantlyReadyCustomers : []);
     const movedCustomers = sourceCustomers
       .filter((customer) => movedIds.has(normalizeString(customer && customer.id)))
       .map((customer) => ({
@@ -1008,9 +998,11 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       generatedAt: now().toISOString(),
       customers: withoutMoved(baseData.customers),
       availableCustomers: withoutMoved(baseData.availableCustomers).concat(movedCustomers),
+      instantlyReadyCustomers: withoutMoved(baseData.instantlyReadyCustomers),
     };
     nextData.total = nextData.customers.length;
     nextData.availableTotal = nextData.availableCustomers.length;
+    nextData.instantlyReadyTotal = nextData.instantlyReadyCustomers.length;
 
     const persisted = await persistDurableSnapshotData(nextData);
     if (!persisted) {
@@ -1121,6 +1113,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     });
     const allCustomers = Array.isArray(snapshotData.customers) ? snapshotData.customers : [];
     const allAvailableCustomers = Array.isArray(snapshotData.availableCustomers) ? snapshotData.availableCustomers : [];
+    const allInstantlyReadyCustomers = Array.isArray(snapshotData.instantlyReadyCustomers) ? snapshotData.instantlyReadyCustomers : [];
     return {
       ok: true,
       source: SNAPSHOT_SOURCE,
@@ -1132,6 +1125,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       customers: allCustomers.slice(offset, offset + limit),
       availableTotal: allAvailableCustomers.length,
       availableCustomers: allAvailableCustomers.slice(offset, offset + limit),
+      instantlyReadyTotal: allInstantlyReadyCustomers.length,
+      instantlyReadyCustomers: allInstantlyReadyCustomers.slice(offset, offset + limit),
       foundTotal: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds.length : 0,
       foundCustomerIds: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds : [],
       timings: snapshotData.timings,

@@ -333,6 +333,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
         websitePhotoName: normalizeString(entry.fileName || entry.legacyMeta?.websitePhotoName) || 'Websitefoto',
         websiteMockupName: normalizeString(entry.websiteMockupName || entry.legacyMeta?.websiteMockupName),
         webdesignMailProvider: normalizeString(entry.legacyMeta?.webdesignMailProvider),
+        senderEmail: normalizeString(entry.legacyMeta?.senderEmail),
         mockupRenderer: mockupMeta.mockupRenderer,
         mockupOrientation: mockupMeta.mockupOrientation,
         mockupQualityStatus: mockupMeta.mockupQualityStatus || (hasMockup ? 'unverified' : ''),

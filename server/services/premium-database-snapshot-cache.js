@@ -39,7 +39,10 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
       const availableCustomers = (Array.isArray(parsed.availableCustomers) ? parsed.availableCustomers : [])
         .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
         .slice(0, maxLimit);
-      if (!customers.length && !availableCustomers.length) return null;
+      const instantlyReadyCustomers = (Array.isArray(parsed.instantlyReadyCustomers) ? parsed.instantlyReadyCustomers : [])
+        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
+        .slice(0, maxLimit);
+      if (!customers.length && !availableCustomers.length && !instantlyReadyCustomers.length) return null;
       return {
         version: Math.max(1, Number(parsed.version) || 1),
         generatedAt: normalizeString(parsed.generatedAt),
@@ -47,6 +50,8 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
         customers,
         availableTotal: Math.max(availableCustomers.length, Number(parsed.availableTotal) || 0),
         availableCustomers,
+        instantlyReadyTotal: Math.max(instantlyReadyCustomers.length, Number(parsed.instantlyReadyTotal) || 0),
+        instantlyReadyCustomers,
         foundCustomerIds: Array.isArray(parsed.foundCustomerIds)
           ? normalizeFoundCustomerIds(parsed.foundCustomerIds)
           : null,
@@ -67,7 +72,8 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
     return Boolean(
       snapshot &&
       isSnapshotCategoryCoherent(snapshot.total, snapshot.customers) &&
-      isSnapshotCategoryCoherent(snapshot.availableTotal, snapshot.availableCustomers)
+      isSnapshotCategoryCoherent(snapshot.availableTotal, snapshot.availableCustomers) &&
+      isSnapshotCategoryCoherent(snapshot.instantlyReadyTotal || 0, snapshot.instantlyReadyCustomers || [])
     );
   }
 
@@ -88,7 +94,8 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
     const limit = Math.max(1, Math.min(maxLimit, Number(rowLimit) || maxLimit));
     const customers = (Array.isArray(data.customers) ? data.customers : []).slice(0, limit);
     const availableCustomers = (Array.isArray(data.availableCustomers) ? data.availableCustomers : []).slice(0, limit);
-    if (!customers.length && !availableCustomers.length) return '';
+    const instantlyReadyCustomers = (Array.isArray(data.instantlyReadyCustomers) ? data.instantlyReadyCustomers : []).slice(0, limit);
+    if (!customers.length && !availableCustomers.length && !instantlyReadyCustomers.length) return '';
     const serialized = JSON.stringify({
       version: formatVersion,
       generatedAt: normalizeString(data.generatedAt),
@@ -96,6 +103,8 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
       customers,
       availableTotal: Math.max(availableCustomers.length, Number(data.availableTotal) || (Array.isArray(data.availableCustomers) ? data.availableCustomers.length : 0)),
       availableCustomers,
+      instantlyReadyTotal: Math.max(instantlyReadyCustomers.length, Number(data.instantlyReadyTotal) || (Array.isArray(data.instantlyReadyCustomers) ? data.instantlyReadyCustomers.length : 0)),
+      instantlyReadyCustomers,
       ...(Array.isArray(data.foundCustomerIds) ? {
         foundCustomerIds: normalizeFoundCustomerIds(data.foundCustomerIds),
       } : {}),

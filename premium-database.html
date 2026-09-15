@@ -1423,7 +1423,7 @@
             sortAsc: true,
             openId: null,
             modalEditId: null,
-            photoTargetId: null, photoRestorePending: true, photoRestoreFailed: false, dataLoading: true, dataUnavailable: false, remoteCustomersLoaded: false, canonicalSnapshotApplied: false, canonicalCountReady: false, canonicalInventoryReady: false, mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: [], availableSnapshotLoaded: false, availableSnapshotTotal: null, availableSnapshotCustomers: [], foundSnapshotLoaded: false, foundSnapshotTotal: null, foundSnapshotCustomerIdSet: new Set(),
+            photoTargetId: null, photoRestorePending: true, photoRestoreFailed: false, dataLoading: true, dataUnavailable: false, remoteCustomersLoaded: false, canonicalSnapshotApplied: false, canonicalCountReady: false, canonicalInventoryReady: false, mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: [], availableSnapshotLoaded: false, availableSnapshotTotal: null, availableSnapshotCustomers: [], instantlyReadySnapshotTotal: 0, instantlyReadySnapshotCustomers: [], foundSnapshotLoaded: false, foundSnapshotTotal: null, foundSnapshotCustomerIdSet: new Set(),
             visibleLimit: TABLE_PAGE_SIZE,
             lastMailReadyHeaderCount: null,
             lastPhotoHeaderCount: null,
@@ -1878,7 +1878,7 @@
                 ? customersBootstrapPayload.customers
                 : [];
             return window.SoftoraDatabaseMailReadySnapshot.dedupeCustomers(rawCustomers.map(function (item, index) {
-                if (isDatabaseSnapshot && item && item.availableSnapshot === true) return window.SoftoraDatabaseMailReadySnapshot.normalizeAvailableCustomer(item, index, normalizeCustomer);
+                if (isDatabaseSnapshot && item && item.instantlyReadySnapshot === true) return window.SoftoraDatabaseMailReadySnapshot.normalizeInstantlyReadyCustomer(item, index, normalizeCustomer); if (isDatabaseSnapshot && item && item.availableSnapshot === true) return window.SoftoraDatabaseMailReadySnapshot.normalizeAvailableCustomer(item, index, normalizeCustomer);
                 if (isDatabaseSnapshot && item && item.mailReadySnapshot === true) return window.SoftoraDatabaseMailReadySnapshot.normalizeCustomer(item, index, normalizeCustomer);
                 return normalizeCustomer(item, "bootstrap-" + index);
             }).filter(function (customer) {
@@ -2787,7 +2787,7 @@
                         const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true });
                         customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, customersWithFallbackMedia);
                     } catch (error) { state.photoRestoreFailed = true; console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error); } }
-                const canonicalCustomers = window.SoftoraDatabaseMailReadySnapshot.mergeWithCanonicalSnapshots(customersWithPhotos, state.mailReadySnapshotCustomers, state.availableSnapshotCustomers);
+                const canonicalCustomers = window.SoftoraDatabaseMailReadySnapshot.mergeWithCanonicalSnapshots(customersWithPhotos, state.mailReadySnapshotCustomers, state.availableSnapshotCustomers, state.instantlyReadySnapshotCustomers);
                 const outreachAutomation = outreachController.applyAutomation(canonicalCustomers);
                 const sortedCustomers = getSortedCustomers(outreachAutomation.customers);
                 state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true;
