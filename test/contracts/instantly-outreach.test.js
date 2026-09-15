@@ -2621,3 +2621,18 @@ test('automatic Instantly upload resumes an already accepted lead without adding
   assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
   assert.ok(harness.fetchCalls.some((call) => call.url.includes('/activate')));
 });
+
+test('automatic AirMail campaigns do not accept personal mailboxes even if legacy sync allows them', async () => {
+  const harness = createService({
+    autoUploadEnabled: true,
+    blockPersonalMailboxDomains: false,
+    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' },
+    rows: [{ id: 'personal', bedrijf: 'Een bedrijf', email: 'bedrijf@gmail.com', website: 'https://bedrijf.test', mail: true }],
+    photoMap: { personal: { id: 'personal', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
+  });
+  const result = await harness.service.autoUploadMailReady();
+  assert.equal(result.reason, 'no_mailready_instantly_leads');
+  assert.equal(harness.outboundGuardCalls.length, 0);
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+});

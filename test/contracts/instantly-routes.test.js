@@ -211,6 +211,7 @@ test('automatic Instantly cron authenticates GET and delegates additions to cano
   const routes = [];
   let uploads = 0;
   let posted = 0;
+  let activationFails = false;
   const app = {
     get(path, ...handlers) { routes.push(['GET', path, handlers]); },
     post(path, ...handlers) { routes.push(['POST', path, handlers]); },
@@ -227,7 +228,7 @@ test('automatic Instantly cron authenticates GET and delegates additions to cano
       async autoUploadMailReady(input) {
         uploads += 1;
         assert.equal(input.actor, 'Instantly automatische cron');
-        return { ok: true, uploaded: 1 };
+        return activationFails ? { ok: false, uploaded: 1, code: 'INSTANTLY_AUTO_ACTIVATION_FAILED' } : { ok: true, uploaded: 1 };
       },
     },
   });
@@ -250,4 +251,10 @@ test('automatic Instantly cron authenticates GET and delegates additions to cano
   await canonical[2][1](postedRequest, postResult);
   assert.equal(uploads, 1);
   assert.deepEqual(postResult.body, { ok: true, uploaded: 1 });
+  activationFails = true;
+  const failedActivation = createResponseRecorder();
+  canonical[2][0](postedRequest, failedActivation, () => {});
+  await canonical[2][1](postedRequest, failedActivation);
+  assert.equal(failedActivation.statusCode, 502);
+  assert.equal(failedActivation.body.code, 'INSTANTLY_AUTO_ACTIVATION_FAILED');
 });

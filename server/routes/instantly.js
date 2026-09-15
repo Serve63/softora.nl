@@ -141,7 +141,7 @@ function registerInstantlyRoutes(app, deps = {}) {
           normalizeString(body.actor) ||
           'Instantly veilige upload',
       });
-      res.json(result);
+      res.status(mode === 'auto' && result && result.ok === false ? 502 : 200).json(result);
     } catch (error) {
       res.status(error && error.status ? error.status : 400).json({
         ok: false,

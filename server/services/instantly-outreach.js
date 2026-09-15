@@ -2665,7 +2665,7 @@ function createInstantlyOutreachService(deps = {}) {
         });
         continue;
       }
-      if (config.blockPersonalMailboxDomains && isPersonalMailboxDomain(email)) {
+      if ((config.blockPersonalMailboxDomains || context.mailProviderOnly === 'instantly') && isPersonalMailboxDomain(email)) {
         failed.push({
           id,
           bedrijf: company,
