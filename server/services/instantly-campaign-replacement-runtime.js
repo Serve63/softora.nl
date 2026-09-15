@@ -67,6 +67,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     reserveRows: (items, options) => reserveRecipients(items, { ...options, campaignId: 'serve-martijn', source: 'instantly-campaign-replacement' }),
     releaseReservation,
     listCampaignLeads: campaignApi.listCampaignLeads,
+    persistSingleRow,
     pauseCampaign: campaignApi.pauseCampaign,
     deleteCampaignLeads: campaignApi.deleteCampaignLeads,
   });
@@ -77,6 +78,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     markPreparedRows,
     persistSingleRow,
     releaseReservation,
+    listCampaignLeads: campaignApi.listCampaignLeads,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, source: 'instantly-auto-upload' }),
   });
   return { ...replacement, autoUpload: automatic.run };

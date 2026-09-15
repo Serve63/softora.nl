@@ -173,6 +173,17 @@ function registerInstantlyRoutes(app, deps = {}) {
           code: normalizeString(result && result.code) || 'NO_ERROR_CODE',
         });
       }
+      // Reuse the existing authenticated 15-minute cron: no extra scheduled
+      // invocation. Only a confirmed Instantly send can enter Verstuurd.
+      if (typeof instantlyOutreachService.refreshInstantlyDeliveryStatus === 'function') {
+        try {
+          await instantlyOutreachService.refreshInstantlyDeliveryStatus({ actor: 'Instantly verzendstatus cron', reconcileOnly: true });
+        } catch (error) {
+          logger.warn('[InstantlyDeliveryCron][Rejected]', {
+            code: normalizeString(error && error.code) || 'INSTANTLY_DELIVERY_CRON_FAILED',
+          });
+        }
+      }
       res.status(response.status).json(result);
     } catch (_error) {
       res.status(502).json({ ok: false, code: 'INSTANTLY_AUTO_CRON_POST_FAILED' });

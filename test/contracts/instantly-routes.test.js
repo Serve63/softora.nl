@@ -311,3 +311,26 @@ test('automatic Instantly cron logs only a safe error code on a rejected canonic
     { status: 503, code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' },
   ]]);
 });
+
+test('automatic Instantly cron reconciles delivery after the canonical POST, even when upload is rejected', async () => {
+  const routes = [];
+  const deliveryRuns = [];
+  registerInstantlyRoutes({
+    get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+    post() {},
+  }, {
+    cronSecret: 'test-secret',
+    instantlyOutreachService: {
+      async refreshInstantlyDeliveryStatus(input) { deliveryRuns.push(input); return { ok: true, updated: 2 }; },
+    },
+    postAutomaticUpload: async () => ({
+      status: 502,
+      json: async () => ({ ok: false, code: 'INSTANTLY_API_FAILED' }),
+    }),
+  });
+  const cron = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-upload/auto-run');
+  const res = createResponseRecorder();
+  await cron[2][0]({ headers: { authorization: 'Bearer test-secret' } }, res);
+  assert.equal(res.statusCode, 502);
+  assert.deepEqual(deliveryRuns, [{ actor: 'Instantly verzendstatus cron', reconcileOnly: true }]);
+});
