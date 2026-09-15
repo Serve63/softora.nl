@@ -27,7 +27,14 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
   } = deps;
 
   const loadRows = async () => {
-      const state = await getUiStateValues(customerDbScope);
+      const state = await getUiStateValues(customerDbScope, {
+        // Auto-upload must read the current durable customer rows. A stale
+        // cache can hide a newly prepared design, while the read cooldown
+        // should never turn into a permanent scheduler stop.
+        uiStateReadTimeoutMs: 12000,
+        bypassReadFailureCooldown: true,
+        bypassReadCache: true,
+      });
       const values = state && typeof state.values === 'object' ? state.values : {};
       return { state, values, rows: parseRows(values, customerDbKey, normalizeString) };
     };

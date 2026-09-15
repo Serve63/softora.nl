@@ -11,7 +11,7 @@ const DATA_OPS_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
   premium_coldmail_autopilot: 12000,
   premium_coldmail_send_guard: 25000,
   premium_coldmailing_settings: 12000,
-  premium_customers_database: 12000,
+  premium_customers_database: 15000,
   premium_database_photos: 20000,
 });
 
@@ -72,8 +72,13 @@ function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
       typeof dataOpsBridge.getUiStateValues === 'function'
     ) {
       try {
+        const readOptions =
+          args.length && args[0] && typeof args[0] === 'object' && !Array.isArray(args[0])
+            ? args[0]
+            : {};
         const bridged = await awaitDataOpsUiStateWithTimeout(
           dataOpsBridge.getUiStateValues(scope, {
+            ...readOptions,
             legacyGetUiStateValues,
           }),
           scope

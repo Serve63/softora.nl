@@ -245,8 +245,8 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     return merged;
   }
 
-  async function getCustomersState(legacyGetUiStateValues) {
-    const customers = await store.listCustomers();
+  async function getCustomersState(legacyGetUiStateValues, options = {}) {
+    const customers = await store.listCustomers(options);
     if (!customers || customers.length === 0) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
       return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-fallback');
@@ -260,10 +260,10 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     return buildState(SCOPES.customers, buildChunkedStatePatch(KEYS.customers, JSON.stringify(mergedCustomers)));
   }
 
-  async function getActiveOrdersState(legacyGetUiStateValues) {
+  async function getActiveOrdersState(legacyGetUiStateValues, options = {}) {
     const [orders, runtime] = await Promise.all([
-      store.listActiveOrders(),
-      store.listOrderRuntime(),
+      store.listActiveOrders(options),
+      store.listOrderRuntime(options),
     ]);
     const ordersLoaded = Array.isArray(orders);
     const hasRuntime = runtime && typeof runtime === 'object' && Object.keys(runtime).length > 0;
@@ -351,10 +351,10 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     return values;
   }
 
-  async function getPhotosState(legacyGetUiStateValues) {
+  async function getPhotosState(legacyGetUiStateValues, options = {}) {
     const entries = typeof store.listDesignPhotosWithSignedUrls === 'function'
-      ? await store.listDesignPhotosWithSignedUrls()
-      : await store.listDesignPhotosWithDataUrls();
+      ? await store.listDesignPhotosWithSignedUrls(options)
+      : await store.listDesignPhotosWithDataUrls(options);
     if (!entries) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
       return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-fallback');
@@ -369,9 +369,9 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
   async function getUiStateValues(scope, options = {}) {
     if (!canHandleScope(scope)) return null;
     try {
-      if (scope === SCOPES.customers) return getCustomersState(options.legacyGetUiStateValues);
-      if (scope === SCOPES.activeOrders) return getActiveOrdersState(options.legacyGetUiStateValues);
-      if (scope === SCOPES.photos) return getPhotosState(options.legacyGetUiStateValues);
+      if (scope === SCOPES.customers) return getCustomersState(options.legacyGetUiStateValues, options);
+      if (scope === SCOPES.activeOrders) return getActiveOrdersState(options.legacyGetUiStateValues, options);
+      if (scope === SCOPES.photos) return getPhotosState(options.legacyGetUiStateValues, options);
     } catch (error) {
       logger.error('[DataOps][ui-state-get]', error?.message || error);
     }
