@@ -281,14 +281,20 @@
       const parsedSignature = hasMessageContext
         ? signature?.parseIncoming?.(body, message)
         : null;
-      const signatureMatched = Boolean(
+      // Inspect the original sender-proven footer before the legacy parser
+      // drops its legal context or leaves the full name outside the contact.
+      const unmarkedSignature = hasMessageContext
+        ? extractUnmarkedContact(body, message, quotedThread)
+        : null;
+      const legacySignatureMatched = Boolean(
         parsedSignature &&
         parsedSignature.matched === true &&
         Array.isArray(parsedSignature.bodyLines)
       );
-      const bodyWithoutSignature = signatureMatched
-        ? parsedSignature.bodyLines.join('\n').trim()
-        : body;
+      const signatureMatched = Boolean(unmarkedSignature || legacySignatureMatched);
+      const bodyWithoutSignature = unmarkedSignature
+        ? unmarkedSignature.body
+        : legacySignatureMatched ? parsedSignature.bodyLines.join('\n').trim() : body;
       const provenBody = getProvenQuotedOutboundResult(bodyWithoutSignature, mail, message).body;
       const parsedDisplayBody = presentationOptions.stripDetectedQuotes === true &&
         typeof options.splitQuotedReply === 'function'
@@ -310,7 +316,9 @@
       }
       return {
         body: sourceSafeBody,
-        contact: normalizeSignatureContact(parsedSignature.contact || emptyContact()),
+        contact: unmarkedSignature
+          ? { ...(parsedSignature?.contact || {}), ...unmarkedSignature.contact }
+          : normalizeSignatureContact(parsedSignature.contact || emptyContact()),
         signatureMatched: true,
       };
     }
