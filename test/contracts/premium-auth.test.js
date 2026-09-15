@@ -625,6 +625,22 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     true
   );
   assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/outreach/provider-upload/auto-run' }),
+    true
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/outreach/provider-upload/auto-run' }),
+    false
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/outreach/provider-upload/auto-run/extra' }),
+    false
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/outreach/provider-upload' }),
+    false
+  );
+  assert.equal(
     manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/coldmailing/autopilot/run' }),
     true
   );
