@@ -206,3 +206,55 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(designStageInput.actor, 'serve@softora.nl');
   assert.equal(adminChecks, 6);
 });
+
+test('automatic Instantly cron authenticates GET and delegates additions to canonical POST', async () => {
+  const routes = [];
+  let uploads = 0;
+  let posted = 0;
+  let activationFails = false;
+  const app = {
+    get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+    post(path, ...handlers) { routes.push(['POST', path, handlers]); },
+  };
+  registerInstantlyRoutes(app, {
+    cronSecret: 'secret-for-test',
+    requirePremiumAdminApiAccess(_req, res) { res.status(403).json({ ok: false }); },
+    postAutomaticUpload: async (secret) => {
+      posted += 1;
+      assert.equal(secret, 'secret-for-test');
+      return { status: 200, json: async () => ({ ok: true, uploaded: 1 }) };
+    },
+    instantlyOutreachService: {
+      async autoUploadMailReady(input) {
+        uploads += 1;
+        assert.equal(input.actor, 'Instantly automatische cron');
+        return activationFails ? { ok: false, uploaded: 1, code: 'INSTANTLY_AUTO_ACTIVATION_FAILED' } : { ok: true, uploaded: 1 };
+      },
+    },
+  });
+  const cron = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-upload/auto-run');
+  const canonical = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-upload');
+  assert.ok(cron);
+  assert.ok(canonical);
+  const denied = createResponseRecorder();
+  await cron[2][0]({ headers: { authorization: 'Bearer wrong' } }, denied);
+  assert.equal(denied.statusCode, 401);
+  assert.equal(posted, 0);
+  const allowed = createResponseRecorder();
+  await cron[2][0]({ headers: { authorization: 'Bearer secret-for-test' } }, allowed);
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(posted, 1);
+  assert.equal(uploads, 0, 'GET never imports directly');
+  const postedRequest = { headers: { authorization: 'Bearer secret-for-test' }, body: { mode: 'auto' } };
+  const postResult = createResponseRecorder();
+  canonical[2][0](postedRequest, postResult, () => {});
+  await canonical[2][1](postedRequest, postResult);
+  assert.equal(uploads, 1);
+  assert.deepEqual(postResult.body, { ok: true, uploaded: 1 });
+  activationFails = true;
+  const failedActivation = createResponseRecorder();
+  canonical[2][0](postedRequest, failedActivation, () => {});
+  await canonical[2][1](postedRequest, failedActivation);
+  assert.equal(failedActivation.statusCode, 502);
+  assert.equal(failedActivation.body.code, 'INSTANTLY_AUTO_ACTIVATION_FAILED');
+});

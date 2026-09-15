@@ -68,6 +68,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/outreach/provider-upload/auto-run",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/coldmailing/autopilot/run",
       "schedule": "*/5 * * * *"
     },
@@ -174,4 +178,3 @@
     }
   ]
 }
-

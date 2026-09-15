@@ -448,6 +448,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           instantlyConfig: {
             enabled: envConfig.INSTANTLY_ENABLED,
             syncEnabled: instantlySyncEnabled,
+            autoUploadEnabled: envConfig.INSTANTLY_AUTO_UPLOAD_ENABLED,
             schedulerEnabled: instantlySchedulerEnabled,
             apiKey: envConfig.INSTANTLY_API_KEY,
             apiBaseUrl: envConfig.INSTANTLY_API_BASE_URL,

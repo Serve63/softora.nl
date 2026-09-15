@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 function registerInstantlyRoutes(app, deps = {}) {
   const {
     instantlyOutreachService,
@@ -6,9 +8,33 @@ function registerInstantlyRoutes(app, deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     requirePremiumAdminApiAccess = (_req, _res, next) => next(),
+    cronSecret = process.env.CRON_SECRET,
+    postAutomaticUpload = async (secret) => fetch('https://www.softora.nl/api/outreach/provider-upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'auto' }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(120_000),
+    }),
   } = deps;
 
   if (!instantlyOutreachService) return;
+
+  function hasCronAccess(req) {
+    const expected = Buffer.from(`Bearer ${normalizeString(cronSecret)}`);
+    const supplied = Buffer.from(normalizeString(req && req.headers && req.headers.authorization));
+    return Boolean(normalizeString(cronSecret)) && expected.length === supplied.length &&
+      crypto.timingSafeEqual(expected, supplied);
+  }
+
+  function requireUploadAccess(req, res, next) {
+    if (normalizeString(req && req.body && req.body.mode).toLowerCase() === 'auto' && hasCronAccess(req)) {
+      req.premiumAuth = { displayName: 'Instantly automatische cron' };
+      next();
+      return;
+    }
+    requirePremiumAdminApiAccess(req, res, next);
+  }
 
   async function handleQueueRegistration(req, res) {
     try {
@@ -88,10 +114,12 @@ function registerInstantlyRoutes(app, deps = {}) {
   async function handlePrepareUpload(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const replaceMode = normalizeString(body.mode).toLowerCase() === 'replace';
-      const operation = replaceMode
-        ? instantlyOutreachService.replaceInstantlyCampaigns
-        : instantlyOutreachService.prepareInstantlyUpload;
+      const mode = normalizeString(body.mode).toLowerCase();
+      const operation = mode === 'auto'
+        ? instantlyOutreachService.autoUploadMailReady
+        : mode === 'replace'
+          ? instantlyOutreachService.replaceInstantlyCampaigns
+          : instantlyOutreachService.prepareInstantlyUpload;
       if (typeof operation !== 'function') {
         res.status(404).json({
           ok: false,
@@ -113,7 +141,7 @@ function registerInstantlyRoutes(app, deps = {}) {
           normalizeString(body.actor) ||
           'Instantly veilige upload',
       });
-      res.json(result);
+      res.status(mode === 'auto' && result && result.ok === false ? 502 : 200).json(result);
     } catch (error) {
       res.status(error && error.status ? error.status : 400).json({
         ok: false,
@@ -124,6 +152,22 @@ function registerInstantlyRoutes(app, deps = {}) {
         ),
         missing: Array.isArray(error && error.missing) ? error.missing : undefined,
       });
+    }
+  }
+
+  async function handleAutoCron(req, res) {
+    if (!hasCronAccess(req)) {
+      res.status(401).json({ ok: false, code: 'INSTANTLY_AUTO_CRON_UNAUTHORIZED' });
+      return;
+    }
+    try {
+      // Vercel Cron invokes GET; this authenticated run delegates every new
+      // lead to the sole canonical POST provider-upload route.
+      const response = await postAutomaticUpload(cronSecret);
+      const result = await response.json();
+      res.status(response.status).json(result);
+    } catch (_error) {
+      res.status(502).json({ ok: false, code: 'INSTANTLY_AUTO_CRON_POST_FAILED' });
     }
   }
 
@@ -243,7 +287,8 @@ function registerInstantlyRoutes(app, deps = {}) {
   app.post('/api/outreach/provider-sync', requirePremiumAdminApiAccess, handleSync);
 
   app.post('/api/instantly/prepare-upload', requirePremiumAdminApiAccess, handlePrepareUpload);
-  app.post('/api/outreach/provider-upload', requirePremiumAdminApiAccess, handlePrepareUpload);
+  app.post('/api/outreach/provider-upload', requireUploadAccess, handlePrepareUpload);
+  app.get('/api/outreach/provider-upload/auto-run', handleAutoCron);
   app.post('/api/outreach/provider-queue/register', requirePremiumAdminApiAccess, handleQueueRegistration);
   app.post('/api/outreach/provider-queue/stage-designs', requirePremiumAdminApiAccess, handleQueueDesignStage);
 
