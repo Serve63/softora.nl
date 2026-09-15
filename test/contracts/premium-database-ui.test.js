@@ -304,6 +304,11 @@ test('premium database source filter recognizes only durable KVK transfers', () 
     { className: 'benaderbaar', label: 'Mailklaar' }
   );
   assert.equal(sourceFilter.getContextualStatusPresentation('benaderbaar', false), null);
+  assert.equal(sourceFilter.getContextualStatusPresentation('instantly-ready', false), null);
+  assert.deepEqual(
+    { ...sourceFilter.getContextualStatusPresentation('instantly-ready', true) },
+    { className: 'benaderbaar', label: 'Mailklaar' }
+  );
   assert.equal(sourceFilter.getContextualStatusPresentation('beschikbaar', true), null);
   assert.equal(sourceFilter.getContextualStatusPresentation('prospect', true), null);
   assert.deepEqual(
@@ -318,12 +323,12 @@ test('Mailklaar view maps only canonical eligible rows to the contextual Mailkla
 
   assert.match(
     pageSource,
-    /getContextualStatusPresentation\(state\.activeStatus, state\.mailReadySnapshotLoaded && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) && isColdmailBaseLeadEligible\(customer\)\)/
+    /getContextualStatusPresentation\(state\.activeStatus, state\.activeStatus === "instantly-ready" \? outreachController\.isInstantlyReadyCustomer\(customer\) : \(state\.mailReadySnapshotLoaded && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) && isColdmailBaseLeadEligible\(customer\)\)\)/
   );
   assert.match(pageSource, /contextualStatus = availableStatus \|\| mailReadyStatus;/);
   assert.match(pageSource, /const statusClassName = contextualStatus \? contextualStatus\.className : customer\.status;/);
   assert.match(pageSource, /const statusLabel = contextualStatus \? contextualStatus\.label :/);
-  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260915-instantly-status/);
 });
 
 test('premium database keeps bootstrap rows hidden until the canonical inventory is ready', () => {
@@ -4715,7 +4720,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
   assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return Boolean\(state\.remoteCustomersLoaded \|\| state\.canonicalSnapshotApplied\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /if \(state\.activeStatus === "beschikbaar"\) return false;/);
-  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260915-instantly-status/);
   assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);

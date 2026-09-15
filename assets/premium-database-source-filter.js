@@ -36,8 +36,11 @@
     }
 
     function getContextualStatusPresentation(activeStatus, isCanonicalMailReady) {
-        if (activeStatus !== "benaderbaar" || isCanonicalMailReady !== true) return null;
-        return { className: "benaderbaar", label: "Mailklaar" };
+        if (isCanonicalMailReady !== true) return null;
+        if (activeStatus === "benaderbaar" || activeStatus === "instantly-ready") {
+            return { className: "benaderbaar", label: "Mailklaar" };
+        }
+        return null;
     }
 
     return {
