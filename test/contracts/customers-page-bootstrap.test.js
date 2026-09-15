@@ -558,7 +558,7 @@ test('premium database bootstrap repairs a category-incomplete compact cache fro
   assert.equal(payload.snapshotFallback, true);
   assert.equal(payload.mailReadySnapshotTotal, 1);
   assert.equal(payload.availableSnapshotTotal, 2);
-  assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'magnivita', 'bliv']);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'bliv', 'magnivita']);
 });
 
 test('premium database bootstrap never publishes category counts when both snapshot caches are incomplete', async () => {

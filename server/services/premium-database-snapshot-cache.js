@@ -1,5 +1,5 @@
+const { compareCustomersByDistance, sortCustomersByDistance } = require('../../assets/premium-database-distance');
 const { gzipSync, gunzipSync } = require('zlib');
-
 function normalizeString(value) {
   return String(value || '').trim();
 }
@@ -34,13 +34,13 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
       const parsed = decodeSnapshotValue(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.customers)) return null;
       const customers = parsed.customers
-        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
+        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id)).sort(compareCustomersByDistance)
         .slice(0, maxLimit);
       const availableCustomers = (Array.isArray(parsed.availableCustomers) ? parsed.availableCustomers : [])
-        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
+        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id)).sort(compareCustomersByDistance)
         .slice(0, maxLimit);
       const instantlyReadyCustomers = (Array.isArray(parsed.instantlyReadyCustomers) ? parsed.instantlyReadyCustomers : [])
-        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
+        .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id)).sort(compareCustomersByDistance)
         .slice(0, maxLimit);
       if (!customers.length && !availableCustomers.length && !instantlyReadyCustomers.length) return null;
       return {
@@ -92,9 +92,9 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
 
   function serializeMailReadySnapshotCache(data = {}, rowLimit = maxLimit, serializeOptions = {}) {
     const limit = Math.max(1, Math.min(maxLimit, Number(rowLimit) || maxLimit));
-    const customers = (Array.isArray(data.customers) ? data.customers : []).slice(0, limit);
-    const availableCustomers = (Array.isArray(data.availableCustomers) ? data.availableCustomers : []).slice(0, limit);
-    const instantlyReadyCustomers = (Array.isArray(data.instantlyReadyCustomers) ? data.instantlyReadyCustomers : []).slice(0, limit);
+    const customers = sortCustomersByDistance(data.customers).slice(0, limit);
+    const availableCustomers = sortCustomersByDistance(data.availableCustomers).slice(0, limit);
+    const instantlyReadyCustomers = sortCustomersByDistance(data.instantlyReadyCustomers).slice(0, limit);
     if (!customers.length && !availableCustomers.length && !instantlyReadyCustomers.length) return '';
     const serialized = JSON.stringify({
       version: formatVersion,
