@@ -196,9 +196,14 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'AI telefonie en voicesoftware op maat',
     description:
       'Laat voicesoftware en AI telefonie op maat maken door Softora voor bereikbaarheid, leadkwalificatie, afspraakintake, CRM-opvolging en veilige overdracht.',
+    lastmod: '2026-09-15',
+    growthEventKind: 'other_growth_action',
+    growthCluster: 'ai-contact',
     kind: 'service',
     serviceName: 'Voicesoftware op maat',
     relatedLinks: [
+      '/kennisbank/ai-telefonist-crm-koppeling',
+      '/blog/ai-telefonist-kosten-mkb',
       '/ai-telefonist',
       '/crm-systeem-op-maat',
       '/ai-automatisering',

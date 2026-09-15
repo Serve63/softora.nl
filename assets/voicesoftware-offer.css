@@ -1,0 +1,29 @@
+/* Only loaded by the maatwerk voice offer; preserve other service designs. */
+html { scroll-padding-top: 100px; }
+body .hero-sub { color: #fff; }
+body .hero-title em { color: #f3a8c8; }
+body .hero-eyebrow { color: #f3a8c8; }
+body .section-sub,
+body .dienst-desc,
+body .dienst-list li,
+body .step-desc,
+body .example-desc,
+body .why-desc,
+body .cta-sub { font-size: 16px; line-height: 1.7; }
+body .cta-sub, body .cta-tel { color: #fff; }
+body .dienst-desc a, body .step-desc a, body .why-desc a {
+  color: #8b2252;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+body a:focus-visible { outline: 3px solid #8b2252; outline-offset: 4px; }
+body .hero a:focus-visible, body .cta-block a:focus-visible { outline-color: #fff; }
+body .nav-start-btn, body .btn-ghost { min-height: 44px; min-width: 44px; }
+/* The fixed header already provides contact without covering the offer. */
+body .whatsapp-widget { display: none; }
+@media (max-width: 600px) {
+  body .hero { padding-top: 112px; padding-bottom: 40px; }
+  body .hero-title { font-size: clamp(36px, 10vw, 48px); }
+  body .hero-btns { gap: 12px; }
+  body .stat-num { font-size: 30px; }
+}
