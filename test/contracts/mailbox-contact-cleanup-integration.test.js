@@ -20,10 +20,12 @@ const fixtures = [
     expected: ['Stephan Voorbeeld', '<div>Walerijstraat 210</div><div>5617 AR Voorbeeld (Wijk)</div>', 'href="http://www.example.nl/"'],
     absent: /&lt;http|<\[|&lt;\[/ },
 ];
+const histories = ['', '\n\nOp 9 sep 2026 om 12:00 schreef Andere Afzender:\n> Dit is een ouder bericht.\n> Tel: 030 7654321'];
 
 test('one central cleanup covers root, dossier, all accounts and providers, old and future messages', () => {
-  for (const fixture of fixtures) for (const owner of ['serve', 'martijn']) for (const source of ['gmail', 'strato', 'instantly', 'future-provider']) for (const date of ['2026-08-01', '2027-01-01']) {
-    const message = Object.freeze({ ...fixture, accountEmail: `${owner}+alias@example.nl`, source, date, direction: 'received' });
+  for (const fixture of fixtures) for (const owner of ['serve', 'martijn']) for (const source of ['gmail', 'strato', 'instantly', 'future-provider']) for (const date of ['2026-08-01', '2027-01-01']) for (const history of histories) {
+    const originalBody = fixture.body + history;
+    const message = Object.freeze({ ...fixture, body: originalBody, accountEmail: `${owner}+alias@example.nl`, source, date, direction: 'received' });
     const root = presentation.getRootPresentation(message.body, message);
     const rootHtml = [root.body];
     assert.equal(root.appendContact(rootHtml), true);
@@ -33,9 +35,10 @@ test('one central cleanup covers root, dossier, all accounts and providers, old 
     for (const html of [rootHtml.join(''), thread.body + thread.contactHtml]) {
       for (const expected of fixture.expected) assert.ok(html.includes(expected), `${source}/${owner}/${date}: ${expected}\n${html}\n${diagnostic()}`);
       assert.doesNotMatch(html, fixture.absent, diagnostic());
+      assert.doesNotMatch(html, /ouder bericht|030 7654321/);
       assert.equal((html.match(/class="detail-mail-contact-card"/g) || []).length, 1);
     }
-    assert.equal(message.body, fixture.body);
+    assert.equal(message.body, originalBody);
     assert.equal(root.body, fixture.body.split(`\n\n${fixture.expected[0]}`)[0]);
   }
 });
