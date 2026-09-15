@@ -22,6 +22,7 @@ const {
 } = require('./instantly-campaign-replacement');
 const { createInstantlyCampaignReplacementApi } = require('./instantly-campaign-replacement-api');
 const { createInstantlyCampaignReplacementRuntime } = require('./instantly-campaign-replacement-runtime');
+const { formatDateKeyForTimeZone, isDesignedInstantlyRow } = require('./instantly-auto-upload');
 const { createInstantlyWebhookState } = require('./instantly-webhook-state');
 const { buildInstantlyInsufficientUploadResult, buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
 const {
@@ -2062,6 +2063,7 @@ function normalizeInstantlyConfig(config = {}) {
   return {
     enabled: readBool(config.enabled, false),
     syncEnabled: readBool(config.syncEnabled, false),
+    autoUploadEnabled: readBool(config.autoUploadEnabled, false),
     schedulerEnabled: readBool(config.schedulerEnabled, false),
     apiKey: defaultNormalizeString(config.apiKey),
     apiBaseUrl: defaultNormalizeString(config.apiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/g, ''),
@@ -2091,25 +2093,6 @@ function normalizeInstantlyConfig(config = {}) {
       normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL) ||
       DEFAULT_INSTANTLY_SENDER_EMAIL,
   };
-}
-
-function formatDateKeyForTimeZone(value, timeZone = DEFAULT_DAILY_CAP_TIME_ZONE) {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  try {
-    const parts = new Intl.DateTimeFormat('en', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(date);
-    const year = parts.find((part) => part.type === 'year')?.value;
-    const month = parts.find((part) => part.type === 'month')?.value;
-    const day = parts.find((part) => part.type === 'day')?.value;
-    return year && month && day ? `${year}-${month}-${day}` : date.toISOString().slice(0, 10);
-  } catch (_) {
-    return date.toISOString().slice(0, 10);
-  }
 }
 
 function createInstantlyError(message, code, status = 400, extra = {}) {
@@ -2651,6 +2634,10 @@ function createInstantlyOutreachService(deps = {}) {
       const company = getRowCompany(row, normalizeString);
       const status = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
       if (!isInstantlyQueueSelectionMatch(row, context, normalizeString)) continue;
+      if (context.mailProviderOnly === 'instantly') {
+        const assets = getReadyWebdesignAssets({ id, index, row }, context);
+        if (!isDesignedInstantlyRow(row, assets, normalizeString)) continue;
+      }
       if (!isLikelyValidEmail(email, normalizeString)) continue;
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
@@ -3484,16 +3471,21 @@ function createInstantlyOutreachService(deps = {}) {
     const existingState = await getUiStateValues(coldmailSendGuardScope);
     const existingValues = existingState && typeof existingState.values === 'object' ? existingState.values : {};
     const existingGuardState = getColdmailSendGuardStateFromValues(existingValues);
+    const preserveExisting = normalizeString(options.source) === 'instantly-auto-upload';
     const entries = mergeColdmailGuardEntries(
       existingGuardState.entries,
       [],
       getColdmailSendGuardEntryMergeKey
-    ).slice(-1000);
+    );
     const mergedRecipientEntries = mergeColdmailGuardEntries(
       existingGuardState.recipientEntries,
       recipientEntries,
       getColdmailRecipientGuardMergeKey
-    ).slice(-2500);
+    );
+    // This append-only path must never discard older send or recipient guards.
+    // If the state write exceeds its size limit, fail before the provider upload.
+    const guardedEntries = preserveExisting ? entries : entries.slice(-1000);
+    const guardedRecipientEntries = preserveExisting ? mergedRecipientEntries : mergedRecipientEntries.slice(-2500);
 
     const write = await setUiStateValues(
       coldmailSendGuardScope,
@@ -3506,8 +3498,8 @@ function createInstantlyOutreachService(deps = {}) {
           provider: 'instantly',
           campaignId: normalizeString(options.campaignId) || 'serve-martijn',
           uploadId: normalizeString(options.uploadId),
-          entries,
-          recipientEntries: mergedRecipientEntries,
+          entries: guardedEntries,
+          recipientEntries: guardedRecipientEntries,
         }),
       },
       {
@@ -4457,12 +4449,19 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
-  const campaignReplacement = createInstantlyCampaignReplacementRuntime({ config, now, createError: createInstantlyError, getUiStateValues, setUiStateValues, customerDbScope, customerDbKey, parseRows: parseDatabaseRows, buildRowsStateValues: buildCustomerRowsStateValues, collectEligibleRows, buildLead: buildInstantlyLead, loadPersonalizationContext, resolveSender: (owner) => resolveInstantlySenderProfile({ senderProfile: owner }, config, normalizeString), reserveRecipients: reserveSupabaseOutboundRecipientsForInstantly, outboundRecipientGuardStore, saveLegacyGuards: savePermanentInstantlyRecipientGuards, campaignApi: { ...replacementCampaignApi, listCampaignLeads: (campaignId, limit) => listInstantlyCampaignLeads(limit, campaignId), addCampaignLeads: (campaignId, leads) => addLeadsToInstantly(leads, campaignId), deleteCampaignLeads: (campaignId, leadIds) => deleteInstantlyLeadsByIds(leadIds, campaignId) }, normalizeString });
+  const campaignReplacement = createInstantlyCampaignReplacementRuntime({ config, now, createError: createInstantlyError, getUiStateValues, setUiStateValues, customerDbScope, customerDbKey, parseRows: parseDatabaseRows, buildRowsStateValues: buildCustomerRowsStateValues, collectEligibleRows, buildLead: async (item, context) => assertInstantlyLeadReady(await buildInstantlyLead(item, context)), loadPersonalizationContext, resolveSender: (owner) => resolveInstantlySenderProfile({ senderProfile: owner }, config, normalizeString), reserveRecipients: reserveSupabaseOutboundRecipientsForInstantly, outboundRecipientGuardStore, saveLegacyGuards: savePermanentInstantlyRecipientGuards, markPreparedRows: markRowsAsPreparedForInstantlyUpload, campaignApi: { ...replacementCampaignApi, listCampaignLeads: (campaignId, limit) => listInstantlyCampaignLeads(limit, campaignId), addCampaignLeads: (campaignId, leads) => addLeadsToInstantly(leads, campaignId), deleteCampaignLeads: (campaignId, leadIds) => deleteInstantlyLeadsByIds(leadIds, campaignId) }, normalizeString });
 
   async function replaceInstantlyCampaigns(input = {}) {
     replacementCampaignApi.assertConfigured();
     return runExclusiveInstantlyOperation(async () => {
       lastSyncResult = await campaignReplacement.replace(input);
+      return lastSyncResult;
+    });
+  }
+
+  async function autoUploadMailReady(input = {}) {
+    return runExclusiveInstantlyOperation(async () => {
+      lastSyncResult = await campaignReplacement.autoUpload(input);
       return lastSyncResult;
     });
   }
@@ -4568,6 +4567,7 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   return {
+    autoUploadMailReady,
     getMissingConfig,
     getStatus,
     handleInstantlyWebhook,
