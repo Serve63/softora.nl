@@ -5912,13 +5912,13 @@ function createColdmailCampaignService(deps = {}) {
       selected: resolved.selectedRows.length,
       safetyLimits: getColdmailSafetyLimits(),
       recipients: resolved.selectedRows.map((item) => {
-        const website = getRowDomain(item.row);
+        const website = getRowDomain(item.row), distanceKm = resolved.mode === 'call' ? getRowDistanceKm(item.row) : getHaarenDistanceKm(item.row);
         const recipient = {
           id: item.id,
           bedrijf: getRowCompany(item.row),
           email: getRowEmail(item.row),
           phone: getRowPhone(item.row),
-          distanceKm: Number.isFinite(getHaarenDistanceKm(item.row)) ? Math.round(getHaarenDistanceKm(item.row) * 10) / 10 : null,
+          distanceKm: Number.isFinite(distanceKm) ? Math.round(distanceKm * 10) / 10 : null,
         };
         if (website) recipient.website = website;
         return recipient;
