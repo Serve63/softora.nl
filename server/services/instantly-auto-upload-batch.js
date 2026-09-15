@@ -1,5 +1,5 @@
-const DEFAULT_AUTO_UPLOAD_BATCH_SIZE = 25;
-const MAX_AUTO_UPLOAD_BATCH_SIZE = 50;
+const DEFAULT_AUTO_UPLOAD_BATCH_SIZE = 10;
+const MAX_AUTO_UPLOAD_BATCH_SIZE = 25;
 const GUARDED_PROVIDER_WARNING_CODES = new Set([
   'INSTANTLY_AUTO_LOCAL_LINK_FAILED',
   'INSTANTLY_AUTO_PROVIDER_PARTIAL_UPLOAD',
@@ -13,11 +13,8 @@ function positiveInteger(value) {
 function resolveAutoUploadBatchLimit(input = {}, config = {}) {
   const explicit = positiveInteger(input.limit);
   if (explicit) return Math.min(MAX_AUTO_UPLOAD_BATCH_SIZE, explicit);
-  const configured = positiveInteger(config.batchSize);
-  return Math.min(
-    MAX_AUTO_UPLOAD_BATCH_SIZE,
-    Math.max(DEFAULT_AUTO_UPLOAD_BATCH_SIZE, configured || 0)
-  );
+  const configured = positiveInteger(config.batchSize) || DEFAULT_AUTO_UPLOAD_BATCH_SIZE;
+  return Math.min(MAX_AUTO_UPLOAD_BATCH_SIZE, configured);
 }
 
 async function runInstantlyAutoUploadBatch(deps = {}) {
