@@ -367,6 +367,10 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/mailbox/instantly/sync' && method === 'GET') {
         return true;
       }
+      if (requestPath === '/api/outreach/provider-upload/auto-run' && method === 'GET') {
+        // The route itself requires CRON_SECRET before delegating to the protected POST.
+        return true;
+      }
       if (requestPath === '/api/coldmailing/autopilot/run' && method === 'GET') {
         return true;
       }
