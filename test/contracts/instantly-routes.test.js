@@ -258,3 +258,31 @@ test('automatic Instantly cron authenticates GET and delegates additions to cano
   assert.equal(failedActivation.statusCode, 502);
   assert.equal(failedActivation.body.code, 'INSTANTLY_AUTO_ACTIVATION_FAILED');
 });
+
+test('automatic Instantly internal POST supplies the required same-origin header', async () => {
+  const originalFetch = global.fetch;
+  const requests = [];
+  global.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return { status: 200, json: async () => ({ ok: true, skipped: true }) };
+  };
+  try {
+    const routes = [];
+    registerInstantlyRoutes({
+      get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+      post() {},
+    }, { cronSecret: 'test-secret', instantlyOutreachService: {} });
+    const cron = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-upload/auto-run');
+    assert.ok(cron);
+    const res = createResponseRecorder();
+    await cron[2][0]({ headers: { authorization: 'Bearer test-secret' } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, 'https://www.softora.nl/api/outreach/provider-upload');
+    assert.equal(requests[0].options.headers.Origin, 'https://www.softora.nl');
+    assert.equal(requests[0].options.headers.Authorization, 'Bearer test-secret');
+    assert.deepEqual(JSON.parse(requests[0].options.body), { mode: 'auto' });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

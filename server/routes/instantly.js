@@ -11,7 +11,7 @@ function registerInstantlyRoutes(app, deps = {}) {
     cronSecret = process.env.CRON_SECRET,
     postAutomaticUpload = async (secret) => fetch('https://www.softora.nl/api/outreach/provider-upload', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${secret}`, Origin: 'https://www.softora.nl', 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'auto' }),
       redirect: 'error',
       signal: AbortSignal.timeout(120_000),
