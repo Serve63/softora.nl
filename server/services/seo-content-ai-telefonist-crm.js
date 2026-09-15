@@ -204,6 +204,12 @@ const AI_TELEFONIST_CRM_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Maak één gespreksuitkomstkaart voor de offerte',
       paragraphs: Object.freeze([
+        Object.freeze({
+          text: 'Kies daarna de passende bouwopdracht. Een AI telefonist kan volstaan voor één eerste-lijnstaak. Wil je verschillende intakevragen, terugbelroutes en CRM-opvolging samen laten inrichten, bespreek dan voicesoftware op maat. Gebruik in beide gevallen deze gespreksuitkomstkaart om de overdracht te begrenzen, niet een algemene belofte dat alles automatisch in CRM verschijnt.',
+          links: Object.freeze([
+            Object.freeze({ anchor: 'voicesoftware op maat', href: '/voicesoftware-op-maat' }),
+          ]),
+        }),
         'Vat de eerste route op één kaart samen: gesprekstaak, start-event, vereiste status, minimale velden, bron per veld, leidend systeem, eventsleutel, recordmatch, toegestane lees- en schrijfacties, agenda-conflictregel, afzendercontrole, timeout, retrylimiet, foutcategorieën, herstelwachtrij, beide eigenaren en acceptatiescenario’s. Laat iedere leverancier op dezelfde kaart aangeven wat standaard is, wat maatwerk is en welk bewijs bij oplevering zichtbaar wordt.',
         Object.freeze({
           text:

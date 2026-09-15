@@ -465,6 +465,30 @@ test('ai telefonist money page answers comparison and follow-up intent', () => {
   assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-een-ai-telefonist'));
 });
 
+test('voicesoftware offer distinguishes confirmed CRM delivery from call completion', () => {
+  const source = readPage('premium-voicesoftware.html');
+  const entry = getRegistryEntry('premium-voicesoftware.html');
+  const css = readPage('assets/voicesoftware-offer.css');
+  const guide = require('../../server/services/seo-content-ai-telefonist-crm').AI_TELEFONIST_CRM_CONTENT_ITEM;
+  assert.match(source, /Een beëindigd gesprek is nog geen geslaagde CRM-overdracht/);
+  assert.match(source, /href="\/kennisbank\/ai-telefonist-crm-koppeling"/);
+  assert.match(source, /href="\/blog\/ai-telefonist-kosten-mkb"/);
+  assert.match(source, /Pas na bevestiging vanuit het doelsysteem/);
+  assert.match(source, /je team beslist over de commerciële waarde/);
+  assert.doesNotMatch(source, /2–6|24\/7|Na elk gesprek ontvang je|welke waarde de lead heeft/);
+  assert.match(source, /href="#diensten"/);
+  assert.match(source, /class="nav-start-btn">Contact<\/a>/);
+  assert.match(source, /voicesoftware-offer\.css\?v=20260915a/);
+  assert.match(css, /font-size: 16px/);
+  assert.match(css, /:focus-visible/);
+  assert.equal(entry.lastmod, '2026-09-15');
+  assert.equal(entry.growthEventKind, 'other_growth_action');
+  assert.ok(entry.relatedLinks.includes('/kennisbank/ai-telefonist-crm-koppeling'));
+  assert.ok(JSON.stringify(guide.sections).includes('voicesoftware op maat'));
+  assert.ok(JSON.stringify(guide.sections).includes('/voicesoftware-op-maat'));
+  assert.equal(guide.updatedAt, '2026-08-18', 'A bounded navigation addition is not a full content refresh');
+});
+
 test('voicesoftware money page is focused on AI telefonie, intake and CRM follow-up', () => {
   const source = readPage('premium-voicesoftware.html');
   const entry = getRegistryEntry('premium-voicesoftware.html');
