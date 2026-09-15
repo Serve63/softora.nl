@@ -1,0 +1,80 @@
+name: Haaren ordering contract reconciliation
+on:
+  push:
+    branches: [codex/haaren-distance-order-20260915]
+    paths: [.github/workflows/haaren-distance-maintenance.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: codex/haaren-distance-order-20260915
+          fetch-depth: 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          cache: npm
+      - name: Align changed behavior contracts without weakening unrelated assertions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('test/contracts/premium-database-ui.test.js')
+          s = p.read_text()
+          original_lines = len(s.splitlines())
+          for a, b, count in [
+              (r'premium-database-distance\.js\?v=20260616a', r'premium-database-distance\.js\?v=20260915-haaren-order-1', 2),
+              (r'premium-database-sent-register\.js\?v=20260910a', r'premium-database-sent-register\.js\?v=20260915-haaren-order-1', 1),
+              ('premium database page keeps customers fixed from Oisterwijk nearby to far away', 'premium database page keeps customers fixed from Haaren nearby to far away', 1),
+              ('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk', 'premium database sorteert bedrijven standaard op afstand vanaf Haaren', 1),
+              (r'/\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/', r'/function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/', 1),
+          ]:
+              assert s.count(a) == count, (a, s.count(a), count)
+              s = s.replace(a, b)
+          assert len(s.splitlines()) == original_lines
+          p.write_text(s)
+          for title in ['premium database page keeps customers fixed from Haaren', 'premium database sorteert bedrijven standaard op afstand vanaf Haaren']:
+              start = s.index("test('" + title)
+              end = s.find("\ntest(", start + 1)
+              print('\nRECONCILED CONTRACT\n' + s[start:end if end > 0 else len(s)][:9000])
+          p = Path('assets/premium-database-distance.js')
+          s = p.read_text()
+          a = 'const HAAREN_COORDS = Object.freeze({ lat: 51.6027, lng: 5.2222 });'
+          assert s.count(a) == 1
+          s = s.replace(a, a + '\n  // Persisted deep-search target indices use their own versioned order; do not migrate them here.\n  const OISTERWIJK_COORDS = { lat: 51.5792, lng: 5.1889 };')
+          start = s.index('  function getTargetDistanceKm(label) {')
+          end = s.index('  function compareTargetLabelsByDistance', start)
+          block = s[start:end]
+          assert block.count('haversineKm(HAAREN_COORDS, coords)') == 1
+          s = s[:start] + block.replace('haversineKm(HAAREN_COORDS, coords)', 'haversineKm(OISTERWIJK_COORDS, coords)') + s[end:]
+          p.write_text(s)
+          PY
+          node --check assets/premium-database-distance.js
+          node --check test/contracts/premium-database-ui.test.js
+          git diff --check
+          test "$(git branch --show-current)" = 'codex/haaren-distance-order-20260915'
+          git add test/contracts/premium-database-ui.test.js assets/premium-database-distance.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'test: align customer ordering expectations and preserve unrelated search progress'
+          git push origin HEAD:refs/heads/codex/haaren-distance-order-20260915
+      - run: npm ci
+      - name: Verify database regression contracts using only fake data
+        run: |
+          status=0
+          node --test --test-reporter=junit test/contracts/*premium-database*.test.js > /tmp/haaren-contracts.xml || status=$?
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('/tmp/haaren-contracts.xml')
+          cases = tree.findall('.//testcase')
+          failures = [(case, failure) for case in cases for failure in case.findall('failure')]
+          print('DATABASE CONTRACTS:', len(cases), 'tests;', len(failures), 'failures')
+          for case, failure in failures:
+              text = failure.text or ''
+              print('\nFAILED:', case.get('name'))
+              print(text[:550])
+              print(text[-2000:])
+          PY
+          exit "$status"
