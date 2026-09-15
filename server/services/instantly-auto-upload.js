@@ -53,7 +53,8 @@ function createInstantlyAutoUpload(deps = {}) {
 
   function assertApprovedCampaign(owner) {
     const approved = APPROVED_CAMPAIGNS[owner];
-    const configured = text(config.replacementCampaigns && config.replacementCampaigns[owner]);
+    const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
+    const configured = text(configuredCampaigns && configuredCampaigns[owner]);
     if (!configured || configured !== approved.id) {
       throw createError('De twee goedgekeurde Instantly-campagnes zijn niet exact gekoppeld.', 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH', 503);
     }

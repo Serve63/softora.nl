@@ -80,6 +80,7 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
     INSTANTLY_API_KEY: ' instantly-key ',
     INSTANTLY_API_BASE_URL: ' https://api.instantly.test/api/v2 ',
     INSTANTLY_DEFAULT_CAMPAIGN_ID: ' campaign-1 ',
+    INSTANTLY_AUTO_APPROVED_CAMPAIGNS_JSON: ' {"serve":"serve-campaign","martijn":"martijn-campaign"} ',
     INSTANTLY_WEBHOOK_SECRET: ' webhook-secret ',
     INSTANTLY_SYNC_INTERVAL_MINUTES: '30',
     INSTANTLY_SYNC_BATCH_SIZE: '25',
@@ -95,6 +96,7 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   assert.equal(runtimeEnv.instantly.apiKey, 'instantly-key');
   assert.equal(runtimeEnv.instantly.apiBaseUrl, 'https://api.instantly.test/api/v2');
   assert.equal(runtimeEnv.instantly.defaultCampaignId, 'campaign-1');
+  assert.equal(runtimeEnv.instantly.autoApprovedCampaigns, '{"serve":"serve-campaign","martijn":"martijn-campaign"}');
   assert.equal(runtimeEnv.instantly.webhookSecret, 'webhook-secret');
   assert.equal(runtimeEnv.instantly.syncIntervalMinutes, 30);
   assert.equal(runtimeEnv.instantly.syncBatchSize, 25);

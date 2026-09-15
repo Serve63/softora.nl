@@ -454,6 +454,7 @@ function buildServerAppFeatureWiringRuntimeContext({
             apiBaseUrl: envConfig.INSTANTLY_API_BASE_URL,
             defaultCampaignId: envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID,
             replacementCampaigns: envConfig.INSTANTLY_REPLACEMENT_CAMPAIGNS_JSON,
+            autoApprovedCampaigns: envConfig.INSTANTLY_AUTO_APPROVED_CAMPAIGNS_JSON,
             webhookSecret: envConfig.INSTANTLY_WEBHOOK_SECRET,
             intervalMinutes: envConfig.INSTANTLY_SYNC_INTERVAL_MINUTES,
             batchSize: envConfig.INSTANTLY_SYNC_BATCH_SIZE,

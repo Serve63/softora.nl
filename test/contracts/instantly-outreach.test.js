@@ -202,6 +202,7 @@ function createService(overrides = {}) {
       apiBaseUrl: 'https://api.instantly.test/api/v2',
       defaultCampaignId: 'campaign-1',
       replacementCampaigns: overrides.replacementCampaigns || '',
+      autoApprovedCampaigns: overrides.autoApprovedCampaigns || '',
       webhookSecret: 'webhook-secret',
       intervalMinutes: 15,
       batchSize: overrides.batchSize || 10,
@@ -2571,6 +2572,25 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   const withoutCampaigns = createService({ autoUploadEnabled: true, rows: [{ id: 'i', bedrijf: 'Instant', email: 'info@instant.test', website: 'https://instant.test', mail: true, webdesignMailProvider: 'instantly' }] });
   await assert.rejects(() => withoutCampaigns.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' });
   assert.equal(withoutCampaigns.fetchCalls.length, 0);
+  const approved = {
+    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+  };
+  const separateApproved = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: { serve: 'legacy-serve', martijn: 'legacy-martijn' },
+    autoApprovedCampaigns: approved,
+    rows: [],
+    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
+  });
+  assert.equal((await separateApproved.service.autoUploadMailReady()).reason, 'no_mailready_instantly_leads');
+  const malformedApproved = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: approved,
+    autoApprovedCampaigns: '{broken-json',
+  });
+  await assert.rejects(() => malformedApproved.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' });
+  assert.equal(malformedApproved.fetchCalls.length, 0);
   const withoutGuard = createService({
     autoUploadEnabled: true,
     replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' },

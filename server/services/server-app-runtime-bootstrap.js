@@ -103,6 +103,7 @@ function buildServerAppEnvConfig(runtimeEnv) {
     INSTANTLY_API_BASE_URL: instantly.apiBaseUrl || 'https://api.instantly.ai/api/v2',
     INSTANTLY_DEFAULT_CAMPAIGN_ID: instantly.defaultCampaignId || '',
     INSTANTLY_REPLACEMENT_CAMPAIGNS_JSON: instantly.replacementCampaigns || '',
+    INSTANTLY_AUTO_APPROVED_CAMPAIGNS_JSON: instantly.autoApprovedCampaigns || '',
     INSTANTLY_WEBHOOK_SECRET: instantly.webhookSecret || '',
     INSTANTLY_SYNC_INTERVAL_MINUTES: instantly.syncIntervalMinutes || 15,
     INSTANTLY_SYNC_BATCH_SIZE: instantly.syncBatchSize || 10,

@@ -111,6 +111,7 @@ test('server app runtime bootstrap flattens env config without changing values',
       apiKey: 'instantly-key',
       apiBaseUrl: 'https://api.instantly.test/api/v2',
       defaultCampaignId: 'campaign-1',
+      autoApprovedCampaigns: '{"serve":"serve-campaign","martijn":"martijn-campaign"}',
       webhookSecret: 'webhook-secret',
       syncIntervalMinutes: 30,
       syncBatchSize: 20,
@@ -143,6 +144,7 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.INSTANTLY_API_KEY, 'instantly-key');
   assert.equal(envConfig.INSTANTLY_API_BASE_URL, 'https://api.instantly.test/api/v2');
   assert.equal(envConfig.INSTANTLY_DEFAULT_CAMPAIGN_ID, 'campaign-1');
+  assert.equal(envConfig.INSTANTLY_AUTO_APPROVED_CAMPAIGNS_JSON, '{"serve":"serve-campaign","martijn":"martijn-campaign"}');
   assert.equal(envConfig.INSTANTLY_WEBHOOK_SECRET, 'webhook-secret');
   assert.equal(envConfig.INSTANTLY_SYNC_INTERVAL_MINUTES, 30);
   assert.equal(envConfig.INSTANTLY_SYNC_BATCH_SIZE, 20);
