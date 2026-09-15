@@ -156,6 +156,32 @@ test('server app feature wiring uses legacy fallback when data-ops ui-state read
   assert.match(String(warnings[1]?.[0] || ''), /legacy-fallback/);
 });
 
+test('server app feature wiring forwards scoped ui-state read options to data-ops', async () => {
+  let bridgeOptions = null;
+  const getter = featureCompositionBuilders.createDataOpsAwareUiStateGetter({
+    getUiStateValues: async () => ({ source: 'legacy' }),
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      getUiStateValues: async (_scope, options) => {
+        bridgeOptions = options;
+        return { source: 'data-ops' };
+      },
+    },
+  });
+
+  const state = await getter('premium_customers_database', {
+    uiStateReadTimeoutMs: 12000,
+    bypassReadFailureCooldown: true,
+    bypassReadCache: true,
+  });
+
+  assert.deepEqual(state, { source: 'data-ops' });
+  assert.equal(bridgeOptions.uiStateReadTimeoutMs, 12000);
+  assert.equal(bridgeOptions.bypassReadFailureCooldown, true);
+  assert.equal(bridgeOptions.bypassReadCache, true);
+  assert.equal(typeof bridgeOptions.legacyGetUiStateValues, 'function');
+});
+
 test('server app feature wiring gives coldmail data-ops scopes enough read time', () => {
   assert.equal(
     featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('premium_database_photos'),
@@ -167,7 +193,7 @@ test('server app feature wiring gives coldmail data-ops scopes enough read time'
   );
   assert.equal(
     featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('premium_customers_database'),
-    12000
+    15000
   );
   assert.equal(
     featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('lightweight_scope'),

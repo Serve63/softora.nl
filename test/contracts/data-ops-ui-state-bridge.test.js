@@ -66,6 +66,28 @@ test('data ops ui-state bridge reads customers in the legacy chunked shape', asy
   assert.match(state.values[KEYS.customers], /Softora/);
 });
 
+test('data ops ui-state bridge forwards scoped read options to customer storage', async () => {
+  let receivedOptions = null;
+  const store = createStore({
+    listCustomers: async (options) => {
+      receivedOptions = options;
+      return [{ id: 'cust-1', bedrijf: 'Softora' }];
+    },
+  });
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+
+  await bridge.getUiStateValues(SCOPES.customers, {
+    uiStateReadTimeoutMs: 12000,
+    bypassReadFailureCooldown: true,
+    bypassReadCache: true,
+    legacyGetUiStateValues: async () => null,
+  });
+
+  assert.equal(receivedOptions.uiStateReadTimeoutMs, 12000);
+  assert.equal(receivedOptions.bypassReadFailureCooldown, true);
+  assert.equal(receivedOptions.bypassReadCache, true);
+});
+
 test('data ops ui-state bridge does not read heavy legacy customers when structured rows exist', async () => {
   const store = createStore({
     listCustomers: async () => [{ id: 'cust-1', bedrijf: 'Softora' }],
