@@ -1369,16 +1369,16 @@ test('instantly sync uses the public Softora image host even when the app base u
   assertInstantlyHtmlUsesApprovedAttachmentCopy(variables.softora_instantly_email_html);
 });
 
-test('instantly sync normalizes Serve accent and pins the city line', async () => {
+test('instantly sync normalizes Serve accent and blocks a province pin for the WA-P address shape', async () => {
   const { service, fetchCalls } = createService({
     rows: [
       {
         id: 'prospect-1',
-        bedrijf: 'Bakkerij Zon',
-        naam: 'Ruben Bakker',
-        email: 'ruben@example.test',
-        website: 'https://bakkerijzon.test',
-        plaats: 'Alphen',
+        bedrijf: 'WA-P',
+        naam: 'WA-P',
+        email: 'info@wa-p.nl',
+        website: 'https://wa-p.nl',
+        stad: 'Energieweg, Udenhout, Noord-Brabant',
         status: 'prospect',
         mail: true,
       },
@@ -1389,7 +1389,7 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
         'serve@softora.nl': {
           subject: 'Kleine vraag over jullie website',
           body:
-            'Goedendag,\n\nIk ben benieuwd wat je ervan vindt.\n\nMet vriendelijke groet,\nServe Creusen\n\n{{stad}}',
+            'Goedendag,\n\nIk ben benieuwd wat je ervan vindt.\n\nMet vriendelijke groet,\nServe Creusen\n\n📍 Noord-Brabant',
         },
       },
     },
@@ -1403,14 +1403,19 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_mail_body, /Servé Creusen/);
   assert.doesNotMatch(variables.softora_mail_body, /Serve Creusen/);
-  assert.match(variables.softora_mail_body, /📍 Alphen/);
+  assert.match(variables.softora_mail_body, /📍 Udenhout/);
+  assert.doesNotMatch(variables.softora_mail_body, /Noord-Brabant|Energieweg/);
   assert.match(variables.softora_mail_body, /Je vindt het ontwerp in de bijlage bij deze e-mail\./);
   assert.doesNotMatch(variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
-  assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
-  assert.equal(variables.softora_city, 'Alphen');
-  assert.equal(variables.softora_city_with_pin, '📍 Alphen');
-  assert.match(variables.softora_instantly_email_html, /📍 Alphen/);
-  assertInstantlyHtmlUsesApprovedAttachmentCopy(variables.softora_instantly_email_html);
+  assert.doesNotMatch(variables.softora_mail_body, /\nUdenhout$/);
+  assert.equal(variables.softora_city, 'Udenhout');
+  assert.equal(variables.softora_city_with_pin, '📍 Udenhout');
+  assert.match(variables.softora_instantly_email_html, /📍 Udenhout/);
+  assert.doesNotMatch(variables.softora_instantly_email_html, /Noord-Brabant|Energieweg/);
+  assertInstantlyHtmlUsesApprovedAttachmentCopy(
+    variables.softora_instantly_email_html,
+    '/webdesign/wa-p?cid=prospect-1&sender=serve'
+  );
 });
 
 test('instantly sync prewarms HTTPS webdesign images so the first email open does not rebuild them', async () => {

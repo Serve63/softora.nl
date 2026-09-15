@@ -26,6 +26,10 @@ const { formatDateKeyForTimeZone, isDesignedInstantlyRow } = require('./instantl
 const { createInstantlyWebhookState } = require('./instantly-webhook-state');
 const { buildInstantlyInsufficientUploadResult, buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
 const {
+  normalizePinnedRecipientLocationLines,
+  resolveRecipientPlace,
+} = require('./outreach-recipient-location');
+const {
   protectWebsiteDomainInText,
   renderTextWithUnlinkedWebsiteDomain,
   renderUnlinkedWebsiteDomain,
@@ -630,70 +634,8 @@ function getExplicitRowId(row, normalizeString = defaultNormalizeString) {
   return normalizeString(row && (row.id || row.customerId || row.databaseId || ''));
 }
 
-function cleanPlaceLabel(value, normalizeString = defaultNormalizeString) {
-  const dutchProvinceSuffix =
-    '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
-  return normalizeString(value)
-    .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
-    .replace(new RegExp(`\\s*\\(${dutchProvinceSuffix}\\)\\s*$`, 'i'), '')
-    .replace(new RegExp(`\\s+${dutchProvinceSuffix}\\s*$`, 'i'), '')
-    .replace(/\b(Nederland|The Netherlands)\b/gi, '')
-    .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function looksLikeStreetAddress(value, normalizeString = defaultNormalizeString) {
-  const text = normalizeString(value).toLowerCase();
-  return (
-    /\d/.test(text) &&
-    /(straat|weg|laan|plein|pad|dijk|hof|kade|markt|singel|steeg|gracht|boulevard|baan|akker|plantsoen|park)\b/.test(text)
-  );
-}
-
-function extractPlaceFromAddress(value, normalizeString = defaultNormalizeString) {
-  const text = normalizeString(value).replace(/\s+/g, ' ').replace(/\s*,\s*/g, ', ').trim();
-  if (!text) return '';
-  const postalMatch = text.match(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b\s+([A-Za-zÀ-ÿ'’.\- ]{2,})$/);
-  if (postalMatch) return cleanPlaceLabel(postalMatch[1], normalizeString);
-  const parts = text.split(/[,\n;|]/).map((part) => cleanPlaceLabel(part, normalizeString)).filter(Boolean);
-  for (let index = parts.length - 1; index >= 0; index -= 1) {
-    const candidate = parts[index];
-    if (!candidate || looksLikeStreetAddress(candidate, normalizeString) || /^\d+$/.test(candidate)) continue;
-    return candidate;
-  }
-  return cleanPlaceLabel(text, normalizeString);
-}
-
 function getRowCity(row, normalizeString = defaultNormalizeString) {
-  const explicit = [
-    row && row.plaats,
-    row && row.city,
-    row && row.gemeente,
-    row && row.locality,
-    row && row.town,
-    row && row.village,
-  ]
-    .map((value) => {
-      const cleaned = cleanPlaceLabel(value, normalizeString);
-      if (!cleaned) return '';
-      return looksLikeStreetAddress(cleaned, normalizeString)
-        ? extractPlaceFromAddress(cleaned, normalizeString)
-        : cleaned;
-    })
-    .find(Boolean);
-  if (explicit) return explicit;
-
-  return (
-    [
-      row && row.stad,
-      row && row.adres,
-      row && row.address,
-      row && row.location,
-    ]
-      .map((value) => extractPlaceFromAddress(value, normalizeString))
-      .find(Boolean) || ''
-  );
+  return resolveRecipientPlace(row, { normalizeString });
 }
 
 function normalizeWebsiteVariableValue(value, normalizeString = defaultNormalizeString) {
@@ -1441,7 +1383,7 @@ function formatPinnedCity(city, normalizeString = defaultNormalizeString) {
 }
 
 function ensurePinnedCityInMailText(text, city, normalizeString = defaultNormalizeString) {
-  const cleanText = normalizeString(text);
+  const cleanText = normalizeString(normalizePinnedRecipientLocationLines(text, city, { normalizeString }));
   const cleanCity = normalizeString(city);
   if (!cleanText || !cleanCity || /📍/.test(cleanText)) return cleanText;
   const cityPattern = cleanCity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
