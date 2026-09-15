@@ -2674,6 +2674,28 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   assert.equal(withoutGuard.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
 });
 
+test('automatic upload does not reactivate a completed campaign that still contains leads', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{ id: 'new-design', bedrijf: 'Nieuw ontwerp', email: 'new-design@company.test', website: 'https://new-design.test', mail: true, verantwoordelijk: 'Serve' }],
+    photoMap: { 'new-design': { id: 'new-design', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    remoteInstantlyLeads: [{ id: 'existing-lead', email: 'already-there@company.test', status: 1 }],
+    fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      : { response: { ok: true, status: 200 }, data: { status: 1 } },
+  });
+
+  await assert.rejects(
+    () => harness.service.autoUploadMailReady(),
+    (error) => error && error.code === 'INSTANTLY_AUTO_COMPLETED_CAMPAIGN_HAS_LEADS'
+  );
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+  assert.equal(harness.fetchCalls.filter((call) => call.url.includes('/activate')).length, 0);
+  assert.equal(harness.outboundGuardCalls.length, 0);
+});
+
 test('automatic Instantly upload appends without truncating an already large legacy guard', async () => {
   const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
   const originalEntries = Array.from({ length: 1001 }, (_, index) => ({ recipientEmail: `entry${index}@old.test`, recipientId: `old-entry-${index}` }));

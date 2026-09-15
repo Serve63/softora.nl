@@ -197,3 +197,64 @@ test('delivery reconciliation moves only confirmed remote sends to gemaild', () 
   assert.equal(result.rows[1].status, 'gemaild');
   assert.equal(result.rows[1].instantlyEmailSentAt, '2026-09-14T09:30:00.000Z');
 });
+
+test('delivery reconciliation persists only changed rows through the safe upsert path', async () => {
+  let rows = [{
+    id: 'queued',
+    email: 'queued@example.test',
+    status: 'prospect',
+    databaseStatus: 'prospect',
+    instantlyLeadId: 'lead-queued',
+    instantlyStatus: 'synced',
+    lastColdmailProvider: 'instantly',
+  }];
+  const singleWrites = [];
+  const fullWrites = [];
+  const service = createInstantlyCampaignReplacement({
+    campaigns: { serve: 'campaign-serve', martijn: 'campaign-martijn' },
+    now: () => new Date('2026-09-14T10:00:00.000Z'),
+    loadRows: async () => ({ values: {}, rows }),
+    persistRows: async () => {
+      fullWrites.push(true);
+      throw new Error('full replacement must not be used');
+    },
+    persistSingleRow: async (row, meta) => {
+      singleWrites.push({ row, meta });
+      rows = rows.map((current) => current.id === row.id ? row : current);
+      return { ok: true };
+    },
+    listCampaignLeads: async (campaignId) => campaignId === 'campaign-serve'
+      ? [{ id: 'lead-queued', email: 'queued@example.test', status: 3, timestamp_last_contact: '2026-09-14T09:30:00.000Z' }]
+      : [],
+  });
+
+  const result = await service.refreshDeliveryStatus({ actor: 'Test' });
+
+  assert.equal(result.updated, 1);
+  assert.equal(fullWrites.length, 0);
+  assert.equal(singleWrites.length, 1);
+  assert.equal(singleWrites[0].row.status, 'gemaild');
+  assert.equal(singleWrites[0].meta.upsertOnly, true);
+  assert.equal(rows[0].instantlyEmailSentAt, '2026-09-14T09:30:00.000Z');
+});
+
+test('delivery reconciliation never claims a send when the durable upsert fails', async () => {
+  const service = createInstantlyCampaignReplacement({
+    campaigns: { serve: 'campaign-serve', martijn: 'campaign-martijn' },
+    now: () => new Date('2026-09-14T10:00:00.000Z'),
+    loadRows: async () => ({ values: {}, rows: [{
+      id: 'queued', email: 'queued@example.test', status: 'prospect', databaseStatus: 'prospect',
+      instantlyLeadId: 'lead-queued', instantlyStatus: 'synced',
+    }] }),
+    persistSingleRow: async () => null,
+    persistRows: async () => ({ ok: true }),
+    listCampaignLeads: async (campaignId) => campaignId === 'campaign-serve'
+      ? [{ id: 'lead-queued', email: 'queued@example.test', status: 3, timestamp_last_contact: '2026-09-14T09:30:00.000Z' }]
+      : [],
+  });
+
+  await assert.rejects(
+    () => service.refreshDeliveryStatus({ actor: 'Test' }),
+    (error) => error && error.code === 'INSTANTLY_DELIVERY_PERSIST_FAILED'
+  );
+});

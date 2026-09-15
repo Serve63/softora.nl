@@ -320,6 +320,7 @@ function createInstantlyCampaignReplacement(deps = {}) {
     now = () => new Date(),
     loadRows,
     persistRows,
+    persistSingleRow,
     collectEligibleRows,
     buildLead,
     loadContext,
@@ -542,7 +543,19 @@ function createInstantlyCampaignReplacement(deps = {}) {
       remoteLeads.push(...await listCampaignLeads(campaigns[owner], 10000));
     }
     const result = applyRemoteDeliveryUpdates(loaded.rows, remoteLeads, at, actor);
-    if (result.updated) await persistRows(loaded, result.rows, { source: 'instantly-delivery-reconcile', actor });
+    if (result.updated) {
+      const changes = result.rows.filter((row, index) => row !== loaded.rows[index]);
+      if (typeof persistSingleRow === 'function') {
+        for (const row of changes) {
+          const saved = await persistSingleRow(row, { source: 'instantly-delivery-reconcile', actor, upsertOnly: true });
+          if (!saved) throw createError('Instantly verzendstatus kon niet duurzaam worden bewaard.',
+            'INSTANTLY_DELIVERY_PERSIST_FAILED', 502);
+        }
+      } else if (!(await persistRows(loaded, result.rows, { source: 'instantly-delivery-reconcile', actor }))) {
+        throw createError('Instantly verzendstatus kon niet duurzaam worden bewaard.',
+          'INSTANTLY_DELIVERY_PERSIST_FAILED', 502);
+      }
+    }
     return { ok: true, updated: result.updated, checked: remoteLeads.length, finishedAt: at };
   }
 

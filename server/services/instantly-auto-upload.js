@@ -51,6 +51,7 @@ function createInstantlyAutoUpload(deps = {}) {
     markPreparedRows,
     persistSingleRow = null,
     getCampaign,
+    listCampaignLeads,
     addCampaignLeads,
     activateCampaign,
     createError = (message, code, status = 400) => Object.assign(new Error(message), { code, status }),
@@ -145,6 +146,23 @@ function createInstantlyAutoUpload(deps = {}) {
     }
     const owner = designOwner.owner;
     const { approved, status } = await readApprovedCampaign(owner);
+    let activated = status === 1;
+    if (!activated) {
+      // Instantly rejects new leads for a Completed campaign. Resume only an
+      // exact approved campaign with no current leads, before creating any new
+      // outbound reservation; existing leads must never be sent again.
+      if (typeof listCampaignLeads !== 'function') {
+        throw createError('Instantly-campagne kan niet veilig op bestaande leads worden gecontroleerd.',
+          'INSTANTLY_AUTO_CAMPAIGN_LEADS_CHECK_UNAVAILABLE', 503);
+      }
+      const existingLeads = await listCampaignLeads(approved.id, 1);
+      if (!Array.isArray(existingLeads) || existingLeads.length) {
+        throw createError('Afgeronde Instantly-campagne bevat nog leads; niet opnieuw geactiveerd.',
+          'INSTANTLY_AUTO_COMPLETED_CAMPAIGN_HAS_LEADS', 503);
+      }
+      await activateCampaign(approved.id);
+      activated = true;
+    }
     const sender = resolveSender(owner);
     const context = await loadContext(rows, sender, { autoMailReadyOnly: true });
     const reselected = await collectEligibleRows(rows, 1, context);
@@ -252,16 +270,6 @@ function createInstantlyAutoUpload(deps = {}) {
       throw createError('Instantly accepteerde de lead, maar de lokale lead-koppeling faalde; guards blijven staan.', 'INSTANTLY_AUTO_LOCAL_LINK_FAILED', 502);
     }
 
-    let activated = status === 1;
-    if (!activated) {
-      try {
-        await activateCampaign(approved.id);
-        activated = true;
-      } catch (_error) {
-        return { ok: false, code: 'INSTANTLY_AUTO_ACTIVATION_FAILED', uploaded: 1, activated: false,
-          owner, campaignId: approved.id, finishedAt: at };
-      }
-    }
     return { ok: true, uploaded: 1, activated, owner, campaignId: approved.id, finishedAt: at };
   }
 
