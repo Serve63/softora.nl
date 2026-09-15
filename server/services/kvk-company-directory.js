@@ -194,6 +194,13 @@ function createKvkCompanyDirectoryService(deps = {}) {
     return request;
   }
 
+  function applyDirectorySearch(request, query) {
+    for (const term of searchTerms(query)) {
+      request = request.ilike('search_text', `%${escapeIlikePattern(term)}%`);
+    }
+    return request;
+  }
+
   function normalizeSyncRow(row, generation) {
     const sourceCompanyId = Number(row?.source_company_id);
     const kvkNummer = normalizedField(row?.kvk_nummer, 32);
@@ -254,9 +261,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
       .limit(limit + 1);
     request = applyDirectoryCategoryFilter(request, normalizeCategory(category));
     if (cursor > 0) request = request.gt('source_company_id', cursor);
-    for (const term of searchTerms(query)) {
-      request = request.ilike('search_text', `%${escapeIlikePattern(term)}%`);
-    }
+    request = applyDirectorySearch(request, query);
     try {
       const result = await withTimeout(
         request,
@@ -265,6 +270,30 @@ function createKvkCompanyDirectoryService(deps = {}) {
       );
       if (result?.error) return { ok: false, error: result.error.message || String(result.error) };
       return { ok: true, rows: Array.isArray(result?.data) ? result.data : [] };
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) };
+    }
+  }
+
+  async function fetchDirectoryCount({
+    query = '',
+    category = DIRECTORY_CATEGORIES.all,
+  } = {}) {
+    const client = directoryClient();
+    if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
+    let request = client
+      .from(DIRECTORY_TABLE)
+      .select('source_company_id', { count: 'exact', head: true });
+    request = applyDirectoryCategoryFilter(request, normalizeCategory(category));
+    request = applyDirectorySearch(request, query);
+    try {
+      const result = await withTimeout(
+        request,
+        readTimeoutMs,
+        'Online bedrijvendatabase-telling reageerde niet op tijd.'
+      );
+      if (result?.error) return { ok: false, error: result.error.message || String(result.error) };
+      return { ok: true, count: Math.max(0, Math.trunc(Number(result?.count) || 0)) };
     } catch (error) {
       return { ok: false, error: error?.message || String(error) };
     }
@@ -378,12 +407,19 @@ function createKvkCompanyDirectoryService(deps = {}) {
     const rowsReader = typeof deps.fetchDirectoryRows === 'function'
       ? deps.fetchDirectoryRows
       : fetchDirectoryRows;
+    const countReader = typeof deps.fetchDirectoryCount === 'function'
+      ? deps.fetchDirectoryCount
+      : fetchDirectoryCount;
     const metaReader = typeof deps.fetchDirectoryMeta === 'function'
       ? deps.fetchDirectoryMeta
       : fetchDirectoryMeta;
-    const [rowsResult, metaResult] = await Promise.all([
+    const needsExactCount = Boolean(query) || category !== DIRECTORY_CATEGORIES.all;
+    const [rowsResult, metaResult, countResult] = await Promise.all([
       rowsReader({ query, cursor, limit, category }),
       metaReader(),
+      needsExactCount
+        ? countReader({ query, category })
+        : Promise.resolve({ ok: true, count: null }),
     ]);
     if (!rowsResult.ok) {
       return res.status(503).json({
@@ -397,37 +433,32 @@ function createKvkCompanyDirectoryService(deps = {}) {
         error: 'Online bedrijvendatabase wordt nog opgebouwd.',
       });
     }
-    const categoryTotals = metaResult.row.category_totals;
-    if (
-      category !== DIRECTORY_CATEGORIES.all &&
-      (!categoryTotals ||
-        typeof categoryTotals !== 'object' ||
-        !Object.prototype.hasOwnProperty.call(categoryTotals, category))
-    ) {
+    if (needsExactCount && !countResult.ok) {
       return res.status(503).json({
         ok: false,
-        error: 'Deze bedrijfscategorie wordt nog opgebouwd.',
+        error: truncateText(countResult.error || 'Exacte bedrijfstelling is tijdelijk niet beschikbaar.', 500),
       });
     }
 
     const hasMore = rowsResult.rows.length > limit;
     const rows = rowsResult.rows.slice(0, limit);
     const nextCursor = hasMore ? Number(rows[rows.length - 1]?.source_company_id || 0) : null;
+    const total = needsExactCount
+      ? Math.max(0, Number(countResult.count) || 0)
+      : Math.max(0, Number(metaResult.row.total) || 0);
     return res.status(200).json({
       ok: true,
       rows,
-      total: query
-        ? 0
-        : category === DIRECTORY_CATEGORIES.all
-          ? Math.max(0, Number(metaResult.row.total) || 0)
-          : normalizeCategoryTotals(categoryTotals)[category],
+      total,
       category,
       limit,
       after: cursor,
       next_cursor: nextCursor,
       has_more: hasMore,
-      total_is_exact: !query,
+      total_is_exact: true,
       source: 'supabase',
+      sync_generation: normalizeString(metaResult.row.sync_generation || ''),
+      source_updated_at: normalizeString(metaResult.row.source_updated_at || ''),
       updated_at: normalizeString(metaResult.row.updated_at || ''),
     });
   }
@@ -521,6 +552,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
   }
 
   return {
+    fetchDirectoryCount,
     fetchDirectoryMeta,
     fetchDirectoryRows,
     hasValidSyncToken,
