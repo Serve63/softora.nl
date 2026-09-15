@@ -286,3 +286,28 @@ test('automatic Instantly internal POST supplies the required same-origin header
     global.fetch = originalFetch;
   }
 });
+
+test('automatic Instantly cron logs only a safe error code on a rejected canonical POST', async () => {
+  const warnings = [];
+  const routes = [];
+  registerInstantlyRoutes({
+    get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+    post() {},
+  }, {
+    cronSecret: 'test-secret',
+    logger: { warn: (...args) => warnings.push(args) },
+    instantlyOutreachService: {},
+    postAutomaticUpload: async () => ({
+      status: 503,
+      json: async () => ({ ok: false, code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH', message: 'not logged' }),
+    }),
+  });
+  const cron = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-upload/auto-run');
+  const res = createResponseRecorder();
+  await cron[2][0]({ headers: { authorization: 'Bearer test-secret' } }, res);
+  assert.equal(res.statusCode, 503);
+  assert.deepEqual(warnings, [[
+    '[InstantlyAutoCron][Rejected]',
+    { status: 503, code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' },
+  ]]);
+});

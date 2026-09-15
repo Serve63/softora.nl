@@ -8,6 +8,7 @@ function registerInstantlyRoutes(app, deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     requirePremiumAdminApiAccess = (_req, _res, next) => next(),
+    logger = console,
     cronSecret = process.env.CRON_SECRET,
     postAutomaticUpload = async (secret) => fetch('https://www.softora.nl/api/outreach/provider-upload', {
       method: 'POST',
@@ -165,6 +166,13 @@ function registerInstantlyRoutes(app, deps = {}) {
       // lead to the sole canonical POST provider-upload route.
       const response = await postAutomaticUpload(cronSecret);
       const result = await response.json();
+      if (response.status >= 400) {
+        // Logs only a fixed error code, never secrets, lead details or payloads.
+        logger.warn('[InstantlyAutoCron][Rejected]', {
+          status: response.status,
+          code: normalizeString(result && result.code) || 'NO_ERROR_CODE',
+        });
+      }
       res.status(response.status).json(result);
     } catch (_error) {
       res.status(502).json({ ok: false, code: 'INSTANTLY_AUTO_CRON_POST_FAILED' });
