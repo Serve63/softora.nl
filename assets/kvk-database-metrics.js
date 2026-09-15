@@ -197,27 +197,36 @@
       return fallbackCount ?? 0;
     }
 
+    // textContent replaces the text node even when its value is unchanged.
+    // The totals are observed below, so a redundant write would schedule this
+    // renderer again forever and starve loading, painting and user input.
+    function renderCount(element, value) {
+      if (!element) return;
+      const text = numberFormat.format(value);
+      if (element.textContent !== text) element.textContent = text;
+    }
+
     function renderMetrics() {
       const snapshot = getSnapshot();
-      const scraperState = snapshot?.state;
-      if (!scraperState) return;
+      if (!snapshot?.state && !canonicalCounts) return;
+      const scraperState = snapshot?.state || {};
       const last60 = getLast60Minutes(snapshot, now());
       const unusableGrades = scraperState.unusable_grades || {};
       const unusableGradeLast60 = last60.unusable_grades || {};
       const unusableGradeActivity = last60.unusable_grade_activity || {};
 
       if (elements.withWebsiteTotal) {
-        elements.withWebsiteTotal.textContent = numberFormat.format(
+        renderCount(elements.withWebsiteTotal,
           countOrFallback('withWebsite', getAvailableWithWebsiteCount(snapshot)),
         );
       }
       if (elements.withoutWebsiteTotal) {
-        elements.withoutWebsiteTotal.textContent = numberFormat.format(
+        renderCount(elements.withoutWebsiteTotal,
           countOrFallback('withoutWebsite', scraperState.without_website),
         );
       }
       if (elements.usableTotal) {
-        elements.usableTotal.textContent = numberFormat.format(
+        renderCount(elements.usableTotal,
           countOrFallback('usable', scraperState.usable),
         );
       }
@@ -230,22 +239,22 @@
               scraperState.unusable,
             ),
         );
-        elements.treatedTotal.textContent = numberFormat.format(
+        renderCount(elements.treatedTotal,
           countOrFallback('treated', Number.isFinite(treatedFallback) ? Math.max(0, treatedFallback) : 0),
         );
       }
       if (elements.successfulFound) {
-        elements.successfulFound.textContent = numberFormat.format(
+        renderCount(elements.successfulFound,
           countOrFallback('successfulFound', scraperState.declared_usable),
         );
       }
       if (elements.declaredUnusable) {
-        elements.declaredUnusable.textContent = numberFormat.format(
+        renderCount(elements.declaredUnusable,
           countOrFallback('declaredUnusable', scraperState.declared_unusable),
         );
       }
       if (elements.controlRoom) {
-        elements.controlRoom.textContent = numberFormat.format(
+        renderCount(elements.controlRoom,
           countOrFallback('controlRoom', scraperState.control_room),
         );
       }
