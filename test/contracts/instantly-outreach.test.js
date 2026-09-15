@@ -171,6 +171,7 @@ function createService(overrides = {}) {
   }
   const fetchCalls = [];
   const publicImageFetchCalls = [];
+  const uiStateReads = [];
   const writes = [];
   const outboundGuardCalls = [];
   const defaultOutboundRecipientGuardStore = {
@@ -231,7 +232,9 @@ function createService(overrides = {}) {
       overrides.outboundRecipientGuardStore === undefined
         ? defaultOutboundRecipientGuardStore
         : overrides.outboundRecipientGuardStore,
-    getUiStateValues: async (scope) => {
+    dataOpsStore: overrides.dataOpsStore,
+    getUiStateValues: async (scope, options) => {
+      uiStateReads.push({ scope, options });
       if (scope === 'premium_database_photos') {
         return {
           values: {
@@ -331,6 +334,7 @@ function createService(overrides = {}) {
     service,
     fetchCalls,
     publicImageFetchCalls,
+    uiStateReads,
     outboundGuardCalls,
     getRows: () => rows,
     writes,
@@ -2582,6 +2586,69 @@ test('automatic upload selects only a designed Instantly lead and guards before 
   assert.equal(harness.getRows()[1].status, 'prospect', 'queued is not confirmed sent');
   assert.equal(harness.outboundGuardCalls[0].options.provisional, undefined);
   assert.equal(harness.outboundGuardCalls[0].options.permanent, false);
+});
+
+test('automatic upload uses targeted design-photo reads instead of the heavy photo UI state', async () => {
+  const campaigns = {
+    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+  };
+  const photoReads = [];
+  const harness = createService({
+    now: '2026-09-15T09:00:00.000Z',
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{
+      id: 'targeted-photo',
+      bedrijf: 'Gericht Design BV',
+      email: 'info@gericht-design.test',
+      website: 'https://gericht-design.test',
+      status: 'prospect',
+      mail: true,
+      verantwoordelijk: 'Servé',
+    }],
+    dataOpsStore: {
+      listDesignPhotoAssetFlags: async (options) => {
+        photoReads.push({ type: 'flags', options });
+        return [{
+          customerId: 'targeted-photo',
+          hasPhoto: true,
+          hasMockup: true,
+          webdesignMailProvider: 'instantly',
+        }];
+      },
+      listDesignPhotosWithSignedUrls: async (options) => {
+        photoReads.push({ type: 'signed', options });
+        return [{
+          customerId: 'targeted-photo',
+          websitePhotoUrl: 'https://cdn.softora.test/targeted-photo.jpg',
+          websiteMockupUrl: 'https://cdn.softora.test/targeted-photo-mockup.jpg',
+          fileName: 'Gericht design',
+          legacyMeta: {
+            webdesignMailProvider: 'instantly',
+            senderEmail: 'serve@softora.nl',
+          },
+        }];
+      },
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 1 } };
+      if (url.endsWith('/leads/add')) {
+        const lead = JSON.parse(options.body).leads[0];
+        return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'targeted-lead', email: lead.email, index: 0 }] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { status: 1 } };
+    },
+  });
+
+  const result = await harness.service.autoUploadMailReady();
+
+  assert.equal(result.uploaded, 1);
+  assert.ok(photoReads.some((read) => read.type === 'flags'));
+  const signedReads = photoReads.filter((read) => read.type === 'signed');
+  assert.ok(signedReads.length >= 1);
+  assert.deepEqual(signedReads[0].options.customerIds, ['targeted-photo']);
+  assert.equal(harness.uiStateReads.some((read) => read.scope === 'premium_database_photos'), false);
 });
 
 test('automatic upload routes the design owner to Martijn even when daily rotation would choose Servé', async () => {

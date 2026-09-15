@@ -82,18 +82,24 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     );
   }
 
-  async function readLegacy(legacyGetUiStateValues, scope) {
-    return typeof legacyGetUiStateValues === 'function' ? legacyGetUiStateValues(scope) : null;
+  async function readLegacy(legacyGetUiStateValues, scope, options = {}) {
+    return typeof legacyGetUiStateValues === 'function' ? legacyGetUiStateValues(scope, options) : null;
   }
 
-  async function readLegacyWithTimeout(legacyGetUiStateValues, scope, reason = 'fallback') {
+  async function readLegacyWithTimeout(legacyGetUiStateValues, scope, reason = 'fallback', options = {}) {
     if (typeof legacyGetUiStateValues !== 'function') return null;
-    const timeoutMs = Math.max(0, Number(legacyReadTimeoutMs) || 0);
+    const requestedTimeoutMs = Number(options && options.legacyReadTimeoutMs);
+    const timeoutMs = Math.max(
+      0,
+      Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0
+        ? requestedTimeoutMs
+        : Number(legacyReadTimeoutMs) || 0
+    );
     if (!timeoutMs) return null;
     let timeoutId = null;
     try {
       return await Promise.race([
-        legacyGetUiStateValues(scope),
+        legacyGetUiStateValues(scope, options),
         new Promise((resolve) => {
           timeoutId = setTimeout(() => resolve(null), timeoutMs);
         }),
@@ -249,10 +255,10 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     const customers = await store.listCustomers(options);
     if (!customers || customers.length === 0) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
-      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-fallback');
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-fallback', options);
     }
     const legacy = legacyContactMergeEnabled
-      ? await readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-overlay')
+      ? await readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-overlay', options)
       : null;
     const mergedCustomers = legacy
       ? mergeLegacyCustomerContactState(customers, parseLegacyCustomerRows(legacy))
@@ -269,7 +275,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     const hasRuntime = runtime && typeof runtime === 'object' && Object.keys(runtime).length > 0;
     if (!ordersLoaded) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
-      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.activeOrders, 'active-orders-fallback');
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.activeOrders, 'active-orders-fallback', options);
     }
     return buildState(SCOPES.activeOrders, {
       ...buildChunkedStatePatch(KEYS.activeOrders, JSON.stringify(orders)),
@@ -357,11 +363,11 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       : await store.listDesignPhotosWithDataUrls(options);
     if (!entries) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
-      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-fallback');
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-fallback', options);
     }
     if (entries.length === 0 && !entries.hadStructuredRows) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
-      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-empty-fallback');
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-empty-fallback', options);
     }
     return buildState(SCOPES.photos, buildPhotoCompatValues(entries));
   }
@@ -376,7 +382,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       logger.error('[DataOps][ui-state-get]', error?.message || error);
     }
     if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
-    return readLegacyWithTimeout(options.legacyGetUiStateValues, scope, 'error-fallback');
+    return readLegacyWithTimeout(options.legacyGetUiStateValues, scope, 'error-fallback', options);
   }
 
   function extractPhotoEntries(values) {

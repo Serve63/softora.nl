@@ -116,6 +116,24 @@ test('data ops ui-state bridge falls back when structured customer rows are empt
   assert.deepEqual(state, { values: { legacy: 'yes' }, source: 'legacy' });
 });
 
+test('data ops ui-state bridge forwards read options to the legacy fallback', async () => {
+  const bridge = createSoftoraDataOpsUiStateBridge({ store: createStore() });
+  let received = null;
+  const state = await bridge.getUiStateValues(SCOPES.customers, {
+    uiStateReadTimeoutMs: 12000,
+    bypassReadFailureCooldown: true,
+    legacyGetUiStateValues: async (scope, options) => {
+      received = { scope, options };
+      return { values: { legacy: 'yes' }, source: 'legacy' };
+    },
+  });
+
+  assert.deepEqual(state, { values: { legacy: 'yes' }, source: 'legacy' });
+  assert.equal(received.scope, SCOPES.customers);
+  assert.equal(received.options.uiStateReadTimeoutMs, 12000);
+  assert.equal(received.options.bypassReadFailureCooldown, true);
+});
+
 test('data ops ui-state bridge skips legacy fallback while structured reads are in cooldown', async () => {
   let legacyRead = false;
   const bridge = createSoftoraDataOpsUiStateBridge({

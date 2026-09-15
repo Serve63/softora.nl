@@ -859,6 +859,46 @@ test('ui-state store supports a longer read timeout for heavy photo scopes', asy
   });
 });
 
+test('ui-state store forwards custom read timeout and cooldown options to the Supabase client', async () => {
+  const client = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  return {
+                    data: {
+                      payload: { values: { panel: 'loaded' } },
+                      updated_at: '2026-04-28T12:00:00.000Z',
+                    },
+                    error: null,
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { clientOptions, store } = createFixture({ client });
+
+  const state = await store.getUiStateValues('dashboard', {
+    uiStateReadTimeoutMs: 12000,
+    bypassReadFailureCooldown: true,
+    suppressReadFailureCooldown: true,
+  });
+
+  assert.equal(state.values.panel, 'loaded');
+  assert.deepEqual(clientOptions[0], {
+    timeoutMs: 12000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  });
+});
+
 test('ui-state store allows longer critical coldmail read timeouts', async () => {
   const { restReads, store } = createFixture({
     uiStateReadTimeoutMs: 1,

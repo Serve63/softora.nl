@@ -22,6 +22,7 @@ const {
 } = require('./instantly-campaign-replacement');
 const { createInstantlyCampaignReplacementApi } = require('./instantly-campaign-replacement-api');
 const { createInstantlyCampaignReplacementRuntime } = require('./instantly-campaign-replacement-runtime');
+const { createInstantlyTargetedPhotoReader } = require('./instantly-targeted-photo-reader');
 const { formatDateKeyForTimeZone, isDesignedInstantlyRow } = require('./instantly-auto-upload');
 const { createInstantlyWebhookState } = require('./instantly-webhook-state');
 const { buildInstantlyInsufficientUploadResult, buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
@@ -2075,6 +2076,7 @@ function createInstantlyOutreachService(deps = {}) {
   } = deps;
 
   const config = normalizeInstantlyConfig(instantlyConfig);
+  const loadCustomerPhotoMap = createInstantlyTargetedPhotoReader({ dataOpsStore: deps.dataOpsStore, normalizeString, getExplicitRowId, buildRowIdentityKeys, buildRowIdentityKey, normalizeStoredIdentityKeys, getUiStateValues, customerPhotoScope, customerPhotoKey, parseCustomerPhotoMap, logger }).load;
   const replacementCampaignApi = createInstantlyCampaignReplacementApi({ config, fetchJsonWithTimeout, createError: createInstantlyError, normalizeString });
   const webhookState = createInstantlyWebhookState({ now, defaultCampaignId: config.defaultCampaignId, normalizeString, chooseStatus: chooseInstantlyStatus, buildSenderFields: buildInstantlySenderRowFields, mergeHistory, buildHistoryEntry, truncateText, normalizeContactStatus, canAdvanceContactStatus });
   let syncPromise = null;
@@ -2280,12 +2282,6 @@ function createInstantlyOutreachService(deps = {}) {
     const domain = getEmailDomain(email);
     if (!domain) return false;
     return Boolean(await resolveEmailDomain(domain));
-  }
-
-  async function loadCustomerPhotoMap(rows = []) {
-    const state = await getUiStateValues(customerPhotoScope);
-    const values = state && typeof state.values === 'object' ? state.values : {};
-    return parseCustomerPhotoMap(values[customerPhotoKey], values, rows, normalizeString);
   }
 
   async function loadColdmailProfile(senderEmail = '') {
@@ -2544,7 +2540,7 @@ function createInstantlyOutreachService(deps = {}) {
       ? resolveInstantlySenderProfile(options, config, normalizeString)
       : null;
     const [photoMap, mailProfile, coldmailSendGuardIndex] = await Promise.all([
-      loadCustomerPhotoMap(rows),
+      loadCustomerPhotoMap(rows, options),
       loadColdmailProfile(explicitSender ? explicitSender.email : ''),
       loadColdmailSendGuardIndex(),
     ]);

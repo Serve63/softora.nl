@@ -49,7 +49,15 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     );
   };
   const loadContext = async (rows, sender, input) => ({
-    ...buildInstantlyQueueSelectionContext(await loadPersonalizationContext(rows, { senderProfile: sender && sender.key, senderEmail: sender && sender.email }), input, normalizeString, createError),
+    ...buildInstantlyQueueSelectionContext(await loadPersonalizationContext(rows, {
+      senderProfile: sender && sender.key,
+      senderEmail: sender && sender.email,
+      instantlyAutoUpload: Boolean(input && input.autoMailReadyOnly === true),
+      uiStateReadTimeoutMs: 20000,
+      bypassReadFailureCooldown: true,
+      bypassReadCache: true,
+      suppressReadFailureCooldown: true,
+    }), input, normalizeString, createError),
     mailProviderOnly: input && input.autoMailReadyOnly === true ? 'instantly' : '',
   });
   const releaseReservation = (reservationId) => outboundRecipientGuardStore && typeof outboundRecipientGuardStore.releaseReservation === 'function'

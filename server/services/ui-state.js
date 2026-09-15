@@ -342,7 +342,16 @@ function createUiStateStore(deps = {}) {
     const timeoutMs = getSafeUiStateReadTimeoutMs(normalizedScope, readOptions);
     const executeRead = async () => {
       const rowKey = getUiStateRowKey(normalizedScope);
-      const client = getSupabaseClient();
+      const clientReadOptions = {
+        timeoutMs,
+        ignoreFailureCooldown: Boolean(
+          readOptions.bypassReadFailureCooldown || readOptions.ignoreSupabaseRestFailureCooldown
+        ),
+        suppressFailureCooldown: Boolean(
+          readOptions.suppressReadFailureCooldown || readOptions.suppressSupabaseRestFailureCooldown
+        ),
+      };
+      const client = getSupabaseClient(clientReadOptions);
       let row = null;
       let restReadFailed = false;
       async function readRowViaRest(clientError = null) {
