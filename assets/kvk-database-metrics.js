@@ -20,6 +20,17 @@
   });
 })(typeof globalThis === 'object' ? globalThis : this, function createKvkDatabaseMetricsApi() {
   const numberFormat = new Intl.NumberFormat('nl-NL');
+  const DIRECTORY_API_URL = '/api/kvk-database/company-directory';
+  const CANONICAL_REFRESH_INTERVAL_MS = 30_000;
+  const CANONICAL_CATEGORIES = Object.freeze({
+    treated: 'behandeld',
+    successfulFound: 'bruikbaar-verklaard',
+    declaredUnusable: 'onbruikbaar-verklaard',
+    controlRoom: 'controlekamer',
+    usable: 'bruikbaar',
+    withWebsite: 'met-website',
+    withoutWebsite: 'zonder-werkende-website',
+  });
 
   // Activity belongs to the source's hour, never the time we fetched it.
   // Share this rule with the snapshot API and re-evaluate it on every render.
@@ -49,10 +60,8 @@
     return Number.isFinite(count) && count >= 0 ? count : null;
   }
 
-  // "Bruikbaar" is partitioned by the two child cards: with a working website
-  // or without one. The producer can lag on state.with_website while usable and
-  // without_website are already current, so derive this subtotal from the two
-  // authoritative stock counters instead of allowing the card to freeze.
+  // Snapshot fallback for the few seconds before the canonical online directory
+  // has answered. The canonical directory replaces this value as soon as it is available.
   function getAvailableWithWebsiteCount(snapshot) {
     const scraperState = snapshot?.state || {};
     const companyTotals = snapshot?.companyTotals || {};
@@ -67,6 +76,29 @@
       return usable - withoutWebsite;
     }
     return reportedWithWebsite ?? 0;
+  }
+
+  async function fetchCanonicalDirectoryCounts(fetchImpl) {
+    if (typeof fetchImpl !== 'function') throw new Error('Canonical directory fetch is unavailable.');
+    const entries = await Promise.all(Object.entries(CANONICAL_CATEGORIES).map(async ([key, category]) => {
+      const params = new URLSearchParams({
+        categorie: category,
+        limit: '1',
+        after: '0',
+      });
+      const response = await fetchImpl(`${DIRECTORY_API_URL}?${params.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
+      if (!response?.ok) throw new Error(`Canonical directory count failed for ${category}.`);
+      const payload = await response.json();
+      const count = nonNegativeCount(payload?.total);
+      if (!payload?.ok || payload?.total_is_exact !== true || count === null) {
+        throw new Error(`Canonical directory count is not exact for ${category}.`);
+      }
+      return [key, count];
+    }));
+    return Object.fromEntries(entries);
   }
 
   function mergeGradeActivity(...activities) {
@@ -129,9 +161,19 @@
     const documentRef = deps.document;
     const getSnapshot = typeof deps.getSnapshot === 'function' ? deps.getSnapshot : () => null;
     const now = typeof deps.now === 'function' ? deps.now : Date.now;
+    const windowRef = deps.window || {};
+    const fetchImpl = typeof deps.fetchImpl === 'function'
+      ? deps.fetchImpl
+      : typeof windowRef.fetch === 'function'
+        ? windowRef.fetch.bind(windowRef)
+        : null;
+    let canonicalCounts = null;
+    let canonicalRefreshPromise = null;
     const elements = {
       treatedTotal: documentRef.getElementById('companies-treated'),
+      usableTotal: documentRef.getElementById('companies-usable'),
       withWebsiteTotal: documentRef.getElementById('companies-with-website'),
+      withoutWebsiteTotal: documentRef.getElementById('companies-without-website'),
       successfulFound: documentRef.getElementById('companies-successful-found'),
       successfulFoundLast60: documentRef.getElementById('companies-successful-found-last60'),
       declaredUnusable: documentRef.getElementById('companies-declared-unusable'),
@@ -148,6 +190,13 @@
       unusableGrade2Last60: documentRef.getElementById('companies-unusable-grade-2-last60'),
     };
 
+    function countOrFallback(key, fallback) {
+      const canonical = nonNegativeCount(canonicalCounts?.[key]);
+      if (canonical !== null) return canonical;
+      const fallbackCount = nonNegativeCount(fallback);
+      return fallbackCount ?? 0;
+    }
+
     function renderMetrics() {
       const snapshot = getSnapshot();
       const scraperState = snapshot?.state;
@@ -158,13 +207,22 @@
       const unusableGradeActivity = last60.unusable_grade_activity || {};
 
       if (elements.withWebsiteTotal) {
-        const withWebsiteText = numberFormat.format(getAvailableWithWebsiteCount(snapshot));
-        if (elements.withWebsiteTotal.textContent !== withWebsiteText) {
-          elements.withWebsiteTotal.textContent = withWebsiteText;
-        }
+        elements.withWebsiteTotal.textContent = numberFormat.format(
+          countOrFallback('withWebsite', getAvailableWithWebsiteCount(snapshot)),
+        );
+      }
+      if (elements.withoutWebsiteTotal) {
+        elements.withoutWebsiteTotal.textContent = numberFormat.format(
+          countOrFallback('withoutWebsite', scraperState.without_website),
+        );
+      }
+      if (elements.usableTotal) {
+        elements.usableTotal.textContent = numberFormat.format(
+          countOrFallback('usable', scraperState.usable),
+        );
       }
       if (elements.treatedTotal) {
-        const treated = Number(
+        const treatedFallback = Number(
           scraperState.treated ??
             sumCounts(
               scraperState.with_website,
@@ -172,20 +230,25 @@
               scraperState.unusable,
             ),
         );
-        const treatedText = numberFormat.format(Number.isFinite(treated) ? Math.max(0, treated) : 0);
-        if (elements.treatedTotal.textContent !== treatedText) {
-          elements.treatedTotal.textContent = treatedText;
-        }
+        elements.treatedTotal.textContent = numberFormat.format(
+          countOrFallback('treated', Number.isFinite(treatedFallback) ? Math.max(0, treatedFallback) : 0),
+        );
       }
       if (elements.successfulFound) {
         elements.successfulFound.textContent = numberFormat.format(
-          Number(
-            scraperState.declared_usable ?? 0,
-          ),
+          countOrFallback('successfulFound', scraperState.declared_usable),
         );
       }
-      if (elements.declaredUnusable) elements.declaredUnusable.textContent = numberFormat.format(Number(scraperState.declared_unusable ?? 0));
-      if (elements.controlRoom) elements.controlRoom.textContent = numberFormat.format(Number(scraperState.control_room ?? 0));
+      if (elements.declaredUnusable) {
+        elements.declaredUnusable.textContent = numberFormat.format(
+          countOrFallback('declaredUnusable', scraperState.declared_unusable),
+        );
+      }
+      if (elements.controlRoom) {
+        elements.controlRoom.textContent = numberFormat.format(
+          countOrFallback('controlRoom', scraperState.control_room),
+        );
+      }
       renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable ?? 0);
       renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable ?? 0);
       renderControlRoomLast60(elements.controlRoomLast60, last60.control_room_activity);
@@ -211,12 +274,33 @@
       );
     }
 
-    return { renderMetrics };
+    async function refreshCanonicalCounts() {
+      if (!fetchImpl) return false;
+      if (canonicalRefreshPromise) return canonicalRefreshPromise;
+      canonicalRefreshPromise = fetchCanonicalDirectoryCounts(fetchImpl)
+        .then((counts) => {
+          canonicalCounts = counts;
+          renderMetrics();
+          return true;
+        })
+        .catch(() => false)
+        .finally(() => {
+          canonicalRefreshPromise = null;
+        });
+      return canonicalRefreshPromise;
+    }
+
+    return {
+      renderMetrics,
+      refreshCanonicalCounts,
+      getCanonicalCounts: () => canonicalCounts && { ...canonicalCounts },
+    };
   }
 
   function start(deps = {}) {
     const controller = createController(deps);
     controller.renderMetrics();
+    void controller.refreshCanonicalCounts();
     const treatedTotal = deps.document.getElementById('companies-treated');
     if (treatedTotal && typeof deps.window.MutationObserver === 'function') {
       const treatedObserver = new deps.window.MutationObserver(controller.renderMetrics);
@@ -230,15 +314,24 @@
       controller.withWebsiteObserver = withWebsiteObserver;
     }
     deps.window.setInterval(controller.renderMetrics, 1000);
-    deps.window.addEventListener('focus', controller.renderMetrics);
+    deps.window.setInterval(() => { void controller.refreshCanonicalCounts(); }, CANONICAL_REFRESH_INTERVAL_MS);
+    deps.window.addEventListener('focus', () => {
+      controller.renderMetrics();
+      void controller.refreshCanonicalCounts();
+    });
     deps.document.addEventListener('visibilitychange', () => {
-      if (!deps.document.hidden) controller.renderMetrics();
+      if (!deps.document.hidden) {
+        controller.renderMetrics();
+        void controller.refreshCanonicalCounts();
+      }
     });
     return controller;
   }
 
   return {
+    CANONICAL_CATEGORIES,
     createController,
+    fetchCanonicalDirectoryCounts,
     getAvailableWithWebsiteCount,
     getLast60Minutes,
     renderLast60Delta,
