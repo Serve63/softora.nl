@@ -29,9 +29,10 @@ test('one central cleanup covers root, dossier, all accounts and providers, old 
     assert.equal(root.appendContact(rootHtml), true);
     assert.equal(root.appendContact(rootHtml), false);
     const thread = presentation.getThreadPresentation(message, message);
+    const diagnostic = () => JSON.stringify({ parsed: signature.parseIncoming(message.body, message), root, thread });
     for (const html of [rootHtml.join(''), thread.body + thread.contactHtml]) {
-      for (const expected of fixture.expected) assert.ok(html.includes(expected), `${source}/${owner}/${date}: ${expected}\n${html}`);
-      assert.doesNotMatch(html, fixture.absent);
+      for (const expected of fixture.expected) assert.ok(html.includes(expected), `${source}/${owner}/${date}: ${expected}\n${html}\n${diagnostic()}`);
+      assert.doesNotMatch(html, fixture.absent, diagnostic());
       assert.equal((html.match(/class="detail-mail-contact-card"/g) || []).length, 1);
     }
     assert.equal(message.body, fixture.body);
@@ -57,10 +58,11 @@ test('quoted third-party contact is not attached to the current sender and outgo
   assert.equal(presentation.getThreadPresentation(sent, sent, { sent: true }).body, sent.body);
 });
 
-test('HTML-looking contact input remains escaped and no active script can be introduced', () => {
+test('HTML-looking contact input cannot introduce active markup and the original is unchanged', () => {
   const body = 'Akkoord.\n\nGroet,\nRobin Voorbeeld\n<img src=x onerror=alert(1)>\n[klik](javascript:alert(1))\nTel: 020 1234567';
-  const message = { body, from: 'Robin Voorbeeld', email: 'robin@example.nl' };
+  const message = Object.freeze({ body, from: 'Robin Voorbeeld', email: 'robin@example.nl' });
   const result = presentation.getThreadPresentation(message, message);
   assert.doesNotMatch(result.contactHtml, /<img|href="javascript:|onerror=/);
-  assert.match(result.contactHtml, /&lt;img/);
+  assert.match(result.contactHtml, /020 1234567/);
+  assert.equal(message.body, body);
 });
