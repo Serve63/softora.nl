@@ -207,7 +207,7 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/=/g, '&#61;');
     const combined = address.map(escape).join(', ');
     return html.replace(`<dd class="detail-mail-contact-value">${combined}</dd>`,
-      `<dd class="detail-mail-contact-value" aria-label="${combined}">${address.map(escape).join('<br>')}</dd>`);
+      `<dd class="detail-mail-contact-value" aria-label="${combined}">${address.map((line) => `<div>${escape(line)}</div>`).join('')}</dd>`);
   }
 
   function create(options = {}) {
@@ -283,7 +283,7 @@
         : null;
       // Inspect the original sender-proven footer before the legacy parser
       // drops its legal context or leaves the full name outside the contact.
-      const unmarkedSignature = hasMessageContext
+      const unmarkedCandidate = hasMessageContext
         ? extractUnmarkedContact(body, message, quotedThread)
         : null;
       const legacySignatureMatched = Boolean(
@@ -291,6 +291,13 @@
         parsedSignature.matched === true &&
         Array.isArray(parsedSignature.bodyLines)
       );
+      const legacyBody = legacySignatureMatched ? parsedSignature.bodyLines.join('\n').trim() : body;
+      // Prefer the established parser's signoff, sender and reference ownership.
+      // Only extend its boundary backwards when it left an identified name in
+      // the authored prefix; never select a company lower in a valid signature.
+      const unmarkedSignature = unmarkedCandidate && (!legacySignatureMatched ||
+        legacyBody.startsWith(unmarkedCandidate.body) && legacyBody !== unmarkedCandidate.body)
+        ? unmarkedCandidate : null;
       const signatureMatched = Boolean(unmarkedSignature || legacySignatureMatched);
       const bodyWithoutSignature = unmarkedSignature
         ? unmarkedSignature.body
