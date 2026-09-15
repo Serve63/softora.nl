@@ -176,7 +176,8 @@ function createKvkCompanyDirectoryService(deps = {}) {
       return request
         .eq('lead_status', 'usable')
         .eq('premium_database_transferred', false)
-        .eq('website_status', 'found')
+        .neq('website_status', 'no_website')
+        .neq('website_status', 'not_working')
         .neq('website', '');
     }
     if (category === DIRECTORY_CATEGORIES['zonder-werkende-website']) {

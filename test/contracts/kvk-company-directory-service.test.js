@@ -322,14 +322,14 @@ test('unused inventory includes pending approvals and hides transferred rows', a
   );
 });
 
-test('exact met-website count uses the same filters as the displayed rows', async () => {
+test('exact met-website count includes website rows unless they are explicitly missing or not working', async () => {
   const filters = [];
   let selectOptions = null;
   const request = {
     select(_columns, options) { selectOptions = options; return this; },
     eq(column, value) { filters.push(['eq', column, value]); return this; },
     neq(column, value) { filters.push(['neq', column, value]); return this; },
-    then(resolve) { return Promise.resolve({ count: 3_007, error: null }).then(resolve); },
+    then(resolve) { return Promise.resolve({ count: 13_743, error: null }).then(resolve); },
   };
   const service = createKvkCompanyDirectoryService({
     getSupabaseClient: () => ({ from: () => request }),
@@ -341,10 +341,11 @@ test('exact met-website count uses the same filters as the displayed rows', asyn
   assert.deepEqual(filters, [
     ['eq', 'lead_status', 'usable'],
     ['eq', 'premium_database_transferred', false],
-    ['eq', 'website_status', 'found'],
+    ['neq', 'website_status', 'no_website'],
+    ['neq', 'website_status', 'not_working'],
     ['neq', 'website', ''],
   ]);
-  assert.deepEqual(result, { ok: true, count: 3_007 });
+  assert.deepEqual(result, { ok: true, count: 13_743 });
 });
 
 test('exact category counts replace missing or stale producer category metadata', async () => {
