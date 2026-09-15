@@ -13,11 +13,11 @@ const presentation = require('../../assets/premium-mailbox-message-presentation'
 const fixtures = [
   { from: 'Robin Voorbeeld', email: 'robin@example.nl',
     body: 'Dank voor je ontwerp. Graag een kostenindicatie.\n\nIk hoor het graag!\n\nRobin Voorbeeld\nwww.example.nl\nVoorbeeld - Wandmontage V.O.F.\nVoorbeeld - Afbouw en projecten\nModerne afbouw. Strak uitgevoerd.\nDe informatie verzonden met dit e-mailbericht (en bijlagen) is uitsluitend\nbestemd voor de geadresseerde(n).\nIndien dit e-mailbericht niet voor u bestemd is, wordt u verzocht de afzender te informeren en het\ne-mailbericht (en bijlagen) te vernietigen.\nT* 0411-123456 | *M* 06-12345678 | *E* robin@example.nl\nDorpsstraat 13\n5268 EP Voorbeeld\nKVK nr. 123.45.678\nBTW nr. NL1234.56.789 B01',
-    expected: ['Robin Voorbeeld', '0411-123456', '06-12345678', 'robin@example.nl', 'Dorpsstraat 13<br>5268 EP Voorbeeld'],
+    expected: ['Robin Voorbeeld', '0411-123456', '06-12345678', 'robin@example.nl', '<div>Dorpsstraat 13</div><div>5268 EP Voorbeeld</div>'],
     absent: /geadresseerde|vernietigen|KVK|BTW|Moderne afbouw|Wandmontage|Afbouw en projecten/ },
   { from: 'stephanvoorbeeld@example.nl', email: 'stephanvoorbeeld@example.nl',
     body: 'Dank voor je werk. Ik kom later terug op de website.\n\nFijne avond, Stephan\n\nStephan Voorbeeld\nWalerijstraat 210\n5617 AR Voorbeeld (Wijk)\n\nexample.nl<http://www.example.nl>',
-    expected: ['Stephan Voorbeeld', 'Walerijstraat 210<br>5617 AR Voorbeeld (Wijk)', 'href="http://www.example.nl/"'],
+    expected: ['Stephan Voorbeeld', '<div>Walerijstraat 210</div><div>5617 AR Voorbeeld (Wijk)</div>', 'href="http://www.example.nl/"'],
     absent: /&lt;http|<\[|&lt;\[/ },
 ];
 
