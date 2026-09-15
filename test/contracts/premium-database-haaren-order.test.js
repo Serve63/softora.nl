@@ -58,7 +58,7 @@ test('nested database payload and narrowed UI/snapshot records retain identical 
 });
 
 test('national place data works identically in browser and server, including screenshot addresses', () => {
-  const browser = {};
+  const browser = { atob };
   vm.runInNewContext(read('assets/premium-database-target-coords.js'), browser);
   vm.runInNewContext(read('assets/premium-database-distance.js'), browser);
   const examples = [
