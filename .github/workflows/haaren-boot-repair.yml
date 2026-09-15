@@ -1,0 +1,36 @@
+name: Haaren first-paint repair
+on:
+  push:
+    branches: [codex/haaren-distance-order-20260915]
+    paths: [.github/workflows/haaren-boot-repair.yml]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: codex/haaren-distance-order-20260915
+          fetch-depth: 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Load nationwide locations before inline database boot
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('premium-database.html')
+          s = p.read_text()
+          anchor = '<script src="assets/premium-database-distance.js?v=20260915-haaren-order-1"></script>'
+          prerequisite = '<script src="assets/premium-database-target-coords.js?v=20260616a"></script>'
+          assert s.count(anchor) == 1 and prerequisite not in s
+          p.write_text(s.replace(anchor, prerequisite + anchor))
+          PY
+          node --test test/contracts/premium-database-location-boot.test.js test/contracts/premium-database-haaren-order.test.js
+          git diff --check
+          test "$(git branch --show-current)" = 'codex/haaren-distance-order-20260915'
+          git add premium-database.html
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: load nationwide place coordinates before database first paint'
+          git push origin HEAD:refs/heads/codex/haaren-distance-order-20260915
