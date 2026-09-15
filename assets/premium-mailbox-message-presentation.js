@@ -172,7 +172,8 @@
     const values = [message.from, message.fromName, message.senderName, message.email, message.fromEmail, message.senderEmail];
     return values.some((value) => {
       const text = String(value || '');
-      const label = text.replace(/<[^>]+>/g, '').replace(/\S+@\S+/g, '');
+      // Parse the RFC-style display-name prefix, never strip arbitrary HTML.
+      const label = text.split('<', 1)[0].replace(/\S+@\S+/g, '');
       if (identityKey(label) === key) return true;
       return (text.match(/[\w.+-]+@[a-z0-9.-]+/gi) || []).some((email) => {
         const [local, domain] = email.split('@');
@@ -199,7 +200,9 @@
     return null;
   }
 
-  function renderStackedContact(signature, contact) {
+  function renderStackedContact(signature, originalContact) {
+    // Keep the public contact object source-compatible; normalize only the view.
+    const contact = normalizeSignatureContact(originalContact || {});
     const html = signature?.renderContactCard?.(contact) || '';
     const address = contact?.addressLines || [];
     if (!html || address.length < 2) return html;
@@ -330,7 +333,7 @@
         body: sourceSafeBody,
         contact: unmarkedSignature
           ? { ...(parsedSignature?.contact || {}), ...unmarkedSignature.contact }
-          : normalizeSignatureContact(parsedSignature.contact || emptyContact()),
+          : parsedSignature.contact || emptyContact(),
         signatureMatched: true,
       };
     }
