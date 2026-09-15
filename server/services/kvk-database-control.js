@@ -83,6 +83,7 @@ function createKvkDatabaseControlService(deps = {}) {
       queuePending: null,
       queueHeadKvk: '',
       currentBatch: '',
+      currentBatchStartedAt: '',
       controlRevision: 0,
       updatedAt: '',
     };
@@ -118,6 +119,7 @@ function createKvkDatabaseControlService(deps = {}) {
       queuePending: typeof payload.queuePending === 'boolean' ? payload.queuePending : null,
       queueHeadKvk: truncateText(payload.queueHeadKvk || '', 32),
       currentBatch: truncateText(payload.currentBatch || '', 160),
+      currentBatchStartedAt: normalizeString(payload.currentBatchStartedAt || ''),
       controlRevision: Math.max(0, Number(payload.controlRevision || 0)),
       updatedAt: normalizeString(payload.updatedAt || ''),
     };
@@ -129,6 +131,22 @@ function createKvkDatabaseControlService(deps = {}) {
     return worker.model === 'gpt-5.6-luna' && worker.reasoningEffort === 'max'
       ? Math.max(workerStaleAfterMs, lunaMaxWorkerStaleAfterMs)
       : workerStaleAfterMs;
+  }
+
+  function batchIdentity(currentBatch) {
+    const normalizedBatch = truncateText(currentBatch || '', 160);
+    if (!normalizedBatch) return '';
+    const kvkMatch = normalizedBatch.match(/(?:^|\D)(\d{8})(?!\d)/);
+    return kvkMatch ? `kvk:${kvkMatch[1]}` : normalizedBatch.toLowerCase();
+  }
+
+  function latestProgressReference(control, worker) {
+    const candidates = [
+      Date.parse(control.requestedAt || ''),
+      Date.parse(worker.workerProgressAt || ''),
+      worker.currentBatch ? Date.parse(worker.currentBatchStartedAt || '') : Number.NaN,
+    ].filter(Number.isFinite);
+    return candidates.length ? Math.max(...candidates) : Number.NaN;
   }
 
   function effectiveWorker(control, worker) {
@@ -166,18 +184,14 @@ function createKvkDatabaseControlService(deps = {}) {
         stalled: false,
       };
     }
-    const progressAt = Date.parse(worker.workerProgressAt || '');
-    const progressReferenceAt = Number.isFinite(progressAt)
-      && (!Number.isFinite(requestedAt) || progressAt >= requestedAt)
-      ? progressAt
-      : requestedAt;
+    const progressReferenceAt = latestProgressReference(control, worker);
     const progressAgeMs = Number.isFinite(progressReferenceAt)
       ? Math.max(0, now().getTime() - progressReferenceAt)
       : 0;
     if (
       worker.queuePending === true &&
       worker.workerState === 'running' &&
-      Number.isFinite(progressAt) &&
+      Number.isFinite(progressReferenceAt) &&
       progressAgeMs > workerProgressStaleAfterMs
     ) {
       return {
@@ -277,11 +291,7 @@ function createKvkDatabaseControlService(deps = {}) {
       }
 
       if (worker.queuePending === true) {
-        const progressAt = Date.parse(worker.workerProgressAt || '');
-        const progressReferenceAt = Number.isFinite(progressAt)
-          && (!Number.isFinite(requestedAt) || progressAt >= requestedAt)
-          ? progressAt
-          : requestedAt;
+        const progressReferenceAt = latestProgressReference(control, worker);
         const progressExpired = Number.isFinite(progressReferenceAt)
           && currentTime - progressReferenceAt > workerProgressStaleAfterMs;
         if (progressExpired) {
@@ -468,6 +478,15 @@ function createKvkDatabaseControlService(deps = {}) {
       return res.status(409).json({ ok: false, error: 'Deze worker is niet geselecteerd voor deze run.' });
     }
     const updatedAt = now().toISOString();
+    const previousWorker = beforeReport.control.workers?.[workerKey] || defaultWorker(workerKey);
+    const currentBatch = truncateText(req?.body?.currentBatch || '', 160);
+    const currentBatchIdentity = workerState === 'running' ? batchIdentity(currentBatch) : '';
+    const previousBatchIdentity = batchIdentity(previousWorker.currentBatch);
+    const currentBatchStartedAt = !currentBatchIdentity
+      ? ''
+      : currentBatchIdentity !== previousBatchIdentity
+        ? updatedAt
+        : previousWorker.currentBatchStartedAt || '';
     const worker = normalizeWorker({
       workerState,
       workerMessage: req?.body?.workerMessage || '',
@@ -477,7 +496,8 @@ function createKvkDatabaseControlService(deps = {}) {
       workerProgressAt: req?.body?.workerProgressAt || '',
       queuePending: req?.body?.queuePending,
       queueHeadKvk: req?.body?.queueHeadKvk || '',
-      currentBatch: req?.body?.currentBatch || '',
+      currentBatch,
+      currentBatchStartedAt,
       controlRevision: req?.body?.controlRevision ?? beforeReport.control.revision,
       updatedAt,
     }, workerKey);
