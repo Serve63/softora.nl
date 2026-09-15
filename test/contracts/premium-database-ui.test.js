@@ -451,7 +451,7 @@ test('premium database page keeps customers fixed from Haaren nearby to far away
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260915-haaren-order-1/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -6236,7 +6236,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Haaren', ()
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260915-haaren-order-1/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);
