@@ -2,11 +2,11 @@ name: Haaren distance repair workspace
 on:
   push:
     branches: [codex/haaren-distance-order-20260915]
-    paths: [.github/workflows/haaren-distance-maintenance.yml, scripts/haaren-distance-maintenance.py]
+    paths: [.github/workflows/haaren-distance-maintenance.yml]
 permissions:
   contents: write
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,31 +18,35 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Apply bounded source changes without production data
+      - name: Complete browser fixture and remove temporary tools
         run: |
-          python3 scripts/haaren-distance-maintenance.py
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          path = Path('premium-database.html')
-          text, count = re.subn(r'(assets/premium-database-sent-register\.js)(?:\?[^"\s]*)?', r'\1?v=20260915-haaren-order-1', path.read_text())
-          assert count == 1
-          path.write_text(text)
+          p = Path('test/contracts/premium-database-haaren-order.test.js')
+          s = p.read_text()
+          assert s.count('const browser = {};') == 1
+          p.write_text(s.replace('const browser = {};', 'const browser = { atob };'))
+          Path('scripts/haaren-distance-maintenance.py').unlink()
+          Path('.github/workflows/haaren-distance-maintenance.yml').unlink()
           PY
-          node --check assets/premium-database-distance.js
-          node --check assets/premium-database-sent-register.js
-          node --check server/services/coldmail-campaign.js
-          node --check server/services/instantly-outreach.js
-          node --check server/services/premium-database-mail-ready-snapshot.js
-          node --check server/services/premium-database-snapshot-cache.js
-          git diff --check
-          git diff --stat
-      - name: Save source changes only to isolated repair branch
-        run: |
           test "$(git branch --show-current)" = 'codex/haaren-distance-order-20260915'
-          git add assets/premium-database-distance.js premium-database.html server/services/coldmail-campaign.js server/services/instantly-outreach.js server/services/premium-database-mail-ready-snapshot.js server/services/premium-database-snapshot-cache.js
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: unify database and outbound ordering by distance from Haaren'
+          git diff --check
+          git add test/contracts/premium-database-haaren-order.test.js scripts/haaren-distance-maintenance.py .github/workflows/haaren-distance-maintenance.yml
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'test: supply browser base64 API and remove temporary repair workspace'
           git push origin HEAD:refs/heads/codex/haaren-distance-order-20260915
       - run: npm ci
-      - name: Test Haaren ordering with fake recipients and no external sends
-        run: node --test test/contracts/premium-database-haaren-order.test.js
+      - name: Run database contract regression tests without sending email
+        run: |
+          status=0
+          node --test --test-reporter=junit test/contracts/*premium-database*.test.js > /tmp/haaren-contracts.xml || status=$?
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('/tmp/haaren-contracts.xml')
+          cases = tree.findall('.//testcase')
+          failures = [(case, failure) for case in cases for failure in case.findall('failure')]
+          print('DATABASE CONTRACTS:', len(cases), 'tests;', len(failures), 'failures')
+          for case, failure in failures:
+              print('\nFAILED:', case.get('name'))
+              print((failure.text or '')[:7000])
+          PY
+          exit "$status"
