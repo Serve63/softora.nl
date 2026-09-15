@@ -12,6 +12,7 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/api/coldmailing/unsubscribe',
   '/api/instantly/webhook',
   '/api/kvk-database/snapshot',
+  '/api/kvk-database/snapshot/progress',
   '/api/kvk-database/company-directory/sync',
   '/api/kvk-database/control/command',
   '/api/kvk-database/control/poll',

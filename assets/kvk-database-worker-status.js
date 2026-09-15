@@ -7,6 +7,7 @@
   const lanes = { searchers: ['vuller'], controllers: ['controle', 'goedgekeurd'] };
   let configuration = {};
   let control = null;
+  let sheetRobot = null;
 
   function modelLabel(model, effort) {
     const match = String(model || '').match(/^gpt-(?:\d+(?:\.\d+)?-)?(luna|sol|terra|astra)$/i);
@@ -15,7 +16,7 @@
   }
 
   function summarize(value, config = {}, now = Date.now()) {
-    return Object.entries(lanes).map(([kind, keys]) => {
+    const groups = Object.entries(lanes).map(([kind, keys]) => {
       let active = 0;
       const models = new Set();
       const unavailable = !value || value.unavailable || typeof value.enabled !== 'boolean';
@@ -38,6 +39,22 @@
       }
       return { kind, active: unavailable ? null : active, models: [...models] };
     });
+    const configuredSheetRobot = value?.sheetRobot || value?.sheet_robot
+      || config?.sheetRobot || config?.sheet_robot || sheetRobot;
+    const heartbeat = Date.parse(
+      configuredSheetRobot?.heartbeat_at || configuredSheetRobot?.workerHeartbeatAt
+      || configuredSheetRobot?.updated_at || ''
+    );
+    const sheetRobotActive = configuredSheetRobot?.active === true
+      && (!Number.isFinite(heartbeat) || now - heartbeat >= -5000 && now - heartbeat <= 180000);
+    if (sheetRobotActive) {
+      const searchers = groups.find((group) => group.kind === 'searchers');
+      if (searchers) {
+        searchers.active = searchers.active === null ? 1 : searchers.active + 1;
+        searchers.models.push(configuredSheetRobot.label || 'Spreadsheetrobot');
+      }
+    }
+    return groups;
   }
 
   function render() {
@@ -62,6 +79,7 @@
 
   function update(value) { control = value; render(); }
   function configure(value) { configuration = value && typeof value === 'object' ? value : {}; render(); }
+  function updateSheetRobot(value) { sheetRobot = value && typeof value === 'object' ? value : null; render(); }
   if (root) { root.setInterval(render, 5000); render(); }
-  return { summarize, modelLabel, update, configure };
+  return { summarize, modelLabel, update, configure, updateSheetRobot };
 });
