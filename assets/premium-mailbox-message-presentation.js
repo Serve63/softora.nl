@@ -291,12 +291,17 @@
         parsedSignature.matched === true &&
         Array.isArray(parsedSignature.bodyLines)
       );
-      const legacyBody = legacySignatureMatched ? parsedSignature.bodyLines.join('\n').trim() : body;
-      // Prefer the established parser's signoff, sender and reference ownership.
-      // Only extend its boundary backwards when it left an identified name in
-      // the authored prefix; never select a company lower in a valid signature.
-      const unmarkedSignature = unmarkedCandidate && (!legacySignatureMatched ||
-        legacyBody.startsWith(unmarkedCandidate.body) && legacyBody !== unmarkedCandidate.body)
+      // Respect a complete existing signature, including embedded authors,
+      // unusual signoffs and reference ownership. Extend only when the legacy
+      // parser demonstrably left the same sender-proven name in the body.
+      const candidateName = unmarkedCandidate?.contact?.beforeLines?.[0] || '';
+      const candidateKey = identityKey(candidateName);
+      const legacyContactNames = [...(parsedSignature?.contact?.beforeLines || []),
+        ...(parsedSignature?.contact?.preservedLines || [])];
+      const omittedName = candidateKey && legacySignatureMatched &&
+        parsedSignature.bodyLines.some((line) => identityKey(line) === candidateKey) &&
+        !legacyContactNames.some((line) => identityKey(line) === candidateKey);
+      const unmarkedSignature = unmarkedCandidate && (!legacySignatureMatched || omittedName)
         ? unmarkedCandidate : null;
       const signatureMatched = Boolean(unmarkedSignature || legacySignatureMatched);
       const bodyWithoutSignature = unmarkedSignature
