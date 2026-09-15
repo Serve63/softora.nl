@@ -295,6 +295,76 @@ test('fresh heartbeats cannot keep control on without persisted progress', async
   assert.match(report.payload.control.automaticStopReason, /geen opgeslagen databasevoortgang/);
 });
 
+test('a newly started company gets one progress grace without weakening the stall cutoff', async () => {
+  const { service, getStoredRow, setNow } = createInMemoryService({
+    workerStaleAfterMs: 60 * 60_000,
+  });
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
+
+  setNow('2026-07-26T20:55:00.000Z');
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'running',
+        workerProgressAt: '2026-07-26T20:30:00.000Z',
+        queuePending: true,
+        currentBatch: 'searcher_2 · 67917747 · Onderzoek starten',
+        currentBatchStartedAt: '2099-01-01T00:00:00.000Z',
+      },
+    },
+    createJsonResponse()
+  );
+  assert.equal(
+    getStoredRow(service.workerStateKeys.vuller).payload.currentBatchStartedAt,
+    '2026-07-26T20:55:00.000Z'
+  );
+
+  setNow('2026-07-26T21:01:00.000Z');
+  const phaseReport = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'running',
+        workerProgressAt: '2026-07-26T20:30:00.000Z',
+        queuePending: true,
+        currentBatch: 'searcher_2 · 67917747 · Onderzoek verwerken',
+      },
+    },
+    phaseReport
+  );
+  assert.equal(phaseReport.payload.control.enabled, true);
+  assert.equal(
+    getStoredRow(service.workerStateKeys.vuller).payload.currentBatchStartedAt,
+    '2026-07-26T20:55:00.000Z',
+    'een ander faselabel voor hetzelfde KVK mag de grace niet resetten'
+  );
+
+  setNow('2026-07-26T21:25:00.001Z');
+  const expired = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'running',
+        workerProgressAt: '2026-07-26T20:30:00.000Z',
+        queuePending: true,
+        currentBatch: 'searcher_2 · 67917747 · Onderzoek verwerken',
+      },
+    },
+    expired
+  );
+  assert.equal(expired.payload.control.enabled, false);
+  assert.match(expired.payload.control.automaticStopReason, /geen opgeslagen databasevoortgang/);
+});
+
 test('an explicit restart gets a fresh progress grace period after stale persisted progress', async () => {
   const { service, setNow } = createInMemoryService({
     workerStaleAfterMs: 60 * 60_000,
