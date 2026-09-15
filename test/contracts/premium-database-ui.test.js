@@ -6252,7 +6252,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Haaren', ()
   assert.match(targetCoordsSource, /placeEntries\.sort\(function \(left, right\)/);
   assert.match(targetCoordsSource, /placePattern: buildNormalizedPhrasePattern\(place\)/);
   assert.match(sorterSource, /function compareCustomerSortEntries\(left, right\)/);
-  assert.match(sorterSource, /\.map\(function \(customer, index\) \{/);
+  assert.match(sorterSource, /\.map\(buildCustomerSortEntry\)/);
   assert.match(sorterSource, /\.sort\(compareCustomerSortEntries\)/);
   assert.match(sorterSource, /"4281": \{ lat: 51\.7835, lng: 5\.0585 \}/);
   assert.match(sorterSource, /"4286": \{ lat: 51\.7714, lng: 4\.9597 \}/);
