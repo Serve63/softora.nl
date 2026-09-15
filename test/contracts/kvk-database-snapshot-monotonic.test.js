@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const repoRoot = path.join(__dirname, '../..');
 const bundlePath = path.join(repoRoot, 'assets/kvk-database.js');
@@ -10,6 +9,19 @@ const bundlePath = path.join(repoRoot, 'assets/kvk-database.js');
 function readBundle() {
   return fs.readFileSync(bundlePath, 'utf8');
 }
+
+// Referentie-implementatie: moet letterlijk overeenkomen met de helper in de
+// bundel (zie volgende test). Hierop draaien de gedragsgevallen, zonder dat
+// bundelcode wordt uitgevoerd.
+function referenceSnapshotTime(e) {
+  const t = e && (e.syncedAt || e.updatedAt || e.generatedAt);
+  const parsed = t ? new Date(t) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+}
+
+const EXPECTED_HELPER =
+  'function snapshotTime(e){const t=e&&(e.syncedAt||e.updatedAt||e.generatedAt),' +
+  'a=t?new Date(t):null;return a&&!Number.isNaN(a.getTime())?a.getTime():0}';
 
 test('kvk database snapshot rendering never moves backwards in time', () => {
   const source = readBundle();
@@ -25,10 +37,8 @@ test('kvk snapshotTime prefers synced/updated/generated timestamps in order', ()
   const source = readBundle();
   const match = source.match(/function snapshotTime\(e\)\{[^{}]*\}/);
   assert.ok(match, 'snapshotTime helper aanwezig');
-  const sandbox = {};
-  vm.createContext(sandbox);
-  vm.runInContext(`${match[0]};this.__snapshotTime = snapshotTime;`, sandbox);
-  const snapshotTime = sandbox.__snapshotTime;
+  assert.equal(match[0], EXPECTED_HELPER);
+  const snapshotTime = referenceSnapshotTime;
   assert.equal(snapshotTime(null), 0);
   assert.equal(snapshotTime({}), 0);
   assert.equal(snapshotTime({ generatedAt: 'niet-een-datum' }), 0);
