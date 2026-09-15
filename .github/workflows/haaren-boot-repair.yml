@@ -1,0 +1,53 @@
+name: Haaren remaining ordering contracts
+on:
+  push:
+    branches: [codex/haaren-distance-order-20260915]
+    paths: [.github/workflows/haaren-boot-repair.yml]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: codex/haaren-distance-order-20260915
+          fetch-depth: 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          cache: npm
+      - name: Update both old UI ordering assertions to the requested order
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('test/contracts/premium-database-ui.test.js')
+          lines = p.read_text().splitlines(keepends=True)
+          matches = [i for i, line in enumerate(lines) if 'assert.match(pageSource' in line and 'function getSortedCustomers' in line and 'sortByRecentOutreach' in line]
+          assert len(matches) == 2, matches
+          for i in matches:
+              lines[i] = '  assert.match(pageSource, /function getSortedCustomers\\(customers\\) \\{\\s*return sortCustomers\\(customers\\);\\s*\\}/);\n'
+          p.write_text(''.join(lines))
+          PY
+          git diff --check
+          test "$(git branch --show-current)" = 'codex/haaren-distance-order-20260915'
+          git add test/contracts/premium-database-ui.test.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'test: require Haaren ordering in both remaining UI contracts'
+          git push origin HEAD:refs/heads/codex/haaren-distance-order-20260915
+      - run: npm ci
+      - name: Test all database contracts without production data
+        run: |
+          status=0
+          node --test --test-reporter=junit test/contracts/*premium-database*.test.js > /tmp/haaren-contracts.xml || status=$?
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('/tmp/haaren-contracts.xml')
+          cases = tree.findall('.//testcase')
+          failures = [(case, failure) for case in cases for failure in case.findall('failure')]
+          print('DATABASE CONTRACTS:', len(cases), 'tests;', len(failures), 'failures')
+          for case, failure in failures:
+              print('\nFAILED:', case.get('name'))
+              print((failure.text or '')[:5000])
+          PY
+          exit "$status"
