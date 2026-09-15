@@ -16,10 +16,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import os, re, urllib.request
+          import os, re, urllib.request, urllib.error
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
           url = 'https://api.github.com/repos/Serve63/softora.nl/actions/jobs/104587188608/logs'
           req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
-          with urllib.request.urlopen(req, timeout=60) as response:
+          try:
+              response = urllib.request.build_opener(NoRedirect).open(req, timeout=60)
+          except urllib.error.HTTPError as error:
+              if error.code != 302:
+                  raise
+              response = urllib.request.urlopen(error.headers['Location'], timeout=60)
+          with response:
               text = response.read().decode('utf-8-sig')
           lines = [re.sub(r'^\S+Z ', '', line) for line in text.splitlines()]
           matches = [i for i, line in enumerate(lines) if re.match(r'not ok \d+ - ', line)]
