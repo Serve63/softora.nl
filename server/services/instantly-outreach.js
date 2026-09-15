@@ -2069,6 +2069,7 @@ function normalizeInstantlyConfig(config = {}) {
     apiBaseUrl: defaultNormalizeString(config.apiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/g, ''),
     defaultCampaignId: defaultNormalizeString(config.defaultCampaignId),
     replacementCampaigns: normalizeReplacementCampaigns(config.replacementCampaigns),
+    autoApprovedCampaigns: defaultNormalizeString(config.autoApprovedCampaigns) && normalizeReplacementCampaigns(config.autoApprovedCampaigns),
     webhookSecret: defaultNormalizeString(config.webhookSecret),
     intervalMinutes: clampNumber(
       config.intervalMinutes,
@@ -4354,7 +4355,6 @@ function createInstantlyOutreachService(deps = {}) {
         lead.last_contacted_from,
       normalizeString
     );
-
     return {
       eventType,
       eventStatus: normalizeInstantlyStatus(eventType, normalizeString),
