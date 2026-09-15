@@ -483,6 +483,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           setUiStateValues: dataOpsAwareUiStateSetter,
           outboundRecipientGuardStore,
           fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+          dataOpsStore: uiSeoRuntime.dataOpsStore,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
           normalizeString: shared.normalizeString,
