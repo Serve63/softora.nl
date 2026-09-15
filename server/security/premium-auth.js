@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const { normalizeRequestPathname } = require('./request-context');
 const { PASSWORD_REGISTER_SCOPE } = require('./password-register-access');
 
@@ -430,10 +431,28 @@ function createPremiumApiAccessGuard(options = {}) {
     getRequestOriginFromHeaders = () => '',
     clearPremiumSessionCookie = () => {},
     normalizeString = (value) => String(value || '').trim(),
+    cronSecret = process.env.CRON_SECRET || '',
   } = options;
+
+  function isTrustedInstantlyAutoPost(req) {
+    if (normalizeString(req?.method).toUpperCase() !== 'POST' ||
+        normalizeRequestPathname(getRequestPathname(req)) !== '/api/outreach/provider-upload' ||
+        normalizeString(req?.body?.mode).toLowerCase() !== 'auto') return false;
+    const secret = normalizeString(cronSecret);
+    if (!secret) return false;
+    const expected = Buffer.from(`Bearer ${secret}`);
+    const actual = Buffer.from(normalizeString(req?.headers?.authorization));
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  }
 
   async function requirePremiumApiAccess(req, res, next) {
     if (isPremiumPublicApiRequest(req)) return next();
+    // A cron-authenticated auto upload still passes the route's second secret
+    // check and all canonical provider-upload recipient/duplicate guards.
+    if (isTrustedInstantlyAutoPost(req)) {
+      res.setHeader('Cache-Control', 'no-store, private');
+      return next();
+    }
 
     const authState = await getResolvedPremiumAuthState(req, {
       allowAnonymousWithoutHydration: true,

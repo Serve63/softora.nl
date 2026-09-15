@@ -46,6 +46,49 @@ test('premium api guard bypasses public api requests', async () => {
   assert.equal(res.statusCode, null);
 });
 
+test('premium api guard permits only the exact secret-authenticated canonical auto POST', async () => {
+  let lookups = 0;
+  const guard = createPremiumApiAccessGuard({
+    cronSecret: 'test-cron-secret',
+    isPremiumPublicApiRequest: () => false,
+    getRequestPathname: (req) => req.originalUrl,
+    getResolvedPremiumAuthState: async () => {
+      lookups += 1;
+      return { configured: true, authenticated: false };
+    },
+  });
+  const base = {
+    method: 'POST', originalUrl: '/api/outreach/provider-upload',
+    body: { mode: 'auto' }, headers: { authorization: 'Bearer test-cron-secret' },
+  };
+  const cases = [
+    [base, true],
+    [{ ...base, headers: { authorization: 'Bearer wrong' } }, false],
+    [{ ...base, body: { mode: 'replace' } }, false],
+    [{ ...base, originalUrl: '/api/outreach/provider-upload/auto-run' }, false],
+    [{ ...base, method: 'GET' }, false],
+  ];
+  for (const [req, expected] of cases) {
+    const res = createResponseRecorder();
+    let nextCalled = false;
+    await guard.requirePremiumApiAccess(req, res, () => { nextCalled = true; });
+    assert.equal(nextCalled, expected);
+    assert.equal(res.headers['Cache-Control'], 'no-store, private');
+    assert.equal(res.statusCode, expected ? null : 401);
+  }
+  assert.equal(lookups, 4, 'only the exact cron request bypasses premium auth');
+  const emptySecret = createPremiumApiAccessGuard({
+    cronSecret: '', isPremiumPublicApiRequest: () => false,
+    getRequestPathname: (req) => req.originalUrl,
+    getResolvedPremiumAuthState: async () => ({ configured: true, authenticated: false }),
+  });
+  const res = createResponseRecorder();
+  let nextCalled = false;
+  await emptySecret.requirePremiumApiAccess(base, res, () => { nextCalled = true; });
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 401);
+});
+
 test('premium api guard returns 503 when auth is not fully configured', async () => {
   const guard = createPremiumApiAccessGuard({
     isPremiumPublicApiRequest: () => false,
