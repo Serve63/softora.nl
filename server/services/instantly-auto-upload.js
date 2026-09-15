@@ -94,8 +94,14 @@ function createInstantlyAutoUpload(deps = {}) {
   }
 
   async function run(input = {}) {
-    if (!config.enabled || !config.autoUploadEnabled || !config.apiKey) {
+    if (!config.enabled) {
+      throw createError('Instantly-integratie staat niet veilig aan.', 'INSTANTLY_AUTO_INTEGRATION_DISABLED', 503);
+    }
+    if (!config.autoUploadEnabled) {
       throw createError('Instantly automatische upload staat niet veilig aan.', 'INSTANTLY_AUTO_DISABLED', 503);
+    }
+    if (!config.apiKey) {
+      throw createError('Instantly API-configuratie ontbreekt.', 'INSTANTLY_AUTO_API_KEY_MISSING', 503);
     }
     // Never use the destructive campaign-replacement operation or an unchecked CSV import.
     assertApprovedCampaign('serve');
