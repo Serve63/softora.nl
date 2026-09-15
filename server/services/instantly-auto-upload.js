@@ -46,8 +46,10 @@ function createInstantlyAutoUpload(deps = {}) {
     resolveSender,
     reserveRows,
     confirmReservation,
+    releaseReservation = async () => ({ ok: false, skipped: true }),
     saveLegacyGuards,
     markPreparedRows,
+    persistSingleRow = null,
     getCampaign,
     addCampaignLeads,
     activateCampaign,
@@ -159,15 +161,59 @@ function createInstantlyAutoUpload(deps = {}) {
       throw createError('Centrale ontvanger-guard kon niet exact één lead reserveren.', 'INSTANTLY_AUTO_CENTRAL_GUARD_FAILED', 503);
     }
 
-    // Both guards and the local queued state must be durable BEFORE /leads/add.
-    await saveLegacyGuards([item], { at, actor, uploadId, campaignId: approved.id, sender, source: 'instantly-auto-upload' });
+    async function releaseProvisional(reservationId) {
+      try {
+        await releaseReservation(reservationId);
+      } catch (_) {}
+    }
+
+    async function rollbackLocalQueuedState() {
+      try {
+        if (typeof persistSingleRow === 'function') {
+          await persistSingleRow(item.row, { source: 'instantly-auto-upload-rollback', actor, upsertOnly: true });
+        } else {
+          await persistRows(loaded, rows, { source: 'instantly-auto-upload-rollback', actor });
+        }
+      } catch (_) {}
+    }
+
+    // Both the local queued state and both permanent guards must be durable BEFORE /leads/add.
+    // The local write is a single-row upsert (never a full replace) so a large database
+    // can never block the queue with a 413/timeout. A provisional central reservation is
+    // always released again when a pre-upload step fails, so the lead stays retryable and
+    // no permanent guard is written before the local state is safe.
     const queued = markPreparedRows(rows, [item], { at, actor, uploadId, campaignId: approved.id, sender });
-    const prepared = await persistRows(loaded, queued, { source: 'instantly-auto-upload', actor });
-    if (!prepared) throw createError('Lokale Instantly-reservering kon niet worden bewaard.', 'INSTANTLY_AUTO_LOCAL_RESERVATION_FAILED', 502);
-    const confirmed = await confirmReservation(reservation.reservationId, {
-      status: 'queued', permanent: true, at, payload: { campaignId: approved.id, uploadId, owner },
-    });
+    const preparedSingle = Array.isArray(queued) ? queued[item.index] : null;
+    let prepared = false;
+    try {
+      prepared = typeof persistSingleRow === 'function'
+        ? await persistSingleRow(preparedSingle, { source: 'instantly-auto-upload', actor, upsertOnly: true })
+        : await persistRows(loaded, queued, { source: 'instantly-auto-upload', actor });
+    } catch (_) {
+      prepared = false;
+    }
+    if (!prepared) {
+      await releaseProvisional(reservation.reservationId);
+      throw createError('Lokale Instantly-reservering kon niet worden bewaard.', 'INSTANTLY_AUTO_LOCAL_RESERVATION_FAILED', 502);
+    }
+    try {
+      await saveLegacyGuards([item], { at, actor, uploadId, campaignId: approved.id, sender, source: 'instantly-auto-upload' });
+    } catch (error) {
+      await rollbackLocalQueuedState();
+      await releaseProvisional(reservation.reservationId);
+      throw error;
+    }
+    let confirmed = null;
+    try {
+      confirmed = await confirmReservation(reservation.reservationId, {
+        status: 'queued', permanent: true, at, payload: { campaignId: approved.id, uploadId, owner },
+      });
+    } catch (_) {
+      confirmed = null;
+    }
     if (!confirmed || confirmed.ok !== true) {
+      await rollbackLocalQueuedState();
+      await releaseProvisional(reservation.reservationId);
       throw createError('Centrale guard kon niet definitief worden bevestigd; er is niets geüpload.', 'INSTANTLY_AUTO_GUARD_CONFIRM_FAILED', 502);
     }
 
@@ -182,15 +228,27 @@ function createInstantlyAutoUpload(deps = {}) {
     }
 
     const fresh = await loadRows();
+    const freshRows = Array.isArray(fresh && fresh.rows) ? fresh.rows : [];
+    const linkTarget = freshRows.find((row) =>
+      text(row && row.instantlyManualUploadId) === uploadId &&
+      text(row && (row.email || row.contactEmail)).toLowerCase() === text(lead.email).toLowerCase());
+    // The provider already accepted the lead, so the permanent guards intentionally stay.
+    // The local link is a small single-row upsert with retries, never a full replace.
     let linked = false;
-    const nextRows = fresh.rows.map((row) => {
-      if (text(row && row.instantlyManualUploadId) !== uploadId ||
-          text(row && (row.email || row.contactEmail)).toLowerCase() !== text(lead.email).toLowerCase()) return row;
-      linked = true;
-      return { ...row, instantlyLeadId: text(createdLead.id), instantlyStatus: 'synced',
+    if (linkTarget) {
+      const linkedRow = { ...linkTarget, instantlyLeadId: text(createdLead.id), instantlyStatus: 'synced',
         lastColdmailProviderStatus: 'synced', instantlyLastEventAt: at, updatedAt: at };
-    });
-    if (!linked || !(await persistRows(fresh, nextRows, { source: 'instantly-auto-upload-linked', actor }))) {
+      for (let attempt = 0; attempt < 3 && !linked; attempt += 1) {
+        try {
+          linked = typeof persistSingleRow === 'function'
+            ? Boolean(await persistSingleRow(linkedRow, { source: 'instantly-auto-upload-linked', actor, upsertOnly: true }))
+            : Boolean(await persistRows(fresh, freshRows.map((row) => (row === linkTarget ? linkedRow : row)), { source: 'instantly-auto-upload-linked', actor }));
+        } catch (_) {
+          linked = false;
+        }
+      }
+    }
+    if (!linked) {
       throw createError('Instantly accepteerde de lead, maar de lokale lead-koppeling faalde; guards blijven staan.', 'INSTANTLY_AUTO_LOCAL_LINK_FAILED', 502);
     }
 

@@ -246,22 +246,22 @@
             const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, true);
-        }).concat(availableRows.map(function (snapshotCustomer) {
-            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
-            if (remoteMatch) consumed.add(remoteMatch);
-            return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);
-        })).concat(instantlyRows.map(function (snapshotCustomer) {
+        }).concat(instantlyRows.map(function (snapshotCustomer) {
             const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeInstantlySnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer);
+        })).concat(availableRows.map(function (snapshotCustomer) {
+            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            if (remoteMatch) consumed.add(remoteMatch);
+            return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);
         }));
-        return canonical.concat(remoteCustomers.filter(function (customer) { return !consumed.has(customer); }).map(function (customer) {
+        return dedupeCustomers(canonical.concat(remoteCustomers.filter(function (customer) { return !consumed.has(customer); }).map(function (customer) {
             return Object.assign({}, customer, {
                 mailReady: false,
                 mailReadySnapshot: false,
                 availableSnapshot: false
             });
-        }));
+        })));
     }
 
     function reconcileCustomerList(state, customers) {

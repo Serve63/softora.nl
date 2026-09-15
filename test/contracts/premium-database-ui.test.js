@@ -1367,6 +1367,23 @@ test('canonical mail-ready merge clears stale category flags from unmatched remo
   );
 });
 
+test('Instantly design wins over a stale available snapshot and is counted once with signed media', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const merged = client.mergeWithCanonicalSnapshots([
+    { id: 'same-company', bedrijf: 'Same Company', email: 'info@same.test' },
+  ], [], [
+    { id: 'same-company', bedrijf: 'Same Company', availableSnapshot: true, hasPhoto: true, hasMockup: true },
+  ], [
+    { id: 'same-company', bedrijf: 'Same Company', webdesignMailProvider: 'instantly', instantlyReadySnapshot: true, hasPhoto: true, hasMockup: true,
+      websitePhoto: 'https://example.test/photo.jpg', websiteMockup: 'https://example.test/mockup.jpg' },
+  ]);
+  assert.equal(merged.length, 1);
+  assert.equal(client.isSnapshotInstantlyReadyCustomer(merged[0]), true);
+  assert.equal(client.isSnapshotAvailableCustomer(merged[0]), false);
+  assert.equal(merged[0].websitePhoto, 'https://example.test/photo.jpg');
+  assert.equal(merged[0].websiteMockup, 'https://example.test/mockup.jpg');
+});
+
 test('Instantly-ready designs remain visible in their own canonical category after a refresh', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('snapshot must load'); } } });
   const state = { klanten: [], mailReadySnapshotLoaded: false, availableSnapshotLoaded: false, foundSnapshotLoaded: false };
@@ -2228,7 +2245,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function hydrateDatabaseAuthSession\(\)/);
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
-  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "instantly-ready" \|\| state\.activeStatus === "verstuurd", showPhotoColumn = !showOutreachActionColumn/);
+  assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly" \|\| state\.activeStatus === "verstuurd", showPhotoColumn = !showOutreachActionColumn/);
   assert.doesNotMatch(pageSource, /function isAvailableColdmailCandidate\(/);
   assert.doesNotMatch(pageSource, /function getAvailableColdmailCandidates\(/);
   assert.doesNotMatch(pageSource, /isAvailableColdmailDisplayCandidate/);
