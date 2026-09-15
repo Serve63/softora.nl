@@ -12,16 +12,17 @@
     }
     function rows(customers, query) {
         const byEmail = new Map(), byId = new Map();
+        const distance = root.SoftoraPremiumDatabaseDistance;
         (customers || []).forEach(customer => {
             if (clean(customer.email)) byEmail.set(clean(customer.email).toLowerCase(), customer);
             if (clean(customer.id)) byId.set(clean(customer.id), customer);
         });
         return (snapshot ? snapshot.recipients : []).map(recipient => {
             const customer = byEmail.get(clean(recipient.email).toLowerCase()) || byId.get(recipient.customerId) || {};
-            return { ...recipient, company: recipient.company || customer.bedrijf || recipient.email,
-                address: customer.stad || '', website: customer.website || customer.dom || '' };
+            return { ...(distance ? distance.getCustomerLocationFields(customer) : {}), ...recipient, company: recipient.company || customer.bedrijf || recipient.email,
+                address: customer.stad || customer.adres || '', website: customer.website || customer.dom || '' };
         }).filter(row => !normalize(query) || normalize([row.company, row.address, row.email, row.senderEmail, row.website].join(' ')).includes(normalize(query)))
-            .sort((a, b) => (Date.parse(b.sentAt) || 0) - (Date.parse(a.sentAt) || 0) || a.key.localeCompare(b.key));
+            .sort((a, b) => (distance ? distance.compareCustomersByDistance(a, b) : 0) || a.key.localeCompare(b.key));
     }
     function render(options) {
         const { state, nodes, setBody, updateLoadMore, formatDate, normalizeUrl } = options;

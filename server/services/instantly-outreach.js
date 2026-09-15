@@ -1,3 +1,4 @@
+const { sortCustomerEntriesByDistance } = require('../../assets/premium-database-distance');
 const crypto = require('node:crypto');
 const dns = require('node:dns').promises;
 const {
@@ -36,7 +37,6 @@ const {
   renderUnlinkedWebsiteDomain,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
-
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
@@ -2566,8 +2566,8 @@ function createInstantlyOutreachService(deps = {}) {
   async function collectEligibleRows(rows, limit, context = {}) {
     const selectedRows = [];
     const failed = [];
-    for (let index = 0; index < rows.length && selectedRows.length < limit; index += 1) {
-      const row = rows[index];
+    for (const { row, index } of sortCustomerEntriesByDistance(rows)) {
+      if (selectedRows.length >= limit) break;
       const id = getRowId(row, index, normalizeString);
       const email = getRowEmail(row, normalizeString);
       const company = getRowCompany(row, normalizeString);

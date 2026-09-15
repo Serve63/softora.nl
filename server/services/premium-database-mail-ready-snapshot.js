@@ -1,3 +1,4 @@
+const { sortCustomersByDistance, getCustomerLocationFields } = require('../../assets/premium-database-distance');
 const { normalizeContactStatus } = require('./customer-lifecycle');
 const { createSnapshotRowHelpers } = require('./premium-database-snapshot-row-helpers');
 const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
@@ -7,7 +8,6 @@ const {
 const {
   createPremiumDatabaseSnapshotCacheCodec,
 } = require('./premium-database-snapshot-cache');
-
 const SNAPSHOT_SOURCE = 'structured-mail-ready-snapshot';
 const MAIL_READY_SNAPSHOT_CACHE_SCOPE = 'premium_database_mail_ready_snapshot_cache';
 const MAIL_READY_SNAPSHOT_CACHE_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
@@ -394,6 +394,7 @@ function buildSnapshotCustomer(row = {}, photoFlag = {}) {
   return {
     id,
     bedrijf: company,
+    ...getCustomerLocationFields(row),
     naam: getRowContactName(row),
     email: getRowEmail(row),
     telefoon: getRowPhone(row),
@@ -580,7 +581,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     if (!Array.isArray(rawCustomerRows)) {
       throw createUnavailableError('Mailklare snapshot kon klantdata niet laden.');
     }
-    const customerRows = dedupeCustomerRows(rawCustomerRows);
+    const customerRows = sortCustomersByDistance(dedupeCustomerRows(rawCustomerRows));
     const photoRows = photoResult.rows;
     const photosMs = photoResult.ms;
     if (!Array.isArray(photoRows)) {
@@ -1112,9 +1113,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       requireFoundSnapshot: options.includeFoundSnapshot === true,
       allowStaleWhileRefreshing: options.allowStaleWhileRefreshing === true,
     });
-    const allCustomers = Array.isArray(snapshotData.customers) ? snapshotData.customers : [];
-    const allAvailableCustomers = Array.isArray(snapshotData.availableCustomers) ? snapshotData.availableCustomers : [];
-    const allInstantlyReadyCustomers = Array.isArray(snapshotData.instantlyReadyCustomers) ? snapshotData.instantlyReadyCustomers : [];
+    const allCustomers = sortCustomersByDistance(snapshotData.customers);
+    const allAvailableCustomers = sortCustomersByDistance(snapshotData.availableCustomers);
+    const allInstantlyReadyCustomers = sortCustomersByDistance(snapshotData.instantlyReadyCustomers);
     return {
       ok: true,
       source: SNAPSHOT_SOURCE,

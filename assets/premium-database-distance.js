@@ -5,6 +5,8 @@
 })(typeof window !== "undefined" ? window : globalThis, function () {
   "use strict";
 
+  const HAAREN_COORDS = Object.freeze({ lat: 51.6027, lng: 5.2222 });
+  // Persisted deep-search target indices use their own versioned order; do not migrate them here.
   const OISTERWIJK_COORDS = { lat: 51.5792, lng: 5.1889 };
   const PLACE_COORD_ENTRIES = [
     ["oisterwijk", 51.5792, 5.1889],
@@ -169,7 +171,7 @@
   }
 
   function getCompanyName(customer) {
-    return normalizeText(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam || customer.name));
+    return normalizeText(firstCustomerValue(customer, ["bedrijf", "company", "companyName", "company_name", "naam", "name"]));
   }
 
   function rememberCachedValue(cache, key, value) {
@@ -194,9 +196,13 @@
   }
 
   function resolveExplicitCoords(customer) {
-    const lat = Number(customer && (customer.lat || customer.latitude || customer.latitudeNumber));
-    const lng = Number(customer && (customer.lng || customer.lon || customer.longitude || customer.longitudeNumber));
-    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+    const rawLat = firstCustomerValue(customer, ["lat", "latitude", "latitudeNumber"]);
+    const rawLng = firstCustomerValue(customer, ["lng", "lon", "longitude", "longitudeNumber"]);
+    if (rawLat === "" || rawLng === "" || typeof rawLat === "boolean" || typeof rawLng === "boolean") return null;
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
+    return Number.isFinite(lat) && Math.abs(lat) <= 90 && Number.isFinite(lng) && Math.abs(lng) <= 180
+      ? { lat: lat, lng: lng } : null;
   }
 
   function resolvePostalCoords(text) {
@@ -217,12 +223,34 @@
   }
 
   function firstCustomerValue(customer, keys) {
-    if (!customer) return "";
-    for (let index = 0; index < keys.length; index += 1) {
-      const value = customer[keys[index]];
-      if (value !== undefined && value !== null && String(value).trim()) return value;
+    if (!customer || typeof customer !== "object") return "";
+    const sources = [customer, customer.payload];
+    for (const source of sources) {
+      if (!source || typeof source !== "object") continue;
+      for (const key of keys) {
+        const value = source[key];
+        if (value !== undefined && value !== null && String(value).trim()) return value;
+      }
     }
     return "";
+  }
+
+  // Keep only location fields when snapshot/UI normalization narrows a record.
+  function getCustomerLocationFields(customer) {
+    const fields = {
+      lat: ["lat", "latitude", "latitudeNumber"],
+      lng: ["lng", "lon", "longitude", "longitudeNumber"],
+      plaats: ["plaats", "woonplaats", "city", "stad"],
+      gemeente: ["gemeente", "municipality"],
+      provincie: ["provincie", "province", "regio", "region"],
+      adres: ["adres", "address", "location"],
+    };
+    const result = {};
+    for (const key of Object.keys(fields)) {
+      const value = firstCustomerValue(customer, fields[key]);
+      if (value !== "") result[key] = value;
+    }
+    return result;
   }
 
   function resolveExternalCustomerCoords(customer, text) {
@@ -243,54 +271,23 @@
   function resolveCustomerCoords(customer) {
     const explicitCoords = resolveExplicitCoords(customer);
     if (explicitCoords) return explicitCoords;
-    const text = [
-      customer && customer.stad,
-      customer && customer.plaats,
-      customer && customer.city,
-      customer && customer.gemeente,
-      customer && customer.adres,
-      customer && customer.address,
-      customer && customer.location,
-    ].filter(Boolean).join(" ");
-    return resolvePostalCoords(text) || resolvePlaceCoords(text) || resolveExternalCustomerCoords(customer, text);
-  }
-
-  function buildCustomerDistanceCacheKey(customer) {
-    if (!customer || typeof customer !== "object") return "";
-    const text = [
-      customer.stad,
-      customer.plaats,
-      customer.city,
-      customer.gemeente,
-      customer.adres,
-      customer.address,
-      customer.location,
-    ].filter(Boolean).join(" ");
-    return [
-      normalizeText(text),
-      normalizeText(firstCustomerValue(customer, ["provincie", "province", "regio", "region"])),
-      normalizeText(firstCustomerValue(customer, ["gemeente", "municipality"])),
-      normalizeText(firstCustomerValue(customer, ["plaats", "woonplaats", "city", "stad"]))
-    ].join("|");
+    const fields = getCustomerLocationFields(customer);
+    const place = fields.plaats || "";
+    const text = [place, fields.gemeente, fields.adres].filter(Boolean).join(" ");
+    return (place && (resolvePlaceCoords(place) || resolveExternalCustomerCoords(customer, place))) ||
+      resolvePostalCoords(text) || resolvePlaceCoords(text) || resolveExternalCustomerCoords(customer, text);
   }
 
   function getDistanceKm(customer) {
-    const existing = Number(customer && (customer.distanceKm || customer.afstandKm));
-    if (Number.isFinite(existing) && existing >= 0) return existing;
-    const cacheKey = buildCustomerDistanceCacheKey(customer);
-    if (cacheKey && customerDistanceCache.has(cacheKey)) return customerDistanceCache.get(cacheKey);
+    // Stored distanceKm/afstandKm may have another origin; always calculate from Haaren.
+    const cacheKey = JSON.stringify(getCustomerLocationFields(customer));
+    if (customerDistanceCache.has(cacheKey)) return customerDistanceCache.get(cacheKey);
     const coords = resolveCustomerCoords(customer);
-    return rememberCachedValue(customerDistanceCache, cacheKey, coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity);
+    return rememberCachedValue(customerDistanceCache, cacheKey, coords ? haversineKm(HAAREN_COORDS, coords) : Infinity);
   }
 
-  function compareCustomersByDistance(left, right) {
-    const leftDistance = getDistanceKm(left);
-    const rightDistance = getDistanceKm(right);
-    if (Number.isFinite(leftDistance) && !Number.isFinite(rightDistance)) return -1;
-    if (!Number.isFinite(leftDistance) && Number.isFinite(rightDistance)) return 1;
-    if (leftDistance < rightDistance) return -1;
-    if (leftDistance > rightDistance) return 1;
-    return getCompanyName(left).localeCompare(getCompanyName(right), "nl");
+  function getCustomerSortId(customer) {
+    return String(firstCustomerValue(customer, ["id", "customerId", "customer_id", "databaseId", "email", "contactEmail"]));
   }
 
   function compareCustomerSortEntries(left, right) {
@@ -298,24 +295,33 @@
     if (!Number.isFinite(left.distanceKm) && Number.isFinite(right.distanceKm)) return 1;
     if (left.distanceKm < right.distanceKm) return -1;
     if (left.distanceKm > right.distanceKm) return 1;
-    const nameComparison = left.companyName.localeCompare(right.companyName, "nl");
-    return nameComparison || left.index - right.index;
+    return left.companyName.localeCompare(right.companyName, "nl") ||
+      left.sortId.localeCompare(right.sortId, "nl") || left.index - right.index;
+  }
+
+  function buildCustomerSortEntry(row, index) {
+    return {
+      row: row,
+      index: index,
+      distanceKm: getDistanceKm(row),
+      companyName: getCompanyName(row),
+      sortId: getCustomerSortId(row),
+    };
+  }
+
+  function compareCustomersByDistance(left, right) {
+    return compareCustomerSortEntries(buildCustomerSortEntry(left, 0), buildCustomerSortEntry(right, 0));
+  }
+
+  // Original row indices are retained for guarded outbound updates after selection.
+  function sortCustomerEntriesByDistance(customers) {
+    return (Array.isArray(customers) ? customers : [])
+      .map(buildCustomerSortEntry)
+      .sort(compareCustomerSortEntries);
   }
 
   function sortCustomersByDistance(customers) {
-    return (Array.isArray(customers) ? customers : [])
-      .map(function (customer, index) {
-        return {
-          customer: customer,
-          index: index,
-          distanceKm: getDistanceKm(customer),
-          companyName: getCompanyName(customer),
-        };
-      })
-      .sort(compareCustomerSortEntries)
-      .map(function (entry) {
-        return entry.customer;
-      });
+    return sortCustomerEntriesByDistance(customers).map(function (entry) { return entry.row; });
   }
 
   function getTargetParts(label) {
@@ -326,6 +332,7 @@
   }
 
   function getTargetCoordSource() {
+    if (typeof module === "object" && module.exports && typeof require === "function") return require("./premium-database-target-coords.js");
     const root = typeof window !== "undefined" ? window : globalThis;
     return root && root.SoftoraPremiumDatabaseTargetCoords &&
       typeof root.SoftoraPremiumDatabaseTargetCoords.getTargetCoords === "function"
@@ -375,6 +382,9 @@
   }
 
   return Object.freeze({
+    HAAREN_COORDS,
+    getCustomerLocationFields,
+    sortCustomerEntriesByDistance,
     compareCustomersByDistance,
     compareTargetLabelsByDistance,
     getDistanceKm,
