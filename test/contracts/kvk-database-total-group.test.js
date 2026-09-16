@@ -54,6 +54,17 @@ test('kvk totaalgroep geeft elke kaart dezelfde paarse rand als de groene kaarte
   );
   assert.match(
     readPage(),
-    /kvk-database-metrics\.css\?v=20260916-purple-cards/
+    /kvk-database-metrics\.css\?v=20260917-control-orange/
+  );
+});
+
+test('kvk database gives the control room card its own orange border', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const css = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
+
+  assert.match(html, /class="stat-card stat-card-control-room stat-card-decision stat-card-directory kvk-stat-card-enhanced"/);
+  assert.match(
+    css,
+    /\.stat-card-control-room\s*\{\s*border-color:\s*rgba\(196,\s*106,\s*34,\s*0\.72\);?\s*\}/
   );
 });
