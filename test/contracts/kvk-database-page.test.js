@@ -542,7 +542,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260916-event-loop-fix/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260910-flow/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260916-purple-cards/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /declared_usable/);

@@ -45,3 +45,15 @@ test('kvk totaalgroep gebruikt paars, vier kolommen en hetzelfde responsieve ged
   assert.match(css, /\.stat-total-group\s*\{[^}]*142,\s*47,\s*95/);
   assert.match(css, /\.stat-total-group-label\s*\{[^}]*color:\s*var\(--accent\)/);
 });
+
+test('kvk totaalgroep geeft elke kaart dezelfde paarse rand als de groene kaarten', () => {
+  const css = readMetricsCss();
+  assert.match(
+    css,
+    /\.stat-total-group > \.stat-card\s*\{\s*border-color:\s*rgba\(142,\s*47,\s*95,\s*0\.72\);?\s*\}/
+  );
+  assert.match(
+    readPage(),
+    /kvk-database-metrics\.css\?v=20260916-purple-cards/
+  );
+});
