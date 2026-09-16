@@ -1,5 +1,6 @@
 const { createInstantlyCampaignReplacement } = require('./instantly-campaign-replacement');
 const { createInstantlyAutoUpload } = require('./instantly-auto-upload');
+const { runInstantlyAutoUploadBatch } = require('./instantly-auto-upload-batch');
 const { buildInstantlyQueueSelectionContext } = require('./instantly-queue-selection');
 
 function createInstantlyCampaignReplacementRuntime(deps = {}) {
@@ -88,7 +89,9 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
   });
   const automatic = createInstantlyAutoUpload({
     ...shared,
-    config,
+    // The daily cap belongs to sending pace, not to mirroring already-approved
+    // mail-ready leads into Instantly. Campaign scheduling still controls sends.
+    config: { ...config, dailyCap: Number.MAX_SAFE_INTEGER },
     getReadyPhoto,
     markPreparedRows,
     persistSingleRow,
@@ -96,7 +99,13 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     listCampaignLeads: campaignApi.listCampaignLeads,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, source: 'instantly-auto-upload' }),
   });
-  return { ...replacement, autoUpload: automatic.run };
+  const autoUpload = (input = {}) => runInstantlyAutoUploadBatch({
+    runOne: automatic.run,
+    input,
+    config,
+    now,
+  });
+  return { ...replacement, autoUpload };
 }
 
 module.exports = { createInstantlyCampaignReplacementRuntime };
