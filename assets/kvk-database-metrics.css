@@ -80,6 +80,10 @@
   border-color: rgba(46, 115, 95, 0.72);
 }
 
+.stat-card-control-room {
+  border-color: rgba(196, 106, 34, 0.72);
+}
+
 .kvk-stat-card-enhanced .stat-main > span {
   min-height: 22px;
   line-height: 1.2;
