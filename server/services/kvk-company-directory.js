@@ -1,6 +1,8 @@
 const crypto = require('node:crypto');
 
 const DIRECTORY_TABLE = 'softora_kvk_company_directory';
+const UNUSED_DIRECTORY_VIEW = 'softora_kvk_unused_company_directory';
+const UNUSED_CATEGORIES = new Set(['bruikbaar', 'met-website', 'zonder-werkende-website']);
 const META_TABLE = 'softora_kvk_company_directory_meta';
 const META_ID = 'canonical';
 const DEFAULT_PAGE_SIZE = 100;
@@ -143,6 +145,12 @@ function createKvkCompanyDirectoryService(deps = {}) {
     return DIRECTORY_CATEGORIES[category] || DIRECTORY_CATEGORIES.all;
   }
 
+  // Both rows and exact totals must exclude destination imports before search,
+  // pagination and limits. Never fall back to the raw mirror if this read fails.
+  function directoryReadRelation(category) {
+    return UNUSED_CATEGORIES.has(normalizeCategory(category)) ? UNUSED_DIRECTORY_VIEW : DIRECTORY_TABLE;
+  }
+
   function normalizeCategoryTotals(value) {
     const totals = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     return Object.fromEntries(
@@ -256,7 +264,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
     const client = directoryClient();
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     let request = client
-      .from(DIRECTORY_TABLE)
+      .from(directoryReadRelation(category))
       .select(DIRECTORY_SELECT_COLUMNS)
       .order('source_company_id', { ascending: true })
       .limit(limit + 1);
@@ -283,7 +291,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
     const client = directoryClient();
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     let request = client
-      .from(DIRECTORY_TABLE)
+      .from(directoryReadRelation(category))
       .select('source_company_id', { count: 'exact', head: true });
     request = applyDirectoryCategoryFilter(request, normalizeCategory(category));
     request = applyDirectorySearch(request, query);
@@ -571,6 +579,7 @@ module.exports = {
   DEFAULT_PAGE_SIZE,
   DIRECTORY_CATEGORIES,
   DIRECTORY_TABLE,
+  UNUSED_DIRECTORY_VIEW,
   MAX_PAGE_SIZE,
   MAX_SYNC_BATCH_SIZE,
   META_TABLE,
