@@ -38,6 +38,10 @@
   background: linear-gradient(rgba(142, 47, 95, 0.55), rgba(142, 47, 95, 0.55)) center / 100% 1px no-repeat;
 }
 
+.stat-total-group > .stat-card {
+  border-color: rgba(142, 47, 95, 0.72);
+}
+
 .stat-total-group-label {
   position: absolute;
   top: -24px;
