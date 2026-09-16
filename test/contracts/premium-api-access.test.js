@@ -312,6 +312,7 @@ test('premium admin api guard re-confirms token fallback admin through hydrated 
     {
       allowAnonymousWithoutHydration: false,
       allowTokenFallbackWithoutHydration: false,
+      resolveTimeoutMs: 5000,
     },
   ]);
 });
@@ -500,4 +501,92 @@ test('premium admin api guard never extends mailbox body fallback to writes or e
   const expiredRead = await run({ method: 'GET', path: '/api/mailbox/message', expired: true });
   assert.equal(expiredRead.nextCalled, false);
   assert.equal(expiredRead.res.statusCode, 401);
+});
+
+test('premium admin guard reports temporary hydration failure instead of a permanent admin rejection', async () => {
+  const guard = createPremiumApiAccessGuard({
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      hydrationUnavailable: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    }),
+    getRequestPathname: () => '/api/live-momentum/access',
+  });
+  const req = {
+    method: 'POST',
+    originalUrl: '/api/live-momentum/access',
+    premiumAuth: {
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    },
+    get: () => 'agent',
+  };
+  const res = createResponseRecorder();
+  let nextCalled = false;
+
+  await guard.requirePremiumAdminApiAccess(req, res, () => { nextCalled = true; });
+
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.code, 'ADMIN_CONFIRMATION_TEMPORARILY_UNAVAILABLE');
+});
+
+test('premium admin guard waits longer on the authoritative admin reconfirmation', async () => {
+  const resolverOptions = [];
+  const guard = createPremiumApiAccessGuard({
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverOptions.push(options);
+      return {
+        configured: true,
+        authenticated: true,
+        isAdmin: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_admin',
+        user: { id: 'usr_admin' },
+      };
+    },
+    getRequestPathname: () => '/api/live-momentum/access',
+  });
+  const req = {
+    method: 'POST',
+    originalUrl: '/api/live-momentum/access',
+    premiumAuth: {
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    },
+    get: () => 'agent',
+  };
+  const res = createResponseRecorder();
+  let nextCalled = false;
+
+  await guard.requirePremiumAdminApiAccess(req, res, () => { nextCalled = true; });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.statusCode, null);
+  assert.equal(resolverOptions.length, 1);
+  assert.equal(resolverOptions[0].resolveTimeoutMs, 5000);
 });

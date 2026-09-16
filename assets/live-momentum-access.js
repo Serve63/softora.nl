@@ -8,6 +8,8 @@
 
   let code = '';
   let checking = false;
+  const MAX_ADMIN_CONFIRMATION_RETRIES = 3;
+  const ADMIN_CONFIRMATION_RETRY_CODE = 'ADMIN_CONFIRMATION_TEMPORARILY_UNAVAILABLE';
 
   function setMessage(text, checkingState = false) {
     message.textContent = text;
@@ -47,7 +49,7 @@
     input.focus({ preventScroll: true });
   }
 
-  async function verifyCode() {
+  async function verifyCode(attempt = 0) {
     if (checking || code.length !== 6) return;
     setChecking(true);
     setMessage('Controleren…', true);
@@ -60,6 +62,17 @@
         body: JSON.stringify({ code }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (
+        response.status === 503 &&
+        payload.code === ADMIN_CONFIRMATION_RETRY_CODE &&
+        attempt < MAX_ADMIN_CONFIRMATION_RETRIES
+      ) {
+        setMessage('Even extra controleren…', true);
+        window.setTimeout(() => {
+          void verifyCode(attempt + 1);
+        }, 600 * (attempt + 1));
+        return;
+      }
       if (!response.ok || payload.ok !== true) {
         throw new Error(payload.error || 'Toegangscode is onjuist.');
       }

@@ -140,7 +140,7 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /settings-module-back\.js\?v=20260909a/);
   assert.equal((html.match(/data-settings-module-back-host/g) || []).length, 1);
   assert.doesNotMatch(html, /momentum-access-close|Toegangsscherm sluiten/);
-  assert.match(html, /live-momentum-access\.js\?v=20260804a/);
+  assert.match(html, /live-momentum-access\.js\?v=20260917a/);
   assert.match(html, /data-sidebar-shell="canonical"/);
   assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host aria-label="Softora navigatie"><\/aside>/);
   assert.match(html, /premium-sidebar-links\.js\?v=20260818a/);
@@ -155,6 +155,8 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.doesNotMatch(css.slice(0, css.indexOf('@media (max-width: 900px)')), /momentum-access-layout[\s\S]*display:\s*none/);
   assert.match(js, /fetch\('\/api\/live-momentum\/access'/);
   assert.match(js, /credentials:\s*'same-origin'/);
+  assert.match(js, /ADMIN_CONFIRMATION_TEMPORARILY_UNAVAILABLE/);
+  assert.match(js, /attempt < MAX_ADMIN_CONFIRMATION_RETRIES/);
   assert.match(js, /window\.location\.replace\('\/winnen'\)/);
   assert.doesNotMatch(js, /808080/);
 });
