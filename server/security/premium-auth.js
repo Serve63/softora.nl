@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 const { normalizeRequestPathname } = require('./request-context');
 const { PASSWORD_REGISTER_SCOPE } = require('./password-register-access');
 
+const ADMIN_REFRESH_RESOLVE_TIMEOUT_MS = 5000;
+
 const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/healthz',
   '/api/health/baseline',
@@ -55,8 +57,9 @@ function createPremiumAuthStateManager(options = {}) {
     getRequestPathname = () => '/',
   } = options;
 
-  function getSafeResolveTimeoutMs() {
-    return Math.max(0, Math.min(10000, Number(resolveTimeoutMs) || 0));
+  function getSafeResolveTimeoutMs(overrideMs) {
+    const rawTimeoutMs = overrideMs === undefined ? resolveTimeoutMs : overrideMs;
+    return Math.max(0, Math.min(10000, Number(rawTimeoutMs) || 0));
   }
 
   function getPremiumAuthState(req) {
@@ -209,7 +212,7 @@ function createPremiumAuthStateManager(options = {}) {
         return cachedFallbackState;
       }
     }
-    const timeoutMs = getSafeResolveTimeoutMs();
+    const timeoutMs = getSafeResolveTimeoutMs(options?.resolveTimeoutMs);
     let hydrated;
     if (!timeoutMs) {
       hydrated = await premiumUsersStore.ensureUsersHydrated(
@@ -551,6 +554,7 @@ function createPremiumApiAccessGuard(options = {}) {
       return await getResolvedPremiumAuthState(req, {
         allowAnonymousWithoutHydration: false,
         allowTokenFallbackWithoutHydration: false,
+        resolveTimeoutMs: ADMIN_REFRESH_RESOLVE_TIMEOUT_MS,
       });
     } catch (error) {
       appendSecurityAuditEvent(
@@ -592,6 +596,14 @@ function createPremiumApiAccessGuard(options = {}) {
     if (refreshedAuthState?.expired || refreshedAuthState?.revoked) {
       clearPremiumSessionCookie(req, res);
       return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+    }
+
+    if (refreshedAuthState?.tokenFallback && refreshedAuthState?.hydrationUnavailable) {
+      return res.status(503).json({
+        ok: false,
+        code: 'ADMIN_CONFIRMATION_TEMPORARILY_UNAVAILABLE',
+        error: 'De volledige controle duurt even. Probeer het direct opnieuw.',
+      });
     }
 
     const fallbackAuthState = refreshedAuthState?.authenticated ? refreshedAuthState : authState;
