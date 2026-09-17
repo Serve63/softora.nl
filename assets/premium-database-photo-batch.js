@@ -14,6 +14,10 @@
     return Number(count || 0).toLocaleString("nl-NL") + (count === 1 ? " bedrijf" : " bedrijven");
   }
 
+  function formatSourceCount(count) {
+    return Number(count || 0).toLocaleString("nl-NL");
+  }
+
   function ensureInputFocusStyles() {
     if (typeof document === "undefined" || document.getElementById(FOCUS_STYLE_ID)) return;
     const style = document.createElement("style");
@@ -94,6 +98,7 @@
   function createController(options) {
     const nodes = options.nodes;
     const getTargets = options.getTargets;
+    const getSourceCounts = options.getSourceCounts;
     const formatCost = options.formatEuroCost || formatEuroCost;
     const costEur = options.costEur;
     const closeAddActions = options.closeAddActions;
@@ -101,14 +106,41 @@
     const generate = options.generate;
     let mode = "custom";
     let cachedTargetCount = null;
+    let cachedTargetCountSource = null;
+    let source = "all";
+    let cachedSourceCounts = null;
     ensureInputFocusStyles();
 
-    function getTargetCount(options) {
-      if (!options || !options.force) {
-        if (cachedTargetCount !== null) return cachedTargetCount;
+    function normalizeSource(value) {
+      return ["all", "searcher", "robot"].includes(value) ? value : "all";
+    }
+
+    function readSourceCounts(force) {
+      if (!force && cachedSourceCounts) return cachedSourceCounts;
+      cachedSourceCounts = typeof getSourceCounts === "function"
+        ? getSourceCounts()
+        : { all: Math.max(0, getTargets("all").length) };
+      return cachedSourceCounts;
+    }
+
+    function readSelectedSource() {
+      if (!nodes.photoBatchModal) return source;
+      const checked = nodes.photoBatchModal.querySelector('input[name="photoBatchSource"]:checked');
+      return normalizeSource(checked && checked.value);
+    }
+
+    function getTargetCount(summaryOptions) {
+      const options = summaryOptions || {};
+      source = normalizeSource(options.source || readSelectedSource());
+      if (!options.force) {
+        if (cachedTargetCount !== null && cachedTargetCountSource === source) return cachedTargetCount;
       }
-      cachedTargetCount = getTargets().length;
-      return cachedTargetCount;
+      cachedTargetCountSource = source;
+      if (source === "all") {
+        cachedTargetCount = Math.max(0, getTargets("all").length);
+        return cachedTargetCount;
+      }
+      return Math.max(0, Number(readSourceCounts(options.force)[source]) || 0);
     }
 
     function updateSummary(message) {
@@ -123,6 +155,18 @@
         optionNode.classList.toggle("is-active", optionNode.dataset.photoBatchMode === mode);
       });
       nodes.photoBatchAllCount.textContent = formatPhotoBatchCount(total);
+      const sourceCounts = readSourceCounts();
+      if (nodes.photoBatchSourceAllCount) nodes.photoBatchSourceAllCount.textContent = formatSourceCount(sourceCounts.all || 0);
+      if (nodes.photoBatchSearcherCount) nodes.photoBatchSearcherCount.textContent = formatSourceCount(sourceCounts.searcher || 0);
+      if (nodes.photoBatchRobotCount) nodes.photoBatchRobotCount.textContent = formatSourceCount(sourceCounts.robot || 0);
+      const unknownSourceCount = Math.max(0, Number(sourceCounts.all || 0) -
+        Number(sourceCounts.searcher || 0) - Number(sourceCounts.robot || 0));
+      if (nodes.photoBatchSourceUnknownCount) {
+        nodes.photoBatchSourceUnknownCount.hidden = unknownSourceCount === 0;
+        nodes.photoBatchSourceUnknownCount.textContent = unknownSourceCount
+          ? "Niet geclassificeerd: " + formatSourceCount(unknownSourceCount)
+          : "";
+      }
       const provider = nodes.photoBatchModal.querySelector('input[name="photoBatchProvider"]:checked');
       nodes.startPhotoBatchButton.disabled = !provider || !selectedCount;
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
@@ -143,13 +187,16 @@
       closeAddActions();
       if (nodes.generatePhotosButton.disabled) return;
 
-      const total = getTargetCount({ force: true });
+      source = "all";
+      const total = getTargetCount({ force: true, source });
       if (!total) {
         setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
         return;
       }
 
       mode = "custom";
+      const allSourceInput = nodes.photoBatchModal.querySelector('input[name="photoBatchSource"][value="all"]');
+      if (allSourceInput) allSourceInput.checked = true;
       nodes.photoBatchModal.querySelectorAll('input[name="photoBatchProvider"]').forEach(function (input) { input.checked = false; });
       nodes.photoBatchLimitInput.value = String(Math.min(10, total));
       updateSummary();
@@ -160,6 +207,8 @@
 
     function close() {
       cachedTargetCount = null;
+      cachedTargetCountSource = null;
+      cachedSourceCounts = null;
       nodes.photoBatchModal.classList.remove("on");
       nodes.photoBatchModal.setAttribute("aria-hidden", "true");
     }
@@ -169,7 +218,8 @@
     }
 
     function resolveSelection() {
-      const total = getTargetCount();
+      const selectedSource = readSelectedSource();
+      const total = getTargetCount({ source: selectedSource });
       if (!total) {
         close();
         setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
@@ -177,7 +227,7 @@
       }
 
       if (mode === "all") {
-        return { limit: null, count: total };
+        return { limit: null, count: total, source: selectedSource };
       }
 
       const limit = Math.floor(Number(nodes.photoBatchLimitInput.value));
@@ -189,7 +239,7 @@
 
       const cappedLimit = Math.min(limit, total);
       nodes.photoBatchLimitInput.value = String(cappedLimit);
-      return { limit: cappedLimit, count: cappedLimit };
+      return { limit: cappedLimit, count: cappedLimit, source: selectedSource };
     }
 
     function start() {
@@ -197,13 +247,15 @@
       if (!selection) return;
       const provider = nodes.photoBatchModal.querySelector('input[name="photoBatchProvider"]:checked');
       if (!provider || !["softora", "instantly"].includes(provider.value)) { updateSummary("Kies eerst de mailprovider."); return; }
+      if (!["all", "searcher", "robot"].includes(selection.source)) { updateSummary("Kies eerst de bron."); return; }
 
       close();
-      void generate(selection.limit, { silentProgress: true, mailProvider: provider.value });
+      void generate(selection.limit, { silentProgress: true, mailProvider: provider.value, source: selection.source });
     }
 
     function bind() {
       nodes.photoBatchModal.querySelectorAll('input[name="photoBatchProvider"]').forEach(function (input) { input.addEventListener("change", updateSummary.bind(null, "")); });
+      nodes.photoBatchModal.querySelectorAll('input[name="photoBatchSource"]').forEach(function (input) { input.addEventListener("change", updateSummary.bind(null, "")); });
       nodes.photoBatchOptions.addEventListener("click", function (event) {
         const optionNode = event.target.closest("[data-photo-batch-mode]");
         if (!optionNode || !nodes.photoBatchOptions.contains(optionNode)) return;

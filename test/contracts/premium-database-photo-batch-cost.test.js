@@ -39,7 +39,7 @@ test('batch generation requires an explicit provider and passes the chosen desti
   assert.equal(nodes.startPhotoBatchButton.disabled, false);
   nodes.photoBatchLimitInput.value = '10';
   nodes.startPhotoBatchButton.onStart();
-  assert.deepEqual(calls, [[10, { silentProgress: true, mailProvider: 'instantly' }]]);
+  assert.deepEqual(calls, [[10, { silentProgress: true, mailProvider: 'instantly', source: 'all' }]]);
 });
 
 
