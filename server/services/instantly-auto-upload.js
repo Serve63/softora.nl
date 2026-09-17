@@ -74,8 +74,10 @@ function createInstantlyAutoUpload(deps = {}) {
       throw createError('Instantly-campagne heeft niet meer de goedgekeurde naam.', 'INSTANTLY_AUTO_CAMPAIGN_IDENTITY_MISMATCH', 503);
     }
     const status = Number(campaign.status);
-    if (![1, 3].includes(status)) {
-      throw createError('Instantly-campagne is gepauzeerd, ongezond of nog een concept.', 'INSTANTLY_AUTO_CAMPAIGN_NOT_SENDABLE', 503);
+    // A paused campaign remains a valid, exact upload target: Instantly accepts
+    // new leads while it is paused and only sends them after a deliberate resume.
+    if (![1, 2, 3].includes(status)) {
+      throw createError('Instantly-campagne is ongezond of nog een concept.', 'INSTANTLY_AUTO_CAMPAIGN_NOT_SENDABLE', 503);
     }
     return { approved, status };
   }
@@ -147,7 +149,7 @@ function createInstantlyAutoUpload(deps = {}) {
     const owner = designOwner.owner;
     const { approved, status } = await readApprovedCampaign(owner);
     let activated = status === 1;
-    if (!activated) {
+    if (!activated && status === 3) {
       // Instantly rejects new leads for a Completed campaign. Resume only an
       // exact approved campaign with no current leads, before creating any new
       // outbound reservation; existing leads must never be sent again.
