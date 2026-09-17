@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Mailsysteem</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260914-kpi-fit"><link rel="stylesheet" href="assets/premium-database-mail-ready-menu.css?v=20260914-provider"><link rel="stylesheet" href="assets/premium-database-photo-batch.css?v=20260914-provider">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260914-kpi-fit"><link rel="stylesheet" href="assets/premium-database-mail-ready-menu.css?v=20260914-provider"><link rel="stylesheet" href="assets/premium-database-photo-batch.css?v=20260917-source">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -1321,6 +1321,7 @@
                     <input class="photo-batch-input" id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" value="10" aria-label="Specifiek aantal webdesigns">
                 </label>
             </div>
+            <div class="photo-batch-source" role="group" aria-label="Bron"><span>Via welke bron?</span><div class="photo-batch-source__choices"><label><input type="radio" name="photoBatchSource" value="all" checked>Alle <strong id="photoBatchSourceAllCount">0</strong></label><label><input type="radio" name="photoBatchSource" value="searcher">Searcher <strong id="photoBatchSearcherCount">0</strong></label><label><input type="radio" name="photoBatchSource" value="robot">Robot <strong id="photoBatchRobotCount">0</strong></label></div><small class="photo-batch-source__note" id="photoBatchSourceUnknownCount" hidden></small></div>
             <div class="photo-batch-provider" role="group" aria-label="Mailprovider"><span>Voor welke mailprovider?</span><div class="photo-batch-provider__choices"><label><input type="radio" name="photoBatchProvider" value="softora">Softora</label><label><input type="radio" name="photoBatchProvider" value="instantly">Instantly</label></div></div>
             <div class="photo-batch-summary" id="photoBatchSummary" aria-live="polite"></div>
             <div class="mbtns">
@@ -1372,14 +1373,14 @@
             <img class="photo-preview-image" id="photoPreviewImage" alt="">
             <div class="photo-preview-meta" id="photoPreviewMeta"></div>
         </div>
-    </div><script src="assets/premium-database-photo-batch.js?v=20260914-provider"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260914-provider"></script>
+    </div><script src="assets/premium-database-photo-batch.js?v=20260917-source"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260914-provider"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260914-provider"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-instantly-status.js?v=20260914-provider"></script><script src="assets/premium-database-webdesign-action.js?v=20260915-manual-instantly"></script><script src="assets/premium-database-webdesign-preview.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
     <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260908a"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260915-manual-instantly"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260914-provider"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-mass-research.js?v=20260629a"></script><script src="assets/premium-database-target-coords.js?v=20260616a"></script><script src="assets/premium-database-distance.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-customers-loader.js?v=20260804a"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260908-publish"></script><script src="assets/premium-database-source-filter.js?v=20260915-instantly-status"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-customers-loader.js?v=20260804a"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260908-publish"></script><script src="assets/premium-database-source-filter.js?v=20260917-source"></script><script src="assets/premium-database-webdesign-source-selection.js?v=20260917-source"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1473,6 +1474,10 @@
             photoBatchOptions: document.getElementById("photoBatchOptions"),
             photoBatchChoiceButtons: Array.from(document.querySelectorAll("[data-photo-batch-mode]")),
             photoBatchAllCount: document.getElementById("photoBatchAllCount"),
+            photoBatchSourceAllCount: document.getElementById("photoBatchSourceAllCount"),
+            photoBatchSearcherCount: document.getElementById("photoBatchSearcherCount"),
+            photoBatchRobotCount: document.getElementById("photoBatchRobotCount"),
+            photoBatchSourceUnknownCount: document.getElementById("photoBatchSourceUnknownCount"),
             photoBatchLimitInput: document.getElementById("photoBatchLimitInput"),
             photoBatchSummary: document.getElementById("photoBatchSummary"),
             cancelPhotoBatchButton: document.getElementById("cancelPhotoBatchButton"),
@@ -1488,11 +1493,12 @@
             toast: document.getElementById("toast")
         };
 
+        const customersCore = window.SoftoraPremiumCustomersCore; const databaseSourceFilter = window.SoftoraPremiumDatabaseSourceFilter;
+        const webdesignPhotoSourceSelection = window.SoftoraDatabaseWebdesignSourceSelection.createController({ getSortedCustomers, getFilteredCustomers, isWebdesignPhotoEligible, sourceFilter: databaseSourceFilter });
         const photoBatchController = window.SoftoraDatabasePhotoBatch.createController({
-            nodes, getTargets: getWebdesignPhotoTargets, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
+            nodes, getTargets: webdesignPhotoSourceSelection.getTargets, getSourceCounts: webdesignPhotoSourceSelection.getSourceCounts, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
             closeAddActions, setStatusMessage, generate: generateWebdesignPhotos
         });
-        const customersCore = window.SoftoraPremiumCustomersCore; const databaseSourceFilter = window.SoftoraPremiumDatabaseSourceFilter;
         const databaseContactStatus = window.SoftoraDatabaseContactStatus;
         const {
             normalizeString,
@@ -2436,22 +2442,12 @@
             return "";
         }
 
-        function getWebdesignPhotoTargets(limit) {
-            const targets = getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
-                return isWebdesignPhotoEligible(customer);
-            });
-            const parsedLimit = Math.floor(Number(limit));
-            if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
-                return targets.slice(0, Math.min(parsedLimit, targets.length));
-            }
-            return targets;
-        }
-
         async function generateWebdesignPhotos(limit, options) {
             const progressSilent = Boolean(options && options.silentProgress); closeAddActions(); nodes.generatePhotosButton.dataset.generating = "true"; nodes.generatePhotosButton.disabled = true;
-            const targets = Array.isArray(limit) ? limit : getWebdesignPhotoTargets(limit);
+            const source = options && ["all", "searcher", "robot"].includes(options.source) ? options.source : "all";
+            const targets = Array.isArray(limit) ? limit : webdesignPhotoSourceSelection.getTargets(limit, source);
             try {
-                if (!targets.length) { if (!progressSilent) setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true); return; }
+                if (!targets.length) { if (!progressSilent) setStatusMessage(source === "robot" ? "Geen robot-bedrijven zonder foto met een geldige website gevonden." : (source === "searcher" ? "Geen Searcher-bedrijven zonder foto met een geldige website gevonden." : "Geen bedrijven zonder foto met een geldige website gevonden."), "info", true); return; }
                 setStatusMessage("");
                 if (!options || !["softora", "instantly"].includes(options.mailProvider)) throw new Error("Kies eerst een mailprovider."); await webdesignActionController.startBulkBatchForCustomers(targets.map(function (customer) { return { ...customer, webdesignMailProvider: options.mailProvider }; }));
                 if (!progressSilent) toast("Webdesign-bulk gestart");

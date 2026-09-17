@@ -8,6 +8,7 @@
     "use strict";
 
     const KVK_SOURCE_LABEL = "softora bedrijven scraper";
+    const ROBOT_TRANSFER_DESTINATION = "available";
 
     function normalizeString(value) {
         return String(value == null ? "" : value).trim();
@@ -18,7 +19,8 @@
         return {
             bronDatabase: normalizeString(source.bronDatabase),
             kvkNummer: normalizeString(source.kvkNummer || source.kvk_nummer),
-            premiumTransferRunId: normalizeString(source.premiumTransferRunId)
+            premiumTransferRunId: normalizeString(source.premiumTransferRunId),
+            premiumTransferDestination: normalizeString(source.premiumTransferDestination).toLowerCase()
         };
     }
 
@@ -29,6 +31,15 @@
         return (Array.isArray(customer.hist) ? customer.hist : []).some(function (entry) {
             return /^kvk-transfer:/i.test(normalizeString(entry && entry.messageKey));
         });
+    }
+
+    function isRobotTransferCustomer(customer) {
+        return isKvkTransferCustomer(customer) &&
+            normalizeString(customer && customer.premiumTransferDestination).toLowerCase() === ROBOT_TRANSFER_DESTINATION;
+    }
+
+    function isSearcherTransferCustomer(customer) {
+        return isKvkTransferCustomer(customer) && !isRobotTransferCustomer(customer);
     }
 
     function getHeaderLabel(activeStatus) {
@@ -46,6 +57,8 @@
     return {
         normalizeCustomerSourceFields: normalizeCustomerSourceFields,
         isKvkTransferCustomer: isKvkTransferCustomer,
+        isRobotTransferCustomer: isRobotTransferCustomer,
+        isSearcherTransferCustomer: isSearcherTransferCustomer,
         getHeaderLabel: getHeaderLabel,
         getContextualStatusPresentation: getContextualStatusPresentation
     };

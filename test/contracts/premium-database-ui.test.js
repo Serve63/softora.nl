@@ -297,6 +297,12 @@ test('premium database source filter recognizes only durable KVK transfers', () 
   assert.equal(sourceFilter.isKvkTransferCustomer({ premiumTransferRunId: 'kvk-transfer-2026-08-04' }), true);
   assert.equal(sourceFilter.isKvkTransferCustomer({ hist: [{ messageKey: 'kvk-transfer:12345678' }] }), true);
   assert.equal(sourceFilter.isKvkTransferCustomer({ id: 'kvk-12345678', bronDatabase: '' }), false);
+  assert.equal(sourceFilter.isRobotTransferCustomer({ bronDatabase: 'Softora Bedrijven Scraper', premiumTransferDestination: 'available' }), true);
+  assert.equal(sourceFilter.isRobotTransferCustomer({ premiumTransferDestination: 'available' }), false);
+  assert.equal(sourceFilter.isRobotTransferCustomer({ bronDatabase: 'Softora Bedrijven Scraper', premiumTransferDestination: 'AVAILABLE ' }), true);
+  assert.equal(sourceFilter.isRobotTransferCustomer({ bronDatabase: 'Softora Bedrijven Scraper' }), false);
+  assert.equal(sourceFilter.isSearcherTransferCustomer({ bronDatabase: 'Softora Bedrijven Scraper' }), true);
+  assert.equal(sourceFilter.isSearcherTransferCustomer({ bronDatabase: 'Softora Bedrijven Scraper', premiumTransferDestination: 'available' }), false);
   assert.equal(sourceFilter.getHeaderLabel('beschikbaar'), "Foto's");
   assert.equal(sourceFilter.getHeaderLabel('benaderbaar'), 'Mailklaar');
   assert.deepEqual(
@@ -313,8 +319,80 @@ test('premium database source filter recognizes only durable KVK transfers', () 
   assert.equal(sourceFilter.getContextualStatusPresentation('prospect', true), null);
   assert.deepEqual(
     { ...sourceFilter.normalizeCustomerSourceFields({ bronDatabase: ' Softora Bedrijven Scraper ', kvk_nummer: '12345678' }) },
-    { bronDatabase: 'Softora Bedrijven Scraper', kvkNummer: '12345678', premiumTransferRunId: '' }
+    { bronDatabase: 'Softora Bedrijven Scraper', kvkNummer: '12345678', premiumTransferRunId: '', premiumTransferDestination: '' }
   );
+});
+
+test('webdesign bulk honors the selected Searcher or Robot source', async () => {
+  const photoBatch = require('../../assets/premium-database-photo-batch');
+  function testElement() {
+    const base = createClassListNode();
+    const listeners = {};
+    const sourceInput = { value: 'all', checked: true };
+    Object.assign(base, {
+      dataset: {},
+      value: '',
+      max: '',
+      querySelector(selector) {
+        if (selector.includes('photoBatchSource')) return sourceInput;
+        return { value: 'softora', checked: true };
+      },
+      querySelectorAll() {
+        return [];
+      },
+      addEventListener(type, listener) {
+        listeners[type] = listeners[type] || [];
+        listeners[type].push(listener);
+      },
+      click() {
+        (listeners.click || []).forEach((listener) => listener({ target: base }));
+      },
+      focus() {},
+    });
+    base.sourceInput = sourceInput;
+    return base;
+  }
+
+  const photoBatchModal = testElement();
+  const sourceInput = photoBatchModal.sourceInput;
+  const nodes = {
+    photoBatchModal,
+    photoBatchOptions: testElement(),
+    photoBatchChoiceButtons: [],
+    photoBatchAllCount: testElement(),
+    photoBatchSourceAllCount: testElement(),
+    photoBatchSearcherCount: testElement(),
+    photoBatchRobotCount: testElement(),
+    photoBatchSourceUnknownCount: testElement(),
+    photoBatchLimitInput: testElement(),
+    photoBatchSummary: testElement(),
+    cancelPhotoBatchButton: testElement(),
+    startPhotoBatchButton: testElement(),
+    generatePhotosButton: testElement(),
+  };
+  nodes.photoBatchLimitInput.value = '10';
+  let generated;
+  const controller = photoBatch.createController({
+    nodes,
+    getTargets: (source) => ({ all: [1, 2, 3, 4, 5], searcher: [1, 2, 3], robot: [4, 5] }[source] || []),
+    getSourceCounts: () => ({ all: 5, searcher: 3, robot: 2 }),
+    costEur: 0.04,
+    closeAddActions() {},
+    setStatusMessage() {},
+    generate: (limit, options) => { generated = { limit, options }; return Promise.resolve(); },
+  });
+
+  controller.open();
+  sourceInput.value = 'robot';
+  sourceInput.checked = true;
+  controller.bind();
+  nodes.startPhotoBatchButton.click();
+
+  await Promise.resolve();
+  assert.deepEqual(generated, { limit: 2, options: { silentProgress: true, mailProvider: 'softora', source: 'robot' } });
+  assert.equal(nodes.photoBatchSearcherCount.textContent, '3');
+  assert.equal(nodes.photoBatchRobotCount.textContent, '2');
+  assert.equal(nodes.photoBatchSourceUnknownCount.hidden, true);
 });
 
 test('Mailklaar view maps only canonical eligible rows to the contextual Mailklaar badge', () => {
@@ -328,7 +406,7 @@ test('Mailklaar view maps only canonical eligible rows to the contextual Mailkla
   assert.match(pageSource, /contextualStatus = availableStatus \|\| mailReadyStatus;/);
   assert.match(pageSource, /const statusClassName = contextualStatus \? contextualStatus\.className : customer\.status;/);
   assert.match(pageSource, /const statusLabel = contextualStatus \? contextualStatus\.label :/);
-  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260915-instantly-status/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260917-source/);
 });
 
 test('premium database keeps bootstrap rows hidden until the canonical inventory is ready', () => {
@@ -2131,9 +2209,15 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="\[0-9\]\*"/);
   assert.doesNotMatch(pageSource, /id="photoBatchLimitInput" type="number"/);
   assert.match(pageSource, /id="photoBatchSummary" aria-live="polite"/);
+  assert.match(pageSource, /name="photoBatchSource" value="all" checked/);
+  assert.match(pageSource, /name="photoBatchSource" value="searcher"/);
+  assert.match(pageSource, /name="photoBatchSource" value="robot"/);
+  assert.match(pageSource, /id="photoBatchSearcherCount">0<\/strong>/);
+  assert.match(pageSource, /id="photoBatchRobotCount">0<\/strong>/);
   const photoBatchCss = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.css'), 'utf8');
-  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20260914-provider/);
+  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20260917-source/);
   assert.match(photoBatchCss, /\.photo-batch-option\.is-active/);
+  assert.match(photoBatchCss, /photo-batch-source__choices/);
   assert.match(photoBatchCss, /overflow-wrap: anywhere/);
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.js'), 'utf8'), /photoBatchPricingNote|Vooraf: geschatte beeldprijs/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
@@ -2532,11 +2616,17 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /!isGeneratedFallbackDomain\(customer, customer && customer\.dom\)/);
   assert.doesNotMatch(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
   assert.doesNotMatch(pageSource, /async function generateWebsitePhotoData\(customer\)/);
-  assert.match(pageSource, /function getWebdesignPhotoTargets\(limit\)/);
+  assert.match(pageSource, /const webdesignPhotoSourceSelection = window\.SoftoraDatabaseWebdesignSourceSelection\.createController\(/);
+  assert.match(pageSource, /getSourceCounts: webdesignPhotoSourceSelection\.getSourceCounts/);
+  assert.match(pageSource, /webdesignPhotoSourceSelection\.getTargets\(limit, source\)/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-source-selection\.js\?v=20260917-source/);
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
-  assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260914-provider/);
+  assert.match(
+    fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-source-selection.js'), 'utf8'),
+    /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/
+  );
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260917-source/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260915-manual-instantly/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
@@ -2611,20 +2701,21 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(instantlySyncScriptSource, /global\.location\.reload\(\)/);
   assert.doesNotMatch(instantlySyncScriptSource, /window\.alert/);
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
+  assert.doesNotMatch(pageSource, /function getWebdesignPhotoSourceCounts\(\)/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
   assert.match(photoBatchScriptSource, /const selectedCost = Number\.isFinite\(costEur\) \? selectedCount \* costEur : null;/);
   assert.match(photoBatchScriptSource, /if \(!Number\.isFinite\(value\)\) return "prijs na generatie";/);
   assert.match(photoBatchScriptSource, /function formatPhotoBatchCount\(count\) \{[\s\S]*count === 1 \? " bedrijf" : " bedrijven"/);
   assert.match(photoBatchScriptSource, /let cachedTargetCount = null;/);
-  assert.match(photoBatchScriptSource, /function getTargetCount\(options\) \{[\s\S]*cachedTargetCount = getTargets\(\)\.length;[\s\S]*return cachedTargetCount;[\s\S]*\}/);
+  assert.match(photoBatchScriptSource, /function getTargetCount\(summaryOptions\) \{[\s\S]*cachedTargetCount = Math\.max\(0, getTargets\("all"\)\.length\);[\s\S]*return cachedTargetCount;[\s\S]*\}/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
-  assert.match(photoBatchScriptSource, /const total = getTargetCount\(\{ force: true \}\);/);
+  assert.match(photoBatchScriptSource, /const total = getTargetCount\(\{ force: true, source \}\);/);
   assert.match(photoBatchScriptSource, /function resolveSelection\(\)/);
   assert.match(photoBatchScriptSource, /function ensureInputFocusStyles\(\)/);
   assert.match(photoBatchScriptSource, /\.photo-batch-input:focus/);
   assert.match(photoBatchScriptSource, /border-color:var\(--crimson\)/);
   assert.doesNotMatch(photoBatchScriptSource, /photoBatchLimitInput\.select\(\)/);
-  assert.match(photoBatchScriptSource, /void generate\(selection\.limit, \{ silentProgress: true, mailProvider: provider\.value \}\);/);
+  assert.match(photoBatchScriptSource, /void generate\(selection\.limit, \{ silentProgress: true, mailProvider: provider\.value, source: selection\.source \}\);/);
   assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
   assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);
   assert.doesNotMatch(pageSource, /function formatBatchProgressMessage\(progress\)/);
@@ -2675,7 +2766,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const BATCH_START_CONCURRENCY = 4;/);
   assert.match(webdesignActionScriptSource, /const BATCH_RENDER_INTERVAL = 20;/);
   assert.match(webdesignActionScriptSource, /const BATCH_POLL_STAGGER_MS = 180;/);
-  assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
+  assert.match(
+    fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-source-selection.js'), 'utf8'),
+    /\.filter\(isWebdesignPhotoEligible\)/
+  );
   assert.doesNotMatch(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
   assert.doesNotMatch(pageSource, /for \(const target of targets\) \{/);
   assert.doesNotMatch(databaseBootSource, /await webdesignActionController\.generateForCustomer\(target\.id\);/);
@@ -4720,7 +4814,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
   assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return Boolean\(state\.remoteCustomersLoaded \|\| state\.canonicalSnapshotApplied\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /if \(state\.activeStatus === "beschikbaar"\) return false;/);
-  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260915-instantly-status/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260917-source/);
   assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
