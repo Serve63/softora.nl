@@ -2588,6 +2588,33 @@ test('automatic upload selects only a designed Instantly lead and guards before 
   assert.equal(harness.outboundGuardCalls[0].options.permanent, false);
 });
 
+test('automatic upload accepts a paused approved campaign without activating it', async () => {
+  const campaigns = {
+    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+  };
+  const harness = createService({
+    now: '2026-09-17T09:00:00.000Z',
+    syncEnabled: false,
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{ id: 'paused-next', bedrijf: 'Pauze Design BV', naam: 'Nina', email: 'info@pauze-design.test', website: 'https://pauze-design.test', status: 'prospect', mail: true, verantwoordelijk: 'Servé Creusen' }],
+    photoMap: { 'paused-next': { id: 'paused-next', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    fetchJsonWithTimeout: async (url) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } };
+      if (url.endsWith('/leads/add')) return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'paused-lead', email: 'info@pauze-design.test', index: 0 }] } };
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+  assert.equal(result.ok, true);
+  assert.equal(result.uploaded, 1);
+  assert.equal(result.activated, false);
+  assert.equal(harness.getRows()[0].instantlyLeadId, 'paused-lead');
+  assert.equal(harness.getRows()[0].instantlyStatus, 'synced');
+  assert.equal(harness.fetchCalls.some((call) => call.url.includes('/activate')), false);
+});
+
 test('automatic upload uses targeted design-photo reads instead of the heavy photo UI state', async () => {
   const campaigns = {
     serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
