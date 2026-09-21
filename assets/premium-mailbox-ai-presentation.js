@@ -46,7 +46,7 @@
     });
     const kept = lines.filter((_, index) => visible.has(index));
     const contacts = value.decision.contacts.filter((contact) => !visible.has(contact.line)).sort((a, b) => a.line - b.line);
-    return { body: kept.join('\n').trim(), aiManaged: true, signatureMatched: true,
+    return { body: kept.join('\n').replace(/\n(?:[\t ]*\n){2,}/g, '\n\n').trim(), aiManaged: true, signatureMatched: true,
       contact: { beforeLines: contacts.filter((c) => c.kind === 'phone').map((c) => `Tel: ${c.text}`),
         addressLines: contacts.filter((c) => c.kind === 'address').map((c) => c.text) } };
   }

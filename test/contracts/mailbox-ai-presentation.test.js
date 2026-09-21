@@ -325,3 +325,11 @@ test('stable-source migration reuses paid decisions across HTML hydration withou
     assert.equal(Number((await db.query('select count(*) n from softora_mailbox_ai_presentations')).rows[0].n), 3);
   } finally { await db.close(); }
 });
+
+test('removed signature spacing collapses without merging authored paragraphs or changing source', () => {
+  const body = 'Dank voor je mail.\n\nGroeten,\n\nRobin\n\nBedrijf\n\nVan: eerdere afzender\n\nBehoud deze inhoud.';
+  const original = { body, aiPresentation: { version: contract.VERSION, model: contract.MODEL, reasoningEffort: 'max',
+    status: 'ready', sourceBody: body, decision: { labels: ['authored','authored','signature','authored','signature','authored','signature','authored','authored','authored','authored'], contacts: [] } } };
+  assert.equal(contract.read(original).body, 'Dank voor je mail.\n\nVan: eerdere afzender\n\nBehoud deze inhoud.');
+  assert.equal(original.body, body);
+});
