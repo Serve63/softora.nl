@@ -36,7 +36,11 @@ function buildSource(message) {
     String(message.email || '').toLowerCase() === account || message.copyContext?.evidenceKnown) return null;
   const source = { body, from: String(message.from || ''), email: String(message.email || ''),
     html: String(message.sourceHtml || '').slice(0, 60000), account, identity };
-  const hash = crypto.createHash('sha256').update(JSON.stringify(source)).digest('hex');
+  // HTML is optional evidence added during detail hydration, not a new message.
+  // Length framing keeps arbitrary Unicode/text delimiters unambiguous.
+  const identityText = [source.body, source.from, source.email, source.account, source.identity]
+    .map((value) => `${Buffer.byteLength(value)}:${value}`).join('|');
+  const hash = crypto.createHash('sha256').update(identityText).digest('hex');
   return { ...source, hash, id: crypto.createHash('sha256').update(`${contract.VERSION}:${hash}`).digest('hex') };
 }
 function buildRequest(source) {
