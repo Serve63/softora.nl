@@ -193,6 +193,8 @@ test('SQL migration actually fences access, reserves budget before claims and pr
         generation_superseded_at timestamptz, body_text text, sender_email text, account_email text, payload jsonb,
         message_key text, message_id text, sender_name text, date timestamptz);`);
     await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260921093527_mailbox_luna_presentations.sql'), 'utf8'));
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260921132500_mailbox_ai_candidate_index.sql'), 'utf8'));
+    assert.equal((await db.query("select indexname from pg_indexes where indexname='softora_mailbox_ai_candidate_date_idx'")).rows.length, 1);
     await db.query("insert into softora_mailbox_ai_presentations (id,version,account_email,message_key,source) values ('a','mailbox-luna-v1','a','a','{}'),('b','mailbox-luna-v1','a','b','{}')");
     const claim = "select * from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
     assert.equal((await db.query(claim)).rows.length, 0);
