@@ -185,7 +185,7 @@ test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoploss
   assert.match(source, /data-step="01">Herken je deze situaties\?<\/div>/);
   assert.match(source, /data-step="04">Samen kijken wat makkelijker kan<\/div>/);
 
-  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor het MKB');
+  assert.equal(entry.title, 'Bedrijfssoftware op maat laten maken | Softora');
   assert.match(entry.description, /CRM, planning, offertes of een klantportaal/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
@@ -226,6 +226,22 @@ test('bedrijfssoftware SEO-pagina behoudt de uitgebreide buyer-intent inhoud', (
   assert.match(source, /Wanneer bedrijfssoftware laten maken slim wordt/);
   assert.match(source, /Veelgestelde vragen over bedrijfssoftware/);
   assert.ok(countVisibleWords(source) >= 950, 'Bedrijfssoftware SEO-pagina mist buyer-intent diepte.');
+});
+
+test('software SEO offer bounds approvals and links to the AI budget preparation', () => {
+  const source = readPage('premium-bedrijfssoftware.html');
+  assert.match(source, /Goedkeuring vóór verzending/);
+  assert.match(source, /Geen verzending zonder vrijgave/);
+  assert.match(source, /Stop- en herstelroute bij ontbrekende data/);
+  for (const selector of ['.dienst-desc', '.dienst-list li', '.intent-card p', '.section-sub', '.step-desc', '.example-desc', '.why-desc', '.intent-list li']) {
+    assert.ok(source.includes(selector + ' { font-size: 16px;'), selector + ' keeps body copy readable');
+  }
+  assert.match(source, /href="\/blog\/ai-automatisering-kosten-mkb">kostengids voor AI automatisering<\/a>/);
+  assert.doesNotMatch(source, /Leadkwalificatie op autopilot|Schaalbaar en toekomstbestendig|Wie zoekt op bedrijfssoftware/);
+  const supporting = readPage('server/services/seo-content-bedrijfssoftware-kosten.js');
+  assert.match(supporting, /Neem één voorbeeldrecord, de beslisser en een foutscenario mee/);
+  assert.match(supporting, /wie keurt het bedrag goed en wat mag niet worden verstuurd/);
+  assert.match(supporting, /href: '\/bedrijfssoftware-op-maat'/);
 });
 
 test('crm money page is focused on pipeline, customers and AI follow-up', () => {
