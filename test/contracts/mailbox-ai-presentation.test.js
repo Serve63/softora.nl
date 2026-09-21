@@ -261,3 +261,26 @@ test('isolated internal signature labels cannot hide contextual attribution betw
   const result = contract.read({ body, aiPresentation: { ...ready.aiPresentation, sourceBody: body, decision } });
   assert.equal(result.body, body.split('\n').slice(0,3).join('\n'));
 });
+
+test('background candidate reads survive the shared client default deadline while interactive reads stay bounded', async () => {
+  const { createSupabaseStateStore } = require('../../server/services/supabase-state');
+  const { createMailboxAiRepository } = require('../../server/repositories/mailbox-ai-presentations');
+  const store = createSupabaseStateStore({ supabaseUrl: 'https://example.supabase.co', supabaseServiceRoleKey: 'offline-key',
+    fetchImpl: async (_url, options) => {
+      await require('node:timers/promises').setTimeout(1700, undefined, { signal: options.signal });
+      return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } });
+  const repository = createMailboxAiRepository({ getClient: store.getSupabaseClient });
+  assert.deepEqual(await repository.candidates(), []);
+  await assert.rejects(repository.enqueue([{ id: 'offline-source' }]));
+});
+
+test('background storage diagnostics identify the stage without logging private provider errors', async () => {
+  const warnings = [];
+  const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' },
+    getOpenAiApiKey: () => 'offline-key', logger: { warn: (...args) => warnings.push(args) },
+    repository: { candidates: async () => { throw new Error('private mail or credential'); } } });
+  assert.equal((await service.processQueue()).unavailable, true);
+  assert.equal(warnings[0][1].stage, 'candidates');
+  assert.doesNotMatch(JSON.stringify(warnings), /private mail|credential/);
+});

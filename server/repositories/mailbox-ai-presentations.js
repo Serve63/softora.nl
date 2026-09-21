@@ -4,7 +4,9 @@ const { VERSION } = require('../../assets/premium-mailbox-ai-presentation');
 const TABLE = 'softora_mailbox_ai_presentations';
 function createMailboxAiRepository({ getClient } = {}) {
   async function run(query, signal = AbortSignal.timeout(5000)) {
-    const client = getClient?.();
+    // Align the underlying HTTP deadline with this operation's outer deadline.
+    // The shared client's default 1.5s is too short for background candidate queries.
+    const client = getClient?.({ timeoutMs: 5000 });
     if (!client) throw new Error('MAILBOX_AI_STORAGE_UNAVAILABLE');
     const builder = query(client);
     const result = await (builder.abortSignal ? builder.abortSignal(signal) : builder);

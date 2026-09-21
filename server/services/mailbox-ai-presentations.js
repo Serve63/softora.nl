@@ -45,8 +45,10 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
   }
   async function processQueue() {
     if (!enabled() || !getOpenAiApiKey?.()) return { skipped: true, processed: 0 };
+    let stage = 'candidates';
     try {
       const candidates = await repository.candidates();
+      stage = 'enqueue';
       await repository.enqueue((candidates || []).map((row) => sourceFor({ body: row.body_text,
         accountEmail: row.account_email, id: row.provider_id, messageKey: row.message_key,
         messageId: row.message_id, from: row.sender_name || row.sender_email || 'Onbekend', email: row.sender_email,
@@ -54,6 +56,7 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
         bodyTruncated: row.body_truncated })).filter(Boolean));
       let processed = 0;
       for (let count = 0; count < 2; count += 1) {
+        stage = 'claim';
         const job = await repository.claim();
         if (!job) break; // Includes exhausted/unapproved lifetime budget.
         let result = null;
@@ -63,11 +66,15 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
             : error?.name === 'TimeoutError' ? 'MAILBOX_AI_TIMEOUT' : 'MAILBOX_AI_REQUEST_FAILED';
           logger.warn?.('[MailboxAI] Classification failed; original body retained, no automatic retry.', { code });
         }
+        stage = 'finish';
         await repository.finish(job, result);
         processed += 1;
       }
       return { processed };
-    } catch (_) { return { processed: 0, unavailable: true }; }
+    } catch (_) {
+      logger.warn?.('[MailboxAI] Background storage unavailable; original body retained.', { stage });
+      return { processed: 0, unavailable: true };
+    }
   }
   return { enrich, enrichTree, enrichPayload, processQueue };
 }
