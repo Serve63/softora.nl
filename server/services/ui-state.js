@@ -1,5 +1,6 @@
 const { INSTANTLY_MAILBOX_SYNC_SCOPE, patchInstantlyMailboxState } = require('./instantly-mailbox-state');
 const {
+  CHUNK_KEY_PREFIX,
   persistColdmailSendGuardValues,
   restoreColdmailSendGuardValues,
 } = require('./coldmail-send-guard-chunks');
@@ -252,6 +253,10 @@ function createUiStateStore(deps = {}) {
         continue;
       }
       const value = String(rawValue);
+      if (key.startsWith(CHUNK_KEY_PREFIX)) {
+        out[key] = value;
+        continue;
+      }
       if (isLikelyJsonStateKey(key) && looksLikeJsonValue(value)) {
         out[key] = value;
         continue;

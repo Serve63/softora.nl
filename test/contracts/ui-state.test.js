@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { createUiStateStore } = require('../../server/services/ui-state');
+const { persistColdmailSendGuardValues } = require('../../server/services/coldmail-send-guard-chunks');
 
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
@@ -576,6 +577,57 @@ test('ui-state store shards and restores an oversized coldmail send guard withou
     preferSupabaseRestRead: true,
   }), null);
   assert.match(String(incompleteReader.loggerErrors[0].join(' ')), /mist 1 opslagchunk/);
+});
+
+test('ui-state store preserves exact coldmail send guard chunk bytes at whitespace boundaries', async () => {
+  const rawGuard = JSON.stringify({
+    entries: [],
+    recipientEntries: [{
+      recipientEmail: 'chunk-boundary@example.test',
+      evidence: 'alpha beta gamma',
+    }],
+  });
+  const whitespaceIndex = rawGuard.indexOf(' ');
+  assert.ok(whitespaceIndex > 0);
+  const persisted = persistColdmailSendGuardValues(
+    {},
+    COLDMAIL_SEND_GUARD_KEY,
+    rawGuard,
+    { threshold: 1, chunkSize: whitespaceIndex + 1 }
+  );
+  assert.equal(persisted.ok, true);
+  const manifest = JSON.parse(persisted.values[COLDMAIL_SEND_GUARD_KEY]);
+  assert.equal(persisted.values[manifest.chunkKeys[0]].endsWith(' '), true);
+
+  const client = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  return {
+                    data: {
+                      payload: { values: persisted.values },
+                      updated_at: '2026-09-21T15:31:00.802Z',
+                    },
+                    error: null,
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { loggerErrors, store } = createFixture({ client });
+
+  const state = await store.getUiStateValues('premium_coldmail_send_guard');
+
+  assert.equal(state.values[COLDMAIL_SEND_GUARD_KEY], rawGuard);
+  assert.equal(loggerErrors.length, 0);
 });
 
 test('ui-state store reads values through REST fallback when client read crashes', async () => {
