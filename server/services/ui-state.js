@@ -1,4 +1,8 @@
 const { INSTANTLY_MAILBOX_SYNC_SCOPE, patchInstantlyMailboxState } = require('./instantly-mailbox-state');
+const {
+  persistColdmailSendGuardValues,
+  restoreColdmailSendGuardValues,
+} = require('./coldmail-send-guard-chunks');
 const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
@@ -6,8 +10,6 @@ const DEFAULT_UI_STATE_VALUE_MAX_LENGTH = 200000;
 const COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH = 1000000;
 const JSON_UI_STATE_VALUE_MAX_LENGTH = 1000000;
 const PREMIUM_DATABASE_MAIL_READY_SNAPSHOT_VALUE_MAX_LENGTH = 4000000;
-const COLDMAIL_SEND_GUARD_MAX_ENTRIES = 1000;
-const COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES = 3000;
 const DEFAULT_UI_STATE_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
 const DEFAULT_UI_STATE_WRITE_TIMEOUT_MS = 8000;
 
@@ -70,13 +72,13 @@ function mergeColdmailSendGuardStates(currentRaw, incomingRaw) {
   const entries = dedupeGuardEntries([
     ...(Array.isArray(current.entries) ? current.entries : []),
     ...(Array.isArray(incoming.entries) ? incoming.entries : []),
-  ]).slice(-COLDMAIL_SEND_GUARD_MAX_ENTRIES);
+  ]);
   const recipientEntries = dedupeGuardEntries([
     ...(Array.isArray(current.recipientEntries) ? current.recipientEntries : []),
     ...(Array.isArray(current.entries) ? current.entries : []),
     ...(Array.isArray(incoming.recipientEntries) ? incoming.recipientEntries : []),
     ...(Array.isArray(incoming.entries) ? incoming.entries : []),
-  ]).slice(-COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES);
+  ]);
   return JSON.stringify({
     ...incoming,
     entries,
@@ -259,14 +261,15 @@ function createUiStateStore(deps = {}) {
     return out;
   }
 
-  function getInvalidJsonStateValueErrors(values) {
+  function getInvalidJsonStateValueErrors(values, options = {}) {
     const errors = [];
+    const allowOversizeKeys = new Set(Array.isArray(options.allowOversizeKeys) ? options.allowOversizeKeys : []);
     if (!values || typeof values !== 'object' || Array.isArray(values)) return errors;
     Object.entries(values).forEach(([key, value]) => {
       if (!isLikelyJsonStateKey(key) || !looksLikeJsonValue(value)) return;
       const text = String(value || '');
       const maxLength = getUiStateValueMaxLength(key);
-      if (text.length > maxLength) {
+      if (text.length > maxLength && !allowOversizeKeys.has(key)) {
         errors.push(`${key} is ${text.length} tekens; limiet is ${maxLength}`);
         return;
       }
@@ -414,7 +417,15 @@ function createUiStateStore(deps = {}) {
       }
 
       if (row?.source === 'memory' && row.values && typeof row.values === 'object') {
-        const values = sanitizeUiStateValues(row.values);
+        const sanitized = sanitizeUiStateValues(row.values);
+        const restored = normalizedScope === COLDMAIL_SEND_GUARD_SCOPE
+          ? restoreColdmailSendGuardValues(sanitized, COLDMAIL_SEND_GUARD_KEY)
+          : { ok: true, values: sanitized };
+        if (!restored.ok) {
+          logger.error('[UI State][ColdmailSendGuardReadRejected]', restored.error);
+          return null;
+        }
+        const values = restored.values;
         inMemoryUiStateByScope.set(normalizedScope, values);
         return {
           values: { ...values },
@@ -424,7 +435,15 @@ function createUiStateStore(deps = {}) {
         };
       }
 
-      const values = sanitizeUiStateValues(row?.payload?.values || {});
+      const sanitized = sanitizeUiStateValues(row?.payload?.values || {});
+      const restored = normalizedScope === COLDMAIL_SEND_GUARD_SCOPE
+        ? restoreColdmailSendGuardValues(sanitized, COLDMAIL_SEND_GUARD_KEY)
+        : { ok: true, values: sanitized };
+      if (!restored.ok) {
+        logger.error('[UI State][ColdmailSendGuardReadRejected]', restored.error);
+        return null;
+      }
+      const values = restored.values;
       inMemoryUiStateByScope.set(normalizedScope, values);
       return {
         values: { ...values },
@@ -521,8 +540,16 @@ function createUiStateStore(deps = {}) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
 
+    const isColdmailGuardWrite = normalizedScope === COLDMAIL_SEND_GUARD_SCOPE &&
+      values && typeof values === 'object' &&
+      Object.prototype.hasOwnProperty.call(values, COLDMAIL_SEND_GUARD_KEY);
     const sanitizedValues = sanitizeUiStateValues(values);
-    const invalidJsonStateValueErrors = getInvalidJsonStateValueErrors(sanitizedValues);
+    if (isColdmailGuardWrite) {
+      sanitizedValues[COLDMAIL_SEND_GUARD_KEY] = String(values[COLDMAIL_SEND_GUARD_KEY] || '');
+    }
+    const invalidJsonStateValueErrors = getInvalidJsonStateValueErrors(sanitizedValues, {
+      allowOversizeKeys: isColdmailGuardWrite ? [COLDMAIL_SEND_GUARD_KEY] : [],
+    });
     if (invalidJsonStateValueErrors.length) {
       logger.error(
         '[UI State][JsonIntegrity][SetRejected]',
@@ -545,9 +572,9 @@ function createUiStateStore(deps = {}) {
       const writeRequestOptions = getUiStateWriteRequestOptions();
       const client = getSupabaseClient(writeRequestOptions);
       const rowKey = getUiStateRowKey(normalizedScope);
+      let persistedValues = sanitizedValues;
       if (
-        normalizedScope === COLDMAIL_SEND_GUARD_SCOPE &&
-        Object.prototype.hasOwnProperty.call(sanitizedValues, COLDMAIL_SEND_GUARD_KEY)
+        isColdmailGuardWrite
       ) {
         try {
           let currentRow = null;
@@ -569,22 +596,35 @@ function createUiStateStore(deps = {}) {
               currentRow = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
             }
           }
-          const currentRaw = currentRow?.payload?.values?.[COLDMAIL_SEND_GUARD_KEY] || '';
+          const currentValues = currentRow?.payload?.values || {};
+          const restoredCurrent = restoreColdmailSendGuardValues(currentValues, COLDMAIL_SEND_GUARD_KEY);
+          if (!restoredCurrent.ok) throw new Error(restoredCurrent.error);
+          const currentRaw = restoredCurrent.raw;
           if (currentRaw) {
             sanitizedValues[COLDMAIL_SEND_GUARD_KEY] = mergeColdmailSendGuardStates(
               currentRaw,
               sanitizedValues[COLDMAIL_SEND_GUARD_KEY]
             );
           }
+          const packed = persistColdmailSendGuardValues(
+            sanitizedValues,
+            COLDMAIL_SEND_GUARD_KEY,
+            sanitizedValues[COLDMAIL_SEND_GUARD_KEY]
+          );
+          if (!packed.ok) throw new Error(packed.error);
+          const persistedErrors = getInvalidJsonStateValueErrors(packed.values);
+          if (persistedErrors.length) throw new Error(persistedErrors.join('; '));
+          persistedValues = packed.values;
         } catch (error) {
           logger.error('[UI State][ColdmailSendGuardMergeError]', error?.message || error);
+          return null;
         }
       }
       const row = {
         state_key: rowKey,
         payload: {
           scope: normalizedScope,
-          values: sanitizedValues,
+          values: persistedValues,
         },
         meta: {
           type: 'ui_state',
@@ -617,8 +657,15 @@ function createUiStateStore(deps = {}) {
         }
       }
 
-      inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
-      return { values: { ...sanitizedValues }, source: 'supabase', updatedAt };
+      const logicalValues = isColdmailGuardWrite
+        ? restoreColdmailSendGuardValues(persistedValues, COLDMAIL_SEND_GUARD_KEY)
+        : { ok: true, values: persistedValues };
+      if (!logicalValues.ok) {
+        logger.error('[UI State][ColdmailSendGuardReadRejected]', logicalValues.error);
+        return null;
+      }
+      inMemoryUiStateByScope.set(normalizedScope, logicalValues.values);
+      return { values: { ...logicalValues.values }, source: 'supabase', updatedAt };
     } catch (error) {
       logger.error('[UI State][Supabase][SetCrash]', error?.message || error);
       return null;
