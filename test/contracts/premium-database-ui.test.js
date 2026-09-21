@@ -2298,8 +2298,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-mail-ready-menu.css'), 'utf8'), /\.filter-bar:has\(\.mail-ready-filter\[open\]\)/);
   assert.match(pageSource, /id="mailReadySoftoraCount">--<\/strong>/);
   assert.match(pageSource, /id="mailReadyInstantlyCount">--<\/strong>/);
-  assert.match(pageSource, /data-s="instantly-queued" id="instantlyQueuedFilterButton"[^>]*>Klaargezet <strong id="instantlyQueuedCount">--<\/strong>/);
-  assert.match(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-mail-ready-menu.js'), 'utf8'), /\/api\/outreach\/provider-capacity/);
+  assert.doesNotMatch(pageSource, /data-s="instantly-queued"|id="instantlyQueuedFilterButton"|id="instantlyQueuedCount"/);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-mail-ready-menu.js'), 'utf8'), /\/api\/outreach\/provider-capacity/);
   assert.doesNotMatch(pageSource, /id="instantOutreachSyncButton"|Instantly-wachtlijst vervangen/);
   assert.doesNotMatch(pageSource, /data-s="instantly-wachtlijst"[^>]*>Instantly-wachtrij<\/button>/);
   assert.doesNotMatch(pageSource, />Veilige Instantly CSV maken<\/span>/);
@@ -4824,7 +4824,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-/<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties">[\s\S]*data-s="beschikbaar"[^>]*>Beschikbaar<\/button>[\s\S]*id="mailReadyMenuButton"[^>]*>Mailklaar<\/summary>[\s\S]*data-mail-ready-status="benaderbaar">[\s\S]*>Softora<\/span>[\s\S]*id="mailReadySoftoraCount"[\s\S]*data-mail-ready-status="instantly-ready">[\s\S]*>Nog te uploaden<\/span>[\s\S]*id="mailReadyInstantlyCount"[\s\S]*data-s="instantly-queued"[^>]*>Klaargezet[\s\S]*id="instantlyQueuedCount"[\s\S]*<div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal">[\s\S]*data-s="verstuurd"[^>]*>Softora<\/button>[\s\S]*data-s="instantly"[^>]*>Instantly<\/button>/
+/<div class="status-filter-group status-filter-group--shared" aria-label="Mailsysteem opties">[\s\S]*data-s="beschikbaar"[^>]*>Beschikbaar<\/button>[\s\S]*id="mailReadyMenuButton"[^>]*>Mailklaar<\/summary>[\s\S]*data-mail-ready-status="benaderbaar">[\s\S]*>Softora<\/span>[\s\S]*id="mailReadySoftoraCount"[\s\S]*data-mail-ready-status="instantly-ready">[\s\S]*>Instantly<\/span>[\s\S]*id="mailReadyInstantlyCount"[\s\S]*<div class="status-filter-group status-filter-group--sent" aria-label="Verstuurd per kanaal">[\s\S]*data-s="verstuurd"[^>]*>Softora<\/button>[\s\S]*data-s="instantly"[^>]*>Instantly<\/button>/
   );
   assert.doesNotMatch(pageSource, /<button[^>]*data-s="instantly-wachtlijst"/);
   assert.match(pageSource, /activeStatus: "beschikbaar"/);
