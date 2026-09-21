@@ -880,7 +880,7 @@
             if (provider === "instantly") return true;
             return Boolean(normalizeString(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt));
         }
-        function isInstantlyConfirmedSent(customer) { return global.SoftoraDatabaseInstantlyStatus.isConfirmedSent(customer); } function isInstantlyQueuedCustomer(customer) { return global.SoftoraDatabaseInstantlyStatus.isCurrentCampaignPrepared(customer, normalizeDatabaseStatus); } function isInstantlyReadyCustomer(customer) { return global.SoftoraDatabaseInstantlyStatus.isReadyForUpload(customer, normalizeDatabaseStatus); }
+        function isInstantlyConfirmedSent(customer) { return global.SoftoraDatabaseInstantlyStatus.isConfirmedSent(customer); } function isInstantlyQueuedCustomer(customer) { return global.SoftoraDatabaseInstantlyStatus.isCurrentCampaignPrepared(customer, normalizeDatabaseStatus); } function isInstantlyReadyCustomer(customer) { return isInstantlyQueuedCustomer(customer); }
         function hasPendingInstantlyQueue(customer) {
             return normalizeString(customer && customer.instantlyQueueStatus).toLowerCase() === "registered";
         }
@@ -999,7 +999,7 @@
                     : "<div class=\"outreach-line\">Verstuurd via Instantly</div>";
             }
             if (isInstantlyQueuedCustomer(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
-            if (isInstantlyReadyCustomer(customer)) return "<div class=\"outreach-line\">Ontwerp klaar voor Instantly</div>";
+            if (global.SoftoraDatabaseInstantlyStatus.isReadyForUpload(customer, normalizeDatabaseStatus)) return "<div class=\"outreach-line\">Ontwerp klaar voor Instantly</div>";
             if (hasPendingInstantlyQueue(customer)) return "<div class=\"outreach-line\">Geregistreerd voor ontwerp</div>";
             if (!isWebdesignOutreachCustomer(customer) && !(forceOutreachMeta && isTrackedOutreachCustomer(customer))) return "";
             const sentAt = getSentAt(customer);
