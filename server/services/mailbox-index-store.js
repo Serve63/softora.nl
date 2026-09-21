@@ -312,7 +312,7 @@ function createMailboxIndexStore(deps = {}) {
       unread: Boolean(message && message.unread),
       starred: Boolean(message && message.starred),
       payload: {
-        source: 'imap-sync',
+        source: 'imap-sync', ...(message.sourceHtml ? { sourceHtml: String(message.sourceHtml).slice(0, 60000) } : {}),
         embeddedImageCount: Math.max(
           0,
           Math.min(8, Array.isArray(message && message.bodyImages) ? message.bodyImages.length : 0)
@@ -381,6 +381,7 @@ function createMailboxIndexStore(deps = {}) {
       subject: normalizeString(row.subject) || '(Geen onderwerp)',
       preview: normalizeString(row.preview),
       body: includeBody ? normalizeString(row.body_text) : '',
+      ...(includeBody && payload.sourceHtml ? { sourceHtml: payload.sourceHtml } : {}),
       messageId: normalizeString(row.message_id),
       inReplyTo: normalizeString(row.in_reply_to),
       references: normalizeString(row.references_text),
@@ -462,7 +463,7 @@ function createMailboxIndexStore(deps = {}) {
       unread: Boolean(message.unread),
       starred: Boolean(message.starred),
       payload: {
-        source: provider,
+        source: provider, ...(message.sourceHtml ? { sourceHtml: String(message.sourceHtml).slice(0, 60000) } : {}),
         provider,
         providerMessageId: providerId,
         providerThreadId: truncateText(normalizeString(message.providerThreadId), 500),
@@ -869,7 +870,7 @@ function createMailboxIndexStore(deps = {}) {
       .filter((message) => message.accountEmail && /^instantly:[a-z0-9-]+$/i.test(message.providerId));
     if (!imapReferences.length && !providerReferences.length) return source;
 
-    const selectedColumns = 'message_key,account_email,provider_id,uid,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text,deleted_at';
+    const selectedColumns = 'sender_name,sender_email,message_id,message_key,account_email,provider_id,uid,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text,deleted_at';
     const priorityReadOptions = { bypassFailureCooldown: true, suppressFailureCooldown: true, clientOptions: { ignoreFailureCooldown: true, suppressFailureCooldown: true }, queryTimeoutMs: 8_000 };
     const [messageResult, providerResult] = await Promise.all([
       imapReferences.length
@@ -918,7 +919,9 @@ function createMailboxIndexStore(deps = {}) {
       const body = normalizeString(row.body_text);
       return {
         ...message,
-        bodyResolved: true,
+        bodyResolved: true, messageKey: row.message_key, messageId: row.message_id,
+        from: row.sender_name || row.sender_email || 'Onbekend', email: row.sender_email, direction: payload.direction,
+        ...(payload.sourceHtml ? { sourceHtml: payload.sourceHtml } : {}),
         body,
         hasBody: Boolean(row.has_body),
         bodyTruncated: Boolean(row.body_truncated),

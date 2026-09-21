@@ -247,7 +247,7 @@ function decorateMessage(mail, source) {
   const legacyMediaNeedsHydration = hasUnverifiedLegacyMedia(message);
   const recipientRoutingNeedsHydration = message.recipientRoutingEvidenceKnown !== true;
   return {
-    ...mail,
+    ...mail, ...(message.aiPresentation ? { aiPresentation: message.aiPresentation } : {}),
     hasBody: Boolean(message.hasBody || message.body),
     bodyLoaded:
       Boolean(message.body) &&
@@ -380,7 +380,7 @@ async function loadBody({
         indexedMessage.resolved !== false
       ) {
         const indexedBody = normalizeText(indexedMessage.body || '');
-        mail.body = indexedBody;
+        mail.body = indexedBody; mail.aiPresentation = indexedMessage.aiPresentation;
         mail.hasBody = Boolean(indexedMessage.hasBody || indexedBody);
         mail.bodyTruncated = Boolean(indexedMessage.bodyTruncated);
         mail.bodyLoaded = Boolean(
@@ -440,7 +440,7 @@ async function loadBody({
     }
     if (!stillCurrent()) return;
     const body = normalizeText(data.message.body || '');
-    mail.body = body;
+    mail.body = body; mail.aiPresentation = data.message.aiPresentation;
     mail.bodyImages = normalizeBodyImages(data.message.bodyImages || mail.bodyImages);
     mail.optOutUrl = normalizeOptOutUrl(data.message.optOutUrl || mail.optOutUrl);
     mail.hasBody = Boolean(data.message.hasBody || body);
@@ -601,6 +601,7 @@ function applyThreadMessagePayload(message, source, normalizeBodyImages, normali
     message.attachmentEvidenceKnown,
     JSON.stringify(Array.isArray(message.attachments) ? message.attachments : []),
   ].map((value) => String(value || '')).join('|');
+  message.aiPresentation = source?.aiPresentation;
   const body = normalizeText(source && source.body);
   if (body) {
     message.body = body;

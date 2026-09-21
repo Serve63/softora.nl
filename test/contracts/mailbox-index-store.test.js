@@ -1768,7 +1768,7 @@ test('Equans detail hydrateert generation-aware exact zonder brede mailboxscan',
   assert.deepEqual(messages[0].attachments, [{ filename: 'reactie.txt', contentType: 'text/plain', size: 12 }]);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',
-    'message_key,account_email,provider_id,uid,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text,deleted_at',
+    'sender_name,sender_email,message_id,message_key,account_email,provider_id,uid,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text,deleted_at',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'or'), [
     'or',

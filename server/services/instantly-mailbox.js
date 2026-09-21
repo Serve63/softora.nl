@@ -353,7 +353,7 @@ function createInstantlyMailboxService(deps = {}) {
       bodyTruncated: false,
       attachments: normalizeProviderAttachmentList(rawMessage.attachment_json || rawMessage.attachments),
       originalCampaignOutbound: direction === 'sent' && lifecycleType === '1',
-      providerBodyHtmlEvidenceKnown: Boolean(html),
+      providerBodyHtmlEvidenceKnown: Boolean(html), ...((deps.env || process.env).MAILBOX_AI_PRESENTATION_ENABLED === 'true' && html ? { sourceHtml: String(html).slice(0, 60000) } : {}),
       providerRichBodyAvailable: Boolean(providerHtml.body),
       providerOriginalBodyEvidenceKnown: originalSource?.evidenceKnown === true,
       providerOriginalBodyAvailable: originalSource?.available === true,

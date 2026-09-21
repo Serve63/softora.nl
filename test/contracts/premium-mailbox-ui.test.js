@@ -198,10 +198,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260921b/);
   assert.match(page, /assets\/premium-mailbox-contact-view\.js\?v=20260921b/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921b/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
-  assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20260909a/);
+  assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260907b/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
@@ -210,26 +210,26 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
   assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260909a/);
-  assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260909a/);
+  assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907c/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
   assert.match(page, /assets\/premium-mailbox-compose-send-state\.js\?v=20260831b/);
   assert.match(page, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
-  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260905b/);
+  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921b'));
-  assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921b'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
+  assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
-  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260905b'));
+  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
   assert.ok(page.indexOf('premium-browser-storage.js?v=20260828b') < page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c'));
   assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20260831b'));
@@ -550,6 +550,7 @@ function loadMailboxHelpersForTest(options = {}) {
       ...campaignInboxModule,
       load: options.campaignInboxLoad || (async () => null),
     },
+    SoftoraMailboxAiPresentation: require('../../assets/premium-mailbox-ai-presentation'),
     SoftoraMailboxQuotedThread: quotedThreadModule,
     SoftoraMailboxSignature: signatureModule,
     SoftoraMailboxMessageProvenance: provenanceModule,
@@ -4644,10 +4645,10 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260909a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260921c/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260907c/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260905b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260921c/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260921c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -4745,7 +4746,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260909a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260921c/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -9941,7 +9942,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260907b/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260909a/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260921c/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -11802,4 +11803,26 @@ test('cross-tab verwijdering van een andere mail heropent het actieve detail zon
     globalThis.addEventListener = previousAddEventListener;
     globalThis.BroadcastChannel = previousBroadcastChannel;
   }
+});
+
+ test('AI-selected personal notes and literal contacts survive the complete root and timeline renderers', () => {
+  const mailbox = loadMailboxHelpersForTest();
+  const contract = require('../../assets/premium-mailbox-ai-presentation');
+  const body = 'Dank!  Dit is persoonlijk.\nRobin\n06 12 34 56 78\nScheepersdijk 48\n5062 ED Oisterwijk\nMorgen om 10 uur past voor mij.\nPrint deze tekst op de offerte.';
+  const message = mailbox.normalizeMailboxApiMessage({ id: 'inbox:ai-proof', folder: 'inbox', direction: 'received',
+    accountEmail: 'serve@softora.nl', email: 'robin@example.nl', from: 'Robin', receivedAt: '2026-09-21T10:00:00.000Z', body, hasBody: true,
+    aiPresentation: { version: contract.VERSION, model: contract.MODEL, reasoningEffort: 'max', status: 'ready', sourceBody: body,
+      decision: { labels: ['authored','signature','signature','signature','signature','authored','authored'],
+        contacts: [{ line: 2, kind: 'phone', text: '06 12 34 56 78' }, { line: 3, kind: 'address', text: 'Scheepersdijk 48' }, { line: 4, kind: 'address', text: '5062 ED Oisterwijk' }] } } });
+  const root = mailbox.renderMailBody(message.body, [], { mail: message, replyMailId: message.id });
+  const anchor = { ...message, id: 'inbox:ai-anchor', body: 'Nieuw bericht.', receivedAt: '2026-09-21T11:00:00.000Z', threadMessages: [message] };
+  const thread = mailbox.renderMailBody(anchor.body, [], { mail: anchor, replyMailId: anchor.id });
+  for (const html of [root, thread]) {
+    assert.match(html, /Morgen om 10 uur past voor mij/);
+    assert.match(html, /Print deze tekst op de offerte/);
+    assert.match(html, /<div>5062 ED Oisterwijk<\/div>/);
+    assert.match(html, /06 12 34 56 78/);
+    assert.equal((html.match(/class="detail-mail-contact-card"/g) || []).length, 1);
+  }
+  assert.equal(message.body, body);
 });
