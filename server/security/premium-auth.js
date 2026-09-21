@@ -371,6 +371,10 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/mailbox/instantly/sync' && method === 'GET') {
         return true;
       }
+      if (requestPath === '/api/mailbox/presentation/process' && method === 'GET') {
+        // The mailbox route validates CRON_SECRET; scheduled workers have no user session.
+        return true;
+      }
       if (requestPath === '/api/outreach/provider-upload/auto-run' && method === 'GET') {
         // The route itself requires CRON_SECRET before delegating to the protected POST.
         return true;
