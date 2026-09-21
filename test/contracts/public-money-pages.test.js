@@ -233,6 +233,9 @@ test('software SEO offer bounds approvals and links to the AI budget preparation
   assert.match(source, /Goedkeuring vóór verzending/);
   assert.match(source, /Geen verzending zonder vrijgave/);
   assert.match(source, /Stop- en herstelroute bij ontbrekende data/);
+  for (const selector of ['.dienst-desc', '.dienst-list li', '.intent-card p', '.section-sub', '.step-desc', '.example-desc', '.why-desc', '.intent-list li']) {
+    assert.ok(source.includes(selector + ' { font-size: 16px;'), selector + ' keeps body copy readable');
+  }
   assert.match(source, /href="\/blog\/ai-automatisering-kosten-mkb">kostengids voor AI automatisering<\/a>/);
   assert.doesNotMatch(source, /Leadkwalificatie op autopilot|Schaalbaar en toekomstbestendig|Wie zoekt op bedrijfssoftware/);
   const supporting = readPage('server/services/seo-content-bedrijfssoftware-kosten.js');
