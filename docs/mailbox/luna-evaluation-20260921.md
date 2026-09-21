@@ -107,3 +107,39 @@ its full conservative USD 0.04 reservation remains counted. Combined known token
 rounds is USD 0.0247832; including that full timeout reservation yields **less than USD 0.065**.
 These are pricing-based estimates/bounds, not invoices. Forty authorized calls were attempted
 in total, with no automatic retry and no production activation.
+
+
+## Third round: repeated holdouts within the same budget
+
+The owner authorized continued testing within the cumulative USD 1 cap, without a per-20-call
+approval limit. Sixty additional calls tested thirty constructed cases twice each: twenty
+second-round cases and ten previously unseen cases with expectations fixed before execution.
+New cases include authored role/availability text, promotional copy requested for a website,
+contact-page instructions, requested legal wording, a one-word reply, code samples, customer
+requirements in quotations, an important bare URL, discussion of mobile footers, and no signature.
+The tested implementation was unchanged at `7dafea8e`.
+
+- All 60 rendered outputs retained every expected authored line, including original fallback.
+- 57 requests returned HTTP 200; three timed out at 45 seconds and retained the original.
+- Two HTTP-200 footer-only cases intentionally failed validation and retained the original.
+- 47 outputs contained none of the originally designated removable lines. Thirteen retained
+  at least one: this includes deliberate retention of historical quotes, two footer-only
+  fallbacks, the three timeouts, and imperfect signature selection. This is not a 60/60 cleanup pass.
+- A French closing remained in one of two repeats. Both English-forward repeats retained
+  their signoff/name/company; one requested-disclaimer repeat retained the sender signature.
+  Repetition therefore demonstrates remaining selection variability, not deterministic quality.
+- No extra contact values were selected. Expected contacts were missing only in one timed-out
+  request, whose entire original remained available.
+
+The runner reserved USD 0.04 before each request, settled only responses with reported token
+usage, and retained the full reservation for unknown timeout billing. Previous rounds were
+conservatively carried forward as USD 0.07. This round accounts for USD 0.175926, including
+three USD 0.04 timeout reservations; the cumulative conservative amount is **USD 0.245926**.
+This uses a conservative USD 0.25/million for all input and USD 1.20/million output and rounds
+up each completed request. It is an estimated accounting bound, not a billing invoice.
+
+There have now been 100 real evaluation attempts. These are constructed messages, not a
+production mailbox sample. No production activation, migration or processing-budget approval
+has occurred. `verify:critical` passed again after these tests. Next release gate remains
+cleanup/availability review and authenticated end-to-end proof; retaining all expected text
+in this suite must not be presented as universal future accuracy.

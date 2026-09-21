@@ -1,6 +1,6 @@
 # Mailbox Luna presentation — activation gate
 
-Status: disabled by default. Two real-model evaluation rounds are complete; the second exposed unsafe quote-label deletion. The renderer now retains quote-labelled content and isolated internal signature labels. Recorded-output replay preserves authored content in all twenty second-round cases, but this is not universal accuracy or live acceptance. See `luna-evaluation-20260921.md`.
+Status: disabled by default. Three real-model evaluation rounds (100 attempts) are complete; the second exposed unsafe quote-label deletion. The renderer now retains quote-labelled content and isolated internal signature labels. Recorded-output replay preserves authored content in all twenty second-round cases, but this is not universal accuracy or live acceptance. See `luna-evaluation-20260921.md`.
 
 The model selects source lines, never rewrites the canonical body. Only literal phone/address
 substrings of signature lines enter Softora contact fields. Uncertain lines remain visible.
@@ -28,8 +28,8 @@ manual investigation is required, never an automatic replay of an uncertain paid
 ## Required before activation
 
 1. Obtain the owner's concrete amount/action approval under the personal AGENTS cost rule.
-   Proposed first action: up to 20 Luna classification evaluations, maximum USD 1 total.
-   This is not permission for unlimited background processing or a credit purchase.
+   Evaluation approval now covers continued quality tests within USD 1 cumulatively, without a per-batch limit.
+   This is not permission for production background processing or a credit purchase.
 2. Run real-model evaluations on anonymized fixtures covering unfamiliar/multilingual signatures,
    mixed body/footer lines, source HTML, quoted third parties, inline answers, important URLs,
    prices, signatures with no contacts, personal notes after footers without P.S., and injection
