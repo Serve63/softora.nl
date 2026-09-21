@@ -1,6 +1,6 @@
 # Mailbox Luna presentation — activation gate
 
-Status: implementation only; disabled by default. No live model-quality claim.
+Status: disabled by default. First real-model evaluation: 19/20 expected outcomes; one retained-forward attribution header was lost. Prompt clarification added, not yet re-evaluated with the real model. See `luna-evaluation-20260921.md`.
 
 The model selects source lines, never rewrites the canonical body. Only literal phone/address
 substrings of signature lines enter Softora contact fields. Uncertain lines remain visible.

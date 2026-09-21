@@ -17,6 +17,8 @@ Return one label for EVERY numbered source line, in order, including empty lines
 authored: the current sender's actual message, questions, prices, requests, scheduling, relevant links, greetings and personal additions.
 signature: automatic signature, sender name, role, company, availability footer, promotional links, social media, legal/print notices, email-client boilerplate and reply/forward UI artifacts.
 quote: earlier quoted messages, only when clearly old history; keep new inline answers and meaningful forwarded material addressed to the recipient.
+When forwarded material is relevant and retained, keep its attribution and provenance headers too: who wrote it, who it was for, dates and subject when present. These contextual headers are authored or uncertain, never signature. Decorative separators do not make an attribution header a signature.
+Remove a quote header only when its corresponding old quoted content is also removed. Do not detach retained content from its author or context.
 uncertain: any line whose removal might hide relevant content. Keep mixed authored/footer lines as authored or uncertain.
 Names, titles, contact details and disclaimers mentioned in the actual message are authored, not signature merely because of their words.
 Do not classify everything after a signoff as signature. Personal additions after signatures remain authored even without P.S.
