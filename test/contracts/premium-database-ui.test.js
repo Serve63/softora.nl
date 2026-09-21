@@ -5013,6 +5013,27 @@ test('Instantly mail-ready menu and list mirror both current unsent campaigns an
   assert.equal(controller.matchesStatusFilter(martijn, 'instantly'), true);
 });
 
+test('Instantly mail-ready column header counts all filtered campaign leads independently of local photos', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  const headerFunction = pageSource.match(/function getPhotoHeaderCount\(customers, showPhotoColumn\) \{[^\n]+/)[0];
+  const state = { activeStatus: 'instantly-ready' };
+  const sandbox = {
+    state,
+    window: { SoftoraDatabaseMailReadySnapshot: { getDisplayCount: () => 151 } },
+    buildCustomerWebdesignAssetState: customer => ({ hasPhoto: Boolean(customer.hasPhoto) }),
+  };
+  vm.runInNewContext(headerFunction, sandbox);
+  const leads = Array.from({ length: 64 }, (_, index) => ({ id: `lead-${index}`, hasPhoto: false }));
+  assert.equal(sandbox.getPhotoHeaderCount(leads, true), 64);
+  assert.equal(sandbox.getPhotoHeaderCount(leads.slice(0, 3), true), 3);
+  assert.equal(sandbox.getPhotoHeaderCount([], true), 0);
+  assert.equal(sandbox.getPhotoHeaderCount(leads, false), 0);
+  state.activeStatus = 'benaderbaar';
+  assert.equal(sandbox.getPhotoHeaderCount(leads, true), 151);
+  state.activeStatus = 'beschikbaar';
+  assert.equal(sandbox.getPhotoHeaderCount([{ hasPhoto: true }, { hasPhoto: false }], true), 1);
+});
+
 test('premium database outreach days column keeps benaderd rows after 25 days', () => {
   const outreachClient = loadDatabaseOutreachClient();
   const controller = outreachClient.createController({
