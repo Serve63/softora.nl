@@ -61,3 +61,18 @@ have less structure than messages whose original HTML is retained.
 Set `MAILBOX_AI_PRESENTATION_ENABLED=false` and reload the mailbox; legacy rendering is the
 compatibility path. Canonical messages are never changed. Do not drop stored jobs or reset
 reserved budget to retry an uncertain request. No send/reply/action-required logic is changed.
+
+## Pilot integration corrections
+
+The worker GET route must reach its own cron-secret guard without requiring a user session.
+Background repository calls request the same five-second HTTP deadline as their operation;
+interactive enqueue still has a 1.2-second outer deadline. A partial global arrival-date index
+supports candidate selection across accounts (account-leading inbox indexes do not).
+
+Presentation identity includes exact body, sender name/email, mailbox and message identity.
+Optional HTML hydration is evidence, not a new version of unchanged message text. Apply
+`20260921132600_mailbox_ai_stable_source.sql` with the pilot budget paused and no running jobs,
+after deploying the stable-key code. It preserves prior paid decisions and reservations,
+retains superseded derived entries for audit, and prevents detail hydration from reclassifying
+the same content. Original mailbox records are never modified. Labelled Markdown links render
+with their original destination and label instead of including markup punctuation in the URL.

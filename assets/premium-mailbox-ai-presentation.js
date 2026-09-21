@@ -52,8 +52,16 @@
   }
   const escape = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   function renderBody(lines) {
-    const link = (text) => text.split(/(https?:\/\/[^\s<>"']+)/g).map((part) => /^https?:\/\//.test(part)
-      ? `<a href="${escape(part)}" target="_blank" rel="noopener noreferrer" style="color:inherit;font-style:italic">${escape(part)}</a>` : escape(part)).join('');
+    const anchor = (url, label) => `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer" style="color:inherit;font-style:italic">${escape(label)}</a>`;
+    const link = (text) => {
+      const pattern = /\[([^\[\]\r\n]+)\]\((https?:\/\/[^\s<>"']+)\)|(https?:\/\/[^\s<>"']+)/g;
+      let html = '', end = 0;
+      for (const match of text.matchAll(pattern)) {
+        html += escape(text.slice(end, match.index)) + anchor(match[2] || match[3], match[1] || match[3]);
+        end = match.index + match[0].length;
+      }
+      return html + escape(text.slice(end));
+    };
     return `<div class="detail-mail-lines">${lines.map((line) => `<div class="detail-mail-line${line.trim() ? '' : ' detail-mail-line-empty'}">${line.trim() ? link(line) : '&nbsp;'}</div>`).join('')}</div>`;
   }
   function renderContact(contact) {

@@ -48,6 +48,7 @@ test('provider contract pins Luna/max, strict structured output and refuses unbo
   assert.ok(2 * (100000 * 0.25 + request.max_output_tokens * 1.2) < RESERVATION_MICRO_USD);
   assert.notEqual(source.id, buildSource({ ...message, accountEmail: 'other@example.nl' }).id);
   assert.notEqual(source.id, buildSource({ ...message, body: body + '\nnew' }).id);
+  assert.equal(source.id, buildSource({ ...message, sourceHtml: '<footer>richer evidence</footer>' }).id);
   assert.equal(buildSource({ ...message, direction: 'sent' }), null);
   assert.equal(buildSource({ ...message, body: 'x\n'.repeat(601) }), null);
   assert.equal(buildSource({ ...message, bodyTruncated: true }), null);
@@ -285,4 +286,42 @@ test('background storage diagnostics identify the stage without logging private 
   assert.equal((await service.processQueue()).unavailable, true);
   assert.equal(warnings[0][1].stage, 'candidates');
   assert.doesNotMatch(JSON.stringify(warnings), /private mail|credential/);
+});
+
+test('AI presentation preserves labelled link destinations without treating Markdown punctuation as URL text', () => {
+  const html = contract.renderBody(['Bekijk [hier](https://example.nl/preview) en [de offerte](https://example.nl/offerte).']);
+  assert.match(html, /href="https:\/\/example.nl\/preview"[^>]*>hier<\/a>/);
+  assert.match(html, /href="https:\/\/example.nl\/offerte"[^>]*>de offerte<\/a>/);
+  assert.doesNotMatch(html, /href="[^"]*\)/);
+  assert.match(contract.renderBody(['[<img>](https://example.nl/)']), /&lt;img&gt;/);
+});
+
+test('stable-source migration reuses paid decisions across HTML hydration without resetting reservations', async () => {
+  const { PGlite } = require('@electric-sql/pglite');
+  const { pgcrypto } = require('@electric-sql/pglite/contrib/pgcrypto');
+  const db = new PGlite({ extensions: { pgcrypto } });
+  try {
+    await db.exec(`create schema extensions; create extension pgcrypto with schema extensions;
+      create role anon; create role authenticated; create role service_role bypassrls;
+      create table public.softora_mailbox_messages (folder text, has_body boolean, body_truncated boolean, deleted_at timestamptz,
+        generation_superseded_at timestamptz, body_text text, sender_email text, account_email text, payload jsonb,
+        message_key text, message_id text, sender_name text, date timestamptz);`);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260921093527_mailbox_luna_presentations.sql'), 'utf8'));
+    const source = buildSource({ ...message, body: body + '\nÉén bericht 😁 | 12:test' });
+    await db.query(`insert into softora_mailbox_ai_presentations (id,version,account_email,message_key,source,status,decision)
+      values ('old-text','mailbox-luna-v1','owner@example.nl','m',$1,'ready',$2),
+      ('old-html','mailbox-luna-v1','owner@example.nl','m',$3,'queued',null),
+      ($4,'mailbox-luna-v1','owner@example.nl','m',$1,'queued',null)`,
+      [JSON.stringify({ ...source, html: '' }), JSON.stringify(decision), JSON.stringify({ ...source, html: '<footer>new evidence</footer>' }), source.id]);
+    await db.exec('update softora_mailbox_ai_budget set approved_micro_usd=100000, reserved_micro_usd=100000');
+    await db.exec('begin');
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260921132600_mailbox_ai_stable_source.sql'), 'utf8'));
+    await db.exec('commit');
+    const rows = (await db.query("select * from softora_mailbox_ai_presentations where version='mailbox-luna-v1'")).rows;
+    assert.equal(rows.length, 1); assert.equal(rows[0].id, source.id); assert.equal(rows[0].status, 'ready');
+    assert.equal(rows[0].source.hash, source.hash); assert.equal(rows[0].source.body, source.body);
+    assert.deepEqual(rows[0].decision, decision);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd), 100000);
+    assert.equal(Number((await db.query('select count(*) n from softora_mailbox_ai_presentations')).rows[0].n), 3);
+  } finally { await db.close(); }
 });
