@@ -228,6 +228,19 @@ test('bedrijfssoftware SEO-pagina behoudt de uitgebreide buyer-intent inhoud', (
   assert.ok(countVisibleWords(source) >= 950, 'Bedrijfssoftware SEO-pagina mist buyer-intent diepte.');
 });
 
+test('software SEO offer bounds approvals and links to the AI budget preparation', () => {
+  const source = readPage('premium-bedrijfssoftware.html');
+  assert.match(source, /Goedkeuring vóór verzending/);
+  assert.match(source, /Geen verzending zonder vrijgave/);
+  assert.match(source, /Stop- en herstelroute bij ontbrekende data/);
+  assert.match(source, /href="\/blog\/ai-automatisering-kosten-mkb">kostengids voor AI automatisering<\/a>/);
+  assert.doesNotMatch(source, /Leadkwalificatie op autopilot|Schaalbaar en toekomstbestendig|Wie zoekt op bedrijfssoftware/);
+  const supporting = readPage('server/services/seo-content-bedrijfssoftware-kosten.js');
+  assert.match(supporting, /Neem één voorbeeldrecord, de beslisser en een foutscenario mee/);
+  assert.match(supporting, /wie keurt het bedrag goed en wat mag niet worden verstuurd/);
+  assert.match(supporting, /href: '\/bedrijfssoftware-op-maat'/);
+});
+
 test('crm money page is focused on pipeline, customers and AI follow-up', () => {
   const source = readPage('crm-systeem-op-maat.html');
   const entry = getRegistryEntry('crm-systeem-op-maat.html');

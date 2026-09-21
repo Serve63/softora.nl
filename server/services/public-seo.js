@@ -90,7 +90,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'Bedrijfssoftware op maat laten maken | Softora',
     description:
       'Bedrijfssoftware op maat laten maken voor CRM, planning, offertes of een klantportaal. Softora helpt MKB-teams met scope, koppelingen en beheer.',
-    lastmod: '2026-09-15',
+    lastmod: '2026-09-21',
     growthEventKind: 'other_growth_action',
     growthCluster: 'software-crm',
     kind: 'service',

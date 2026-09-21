@@ -170,7 +170,7 @@ const BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM = Object.freeze({
         'Schrijf vóór een gesprek op: welk probleem dagelijks zichtbaar is; welke uitkomst nodig is; wie de eerste gebruikers zijn; welke vijf scenario’s moeten werken; welke gegevens daarbij horen; welke bron leidend is; welke rollen verschillen; welke koppeling noodzakelijk is; welke uitzondering risicovol is; wat later mag; wie intern beslist; en hoe acceptatie plaatsvindt. Onbekende antwoorden hoeven niet te worden verzonnen, maar worden als onderzoeksvraag gemarkeerd.',
         Object.freeze({
           text:
-            'Wil je van je kostenkaart naar een voorstel? Neem de eerste workflow, gebruikersrollen, databronnen en noodzakelijke koppelingen mee in een gesprek met Softora. Bekijk bedrijfssoftware laten maken voor het MKB om te zien welke startversie bij je proces past en hoe bouw, testen en beheer worden afgebakend.',
+            'Wil je van je kostenkaart naar een voorstel? Neem één voorbeeldrecord, de beslisser en een foutscenario mee naast je eerste workflow en noodzakelijke koppelingen. Bij een offerteflow kan dat een aanvraag met ontbrekende prijsinformatie zijn: wie vult die aan, wie keurt het bedrag goed en wat mag niet worden verstuurd? Bekijk bedrijfssoftware laten maken voor het MKB om de startversie, controle vóór verzending en herstel bij een mislukte overdracht met Softora af te bakenen.',
           links: Object.freeze([
             Object.freeze({
               anchor: 'bedrijfssoftware laten maken voor het MKB',
