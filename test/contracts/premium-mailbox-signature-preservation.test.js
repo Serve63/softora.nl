@@ -14,15 +14,15 @@ const cases = [
     name: 'samengeplakte naam, telefoon en website',
     from: 'Robin Voorbeeld', email: 'robin@example.nl',
     body: 'Dank voor je ontwerp.\n\nIk wens je veel succes.\n\nMet vriendelijke groet,\nRobin Voorbeeld\n\n*Robin VoorbeeldTel: 06-12345678www.example.nl\n *\n\nOp wo 9 sep 2026 om 09:59 schreef Servé Creusen :\n> Oude tekst\n> Tel: 06-99999999',
-    expected: ['Robin Voorbeeld', 'href="tel:0612345678"', 'href="https://www.example.nl/"'],
-    absent: /\*Robin|VoorbeeldTel|12345678www|99999999|Oude tekst/,
+    expected: ['href="tel:0612345678"'],
+    absent: /Robin Voorbeeld|example.nl|VoorbeeldTel|12345678www|99999999|Oude tekst/,
   },
   {
     name: 'hotelcontact met pictogrammen en een reserveringsvoetnoot achter het citaat',
     from: 'Hotel Voorbeeld', email: 'info@hotel.example',
     body: 'Dank, ik stuur het door.\n\nVriendelijke groet,\n\nJamie Voorbeeld\nHotel Voorbeeld\n\n📍 Dorpsstraat 2-1 | 1234 AB Voorbeeldstad\n📞 013 123 45 67\n\nMaak hier je reservering [2]\n\nVolg ons:\nInstagram @hotelvoorbeeld | LinkedIn Hotel Voorbeeld\n\nServé Creusen schreef op 2026-09-09 11:02:\n> Oude ontwerptekst [1]\n\nLinks:\n------\n[1] https://www.softora.nl/webdesign/voorbeeld\n[2] https://booking.example/hotel/nl/%20',
-    expected: ['Jamie Voorbeeld', 'Hotel Voorbeeld', 'href="tel:0131234567"', 'Dorpsstraat 2-1, 1234 AB Voorbeeldstad'],
-    absent: /\[2\]|Oude ontwerptekst|webdesign\/voorbeeld|Maak hier je reservering|booking\.example|Volg ons|Instagram|LinkedIn/,
+    expected: ['href="tel:0131234567"', 'Dorpsstraat 2-1, 1234 AB Voorbeeldstad'],
+    absent: /Jamie Voorbeeld|Hotel Voorbeeld|\[2\]|Oude ontwerptekst|webdesign\/voorbeeld|Maak hier je reservering|booking\.example|Volg ons|Instagram|LinkedIn/,
   },
 ];
 
@@ -139,15 +139,13 @@ test('hoofdmail en dossier verwijderen app-reclame en de bijbehorende streep ook
   }
 });
 
-test('app-footer verdwijnt ook uit een herkende handtekening zonder naam, telefoon of website te verliezen', () => {
+test('herkende handtekeningen tonen alleen het telefoonnummer en laten app-footer, naam en website weg', () => {
   const body = 'Akkoord.\n\nMet vriendelijke groet,\nRobin Voorbeeld\nTel: 06-12345678\nwww.example.nl\n\nVerzonden vanaf Outlook voor Android [https://aka.ms/AAb9ysg]\n\n________________________________';
   const message = { body, direction: 'received', from: 'Robin Voorbeeld', email: 'robin@example.nl' };
   const result = presentation.getThreadPresentation(message, message);
   assert.equal(result.body, 'Akkoord.');
-  assert.match(result.contactHtml, /Robin Voorbeeld/);
   assert.match(result.contactHtml, /href="tel:0612345678"/);
-  assert.match(result.contactHtml, /href="https:\/\/www.example.nl\/"/);
-  assert.doesNotMatch(result.contactHtml, /Outlook|aka\.ms|_{3}/);
+  assert.doesNotMatch(result.contactHtml, /Robin Voorbeeld|www.example.nl|Outlook|aka\.ms|_{3}/);
 });
 
 test('uitgaande berichtweergave ruimt alleen de automatische app-footer op', () => {

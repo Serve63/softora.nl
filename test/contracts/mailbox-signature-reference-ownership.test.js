@@ -22,64 +22,59 @@ function render(body) {
   return { body: root.body, html: thread.contactHtml };
 }
 
-test('iconverwijzingen worden afzonderlijke contacten zonder afhankelijkheid van nummers in het citaat', () => {
+test('handtekeningverwijzingen verdwijnen zonder telefoon of adres uit een citaat over te nemen', () => {
   for (const history of ['', quote, quote.replace('linknummers.', 'linknummers [1].')]) {
     const result = render('Akkoord.' + signoff + '[1] [2] [3] [4]' + history + links);
     assert.equal(result.body, 'Akkoord.');
-    assert.match(result.html, /href="https:\/\/example.nl\/"/);
-    for (const value of ['Robin Voorbeeld', 'Adviseur', 'tel:0612345678', 'Dorpsstraat 1', '1234 AB Voorbeeldstad']) assert.ok(result.html.includes(value), value);
-    assert.doesNotMatch(result.html, /facebook|instagram|bedrijfsfilm|Links:|\[\d+\]|\]\(/);
+    for (const value of ['tel:0612345678', 'Dorpsstraat 1', '1234 AB Voorbeeldstad']) assert.ok(result.html.includes(value), value);
+    assert.doesNotMatch(result.html, /Robin Voorbeeld|Adviseur|example.nl|facebook|instagram|bedrijfsfilm|Links:|\[\d+\]|\]\(/);
   }
 });
 
 test('een gelabelde referentie na een citaat hoort bij de handtekening', () => {
   const result = render('Akkoord.' + signoff + 'Onze website [1]' + quote + '\nLinks:\n-----\n[1] https://example.nl');
   assert.equal(result.body, 'Akkoord.');
-  assert.match(result.html, /href="https:\/\/example.nl\/"[^>]*>Onze website<\/a>/);
-  assert.doesNotMatch(result.html, /\[1\]/);
+  assert.doesNotMatch(result.html, /Onze website|example.nl|\[1\]/);
+  assert.match(result.html, /tel:0612345678/);
 });
 
 test('een cluster met slechts twee verwijzingen is geen referentiedefinitie', () => {
   const result = render('Akkoord.' + signoff + '[1] [2]' + quote + '\nLinks:\n----\n[1] https://example.nl\n[2] https://facebook.com/voorbeeld');
   assert.equal(result.body, 'Akkoord.');
-  assert.match(result.html, /href="https:\/\/example.nl\/"/);
-  assert.doesNotMatch(result.html, /facebook|\[1\]|\[2\]/);
+  assert.match(result.html, /tel:0612345678/);
+  assert.doesNotMatch(result.html, /example.nl|facebook|\[1\]|\[2\]/);
 });
 
-test('inhoudelijke bronverwijzingen en handtekening houden elk hun klikbare bestemming', () => {
+test('inhoudelijke bronverwijzingen blijven klikbaar wanneer dezelfde website uit de handtekening verdwijnt', () => {
   const result = render('Lees de voorwaarden [1].' + signoff + 'Website [1]' + quote + '\nLinks:\n-----\n[1] https://example.nl');
   assert.match(result.body, /Lees de voorwaarden \[1\]/);
   assert.match(result.body, /\[1\]\(https:\/\/example.nl\/\)/);
   assert.doesNotMatch(result.body, /Links:|-----/);
-  assert.match(result.html, /href="https:\/\/example.nl\/"/);
+  assert.doesNotMatch(result.html, /example.nl|Website/);
 });
 
 test('onbekende en conflicterende nummers leiden niet tot gegokte linkbestemmingen', () => {
   for (const definitions of ['', '\n[1] javascript:alert(1)', '\n[1] https://one.example\n[1] https://two.example']) {
     const result = render('Akkoord.' + signoff + '[1] [2]' + quote + definitions);
-    assert.match(result.html, /\[1\]/);
-    assert.match(result.html, /\[2\]/);
-    assert.doesNotMatch(result.html, /href="(?:https:\/\/(?:one|two)|javascript)/);
+    assert.match(result.html, /tel:0612345678/);
+    assert.doesNotMatch(result.html, /\[1\]|\[2\]|href="(?:https:\/\/(?:one|two)|javascript)/);
   }
 });
 
-test('signaturepromotie wordt per onderdeel verwijderd en nuttige tekst blijft bestaan', () => {
+test('alle handtekeninglinks verdwijnen terwijl extra telefoons en berichtinhoud blijven bestaan', () => {
   const result = render('We bespreken Instagram als kanaal.' + signoff +
     'Volg ons:\nLinkedIn voorbeeld bv\nInstagram @voorbeeld | WhatsApp: 0687654321\nhttps://m.facebook.com/voorbeeld\n[@voorbeeld](https://instagram.com/voorbeeld)\n[*www.example.nl*](https://example.nl)\n[Besproken voorbeeld](https://instagram.com/p/voorbeeld)');
   assert.equal(result.body, 'We bespreken Instagram als kanaal.');
-  assert.match(result.html, /WhatsApp: 0687654321/);
-  assert.match(result.html, />www.example.nl<\/a>/);
-  assert.match(result.html, /href="https:\/\/instagram.com\/p\/voorbeeld"/);
-  assert.doesNotMatch(result.html, /LinkedIn|@voorbeeld|m.facebook|\*www/);
+  assert.match(result.html, /href="tel:0687654321"/);
+  assert.doesNotMatch(result.html, /example.nl|Besproken voorbeeld|instagram|LinkedIn|@voorbeeld|m.facebook|\*www/);
 });
 
 test('herkenbare afzender en contactvelden ondersteunen ontbrekende of afwijkende groet', () => {
   for (const boundary of ['\nRobin Voorbeeld', 'Grt.\nRobin Voorbeeld', 'Met vriendelijke groet, kind regards,\nRobin Voorbeeld', 'Met vriendelijke groet, Robin Voorbeeld']) {
     const result = render('Akkoord.\n\n' + boundary + '\nTel: 0612345678\nVolg ons:\nInstagram @voorbeeld');
     assert.equal(result.body, 'Akkoord.');
-    assert.match(result.html, /Robin Voorbeeld/);
     assert.match(result.html, /tel:0612345678/);
-    assert.doesNotMatch(result.html, /Instagram/);
+    assert.doesNotMatch(result.html, /Robin Voorbeeld|Instagram/);
   }
 });
 
@@ -91,7 +86,7 @@ test('de standaardfooter verdwijnt met numerieke bijlage en na samenklappen van 
   ]) assert.equal(render(body).body, 'Akkoord.');
   const result = render('Akkoord.' + signoff + 'Verzonden vanaf Outlook voor Android [1]\nWhatsApp: 0687654321\n[1] https://aka.ms/AAb9ysg');
   assert.doesNotMatch(result.html, /Outlook|aka.ms|\[1\]/);
-  assert.match(result.html, /WhatsApp: 0687654321/);
+  assert.match(result.html, /href="tel:0687654321"/);
 });
 
 test('footeropruiming wist geen definitie die nog bij inhoudelijke tekst hoort', () => {

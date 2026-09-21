@@ -97,7 +97,8 @@ test('old and future incoming messages in every mailbox use the same root and th
       assert.equal(root.body, authored);
       assert.equal(thread.body, authored);
       for (const html of [rootHtml.join(''), thread.contactHtml]) {
-        for (const content of ['Robin Voorbeeld', 'Adviseur', '06 12 34 56 78', 'info@example.nl', 'www.example.nl']) assert.ok(html.includes(content), content);
+        assert.ok(html.includes('06 12 34 56 78'));
+        assert.doesNotMatch(html, /Robin Voorbeeld|Adviseur|info@example.nl|www.example.nl/);
         assert.match(html, /class="detail-mail-contact-value detail-mail-contact-address"[^>]*><div>Voorbeeldstraat 48<\/div><div>1234 AB Voorbeeld<\/div>/);
         assert.doesNotMatch(html, /Print deze|geadresseerde|ontleend|BeantwoordenDoorsturen/);
       }
