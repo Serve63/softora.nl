@@ -62,6 +62,9 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
       async getStatus() {
         return { ok: true, enabled: true };
       },
+      async getUploadCapacity() {
+        return { ok: true, exact: true, total: 17, campaigns: { serve: { available: 9 }, martijn: { available: 8 } } };
+      },
     },
     instantlyQueueRegistrationService: {
       async registerBatch(input) {
@@ -78,11 +81,13 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   const syncRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-sync');
   const uploadRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-upload');
   const statusRoute = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-status');
+  const capacityRoute = routes.find(([method, path]) => method === 'GET' && path === '/api/outreach/provider-capacity');
   const queueRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-queue/register');
   const designStageRoute = routes.find(([method, path]) => method === 'POST' && path === '/api/outreach/provider-queue/stage-designs');
   assert.ok(syncRoute, 'safe sync alias should be registered');
   assert.ok(uploadRoute, 'safe upload alias should be registered');
   assert.ok(statusRoute, 'safe status alias should be registered');
+  assert.ok(capacityRoute, 'read-only exact capacity route should be registered');
   assert.ok(queueRoute, 'safe queue registration route should be registered');
   assert.ok(designStageRoute, 'safe queue design staging route should be registered');
 
@@ -204,7 +209,14 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.deepEqual(designStageInput.emails, ['info@voorbeeld.nl']);
   assert.equal(designStageInput.refreshInventory, true);
   assert.equal(designStageInput.actor, 'serve@softora.nl');
-  assert.equal(adminChecks, 6);
+  const capacityResponse = createResponseRecorder();
+  const capacityRequest = {};
+  capacityRoute[2][0](capacityRequest, capacityResponse, () => {});
+  await capacityRoute[2][1](capacityRequest, capacityResponse);
+  assert.equal(capacityResponse.statusCode, 200);
+  assert.equal(capacityResponse.body.exact, true);
+  assert.deepEqual(capacityResponse.body.campaigns, { serve: { available: 9 }, martijn: { available: 8 } });
+  assert.equal(adminChecks, 7);
 });
 
 test('automatic Instantly cron authenticates GET and delegates additions to canonical POST', async () => {

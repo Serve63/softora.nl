@@ -54,7 +54,8 @@ function createInstantlyAutoUpload(deps = {}) {
     listCampaignLeads,
     addCampaignLeads,
     activateCampaign,
-    createError = (message, code, status = 400) => Object.assign(new Error(message), { code, status }),
+    removeMailReadyCustomer = async () => {},
+    createError = (message, code, status = 400, details = {}) => Object.assign(new Error(message), { code, status, ...details }),
   } = deps;
 
   function assertApprovedCampaign(owner) {
@@ -65,6 +66,18 @@ function createInstantlyAutoUpload(deps = {}) {
       throw createError('De twee goedgekeurde Instantly-campagnes zijn niet exact gekoppeld.', 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH', 503);
     }
     return approved;
+  }
+
+  function assertAutoReady() {
+    if (!config.enabled) {
+      throw createError('Instantly-integratie staat niet veilig aan.', 'INSTANTLY_AUTO_INTEGRATION_DISABLED', 503);
+    }
+    if (!config.autoUploadEnabled) {
+      throw createError('Instantly automatische upload staat niet veilig aan.', 'INSTANTLY_AUTO_DISABLED', 503);
+    }
+    if (!config.apiKey) {
+      throw createError('Instantly API-configuratie ontbreekt.', 'INSTANTLY_AUTO_API_KEY_MISSING', 503);
+    }
   }
 
   async function readApprovedCampaign(owner) {
@@ -107,16 +120,138 @@ function createInstantlyAutoUpload(deps = {}) {
     return null;
   }
 
+  function getRemoteLeadPayload(lead) {
+    if (!lead || typeof lead !== 'object') return {};
+    const payload = lead.payload && typeof lead.payload === 'object' ? lead.payload : {};
+    const customVariables = lead.custom_variables && typeof lead.custom_variables === 'object'
+      ? lead.custom_variables
+      : {};
+    return { ...customVariables, ...payload };
+  }
+
+  function getRemoteLeadId(lead) {
+    return text(lead && (lead.id || lead.lead_id || lead.instantly_lead_id));
+  }
+
+  function getRemoteLeadEmail(lead) {
+    const payload = getRemoteLeadPayload(lead);
+    return text(lead && (lead.email || lead.contact || lead.lead_email || payload.email)).toLowerCase();
+  }
+
+  function getRemoteCustomerId(lead) {
+    const payload = getRemoteLeadPayload(lead);
+    return text(payload.softora_customer_id || payload.softoraCustomerId || payload.customer_id || payload.customerId);
+  }
+
+  function getRemoteUploadId(lead) {
+    const payload = getRemoteLeadPayload(lead);
+    return text(payload.softora_instantly_upload_id || payload.softoraInstantlyUploadId);
+  }
+
+  async function persistLinkedRow(row, actor) {
+    if (!row || typeof persistSingleRow !== 'function') return false;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        if (await persistSingleRow(row, { source: 'instantly-auto-upload-linked', actor, upsertOnly: true })) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  async function recoverAcceptedLeadLink(rows, actor, at) {
+    const pending = (Array.isArray(rows) ? rows : []).find((row) =>
+      text(row && row.instantlyManualUploadId).startsWith('instantly-auto-') &&
+      text(row && row.instantlyStatus).toLowerCase() === 'queued' &&
+      !text(row && row.instantlyLeadId) &&
+      !text(row && (row.instantlyEmailSentAt || row.lastInstantlySentAt || row.instantlySentAt))
+    );
+    if (!pending) return null;
+
+    const owner = ['serve', 'martijn'].find((key) => APPROVED_CAMPAIGNS[key].id === text(pending.instantlyCampaignId));
+    if (!owner) {
+      throw createError('Lokale Instantly-wachtrij verwijst niet naar een goedgekeurde campagne.',
+        'INSTANTLY_AUTO_PENDING_CAMPAIGN_MISMATCH', 503);
+    }
+    const { approved } = await readApprovedCampaign(owner);
+    const remoteLeads = await listCampaignLeads(approved.id, 10000);
+    const uploadId = text(pending.instantlyManualUploadId);
+    const customerId = text(pending.id || pending.customerId || pending.databaseId);
+    const email = text(pending.email || pending.contactEmail).toLowerCase();
+    const matches = (Array.isArray(remoteLeads) ? remoteLeads : []).filter((lead) => {
+      const identityMatches = getRemoteUploadId(lead) === uploadId ||
+        (customerId && getRemoteCustomerId(lead) === customerId);
+      return Boolean(getRemoteLeadId(lead) && email && getRemoteLeadEmail(lead) === email && identityMatches);
+    });
+    if (matches.length !== 1) {
+      throw createError(
+        matches.length
+          ? 'Meer dan één Instantly-lead past bij de lokale wachtrij; herstel is veilig gestopt.'
+          : 'De provideracceptatie kon nog niet exact aan de lokale wachtrij worden gekoppeld.',
+        matches.length ? 'INSTANTLY_AUTO_REMOTE_LINK_AMBIGUOUS' : 'INSTANTLY_AUTO_REMOTE_LINK_NOT_FOUND',
+        502,
+        { campaignId: approved.id, customerId, uploadId, email, matches: matches.length }
+      );
+    }
+    const leadId = getRemoteLeadId(matches[0]);
+    const linkedRow = { ...pending, instantlyLeadId: leadId, instantlyStatus: 'synced',
+      lastColdmailProviderStatus: 'synced', instantlyLastEventAt: at, updatedAt: at };
+    if (!(await persistLinkedRow(linkedRow, actor))) {
+      throw createError('Bestaande Instantly-lead is gevonden, maar de lokale herkoppeling faalde.',
+        'INSTANTLY_AUTO_LOCAL_RECOVERY_LINK_FAILED', 502,
+        { campaignId: approved.id, customerId, uploadId, email, leadId });
+    }
+    await removeMailReadyCustomer(customerId);
+    return { owner, campaignId: approved.id, customerId, uploadId, leadId };
+  }
+
+  async function getCapacity() {
+    assertAutoReady();
+    assertApprovedCampaign('serve');
+    assertApprovedCampaign('martijn');
+    const at = now().toISOString();
+    const loaded = await loadRows();
+    const rows = Array.isArray(loaded && loaded.rows) ? loaded.rows : [];
+    const context = await loadContext(rows, null, { autoMailReadyOnly: true });
+    const selected = await collectEligibleRows(rows, Math.max(1, rows.length), context);
+    const availableByOwner = { serve: 0, martijn: 0 };
+    let unresolvedSender = 0;
+    for (const item of selected.selectedRows || []) {
+      const resolved = resolveInstantlyDesignOwner(item.row, getReadyPhoto(item, context));
+      if (resolved.owner && Object.hasOwn(availableByOwner, resolved.owner)) availableByOwner[resolved.owner] += 1;
+      else unresolvedSender += 1;
+    }
+    const campaignStates = await Promise.all(['serve', 'martijn'].map(readApprovedCampaign));
+    const today = formatDateKeyForTimeZone(at, config.dailyCapTimeZone);
+    const syncedToday = rows.filter((row) =>
+      formatDateKeyForTimeZone(row && row.instantlySyncedAt, config.dailyCapTimeZone) === today
+    ).length;
+    const remainingToday = Math.max(0, Number(config.dailyCap || 0) - syncedToday);
+    const total = availableByOwner.serve + availableByOwner.martijn;
+    return {
+      ok: true,
+      exact: true,
+      total,
+      syncedToday,
+      dailyCap: Number(config.dailyCap || 0),
+      remainingToday,
+      uploadableToday: Math.min(total, remainingToday),
+      unresolvedSender,
+      campaigns: Object.fromEntries(['serve', 'martijn'].map((owner, index) => [owner, {
+        id: APPROVED_CAMPAIGNS[owner].id,
+        name: APPROVED_CAMPAIGNS[owner].name,
+        status: campaignStates[index].status,
+        available: availableByOwner[owner],
+      }])),
+      checkedRows: rows.length,
+      rejectedBySafetyChecks: Array.isArray(selected.failed) ? selected.failed.length : 0,
+      generatedAt: at,
+    };
+  }
+
   async function run(input = {}) {
-    if (!config.enabled) {
-      throw createError('Instantly-integratie staat niet veilig aan.', 'INSTANTLY_AUTO_INTEGRATION_DISABLED', 503);
-    }
-    if (!config.autoUploadEnabled) {
-      throw createError('Instantly automatische upload staat niet veilig aan.', 'INSTANTLY_AUTO_DISABLED', 503);
-    }
-    if (!config.apiKey) {
-      throw createError('Instantly API-configuratie ontbreekt.', 'INSTANTLY_AUTO_API_KEY_MISSING', 503);
-    }
+    assertAutoReady();
     // Never use the destructive campaign-replacement operation or an unchecked CSV import.
     assertApprovedCampaign('serve');
     assertApprovedCampaign('martijn');
@@ -124,6 +259,10 @@ function createInstantlyAutoUpload(deps = {}) {
     const at = now().toISOString();
     const loaded = await loadRows();
     const rows = Array.isArray(loaded && loaded.rows) ? loaded.rows : [];
+    const recoveredLink = await recoverAcceptedLeadLink(rows, actor, at);
+    if (recoveredLink) {
+      return { ok: true, skipped: true, reason: 'accepted_lead_linked', ...recoveredLink, finishedAt: at };
+    }
     // A provider-accepted lead must not remain stranded if a previous activation
     // failed. Resume only an exact approved Completed campaign, never a paused one.
     const recovered = await recoverAcceptedLeadCampaign(rows);
@@ -236,6 +375,7 @@ function createInstantlyAutoUpload(deps = {}) {
       await releaseProvisional(reservation.reservationId);
       throw createError('Centrale guard kon niet definitief worden bevestigd; er is niets geüpload.', 'INSTANTLY_AUTO_GUARD_CONFIRM_FAILED', 502);
     }
+    await removeMailReadyCustomer(item.id);
 
     // An ambiguous provider response is never retried automatically: the permanent
     // recipient guards protect against a duplicate even when Instantly did create it.
@@ -247,35 +387,19 @@ function createInstantlyAutoUpload(deps = {}) {
       throw createError('Instantly bevestigde niet exact één nieuwe lead; guards blijven staan.', 'INSTANTLY_AUTO_PROVIDER_PARTIAL_UPLOAD', 502);
     }
 
-    const fresh = await loadRows();
-    const freshRows = Array.isArray(fresh && fresh.rows) ? fresh.rows : [];
-    const linkTarget = freshRows.find((row) =>
-      text(row && row.instantlyManualUploadId) === uploadId &&
-      text(row && (row.email || row.contactEmail)).toLowerCase() === text(lead.email).toLowerCase());
-    // The provider already accepted the lead, so the permanent guards intentionally stay.
-    // The local link is a small single-row upsert with retries, never a full replace.
-    let linked = false;
-    if (linkTarget) {
-      const linkedRow = { ...linkTarget, instantlyLeadId: text(createdLead.id), instantlyStatus: 'synced',
-        lastColdmailProviderStatus: 'synced', instantlyLastEventAt: at, updatedAt: at };
-      for (let attempt = 0; attempt < 3 && !linked; attempt += 1) {
-        try {
-          linked = typeof persistSingleRow === 'function'
-            ? Boolean(await persistSingleRow(linkedRow, { source: 'instantly-auto-upload-linked', actor, upsertOnly: true }))
-            : Boolean(await persistRows(fresh, freshRows.map((row) => (row === linkTarget ? linkedRow : row)), { source: 'instantly-auto-upload-linked', actor }));
-        } catch (_) {
-          linked = false;
-        }
-      }
-    }
+    const linkedRow = { ...preparedSingle, instantlyLeadId: text(createdLead.id), instantlyStatus: 'synced',
+      lastColdmailProviderStatus: 'synced', instantlyLastEventAt: at, updatedAt: at };
+    const linked = await persistLinkedRow(linkedRow, actor);
     if (!linked) {
-      throw createError('Instantly accepteerde de lead, maar de lokale lead-koppeling faalde; guards blijven staan.', 'INSTANTLY_AUTO_LOCAL_LINK_FAILED', 502);
+      throw createError('Instantly accepteerde de lead, maar de lokale lead-koppeling faalde; guards blijven staan.',
+        'INSTANTLY_AUTO_LOCAL_LINK_FAILED', 502,
+        { campaignId: approved.id, customerId: item.id, uploadId, email: lead.email, leadId: text(createdLead.id) });
     }
 
     return { ok: true, uploaded: 1, activated, owner, campaignId: approved.id, finishedAt: at };
   }
 
-  return { run };
+  return { getCapacity, run };
 }
 
 module.exports = { APPROVED_CAMPAIGNS, createInstantlyAutoUpload, formatDateKeyForTimeZone, isDesignedInstantlyRow };

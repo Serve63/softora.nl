@@ -269,6 +269,29 @@ function registerInstantlyRoutes(app, deps = {}) {
     }
   }
 
+  async function handleCapacity(_req, res) {
+    try {
+      if (typeof instantlyOutreachService.getUploadCapacity !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'INSTANTLY_CAPACITY_UNAVAILABLE',
+          message: 'Exacte Instantly-uploadcapaciteit is niet beschikbaar.',
+        });
+        return;
+      }
+      res.json(await instantlyOutreachService.getUploadCapacity());
+    } catch (error) {
+      res.status(error && error.status ? error.status : 502).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'INSTANTLY_CAPACITY_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Exacte Instantly-uploadcapaciteit kon niet worden berekend.',
+          500
+        ),
+      });
+    }
+  }
+
   app.post('/api/instantly/webhook', async (req, res) => {
     try {
       if (typeof instantlyOutreachService.handleInstantlyWebhook !== 'function') {
@@ -313,6 +336,7 @@ function registerInstantlyRoutes(app, deps = {}) {
 
   app.get('/api/instantly/status', requirePremiumAdminApiAccess, handleStatus);
   app.get('/api/outreach/provider-status', requirePremiumAdminApiAccess, handleStatus);
+  app.get('/api/outreach/provider-capacity', requirePremiumAdminApiAccess, handleCapacity);
 }
 
 module.exports = {

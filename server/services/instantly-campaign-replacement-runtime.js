@@ -22,12 +22,13 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     outboundRecipientGuardStore,
     saveLegacyGuards,
     markPreparedRows,
+    removeMailReadyCustomer,
     campaignApi,
     normalizeString,
   } = deps;
   const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
 
-  const loadRows = async () => {
+  const loadRowsOnce = async () => {
       const state = await getUiStateValues(customerDbScope, {
         // Auto-upload must read the current durable customer rows. A stale
         // cache can hide a newly prepared design, while the read cooldown
@@ -39,6 +40,17 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
       const values = state && typeof state.values === 'object' ? state.values : {};
       return { state, values, rows: parseRows(values, customerDbKey, normalizeString) };
     };
+  const loadRows = async () => {
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await loadRowsOnce();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  };
   const persistRows = async (loaded, rows, meta) =>
     setUiStateValues(customerDbScope, buildRowsStateValues(loaded && loaded.values, rows, customerDbKey), meta);
   const persistSingleRow = async (singleRow, meta) => {
@@ -95,9 +107,10 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     persistSingleRow,
     releaseReservation,
     listCampaignLeads: campaignApi.listCampaignLeads,
+    removeMailReadyCustomer,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, source: 'instantly-auto-upload' }),
   });
-  return { ...replacement, autoUpload: automatic.run };
+  return { ...replacement, autoUpload: automatic.run, getUploadCapacity: automatic.getCapacity };
 }
 
 module.exports = { createInstantlyCampaignReplacementRuntime };

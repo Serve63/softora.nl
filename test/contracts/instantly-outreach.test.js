@@ -174,6 +174,7 @@ function createService(overrides = {}) {
   const uiStateReads = [];
   const writes = [];
   const outboundGuardCalls = [];
+  let customerReadCount = 0;
   const defaultOutboundRecipientGuardStore = {
     findRecipientConflict: async () => null,
     reserveRecipients: async (items, options) => {
@@ -232,6 +233,7 @@ function createService(overrides = {}) {
       overrides.outboundRecipientGuardStore === undefined
         ? defaultOutboundRecipientGuardStore
         : overrides.outboundRecipientGuardStore,
+    mailReadySnapshotService: overrides.mailReadySnapshotService,
     dataOpsStore: overrides.dataOpsStore,
     getUiStateValues: async (scope, options) => {
       uiStateReads.push({ scope, options });
@@ -269,6 +271,14 @@ function createService(overrides = {}) {
         return {
           values: scopeValues.get(scope),
         };
+      }
+      if (scope === 'premium_customers_database') {
+        customerReadCount += 1;
+        if (Number(overrides.failCustomerReadsFrom || 0) > 0 && customerReadCount >= Number(overrides.failCustomerReadsFrom)) {
+          const error = new Error('DataOps page timeout');
+          error.code = 'DATA_OPS_FEATURE_UI_STATE_TIMEOUT';
+          throw error;
+        }
       }
       return {
         values: customerValues,
@@ -339,6 +349,7 @@ function createService(overrides = {}) {
     publicImageFetchCalls,
     uiStateReads,
     outboundGuardCalls,
+    getCustomerReadCount: () => customerReadCount,
     getRows: () => rows,
     writes,
   };
@@ -2948,4 +2959,99 @@ test('automatic upload persists the local queue as a single-row upsert instead o
   assert.equal(harness.getRows().length, 2);
   assert.equal(harness.getRows().find((row) => row.id === 'untouched').instantlyManualUploadId, undefined);
   assert.ok(harness.getRows().find((row) => row.id === 'instantly-single').instantlyManualUploadId.startsWith('instantly-auto-'));
+});
+
+test('automatic upload links the accepted provider lead without rereading every DataOps page', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const removed = [];
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    failCustomerReadsFrom: 2,
+    mailReadySnapshotService: { async removeCustomers(ids) { removed.push(...ids); return true; } },
+    rows: [{ id: 'no-reread', bedrijf: 'Geen Herlezing BV', email: 'info@geen-herlezing.test', website: 'https://geen-herlezing.test', mail: true, verantwoordelijk: 'Serve' }],
+    photoMap: { 'no-reread': { id: 'no-reread', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    fetchJsonWithTimeout: async (url) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } };
+      if (url.endsWith('/leads/add')) return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'accepted-without-reread', email: 'info@geen-herlezing.test', index: 0 }] } };
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+
+  assert.equal(result.uploaded, 1);
+  assert.equal(harness.getCustomerReadCount(), 1, 'no full customer reread may happen after provider acceptance');
+  assert.equal(harness.getRows()[0].instantlyLeadId, 'accepted-without-reread');
+  assert.equal(harness.getRows()[0].instantlyStatus, 'synced');
+  assert.deepEqual(removed, ['no-reread']);
+});
+
+test('automatic upload recovers an accepted queued lead by exact remote identity without adding it twice', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const uploadId = 'instantly-auto-20260921T083006-serve';
+  const removed = [];
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    mailReadySnapshotService: { async removeCustomers(ids) { removed.push(...ids); return true; } },
+    rows: [{
+      id: 'instantly_queue_gitz', bedrijf: 'Gitz Gifts', email: 'info@gitzgifts.nl', verantwoordelijk: 'Serve',
+      instantlyCampaignId: campaigns.serve, instantlyManualUploadId: uploadId, instantlyStatus: 'queued',
+      instantlySyncedAt: '2026-09-21T08:30:06.000Z', lastColdmailProvider: 'instantly',
+    }],
+    remoteInstantlyLeads: [{
+      id: 'remote-gitz-lead', email: 'info@gitzgifts.nl',
+      payload: { softora_customer_id: 'instantly_queue_gitz', softora_instantly_upload_id: uploadId },
+    }],
+    fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } }
+      : { response: { ok: true, status: 200 }, data: {} },
+  });
+
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+
+  assert.equal(result.reason, 'accepted_lead_linked');
+  assert.equal(result.leadId, 'remote-gitz-lead');
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+  assert.equal(harness.getRows()[0].instantlyLeadId, 'remote-gitz-lead');
+  assert.equal(harness.getRows()[0].instantlyStatus, 'synced');
+  assert.deepEqual(removed, ['instantly_queue_gitz']);
+});
+
+test('exact Instantly capacity uses upload safety gates and design-owner campaign routing', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const rows = [
+    { id: 'serve-ready', bedrijf: 'Serve Klaar', email: 'info@serve-klaar.test', website: 'https://serve-klaar.test', mail: true, verantwoordelijk: 'Serve' },
+    { id: 'martijn-ready', bedrijf: 'Martijn Klaar', email: 'info@martijn-klaar.test', website: 'https://martijn-klaar.test', mail: true, verantwoordelijk: 'Martijn' },
+    { id: 'personal-blocked', bedrijf: 'Persoonlijk', email: 'persoonlijk@gmail.com', website: 'https://persoonlijk.test', mail: true, verantwoordelijk: 'Serve' },
+    { id: 'dns-blocked', bedrijf: 'Geen MX', email: 'info@geen-mx.test', website: 'https://geen-mx.test', mail: true, verantwoordelijk: 'Martijn' },
+  ];
+  const photoMap = Object.fromEntries(rows.map((row) => [row.id, {
+    id: row.id, websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly',
+  }]));
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows,
+    photoMap,
+    invalidDomains: ['geen-mx.test'],
+    fetchJsonWithTimeout: async (url) => ({
+      response: { ok: true, status: 200 },
+      data: {
+        name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl' : 'Servé Creusen Softora.nl',
+        status: 2,
+      },
+    }),
+  });
+
+  const capacity = await harness.service.getUploadCapacity();
+
+  assert.equal(capacity.exact, true);
+  assert.equal(capacity.total, 2);
+  assert.equal(capacity.campaigns.serve.available, 1);
+  assert.equal(capacity.campaigns.martijn.available, 1);
+  assert.equal(capacity.campaigns.serve.status, 2);
+  assert.equal(capacity.campaigns.martijn.status, 2);
+  assert.equal(capacity.rejectedBySafetyChecks, 2);
 });
