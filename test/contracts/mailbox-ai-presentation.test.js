@@ -2,13 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const contract = require('../../assets/premium-mailbox-ai-presentation');
-const { buildSource, buildRequest, createMailboxAiClassifier } = require('../../server/services/mailbox-ai-classifier');
+const { buildSource, buildRequest, createMailboxAiClassifier, CLASSIFICATION_TIMEOUT_MS, RESERVATION_MICRO_USD } = require('../../server/services/mailbox-ai-classifier');
 const { createMailboxAiPresentations } = require('../../server/services/mailbox-ai-presentations');
 const { createMailboxMessageResponse } = require('../../server/services/mailbox-message-response');
 const { create: createRefresh } = require('../../assets/premium-mailbox-ai-refresh');
 const body = 'Goedemorgen,\nDe offerte bedraagt EUR 1.250. Zie https://example.nl/offerte\nMet vriendelijke groet, cordiali saluti,\nRobin Voorbeeld | Voorbeeldbedrijf\nT +31 6 12345678 <tel:+31612345678>\nScheepersdijk 48\n5062 ED Oisterwijk\nPrint deze mail alleen indien nodig.\nMorgen om 10 uur past voor mij.\n> Vorige reactie';
 const decision = { labels: ['authored','authored','signature','signature','signature','signature','signature','signature','authored','quote'],
   contacts: [{ line: 4, kind: 'phone', text: '+31 6 12345678' }, { line: 5, kind: 'address', text: 'Scheepersdijk 48' }, { line: 6, kind: 'address', text: '5062 ED Oisterwijk' }] };
+const selection = (value) => ({ signatureLines: value.labels.flatMap((label, i) => label === 'signature' ? [i] : []), contacts: value.contacts });
 const message = { id: 'inbox:1', messageKey: 'account:inbox:1', body, accountEmail: 'owner@example.nl', email: 'robin@example.nl', from: 'Robin', folder: 'inbox' };
 const ready = { ...message, aiPresentation: { version: contract.VERSION, model: contract.MODEL, reasoningEffort: 'max', status: 'ready', sourceBody: body, decision } };
 test('offline decision fixture keeps original authored text and only literal sender contacts; root/thread agree', () => {
@@ -43,6 +44,8 @@ test('provider contract pins Luna/max, strict structured output and refuses unbo
   const source = buildSource(message), request = buildRequest(source);
   assert.equal(request.model, 'gpt-5.6-luna'); assert.equal(request.reasoning.effort, 'max'); assert.equal(request.store, false);
   assert.equal(request.text.format.strict, true); assert.equal(request.tools, undefined);
+  assert.equal(request.max_output_tokens, 16384);
+  assert.ok(2 * (100000 * 0.25 + request.max_output_tokens * 1.2) < RESERVATION_MICRO_USD);
   assert.notEqual(source.id, buildSource({ ...message, accountEmail: 'other@example.nl' }).id);
   assert.notEqual(source.id, buildSource({ ...message, body: body + '\nnew' }).id);
   assert.equal(buildSource({ ...message, direction: 'sent' }), null);
@@ -50,10 +53,11 @@ test('provider contract pins Luna/max, strict structured output and refuses unbo
   assert.equal(buildSource({ ...message, bodyTruncated: true }), null);
   let calls = 0;
   const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async (url, init) => {
-    calls++; assert.equal(url, 'https://api.openai.com/v1/responses'); assert.deepEqual(JSON.parse(init.body), request);
-    return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(decision) }] }] }) };
+    calls++; assert.equal(url, 'https://api.openai.com/v1/responses'); if (calls === 1) assert.deepEqual(JSON.parse(init.body), request);
+    const value = calls === 1 ? selection(decision) : { safeToRemove: decision.labels.flatMap((label, i) => label === 'signature' ? [i] : []) };
+    return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(value) }] }] }) };
   } });
-  assert.deepEqual((await classifier.classify(source)).decision, decision); assert.equal(calls, 1);
+  assert.deepEqual((await classifier.classify(source)).decision, { ...decision, labels: decision.labels.map((label) => label === 'quote' ? 'authored' : label) }); assert.equal(calls, 2);
 });
 test('provider timeout, refusal, malformed JSON and incomplete output never retry', async () => {
   for (const result of [null, { status: 'incomplete' }, { status: 'completed', output: [{ type: 'message', content: [{ type: 'refusal' }] }] },
@@ -61,6 +65,81 @@ test('provider timeout, refusal, malformed JSON and incomplete output never retr
     let calls = 0;
     const classifier = createMailboxAiClassifier({ getApiKey: () => 'secret', fetchImpl: async () => { calls++; if (!result) throw new Error('timeout'); return { ok: true, json: async () => result }; } });
     await assert.rejects(classifier.classify(buildSource(message))); assert.equal(calls, 1);
+  }
+});
+test('background classification allows slow max reasoning within the worker runtime without retrying', async (t) => {
+  let calls = 0; const noFooter = { labels: decision.labels.map(() => 'authored'), contacts: [] };
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  t.mock.method(AbortSignal, 'timeout', (ms) => {
+    assert.equal(ms, 120000); const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error('deadline')), ms); return controller.signal;
+  });
+  const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async (_url, init) => {
+    calls++; assert.equal(init.signal.aborted, false);
+    await new Promise((resolve, reject) => {
+      setTimeout(resolve, 60000); init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+    });
+    return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(selection(noFooter)) }] }] }) };
+  } });
+  const pending = classifier.classify(buildSource(message)); t.mock.timers.tick(60000);
+  assert.deepEqual((await pending).decision, noFooter); assert.equal(calls, 1);
+  const config = JSON.parse(fs.readFileSync(require.resolve('../../vercel.json'), 'utf8'));
+  assert.ok(4 * CLASSIFICATION_TIMEOUT_MS + 30000 < config.functions['api/[...path].js'].maxDuration * 1000);
+});
+test('aborting a pending provider request preserves source through the worker fallback and never retries', async () => {
+  let calls = 0;
+  const keepAlive = setTimeout(() => {}, 1000);
+  try {
+    const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', timeoutMs: 5,
+      fetchImpl: async (_url, init) => { calls++; return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+      }); } });
+    await assert.rejects(classifier.classify(buildSource(message)), { name: 'TimeoutError' });
+    assert.equal(calls, 1); assert.equal(contract.read({ ...message, aiPresentation: { status: 'unavailable' } }).body, body);
+  } finally { clearTimeout(keepAlive); }
+});
+test('forwarded signature removal retains provenance and substantive quotes, without third-party contact cards', () => {
+  const source = 'Please use these requirements.\nFrom: Alex <alex@example.org>\n> Deliver on Friday.\n> Best regards,\n> Alex\n> Tel: 06 98 76 54 32';
+  const classified = { labels: ['authored', 'uncertain', 'quote', 'signature', 'signature', 'signature'], contacts: [] };
+  const result = contract.read({ body: source, aiPresentation: { ...ready.aiPresentation, sourceBody: source, decision: classified } });
+  assert.equal(result.body, source.split('\n').slice(0, 3).join('\n'));
+  assert.deepEqual(result.contact, { beforeLines: [], addressLines: [] });
+});
+test('removal review can only restore candidate text; it cannot delete additional lines or duplicate restored contacts', async () => {
+  const sample = 'Gebruik deze voorbeeldhandtekening:\nGroeten,\nSam\nTel: 06 12 34 56 78\nDit hele blok hoort bij mijn verzoek.\nGroet,\nRobin';
+  const proposed = { labels: ['authored','signature','signature','signature','authored','signature','signature'], contacts: [{ line: 3, kind: 'phone', text: '06 12 34 56 78' }] };
+  let calls = 0;
+  const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async (_url, init) => {
+    calls++; const request = JSON.parse(init.body);
+    assert.equal(request.model, contract.MODEL); assert.equal(request.reasoning.effort, 'max'); assert.equal(request.store, false);
+    if (calls === 2) assert.deepEqual(JSON.parse(request.input).candidates, [1,2,3,5,6]);
+    return { ok: true, json: async () => ({ status: 'completed', usage: { input_tokens: 10, output_tokens: 20 },
+      output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(calls === 1 ? selection(proposed) : { safeToRemove: [5,6] }) }] }] }) };
+  } });
+  const result = await classifier.classify(buildSource({ ...message, body: sample }));
+  assert.equal(calls, 2); assert.deepEqual(result.usage, { inputTokens: 20, outputTokens: 40 });
+  assert.equal(contract.read({ body: sample, aiPresentation: { ...ready.aiPresentation, sourceBody: sample, decision: result.decision } }).body, sample.split('\n').slice(0,5).join('\n'));
+  assert.deepEqual(result.decision.contacts, []); assert.deepEqual(proposed.contacts, [{ line: 3, kind: 'phone', text: '06 12 34 56 78' }]);
+  const { applyRemovalReview } = require('../../server/services/mailbox-ai-removal-review');
+  for (const safeToRemove of [[0], [99], [-1], [1,1], ['1'], null]) assert.throws(() => applyRemovalReview(proposed, { safeToRemove }), /INVALID_REVIEW/);
+});
+test('failed second review never releases an unreviewed first selection or starts a third paid request', async () => {
+  let calls = 0;
+  const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async () => {
+    calls++; if (calls === 2) throw new Error('review unavailable');
+    return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(selection(decision)) }] }] }) };
+  } });
+  await assert.rejects(classifier.classify(buildSource(message)), /review unavailable/); assert.equal(calls, 2);
+});
+test('selection indices retain original positions across blank lines and reject invalid removals before review', async () => {
+  const source = buildSource({ ...message, body: 'Hoi,\n\nEen inhoudelijk verzoek.\n\nRobin' });
+  assert.deepEqual(JSON.parse(buildRequest(source).input).lines.map((row) => row.line), [0,2,4]);
+  for (const signatureLines of [[1], [5], [-1], [4,4], ['4']]) {
+    let calls = 0;
+    const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async () => {
+      calls++; return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ signatureLines, contacts: [] }) }] }] }) };
+    } });
+    await assert.rejects(classifier.classify(source), /MAILBOX_AI_INVALID_RESULT/); assert.equal(calls, 1);
   }
 });
 test('feature is dormant by default; reads never call model; nested current messages share source-safe result', async () => {
@@ -82,11 +161,12 @@ test('storage failures and oversized inputs preserve original rather than fallin
   for (const mail of result) assert.equal(contract.read(mail).body, mail.body);
 });
 test('worker never calls model without durable budget claim and does not retry a failed call', async () => {
-  let calls = 0, claims = 0, finished = 0;
-  const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, getOpenAiApiKey: () => 'secret', logger: { warn() {} },
+  let calls = 0, claims = 0, finished = 0; const warnings = [];
+  const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, getOpenAiApiKey: () => 'secret', logger: { warn(...args) { warnings.push(args); } },
     repository: { candidates: async () => [], enqueue: async () => [], claim: async () => ++claims === 1 ? { source: buildSource(message) } : null,
-      finish: async (_job, result) => { finished++; assert.equal(result, null); } }, classifier: { classify: async () => { calls++; throw new Error('timeout'); } } });
+      finish: async (_job, result) => { finished++; assert.equal(result, null); } }, classifier: { classify: async () => { calls++; throw new Error('private provider content'); } } });
   assert.deepEqual(await service.processQueue(), { processed: 1 }); assert.equal(calls, 1); assert.equal(finished, 1);
+  assert.equal(warnings[0][1].code, 'MAILBOX_AI_REQUEST_FAILED'); assert.doesNotMatch(JSON.stringify(warnings), /private provider content/);
   await service.processQueue(); assert.equal(calls, 1);
 });
 test('detail handler preserves canonical body, applies account scope and excludes source HTML', async () => {
@@ -117,9 +197,9 @@ test('SQL migration actually fences access, reserves budget before claims and pr
     const claim = "select * from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
     assert.equal((await db.query(claim)).rows.length, 0);
     await db.exec("set role anon"); await assert.rejects(db.query(claim), /permission denied/); await assert.rejects(db.query('select * from softora_mailbox_ai_presentations'), /permission denied/);
-    await db.exec("reset role; update softora_mailbox_ai_budget set approved_micro_usd=50000; set role service_role");
+    await db.exec("reset role; update softora_mailbox_ai_budget set approved_micro_usd=100000; set role service_role");
     const results = await Promise.all([db.query(claim), db.query(claim)]); assert.equal(results.reduce((n,r) => n+r.rows.length,0), 1);
-    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd), 50000);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd), 100000);
     assert.equal((await db.query(claim)).rows.length, 0);
   } finally { await db.close(); }
 });

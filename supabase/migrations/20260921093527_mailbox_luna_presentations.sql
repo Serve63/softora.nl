@@ -33,12 +33,12 @@ declare budget public.softora_mailbox_ai_budget; job public.softora_mailbox_ai_p
 begin
   if p_token is null then return; end if;
   select * into budget from public.softora_mailbox_ai_budget where id = 'mailbox-luna-v1' for update;
-  if not found or budget.approved_micro_usd - budget.reserved_micro_usd < 50000 then return; end if;
+  if not found or budget.approved_micro_usd - budget.reserved_micro_usd < 100000 then return; end if;
   select * into job from public.softora_mailbox_ai_presentations
     where status = 'queued' and version = 'mailbox-luna-v1' order by created_at, id limit 1 for update skip locked;
   if not found then return; end if;
-  -- Reserve conservatively BEFORE the external request; failures are not refunded or auto-retried.
-  update public.softora_mailbox_ai_budget set reserved_micro_usd = reserved_micro_usd + 50000 where id = budget.id;
+  -- Reserve both selection and removal review BEFORE any request; failures are not refunded or retried.
+  update public.softora_mailbox_ai_budget set reserved_micro_usd = reserved_micro_usd + 100000 where id = budget.id;
   return query update public.softora_mailbox_ai_presentations
     set status = 'running', claim_token = p_token, started_at = now() where id = job.id returning *;
 end;

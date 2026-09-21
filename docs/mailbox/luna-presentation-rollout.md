@@ -1,8 +1,14 @@
 # Mailbox Luna presentation — activation gate
 
-Status: disabled by default. Three real-model evaluation rounds (100 attempts) are complete; the second exposed unsafe quote-label deletion. The renderer now retains quote-labelled content and isolated internal signature labels. Recorded-output replay preserves authored content in all twenty second-round cases, but this is not universal accuracy or live acceptance. See `luna-evaluation-20260921.md`.
+Status: disabled by default, production budget zero. Real evaluation found that both prompt-only
+selection and quote-label deletion can lose meaningful content. Selection now proposes footer
+indices only; a second Luna review can only restore candidate lines, never delete additional
+content. See `luna-evaluation-20260921.md` for the successive failures and evaluations.
 
-The model selects source lines, never rewrites the canonical body. Only literal phone/address
+The model proposes original nonempty footer-line indices, never rewrites the canonical body.
+Blank lines and unselected content stay unchanged; a separate review must confirm removals.
+The review can restore text and removes contact-card entries for restored lines. Invalid or
+unavailable review results preserve the entire original, never the unreviewed first result. Only literal phone/address
 substrings of signature lines enter Softora contact fields. Uncertain lines remain visible.
 Invalid, incomplete, refused, unavailable, oversized or stale results retain the source body.
 Root and timeline rendering bypass legacy cleanup after AI selection. Quote labels cannot delete text. A lone signature-labelled line between retained nonempty lines also remains visible as an ambiguous boundary. This may retain extra old quote text or an isolated footer line, deliberately preferring context preservation.
@@ -17,10 +23,13 @@ OpenAI model is unchanged. GET `/api/mailbox/presentation/process` requires the 
 Reads enqueue/cache only; a background worker classifies at most two jobs per invocation.
 No model call occurs without an atomic reservation from the persisted lifetime budget.
 
-Every claim reserves USD 0.05 conservatively before any external request. The request caps
-serialized input at 100 KB and total output/reasoning at 8192 tokens. This bound uses the
+Every claim reserves USD 0.10 conservatively for both requests before any external request.
+Each request caps serialized input at 100 KB and total output/reasoning at 16384 tokens.
+The second request runs only when valid removal candidates exist. Each has a 120-second
+deadline; four requests across two jobs plus storage overhead fit the configured 800-second
+function limit. Longer reasoning does not block mailbox reads or trigger automatic retries. This bound uses the
 verified Luna standard input/output rates of USD 0.20/1.20 per million tokens; recheck official
-pricing before activation or a model/version change. No fallback, automatic retry, credit
+pricing before activation or a model/version change. No provider fallback, automatic retry, credit
 purchase, refund or budget increase exists. Concurrent workers share the same locked budget.
 A crash after claim leaves the job running, preserves its reservation and displays the original;
 manual investigation is required, never an automatic replay of an uncertain paid request.

@@ -58,7 +58,11 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
         if (!job) break; // Includes exhausted/unapproved lifetime budget.
         let result = null;
         try { result = await classifier.classify(job.source); }
-        catch (_) { logger.warn?.('[MailboxAI] Classification failed; original body retained, no automatic retry.'); }
+        catch (error) {
+          const code = /^MAILBOX_AI_[A-Z_]+$/.test(error?.message) ? error.message
+            : error?.name === 'TimeoutError' ? 'MAILBOX_AI_TIMEOUT' : 'MAILBOX_AI_REQUEST_FAILED';
+          logger.warn?.('[MailboxAI] Classification failed; original body retained, no automatic retry.', { code });
+        }
         await repository.finish(job, result);
         processed += 1;
       }

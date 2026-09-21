@@ -143,3 +143,93 @@ production mailbox sample. No production activation, migration or processing-bud
 has occurred. `verify:critical` passed again after these tests. Next release gate remains
 cleanup/availability review and authenticated end-to-end proof; retaining all expected text
 in this suite must not be presented as universal future accuracy.
+
+
+## Follow-up: structural failures and revised selection
+
+Round 4 ran 76 real requests: 38 constructed cases twice each. All returned HTTP 200;
+two footer-only cases intentionally fell back. Original expected body lines were retained in
+74/76, **not 76/76**: both repeats of a complete signature supplied as publication copy lost
+the four sample lines. Earlier residual French/forwarded/requested-disclaimer signoffs were
+cleaned, but the new loss blocks activation. A preliminary progress claim of no lost text was
+corrected after inspecting the complete results. Known conservative usage for this round was
+USD 0.052296, bringing its carried-forward total to USD 0.302296.
+
+Round 5 tested two actual incoming messages from a previously reported conversation, three
+times each, without writing model results to the mailbox. Four of the six requests exhausted
+the 8192-output/reasoning limit and returned incomplete output. They preserved the original;
+this is a processing failure, not successful cleanup. All HTTP statuses were 200. One of the
+successful requests needed 33.8 seconds. Conservative usage was USD 0.049260; with rounded
+prior accounting the round ended at USD 0.352260. No raw production message is committed.
+
+Round 6 simplified content-versus-history classification and increased the output/reasoning
+cap to 16384, keeping Luna/max and a 120-second request deadline. There were 82 requests:
+76 constructed-message repetitions plus the same six real-message repetitions. All returned
+HTTP 200, with no provider timeout or output-limit failure; two footer-only cases intentionally
+fell back. All originally required lines were retained. All six real-message results retained
+required content and selected the expected current-sender phone; the slowest took 93.651 seconds.
+This demonstrates a case that the previous 45-second deadline would terminate, not guaranteed
+provider availability. The round accounted for USD 0.088022; rounded cumulative accounting was
+USD 0.443022. All these rounds were one-pass candidates, not the final two-pass implementation.
+
+A stricter review also found that quoted address lines can be wrongly treated as a footer even
+when the surrounding message asks the recipient to use those details. Earlier fixture labels
+classified that entire history block as removable. The next evaluation explicitly strengthens
+content-retention expectations for those address lines, inline quoted questions and attribution;
+it must not be compared to earlier full-cleanup percentages as an unchanged benchmark.
+
+### Final architecture under evaluation
+
+Selection now returns **only footer indices**, rather than a label for every line including blanks.
+Unselected lines stay visible by construction. This avoids unnecessary history classification
+and position-counting output. A second Luna/max request sees the original nonempty lines and
+candidate indices and must confirm safe removals. It may only restore candidate lines; unknown,
+out-of-range or duplicate indices invalidate the review. Restored contacts stay in the original
+text and are not duplicated into a signature card. Failure of either stage retains the source.
+This remains probabilistic review by the same model, not a proof of universal semantic accuracy.
+
+The atomic production reservation is now USD 0.10 for up to two bounded requests per job;
+initial approved budget remains zero. Both calls use the same 100 KB / 16384-token bounds,
+120-second deadline, strict output and no automatic retry. No environment flag, production
+budget, migration or deployment has been changed.
+
+
+### Two-pass evaluation and remaining limitation
+
+Round 7 evaluated 43 messages using 80 API requests (review is skipped when no valid footer
+candidates exist). Expectations were declared before the calls. Quoted contact details,
+inline questions and attribution were explicitly required to remain. **40/43** met all cleanup
+expectations; all 43 retained required content and expected contacts. Three retained unnecessary
+footer text: a signoff after requested disclaimer copy, office availability in an identity block,
+and a quoted sender footer. Both actual messages passed in both repetitions. Root/thread body
+output agreed for every case and source data was unchanged. Accounting reached USD 0.487252.
+
+After clarifying the review's distinction between actual office availability and scheduling
+requests, and between quoted requirements and their sender footer, round 8 evaluated 46 messages
+with 85 API requests. It repeated the 43 cases and added three previously unseen holdouts:
+office-hours context, a German forwarded footer, and an English complete signature example.
+
+- **45/46** fully matched the declared expectations, including one intentional footer-only fallback.
+- **46/46** retained every required content line and matched expected signature contacts.
+- No provider timeout, incomplete generation, invalid review or invented contact occurred.
+- Both actual mails passed twice. Their total selection/review times ranged 1.868–32.967 seconds.
+- Root/thread output agreed and canonical source stayed unchanged in all 46 cases.
+- The remaining miss is explicit: `Graag deze exacte tekst toevoegen:` followed by a disclaimer
+  and a closing/name/company block resulted in no proposed removals. That entire passage stayed.
+  This is safe content retention but incomplete cleanup, not a perfect result or a changed expectation.
+
+The last round conservatively accounted for USD 0.047251 on top of USD 0.488 carried forward:
+**USD 0.535251 cumulative** including rounded prior usage and earlier unknown-timeout reservations.
+Across the entire evaluation there have been 429 paid requests (264 through round 6, then 80 and 85).
+No automatic request retry, credit purchase, production classification or activation occurred.
+The two-pass design adds a safeguard, not mathematical certainty: the same model can still
+misunderstand an unknown message. The known ambiguous-footer miss remains visible for rollout review.
+
+The implementation is suitable for a separately approved, bounded live pilot, not an unrestricted
+claim that every existing/future mail is clean. Production backup/migration, protected release,
+explicit production processing budget and authenticated feature-enabled UI proof remain required.
+The browser inspection in this evaluation read source messages from the existing live mailbox;
+it did not run or demonstrate the new feature on production.
+
+Final classifier SHA-256: `6e0f1fbfe210b0f634c96158a43784af1b68e02b49a7beb1fc2f8696e086b611`.
+Removal reviewer SHA-256: `1c86ed5cf8ea136f460b3ecaaed3d7c6955520e273ae608e405460143d7ac6cc`.
