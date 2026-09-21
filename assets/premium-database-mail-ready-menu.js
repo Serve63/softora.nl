@@ -19,40 +19,6 @@
         const options = Array.from(menu.querySelectorAll("[data-mail-ready-status]"));
         const softoraCount = document.getElementById("mailReadySoftoraCount");
         const instantlyCount = document.getElementById("mailReadyInstantlyCount");
-        const instantlyQueuedCount = document.getElementById("instantlyQueuedCount");
-        const instantlyQueuedButton = document.getElementById("instantlyQueuedFilterButton");
-        let remoteQueuedLoaded = false;
-
-        function setQueuedCount(value, campaigns) {
-            if (instantlyQueuedCount) instantlyQueuedCount.textContent = formatCount(value);
-            if (!instantlyQueuedButton) return;
-            const serve = campaigns && campaigns.serve;
-            const martijn = campaigns && campaigns.martijn;
-            const details = serve && martijn
-                ? "Servé " + formatCount(serve.queued) + " · Martijn " + formatCount(martijn.queued)
-                : "Actuele campagnes";
-            const paused = serve && martijn && Number(serve.status) === 2 && Number(martijn.status) === 2;
-            instantlyQueuedButton.title = "Klaargezet in Instantly: " + formatCount(value) + " · " + details + (paused ? " · beide campagnes gepauzeerd" : "");
-            instantlyQueuedButton.setAttribute("aria-label", instantlyQueuedButton.title);
-        }
-
-        async function loadProviderCapacity() {
-            if (!global.fetch) return;
-            try {
-                const response = await global.fetch("/api/outreach/provider-capacity", {
-                    method: "GET",
-                    credentials: "same-origin",
-                    cache: "no-store",
-                    headers: { Accept: "application/json" }
-                });
-                const payload = await response.json().catch(function () { return {}; });
-                if (!response.ok || payload.ok !== true || !Number.isFinite(Number(payload.queuedTotal))) return;
-                remoteQueuedLoaded = true;
-                setQueuedCount(payload.queuedTotal, payload.campaigns);
-            } catch (error) {
-                if (global.console && typeof global.console.warn === "function") global.console.warn("Instantly-campagnetelling kon niet worden geladen.", error);
-            }
-        }
 
         function setOpen(open) {
             if (disclosure) disclosure.open = Boolean(open);
@@ -102,10 +68,8 @@
             const detail = event.detail || {};
             if (softoraCount) softoraCount.textContent = formatCount(detail.softora);
             if (instantlyCount) instantlyCount.textContent = formatCount(detail.instantly);
-            if (!remoteQueuedLoaded) setQueuedCount(detail.queued);
             setSelected(detail.activeStatus);
         });
-        void loadProviderCapacity();
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind, { once: true });
