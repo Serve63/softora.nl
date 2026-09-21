@@ -251,7 +251,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260804a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260908-publish') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260914-provider') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-counts') > asideEnd);
   assert.match(source, /assets\/premium-database-mail-ready-menu\.css\?v=20260914-provider/);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
 });
@@ -1351,7 +1351,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-boot\.js\?v=20260908a/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260908-publish/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260915-manual-instantly/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260921-counts/);
 });
 
 
