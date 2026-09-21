@@ -792,3 +792,30 @@ test('premium auth manager treats bootstrap-backed users as configured auth stat
   assert.equal(resolved.email, 'info@softora.nl');
   assert.equal(resolved.isAdmin, true);
 });
+
+test('mailbox presentation cron reaches its secret guard without a premium session', async () => {
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret', normalizeString, truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    premiumUsersStore: createPremiumUsersStoreStub(), getRequestPathname,
+  });
+  const path = '/api/mailbox/presentation/process';
+  assert.equal(manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: path }), true);
+  assert.equal(manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: path }), false);
+  assert.equal(manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: path + '/extra' }), false);
+  const routes = new Map();
+  let calls = 0;
+  require('../../server/routes/mailbox').registerMailboxRoutes({
+    get(route, ...handlers) { routes.set(route, handlers); }, post() {},
+  }, { cronSecret: 'test-cron-secret', coordinator: {
+    async processAiPresentations() { calls++; return { processed: 0 }; },
+  } });
+  const handlers = routes.get(path);
+  for (const [authorization, expected] of [['', 401], ['Bearer wrong', 401], ['Bearer test-cron-secret', 200]]) {
+    const req = { method: 'GET', originalUrl: path, headers: { authorization } };
+    const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    await handlers[0](req, res, () => handlers[1](req, res));
+    assert.equal(res.statusCode, expected);
+  }
+  assert.equal(calls, 1);
+});
