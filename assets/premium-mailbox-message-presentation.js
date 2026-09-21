@@ -23,6 +23,9 @@
   const registryLine = /^(?:k\.?v\.?k\.?\s*(?:(?:nr|nummer|number)\.?)?|btw\s*(?:(?:nr|nummer|number|id)\.?)?|vat\s*(?:number|no\.?|id)?|chamber of commerce\s*(?:number|no\.?)?)\s*:?\s*[a-z0-9][a-z0-9. /-]*$/i;
   const postcodeLine = /^\d{4}\s?[a-z]{2}\s+\p{L}/iu;
   const streetLine = /^(?:[\p{L}][\p{L} .'’/-]{1,85}\s+\d{1,5}[a-z]?(?:[-/]\d{1,5}[a-z]?)?|postbus\s+\d{1,7})$/iu;
+  const contactView = global.SoftoraMailboxContactView || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-contact-view.js') : null
+  );
 
   function safeWeb(value) {
     const raw = cleanLine(value);
@@ -246,22 +249,15 @@
       if (!tail.some((line) => phoneValue(line) || postcodeLine.test(line) || safeWeb(line) ||
         /^\[[^\]]+\]\(https?:/.test(line))) continue;
       const contact = normalizeSignatureContact({ beforeLines: lines.slice(index, end), addressLines: [] });
-      return { body: [...lines.slice(0, index), ...lines.slice(end)].join('\n').trim(), contact, signatureMatched: true };
+      return { body: [...lines.slice(0, index), ...lines.slice(end)].join('\n').trim(), contact,
+        signatureLines: lines.slice(index, end), signatureMatched: true };
     }
     return null;
   }
 
-  function renderStackedContact(signature, originalContact) {
+  function renderStackedContact(originalContact) {
     // Keep the public contact object source-compatible; normalize only the view.
-    const contact = normalizeSignatureContact(originalContact || {});
-    const html = signature?.renderContactCard?.(contact) || '';
-    const address = contact?.addressLines || [];
-    if (!html || address.length < 2) return html;
-    const escape = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/=/g, '&#61;');
-    const combined = address.map(escape).join(', ');
-    return html.replace(`<dd class="detail-mail-contact-value">${combined}</dd>`,
-      `<dd class="detail-mail-contact-value detail-mail-contact-address" aria-label="${combined}">${address.map((line) => `<div>${escape(line)}</div>`).join('')}</dd>`);
+    return contactView?.renderContactDetails(normalizeSignatureContact(originalContact || {})) || '';
   }
 
   function create(options = {}) {
@@ -369,7 +365,10 @@
       const displayBody = parsedDisplayBody && typeof parsedDisplayBody.authored === 'string'
         ? parsedDisplayBody.authored
         : provenBody;
-      const cleanedBody = hasMessageContext ? cleanClientFooter(displayBody) : displayBody;
+      const noteLines = unmarkedSignature?.signatureLines || parsedSignature?.signatureLines || [];
+      const notes = signatureMatched ? contactView?.authoredNotes(noteLines) || '' : '';
+      const authoredBody = [displayBody, notes].filter(Boolean).join('\n\n');
+      const cleanedBody = hasMessageContext ? cleanClientFooter(authoredBody) : authoredBody;
       const sourceSafeBody = hasMessageContext && presentationOptions.stripDetectedQuotes === true &&
         typeof signature?.formatBodyReferences === 'function'
         ? signature.formatBodyReferences(cleanedBody, body) : cleanedBody;
@@ -400,7 +399,7 @@
             stripDetectedQuotes: !state.sent,
           }));
       const contactHtml = !state.sent && !state.loading && !state.loadError
-        ? renderStackedContact(signature, presentation.contact)
+        ? renderStackedContact(presentation.contact)
         : '';
       return { ...presentation, contactHtml };
     }
@@ -416,7 +415,7 @@
       return {
         ...presentation,
         appendContact(target) {
-          const html = contactInserted ? '' : renderStackedContact(signature, presentation.contact);
+          const html = contactInserted ? '' : renderStackedContact(presentation.contact);
           if (!html || !Array.isArray(target)) return false;
           target.push(html);
           contactInserted = true;

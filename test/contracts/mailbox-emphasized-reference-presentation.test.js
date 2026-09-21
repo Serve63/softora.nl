@@ -41,10 +41,10 @@ test('embedded marketing response preserves authored emphasis and PDF citation, 
     assert.match(result.html, /href="https:\/\/example.nl\/kleuren.pdf"[^>]*>\[2\]<\/a>/);
     assert.match(result.html, /We komen op de lijn\.<\/em>/);
     assert.doesNotMatch(result.html, /Links:|------|booking|Instagram|LinkedIn|reservering|_Beste|_Het|ontwerp"/);
-    for (const value of ['Jamie Voorbeeld', 'Hotel Voorbeeld', 'tel:0131234567', 'Dorpsstraat 2-1', '1234 AB Voorbeeldstad', 'href="https://www.example.nl/"']) {
+    for (const value of ['tel:0131234567', 'Dorpsstraat 2-1', '1234 AB Voorbeeldstad']) {
       assert.ok(result.contactHtml.includes(value), value);
     }
-    assert.doesNotMatch(DomUtils.textContent(parseDocument(result.contactHtml)), /[_*]|Links:|booking|Instagram|LinkedIn|reservering|\[\d+\]/);
+    assert.doesNotMatch(DomUtils.textContent(parseDocument(result.contactHtml)), /Jamie Voorbeeld|Hotel Voorbeeld|example.nl|[_*]|Links:|booking|Instagram|LinkedIn|reservering|\[\d+\]/);
   }
 });
 

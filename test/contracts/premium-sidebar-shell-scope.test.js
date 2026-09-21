@@ -846,9 +846,10 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.doesNotMatch(pageSource, /\.detail-more/);
   assert.match(pageSource, /\.detail-reply \{[^}]*border:\s*1px solid rgba\(155,35,85,\.34\);[^}]*border-radius:\s*6px;[^}]*padding:\s*8px 14px;/);
   assert.match(pageSource, /\.detail-footer \{[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*0;/);
-  assert.match(pageSource, /\.detail-mail-contact-item \{[^}]*display:\s*flex;[^}]*gap:\s*0 \.35em;/);
-  assert.match(pageSource, /\.detail-mail-contact-item:has\(> \.detail-mail-contact-address\) \{\s*display:\s*block;\s*\}/);
-  assert.match(pageSource, /assets\/premium-mailbox-message-presentation\.js\?v=20260921a/);
+  assert.match(pageSource, /\.detail-mail-contact-item \{[^}]*display:\s*block;/);
+  assert.match(pageSource, /\.detail-mail-contact-grid \{[^}]*gap:\s*10px;/);
+  assert.match(pageSource, /assets\/premium-mailbox-contact-view\.js\?v=20260921b/);
+  assert.match(pageSource, /assets\/premium-mailbox-message-presentation\.js\?v=20260921b/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(pageSource, /id="compose-attachment-dropzone" role="group" aria-label="Bijlagen toevoegen: kies bestanden of sleep ze hierheen"/);
   assert.match(pageSource, /\.compose-attachment-row\.is-dragover \{[^}]*box-shadow:\s*inset 0 0 0 2px/);
@@ -857,7 +858,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-compose-no-drag aria-label="Sluiten"/);
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
-  assert.match(pageSource, /assets\/premium-mailbox-signature\.js\?v=20260910b/);
+  assert.match(pageSource, /assets\/premium-mailbox-signature\.js\?v=20260921b/);
   const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20260908a');
   assert.doesNotMatch(pageSource, /<button[^>]+(?:spellcheck-compose|undo-spelling)/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);

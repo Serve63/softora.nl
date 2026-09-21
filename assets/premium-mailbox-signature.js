@@ -627,6 +627,7 @@
         (index < signatureStart || index >= signatureEnd) && !removedDefinitions.has(index)
       ))),
       contact: extractContact(signatureLines, messageContext, references),
+      signatureLines: signatureLines.slice(),
       matched: true,
     };
   }
