@@ -1077,6 +1077,111 @@ test('ui-state store can isolate critical reads through REST-first scoped option
   });
 });
 
+test('coldmail send guard prefers the healthy Supabase client row over stale REST chunk metadata', async () => {
+  const { RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE, RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE } = require('../../server/services/ui-seo-runtime');
+  const healthyGuard = JSON.stringify({
+    entries: [{ recipientEmail: 'healthy@example.test' }],
+    recipientEntries: [{ recipientEmail: 'healthy@example.test', provider: 'instantly' }],
+  });
+  const client = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  return {
+                    data: {
+                      payload: { values: { [COLDMAIL_SEND_GUARD_KEY]: healthyGuard } },
+                      updated_at: '2026-09-21T14:30:00.000Z',
+                    },
+                    error: null,
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { restReads, store } = createFixture({
+    client,
+    uiStateReadTimeoutMsByScope: RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
+    uiStateReadOptionsByScope: RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE,
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: {
+          values: {
+            [COLDMAIL_SEND_GUARD_KEY]: JSON.stringify({
+              storageFormat: 'softora-coldmail-send-guard-chunks-v1',
+              chunkKeys: ['softora_coldmail_send_guard_v1_chunk_0'],
+            }),
+          },
+        },
+      },
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_coldmail_send_guard');
+
+  assert.equal(RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE.premium_coldmail_send_guard.preferSupabaseRestRead, false);
+  assert.equal(RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE.premium_coldmail_autopilot.preferSupabaseRestRead, true);
+  assert.equal(restReads.length, 0);
+  assert.equal(state.values[COLDMAIL_SEND_GUARD_KEY], healthyGuard);
+  assert.equal(state.updatedAt, '2026-09-21T14:30:00.000Z');
+});
+
+test('coldmail send guard falls back to REST when the preferred Supabase client read fails', async () => {
+  const { RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE, RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE } = require('../../server/services/ui-seo-runtime');
+  const fallbackGuard = JSON.stringify({
+    entries: [{ recipientEmail: 'fallback@example.test' }],
+    recipientEntries: [{ recipientEmail: 'fallback@example.test', provider: 'instantly' }],
+  });
+  const client = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  throw new Error('client read unavailable');
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { restReads, store } = createFixture({
+    client,
+    uiStateReadTimeoutMsByScope: RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
+    uiStateReadOptionsByScope: RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE,
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: { values: { [COLDMAIL_SEND_GUARD_KEY]: fallbackGuard } },
+        updated_at: '2026-09-21T14:31:00.000Z',
+      },
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_coldmail_send_guard');
+
+  assert.equal(restReads.length, 1);
+  assert.deepEqual(restReads[0].requestOptions, {
+    timeoutMs: 25000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  });
+  assert.equal(state.values[COLDMAIL_SEND_GUARD_KEY], fallbackGuard);
+  assert.equal(state.updatedAt, '2026-09-21T14:31:00.000Z');
+});
+
 test('ui-state store treats a missing REST-first row as valid empty Supabase state', async () => {
   const { store } = createFixture({
     uiStateReadTimeoutMsByScope: {
@@ -1116,7 +1221,7 @@ test('ui-seo runtime keeps durable state reads critical and isolated by default'
   assert.match(source, /premium_database_photos:\s*12000/);
   assert.match(source, /legacyContactMergeEnabled:\s*true/);
   assert.match(source, /legacyReadTimeoutMs:\s*2500/);
-  assert.match(source, /preferSupabaseRestRead:\s*true/);
+  assert.match(source, /preferSupabaseRestRead:\s*scope !== 'premium_coldmail_send_guard'/);
   assert.match(source, /ignoreSupabaseRestFailureCooldown:\s*true/);
   assert.match(source, /suppressSupabaseRestFailureCooldown:\s*true/);
 });

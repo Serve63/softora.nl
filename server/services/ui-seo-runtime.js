@@ -27,7 +27,7 @@ const RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE = Object.freeze(
     Object.keys(RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE).map((scope) => [
       scope,
       Object.freeze({
-        preferSupabaseRestRead: true,
+        preferSupabaseRestRead: scope !== 'premium_coldmail_send_guard',
         ignoreSupabaseRestFailureCooldown: true,
         suppressSupabaseRestFailureCooldown: true,
         ...(scope === 'premium_mailbox_preferences' ? {
