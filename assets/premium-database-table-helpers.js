@@ -63,5 +63,13 @@
     return { hasMore, summary: hasMore ? "Toont " + rendered.toLocaleString("nl-NL") + " van " + total.toLocaleString("nl-NL") : "" };
   }
 
-  return { getLoadMoreState, getNextVisibleLimit, getVisibleRows, hasUsedColdCalling, isColdcallingStatusFilter, mapColdCallingOutcomeText, matchesColdcallingStatusFilter };
+  function getPhotoHeaderCount(customers, options) {
+    const rows = customers || [];
+    if (!options.showPhotoColumn) return 0;
+    if (options.activeStatus === "instantly-ready") return rows.length;
+    if (options.activeStatus === "benaderbaar") return options.getMailReadyCount(rows.length);
+    return rows.filter(options.hasPhoto).length;
+  }
+
+  return { getPhotoHeaderCount, getLoadMoreState, getNextVisibleLimit, getVisibleRows, hasUsedColdCalling, isColdcallingStatusFilter, mapColdCallingOutcomeText, matchesColdcallingStatusFilter };
 });

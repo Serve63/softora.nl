@@ -2411,7 +2411,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.isMailReady;/);
   assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
   assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
-  assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, \(customers \|\| \[\]\)\.length\)/);
+  assert.match(pageSource, /getMailReadyCount: function \(fallback\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, fallback\); \}/);
+  assert.match(pageSource, /if \(state\.activeStatus === "benaderbaar"\) state\.lastMailReadyHeaderCount = count;/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto's nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
   assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null, mailReadyStatus = databaseSourceFilter\.getContextualStatusPresentation/);
@@ -4840,7 +4841,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
   assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\)\) return matchesColdcallingStatusFilter\(customer, state\.activeStatus\);/);
   assert.match(pageSource, /return outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\);/);
-  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260605a/);
+  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260921-mailready-header/);
   assert.match(pageSource, /function hasUsedColdCalling\(customer\) \{ return databaseTableHelpers\.hasUsedColdCalling\(customer, getTableHelperOptions\(\)\); \}/);
   assert.match(pageSource, /function matchesColdcallingStatusFilter\(customer, activeStatus\) \{ return databaseTableHelpers\.matchesColdcallingStatusFilter\(customer, activeStatus, getTableHelperOptions\(\)\); \}/);
   assert.match(tableHelpersSource, /function mapColdCallingOutcomeText\(text, helpers\)/);
@@ -5015,23 +5016,21 @@ test('Instantly mail-ready menu and list mirror both current unsent campaigns an
 
 test('Instantly mail-ready column header counts all filtered campaign leads independently of local photos', () => {
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
-  const headerFunction = pageSource.match(/function getPhotoHeaderCount\(customers, showPhotoColumn\) \{[^\n]+/)[0];
-  const state = { activeStatus: 'instantly-ready' };
-  const sandbox = {
-    state,
-    window: { SoftoraDatabaseMailReadySnapshot: { getDisplayCount: () => 151 } },
-    buildCustomerWebdesignAssetState: customer => ({ hasPhoto: Boolean(customer.hasPhoto) }),
+  assert.match(pageSource, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
+  const { getPhotoHeaderCount } = require('../../assets/premium-database-table-helpers.js');
+  const options = {
+    activeStatus: 'instantly-ready', showPhotoColumn: true,
+    getMailReadyCount: () => 151,
+    hasPhoto: customer => Boolean(customer.hasPhoto),
   };
-  vm.runInNewContext(headerFunction, sandbox);
   const leads = Array.from({ length: 64 }, (_, index) => ({ id: `lead-${index}`, hasPhoto: false }));
-  assert.equal(sandbox.getPhotoHeaderCount(leads, true), 64);
-  assert.equal(sandbox.getPhotoHeaderCount(leads.slice(0, 3), true), 3);
-  assert.equal(sandbox.getPhotoHeaderCount([], true), 0);
-  assert.equal(sandbox.getPhotoHeaderCount(leads, false), 0);
-  state.activeStatus = 'benaderbaar';
-  assert.equal(sandbox.getPhotoHeaderCount(leads, true), 151);
-  state.activeStatus = 'beschikbaar';
-  assert.equal(sandbox.getPhotoHeaderCount([{ hasPhoto: true }, { hasPhoto: false }], true), 1);
+  assert.equal(getPhotoHeaderCount(leads, options), 64);
+  assert.equal(getPhotoHeaderCount(leads.slice(0, 3), options), 3);
+  assert.equal(getPhotoHeaderCount([], options), 0);
+  assert.equal(getPhotoHeaderCount(null, options), 0);
+  assert.equal(getPhotoHeaderCount(leads, { ...options, showPhotoColumn: false }), 0);
+  assert.equal(getPhotoHeaderCount(leads, { ...options, activeStatus: 'benaderbaar' }), 151);
+  assert.equal(getPhotoHeaderCount([{ hasPhoto: true }, { hasPhoto: false }], { ...options, activeStatus: 'beschikbaar' }), 1);
 });
 
 test('premium database outreach days column keeps benaderd rows after 25 days', () => {
