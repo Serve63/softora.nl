@@ -185,7 +185,7 @@ test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoploss
   assert.match(source, /data-step="01">Herken je deze situaties\?<\/div>/);
   assert.match(source, /data-step="04">Samen kijken wat makkelijker kan<\/div>/);
 
-  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor het MKB');
+  assert.equal(entry.title, 'Bedrijfssoftware op maat laten maken | Softora');
   assert.match(entry.description, /CRM, planning, offertes of een klantportaal/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
