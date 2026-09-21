@@ -850,6 +850,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-mail-contact-grid \{[^}]*gap:\s*10px;/);
   assert.match(pageSource, /assets\/premium-mailbox-contact-view\.js\?v=20260921b/);
   assert.match(pageSource, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
+  assert.match(pageSource, /assets\/premium-mailbox-ai-presentation\.js\?v=20260921d/);
   assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(pageSource, /id="compose-attachment-dropzone" role="group" aria-label="Bijlagen toevoegen: kies bestanden of sleep ze hierheen"/);
   assert.match(pageSource, /\.compose-attachment-row\.is-dragover \{[^}]*box-shadow:\s*inset 0 0 0 2px/);

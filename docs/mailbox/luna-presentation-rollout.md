@@ -1,11 +1,11 @@
 # Mailbox Luna presentation — activation gate
 
-Status: disabled by default. First real-model evaluation: 19/20 expected outcomes; one retained-forward attribution header was lost. Prompt clarification added, not yet re-evaluated with the real model. See `luna-evaluation-20260921.md`.
+Status: disabled by default. Two real-model evaluation rounds are complete; the second exposed unsafe quote-label deletion. The renderer now retains quote-labelled content and isolated internal signature labels. Recorded-output replay preserves authored content in all twenty second-round cases, but this is not universal accuracy or live acceptance. See `luna-evaluation-20260921.md`.
 
 The model selects source lines, never rewrites the canonical body. Only literal phone/address
 substrings of signature lines enter Softora contact fields. Uncertain lines remain visible.
 Invalid, incomplete, refused, unavailable, oversized or stale results retain the source body.
-Root and timeline rendering bypass legacy cleanup after AI selection.
+Root and timeline rendering bypass legacy cleanup after AI selection. Quote labels cannot delete text. A lone signature-labelled line between retained nonempty lines also remains visible as an ambiguous boundary. This may retain extra old quote text or an isolated footer line, deliberately preferring context preservation.
 
 ## Storage and execution
 

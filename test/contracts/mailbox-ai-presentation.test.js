@@ -18,7 +18,7 @@ test('offline decision fixture keeps original authored text and only literal sen
   const root = presentation.getRootPresentation(body, ready), thread = presentation.getThreadPresentation(ready, ready);
   assert.equal(root.body, thread.body);
   assert.match(root.body, /EUR 1.250/); assert.match(root.body, /Morgen om 10 uur/);
-  assert.doesNotMatch(root.body, /Robin|Print deze|Vorige reactie/);
+  assert.doesNotMatch(root.body, /Robin|Print deze/); assert.match(root.body, /> Vorige reactie/);
   const html = []; root.appendContact(html); root.appendContact(html);
   assert.equal(html.join(''), thread.contactHtml);
   assert.match(html[0], /<div>5062 ED Oisterwijk<\/div>/);
@@ -150,4 +150,34 @@ test('cached reads do not rewrite source or fetch full source payload; inserts a
   const sources = Array.from({ length: 85 }, (_, i) => ({ ...buildSource({ ...message, id: String(i), messageKey: String(i) }), messageKey: String(i) }));
   assert.equal((await repository.enqueue(sources)).length, 85); assert.equal(writes, 3); assert.equal(maxBatch, 40);
   await repository.enqueue(sources); assert.equal(writes, 3);
+});
+test('phone validation accepts Unicode spacing/dashes without changing source contact text', () => {
+  for (const phone of ['06\u00a012\u00a034\u00a056\u00a078', '+31\u202f6\u201112345678', '０６ １２ ３４ ５６ ７８']) {
+    const body = `Ja, dat is akkoord.\n${phone}`;
+    const decision = { labels: ['authored','signature'], contacts: [{ line: 1, kind: 'phone', text: phone }] };
+    assert.equal(contract.validate(body, decision), true);
+    const view = contract.read({ body, aiPresentation: { ...ready.aiPresentation, sourceBody: body, decision } });
+    assert.equal(view.contact.beforeLines[0], `Tel: ${phone}`);
+  }
+  const long = '1234567890123456';
+  assert.equal(contract.validate(`Akkoord\n${long}`, { labels: ['authored','signature'], contacts: [{ line: 1, kind: 'phone', text: long }] }), false);
+});
+
+test('real Luna quote misclassification cannot remove forwarded requirements from root or thread', () => {
+  const source = 'Servé, hieronder staan de eisen van onze klant; verwerk deze allemaal.\n--- Doorgestuurd bericht van Alex ---\nVoor de nieuwe website hebben we drie talen nodig.\nDe eerste oplevering moet uiterlijk 15 oktober plaatsvinden.\nHet formulier moet een veld voor het ordernummer hebben.\nMet vriendelijke groet,\nRobin Voorbeeld';
+  const observed = { labels: ['authored','uncertain','quote','quote','quote','signature','signature'], contacts: [] };
+  const message = { body: source, aiPresentation: { ...ready.aiPresentation, sourceBody: source, decision: observed } };
+  const presentation = require('../../assets/premium-mailbox-message-presentation').create({ isSentMessageByProvenance: () => false });
+  for (const result of [presentation.getRootPresentation(source, message), presentation.getThreadPresentation(message, message)]) {
+    assert.equal(result.body, source.split('\n').slice(0, 5).join('\n'));
+    assert.equal(result.aiManaged, true);
+  }
+  assert.equal(message.body, source);
+});
+
+test('isolated internal signature labels cannot hide contextual attribution between kept paragraphs', () => {
+  const body = 'Hieronder staan de eisen; verwerk ze allemaal.\n--- Bericht van Alex ---\nLever op 15 oktober.\nGroet,\nRobin';
+  const decision = { labels: ['authored','signature','authored','signature','signature'], contacts: [] };
+  const result = contract.read({ body, aiPresentation: { ...ready.aiPresentation, sourceBody: body, decision } });
+  assert.equal(result.body, body.split('\n').slice(0,3).join('\n'));
 });

@@ -5,19 +5,25 @@
   const labels = ['authored', 'signature', 'quote', 'uncertain'];
   const sourceBody = (message) => typeof message?.body === 'string' ? message.body : '';
   const linesOf = (body) => body.split(/\r?\n/);
+  function isPhone(value) {
+    const normalized = value.normalize('NFKC').replace(/\p{Pd}/gu, '-');
+    const match = /^(?:\+|00)?([\d ()./-]{7,40})(?:\s+(?:ext\.?|toestel)\s*\d{1,6})?$/i.exec(normalized);
+    const digits = match ? (match[1].match(/\d/g) || []).length : 0;
+    return digits >= 7 && digits <= 15;
+  }
   function validate(body, decision) {
     const lines = linesOf(body);
     if (!decision || !Array.isArray(decision.labels) || decision.labels.length !== lines.length ||
       decision.labels.some((label) => !labels.includes(label)) || !Array.isArray(decision.contacts) ||
       decision.contacts.length > 40) return false;
     // An empty message after filtering is never accepted as a successful extraction.
-    if (!lines.some((line, i) => line.trim() && ['authored', 'uncertain'].includes(decision.labels[i]))) return false;
+    if (!lines.some((line, i) => line.trim() && ['authored', 'uncertain', 'quote'].includes(decision.labels[i]))) return false;
     return decision.contacts.every((contact) => contact && Number.isInteger(contact.line) &&
       contact.line >= 0 && contact.line < lines.length && decision.labels[contact.line] === 'signature' &&
       ['phone', 'address'].includes(contact.kind) && typeof contact.text === 'string' &&
       contact.text.trim() === contact.text && contact.text.length > 0 && contact.text.length <= 200 &&
       !/[\r\n<>]/.test(contact.text) && lines[contact.line].includes(contact.text) &&
-      (contact.kind !== 'phone' || ((contact.text.match(/\d/g) || []).length >= 7 && /^(?:\+|00)?[\d ()./-]{7,40}(?:\s+(?:ext\.?|toestel)\s*\d{1,6})?$/i.test(contact.text))));
+      (contact.kind !== 'phone' || isPhone(contact.text)));
   }
   function read(message) {
     const value = message?.aiPresentation;
@@ -27,8 +33,19 @@
       value.sourceBody !== body || !validate(body, value.decision)) {
       return { body, contact: { beforeLines: [], addressLines: [] }, signatureMatched: false, aiManaged: true };
     }
-    const kept = linesOf(body).filter((_, index) => ['authored', 'uncertain'].includes(value.decision.labels[index]));
-    const contacts = value.decision.contacts.slice().sort((a, b) => a.line - b.line);
+    // Quote ownership is not evidence that content is irrelevant. Only signature labels may hide source lines.
+    const lines = linesOf(body), labels = value.decision.labels;
+    const visible = new Set(labels.flatMap((label, index) => label !== 'signature' ? [index] : []));
+    const nonempty = lines.flatMap((line, index) => line.trim() ? [index] : []);
+    // A lone supposed signature line between retained content is an ambiguous boundary,
+    // not enough evidence to hide a forwarded attribution or a personal addition.
+    nonempty.forEach((index, position) => {
+      const before = nonempty[position - 1], after = nonempty[position + 1];
+      if (labels[index] === 'signature' && before !== undefined && after !== undefined &&
+        labels[before] !== 'signature' && labels[after] !== 'signature') visible.add(index);
+    });
+    const kept = lines.filter((_, index) => visible.has(index));
+    const contacts = value.decision.contacts.filter((contact) => !visible.has(contact.line)).sort((a, b) => a.line - b.line);
     return { body: kept.join('\n').trim(), aiManaged: true, signatureMatched: true,
       contact: { beforeLines: contacts.filter((c) => c.kind === 'phone').map((c) => `Tel: ${c.text}`),
         addressLines: contacts.filter((c) => c.kind === 'address').map((c) => c.text) } };

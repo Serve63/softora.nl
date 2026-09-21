@@ -1,6 +1,6 @@
 # Luna mailbox evaluation — 2026-09-21
 
-**Not approved for activation.** Twenty real Responses API calls were made with the existing
+**Not approved for activation.** In the first round, twenty real Responses API calls were made with the existing
 Softora development key, `gpt-5.6-luna`, reasoning `max`, strict structured output, and no
 retries. The owner authorized this one-time evaluation with a maximum of USD 1.
 No production mailbox processing, environment changes, migration or deployment was performed.
@@ -60,7 +60,50 @@ The instructions now explicitly preserve attribution/provenance headers belongin
 forwarded content, and only remove an old quote header alongside its removed old content.
 This is a general context-preservation rule, not a sender/company-specific filter.
 
-The modified prompt still requires real-model re-evaluation; the prior 19 passes do not establish
-its quality. The twenty authorized calls are exhausted. Do not run more model calls or enable
-production until the owner authorizes the next concrete action and budget. Offline regression
-checks do not substitute for this re-evaluation.
+The follow-up evaluation below tests that prompt clarification. The first-round passes did not predict universal correctness.
+
+
+## Second round: ten regression cases and ten new cases
+
+A further twenty calls were explicitly approved, with USD 1 as the combined cap for both rounds.
+The model/prompt remained the clarified version from `c1c2fc20`. A Unicode phone-validation fix
+accepts typographic spaces/dashes/full-width digits for validation while preserving the exact
+source contact text. Expectations were defined before execution. New cases include Dutch and
+English forwarded headers, Japanese/Spanish signatures, a personal addition inside an HTML
+signature container, side-by-side signature fields, and authored legal text.
+
+The initial end-to-end expectation score was **16/20**, including one intentional safe fallback:
+
+- Relevant forwarded requirements: three requirement lines labelled `quote` would disappear.
+- Dutch forwarded confirmation: the deadline labelled `quote` would disappear.
+- French signature: `Bien cordialement,` remained labelled `authored`.
+- English forwarded headers: timeout after 45 seconds; the original is retained, no retry made.
+
+This invalidates prompt-only reliance on the `quote` label as deletion evidence. It is not fixed
+by declaring the forwarding cases unimportant or weakening their expected content.
+
+### General safety change and recorded-output replay
+
+Only signature-labelled lines can now be hidden; `quote` lines remain visible. A single supposed
+signature line between retained nonempty content also remains visible. The latter protects the
+first-round lost attribution without a list of company names, languages or header phrases.
+The renderer may consequently retain extra historical text or an ambiguous one-line footer.
+
+Replaying the **same twenty real responses** through the changed shared root/thread presentation
+retained every expected authored line in all twenty cases. Root and thread bodies matched and
+canonical source text remained unchanged. This replay made **zero additional API calls**. The
+specific real quote-misclassification and isolated-header failure are permanent regression tests.
+
+This proves the changed deletion rule against those observed outputs, not perfect model semantics
+or all future inputs. The retained French closing and the model timeout remain limits to cleanup
+quality/availability. The original text is visible on timeout; the failed job is not retried
+without a new budgeted attempt under the existing conservative worker policy.
+
+### Second-round cost evidence
+
+Nineteen responses supplied usage: 12,503 input tokens and 8,306 output tokens. Their estimated
+standard usage cost is USD 0.0124678. The timed-out request has unknown final billed usage;
+its full conservative USD 0.04 reservation remains counted. Combined known token cost for both
+rounds is USD 0.0247832; including that full timeout reservation yields **less than USD 0.065**.
+These are pricing-based estimates/bounds, not invoices. Forty authorized calls were attempted
+in total, with no automatic retry and no production activation.
