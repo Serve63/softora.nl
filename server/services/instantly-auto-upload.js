@@ -1,4 +1,5 @@
 const { resolveInstantlyDesignOwner } = require('./instantly-design-owner');
+const { isRemoteLeadConfirmedSent } = require('./instantly-campaign-replacement');
 
 const APPROVED_CAMPAIGNS = Object.freeze({
   serve: { id: '6ba410c6-d97a-4186-a414-83ba95022b1a', name: 'Servé Creusen Softora.nl' },
@@ -184,12 +185,58 @@ function createInstantlyAutoUpload(deps = {}) {
         (customerId && getRemoteCustomerId(lead) === customerId);
       return Boolean(getRemoteLeadId(lead) && email && getRemoteLeadEmail(lead) === email && identityMatches);
     });
+    if (!matches.length) {
+      const history = Array.isArray(pending.hist) ? pending.hist.filter(Boolean) : [];
+      const failedRow = {
+        ...pending,
+        instantlyLeadId: '',
+        instantlyCampaignId: '',
+        instantlyStatus: 'provider_not_found',
+        instantlySyncedAt: '',
+        instantlyLastEventAt: at,
+        instantlyManualUploadId: '',
+        instantlyManualUploadPreparedAt: '',
+        instantlySenderProfileKey: '',
+        instantlySenderName: '',
+        instantlySenderEmail: '',
+        instantlyPreviousStatus: '',
+        instantlyPreviousDatabaseStatus: '',
+        instantlyProviderRecoveryAt: at,
+        instantlyProviderRecoveryReason: 'provider_lead_not_found',
+        instantlyProviderRecoveryCampaignId: approved.id,
+        instantlyProviderRecoveryUploadId: uploadId,
+        lastColdmailProvider: 'instantly',
+        lastColdmailProviderStatus: 'provider_not_found',
+        updatedAt: at,
+        hist: [{
+          type: 'instantly_niet_geaccepteerd',
+          label: 'Niet aanwezig in Instantly',
+          date: at,
+          actor,
+          source: 'instantly-auto-upload-missing-provider-cleanup',
+          messageKey: `instantly-auto-provider-not-found:${uploadId}:${customerId || email}`,
+          subject: 'Instantly wachtrij hersteld',
+          preview: 'De lokale voorreservering is niet door Instantly geaccepteerd en telt daarom niet meer als klaargezet. De ontvanger-guard blijft fail-closed staan.',
+        }, ...history].slice(0, 50),
+      };
+      if (!(await persistLinkedRow(failedRow, actor))) {
+        throw createError('De niet-geaccepteerde Instantly-voorreservering kon niet worden hersteld.',
+          'INSTANTLY_AUTO_MISSING_PROVIDER_CLEANUP_FAILED', 502,
+          { campaignId: approved.id, customerId, uploadId, email });
+      }
+      return {
+        owner,
+        campaignId: approved.id,
+        customerId,
+        uploadId,
+        email,
+        reason: 'missing_provider_lead_cleared',
+      };
+    }
     if (matches.length !== 1) {
       throw createError(
-        matches.length
-          ? 'Meer dan één Instantly-lead past bij de lokale wachtrij; herstel is veilig gestopt.'
-          : 'De provideracceptatie kon nog niet exact aan de lokale wachtrij worden gekoppeld.',
-        matches.length ? 'INSTANTLY_AUTO_REMOTE_LINK_AMBIGUOUS' : 'INSTANTLY_AUTO_REMOTE_LINK_NOT_FOUND',
+        'Meer dan één Instantly-lead past bij de lokale wachtrij; herstel is veilig gestopt.',
+        'INSTANTLY_AUTO_REMOTE_LINK_AMBIGUOUS',
         502,
         { campaignId: approved.id, customerId, uploadId, email, matches: matches.length }
       );
@@ -223,6 +270,14 @@ function createInstantlyAutoUpload(deps = {}) {
       else unresolvedSender += 1;
     }
     const campaignStates = await Promise.all(['serve', 'martijn'].map(readApprovedCampaign));
+    const campaignLeadLists = await Promise.all(['serve', 'martijn'].map((owner) =>
+      listCampaignLeads(APPROVED_CAMPAIGNS[owner].id, 10000)
+    ));
+    const queuedByOwner = Object.fromEntries(['serve', 'martijn'].map((owner, index) => [
+      owner,
+      (Array.isArray(campaignLeadLists[index]) ? campaignLeadLists[index] : [])
+        .filter((lead) => !isRemoteLeadConfirmedSent(lead)).length,
+    ]));
     const today = formatDateKeyForTimeZone(at, config.dailyCapTimeZone);
     const syncedToday = rows.filter((row) =>
       formatDateKeyForTimeZone(row && row.instantlySyncedAt, config.dailyCapTimeZone) === today
@@ -243,7 +298,9 @@ function createInstantlyAutoUpload(deps = {}) {
         name: APPROVED_CAMPAIGNS[owner].name,
         status: campaignStates[index].status,
         available: availableByOwner[owner],
+        queued: queuedByOwner[owner],
       }])),
+      queuedTotal: queuedByOwner.serve + queuedByOwner.martijn,
       checkedRows: rows.length,
       rejectedBySafetyChecks: Array.isArray(selected.failed) ? selected.failed.length : 0,
       generatedAt: at,

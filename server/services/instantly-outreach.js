@@ -23,6 +23,7 @@ const {
 } = require('./instantly-campaign-replacement');
 const { createInstantlyCampaignReplacementApi } = require('./instantly-campaign-replacement-api');
 const { createInstantlyCampaignReplacementRuntime } = require('./instantly-campaign-replacement-runtime');
+const { countInstantlyProviderQueueRows } = require('./instantly-provider-queue-status');
 const { createInstantlyTargetedPhotoReader } = require('./instantly-targeted-photo-reader');
 const { formatDateKeyForTimeZone, isDesignedInstantlyRow } = require('./instantly-auto-upload');
 const { createInstantlyWebhookState } = require('./instantly-webhook-state');
@@ -169,7 +170,7 @@ const ACTIVE_INSTANTLY_STATUSES = new Set([
   'interested',
   'completed',
 ]);
-const BLOCKING_INSTANTLY_STATUSES = new Set(['bounced', 'unsubscribed', 'blocked']);
+const BLOCKING_INSTANTLY_STATUSES = new Set(['bounced', 'unsubscribed', 'blocked', 'provider_not_found']);
 const PRIOR_COLDMAIL_HISTORY_PATTERN =
   /\b(gemaild|mail verstuurd|mail geopend|mailcontact|coldmail|cold mailing|open tracking|email sent|email opened|reply received|reactie ontvangen)\b/;
 const INSTANTLY_HISTORY_PATTERN = /\b(instantly|instantly sync|instantly webhook|lead via instantly)\b/;
@@ -4457,10 +4458,8 @@ function createInstantlyOutreachService(deps = {}) {
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
-    const activeInstantlyRows = rows.filter((row) => hasActiveInstantlyOutreach(row)).length;
-    const approachedInstantlyRows = rows.filter((row) => isMarkedAsInstantlyApproached(row)).length;
-    const instantlyReadyRows = rows.filter((row) => hasActiveInstantlyOutreach(row) && !isCustomerConfirmedSent(row)).length;
-    const instantlySentRows = rows.filter(isCustomerConfirmedSent).length;
+    const instantlyRowCounts = countInstantlyProviderQueueRows({ rows, campaignIds: Object.values(configuredCampaigns),
+      isActive: hasActiveInstantlyOutreach, isApproached: isMarkedAsInstantlyApproached, isConfirmedSent: isCustomerConfirmedSent });
     const priorColdmailInstantlyRiskRows = getPriorColdmailInstantlyRows(rows).length;
     return {
       ok: true,
@@ -4484,10 +4483,7 @@ function createInstantlyOutreachService(deps = {}) {
       prewarmPublicImageUrls: config.prewarmPublicImageUrls,
       defaultSenderEmail: config.defaultSenderEmail,
       marksSyncedLeadsAsApproached: false,
-      activeInstantlyRows,
-      approachedInstantlyRows,
-      instantlyReadyRows,
-      instantlySentRows,
+      ...instantlyRowCounts,
       replacementCampaignsConfigured: getMissingReplacementCampaigns(configuredCampaigns).length === 0,
       replacementCampaigns: configuredCampaigns,
       priorColdmailInstantlyRiskRows,
