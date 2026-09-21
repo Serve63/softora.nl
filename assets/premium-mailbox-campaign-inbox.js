@@ -761,7 +761,7 @@
       const loadError = String(message && message.bodyLoadError || '').trim();
       const loading = !loadError && isMessageBodyPending(message);
       const sent = isSentMessageByProvenance(message, mail.accountEmail);
-      const { body, contactHtml } = messagePresentation.getThreadPresentation(message, mail, { loading, loadError, sent, escapeHtml });
+      const { body, contactHtml, aiManaged } = messagePresentation.getThreadPresentation(message, mail, { loading, loadError, sent, escapeHtml });
       if (!body && !contactHtml && !loading && !loadError) return '';
       const canonicalTimestamp = [message.receivedAt, message.internalDate]
         .find((value) => Number.isFinite(Date.parse(String(value || '')))) || (
@@ -790,7 +790,7 @@
         : !body
         ? ''
         : typeof options.renderMessageBody === 'function'
-        ? options.renderMessageBody({ message, body, sent })
+        ? options.renderMessageBody({ message, body, sent, aiManaged })
         : `<div class="detail-mail-lines">${body.split('\n').map((line) => {
             const content = String(line || '');
             const emptyClass = content.trim() ? '' : ' detail-mail-line-empty';

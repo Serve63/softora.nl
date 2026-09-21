@@ -59,6 +59,7 @@
     }
   },
   "crons": [
+    { "path": "/api/mailbox/presentation/process", "schedule": "* * * * *" },
     {
       "path": "/api/mailbox/sync",
       "schedule": "*/15 * * * *"

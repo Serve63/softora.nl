@@ -29,7 +29,7 @@
   }
 
   const HYDRATED_MESSAGE_FIELDS = [
-    'body', 'hasBody', 'bodyLoaded', 'bodyLoading', 'bodyLoadError', 'bodyTruncated',
+    'aiPresentation', 'body', 'hasBody', 'bodyLoaded', 'bodyLoading', 'bodyLoadError', 'bodyTruncated',
     'bodyImages', 'bodyImagesTruncated', 'bodyImageEvidenceKnown', 'embeddedImageCount',
     'attachments', 'optOutUrl', 'originalCampaignOutbound', 'webdesignLinkEvidenceKnown',
     'webdesignLinkHydrationAttempted', 'webdesignLinkUrl', 'recipientRoutingEvidenceKnown',

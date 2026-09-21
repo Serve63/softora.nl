@@ -1,3 +1,5 @@
+const { createMailboxAiPresentations } = require('./mailbox-ai-presentations');
+const { createMailboxMessageResponse } = require('./mailbox-message-response');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
@@ -525,7 +527,7 @@ function createMailboxService(deps = {}) {
     mailboxIndexStaleMs = INDEX_STALE_MS,
     mailboxOutreachScope = createMailboxOutreachScope({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, getInstantlyAccounts: (owner) => instantlyMailboxService?.getConfiguredAccounts?.(owner) || [] }),
     mailboxCampaignRepliesService = createMailboxCampaignRepliesService({ mailboxIndexStore, dataOpsStore, mailboxSendProvenanceStore, mailboxOutreachScope, outboundRecipientGuardStore }),
-    mailboxDiscoveryService = createMailboxDiscoveryService({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, mailboxOutreachScope, logger }),
+    mailboxDiscoveryService = createMailboxDiscoveryService({ isSupabaseConfigured, getSupabaseClient, mailboxIndexStore, mailboxOutreachScope, logger, enrichMessages: (messages) => mailboxAiPresentations.enrichTree(messages) }),
   } = deps; const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
       env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
@@ -1763,7 +1765,7 @@ function createMailboxService(deps = {}) {
       recipientRoutingEvidenceKnown: true,
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
-      body: text || preview,
+      body: text || preview, ...(env.MAILBOX_AI_PRESENTATION_ENABLED === 'true' && typeof parsed.html === 'string' ? { sourceHtml: parsed.html.slice(0, 60000) } : {}),
       optOutUrl,
       bodyImages,
       attachments, attachmentEvidenceKnown: true,
@@ -1878,8 +1880,9 @@ function createMailboxService(deps = {}) {
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
   });
+  const mailboxAiPresentations = createMailboxAiPresentations({ env, getOpenAiApiKey, getSupabaseClient, logger });
   const { getInstantlyMessage, getMessageBodiesResponse } = createMailboxMessageBodiesService({
-    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, fetchMessagesFromImap, logger,
+    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, fetchMessagesFromImap, logger, enrichMessages: mailboxAiPresentations.enrich,
   }); const { providerThreadAuditResponse } = createMailboxProviderThreadAuditService({ assertReadableAccount, fetchMessagesFromImap, isValidEmail, logger, mailboxIndexStore });
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);
@@ -2148,7 +2151,7 @@ function createMailboxService(deps = {}) {
       if (Number.isFinite(Number(result.sync?.durationMs))) {
         res.setHeader('Server-Timing', `mailbox;dur=${Number(result.sync.durationMs)}`);
       }
-      return res.status(200).json({ ok: true, messages: result.messages, sync: result.sync });
+      return res.status(200).json({ ok: true, messages: await mailboxAiPresentations.enrichTree(result.messages), sync: result.sync });
     } catch (error) {
       logger.error('[Mailbox][List]', error?.message || error);
       const folder = normalizeFolder(req.query?.folder || 'inbox');
@@ -2161,11 +2164,11 @@ function createMailboxService(deps = {}) {
   }
   async function campaignRepliesResponse(req, res) {
     try {
-      return res.status(200).json(await listCampaignReplies({
+      return res.status(200).json(await mailboxAiPresentations.enrichPayload(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
         owner: normalizeString(req.query?.owner),
         preferSnapshot: /^(1|true|yes)$/i.test(normalizeString(req.query?.preferSnapshot)), refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)), hydrateBodies: !/^(1|true|yes)$/i.test(normalizeString(req.query?.metadataOnly)),
-      }));
+      })));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);
       return res.status(error.status || 500).json({
@@ -2175,23 +2178,7 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-  async function getMessageResponse(req, res) {
-    try {
-      const message = await getMessage({
-        accountEmail: req.query?.account,
-        folder: req.query?.folder || 'inbox',
-        id: req.query?.id || req.query?.message || '',
-      });
-      return res.status(200).json({ ok: true, message });
-    } catch (error) {
-      logger.error('[Mailbox][Message]', error?.message || error);
-      return res.status(error.status || 500).json({
-        ok: false,
-        error: 'Mailboxbericht laden mislukt',
-        detail: String(error?.message || 'Onbekende fout'),
-      });
-    }
-  }
+  const getMessageResponse = createMailboxMessageResponse({ getMessage, enrich: mailboxAiPresentations.enrich, logger });
   async function getMessageImageResponse(req, res) {
     try {
       const imageIndex = Number(req.query?.index);
@@ -2316,6 +2303,7 @@ function createMailboxService(deps = {}) {
     }
   }
   return {
+    processAiPresentations: mailboxAiPresentations.processQueue,
     accountsResponse, attachmentCleanupResponse, attachmentUploadResponse,
     campaignRepliesResponse,
     contactTimelineResponse: mailboxDiscoveryService.contactTimelineResponse,

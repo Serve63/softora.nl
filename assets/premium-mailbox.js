@@ -353,6 +353,7 @@ function buildMailboxBodySections(value) {
   return sections.length ? sections : [{ type: 'body', lines: ['Geen inhoud.'] }];
 }
 function renderMailboxParagraphs(lines, options) {
+  if (options?.aiManaged) return window.SoftoraMailboxAiPresentation.renderBody(lines);
   const renderedLines = [];
   const quoteBody = Boolean(options && options.quoteBody);
   const images = Array.isArray(options && options.images) ? options.images : [];
@@ -455,7 +456,7 @@ function renderMailBody(value, images, options) {
   };
   const copyContext = options && options.mail && options.mail.copyContext;
   const isProvenMailboxCopy = Boolean(copyContext && copyContext.evidenceKnown === true);
-  const rootPresentation = window.SoftoraMailboxCampaignInbox.getRootMessagePresentation(value, options && options.mail); const sections = buildMailboxBodySections(rootPresentation.body).filter((section) => (
+  const rootPresentation = window.SoftoraMailboxCampaignInbox.getRootMessagePresentation(value, options && options.mail); imageState.aiManaged = rootPresentation.aiManaged; const sections = (rootPresentation.aiManaged ? [{ type: 'body', lines: rootPresentation.body.split('\n') }] : buildMailboxBodySections(rootPresentation.body)).filter((section) => (
     !(isProvenMailboxCopy && section && section.type === 'quote') &&
     !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxReplyHeaderLine)
   ));
@@ -743,7 +744,7 @@ function formatMailDate(value, nowValue) {
 }
 function normalizeMailboxApiMessage(message, options = {}) {
   const when = formatMailDate(message.receivedAt || message.date);
-  const body = cleanMailboxText(message.body || '');
+  const body = message.aiPresentation ? String(message.body || '') : cleanMailboxText(message.body || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
   const optOutUrl = normalizeMailboxOptOutUrl(message.optOutUrl);
@@ -1073,6 +1074,7 @@ function bindMailboxActions() {
   });
   mailboxComposeController.bind();
 }
+const mailboxAiRefresh = window.SoftoraMailboxAiRefresh?.create({ getMail: findMailById, getActiveId: () => activeMail, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), openMail });
 bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: (id, loadOptions = {}) => openMail(id, { ...loadOptions, skipReadPersist: true }), openMail });
 mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getMessageOwner: (mail) => window.SoftoraMailboxCampaignInbox.getMessageOwner(mail), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail, resetDetail: resetDetailEmpty });
 mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, initiallyChecking: true, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
@@ -1088,7 +1090,7 @@ mailboxDetailController = window.SoftoraMailboxDetailStability?.createController
   shouldHydrateThread: (mail, openOptions) => !openOptions.skipThreadBodyFetch && activeFolder === 'outreach' && (window.SoftoraMailboxCampaignInbox.isCampaignMail(mail) || mail.contactTimelineLoaded),
   hydrateThread: ({ mail, signal, isCurrent, requestRender }) => window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail: requestRender, isCurrent, signal }),
   prepare: (mail, openOptions) => openOptions.imagesPrepared ? null : window.SoftoraMailboxImages?.prepareForCommit?.(window.SoftoraMailboxImages?.getConversationImages?.(mail) || mail.bodyImages),
-  afterCommit: (mail, { changed }) => { window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: mail.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail }); if (changed) { try { window.dispatchEvent?.(new CustomEvent('softora:mailbox-detail-committed', { detail: { id: String(mail.id || '') } })); } catch (_) {} } },
+  afterCommit: (mail, { changed }) => { mailboxAiRefresh?.watch(mail); window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: mail.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail }); if (changed) { try { window.dispatchEvent?.(new CustomEvent('softora:mailbox-detail-committed', { detail: { id: String(mail.id || '') } })); } catch (_) {} } },
 });
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');

@@ -47,7 +47,7 @@ function createMailboxMessageBodiesService({
   assertMailboxMessageVisible,
   normalizeFolder,
   fetchMessagesFromImap,
-  logger = console,
+  logger = console, enrichMessages = async (messages) => messages,
 } = {}) {
   function normalizeMessageFolder(value) {
     const folder = normalizeText(value).toLowerCase();
@@ -290,7 +290,8 @@ function createMailboxMessageBodiesService({
         bodyResolved: false,
       };
     });
-    return hydrated.map((message) => ({
+    return (await enrichMessages(hydrated)).map((message) => ({
+      ...(message.aiPresentation ? { aiPresentation: message.aiPresentation } : {}),
       id: normalizeText(message && message.id),
       uid: Number(message && message.uid) || 0,
       folder: normalizeMessageFolder(message && message.folder),
