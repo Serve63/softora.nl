@@ -311,10 +311,17 @@ function createService(overrides = {}) {
         if (typeof overrides.onInstantlyLeadList === 'function') {
           overrides.onInstantlyLeadList(url, options, timeoutMs);
         }
+        let campaignId = '';
+        try { campaignId = JSON.parse(options && options.body || '{}').campaign || ''; } catch (_) {}
+        const remoteByCampaign = overrides.remoteInstantlyLeadsByCampaign && typeof overrides.remoteInstantlyLeadsByCampaign === 'object'
+          ? overrides.remoteInstantlyLeadsByCampaign[campaignId]
+          : null;
         return {
           response: { ok: true, status: 200 },
           data: {
-            items: Array.isArray(overrides.remoteInstantlyLeads) ? overrides.remoteInstantlyLeads : [],
+            items: Array.isArray(remoteByCampaign)
+              ? remoteByCampaign
+              : Array.isArray(overrides.remoteInstantlyLeads) ? overrides.remoteInstantlyLeads : [],
             next_starting_after: '',
           },
         };
@@ -3019,6 +3026,38 @@ test('automatic upload recovers an accepted queued lead by exact remote identity
   assert.deepEqual(removed, ['instantly_queue_gitz']);
 });
 
+test('automatic upload clears a stranded local queue mark when the exact lead is absent at Instantly', async () => {
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const uploadId = 'instantly-auto-20260921T090006-serve';
+  const harness = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{
+      id: 'instantly_queue_missing', bedrijf: 'Ontbrekende Providerlead', email: 'info@missing-provider.test', verantwoordelijk: 'Serve',
+      status: 'prospect', instantlyCampaignId: campaigns.serve, instantlyManualUploadId: uploadId,
+      instantlyStatus: 'queued', instantlySyncedAt: '2026-09-21T09:00:06.000Z', lastColdmailProvider: 'instantly',
+    }],
+    remoteInstantlyLeads: [],
+    fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } }
+      : { response: { ok: true, status: 200 }, data: {} },
+  });
+
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+
+  assert.equal(result.reason, 'missing_provider_lead_cleared');
+  assert.equal(result.customerId, 'instantly_queue_missing');
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
+  const row = harness.getRows()[0];
+  assert.equal(row.instantlyCampaignId, '');
+  assert.equal(row.instantlyLeadId, '');
+  assert.equal(row.instantlyManualUploadId, '');
+  assert.equal(row.instantlyStatus, 'provider_not_found');
+  assert.equal(row.lastColdmailProviderStatus, 'provider_not_found');
+  assert.equal(row.instantlyProviderRecoveryReason, 'provider_lead_not_found');
+  assert.match(row.hist[0].preview, /telt daarom niet meer als klaargezet/);
+});
+
 test('exact Instantly capacity uses upload safety gates and design-owner campaign routing', async () => {
   const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
   const rows = [
@@ -3036,6 +3075,16 @@ test('exact Instantly capacity uses upload safety gates and design-owner campaig
     rows,
     photoMap,
     invalidDomains: ['geen-mx.test'],
+    remoteInstantlyLeadsByCampaign: {
+      [campaigns.serve]: [
+        { id: 'serve-waiting-1', email: 'one@serve.test', status: 1 },
+        { id: 'serve-waiting-2', email: 'two@serve.test', status: 1 },
+      ],
+      [campaigns.martijn]: [
+        { id: 'martijn-waiting-1', email: 'one@martijn.test', status: 1 },
+        { id: 'martijn-sent-1', email: 'sent@martijn.test', timestamp_last_contact: '2026-09-21T08:00:00.000Z' },
+      ],
+    },
     fetchJsonWithTimeout: async (url) => ({
       response: { ok: true, status: 200 },
       data: {
@@ -3053,5 +3102,8 @@ test('exact Instantly capacity uses upload safety gates and design-owner campaig
   assert.equal(capacity.campaigns.martijn.available, 1);
   assert.equal(capacity.campaigns.serve.status, 2);
   assert.equal(capacity.campaigns.martijn.status, 2);
+  assert.equal(capacity.campaigns.serve.queued, 2);
+  assert.equal(capacity.campaigns.martijn.queued, 1);
+  assert.equal(capacity.queuedTotal, 3);
   assert.equal(capacity.rejectedBySafetyChecks, 2);
 });
