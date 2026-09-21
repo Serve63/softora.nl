@@ -111,7 +111,7 @@ function createMailboxDiscoveryService(deps = {}) {
     return {
       ok: true,
       query,
-      messages: result.messages,
+      messages: await (deps.enrichMessages || (async (messages) => messages))(result.messages),
       totalCount: result.totalCount,
       nextCursor: nextOffset < result.totalCount ? encodeCursor(nextOffset) : null,
     };
@@ -128,7 +128,7 @@ function createMailboxDiscoveryService(deps = {}) {
     return {
       ok: true,
       contactEmail,
-      messages: result.messages,
+      messages: await (deps.enrichMessages || (async (messages) => messages))(result.messages),
       totalCount: result.totalCount,
       nextCursor: nextOffset < result.totalCount ? encodeCursor(nextOffset) : null,
     };

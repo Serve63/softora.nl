@@ -267,7 +267,9 @@
     const signature = options.signature || global.SoftoraMailboxSignature || (
       typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-signature.js') : null
     );
+    const ai = global.SoftoraMailboxAiPresentation || (typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-ai-presentation') : null);
     function cleanPresentation(presentation) {
+      if (presentation.aiManaged) return presentation;
       const display = options.display || global.SoftoraMailboxDisplay || (
         typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-display.js') : null
       );
@@ -327,6 +329,8 @@
       ) {
         return { body: cleanClientFooter(getSentAuthoredBody(body)), contact: emptyContact(), signatureMatched: false };
       }
+      const classified = ai?.read({ ...message, body });
+      if (classified) return classified;
       const hasMessageContext = Boolean(message && typeof message === 'object' && !Array.isArray(message));
       const parsedSignature = hasMessageContext
         ? signature?.parseIncoming?.(body, message)
@@ -399,7 +403,7 @@
             stripDetectedQuotes: !state.sent,
           }));
       const contactHtml = !state.sent && !state.loading && !state.loadError
-        ? renderStackedContact(presentation.contact)
+        ? (presentation.aiManaged ? ai.renderContact(presentation.contact) : renderStackedContact(presentation.contact))
         : '';
       return { ...presentation, contactHtml };
     }
@@ -415,7 +419,7 @@
       return {
         ...presentation,
         appendContact(target) {
-          const html = contactInserted ? '' : renderStackedContact(presentation.contact);
+          const html = contactInserted ? '' : (presentation.aiManaged ? ai.renderContact(presentation.contact) : renderStackedContact(presentation.contact));
           if (!html || !Array.isArray(target)) return false;
           target.push(html);
           contactInserted = true;
