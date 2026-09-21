@@ -236,6 +236,11 @@ test('runtime ops routes keep their auth boundaries', async () => {
     assert.equal(uiStateResult.body.scope, 'contract_test');
     assert.equal(typeof uiStateResult.body.values, 'object');
   }
+
+  await getProtectedApiExpectation('/api/admin/coldmail-send-guard/storage');
+  await postProtectedApiExpectation('/api/admin/coldmail-send-guard/repair', {
+    confirm: 'repair-coldmail-send-guard-manifest',
+  });
 });
 
 test('sportschool logboek route weigert anonieme reads en writes', async () => {

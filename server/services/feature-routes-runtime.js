@@ -35,6 +35,9 @@ const {
 } = require('../routes/premium-database-mass-research');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
+const {
+  registerColdmailSendGuardRepairRoutes,
+} = require('../routes/coldmail-send-guard-repair');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
 const { registerSeoWriteRoutes } = require('../routes/seo-write');
 const {
@@ -102,6 +105,7 @@ function registerFeatureRoutes(app, deps = {}) {
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
+    coldmailSendGuardRepairService,
     requireRuntimeDebugAccess,
     seoReadCoordinator,
     seoWriteCoordinator,
@@ -325,6 +329,10 @@ function registerFeatureRoutes(app, deps = {}) {
   registerRuntimeDebugOpsRoutes(app, {
     coordinator: runtimeDebugOpsCoordinator,
     requireRuntimeDebugAccess,
+  });
+  registerColdmailSendGuardRepairRoutes(app, {
+    service: coldmailSendGuardRepairService,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerSeoReadRoutes(app, {
     readCoordinator: seoReadCoordinator,
