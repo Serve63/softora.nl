@@ -13,6 +13,7 @@
     function text(value) { return String(value || "").trim(); }
     function status(customer) { return text(customer && (customer.instantlyStatus || customer.lastColdmailProviderStatus)).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""); }
     function hasSignal(customer) { return Boolean(customer) && Boolean(text(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt || (text(customer.lastColdmailProvider).toLowerCase() === "instantly" ? "instantly" : ""))); }
+    function isProviderPrepared(customer) { return Boolean(customer) && Boolean(text(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyManualUploadId || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyStatus)); }
     function isConfirmedSent(customer) { return Boolean(customer) && (Boolean(text(customer.instantlyEmailSentAt || customer.lastInstantlySentAt || customer.instantlySentAt)) || CONFIRMED.has(status(customer))); }
     function hasDesign(customer) { return Boolean(customer && (customer.websitePhotoAssetReady === true || customer.hasPhoto === true || text(customer.websitePhoto)) && (customer.websiteMockupAssetReady === true || customer.hasMockup === true || text(customer.websiteMockup))); }
     function isReady(customer, normalizeDatabaseStatus) {
@@ -28,5 +29,5 @@
         return !FINISHED_DATABASE.has(databaseStatus) && !BLOCKED.has(status(customer)) && READY.has(status(customer));
     }
 
-    return { hasSignal, hasDesign, isConfirmedSent, isReady, isWaitingForDesign, status };
+    return { hasSignal, hasDesign, isConfirmedSent, isProviderPrepared, isReady, isWaitingForDesign, status };
 });

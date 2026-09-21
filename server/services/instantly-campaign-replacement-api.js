@@ -2,10 +2,11 @@ const { getMissingReplacementCampaigns } = require('./instantly-campaign-replace
 
 function createInstantlyCampaignReplacementApi(deps = {}) {
   const { config = {}, fetchJsonWithTimeout, createError, normalizeString = (value) => String(value || '').trim() } = deps;
+  const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
 
   function assertConfigured() {
     if (!config.enabled) throw createError('Instantly is niet ingeschakeld.', 'INSTANTLY_DISABLED', 503);
-    const missing = [!config.apiKey ? 'INSTANTLY_API_KEY' : null, ...getMissingReplacementCampaigns(config.replacementCampaigns).map((owner) => `INSTANTLY_REPLACEMENT_CAMPAIGN_${owner.toUpperCase()}`)].filter(Boolean);
+    const missing = [!config.apiKey ? 'INSTANTLY_API_KEY' : null, ...getMissingReplacementCampaigns(configuredCampaigns).map((owner) => `INSTANTLY_REPLACEMENT_CAMPAIGN_${owner.toUpperCase()}`)].filter(Boolean);
     if (missing.length) throw createError('De Instantly-wachtlijsten van Servé en Martijn zijn nog niet volledig gekoppeld.', 'INSTANTLY_REPLACEMENT_NOT_CONFIGURED', 503, { missing });
   }
 

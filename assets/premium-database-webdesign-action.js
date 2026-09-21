@@ -998,7 +998,7 @@
                     ? "<div class=\"outreach-line\">Handmatig als gemaild via Instantly gemarkeerd</div>"
                     : "<div class=\"outreach-line\">Verstuurd via Instantly</div>";
             }
-            if (isInstantlyReadyCustomer(customer)) return "<div class=\"outreach-line\">Klaargezet voor Instantly</div>";
+            if (isInstantlyReadyCustomer(customer)) return "<div class=\"outreach-line\">" + (global.SoftoraDatabaseInstantlyStatus.isProviderPrepared(customer) ? "Klaargezet voor Instantly" : "Ontwerp klaar voor Instantly") + "</div>";
             if (hasPendingInstantlyQueue(customer)) return "<div class=\"outreach-line\">Geregistreerd voor ontwerp</div>";
             if (!isWebdesignOutreachCustomer(customer) && !(forceOutreachMeta && isTrackedOutreachCustomer(customer))) return "";
             const sentAt = getSentAt(customer);

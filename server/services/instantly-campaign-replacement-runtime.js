@@ -25,6 +25,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     campaignApi,
     normalizeString,
   } = deps;
+  const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
 
   const loadRows = async () => {
       const state = await getUiStateValues(customerDbScope, {
@@ -78,7 +79,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
   };
   const replacement = createInstantlyCampaignReplacement({
     ...shared,
-    campaigns: config.replacementCampaigns,
+    campaigns: configuredCampaigns,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, campaignId: 'serve-martijn', source: 'instantly-campaign-replacement' }),
     releaseReservation,
     listCampaignLeads: campaignApi.listCampaignLeads,

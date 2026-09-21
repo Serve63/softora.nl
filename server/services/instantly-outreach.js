@@ -2074,8 +2074,8 @@ function createInstantlyOutreachService(deps = {}) {
     scheduleTask = (fn, delayMs) => setTimeout(fn, delayMs),
     clearScheduledTask = (timer) => clearTimeout(timer),
   } = deps;
-
   const config = normalizeInstantlyConfig(instantlyConfig);
+  const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
   const loadCustomerPhotoMap = createInstantlyTargetedPhotoReader({ dataOpsStore: deps.dataOpsStore, normalizeString, getExplicitRowId, buildRowIdentityKeys, buildRowIdentityKey, normalizeStoredIdentityKeys, getUiStateValues, customerPhotoScope, customerPhotoKey, parseCustomerPhotoMap, logger }).load;
   const replacementCampaignApi = createInstantlyCampaignReplacementApi({ config, fetchJsonWithTimeout, createError: createInstantlyError, normalizeString });
   const webhookState = createInstantlyWebhookState({ now, defaultCampaignId: config.defaultCampaignId, normalizeString, chooseStatus: chooseInstantlyStatus, buildSenderFields: buildInstantlySenderRowFields, mergeHistory, buildHistoryEntry, truncateText, normalizeContactStatus, canAdvanceContactStatus });
@@ -4424,7 +4424,7 @@ function createInstantlyOutreachService(deps = {}) {
     syncTimer = scheduleTask(() => {
       syncTimer = null;
       nextSyncAt = '';
-      const refresh = getMissingReplacementCampaigns(config.replacementCampaigns).length === 0
+      const refresh = getMissingReplacementCampaigns(configuredCampaigns).length === 0
         ? refreshInstantlyDeliveryStatus({ actor: 'Instantly verzendstatus' })
         : syncInstantlyLeads({ actor: 'Instantly autopilot', reconcileOnly: true });
       void refresh
@@ -4490,8 +4490,8 @@ function createInstantlyOutreachService(deps = {}) {
       approachedInstantlyRows,
       instantlyReadyRows,
       instantlySentRows,
-      replacementCampaignsConfigured: getMissingReplacementCampaigns(config.replacementCampaigns).length === 0,
-      replacementCampaigns: config.replacementCampaigns,
+      replacementCampaignsConfigured: getMissingReplacementCampaigns(configuredCampaigns).length === 0,
+      replacementCampaigns: configuredCampaigns,
       priorColdmailInstantlyRiskRows,
       syncedToday: getDailySyncCount(rows),
       nextSyncAt,

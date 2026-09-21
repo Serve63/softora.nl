@@ -4944,7 +4944,8 @@ test('Instantly separates waiting leads from confirmed deliveries', () => {
   assert.equal(controller.matchesStatusFilter({ id: 'new-design', status: 'prospect', webdesignMailProvider: 'instantly', hasPhoto: true, hasMockup: true }, 'instantly-ready'), true);
   assert.equal(controller.matchesStatusFilter({ id: 'unready', status: 'prospect', lastColdmailProvider: 'instantly', instantlyStatus: 'queued' }, 'instantly-wachtlijst'), true);
   assert.deepEqual(contacts.filter(item => controller.matchesStatusFilter(item, 'instantly-wachtlijst')).map(item => item.id), []);
-  assert.match(controller.renderMeta(contacts[5], true), /Klaargezet voor Instantly/);
+  assert.match(controller.renderMeta(contacts[5], true), /Ontwerp klaar voor Instantly/);
+  assert.match(controller.renderMeta({ ...contacts[5], instantlyCampaignId: 'campaign-1' }, true), /Klaargezet voor Instantly/);
   assert.doesNotMatch(controller.renderMeta(contacts[5], true), /Verstuurd vanaf/);
   assert.match(controller.renderMeta(contacts[8], true), /Geregistreerd voor ontwerp/);
   assert.equal(controller.hasInstantlyOutreachSignal(contacts[8]), false);

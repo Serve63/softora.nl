@@ -298,6 +298,9 @@ function createService(overrides = {}) {
     },
     fetchJsonWithTimeout: async (url, options, timeoutMs) => {
       if (url === 'https://api.instantly.test/api/v2/leads/list') {
+        if (typeof overrides.onInstantlyLeadList === 'function') {
+          overrides.onInstantlyLeadList(url, options, timeoutMs);
+        }
         return {
           response: { ok: true, status: 200 },
           data: {
@@ -2749,6 +2752,28 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
     fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
   });
   assert.equal((await separateApproved.service.autoUploadMailReady()).reason, 'no_mailready_instantly_leads');
+  const deliveryCampaignCalls = [];
+  const deliveryUsesApproved = createService({
+    replacementCampaigns: { serve: 'legacy-serve', martijn: 'legacy-martijn' },
+    autoApprovedCampaigns: approved,
+    rows: [],
+    onInstantlyLeadList: (_url, options) => {
+      deliveryCampaignCalls.push(JSON.parse(options.body).campaign);
+    },
+  });
+  await deliveryUsesApproved.service.refreshInstantlyDeliveryStatus();
+  assert.deepEqual(deliveryCampaignCalls, [approved.serve, approved.martijn]);
+  assert.deepEqual((await deliveryUsesApproved.service.getStatus()).replacementCampaigns, approved);
+  const approvedOnlyCampaignCalls = [];
+  const deliveryUsesApprovedWithoutLegacyReplacement = createService({
+    autoApprovedCampaigns: approved,
+    rows: [],
+    onInstantlyLeadList: (_url, options) => {
+      approvedOnlyCampaignCalls.push(JSON.parse(options.body).campaign);
+    },
+  });
+  await deliveryUsesApprovedWithoutLegacyReplacement.service.refreshInstantlyDeliveryStatus();
+  assert.deepEqual(approvedOnlyCampaignCalls, [approved.serve, approved.martijn]);
   const malformedApproved = createService({
     autoUploadEnabled: true,
     replacementCampaigns: approved,

@@ -491,6 +491,93 @@ test('ui-state store merges live coldmail send guards before saving stale state'
   );
 });
 
+test('ui-state store shards and restores an oversized coldmail send guard without losing recipients', async () => {
+  const existingRecipientEntries = [];
+  let existingRaw = '';
+  for (let index = 0; existingRaw.length < 980000; index += 1) {
+    existingRecipientEntries.push({
+      recipientKey: `email:existing-${index}@example.test`,
+      recipientEmail: `existing-${index}@example.test`,
+      recipientCompany: `Existing Company ${index}`,
+      permanent: true,
+      provider: 'instantly',
+      source: 'instantly-auto-upload',
+      evidence: 'x'.repeat(620),
+    });
+    existingRaw = JSON.stringify({ entries: [], recipientEntries: existingRecipientEntries });
+  }
+  assert.ok(existingRaw.length < 1000000);
+  const incoming = {
+    recipientKey: 'email:new-oversize@example.test',
+    recipientEmail: 'new-oversize@example.test',
+    recipientCompany: 'New Oversize Company',
+    permanent: true,
+    provider: 'instantly',
+    source: 'instantly-auto-upload',
+    evidence: 'y'.repeat(30000),
+  };
+  const upserts = [];
+  const client = {
+    from() {
+      return {
+        select() {
+          return { eq() { return { async maybeSingle() {
+            return { data: { payload: { values: { [COLDMAIL_SEND_GUARD_KEY]: existingRaw } } }, error: null };
+          } }; } };
+        },
+        async upsert(row) {
+          upserts.push(row);
+          return { error: null };
+        },
+      };
+    },
+  };
+  const { store } = createFixture({ client });
+
+  const result = await store.setUiStateValues('premium_coldmail_send_guard', {
+    [COLDMAIL_SEND_GUARD_KEY]: JSON.stringify({ entries: [], recipientEntries: [incoming] }),
+  }, { source: 'instantly-auto-upload' });
+
+  assert.ok(result);
+  assert.equal(upserts.length, 1);
+  const persistedValues = upserts[0].payload.values;
+  const manifest = JSON.parse(persistedValues[COLDMAIL_SEND_GUARD_KEY]);
+  assert.equal(manifest.storageFormat, 'softora-coldmail-send-guard-chunks-v1');
+  assert.ok(manifest.chunkKeys.length > 1);
+  assert.ok(manifest.chunkKeys.every((key) => persistedValues[key].length <= 180000));
+  const saved = JSON.parse(result.values[COLDMAIL_SEND_GUARD_KEY]);
+  assert.equal(saved.recipientEntries.length, existingRecipientEntries.length + 1);
+  assert.ok(saved.recipientEntries.some((entry) => entry.recipientEmail === incoming.recipientEmail));
+  assert.ok(saved.recipientEntries.some((entry) => entry.recipientEmail === 'existing-0@example.test'));
+
+  const reader = createFixture({
+    fetchResult: {
+      ok: true,
+      body: { payload: { values: persistedValues }, updated_at: '2026-09-21T08:00:00.000Z' },
+    },
+  }).store;
+  const restored = await reader.getUiStateValues('premium_coldmail_send_guard', {
+    preferSupabaseRestRead: true,
+  });
+  assert.equal(
+    JSON.parse(restored.values[COLDMAIL_SEND_GUARD_KEY]).recipientEntries.length,
+    existingRecipientEntries.length + 1
+  );
+
+  const incompleteValues = { ...persistedValues };
+  delete incompleteValues[manifest.chunkKeys[0]];
+  const incompleteReader = createFixture({
+    fetchResult: {
+      ok: true,
+      body: { payload: { values: incompleteValues }, updated_at: '2026-09-21T08:00:00.000Z' },
+    },
+  });
+  assert.equal(await incompleteReader.store.getUiStateValues('premium_coldmail_send_guard', {
+    preferSupabaseRestRead: true,
+  }), null);
+  assert.match(String(incompleteReader.loggerErrors[0].join(' ')), /mist 1 opslagchunk/);
+});
+
 test('ui-state store reads values through REST fallback when client read crashes', async () => {
   const crashingClient = {
     from() {
