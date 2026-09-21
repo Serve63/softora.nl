@@ -197,7 +197,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(page, /Coldmail Inbox/);
   assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260910b/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260910b/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921a/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20260909a/);
@@ -223,8 +223,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260905c/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260910b'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260910b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260910b'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260910b') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260910b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921a'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921a') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260907c'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260905b'));
