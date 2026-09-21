@@ -15,8 +15,11 @@
     .toLowerCase().replace(/[^a-z0-9]/g, '');
   const addressKey = (value) => cleanLine(value).toLowerCase().replace(/(\d{4})\s*([a-z]{2})(?=\s|$)/g, '$1$2');
   const emailPattern = /^[\w.!#$%&'*+/=?^`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
-  const disclaimerStart = /^(?:de informatie (?:verzonden|in dit)|de inhoud van dit (?:e-?mail|bericht)|dit e-?mailbericht (?:en|is|kan)|this (?:e-?mail|message|communication)(?: and|,| is| may)|confidentiality (?:notice|disclaimer)|disclaimer\s*:)/i;
-  const legalContinuation = /(?:geadresseerd|bestemd|toestemming|kennisneming|toegestaan|vertrouwelijk|geheimhoud|afzender|e-?mailbericht|bijlagen|ontvanger|verspreid|aansprak|vernietig|verzocht|informeren|confidential|privileged|recipient|intended|disclos|unauthori[sz]ed|distribution|attachment|sender|delete|destroy|received.*error|liability|disseminat|copying|notify)/i;
+  const disclaimerStart = /^(?:de informatie (?:verzonden|in (?:dit|deze))|de inhoud van (?:dit|deze) (?:e-?mail|bericht)|(?:dit|deze) e-?mail(?:bericht)? (?:en|is|kan)|this (?:e-?mail|message|communication)(?: and|,| is| may)|confidentiality (?:notice|disclaimer)|disclaimer\s*:)/i;
+  const legalEvidence = /(?:vertrouwelijk|geheimhoud|bestemd voor de geadresseerde|niet voor u bestemd|niet toegestaan|geen recht(?:en)?|geen aansprakelijkheid|confidential|privileged|intended (?:solely|only)|received.*error|unauthori[sz]ed|prohibited|not permitted|no liability|please (?:notify (?:the sender|us)|delete (?:this|it)|destroy (?:this|it)))/i;
+  const legalSentenceStart = /^(?:(?:indien|als) (?:dit|deze|u|de (?:lezer|ontvanger))|kennisneming door|(?:door ons|wij) wordt|aan (?:de inhoud van )?(?:dit|deze)|if you (?:have )?received|(?:any|unauthori[sz]ed) (?:use|disclos|distribut|copy|disseminat)|please (?:notify|delete|destroy)|we (?:accept|assume) no liability)/i;
+  const printNotice = /^(?:print (?:deze|dit) (?:e-?mail(?:bericht)?|bericht) (?:alleen|uitsluitend) (?:indien|als|wanneer) (?:het|dit|dat) (?:echt )?noodzakelijk is|(?:please )?consider (?:the environment|your environmental responsibility) before printing (?:this (?:e-?mail|message))|(?:please )?only print this (?:e-?mail|message) if necessary)[.!]?$/i;
+  const footerActions = /^(?:beantwoorden\s*(?:[|·]\s*)?doorsturen|reply\s*(?:[|·]\s*)?forward)$/i;
   const registryLine = /^(?:k\.?v\.?k\.?\s*(?:(?:nr|nummer|number)\.?)?|btw\s*(?:(?:nr|nummer|number|id)\.?)?|vat\s*(?:number|no\.?|id)?|chamber of commerce\s*(?:number|no\.?)?)\s*:?\s*[a-z0-9][a-z0-9. /-]*$/i;
   const postcodeLine = /^\d{4}\s?[a-z]{2}\s+\p{L}/iu;
   const streetLine = /^(?:[\p{L}][\p{L} .'’/-]{1,85}\s+\d{1,5}[a-z]?(?:[-/]\d{1,5}[a-z]?)?|postbus\s+\d{1,7})$/iu;
@@ -92,6 +95,60 @@
       }).map(normalizeContactLink).filter(Boolean);
   }
 
+  function cleanFooterRows(sourceRows) {
+    const rows = sourceRows.slice();
+    const kept = [];
+    let inLegal = false;
+    const protectedRow = (row) => phoneValue(row) || streetLine.test(row) || postcodeLine.test(row) ||
+      emailPattern.test(row) || safeWeb(row) || /^\[[^\]]+\]\((?:https?:|mailto:)/i.test(row) ||
+      /^(?:tel(?:efoon)?|phone|mobiel|mobile|fax|adres|address|postcode|plaats|city|land|country|[tmefwi])\s*:/i.test(row) ||
+      /^(?:p\.?s\.?\s*[:.]?|nb\s*:|let op\b|note\s*:|bereikbaar\b|aanwezig\b|graag\b|bel\b|mail\b|stuur\b|please (?:call|send|contact)\b)/i.test(row);
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      if (footerActions.test(row)) continue;
+      if (/^(?:beantwoorden|reply)$/i.test(row) && /^(?:doorsturen|forward)$/i.test(rows[index + 1] || '')) {
+        index += 1;
+        continue;
+      }
+      // Recognize whole sentences across provider line wraps. A continuation
+      // such as "ontleend." need not contain another legal keyword. Never
+      // consume a contact field or a personal note to complete a notice.
+      const preview = rows.slice(index, index + 4).join(' ').replace(/\s+/g, ' ');
+      const startsLegal = disclaimerStart.test(preview);
+      const continuesLegal = inLegal && legalSentenceStart.test(preview);
+      const startsPrint = /^(?:print (?:dit|deze)|(?:please )?(?:consider|only print))\b/i.test(preview);
+      if (!protectedRow(row) && (startsLegal || continuesLegal || startsPrint)) {
+        let end = index;
+        let candidate = row;
+        let sentenceEnd = /[.!?](?=\s|$)/.exec(candidate);
+        while (!sentenceEnd && end + 1 < rows.length && end - index < 24 && candidate.length < 4000) {
+          const next = rows[end + 1];
+          if (protectedRow(next) || footerActions.test(next) || /^[-_=*\s]{3,}$/.test(next)) break;
+          // Unpunctuated boilerplate may precede another name or a new note.
+          if (/^\p{Lu}/u.test(next) && !disclaimerStart.test(next) && !legalSentenceStart.test(next)) break;
+          candidate += `\n${next}`;
+          end += 1;
+          sentenceEnd = /[.!?](?=\s|$)/.exec(candidate);
+        }
+        const stop = sentenceEnd ? sentenceEnd.index + 1 : candidate.length;
+        const sentence = candidate.slice(0, stop).replace(/\s+/g, ' ').trim();
+        if (printNotice.test(sentence) || (startsLegal || continuesLegal) && legalEvidence.test(sentence)) {
+          inLegal = !printNotice.test(sentence);
+          const rest = candidate.slice(stop).trim();
+          index = end;
+          if (rest) {
+            rows[index] = rest;
+            index -= 1;
+          }
+          continue;
+        }
+      }
+      inLegal = false;
+      kept.push(row);
+    }
+    return kept;
+  }
+
   function normalizeSignatureContact(contact = {}) {
     const source = { ...contact };
     const rows = contactRows([...(source.beforeLines || []), source.phone ? `Tel: ${source.phone}` : '',
@@ -106,15 +163,8 @@
       }
     }
     const kept = [];
-    let inLegal = false;
     for (let index = 0; index < rows.length; index += 1) {
       let row = rows[index];
-      const startsLegal = disclaimerStart.test(row) && legalContinuation.test(rows.slice(index, index + 4).join(' '));
-      if (startsLegal || inLegal && legalContinuation.test(row)) {
-        inLegal = !/(?:vernietigen|verwijderen|destroy (?:it|this message)|delete (?:it|this message))\.?$/i.test(row);
-        continue;
-      }
-      inLegal = false;
       if (registryLine.test(row) || /^[-_=*\s]{3,}$/.test(row) || /^\[(?:cid:|image\d*\.(?:png|jpe?g|gif))/i.test(row)) continue;
       // Short advertising taglines immediately before a legal footer, never
       // instructions, availability, numbers or ordinary message paragraphs.
@@ -137,8 +187,9 @@
       seen.add(key);
       target.push(row);
     };
-    for (let index = 0; index < kept.length; index += 1) {
-      const row = kept[index];
+    const cleanRows = cleanFooterRows(kept);
+    for (let index = 0; index < cleanRows.length; index += 1) {
+      const row = cleanRows[index];
       const phone = phoneValue(row);
       if (phone) {
         const key = `phone:${phone.key}`;
@@ -152,7 +203,7 @@
       }
       const address = row.replace(/^(?:adres|address|straat|street|postcode|plaats|city|land|country)\s*:\s*/i, '');
       const isAddress = knownAddresses.has(addressKey(address)) || postcodeLine.test(address) ||
-        streetLine.test(address) && kept.slice(index + 1, index + 3).some((next) => postcodeLine.test(next));
+        streetLine.test(address) && cleanRows.slice(index + 1, index + 3).some((next) => postcodeLine.test(next));
       if (isAddress) {
         add(result.addressLines, address, `address:${addressKey(address)}`);
         continue;
@@ -210,7 +261,7 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/=/g, '&#61;');
     const combined = address.map(escape).join(', ');
     return html.replace(`<dd class="detail-mail-contact-value">${combined}</dd>`,
-      `<dd class="detail-mail-contact-value" aria-label="${combined}">${address.map((line) => `<div>${escape(line)}</div>`).join('')}</dd>`);
+      `<dd class="detail-mail-contact-value detail-mail-contact-address" aria-label="${combined}">${address.map((line) => `<div>${escape(line)}</div>`).join('')}</dd>`);
   }
 
   function create(options = {}) {
