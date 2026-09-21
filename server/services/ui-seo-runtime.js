@@ -1,4 +1,5 @@
 const { createUiStateStore } = require('./ui-state');
+const { createColdmailSendGuardRepairService } = require('./coldmail-send-guard-repair');
 const { createSeoCore } = require('./seo-core');
 const { createSeoConfigStore } = require('./seo-config-store');
 const { createHtmlPageCoordinator } = require('./html-pages');
@@ -132,6 +133,15 @@ function createUiSeoRuntime(deps = {}) {
     sanitizeUiStateValues,
     setUiStateValues,
   } = uiStateStore;
+
+  const coldmailSendGuardRepairService = createColdmailSendGuardRepairService({
+    isSupabaseConfigured,
+    getSupabaseClient,
+    supabaseStateTable,
+    fetchSupabaseRowByKeyViaRest,
+    getUiStateValues,
+    logger,
+  });
 
   const dataOpsStore = createSoftoraDataOpsStore({
     isSupabaseConfigured,
@@ -338,6 +348,7 @@ function createUiSeoRuntime(deps = {}) {
     setUiStateValues,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
+    coldmailSendGuardRepairService,
     dataOpsStore,
     backgroundWorkerLeaseStore,
     dataOpsHealthReporter,

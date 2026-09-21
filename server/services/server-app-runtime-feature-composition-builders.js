@@ -593,6 +593,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       },
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,
+      coldmailSendGuardRepairService: uiSeoRuntime.coldmailSendGuardRepairService,
       dataOpsStore: uiSeoRuntime.dataOpsStore,
       backgroundWorkerLeaseStore: uiSeoRuntime.backgroundWorkerLeaseStore,
       requireRuntimeDebugAccess: securityRuntime.requireRuntimeDebugAccess,
