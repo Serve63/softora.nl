@@ -70,6 +70,17 @@ test('a multi-sentence postscript remains complete until the next contact field 
   assert.doesNotMatch(html, /collega|Manager|bedrijfsnaam|planning/);
 });
 
+test('postscript prices and relevant links are authored content, not signature addresses or website fields', () => {
+  const note = 'P.S. Het totaalbedrag is 1250\nDe offerte staat hier:\nhttps://example.nl/offerte';
+  const body = `${authored}\n\nGroet,\n${footer}\n\n${note}\n\nVolg ons op LinkedIn`;
+  const message = { body, from: 'Robin Voorbeeld', email: 'info@example.nl' };
+  const root = presentation.getRootPresentation(body, message);
+  const thread = presentation.getThreadPresentation(message, message);
+  assert.equal(root.body, `${authored}\n\n${note}`);
+  assert.equal(thread.body, root.body);
+  assert.doesNotMatch(thread.contactHtml, /1250|offerte|LinkedIn/);
+});
+
 test('several phones, extensions and postal addresses remain structured without unknown numbers', () => {
   const result = view.renderContactDetails({ phone: '06-12345678', beforeLines: ['Extra rol', 'M: +31 (0)6 12345678',
     'T: 020 1234567 toestel 9', 'WhatsApp: +44 20 1234 5678', 'Klantnummer 12345678'],

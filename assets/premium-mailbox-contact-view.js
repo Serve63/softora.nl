@@ -68,20 +68,24 @@
     const kept = [];
     let continuing = false;
     let postscript = false;
-    for (const value of signatureLines) {
-      const line = clean(value);
+    for (let index = 0; index < signatureLines.length; index += 1) {
+      const line = clean(signatureLines[index]);
       // Only recover personal additions inside an already proven signature.
       // Standalone contact fields, signoffs and automatic footers stay outside
       // the authored message, even after a postscript.
-      const boundary = !line || contactField.test(line) || phone(line) || street.test(line) || postcode.test(line) ||
-        /^(?:https?:\/\/|www\.|\S+@\S+|[>_=-]{2,}|(?:met )?vriendelijke groet|groet(?:en)?\b|kind regards|best regards|verzonden vanaf|sent from|volg ons|follow us|de informatie|this e-?mail|print deze)/i.test(line);
+      const startsNote = noteStart.test(line);
+      const address = street.test(line) && (!postscript || postcode.test(clean(signatureLines[index + 1])));
+      const standaloneLink = /^(?:https?:\/\/|www\.|\S+@\S+)/i.test(line);
+      const boundary = !line || !startsNote && (contactField.test(line) || phone(line) || address || postcode.test(line) ||
+        standaloneLink && !postscript ||
+        /^(?:[>_=-]{2,}|(?:met )?vriendelijke groet|groet(?:en)?\b|kind regards|best regards|verzonden vanaf|sent from|volg ons|follow us|de informatie|this e-?mail|print deze)/i.test(line));
       if (boundary) {
         if (continuing && kept.length) kept.push('');
         continuing = false;
         postscript = false;
         continue;
       }
-      if (noteStart.test(line) || continuing) {
+      if (startsNote || continuing) {
         kept.push(line);
         postscript = postscript || postscriptStart.test(line);
         continuing = postscript || !/[.!?]["'”’)]?$/.test(line);
