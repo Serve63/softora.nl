@@ -26,6 +26,7 @@ const { createInstantlyCampaignReplacementRuntime } = require('./instantly-campa
 const { createInstantlyTargetedPhotoReader } = require('./instantly-targeted-photo-reader');
 const { formatDateKeyForTimeZone, isDesignedInstantlyRow } = require('./instantly-auto-upload');
 const { createInstantlyWebhookState } = require('./instantly-webhook-state');
+const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { buildInstantlyInsufficientUploadResult, buildInstantlyQueueSelectionContext, isInstantlyQueueSelectionMatch } = require('./instantly-queue-selection');
 const {
   normalizePinnedRecipientLocationLines,
@@ -2084,17 +2085,10 @@ function createInstantlyOutreachService(deps = {}) {
   let syncTimer = null;
   let nextSyncAt = '';
   let lastSyncResult = null;
+  let mailReadySnapshotService = deps.mailReadySnapshotService || null;
 
-  function getMissingConfig() {
-    return [
-      !config.apiKey ? 'INSTANTLY_API_KEY' : null,
-      !config.defaultCampaignId ? 'INSTANTLY_DEFAULT_CAMPAIGN_ID' : null,
-    ].filter(Boolean);
-  }
-
-  function isConfigured() {
-    return getMissingConfig().length === 0;
-  }
+  function getMissingConfig() { return [!config.apiKey ? 'INSTANTLY_API_KEY' : null, !config.defaultCampaignId ? 'INSTANTLY_DEFAULT_CAMPAIGN_ID' : null].filter(Boolean); }
+  function isConfigured() { return getMissingConfig().length === 0; }
 
   function assertConfigured() {
     if (!config.enabled) {
@@ -4387,7 +4381,9 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
-  const campaignReplacement = createInstantlyCampaignReplacementRuntime({ config, now, createError: createInstantlyError, getUiStateValues, setUiStateValues, customerDbScope, customerDbKey, parseRows: parseDatabaseRows, buildRowsStateValues: buildCustomerRowsStateValues, collectEligibleRows, getReadyPhoto: (item, context) => getWebdesignAssetRecordForRow(item.row, item.index, context, normalizeString), buildLead: async (item, context) => assertInstantlyLeadReady(await buildInstantlyLead(item, context)), loadPersonalizationContext, resolveSender: (owner) => resolveInstantlySenderProfile({ senderProfile: owner }, config, normalizeString), reserveRecipients: reserveSupabaseOutboundRecipientsForInstantly, outboundRecipientGuardStore, saveLegacyGuards: savePermanentInstantlyRecipientGuards, markPreparedRows: markRowsAsPreparedForInstantlyUpload, campaignApi: { ...replacementCampaignApi, listCampaignLeads: (campaignId, limit) => listInstantlyCampaignLeads(limit, campaignId), addCampaignLeads: (campaignId, leads) => addLeadsToInstantly(leads, campaignId), deleteCampaignLeads: (campaignId, leadIds) => deleteInstantlyLeadsByIds(leadIds, campaignId) }, normalizeString });
+  const campaignReplacement = createInstantlyCampaignReplacementRuntime({ config, now, createError: createInstantlyError, getUiStateValues, setUiStateValues, customerDbScope, customerDbKey, parseRows: parseDatabaseRows, buildRowsStateValues: buildCustomerRowsStateValues, collectEligibleRows, getReadyPhoto: (item, context) => getWebdesignAssetRecordForRow(item.row, item.index, context, normalizeString), buildLead: async (item, context) => assertInstantlyLeadReady(await buildInstantlyLead(item, context)), loadPersonalizationContext, resolveSender: (owner) => resolveInstantlySenderProfile({ senderProfile: owner }, config, normalizeString), reserveRecipients: reserveSupabaseOutboundRecipientsForInstantly, outboundRecipientGuardStore, saveLegacyGuards: savePermanentInstantlyRecipientGuards, markPreparedRows: markRowsAsPreparedForInstantlyUpload, removeMailReadyCustomer: (customerId) => removeAcceptedCustomerFromMailReadySnapshot(customerId, mailReadySnapshotService, logger, normalizeString), campaignApi: { ...replacementCampaignApi, listCampaignLeads: (campaignId, limit) => listInstantlyCampaignLeads(limit, campaignId), addCampaignLeads: (campaignId, leads) => addLeadsToInstantly(leads, campaignId), deleteCampaignLeads: (campaignId, leadIds) => deleteInstantlyLeadsByIds(leadIds, campaignId) }, normalizeString });
+
+  function setMailReadySnapshotService(service) { mailReadySnapshotService = service || null; }
 
   async function replaceInstantlyCampaigns(input = {}) {
     replacementCampaignApi.assertConfigured();
@@ -4403,6 +4399,8 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     });
   }
+
+  async function getUploadCapacity() { return runExclusiveInstantlyOperation(() => campaignReplacement.getUploadCapacity()); }
 
   async function refreshInstantlyDeliveryStatus(input = {}) {
     replacementCampaignApi.assertConfigured();
@@ -4508,11 +4506,13 @@ function createInstantlyOutreachService(deps = {}) {
     autoUploadMailReady,
     getMissingConfig,
     getStatus,
+    getUploadCapacity,
     handleInstantlyWebhook,
     isConfigured,
     prepareInstantlyUpload,
     refreshInstantlyDeliveryStatus,
     replaceInstantlyCampaigns,
+    setMailReadySnapshotService,
     startAutopilot,
     stopAutopilot,
     syncInstantlyLeads,

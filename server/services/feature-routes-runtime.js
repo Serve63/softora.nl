@@ -115,6 +115,9 @@ function registerFeatureRoutes(app, deps = {}) {
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
   });
+  if (typeof instantly?.instantlyOutreachService?.setMailReadySnapshotService === 'function') {
+    instantly.instantlyOutreachService.setMailReadySnapshotService(premiumDatabaseMailReadySnapshotService);
+  }
   const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
