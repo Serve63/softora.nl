@@ -531,6 +531,25 @@ function wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName) {
   window._lastPreviewImageDataUrl = previewDataUrl;
   window._lastPreviewImageFileName = fn;
   window._lastPreviewUrl = url;
+
+  const footer = document.createElement('div');
+  footer.className = 'preview-footer';
+  const regenerateButton = document.createElement('button');
+  regenerateButton.type = 'button';
+  regenerateButton.className = 'btn outline';
+  regenerateButton.textContent = 'Opnieuw genereren';
+  regenerateButton.addEventListener('click', async () => {
+    if (regenerateButton.disabled) return;
+    regenerateButton.disabled = true;
+    try {
+      document.getElementById('scan-url').value = url;
+      await startScan();
+    } finally {
+      regenerateButton.disabled = false;
+    }
+  });
+  footer.appendChild(regenerateButton);
+  root.appendChild(footer);
 }
 
 function downloadPreviewBlock(blockId) {
