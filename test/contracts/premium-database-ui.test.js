@@ -1747,22 +1747,22 @@ test('mail-ready snapshot client retries when new companies arrive during pagina
 
 test('premium database customer loader fetches every structured page and skips unchanged reloads', async () => {
   const client = loadPremiumDatabaseCustomersClient();
-  const customers = Array.from({ length: 1601 }, (_item, index) => ({ id: `customer-${index + 1}` }));
+  const customers = Array.from({ length: 2001 }, (_item, index) => ({ id: `customer-${index + 1}` }));
   const requests = [];
   const fetchJsonWithTimeout = async (url) => {
     requests.push(url);
     const parsed = new URL(url, 'https://softora.test');
     if (parsed.searchParams.get('meta') === '1') {
-      return { ok: true, json: async () => ({ ok: true, total: customers.length, snapshotVersion: '1601:v1', customers: [] }) };
+      return { ok: true, json: async () => ({ ok: true, total: customers.length, snapshotVersion: '2001:v1', customers: [] }) };
     }
     const offset = Number(parsed.searchParams.get('offset')) || 0;
-    const limit = Number(parsed.searchParams.get('limit')) || 750;
+    const limit = Number(parsed.searchParams.get('limit')) || 1000;
     return {
       ok: true,
       json: async () => ({
         ok: true,
         total: customers.length,
-        snapshotVersion: '1601:v1',
+        snapshotVersion: '2001:v1',
         customers: customers.slice(offset, offset + limit),
       }),
     };
@@ -1770,18 +1770,18 @@ test('premium database customer loader fetches every structured page and skips u
 
   const loaded = await client.load({ fetchJsonWithTimeout });
   assert.equal(loaded.changed, true);
-  assert.equal(loaded.total, 1601);
-  assert.equal(loaded.customers.length, 1601);
+  assert.equal(loaded.total, 2001);
+  assert.equal(loaded.customers.length, 2001);
   assert.deepEqual(requests.filter((url) => !url.includes('meta=1')).sort(), [
-    '/api/premium-database/customers?offset=0&limit=750',
-    '/api/premium-database/customers?offset=1500&limit=750',
-    '/api/premium-database/customers?offset=750&limit=750',
+    '/api/premium-database/customers?offset=0&limit=1000',
+    '/api/premium-database/customers?offset=1000&limit=1000',
+    '/api/premium-database/customers?offset=2000&limit=1000',
   ]);
 
   requests.length = 0;
-  const unchanged = await client.load({ previousSnapshotVersion: '1601:v1', fetchJsonWithTimeout });
+  const unchanged = await client.load({ previousSnapshotVersion: '2001:v1', fetchJsonWithTimeout });
   assert.equal(unchanged.changed, false);
-  assert.equal(unchanged.total, 1601);
+  assert.equal(unchanged.total, 2001);
   assert.deepEqual(requests, ['/api/premium-database/customers?meta=1']);
 });
 
@@ -2044,7 +2044,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260923-pages/);
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260923-payload/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);

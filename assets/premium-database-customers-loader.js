@@ -2,7 +2,7 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/customers";
-    const PAGE_LIMIT = 750;
+    const PAGE_LIMIT = 1000;
     const PAGE_CONCURRENCY = 4;
     const MAX_CUSTOMERS = 25000;
     const REQUEST_TIMEOUT_MS = 12000;
