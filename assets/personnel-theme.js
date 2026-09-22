@@ -753,7 +753,7 @@
     function pruneDeprecatedSidebarLinks(sidebar) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const legacyAnalyticsLinks = sidebar.querySelectorAll(
-            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="websitegenerator"], a[data-sidebar-key="bookkeeping"], a[data-sidebar-key="pdfs"], a[data-sidebar-key="live_momentum"], a[href="/winnen"], a[href="/live-momentum"], a[href="/live-momentum.html"]'
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"], a[data-sidebar-key="agenda"], a[data-sidebar-key="bookkeeping"], a[data-sidebar-key="pdfs"], a[data-sidebar-key="live_momentum"], a[href="/winnen"], a[href="/live-momentum"], a[href="/live-momentum.html"]'
         );
         legacyAnalyticsLinks.forEach(function (link) {
             if (link && link.parentNode) {
@@ -861,7 +861,7 @@
                 "beheer",
                 getCustomersSidebarLink(),
                 ["mailbox", "websitegenerator", "seo", "packages"]
-            ); ensureStaticSidebarLink(sidebar, "beheer", window.SoftoraPremiumSidebarLinks.getSummarizeSidebarLink(), ["websitegenerator", "seo", "qr_code", "packages"]);
+            ); ensureStaticSidebarLink(sidebar, "beheer", window.SoftoraPremiumSidebarLinks.getSummarizeSidebarLink(), ["websitegenerator", "seo", "qr_code", "packages"]); ensureStaticSidebarLink(sidebar, "beheer", window.SoftoraPremiumSidebarLinks.getWebdesignSidebarLink(), ["seo", "qr_code", "packages"]);
         }
 
         if (overviewSection) {

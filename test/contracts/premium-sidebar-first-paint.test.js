@@ -35,12 +35,13 @@ for (const fileName of modulePages) {
     const { getMailboxSidebarLink } = require('../../assets/premium-sidebar-links');
     assert.equal(mailbox, getMailboxSidebarLink().icon + '<span class="sidebar-link-text">Mailbox</span>');
     assert.match(sidebar, />Layout Test</);
-    assert.doesNotMatch(sidebar, /data-sidebar-key="(?:agenda|coldmailing|bookkeeping|pdfs|websitegenerator)"/);
+    assert.match(sidebar, /href="\/premium-websitegenerator"[^>]*data-sidebar-key="websitegenerator"/);
+    assert.doesNotMatch(sidebar, /data-sidebar-key="(?:agenda|coldmailing|bookkeeping|pdfs)"/);
     assert.ok(res.body.indexOf('id="softora-premium-sidebar-critical"') < res.body.indexOf('assets/personnel-theme.css'));
     assert.match(res.body, /scrollbar-gutter:auto !important/);
     assert.match(res.body, /premium-sidebar-mobile\.css\?v=/);
     assert.doesNotMatch(res.body, /premium-sidebar-links\.js\?v=20260818a/);
-    assert.match(res.body, /premium-sidebar-links\.js\?v=20260909d" defer blocking="render"/);
+    assert.match(res.body, /premium-sidebar-links\.js\?v=20260922-design" defer blocking="render"/);
     assert.match(res.body, /function prefillPremiumSidebarActiveState/);
   });
 }
