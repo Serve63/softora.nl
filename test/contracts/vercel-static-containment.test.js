@@ -61,3 +61,11 @@ test('Vercel-config gebruikt de afgeschermde static-output in plaats van de repo
   assert.equal(vercelConfig.rewrites.at(-1).source, '/(.*)');
   assert.equal(vercelConfig.rewrites.at(-1).destination, '/api');
 });
+
+test('Vercel-functies draaien bij de primaire Softora-database in Londen', () => {
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
+  assert.deepEqual(vercelConfig.regions, ['lhr1']);
+  for (const [entrypoint, config] of Object.entries(vercelConfig.functions || {})) {
+    assert.equal(config.regions, undefined, `${entrypoint} mag niet ongemerkt naar een andere regio afwijken`);
+  }
+});
