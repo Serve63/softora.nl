@@ -103,7 +103,7 @@ test('premium websitegenerator removes the legacy openen button but keeps downlo
   assert.match(source, /function createLibraryCardElement\(entry\) \{/);
   assert.match(source, /card\.addEventListener\('click', \(\) => openLibraryEntry\(id\)\);/);
   assert.match(source, /removeBtn\.addEventListener\('click', \(event\) => \{[\s\S]*void removeLibraryEntry\(id, event\);/);
-  assert.match(source, /grid\.replaceChildren\(\.\.\.items\.map\(\(entry\) => createLibraryCardElement\(entry\)\)\);/);
+  assert.match(source, /reconcileWebsitePreviewCards\(grid, items, createLibraryCardElement\)/);
   assert.doesNotMatch(source, /onclick="openLibraryEntry\(/);
   assert.doesNotMatch(source, /onclick="removeLibraryEntry\(/);
   assert.doesNotMatch(source, /onclick="downloadPreviewBlock\(/);
@@ -153,12 +153,12 @@ test('premium websitegenerator toont compacte previews en behoudt de volledige a
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
   assert.match(source, /const previewWidth = Number\(entry\.width\) \|\| WEBSITE_PREVIEW_IMAGE_WIDTH/);
   assert.match(source, /const frameW = Math\.min\(window\.innerWidth - 100, previewWidth\)/);
-  assert.match(source, /function createPreviewZoneElement\(blockId, hostname, previewWidth, useStablePreviewImageId\) \{/);
+  assert.match(source, /function createPreviewZoneElement\(blockId, hostname, previewWidth, useStablePreviewImageId, previewHeight = WEBSITE_PREVIEW_IMAGE_HEIGHT\) \{/);
   assert.match(source, /media\.style\.maxWidth = `\$\{frameW\}px`;/);
   assert.match(source, /img\.id = 'preview-image';/);
   assert.match(source, /img\.className = 'preview-image-pixel';/);
   assert.match(source, /downloadBtn\.addEventListener\('click', \(\) => downloadPreviewBlock\(blockId\)\);/);
-  assert.match(source, /stack\.appendChild\(createPreviewZoneElement\(blockId, entry\.hostname \|\| host, w, false\)\);/);
+  assert.match(source, /stack\.appendChild\(createPreviewZoneElement\(blockId, entry\.hostname \|\| host, w, false, Number\(entry.height\) \|\| WEBSITE_PREVIEW_IMAGE_HEIGHT\)\);/);
   assert.match(source, /mountScanBatchShell\(out, 'Preview hervatten…'\);/);
   assert.doesNotMatch(source, /previewZoneHtml/);
   assert.doesNotMatch(source, /insertAdjacentHTML/);
@@ -239,4 +239,16 @@ test('websitegenerator removes link creation and supports deferred library image
   assert.match(websiteGeneratorScriptSource, /entry.imageDeferred/);
   assert.match(websiteGeneratorScriptSource, /if \(!entry\?\.dataUrl\) entry = await fetchLibraryEntryById\(id\)/);
   assert.match(websiteGeneratorScriptSource, /MAX_STALLED_POLLS = 500/);
+});
+
+test('websitegenerator uses stable library navigation and prevents unchanged status rerenders', () => {
+  const source = websiteGeneratorScriptSource;
+  assert.ok(websiteGeneratorHtmlSource.indexOf('premium-websitegenerator-ui-state.js') < websiteGeneratorHtmlSource.indexOf('premium-websitegenerator.js?'));
+  assert.match(source, /const maybeHydrateWebsitePreviewLibraryFromServer = singleWebsitePreviewRequest/);
+  assert.match(source, /const pollWebsitePreviewBatch = singleWebsitePreviewRequest/);
+  assert.match(source, /if \(progressChanged\) await renderBatchJobProgress/);
+  assert.match(source, /if \(!isCurrent\(\)\) return/);
+  assert.doesNotMatch(source, /window\.location\.hash =/);
+  assert.doesNotMatch(source, /last\.scrollIntoView/);
+  assert.match(websiteGeneratorHtmlSource, /scrollbar-gutter: stable/);
 });
