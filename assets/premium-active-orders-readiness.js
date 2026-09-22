@@ -19,7 +19,7 @@
             requiredData: { activeOrders: true },
             requiredActions: ['#createOrderBtn', '#onlyMyAssignmentsToggle', '.orders-filter-bar', '#ordersGrid'],
             requiredImages: Array.from(contentRoot.querySelectorAll('img:not([loading="lazy"])')),
-            actionsBound: true,
+            actionsBound: () => doc.documentElement?.dataset.softoraOrdersActionsBound === 'true',
         });
         if (!ready) readiness.markDegraded({ page: 'premium-actieve-opdrachten', reason: 'screen-readiness-contract-incomplete' });
         return ready;

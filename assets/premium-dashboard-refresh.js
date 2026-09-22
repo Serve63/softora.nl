@@ -96,7 +96,11 @@
             },
             requiredActions: ['#dashboardAiChatToggle', '#aiManagementConfigSave'],
             requiredImages: Array.from((main || doc).querySelectorAll('img:not([loading="lazy"])')),
-            actionsBound: true,
+            actionsBound: () => {
+                const chat = doc.getElementById('dashboardAiChatToggle');
+                const save = doc.getElementById('aiManagementConfigSave');
+                return chat?.dataset.softoraActionBound === 'true' && save?.dataset.softoraActionBound === 'true';
+            },
         });
         if (ready) dashboardCore?.releasePremiumDashboardBootShell?.();
         else {

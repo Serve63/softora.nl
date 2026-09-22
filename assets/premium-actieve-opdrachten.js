@@ -2861,7 +2861,7 @@ function bindActiveOrdersPageUi() {
         }
     });
 
-    document.querySelectorAll('#ordersGrid .order-card').forEach(bindDynamicOrderCard);
+    document.querySelectorAll('#ordersGrid .order-card').forEach(bindDynamicOrderCard); document.documentElement.dataset.softoraOrdersActionsBound = 'true';
 }
 
 async function initializeActiveOrdersPageState(options = {}) {
