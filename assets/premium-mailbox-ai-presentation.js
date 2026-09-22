@@ -29,9 +29,17 @@
     const value = message?.aiPresentation;
     if (!value) return null;
     const body = sourceBody(message);
+    if (value.version === VERSION && value.status === 'pending' && value.gate === true) {
+      return { body: 'Deze e-mail wordt opgeschoond. De inhoud verschijnt automatisch zodra dit klaar is.',
+        contact: { beforeLines: [], addressLines: [] }, signatureMatched: false, aiManaged: true };
+    }
+    const notices = { failed: 'AI-opschoning is niet gelukt. Hieronder staat de originele e-mail.',
+      timeout: 'AI-opschoning duurt langer dan verwacht. Hieronder staat de originele e-mail.',
+      budget: 'Het budget voor AI-opschoning is bereikt. Hieronder staat de originele e-mail.',
+      storage: 'AI-opschoning is tijdelijk niet beschikbaar. Hieronder staat de originele e-mail.' };
     if (value.version !== VERSION || value.status !== 'ready' || value.model !== MODEL || value.reasoningEffort !== 'max' ||
       value.sourceBody !== body || !validate(body, value.decision)) {
-      return { body, contact: { beforeLines: [], addressLines: [] }, signatureMatched: false, aiManaged: true };
+      return { body: notices[value.reason] ? `${notices[value.reason]}\n\n${body}` : body, contact: { beforeLines: [], addressLines: [] }, signatureMatched: false, aiManaged: true };
     }
     // Quote ownership is not evidence that content is irrelevant. Only signature labels may hide source lines.
     const lines = linesOf(body), labels = value.decision.labels;
