@@ -11,7 +11,8 @@ const websiteGeneratorScriptSource = fs.readFileSync(
   path.join(__dirname, '../../assets/premium-websitegenerator.js'),
   'utf8'
 );
-const websiteGeneratorSource = `${websiteGeneratorHtmlSource}\n${websiteGeneratorScriptSource}`;
+const resumeSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-websitegenerator-job-resume.js'), 'utf8');
+const websiteGeneratorSource = `${websiteGeneratorHtmlSource}\n${websiteGeneratorScriptSource}\n${resumeSource}`;
 
 [
   '../../premium-websitegenerator.html',
