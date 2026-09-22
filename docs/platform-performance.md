@@ -52,9 +52,25 @@ voorkomt terugschrijven van achterhaalde antwoorden en wist zijn cache op pagehi
 Dit werkt binnen het huidige document. Het is nog geen blijvende applicatieshell,
 geen cross-tab-sessieprotocol en geen volledige vervanging voor domein-readmodels.
 
-Nieuwe `application-module`-registraties blijven bewust geblokkeerd totdat de echte
-gedeelde runtime en bijbehorende gedragstests in de volgende stap beschikbaar zijn.
-Een wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen.
+`assets/premium-application-runtime.js` bevat een geteste modulelevenscyclus voor
+geregistreerde reads, begrensde voorbereiding, montage, updates, formulierblokkades
+en sessiegebonden cache wissen. `assets/premium-application-navigation.js` bevat een
+geteste router voor geregistreerde routes, browsergeschiedenis en navigatieblokkades.
+De twee kernen zijn nog niet door Dashboard of Opdrachten geladen. Die routes blijven
+`legacy-document` tot de blijvende shell en complete browsergedrag bewezen zijn. Een
+wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen.
+
+`assets/premium-screen-readiness.js` legt daarnaast een expliciet gereedmoment vast.
+Dashboard en Opdrachten melden pas `ready` als hun volledige vereiste data en
+bediening beschikbaar zijn en de documentresources, gebruikte fonts en opgegeven
+afbeeldingen klaar zijn. De gedeelde personeelszijbalk moet eveneens zijn afgerond;
+een vastgelopen zijbalk kan geen `ready` produceren. `performance.mark('softora:screen-ready')` en
+`data-softora-screen-ready-ms` maken het moment meetbaar. Een mislukte datastroom blijft
+apart herkenbaar als `degraded`; waar een loader aanwezig is, verdwijnt die pas nadat
+de foutweergave beschikbaar is. Opdrachten toont tijdens een koude hydratie nog
+statische nullen. De gereedheidsmarkering lost die zichtbare tussenstand niet op;
+daarvoor is de blijvende shell nodig. Deze stap bewijst evenmin dat alle routes de
+3-secondennorm halen.
 
 ## Nog te implementeren en te bewijzen
 
@@ -63,12 +79,13 @@ Een wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen
    Dynamisch gegenereerde SEO-collecties/artikelen, gepubliceerde klantlinks en
    persoonlijke sites houden hun bestaande routetests; volledige runtime-inventaris
    en prestatiedekking van die routefamilies volgen nog.
-2. Een blijvende shell en echte modulelevenscyclus voor Dashboard en Opdrachten,
-   daarna Klanten. De broncode moet eerst uit de grote pagina-initialisaties worden
-   losgemaakt; geen willekeurige HTML-injectie of verborgen frames als prefetch.
+2. De lifecycle- en navigatiekernen met een blijvende shell koppelen voor Dashboard
+   en Opdrachten, daarna Klanten. De broncode moet eerst uit de grote
+   pagina-initialisaties worden losgemaakt; geen willekeurige HTML-injectie of
+   verborgen frames als prefetch.
 3. Gedeelde versiegebonden readmodels, gelijktijdige reads, mutatie-invalidation,
-   sessiewissels, dirty-form navigatie en begrensde voorbereiding bewijzen met
-   echte browseruitvoering. Lever dan het modulesjabloon/aanmaakscript.
+   sessiewissels, dirty-form navigatie en begrensde voorbereiding ook met echte
+   browseruitvoering bewijzen. Lever dan het modulesjabloon/aanmaakscript.
 4. Mailsysteem volledig aansluiten, vervolgens Mailbox, Agenda, Lead Radar,
    instellingen en overige modules. Miniaturen vooraf op maat maken en netwerk-
    en opslagbudgetten meten. Publieke pagina's en assets apart controleren.

@@ -46,9 +46,9 @@ test('fast stats refresh wins; yesterday and unproven totals never become today 
   }
 });
 
-test('complete snapshot becomes visible while canonical customer details are still pending, without loading legacy photos', async () => {
+test('complete snapshot hydrates while screen readiness waits for canonical details and photos', async () => {
   const page = fs.readFileSync(path.join(root, 'premium-database.html'), 'utf8');
-  const snapshot = deferred(), customers = deferred();
+  const snapshot = deferred(), customers = deferred(), ready = deferred();
   const state = {
     klanten: [{ id: 'available-1', availableSnapshot: true }],
     mailReadySnapshotLoaded: true, mailReadySnapshotTotal: 0, mailReadySnapshotCustomers: [],
@@ -57,7 +57,7 @@ test('complete snapshot becomes visible while canonical customer details are sti
     foundSnapshotLoaded: true, foundSnapshotTotal: 0, foundSnapshotCustomerIdSet: new Set(),
     canonicalSnapshotApplied: true, remoteCustomersLoaded: false,
   };
-  let photoReads = 0, readyRenders = 0, finished = false;
+  let photoReads = 0, readyRenders = 0, finished = false, releases = 0, readinessCalls = 0;
   const sandbox = {
     snapshotClient, state, console, databaseHadBootstrapCustomers: true, databaseHasFastSnapshotBootstrap: false,
     normalizeCustomer: (value) => value, applyCustomerList() {},
@@ -66,7 +66,8 @@ test('complete snapshot becomes visible while canonical customer details are sti
     loadCustomerPhotoMap() { photoReads += 1; return new Promise(() => {}); },
     webdesignActionController: { preloadPhotoImages: async () => {} },
     getSortedCustomers: (rows) => rows, getFilteredCustomers: () => state.klanten,
-    releaseDatabaseBootShell() {}, databasePendingJobsPromise: Promise.resolve(),
+    databaseReadiness: { publish: () => { readinessCalls += 1; return ready.promise; } },
+    releaseDatabaseBootShell() { releases += 1; }, databasePendingJobsPromise: Promise.resolve(),
     databaseImportController: { startAutoSync() { finished = true; } },
   };
   assert.match(page, /window\.SoftoraDatabaseBoot\.run\(/);
@@ -86,9 +87,14 @@ test('complete snapshot becomes visible while canonical customer details are sti
   assert.equal(state.canonicalInventoryReady, true);
   assert.ok(readyRenders > 0);
   assert.equal(photoReads, 0);
+  assert.equal(releases, 0);
   customers.resolve(true);
   await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(readinessCalls, 1);
+  assert.equal(releases, 0);
+  ready.resolve(true);
   await boot;
+  assert.ok(releases > 0);
   assert.equal(finished, true);
   assert.equal(photoReads, 0);
 });
