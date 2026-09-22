@@ -35,7 +35,7 @@ const websiteGeneratorSource = `${websiteGeneratorHtmlSource}\n${websiteGenerato
   });
 });
 
-test('premium websitegenerator biedt een websitelink-aanmaken flow met html input', () => {
+test('premium websitegenerator genereert fotos en bewaart de bibliotheek zonder websitelink flow', () => {
   const source = websiteGeneratorHtmlSource;
 
   assert.match(source, /<title>Webdesign – Softora\.nl<\/title>/);
@@ -58,20 +58,10 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.doesNotMatch(source, /Kopieer websitelink/);
   assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
   assert.doesNotMatch(websiteGeneratorScriptSource, /websiteLinkCopyEl/);
-  assert.match(websiteGeneratorSource, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkStatusEl[\s\S]*!websiteLinkListEl[\s\S]*\) \{\s*return;\s*\}/);
-  assert.match(source, /id="website-link-list"/);
-  assert.match(websiteGeneratorSource, /window\.open\('about:blank', '_blank'\)/);
-  assert.match(websiteGeneratorSource, /function createWebsiteLinkRow\(link\) \{/);
   assert.match(websiteGeneratorSource, /function bindWebsiteGeneratorPageActions\(\) \{/);
   assert.match(websiteGeneratorSource, /button\.addEventListener\('click', \(\) => \{[\s\S]*void switchTab\(button\.dataset\.tab \|\| 'scan', button\);/);
   assert.match(websiteGeneratorSource, /scanButton\.addEventListener\('click', \(\) => \{[\s\S]*void startScan\(\);/);
-  assert.match(websiteGeneratorSource, /websiteLinkListEl\.replaceChildren\(\.\.\.normalizedLinks\.map\(\(link\) => createWebsiteLinkRow\(link\)\)\);/);
-  assert.match(websiteGeneratorSource, /return url\.protocol === 'http:' \|\| url\.protocol === 'https:' \? url\.href : '';/);
   assert.doesNotMatch(websiteGeneratorSource, /websiteLinkListEl\.innerHTML/);
-  assert.match(websiteGeneratorSource, /\/api\/website-links'/);
-  assert.match(websiteGeneratorSource, /\/api\/website-links\/create/);
-  assert.match(websiteGeneratorSource, /console\.warn\('Opgeslagen websitelinks laden mislukt:', error\);/);
-  assert.match(websiteGeneratorSource, /renderWebsiteLinks\(\[\]\);/);
   assert.doesNotMatch(websiteGeneratorSource, /renderWebsiteLinkEmptyState\(String\(error\?\.message \|\| 'Websitelinks laden mislukt'\)\);/);
   assert.doesNotMatch(websiteGeneratorSource, /Kon opgeslagen websitelinks niet ophalen/);
 });
@@ -130,10 +120,8 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /\/api\/auth\/session/);
   assert.match(source, /premium-personeel-login\?next=/);
   assert.match(source, /id="scan-btn"[\s\S]*disabled/);
-  assert.match(source, /id="website-link-create-btn"[\s\S]*disabled/);
-  assert.match(source, /Log in met je premium account om scans te genereren en websitelinks te publiceren\./);
+  assert.match(source, /Log in met je premium account om webdesignfoto’s te genereren en je bibliotheek te bekijken\./);
   assert.match(source, /Log eerst in om AI previews te genereren\./);
-  assert.match(source, /Log eerst in om websitelinks aan te maken\./);
   assert.match(source, /\/api\/website-preview\/batch/);
   assert.match(source, /\/api\/website-preview\/batch\/current/);
   assert.match(source, /websitePreviewActiveBatchJobId/);
@@ -148,7 +136,7 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /renderScanOutputMessage\(out, String\(e\?\.message \|\| e \|\| 'Batch mislukt'\)\);/);
   assert.doesNotMatch(source, /out\.innerHTML/);
   assert.match(source, /buildWebsitePreviewJobFingerprint/);
-  assert.match(source, /Scanstatus kon niet worden opgehaald\./);
+  assert.match(source, /Status tijdelijk niet beschikbaar\./);
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
@@ -241,4 +229,12 @@ test('website preview batch runs server-side and exposes poll route', () => {
   assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
   assert.match(library, /persistPreviewLibraryEntry/);
   assert.match(library, /getLibraryEntryResponse/);
+});
+
+test('websitegenerator removes link creation and supports deferred library images', () => {
+  assert.doesNotMatch(websiteGeneratorHtmlSource, /data-tab="link"|id="html-code"|Maak Website Link Aan/);
+  assert.doesNotMatch(websiteGeneratorScriptSource, /fetch\('\/api\/website-links/);
+  assert.match(websiteGeneratorScriptSource, /entry.imageDeferred/);
+  assert.match(websiteGeneratorScriptSource, /if \(!entry\?\.dataUrl\) entry = await fetchLibraryEntryById\(id\)/);
+  assert.match(websiteGeneratorScriptSource, /MAX_STALLED_POLLS = 500/);
 });

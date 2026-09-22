@@ -2,7 +2,7 @@ let websitePreviewLibraryRemoteEntries = null;
 let websitePreviewLibraryUseRemote = false;
 let websitePreviewBatchPollTimer = null;
 let websitePreviewActiveBatchJobId = '';
-const WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS = 30;
+const WEBSITE_PREVIEW_BATCH_MAX_STALLED_POLLS = 500;
 const WEBSITE_PREVIEW_BATCH_POLL_INTERVAL_MS = 1400;
 const WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES = 12;
 let websitePreviewBatchPollFailures = 0;
@@ -137,6 +137,25 @@ function createLibraryCardElement(entry) {
     img.width = 200;
     img.height = 300;
     thumbWrap.appendChild(img);
+  } else if (entry.imageDeferred) {
+    appendWebsiteGeneratorTextElement(thumbWrap, 'span', '', 'Afbeelding laden…');
+    const observer = new IntersectionObserver((records) => {
+      if (!records.some((record) => record.isIntersecting)) return;
+      observer.disconnect();
+      void fetchLibraryEntryById(id).then((full) => {
+        if (!isSafeLibraryDataUrl(full?.dataUrl)) {
+          thumbWrap.textContent = 'Klik om de afbeelding te openen';
+          return;
+        }
+        const img = document.createElement('img');
+        img.src = full.dataUrl;
+        img.alt = '';
+        img.width = 200;
+        img.height = 300;
+        thumbWrap.replaceChildren(img);
+      });
+    });
+    observer.observe(thumbWrap);
   } else {
     const invalidImage = appendWebsiteGeneratorTextElement(thumbWrap, 'span', '', 'Geen geldige afbeelding');
     invalidImage.style.fontSize = '11px';
@@ -246,8 +265,9 @@ async function fetchLibraryEntryById(id) {
   return null;
 }
 
-function openLibraryEntry(id) {
-  const entry = loadLibraryEntries().find((x) => x.id === id);
+async function openLibraryEntry(id) {
+  let entry = loadLibraryEntries().find((x) => x.id === id);
+  if (!entry?.dataUrl) entry = await fetchLibraryEntryById(id);
   if (!entry || !entry.dataUrl) {
     showToast('Item niet gevonden');
     return;
@@ -740,7 +760,7 @@ async function pollWebsitePreviewBatch() {
       websitePreviewBatchPollFailures += 1;
       if (websitePreviewBatchPollFailures >= WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES) {
         stopScanBatchPollWithMessage(
-          'Scanstatus kon niet worden opgehaald. De foto-generatie is mogelijk onstabiel. Probeer het opnieuw.'
+          'Status tijdelijk niet beschikbaar. Controleer de bibliotheek voordat je opnieuw genereert.'
         );
       }
       return;
@@ -758,7 +778,7 @@ async function pollWebsitePreviewBatch() {
       payload.job.status === 'running'
     ) {
       stopScanBatchPollWithMessage(
-        'De scan loopt vast. Start de preview opnieuw of controleer de pagina later in de bibliotheek.'
+        'De generatie duurt langer dan verwacht. Controleer de bibliotheek voordat je opnieuw genereert.'
       );
       return;
     }
@@ -781,7 +801,7 @@ async function pollWebsitePreviewBatch() {
     websitePreviewBatchPollFailures += 1;
     if (websitePreviewBatchPollFailures >= WEBSITE_PREVIEW_BATCH_MAX_POLL_FAILURES) {
       stopScanBatchPollWithMessage(
-        'Scanstatus kon niet worden opgehaald. De foto-generatie is mogelijk onstabiel. Probeer het opnieuw.'
+        'Status tijdelijk niet beschikbaar. Controleer de bibliotheek voordat je opnieuw genereert.'
       );
     }
   }
@@ -1210,178 +1230,6 @@ function showToast(msg) {
 
 applyWebsiteGeneratorAuthState();
 loadWebsiteGeneratorAuthState();
-
-(function () {
-  const urlInput = document.getElementById('scan-url');
-  const htmlInput = document.getElementById('html-code');
-  const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
-  const websiteLinkStatusEl = document.getElementById('website-link-status');
-  const websiteLinkListEl = document.getElementById('website-link-list');
-  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkListEl) { return; }
-
-  function setWebsiteLinkStatus(message, isError = false) {
-    websiteLinkStatusEl.textContent = String(message || '');
-    websiteLinkStatusEl.style.color = isError ? '#c0392b' : 'var(--text-mid)';
-  }
-
-  function normalizeWebsiteLinkHref(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return '';
-    try {
-      const url = new URL(raw);
-      return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function renderWebsiteLinkEmptyState(message) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.style.padding = '22px';
-    appendWebsiteGeneratorTextElement(empty, 'p', '', message);
-    websiteLinkListEl.replaceChildren(empty);
-  }
-
-  function createWebsiteLinkRow(link) {
-    const title = String(link?.title || link?.slug || 'Softora pagina').trim() || 'Softora pagina';
-    const urlLabel = String(link?.url || '').trim() || '—';
-    const href = normalizeWebsiteLinkHref(urlLabel);
-
-    const row = document.createElement('div');
-    row.className = 'website-link-row';
-
-    const main = document.createElement('div');
-    main.className = 'website-link-row-main';
-    const titleEl = appendWebsiteGeneratorTextElement(main, 'div', 'website-link-row-title', title);
-    titleEl.title = title;
-
-    if (href) {
-      const urlLink = appendWebsiteGeneratorTextElement(main, 'a', 'website-link-row-url', urlLabel);
-      urlLink.href = href;
-      urlLink.target = '_blank';
-      urlLink.rel = 'noopener noreferrer';
-    } else {
-      appendWebsiteGeneratorTextElement(main, 'span', 'website-link-row-url', urlLabel);
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'website-link-row-actions';
-    if (href) {
-      const liveLink = appendWebsiteGeneratorTextElement(actions, 'a', 'btn outline', 'Live pagina');
-      liveLink.href = href;
-      liveLink.target = '_blank';
-      liveLink.rel = 'noopener noreferrer';
-    } else {
-      const unavailable = appendWebsiteGeneratorTextElement(actions, 'span', 'btn outline', 'Geen live URL');
-      unavailable.setAttribute('aria-disabled', 'true');
-    }
-
-    row.append(main, actions);
-    return row;
-  }
-
-  function renderWebsiteLinks(links) {
-    const normalizedLinks = Array.isArray(links) ? links : [];
-    if (!websiteGeneratorAuthState.authenticated) {
-      renderWebsiteLinkEmptyState('Log in om opgeslagen websitelinks te bekijken.');
-      return;
-    }
-    if (!normalizedLinks.length) {
-      renderWebsiteLinkEmptyState('Nog geen websitelinks. Plak HTML-code en maak je eerste live pagina aan.');
-      return;
-    }
-    websiteLinkListEl.replaceChildren(...normalizedLinks.map((link) => createWebsiteLinkRow(link)));
-  }
-  async function loadWebsiteLinks() {
-    if (!websiteGeneratorAuthState.authenticated) {
-      renderWebsiteLinks([]);
-      return;
-    }
-    renderWebsiteLinkEmptyState('Websitelinks laden...');
-    try {
-      const response = await fetch('/api/website-links', {
-        method: 'GET',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: { Accept: 'application/json' }
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload || payload.ok === false) {
-        throw new Error(String(payload?.detail || payload?.error || 'Websitelinks laden mislukt'));
-      }
-      renderWebsiteLinks(payload.links || []);
-    } catch (error) {
-      console.warn('Opgeslagen websitelinks laden mislukt:', error);
-      renderWebsiteLinks([]);
-    }
-  }
-
-  websiteLinkCreateEl.addEventListener('click', async function () {
-    const openedTab = window.open('about:blank', '_blank');
-    if (openedTab) {
-      openedTab.document.title = 'Websitelink wordt aangemaakt...';
-      const loadingBody = openedTab.document.body || openedTab.document.createElement('body');
-      if (!openedTab.document.body) {
-        openedTab.document.documentElement.appendChild(loadingBody);
-      }
-      loadingBody.style.fontFamily = 'system-ui,sans-serif';
-      loadingBody.style.padding = '32px';
-      loadingBody.textContent = 'Websitelink wordt aangemaakt...';
-      openedTab.opener = null;
-    }
-    if (!(await ensureWebsiteGeneratorAuth('Log eerst in om websitelinks aan te maken.'))) {
-      if (openedTab && !openedTab.closed) openedTab.close();
-      return;
-    }
-    const html = String(htmlInput.value || '').trim();
-    if (!html) {
-      setWebsiteLinkStatus('Plak eerst HTML code in.', true);
-      htmlInput.focus();
-      if (openedTab && !openedTab.closed) openedTab.close();
-      return;
-    }
-
-    websiteLinkCreateEl.disabled = true;
-    setWebsiteLinkStatus('Websitelink wordt aangemaakt...');
-
-    try {
-      const response = await fetch('/api/website-links/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          html,
-          title: String(urlInput.value || '').trim()
-        })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        await loadWebsiteGeneratorAuthState(true);
-        throw new Error('Log eerst in om websitelinks aan te maken.');
-      }
-      if (!response.ok || !payload || payload.ok === false) {
-        throw new Error(String(payload?.detail || payload?.error || 'Websitelink aanmaken mislukt'));
-      }
-      const websiteLinkUrl = String(payload.url || '').trim();
-      setWebsiteLinkStatus(websiteLinkUrl || 'Websitelink aangemaakt.');
-      if (websiteLinkUrl) {
-        if (openedTab && !openedTab.closed) {
-          openedTab.location.href = websiteLinkUrl;
-        } else {
-          window.open(websiteLinkUrl, '_blank', 'noopener');
-        }
-      }
-      await loadWebsiteLinks();
-    } catch (error) {
-      if (openedTab && !openedTab.closed) openedTab.close();
-      setWebsiteLinkStatus(String(error?.message || 'Websitelink aanmaken mislukt'), true);
-    } finally {
-      applyWebsiteGeneratorAuthState();
-    }
-  });
-
-  void loadWebsiteGeneratorAuthState().then(() => loadWebsiteLinks());
-})();
 
 bindWebsiteGeneratorPageActions();
 

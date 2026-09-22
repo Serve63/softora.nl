@@ -9,6 +9,19 @@ function normalizeWebdesignVariant(value) {
     : WEBDESIGN_VARIANT_V1;
 }
 
+function buildWebdesignPipelineOptions({ variant: inputVariant, source, company = '', domain = '' }) {
+  const variant = normalizeWebdesignVariant(inputVariant);
+  const usesHomepageScreenshot = variant === WEBDESIGN_VARIANT_V2;
+  return {
+    allowScanFallback: true,
+    imageSize: '1024x1536',
+    disableReferenceImages: !usesHomepageScreenshot,
+    referenceImageMode: usesHomepageScreenshot ? 'homepage-screenshot' : 'prompt-only',
+    requireReferenceImages: usesHomepageScreenshot,
+    body: { source, action: 'webdesign', variant, company, domain },
+  };
+}
+
 function buildWebdesignGenerationProvenance(job = {}) {
   const authenticatedEmail = String(job.ownerKey || '').split('::')[0].trim().toLowerCase();
   const senderEmail = job.customer && job.customer.webdesignMailProvider === 'instantly' &&
@@ -64,6 +77,7 @@ module.exports = {
   WEBDESIGN_VARIANT_V1,
   WEBDESIGN_VARIANT_V2,
   buildWebdesignGenerationProvenance,
+  buildWebdesignPipelineOptions,
   filterDesignPhotoRowsForServing,
   isDesignPhotoIncidentQuarantined,
   markIncidentQuarantinedDesignPhotosAuthoritative,
