@@ -127,7 +127,9 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 /* PREVIEW ZONE */
 .preview-zone { margin-top: 24px; width: 100%; max-width: 360px; }
 .preview-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-.preview-actions { display: flex; gap: 8px; }
+.preview-label { gap: 10px; }
+.preview-label > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .3px; }
+.preview-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .preview-media { display: block; width: 100%; }
 .preview-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
 .preview-footer .btn { padding: 8px 12px; font-size: 11px; letter-spacing: .7px; }
@@ -357,7 +359,6 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div class="card">
     <div class="card-head">
       <div class="card-title">Bibliotheek</div>
-      <div class="card-sub">Elk webdesign dat wordt gemaakt, wordt centraal opgeslagen in <strong>Supabase</strong> en verschijnt hier voor alle accounts.</div>
     </div>
     <div class="card-body">
       <div id="library-empty" class="empty-state" style="padding: 48px 24px;">
@@ -377,7 +378,6 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div class="card" style="margin-bottom:24px">
     <div class="card-head">
       <div class="card-title">Website Scannen</div>
-      <div class="card-sub">Eén URL per keer. AI genereert voor die website één homepage preview.</div>
     </div>
     <div class="card-body">
       <div class="input-row" style="align-items: flex-start">
@@ -405,7 +405,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 </div>
 <script src="assets/premium-websitegenerator-job-resume.js?v=20260922-active" defer></script>
 <script src="assets/premium-websitegenerator-ui-state.js?v=20260922-stable" defer></script>
-<script src="assets/premium-websitegenerator.js?v=20260922-regenerate" defer></script>
+<script src="assets/premium-websitegenerator.js?v=20260922-no-complete-bar" defer></script>
 <script src="assets/premium-websitegenerator-boot.js?v=20260507a" defer></script>
 </body>
 </html>
