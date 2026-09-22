@@ -261,8 +261,16 @@
     color: #1a1a1a;
 }
 
+.mail-roi-value-softora {
+    color: var(--purple);
+}
+
 .mail-roi-value-instantly {
     color: var(--blue);
+}
+
+.mail-roi-value-combined {
+    color: #1a1a1a;
 }
 
 .mail-roi-autopilot-toggle {
