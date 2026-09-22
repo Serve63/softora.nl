@@ -133,6 +133,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/toekomst", "destination": "/assets/entry/toekomst.html" },
     {
       "source": "/chatbot-login",
       "destination": "/assets/chatbot-login/index.html"
