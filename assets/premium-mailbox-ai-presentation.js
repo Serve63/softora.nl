@@ -27,7 +27,7 @@
   }
   function read(message) {
     const value = message?.aiPresentation;
-    if (!value) return null;
+    if (!value || value.reason === 'outside_scope') return null;
     const body = sourceBody(message);
     if (value.version === VERSION && value.status === 'pending' && value.gate === true) {
       return { body: 'Deze e-mail wordt opgeschoond. De inhoud verschijnt automatisch zodra dit klaar is.',

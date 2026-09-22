@@ -73,7 +73,7 @@ function imageLabel(node) {
   return normalizeText(attributes.alt);
 }
 
-function parseProviderHtml(value, { includeImageLabels = false } = {}) {
+function parseProviderHtml(value, { includeImageLabels = false, includeLinkTargets = true } = {}) {
   const html = normalizeText(value);
   if (!html) {
     return {
@@ -137,6 +137,7 @@ function parseProviderHtml(value, { includeImageLabels = false } = {}) {
     if (tag === 'a') {
       const label = normalizeText(readPlainText(node).replace(/\s+/g, ' '));
       const href = normalizeText(node.attribs && node.attribs.href);
+      if (!includeLinkTargets) { append(label); return; }
       if (
         /^(?:deze\s+link|link|hier)$/i.test(label) &&
         isExactSoftoraWebdesignUrl(href)
@@ -167,7 +168,19 @@ function parseProviderHtml(value, { includeImageLabels = false } = {}) {
   };
 }
 
+// Restore only whitespace proven by the corresponding HTML. A divergent plain-text
+// alternative must never be replaced by HTML content, even when HTML looks nicer.
+function restoreMailboxParagraphs(body, html) {
+  const original = String(body || '');
+  if (!html || !original.trim()) return original;
+  const formatted = parseProviderHtml(html, { includeLinkTargets: false }).body;
+  const compact = (value) => String(value).replace(/\s/g, '');
+  const repairsJoinedWords = formatted.split(/\s+/).length > original.trim().split(/\s+/).length;
+  return repairsJoinedWords && compact(formatted) === compact(original) ? formatted : original;
+}
+
 module.exports = {
+  restoreMailboxParagraphs,
   decodeMailboxEntities,
   isMailboxHtml,
   isExactSoftoraWebdesignUrl,
