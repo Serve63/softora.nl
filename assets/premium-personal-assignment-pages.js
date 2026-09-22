@@ -211,7 +211,7 @@
 
     function syncActiveOrdersPage() {
         const grid = doc.getElementById('ordersGrid');
-        if (!grid) return;
+        if (!grid || grid.dataset.ordersState === 'unavailable') return;
         const cards = Array.from(grid.querySelectorAll('.order-card'));
         cards.forEach((card) => {
             const shouldHide = currentState.enabled && !matchesCurrentOwner(card.querySelector('.order-assignee')?.textContent || '');

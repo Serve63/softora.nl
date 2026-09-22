@@ -537,7 +537,7 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
   assert.doesNotMatch(html, /assets\/premium-active-order-open-leads\.js/, 'Openstaande leads asset mag niet in de eerste laadroute staan.');
   assert.doesNotMatch(html, /assets\/premium-active-order-manual-open-leads\.js/, 'Handmatige openstaande leads asset mag niet in de eerste laadroute staan.');
-  assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
+  assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260922b/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
   assert.match(html, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/, 'Aanmaken-knop hoort neutraal te zijn.');
   const createButtonHtml = html.match(/<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?<\/button>/)?.[0] || '';
   assert.doesNotMatch(createButtonHtml, /<svg\b/, 'Aanmaken-knop hoort geen plus-icoon meer te tonen.');
@@ -547,8 +547,8 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op openstaande opdrachten te staan.');
-  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260722a"><\/script>/, 'Bootstrap hoort direct te starten.');
-  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script>/, 'Opdrachten-script hoort direct te starten.');
+  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260922b"><\/script>/, 'Bootstrap hoort direct te starten.');
+  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260922b"><\/script>/, 'Opdrachten-script hoort direct te starten.');
 });
 
 test('page smoke: premium-actieve-opdrachten.html renders without a blocking boot loader', () => {

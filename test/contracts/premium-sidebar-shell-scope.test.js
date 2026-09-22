@@ -1418,3 +1418,15 @@ test('Webdesign remains visible and clickable in the shared menu and all pruning
   assert.doesNotMatch(prefill.match(/var FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS = \[[\s\S]*?\];/)[0], /"websitegenerator"/);
   assert.match(prefill, /ensureFirstPaintSidebarLink\(sidebar, management, getFirstPaintSidebarLink\("websitegenerator"\)/);
 });
+
+
+test('dashboard owns refresh lifetime while preserving the existing sidebar shell', () => {
+  const pageSource = readRepoFile('premium-personeel-dashboard.html');
+  const refreshSource = readRepoFile('assets/premium-dashboard-refresh.js');
+  assert.match(pageSource, /assets\/premium-dashboard-refresh\.js\?v=20260922b/);
+  assert.match(pageSource, /dashboardRefresh\.mount\(\)/);
+  assert.match(refreshSource, /root\.addEventListener\('pagehide', dispose/);
+  assert.match(refreshSource, /root\.removeEventListener\('focus', refreshWhenVisible\)/);
+  assert.match(refreshSource, /root\.document\.removeEventListener\('visibilitychange', refreshWhenVisible\)/);
+  assert.match(pageSource, /if \(!isCurrent\(\)\) return false;/);
+});

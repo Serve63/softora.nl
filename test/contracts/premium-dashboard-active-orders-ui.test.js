@@ -7,8 +7,8 @@ test('premium dashboard leest actieve opdrachten uit chunked Supabase state', ()
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const loadOrdersSource = pageSource.slice(
-    pageSource.indexOf('async function loadPremiumDashboardOrders()'),
-    pageSource.indexOf('async function loadPremiumDashboardCustomers()')
+    pageSource.indexOf('async function loadPremiumDashboardOrders('),
+    pageSource.indexOf('async function loadPremiumDashboardCustomers(')
   );
   const validationLine = loadOrdersSource.split('\n').find((line) => line.includes('Geen Supabase-opdrachtdata')) || '';
 
