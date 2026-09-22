@@ -14,6 +14,23 @@ test('the live schedule is reconciled into today while invalid dates are rejecte
   await assert.rejects(service.get('2026-09-23'),{status:400});
   await assert.rejects(service.set({date:'2026-09-22',done:'true'}),{status:400});
 });
+test('stale cut sessions are refreshed from the complete canonical logbook exercise source',async()=>{
+  const plan={
+    days:{tuesday:{orders:['7'],exercises:{7:{title:'Old press',exerciseKey:'press',sets:'2',reps:'8',kg:'old',notes:'old day copy'}}}},
+    exerciseSources:{press:{title:'Chest Press',sets:'3',reps:'10',kg:'82,5',notes:'Canonical note'}},
+  };
+  let session={training_date:'2026-09-22',exercises:[{order:7,title:'Old press',sets:2,reps:'8',kg:'old',notes:'old day copy'}],checks:{}};
+  let refreshed;
+  const repo={
+    plan:async()=>({payload:plan,updatedAt:'2026-09-22T17:00:00Z'}),
+    read:async()=>session,
+    refreshExercises:async(_date,exercises)=>{refreshed=exercises;session={...session,exercises};return session;},
+  };
+  const service=createLogboekCutService({now:()=>new Date('2026-09-22T18:00:00Z'),repo});
+  const body=await service.get('2026-09-22');
+  assert.deepEqual(refreshed,[{order:7,title:'Chest Press',kg:'82,5',reps:'10',sets:3,notes:'Canonical note'}]);
+  assert.deepEqual(body.session.exercises,refreshed);
+});
 test('SQL saves are atomic, idempotent, conflict-aware and isolated per date',async()=>{
   const db=new PGlite();
   try {
