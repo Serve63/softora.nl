@@ -1,3 +1,4 @@
+const { singleWebsitePreviewRequest, mergeWebsitePreviewLibrary, reconcileWebsitePreviewCards, createWebsitePreviewNavigation } = window.SoftoraWebsitePreviewUiState;
 let websitePreviewLibraryRemoteEntries = null;
 let websitePreviewLibraryLoadError = false;
 let websitePreviewLibraryUseRemote = false;
@@ -37,7 +38,8 @@ function loadLibraryEntries() {
   return [];
 }
 
-async function maybeHydrateWebsitePreviewLibraryFromServer() {
+const maybeHydrateWebsitePreviewLibraryFromServer = singleWebsitePreviewRequest(async function () {
+  if (!websiteGeneratorAuthState.loaded) return;
   if (!websiteGeneratorAuthState.authenticated) {
     websitePreviewLibraryRemoteEntries = [];
     websitePreviewLibraryUseRemote = true;
@@ -55,7 +57,7 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
       throw new Error(String(data?.detail || data?.error || 'Bibliotheek laden mislukt'));
     }
     websitePreviewLibraryLoadError = false;
-    websitePreviewLibraryRemoteEntries = Array.isArray(data.entries) ? data.entries : [];
+    websitePreviewLibraryRemoteEntries = mergeWebsitePreviewLibrary(Array.isArray(data.entries) ? data.entries : [], websitePreviewLibraryRemoteEntries);
     websitePreviewLibraryUseRemote = true;
     if (Number(data.omittedLargeItems || 0) > 0) {
       showToast('Bibliotheek geladen; een paar te grote previews zijn overgeslagen');
@@ -65,7 +67,7 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
     websitePreviewLibraryLoadError = true;
     console.warn('Websitepreview-bibliotheek laden mislukt:', error);
   }
-}
+});
 
 async function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, height }) {
   if (!dataUrl || !url) return;
@@ -198,6 +200,7 @@ function renderLibraryPanel() {
   const emptyText = empty.querySelector('p');
   if (emptyText) emptyText.textContent = websitePreviewLibraryLoadError
     ? 'Bibliotheek kon niet worden geladen. Open Bibliotheek opnieuw om het nogmaals te proberen.'
+    : websitePreviewLibraryRemoteEntries === null ? 'Bibliotheek laden…'
     : 'Nog geen opgeslagen previews. Genereer een preview onder Website Scan & Preview — die verschijnt dan hier.';
   if (!items.length) {
     grid.style.display = 'none';
@@ -207,7 +210,7 @@ function renderLibraryPanel() {
   }
   empty.style.display = 'none';
   grid.style.display = 'grid';
-  grid.replaceChildren(...items.map((entry) => createLibraryCardElement(entry)));
+  reconcileWebsitePreviewCards(grid, items, createLibraryCardElement);
 }
 
 async function removeLibraryEntry(id, ev) {
@@ -249,7 +252,7 @@ async function removeLibraryEntry(id, ev) {
   showToast('Verwijderen kan alleen vanuit de centrale bibliotheek.');
 }
 
-async function fetchLibraryEntryById(id) {
+const fetchLibraryEntryById = singleWebsitePreviewRequest(async function fetchLibraryEntryById(id) {
   const entryId = String(id || '').trim();
   if (!entryId || !websiteGeneratorAuthState.authenticated) return null;
   try {
@@ -262,18 +265,21 @@ async function fetchLibraryEntryById(id) {
     const data = await response.json().catch(() => ({}));
     if (response.ok && data?.ok && data.entry?.id) {
       const entry = data.entry;
-      const merged = [entry, ...(websitePreviewLibraryRemoteEntries || []).filter((x) => x.id !== entry.id)];
-      websitePreviewLibraryRemoteEntries = merged;
+      const current = websitePreviewLibraryRemoteEntries || [];
+      websitePreviewLibraryRemoteEntries = current.some((x) => x.id === entry.id)
+        ? current.map((x) => x.id === entry.id ? entry : x) : [entry, ...current];
       websitePreviewLibraryUseRemote = true;
       return entry;
     }
   } catch (_) {}
   return null;
-}
+}, (id) => String(id));
 
 async function openLibraryEntry(id) {
+  const isCurrent = websitePreviewNavigation.beginOpen();
   let entry = loadLibraryEntries().find((x) => x.id === id);
   if (!entry?.dataUrl) entry = await fetchLibraryEntryById(id);
+  if (!isCurrent()) return;
   if (!entry || !entry.dataUrl) {
     showToast('Item niet gevonden');
     return;
@@ -294,30 +300,10 @@ async function openLibraryEntry(id) {
   showToast('Preview geopend');
 }
 
-async function switchTab(name, el) {
-  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-  const tabBtn = el || document.querySelector(`.tab[data-tab="${name}"]`);
-  const panel = document.getElementById('tab-' + name);
-  if (panel) panel.classList.add('active');
-  if (tabBtn) tabBtn.classList.add('active');
-  if (name === 'library') {
-    await maybeHydrateWebsitePreviewLibraryFromServer();
-    renderLibraryPanel();
-  }
-  try {
-    const base = `${window.location.pathname || '/premium-websitegenerator'}${window.location.search || ''}`;
-    if (name === 'library') {
-      if (window.location.hash !== '#bibliotheek') {
-        window.location.hash = 'bibliotheek';
-      }
-    } else if (window.location.hash) {
-      window.history.replaceState(null, '', base);
-      const refresh = window.SoftoraPersonnelTheme && window.SoftoraPersonnelTheme.refreshPremiumStaticSidebarActiveState;
-      if (typeof refresh === 'function') refresh();
-    }
-  } catch (_) {}
-}
+const websitePreviewNavigation = createWebsitePreviewNavigation({
+  window, document, loadLibrary: maybeHydrateWebsitePreviewLibraryFromServer, renderLibrary: renderLibraryPanel,
+});
+function switchTab(name, el) { return websitePreviewNavigation.switchTab(name, el); }
 
 let websiteGeneratorAuthState = {
   loaded: false,
@@ -489,7 +475,7 @@ function createDownloadIconElement() {
   return svg;
 }
 
-function createPreviewZoneElement(blockId, hostname, previewWidth, useStablePreviewImageId) {
+function createPreviewZoneElement(blockId, hostname, previewWidth, useStablePreviewImageId, previewHeight = WEBSITE_PREVIEW_IMAGE_HEIGHT) {
   const host = String(hostname || '');
   const frameW = Math.min(window.innerWidth - 100, previewWidth);
 
@@ -523,6 +509,8 @@ function createPreviewZoneElement(blockId, hostname, previewWidth, useStablePrev
     img.className = 'preview-image-pixel';
   }
   img.alt = `Website preview ${host}`;
+  img.width = previewWidth;
+  img.height = previewHeight;
   img.style.width = '100%';
   img.style.height = 'auto';
   img.style.display = 'block';
@@ -566,7 +554,8 @@ function mountScanPreviewUI(previewDataUrl, url, hostname, fileName, previewWidt
     blockId,
     hostname,
     previewWidth,
-    true
+    true,
+    previewHeight
   ));
   out.replaceChildren(stack);
   wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName);
@@ -713,7 +702,7 @@ async function startBackgroundBatchScan(urls) {
   scheduleWebsitePreviewBatchPoll();
 }
 
-async function pollWebsitePreviewBatch() {
+const pollWebsitePreviewBatch = singleWebsitePreviewRequest(async function () {
   const jobId = getStoredWebsitePreviewBatchJobId();
   if (!jobId) {
     clearWebsitePreviewBatchPoll();
@@ -757,7 +746,8 @@ async function pollWebsitePreviewBatch() {
     }
     websitePreviewBatchPollFailures = 0;
     const fingerprint = buildWebsitePreviewJobFingerprint(payload.job);
-    if (fingerprint === websitePreviewBatchPollLastFingerprint) {
+    const progressChanged = fingerprint !== websitePreviewBatchPollLastFingerprint;
+    if (!progressChanged) {
       websitePreviewBatchPollNoProgress += 1;
     } else {
       websitePreviewBatchPollNoProgress = 0;
@@ -772,7 +762,7 @@ async function pollWebsitePreviewBatch() {
       );
       return;
     }
-    await renderBatchJobProgress(payload.job);
+    if (progressChanged) await renderBatchJobProgress(payload.job);
     if (payload.job.status === 'done' || payload.job.status === 'error') {
       clearStoredWebsitePreviewBatchJobId();
       clearWebsitePreviewBatchPoll();
@@ -795,7 +785,7 @@ async function pollWebsitePreviewBatch() {
       );
     }
   }
-}
+});
 
 async function renderBatchJobProgress(job) {
   const stack = document.getElementById('scan-previews-stack');
@@ -823,9 +813,6 @@ async function renderBatchJobProgress(job) {
     bar.textContent = total ? `Preview bezig… (${total} URL)` : 'Preview bezig…';
   }
 
-  if (websiteGeneratorAuthState.authenticated) {
-    await maybeHydrateWebsitePreviewLibraryFromServer().catch(() => {});
-  }
   const entries = loadLibraryEntries();
 
   stack.replaceChildren();
@@ -854,7 +841,7 @@ async function renderBatchJobProgress(job) {
       if (entry && isSafeLibraryDataUrl(entry.dataUrl)) {
         const blockId = newPreviewBlockId();
         const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
-        stack.appendChild(createPreviewZoneElement(blockId, entry.hostname || host, w, false));
+        stack.appendChild(createPreviewZoneElement(blockId, entry.hostname || host, w, false, Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT));
         wirePreviewBlock(
           blockId,
           entry.dataUrl,
@@ -869,10 +856,6 @@ async function renderBatchJobProgress(job) {
         ));
       }
     }
-  }
-  const last = stack.lastElementChild;
-  if (last && job.status === 'running') {
-    last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
 
@@ -1175,23 +1158,4 @@ loadWebsiteGeneratorAuthState();
 
 bindWebsiteGeneratorPageActions();
 
-(function initWebsiteGeneratorLibraryHash() {
-  function applyLibraryHash() {
-    const raw = String(window.location.hash || "")
-      .replace(/^#/, "")
-      .trim()
-      .toLowerCase();
-    if (raw !== "bibliotheek" && raw !== "library") return;
-    const libBtn = document.querySelector('.tab[data-tab="library"]');
-    void (async () => {
-      if (libBtn) await switchTab("library", libBtn);
-      else if (typeof renderLibraryPanel === "function") renderLibraryPanel();
-    })();
-  }
-  window.addEventListener("hashchange", applyLibraryHash);
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", applyLibraryHash);
-  } else {
-    applyLibraryHash();
-  }
-})();
+websitePreviewNavigation.init();
