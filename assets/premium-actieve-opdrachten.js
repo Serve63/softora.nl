@@ -100,56 +100,11 @@ function getTime() {
 }
 
 async function fetchUiStateGetWithFallback(scope) {
-    const encodedScope = encodeURIComponent(String(scope || ''));
-    const urls = [
-        `/api/ui-state-get?scope=${encodedScope}`,
-        `/api/ui-state/${encodedScope}`
-    ];
-    let lastError = null;
-
-    for (const url of urls) {
-        try {
-            const res = await fetch(url, {
-                method: 'GET',
-                cache: 'no-store'
-            });
-            if (!res.ok) {
-                throw new Error(`UI-state GET mislukt (${res.status})`);
-            }
-            return await res.json().catch(() => ({}));
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw lastError || new Error('UI-state GET mislukt');
+    return window.SoftoraActiveOrdersBoot.getState(scope);
 }
 
 async function fetchUiStateSetWithFallback(scope, body) {
-    const encodedScope = encodeURIComponent(String(scope || ''));
-    const urls = [
-        `/api/ui-state-set?scope=${encodedScope}`,
-        `/api/ui-state/${encodedScope}`
-    ];
-    let lastError = null;
-
-    for (const url of urls) {
-        try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body || {})
-            });
-            if (!res.ok) {
-                throw new Error(`UI-state POST mislukt (${res.status})`);
-            }
-            return await res.json().catch(() => ({}));
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw lastError || new Error('UI-state POST mislukt');
+    return window.SoftoraActiveOrdersBoot.setState(scope, body);
 }
 
 async function loadRemoteUiState(options = {}) {
@@ -158,7 +113,8 @@ async function loadRemoteUiState(options = {}) {
 
     remoteUiStateLoadPromise = (async () => {
         try {
-            const data = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
+            const data = await window.SoftoraActiveOrdersBoot.getState(REMOTE_UI_STATE_SCOPE, options);
+            if (!window.SoftoraActiveOrdersBoot.hasCompleteOrdersState(data)) throw new Error('Onvolledige opdrachtgegevens.');
             if (data?.ok && data.values && typeof data.values === 'object') {
                 const next = {};
                 Object.entries(data.values).forEach(([k, v]) => {
@@ -169,7 +125,6 @@ async function loadRemoteUiState(options = {}) {
             remoteUiStateLoaded = true;
             return true;
         } catch (_) {
-            remoteUiStateLoaded = true;
             return false;
         } finally {
             remoteUiStateLoadPromise = null;
@@ -265,9 +220,9 @@ function getBuildSteps() {
     return buildMode === 'premium' ? premiumBuildSteps : quickBuildSteps;
 }
 
-function setBuildMode(mode) {
+function setBuildMode(mode, options = {}) {
     buildMode = mode === 'premium' ? 'premium' : 'quick';
-    saveBuildMode(buildMode);
+    if (options.persist !== false) saveBuildMode(buildMode);
 
     document.querySelectorAll('.mode-btn[data-build-mode]').forEach((btn) => {
         btn.classList.toggle('active', btn.getAttribute('data-build-mode') === buildMode);
@@ -1185,7 +1140,7 @@ function applyOrderUiStateToCard(id) {
     refreshOrderSummaryCards();
 }
 
-function reconcileOrdersRuntimeAfterRestore() {
+function reconcileOrdersRuntimeAfterRestore(options = {}) {
     let changed = false;
 
     Object.keys(orders).forEach((idRaw) => {
@@ -1238,13 +1193,13 @@ function reconcileOrdersRuntimeAfterRestore() {
         if (note) {
             const lastLog = Array.isArray(order.logs) && order.logs.length ? String(order.logs[order.logs.length - 1]?.msg || '') : '';
             if (lastLog !== note) {
-                appendOrderLog(id, note, true);
+                appendOrderLog(id, note, true, options);
                 changed = true;
             }
         }
     });
 
-    if (changed) {
+    if (changed && options.persist !== false) {
         persistOrdersRuntime();
     }
 }
@@ -1274,7 +1229,7 @@ function restoreOrdersRuntimeFromState() {
             };
         });
 
-        reconcileOrdersRuntimeAfterRestore();
+        reconcileOrdersRuntimeAfterRestore({ persist: false });
         Object.keys(orders).forEach((id) => applyOrderUiStateToCard(Number(id)));
     } catch (_) {
         // ignore broken state
@@ -2433,7 +2388,7 @@ function setOrderProgress(id, pct, step, options = {}) {
     if (options.persist !== false) persistOrdersRuntime();
 }
 
-function appendOrderLog(id, msg, highlight = false) {
+function appendOrderLog(id, msg, highlight = false, options = {}) {
     if (!orders[id]) return;
     const entry = {
         time: getTime(),
@@ -2443,7 +2398,7 @@ function appendOrderLog(id, msg, highlight = false) {
     orders[id].logs.push(entry);
     orders[id].updatedAt = Date.now();
     refreshOpenModalOverview(id);
-    persistOrdersRuntime();
+    if (options.persist !== false) persistOrdersRuntime();
 }
 
 function stopOrderProgressSimulation(id) {
@@ -2910,9 +2865,9 @@ function bindActiveOrdersPageUi() {
 }
 
 async function initializeActiveOrdersPageState(options = {}) {
-    if (options.loadRemote !== false) await loadRemoteUiState({ force: Boolean(options.forceRemote) });
+    if (options.loadRemote !== false && !await loadRemoteUiState({ force: Boolean(options.forceRemote) })) throw new Error('Opdrachtgegevens niet geladen. Probeer opnieuw.');
     buildMode = loadBuildMode();
-    setBuildMode(buildMode);
+    setBuildMode(buildMode, { persist: false });
     clearDemoOrdersOnLoad();
     loadCustomOrderCards();
     restoreOrdersRuntimeFromState();
@@ -2925,8 +2880,14 @@ async function bootActiveOrdersPage() {
     const hadBootstrap = typeof boot.hydrateRemoteUiStateFromBootstrap === 'function' ? boot.hydrateRemoteUiStateFromBootstrap(remoteUiStateCache, (next) => { remoteUiStateCache = next; remoteUiStateLoaded = true; }) : false;
     try {
         await initializeActiveOrdersPageState({ loadRemote: !hadBootstrap });
+    } catch (_) {
+        const grid = document.getElementById('ordersGrid');
+        if (grid) { grid.dataset.ordersState = 'unavailable'; grid.textContent = 'Opdrachtgegevens niet geladen. Herlaad de pagina om opnieuw te proberen.'; grid.setAttribute('role', 'alert'); }
+        ['sumActive', 'sumTotal', 'sumDelivered', 'filterCountProgress', 'filterCountCompleted'].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+        document.getElementById('sumActive')?.setAttribute('aria-label', 'Opdrachtgegevens niet geladen');
+        document.querySelectorAll('#createOrderBtn, [data-order-filter]').forEach((button) => { button.disabled = true; });
     } finally {
-        (boot.releaseAfterMinimum || (() => window.SoftoraPremiumBoot?.setShellBooting?.(false)))(bootStartedAt); if (hadBootstrap) void loadRemoteUiState({ force: true }).then((loaded) => loaded && initializeActiveOrdersPageState({ loadRemote: false })).catch(() => {});
+        (boot.releaseAfterMinimum || (() => window.SoftoraPremiumBoot?.setShellBooting?.(false)))(bootStartedAt);
     }
 }
 

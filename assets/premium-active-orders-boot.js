@@ -1,4 +1,7 @@
-(function (root) {
+(function (root, createBoot) {
+    if (typeof module === 'object' && module.exports) module.exports = createBoot;
+    else createBoot(root);
+})(typeof window !== 'undefined' ? window : globalThis, function (root) {
     'use strict';
 
     const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';
@@ -64,10 +67,62 @@
         }
     }
 
+    function requireState(data) {
+        if (!data || data.ok !== true || !data.values || typeof data.values !== 'object' || Array.isArray(data.values)) {
+            throw new Error('Opdrachtgegevens niet geladen. Probeer opnieuw.');
+        }
+        return data;
+    }
+
+    function readCompleteJsonState(values, key) {
+        const metaRaw = values[getStateChunkMetaKey(key)];
+        if (metaRaw) {
+            const count = JSON.parse(metaRaw).count;
+            if (!Number.isInteger(count) || count < 1 || count > 200) throw new Error('Ongeldig aantal delen.');
+            for (let i = 0; i < count; i += 1) {
+                if (typeof values[getStateChunkPrefix(key) + i] !== 'string') throw new Error('Ontbrekend deel.');
+            }
+        }
+        return JSON.parse(readChunkedStateValue(values, key));
+    }
+
+    function hasCompleteOrdersState(snapshot) {
+        if (!snapshot || snapshot.ok === false || ['unavailable', 'bootstrap-timeout'].includes(String(snapshot.source || '').toLowerCase())) return false;
+        const values = snapshot.values;
+        if (!values || typeof values !== 'object' || Array.isArray(values)) return false;
+        try {
+            // Never replace a missing chunk with an older unchunked copy.
+            if (!Array.isArray(readCompleteJsonState(values, 'softora_custom_orders_premium_v1'))) return false;
+            for (const key of ['softora_order_runtime_premium_v1', 'softora_order_state_premium_v1']) {
+                if (!values[key] && !values[getStateChunkMetaKey(key)]) continue;
+                const parsed = readCompleteJsonState(values, key);
+                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+            }
+            return true;
+        } catch (_) { return false; }
+    }
+
+    async function getState(scope, options = {}) {
+        const client = root.SoftoraUiStateClient;
+        if (!client?.get) throw new Error('Gedeelde gegevensclient niet beschikbaar.');
+        const cached = client.peek?.(scope);
+        const unusable = cached && (cached.ok !== true || (scope === 'premium_active_orders' && !hasCompleteOrdersState(cached)));
+        if (options.force || unusable) client.invalidate(scope);
+        return requireState(await client.get(scope));
+    }
+
+    async function setState(scope, body) {
+        const client = root.SoftoraUiStateClient;
+        if (!client?.set) throw new Error('Gedeelde gegevensclient niet beschikbaar.');
+        const data = await client.set(scope, body);
+        if (data?.ok !== true) throw new Error('Opdrachtgegevens niet opgeslagen. Probeer opnieuw.');
+        return data;
+    }
+
     function hydrateRemoteUiStateFromBootstrap(currentCache, setCache) {
         const payload = readActiveOrdersBootstrapPayload();
         const values = payload?.activeOrdersState?.values;
-        if (!values || typeof values !== 'object' || Array.isArray(values)) return false;
+        if (payload?.ok === false || !hasCompleteOrdersState(payload?.activeOrdersState)) return false;
 
         const nextValues = {};
         Object.entries(values).forEach(([key, value]) => {
@@ -113,6 +168,9 @@
 
     root.SoftoraActiveOrdersBoot = Object.freeze({
         buildStateWritePatch,
+        getState,
+        setState,
+        hasCompleteOrdersState,
         hydrateRemoteUiStateFromBootstrap,
         readActiveOrdersBootstrapPayload,
         readChunkedStateValue,
@@ -120,4 +178,5 @@
         releaseAfterMinimum,
         startWatchdog
     });
-})(typeof window !== 'undefined' ? window : globalThis);
+    return root.SoftoraActiveOrdersBoot;
+});

@@ -68,42 +68,13 @@
     }
 
     async function fetchStateGet() {
-        const scope = encodeURIComponent(SCOPE);
-        const urls = [`/api/ui-state-get?scope=${scope}`, `/api/ui-state/${scope}`];
-        let lastError = null;
-        for (const url of urls) {
-            try {
-                const response = await fetch(url, { method: 'GET', cache: 'no-store' });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data?.ok) throw new Error(String(data?.error || `UI-state lezen mislukt (${response.status})`));
-                return data;
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        throw lastError || new Error('UI-state lezen mislukt.');
+        return window.SoftoraActiveOrdersBoot.getState(SCOPE, { force: true });
     }
 
     async function fetchStateSet(patch) {
-        const scope = encodeURIComponent(SCOPE);
-        const urls = [`/api/ui-state-set?scope=${scope}`, `/api/ui-state/${scope}`];
-        let lastError = null;
-        for (const url of urls) {
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ patch, source: 'premium-active-orders-edit-data', actor: 'browser' }),
-                    cache: 'no-store'
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data?.ok) throw new Error(String(data?.error || `UI-state opslaan mislukt (${response.status})`));
-                return data;
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        throw lastError || new Error('UI-state opslaan mislukt.');
+        return window.SoftoraActiveOrdersBoot.setState(SCOPE, {
+            patch, source: 'premium-active-orders-edit-data', actor: 'browser'
+        });
     }
 
     function readOrdersFromValues(values) {

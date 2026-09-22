@@ -138,8 +138,8 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const dataStatusPath = path.join(__dirname, '../../assets/premium-dashboard-data-status.js');
   const dataStatusSource = fs.readFileSync(dataStatusPath, 'utf8');
   const loadOrdersSource = pageSource.slice(
-    pageSource.indexOf('async function loadPremiumDashboardOrders()'),
-    pageSource.indexOf('async function loadPremiumDashboardCustomers()')
+    pageSource.indexOf('async function loadPremiumDashboardOrders('),
+    pageSource.indexOf('async function loadPremiumDashboardCustomers(')
   );
   const orderValidationLine = loadOrdersSource.split('\n').find((line) => line.includes('Geen Supabase-opdrachtdata')) || '';
 
@@ -192,7 +192,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(dataStatusSource, /function scheduleUnavailableForEmptyBootstrap\(\) \{\s*global\.setTimeout\(showUnavailableForEmptyBootstrap, 3200\);/);
   assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", scheduleUnavailableForEmptyBootstrap, \{ once: true \}\);/);
   assert.doesNotMatch(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap/);
-  assert.match(pageSource, /const loaded = customersLoaded \|\| premiumDashboardState\.customersHydrated;/);
+  assert.match(pageSource, /return dashboardRefresh\.refresh\(force, onlyMissing\)/);
   assert.match(coreSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(coreSource, /status === 401 \|\| status === 403 \|\| status === 429/);
   assert.doesNotMatch(coreSource, /status >= 500/);
@@ -202,15 +202,15 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /if \(!premiumDashboardState\.customersHydrated\) \{ showPremiumDashboardUnavailable\(\); return; \}/);
   assert.match(pageSource, /showUnavailable\(\{ preserveActiveOrders: hasOrders \}\)/);
   assert.match(pageSource, /if \(premiumDashboardState\.ordersHydrated\) updateKpiActiveOrdersDisplay\(activeOrders\);/);
-  assert.match(pageSource, /recoveryTimer: null,/);
-  assert.match(pageSource, /function schedulePremiumDashboardRecovery\(\) \{/);
-  assert.match(pageSource, /premiumDashboardState\.recoveryAttempts >= 4/);
+  const refreshSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-dashboard-refresh.js'), 'utf8');
+  assert.match(refreshSource, /function scheduleRecovery\(\) \{/);
+  assert.match(refreshSource, /attempts >= delays.length/);
+  assert.match(refreshSource, /const delays = \[1500, 4000, 9000, 15000\]/);
+  assert.match(refreshSource, /Promise\.all\(\[ordersResult, customersResult\]\)/);
+  assert.match(refreshSource, /loadCustomers\(current\)/);
+  assert.match(refreshSource, /else scheduleRecovery\(\)/);
+  assert.match(refreshSource, /else renderPending\(\)/);
   assert.match(pageSource, /void refreshPremiumDashboard\(true, true\);/);
-  assert.match(pageSource, /schedulePremiumDashboardRecovery\(\);/);
-  assert.match(pageSource, /const ordersPromise = shouldLoadOrders \? loadPremiumDashboardOrders\(\) : Promise\.resolve\(false\);/);
-  assert.match(pageSource, /const customersLoaded = shouldLoadCustomers \? await loadPremiumDashboardCustomers\(\) : false;/);
-  assert.match(pageSource, /if \(!ordersLoaded\) \{ if \(!premiumDashboardState\.ordersHydrated\) schedulePremiumDashboardRecovery\(\); return; \}/);
-  assert.match(pageSource, /else renderPremiumDashboardPending\(\); \}\);/);
   assert.doesNotMatch(pageSource, /Promise\.all\(\[loadPremiumDashboardCustomers\(\), loadPremiumDashboardOrders\(\)\]\)/);
   assert.match(pageSource, /if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/);
   assert.match(pageSource, /if \(hadPremiumDashboardCustomers\) renderPremiumDashboardOrders\(\);\s*else renderPremiumDashboardPending\(\);/);

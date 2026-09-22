@@ -1967,7 +1967,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260922a"></script><script src="assets/premium-dashboard-core.js?v=20260903a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260922a"></script><script src="assets/premium-dashboard-core.js?v=20260903a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script><script src="assets/premium-dashboard-refresh.js?v=20260922b"></script>
     <script>
         const initialNow = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -1978,12 +1978,8 @@
         const MONTH_LABELS_SHORT = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
         const MONTH_LABELS_LONG = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
         const premiumDashboardState = {
-            loading: false,
             orders: [],
             customers: [],
-            pollTimer: null, recoveryTimer: null, recoveryAttempts: 0,
-            refreshPromise: null,
-            lastRefreshAt: 0,
             ordersHydrated: false, customersHydrated: false,
         };
         let dashboardPeriodFilter = loadDashboardPeriodFilter();
@@ -2470,7 +2466,7 @@
         }
 
         async function fetchPremiumUiState(scope) {
-            if (window.SoftoraUiStateClient?.get) return window.SoftoraUiStateClient.get(scope);
+            if (window.SoftoraUiStateClient?.get) { const client = window.SoftoraUiStateClient; if (client.peek?.(scope)?.ok === false) client.invalidate(scope); return client.get(scope); }
             const encodedScope = encodeURIComponent(String(scope || ''));
             const urls = [
                 `/api/ui-state-get?scope=${encodedScope}`,
@@ -2873,28 +2869,25 @@
 
         function renderPremiumDashboardPending() { if (premiumDashboardState.ordersHydrated) updateKpiActiveOrdersDisplay(premiumDashboardState.orders.filter((order) => !order?.ui?.isBuilt)); }
         function showPremiumDashboardUnavailable() { const hasOrders = premiumDashboardState.ordersHydrated === true; if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable({ preserveActiveOrders: hasOrders }); renderPremiumDashboardPending(); }
-        function clearPremiumDashboardRecoveryTimer() { if (premiumDashboardState.recoveryTimer) { window.clearTimeout(premiumDashboardState.recoveryTimer); premiumDashboardState.recoveryTimer = null; } premiumDashboardState.recoveryAttempts = 0; } function schedulePremiumDashboardRecovery() { if (premiumDashboardState.recoveryTimer || premiumDashboardState.recoveryAttempts >= 4) return; const delays = [1500, 4000, 9000, 15000]; const delay = delays[premiumDashboardState.recoveryAttempts] || 15000; premiumDashboardState.recoveryAttempts += 1; premiumDashboardState.recoveryTimer = window.setTimeout(() => { premiumDashboardState.recoveryTimer = null; void refreshPremiumDashboard(true, true); }, delay); }
-        async function loadPremiumDashboardOrders() {
-            if (premiumDashboardState.loading) return false;
-            premiumDashboardState.loading = true;
+        async function loadPremiumDashboardOrders(isCurrent = () => true) {
             try {
                 const data = await fetchPremiumUiState(PREMIUM_ACTIVE_ORDERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
                 if (!Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY))) throw new Error('Geen Supabase-opdrachtdata ontvangen.');
+                if (!isCurrent()) return false;
                 premiumDashboardState.orders = parsePremiumOrdersFromState(values); premiumDashboardState.ordersHydrated = true;
                 return true;
             } catch (_) {
                 return false;
-            } finally {
-                premiumDashboardState.loading = false;
             }
         }
 
-        async function loadPremiumDashboardCustomers() {
+        async function loadPremiumDashboardCustomers(isCurrent = () => true) {
             try {
                 const response = await fetchPremiumDashboardJson('/api/dashboard/customers', { method: 'GET', cache: 'no-store' }, 2500);
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || data?.ok !== true || !Array.isArray(data.customers)) throw new Error('Geen formele dashboardklanten ontvangen.');
+                if (!isCurrent()) return false;
                 premiumDashboardState.customers = parsePremiumCustomers(data.customers);
                 premiumDashboardState.customersHydrated = true;
                 return true;
@@ -2903,29 +2896,14 @@
             }
         }
 
+        const dashboardRefresh = window.SoftoraDashboardRefresh({
+            root: window, state: premiumDashboardState,
+            loadOrders: loadPremiumDashboardOrders, loadCustomers: loadPremiumDashboardCustomers,
+            render: renderPremiumDashboardOrders, renderPending: renderPremiumDashboardPending,
+            showUnavailable: showPremiumDashboardUnavailable,
+        });
         function refreshPremiumDashboard(force = false, onlyMissing = false) {
-            const nowTs = Date.now();
-            if (premiumDashboardState.refreshPromise) return premiumDashboardState.refreshPromise;
-            if (!force && premiumDashboardState.lastRefreshAt && (nowTs - premiumDashboardState.lastRefreshAt) < 1200) {
-                return Promise.resolve(false);
-            }
-
-            premiumDashboardState.refreshPromise = (async () => {
-                const shouldLoadCustomers = !onlyMissing || !premiumDashboardState.customersHydrated;
-                const shouldLoadOrders = !onlyMissing || !premiumDashboardState.ordersHydrated;
-                const ordersPromise = shouldLoadOrders ? loadPremiumDashboardOrders() : Promise.resolve(false);
-                void ordersPromise.then((ordersLoaded) => { if (!ordersLoaded) { if (!premiumDashboardState.ordersHydrated) schedulePremiumDashboardRecovery(); return; } if (premiumDashboardState.customersHydrated) { clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); } else renderPremiumDashboardPending(); });
-                const customersLoaded = shouldLoadCustomers ? await loadPremiumDashboardCustomers() : false;
-                const loaded = customersLoaded || premiumDashboardState.customersHydrated;
-                if (loaded) { if (premiumDashboardState.ordersHydrated || !shouldLoadOrders) clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); }
-                else { showPremiumDashboardUnavailable(); schedulePremiumDashboardRecovery(); }
-                premiumDashboardState.lastRefreshAt = Date.now();
-                return loaded;
-            })().finally(() => {
-                premiumDashboardState.refreshPromise = null;
-            });
-
-            return premiumDashboardState.refreshPromise;
+            return dashboardRefresh.refresh(force, onlyMissing);
         }
 
         function formatTaskDateTimeLabel(task) {
@@ -3302,19 +3280,8 @@
         releasePremiumDashboardBootShell();
         if (!hadPremiumDashboardCustomers || !hadPremiumDashboardOrders) void refreshPremiumDashboard(true, true);
 
-        premiumDashboardState.pollTimer = window.setInterval(() => {
-            void refreshPremiumDashboard();
-        }, 30000);
-
-        window.addEventListener('focus', () => {
-            void refreshPremiumDashboard();
-        });
-
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                void refreshPremiumDashboard();
-            }
-        });
+        dashboardRefresh.mount();
+        window.addEventListener('pageshow', (event) => { if (event.persisted) { dashboardRefresh.mount(); void refreshPremiumDashboard(true); } });
 
         const cursor = document.querySelector('.cursor');
         const cursorDot = document.querySelector('.cursor-dot');
