@@ -2233,9 +2233,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /id="photoBatchSearcherCount">0<\/strong>/);
   assert.match(pageSource, /id="photoBatchRobotCount">0<\/strong>/);
   const photoBatchCss = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.css'), 'utf8');
-  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20260917-source/);
+  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20260922-count-fit/);
   assert.match(photoBatchCss, /\.photo-batch-option\.is-active/);
   assert.match(photoBatchCss, /photo-batch-source__choices/);
+  assert.match(photoBatchCss, /grid-template-columns: minmax\(0, \.92fr\) minmax\(0, 1\.18fr\) minmax\(0, 1fr\)/);
+  assert.match(photoBatchCss, /\.photo-batch-source__choices strong \{ flex: 0 0 auto;[^}]*overflow: visible;[^}]*text-overflow: clip;/);
+  assert.doesNotMatch(photoBatchCss, /\.photo-batch-source__choices strong \{[^}]*text-overflow: ellipsis;/);
   assert.match(photoBatchCss, /overflow-wrap: anywhere/);
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.js'), 'utf8'), /photoBatchPricingNote|Vooraf: geschatte beeldprijs/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);

@@ -13,7 +13,7 @@
 .photo-batch-provider__choices label:has(input:checked) { border-color: var(--crimson); background: rgba(139, 34, 82, .055); }
 .photo-batch-provider__choices input { accent-color: var(--crimson); margin-right: 6px; }
 .photo-batch-source { display: grid; gap: 8px; margin-top: 18px; color: var(--dark); font: 600 13px 'Inter', sans-serif; }
-.photo-batch-source__choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.photo-batch-source__choices { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.18fr) minmax(0, 1fr); gap: 8px; }
 .photo-batch-source__choices label {
   min-width: 0; display: flex; align-items: center; gap: 5px; box-sizing: border-box;
   padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px;
@@ -21,7 +21,7 @@
 }
 .photo-batch-source__choices label:has(input:checked) { border-color: var(--crimson); background: rgba(139, 34, 82, .055); }
 .photo-batch-source__choices input { flex: 0 0 auto; accent-color: var(--crimson); margin: 0; }
-.photo-batch-source__choices strong { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 600; color: var(--mid); font-variant-numeric: tabular-nums; }
+.photo-batch-source__choices strong { flex: 0 0 auto; margin-left: auto; min-width: 0; overflow: visible; text-overflow: clip; font-size: 11px; font-weight: 600; color: var(--mid); font-variant-numeric: tabular-nums; }
 .photo-batch-source__note { color: var(--mid); font-size: 11px; font-weight: 500; }
 .photo-cell > .photo-drop:not(.photo-drop--mockup)[data-has-photo="false"]:not(.is-generating) { border: 0; background: transparent; cursor: default; }
 .photo-batch-options { display: grid; min-width: 0; gap: 10px; }
