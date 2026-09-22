@@ -28,7 +28,7 @@ function environment() {
       markDegraded: (input) => { events.push(input.reason); },
     },
   };
-  const state = { canonicalInventoryReady: true, photoRestorePending: false, photoRestoreFailed: false, dataLoading: false };
+  const state = { canonicalInventoryReady: true, remoteCustomersLoaded: true, photoRestorePending: false, photoRestoreFailed: false, dataLoading: false };
   return { readiness: createReadiness(root), root, state, values, visible, events };
 }
 
@@ -53,6 +53,10 @@ test('Mailsysteem cannot claim readiness with missing metrics or incomplete medi
   assert.ok(!env.events.includes('ready'));
 
   env.values.set('systemMailSentTodayCount', '77');
+  env.state.remoteCustomersLoaded = false;
+  assert.equal(await env.readiness.publish({ state: env.state }), false);
+  assert.ok(env.events.includes('database-inventory-incomplete'));
+  env.state.remoteCustomersLoaded = true;
   env.state.photoRestoreFailed = true;
   assert.equal(await env.readiness.publish({ state: env.state }), false);
   assert.ok(env.events.includes('database-inventory-incomplete'));

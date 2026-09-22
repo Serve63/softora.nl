@@ -32,7 +32,7 @@
             const value = doc.getElementById(id)?.textContent?.trim();
             return value && value !== '--';
         });
-        const complete = state.canonicalInventoryReady === true &&
+        const complete = state.canonicalInventoryReady === true && state.remoteCustomersLoaded === true &&
             state.photoRestorePending === false && state.photoRestoreFailed !== true && state.dataLoading === false;
         if (!complete || !metricsReady) {
             readiness.markDegraded({ page: 'premium-database', reason: complete ? 'mail-metrics-unavailable' : 'database-inventory-incomplete' });
