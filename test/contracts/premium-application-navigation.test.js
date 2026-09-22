@@ -156,6 +156,17 @@ test('modified, external, download, new-tab, hash-only, and unregistered links k
   assert.equal(harness.address.href, 'https://softora.test/premium-personeel-dashboard');
 });
 
+test('non-HTTP link schemes cannot enter application navigation', async () => {
+  const harness = createHarness();
+  harness.navigation.start();
+  for (const href of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,hello', 'vbscript:MsgBox(1)']) {
+    assert.equal(click(harness.document, createAnchor(href)).prevented, false, href);
+    assert.equal((await harness.navigation.navigate(href, 'push')).status, 'unregistered-route', href);
+  }
+  assert.equal(harness.calls.length, 0);
+  assert.equal(harness.address.href, 'https://softora.test/premium-personeel-dashboard');
+});
+
 test('blocked dirty-form navigation keeps the old URL and screen active', async () => {
   const harness = createHarness({ navigate: async () => ({ status: 'blocked' }) });
   harness.navigation.start();

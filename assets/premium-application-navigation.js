@@ -45,6 +45,7 @@
       let url;
       try { url = new URL(String(rawUrl || win.location.href), win.location.origin); }
       catch (_) { return null; }
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
       if (url.origin !== win.location.origin) return null;
       const definition = routeMap.get(normalizePath(url.pathname));
       if (!definition) return null;
@@ -129,7 +130,7 @@
       if (target && target !== '_self') return false;
       if (anchor.getAttribute('rel')?.split(/\s+/).includes('external')) return false;
       const href = anchor.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
+      if (!href || href.startsWith('#')) return false;
       const resolved = routeFromUrl(anchor.href || href);
       if (!resolved) return false;
       if (!anchor.closest('.sidebar') && !anchor.hasAttribute('data-application-link')) return false;
