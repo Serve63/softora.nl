@@ -50,6 +50,8 @@ function buildServerAppUiContentRuntimeCompositionContext({
       isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
       getSupabaseClient: platformRuntime.getSupabaseClient,
       fetchSupabaseRowByKeyViaRest: platformRuntime.fetchSupabaseRowByKeyViaRest,
+      fetchSupabaseRowsByStateKeyPrefixViaRest: platformRuntime.fetchSupabaseRowsByStateKeyPrefixViaRest,
+      deleteSupabaseRowByStateKeyViaRest: platformRuntime.deleteSupabaseRowByStateKeyViaRest,
       upsertSupabaseRowViaRest: platformRuntime.upsertSupabaseRowViaRest,
       getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
       getAnthropicApiKey: platformRuntime.getAnthropicApiKey,

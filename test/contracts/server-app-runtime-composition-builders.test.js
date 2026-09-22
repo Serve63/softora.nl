@@ -887,6 +887,8 @@ test('server app runtime composition builders preserve operational runtime group
 });
 
 test('server app runtime composition builders preserve ui-content runtime groups', async () => {
+  const fetchLibraryRows = async (prefix) => ({ ok: true, body: [{ state_key: prefix + 'saved-photo' }] });
+  const deleteLibraryRow = async (key) => ({ ok: true, deleted: key });
   let bootstrapReader = async () => ({ ok: 'initial' });
   const fetchBinaryWithTimeout = async () => ({
     response: { ok: true, status: 200 },
@@ -916,6 +918,8 @@ test('server app runtime composition builders preserve ui-content runtime groups
       isSupabaseConfigured: () => true,
       getSupabaseClient: () => ({ from: () => ({}) }),
       fetchSupabaseRowByKeyViaRest: async () => null,
+      fetchSupabaseRowsByStateKeyPrefixViaRest: fetchLibraryRows,
+      deleteSupabaseRowByStateKeyViaRest: deleteLibraryRow,
       upsertSupabaseRowViaRest: async () => null,
       getOpenAiApiKey: () => 'openai',
       getAnthropicApiKey: () => 'anthropic',
@@ -953,6 +957,8 @@ test('server app runtime composition builders preserve ui-content runtime groups
     },
   });
 
+  assert.equal(context.platform.fetchSupabaseRowsByStateKeyPrefixViaRest, fetchLibraryRows);
+  assert.equal(context.platform.deleteSupabaseRowByStateKeyViaRest, deleteLibraryRow);
   assert.deepEqual(context.knownHtmlPageFiles, ['premium-test.html']);
   assert.equal(context.uiSeoConfig.seoConfigScope, 'seo');
   assert.equal(context.platform.getWebsiteGenerationProvider(), 'anthropic');
