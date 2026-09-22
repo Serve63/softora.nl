@@ -134,6 +134,10 @@
   ],
   "rewrites": [
     {
+      "source": "/chatbot-login",
+      "destination": "/assets/chatbot-login/index.html"
+    },
+    {
       "source": "/api/agenda/confirmation-tasks/:taskId",
       "destination": "/api/agenda/confirmation-task?taskId=:taskId"
     },
