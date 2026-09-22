@@ -894,9 +894,9 @@ async function resumeWebsitePreviewBatchIfAny() {
       });
       if (response.ok) {
         const payload = await response.json().catch(() => ({}));
-        if (payload?.job?.id) {
+        if (payload?.job?.id && payload.job.status === 'running') {
           hasResumed = true;
-        } else if (response.status === 404) {
+        } else {
           clearStoredWebsitePreviewBatchJobId();
           jobId = '';
         }
@@ -917,7 +917,7 @@ async function resumeWebsitePreviewBatchIfAny() {
         headers: { Accept: 'application/json' },
       });
       const payload = await response.json().catch(() => ({}));
-      if (response.ok && payload?.job?.id) {
+      if (response.ok && payload?.job?.id && payload.job.status === 'running') {
         jobId = String(payload.job.id);
         setStoredWebsitePreviewBatchJobId(jobId);
       } else {
