@@ -547,8 +547,8 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op openstaande opdrachten te staan.');
-  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260922b"><\/script>/, 'Bootstrap hoort direct te starten.');
-  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260922b"><\/script>/, 'Opdrachten-script hoort direct te starten.');
+  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script>/, 'Bootstrap hoort direct te starten.');
+  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260922c"><\/script>/, 'Opdrachten-script hoort direct te starten.');
 });
 
 test('page smoke: premium-actieve-opdrachten.html renders without a blocking boot loader', () => {

@@ -60,6 +60,18 @@ De twee kernen zijn nog niet door Dashboard of Opdrachten geladen. Die routes bl
 `legacy-document` tot de blijvende shell en complete browsergedrag bewezen zijn. Een
 wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen.
 
+`assets/premium-screen-readiness.js` legt daarnaast een expliciet gereedmoment vast.
+Dashboard en Opdrachten melden pas `ready` als hun volledige vereiste data en
+bediening beschikbaar zijn en de documentresources, gebruikte fonts en opgegeven
+afbeeldingen klaar zijn. De gedeelde personeelszijbalk moet eveneens zijn afgerond;
+een vastgelopen zijbalk kan geen `ready` produceren. `performance.mark('softora:screen-ready')` en
+`data-softora-screen-ready-ms` maken het moment meetbaar. Een mislukte datastroom blijft
+apart herkenbaar als `degraded`; waar een loader aanwezig is, verdwijnt die pas nadat
+de foutweergave beschikbaar is. Opdrachten toont tijdens een koude hydratie nog
+statische nullen. De gereedheidsmarkering lost die zichtbare tussenstand niet op;
+daarvoor is de blijvende shell nodig. Deze stap bewijst evenmin dat alle routes de
+3-secondennorm halen.
+
 ## Nog te implementeren en te bewijzen
 
 1. Volledige nulmeting per hoofdmodule en inhoudstype; data, beelden, acties en

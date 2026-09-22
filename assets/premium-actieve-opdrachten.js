@@ -2887,7 +2887,7 @@ async function bootActiveOrdersPage() {
         document.getElementById('sumActive')?.setAttribute('aria-label', 'Opdrachtgegevens niet geladen');
         document.querySelectorAll('#createOrderBtn, [data-order-filter]').forEach((button) => { button.disabled = true; });
     } finally {
-        (boot.releaseAfterMinimum || (() => window.SoftoraPremiumBoot?.setShellBooting?.(false)))(bootStartedAt);
+        await (boot.releaseAfterMinimum || (() => window.SoftoraPremiumBoot?.setShellBooting?.(false)))(bootStartedAt, remoteUiStateLoaded === true);
     }
 }
 

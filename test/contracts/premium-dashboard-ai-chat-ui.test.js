@@ -154,7 +154,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260903a/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260922c/);
   assert.doesNotMatch(pageSource, /assets\/premium-dashboard-core\.js\?v=20260722a/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
@@ -208,7 +208,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(refreshSource, /const delays = \[1500, 4000, 9000, 15000\]/);
   assert.match(refreshSource, /Promise\.all\(\[ordersResult, customersResult\]\)/);
   assert.match(refreshSource, /loadCustomers\(current\)/);
-  assert.match(refreshSource, /else scheduleRecovery\(\)/);
+  assert.match(refreshSource, /else \{[\s\S]*scheduleRecovery\(\);/);
   assert.match(refreshSource, /else renderPending\(\)/);
   assert.match(pageSource, /void refreshPremiumDashboard\(true, true\);/);
   assert.doesNotMatch(pageSource, /Promise\.all\(\[loadPremiumDashboardCustomers\(\), loadPremiumDashboardOrders\(\)\]\)/);
@@ -290,7 +290,8 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
 
   assert.match(pageSource, /startPremiumDashboardBootWatchdog\(\);/);
   assert.match(pageSource, /fetchPremiumDashboardJson\(url, \{ method: 'GET', cache: 'no-store' \}\)/);
-  assert.match(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/s);
+  assert.match(pageSource, /if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/);
+  assert.doesNotMatch(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\)/s);
   assert.doesNotMatch(pageSource, /await refreshPremiumDashboard\(true\)/);
   assert.match(pageSource, /setAttribute\("data-dashboard-boot-loading", "true"\)/);
   assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
@@ -304,7 +305,9 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
   assert.match(pageSource, /style="display:none;background:var\(--bg-primary,#f8f7f4\);z-index:120;"/);
   assert.match(pageSource, /style="--loader-size:58px;filter:drop-shadow\(0 14px 28px rgba\(139,34,82,0\.18\)\);"/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;/);
-  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;/);
+  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 10000;/);
+  assert.match(coreSource, /if \(!isPremiumDashboardScreenReadyForRelease\(\)\) return false;/);
+  assert.match(coreSource, /readiness\.markDegraded\(\{ page: 'premium-personeel-dashboard', reason: 'screen-readiness-watchdog-expired' \}\)/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 0;/);
   assert.match(coreSource, /function forcePremiumDashboardBootShellVisible\(\) \{/);
   assert.match(coreSource, /getElementById\('dashboardHardBootLoader'\)/);
@@ -370,7 +373,7 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260903a/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260922c/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);

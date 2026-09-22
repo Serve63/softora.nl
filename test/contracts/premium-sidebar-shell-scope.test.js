@@ -673,9 +673,11 @@ test('premium dashboard keeps its first-paint boot overlay in the shell contract
   assert.match(pageSource, /softora-dossier-loader__orbit--outer/);
   assert.doesNotMatch(pageSource, /@keyframes softora-dashboard-boot-spin/);
   assert.match(pageSource, /data-dashboard-boot-loader="true"/);
-  assert.match(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/s);
+  assert.match(pageSource, /if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/);
+  assert.doesNotMatch(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\)/s);
   assert.doesNotMatch(pageSource, /await refreshPremiumDashboard\(true\)/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 0;/);
+  assert.match(coreSource, /if \(!isPremiumDashboardScreenReadyForRelease\(\)\) return false;/);
   assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);
   assert.match(coreSource, /getElementById\('dashboardHardBootLoader'\)/);
   assert.match(coreSource, /function showPremiumDashboardBootShellForMinimum\(minimumMs = PREMIUM_DASHBOARD_BOOT_MINIMUM_MS\) \{/);
@@ -1423,7 +1425,7 @@ test('Webdesign remains visible and clickable in the shared menu and all pruning
 test('dashboard owns refresh lifetime while preserving the existing sidebar shell', () => {
   const pageSource = readRepoFile('premium-personeel-dashboard.html');
   const refreshSource = readRepoFile('assets/premium-dashboard-refresh.js');
-  assert.match(pageSource, /assets\/premium-dashboard-refresh\.js\?v=20260922b/);
+  assert.match(pageSource, /assets\/premium-dashboard-refresh\.js\?v=20260922c/);
   assert.match(pageSource, /dashboardRefresh\.mount\(\)/);
   assert.match(refreshSource, /root\.addEventListener\('pagehide', dispose/);
   assert.match(refreshSource, /root\.removeEventListener\('focus', refreshWhenVisible\)/);

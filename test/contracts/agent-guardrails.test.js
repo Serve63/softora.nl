@@ -53,6 +53,17 @@ test('platform performance plan distinguishes lifecycle core from a migrated bro
   assert.match(performancePlan, /routes blijven\s+`legacy-document`/);
 });
 
+test('screen readiness behavior stays covered by the critical contract suite', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const readinessContract = readRepoFile('test/contracts/premium-screen-readiness.test.js');
+  const readinessRuntime = readRepoFile('assets/premium-screen-readiness.js');
+  assert.equal(packageJson.scripts['test:contracts'], 'node --test test/contracts/*.test.js');
+  assert.match(readinessContract, /Dashboard keeps its boot shell during recoverable partial data/);
+  assert.match(readinessContract, /assert\.equal\(releases, 0\)/);
+  assert.match(readinessContract, /assert\.equal\(status, 'ready'\)/);
+  assert.match(readinessRuntime, /performanceApi\.mark\('softora:screen-ready'\)/);
+});
+
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }

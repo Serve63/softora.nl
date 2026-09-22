@@ -62,8 +62,12 @@
             retryCustomers = !results[1];
             const complete = results.every(Boolean) && state.ordersHydrated && state.customersHydrated;
             if (complete) clearRecovery();
-            else scheduleRecovery();
+            else {
+                if (!results[0] && results[1]) showUnavailable();
+                scheduleRecovery();
+            }
             lastRefreshAt = (root.Date || Date).now();
+            void publishScreenReadiness(complete);
             return Boolean(complete);
         }).finally(() => { if (run === generation) pending = null; });
         return pending;
@@ -73,10 +77,41 @@
         if (!root.document.hidden) void refresh();
     }
 
+    async function publishScreenReadiness(complete) {
+        const readiness = root.SoftoraScreenReadiness;
+        const dashboardCore = root.SoftoraPremiumDashboardCore;
+        if (!readiness) return false;
+        if (!complete) {
+            // Keep the boot shell up while recovery reads are still running.
+            return false;
+        }
+
+        const doc = root.document;
+        const main = doc?.querySelector?.('.dashboard-layout main.main');
+        const ready = await readiness.markReady({
+            page: 'premium-personeel-dashboard',
+            requiredData: {
+                customers: state.customersHydrated,
+                activeOrders: state.ordersHydrated,
+            },
+            requiredActions: ['#dashboardAiChatToggle', '#aiManagementConfigSave'],
+            requiredImages: Array.from((main || doc).querySelectorAll('img:not([loading="lazy"])')),
+            actionsBound: true,
+        });
+        if (ready) dashboardCore?.releasePremiumDashboardBootShell?.();
+        else {
+            readiness.markDegraded({ page: 'premium-personeel-dashboard', reason: 'screen-readiness-contract-incomplete' });
+            showUnavailable();
+            dashboardCore?.releasePremiumDashboardBootShell?.();
+        }
+        return ready;
+    }
+
     function mount() {
         if (mounted) return;
         disposed = false;
         mounted = true;
+        if (state.ordersHydrated && state.customersHydrated) void publishScreenReadiness(true);
         pollTimer = root.setInterval(refreshWhenVisible, 30000);
         root.addEventListener('focus', refreshWhenVisible);
         root.document.addEventListener('visibilitychange', refreshWhenVisible);
