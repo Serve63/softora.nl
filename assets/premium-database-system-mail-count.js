@@ -446,23 +446,36 @@
     function ensureTodaySentElements(rootDocument, element) {
         let softoraElement = rootDocument.getElementById("systemMailSentTodaySoftoraCount");
         let instantlyElement = rootDocument.getElementById("systemMailInstantlySentTodayCount");
-        if (softoraElement && instantlyElement) return { softoraElement: softoraElement, instantlyElement: instantlyElement };
+        let combinedElement = rootDocument.getElementById("systemMailCombinedSentTodayCount");
+        if (softoraElement && instantlyElement && combinedElement) {
+            return { softoraElement: softoraElement, instantlyElement: instantlyElement, combinedElement: combinedElement };
+        }
         if (typeof rootDocument.createElement !== "function" || typeof element.appendChild !== "function") return null;
         element.textContent = "";
         if (element.classList && typeof element.classList.add === "function") element.classList.add("mail-roi-value--today-split");
         softoraElement = rootDocument.createElement("span");
         softoraElement.id = "systemMailSentTodaySoftoraCount";
-        const separator = rootDocument.createElement("span");
-        separator.className = "mail-roi-value-separator";
-        separator.setAttribute("aria-hidden", "true");
-        separator.textContent = "-";
+        softoraElement.className = "mail-roi-value-softora";
+        const firstSeparator = rootDocument.createElement("span");
+        firstSeparator.className = "mail-roi-value-separator";
+        firstSeparator.setAttribute("aria-hidden", "true");
+        firstSeparator.textContent = "-";
         instantlyElement = rootDocument.createElement("span");
         instantlyElement.id = "systemMailInstantlySentTodayCount";
         instantlyElement.className = "mail-roi-value-instantly";
+        const secondSeparator = rootDocument.createElement("span");
+        secondSeparator.className = "mail-roi-value-separator";
+        secondSeparator.setAttribute("aria-hidden", "true");
+        secondSeparator.textContent = "-";
+        combinedElement = rootDocument.createElement("span");
+        combinedElement.id = "systemMailCombinedSentTodayCount";
+        combinedElement.className = "mail-roi-value-combined";
         element.appendChild(softoraElement);
-        element.appendChild(separator);
+        element.appendChild(firstSeparator);
         element.appendChild(instantlyElement);
-        return { softoraElement: softoraElement, instantlyElement: instantlyElement };
+        element.appendChild(secondSeparator);
+        element.appendChild(combinedElement);
+        return { softoraElement: softoraElement, instantlyElement: instantlyElement, combinedElement: combinedElement };
     }
 
     function renderTodaySentCount(value, instantlyValue, isLoading) {
@@ -485,18 +498,23 @@
             : lastInstantlyTodaySentCount === null || lastInstantlyTodaySentCount === undefined
                 ? "--"
                 : lastInstantlyTodaySentCount.toLocaleString("nl-NL");
+        const combinedText = lastTodaySentCount === null || lastTodaySentCount === undefined ||
+            lastInstantlyTodaySentCount === null || lastInstantlyTodaySentCount === undefined
+            ? "--"
+            : (lastTodaySentCount + lastInstantlyTodaySentCount).toLocaleString("nl-NL");
         const splitElements = ensureTodaySentElements(rootDocument, element);
         if (splitElements) {
             splitElements.softoraElement.textContent = softoraText;
             splitElements.instantlyElement.textContent = instantlyText;
+            splitElements.combinedElement.textContent = combinedText;
         } else {
-            element.textContent = softoraText + " - " + instantlyText;
+            element.textContent = softoraText + " - " + instantlyText + " - " + combinedText;
         }
         element.setAttribute && element.setAttribute(
             "aria-label",
-            "Vandaag verstuurd: " + softoraText + " via Softora en " + instantlyText + " via Instantly"
+            "Vandaag verstuurd: " + softoraText + " via Softora, " + instantlyText + " via Instantly, " + combinedText + " samen"
         );
-        element.title = "Links Softora; rechts Instantly (alleen bevestigde verzendingen).";
+        element.title = "Paars Softora; blauw Instantly; zwart samen.";
     }
 
     function renderHardBouncesCount(value, isLoading) {
