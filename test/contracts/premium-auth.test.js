@@ -569,6 +569,18 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     false
   );
   assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/logboek-cut' }),
+    true
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/logboek-cut' }),
+    true
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'DELETE', originalUrl: '/api/logboek-cut' }),
+    false
+  );
+  assert.equal(
     manager.isPremiumPublicApiRequest({
       method: 'POST',
       originalUrl: '/api/retell/functions/agenda/availability',
