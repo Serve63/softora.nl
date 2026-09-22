@@ -91,6 +91,18 @@ function createCustomersPageBootstrapService(deps = {}) {
     return pickNonNegativeInteger(stats, ['centralGuardSentToday', 'systemSentToday']);
   }
 
+  function readReliableCurrentDayInstantlySentCount(stats) {
+    const updatedAtMs = Date.parse(normalizeString(stats && (stats.instantlyStatsUpdatedAt || stats.updatedAt)));
+    const isCurrentInstantlyStats = Boolean(
+      stats &&
+      stats.instantlyStatsReliable === true &&
+      normalizeString(stats.dateKey) === getAmsterdamDateKey(now()) &&
+      Number.isFinite(updatedAtMs)
+    );
+    if (!isCurrentInstantlyStats) return null;
+    return pickNonNegativeInteger(stats, ['instantlySentToday']);
+  }
+
   function buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState) {
     const statsValues = statsState && statsState.values && typeof statsState.values === 'object' ? statsState.values : {};
     const cachedStatsPayload = parseJsonObject(statsValues[DATABASE_MAIL_STATS_CACHE_KEY]);
@@ -106,6 +118,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     return {
       mailStats: {
         sentToday: readReliableCurrentDaySentCount(stats),
+        instantlySentToday: readReliableCurrentDayInstantlySentCount(stats),
         bounces: pickNonNegativeInteger(stats, ['bounces', 'totalBounces', 'bouncesTotal']),
         hardBounces, bounceStatsReliable: stats.bounceStatsReliable === true, bounceStatsModel: stats.bounceStatsModel,
         bounceStatsUpdatedAt: stats.bounceStatsUpdatedAt, bounceStatsStale: stats.bounceStatsStale === true,

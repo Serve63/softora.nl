@@ -21,6 +21,7 @@ const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshne
 const { resolveColdmailStatsResponse } = require('./coldmail-live-stats-response');
 const { SENT_COUNT_MODEL, preserveReliableColdmailLiveStats } = require('./coldmail-live-stats-reconciliation');
 const { COLDMAIL_SENT_TIMESTAMP_MODEL, resolveColdmailGuardSentAt } = require('./coldmail-guard-sent-at');
+const { createColdmailProviderSentStats } = require('./coldmail-provider-sent-stats');
 const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard'); const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
 const { assertOutboundRecipientsNotSuppressed } = require('../security/outbound-mail-suppression');
 const previewImageCache = require('./coldmail-preview-image-cache');
@@ -3231,109 +3232,57 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function isSoftoraColdmailCentralGuardGroup(group) {
-    const provider = normalizeString(group && group.provider).toLowerCase();
-    const channel = normalizeString(group && group.channel).toLowerCase();
-    if ((provider && provider !== 'softora') || group?.payload?.sentStatsExcluded === true) return false;
-    if (channel && channel !== 'coldmail') return false;
-    return true;
-  }
-
-  function summarizeColdmailCentralGuardLiveStats(groups, options = {}) {
-    const recipientCounts = {};
-    const recipients = new Map();
-    const todayRecipientCounts = {};
-    const timezone =
-      normalizeString(options.timezone || options.timeZone) ||
-      DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE;
-    const todayKey = getColdmailAutopilotDateKey(now(), timezone);
-    let lastSentAt = '';
-    let lastSenderEmail = '';
-    (Array.isArray(groups) ? groups : []).forEach((group) => {
-      if (!isSoftoraColdmailCentralGuardGroup(group)) return;
-      const source = normalizeString(group && group.source).toLowerCase();
-      const actor = normalizeString(group && group.actor).toLowerCase();
-      if (
-        source === 'data-ops-customers-sent-guard' ||
-        source === 'coldmail-invalid-email-domain' ||
-        actor === 'coldmail-invalid-email-domain'
-      ) {
-        return;
-      }
-      const senderEmail = normalizeEmailAddress(group.sender_email || group.senderEmail);
-      if (!senderEmail) return;
-      const recipientKey = buildColdmailStatsRecipientKey({
-        recipientEmail: group.recipient_email || group.recipientEmail,
-        recipientDomain: group.recipient_domain || group.recipientDomain,
-        recipientId: group.recipient_id || group.recipientId,
-        recipientCompanyKey: group.recipient_company_key || group.recipientCompanyKey || group.recipient_company || group.recipientCompany,
-      });
-      setColdmailRecipientCount(recipientCounts, recipientKey, 1);
-      const sentAt = resolveColdmailGuardSentAt(group);
-      const sentAtMs = parseTimestampMs(sentAt);
-      if (recipientKey && (!recipients.has(recipientKey) || sentAtMs > parseTimestampMs(recipients.get(recipientKey).sentAt))) recipients.set(recipientKey, {
-        key: recipientKey, email: normalizeEmailAddress(group.recipient_email || group.recipientEmail),
-        company: normalizeString(group.recipient_company || group.recipientCompany), customerId: normalizeString(group.recipient_id || group.recipientId),
-        senderEmail, sentAt });
-      if (sentAtMs && (!lastSentAt || sentAtMs > parseTimestampMs(lastSentAt))) {
-        lastSentAt = sentAt;
-        lastSenderEmail = senderEmail;
-      }
-      if (
-        sentAtMs &&
-        getColdmailAutopilotDateKey(new Date(sentAtMs), timezone) === todayKey
-      ) {
-        setColdmailRecipientCount(todayRecipientCounts, recipientKey, 1);
-      }
-    });
-    return {
-      available: true, sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL,
-      recipientCounts, recipients: Array.from(recipients.values()),
-      todayRecipientCounts,
-      unkeyedTotalSent: 0,
-      lastSentAt,
-      lastSenderEmail,
-    };
-  }
-  async function loadColdmailCentralGuardStats() {
-    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') {
-      return {
-        ...summarizeColdmailCentralGuardLiveStats([]),
-        available: false,
-        unavailableReason: 'central_guard_store_unavailable',
-      };
-    }
-    try {
-      const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
-        provider: 'softora',
-        channel: 'coldmail',
-        keyType: 'email',
-        maxRows: 20_000, requireComplete: true,
-      });
-      if (!Array.isArray(groups) || groups.length >= 20_000) throw new Error('Sent register incomplete');
-      return summarizeColdmailCentralGuardLiveStats(groups);
-    } catch (error) {
-      logger.warn('[ColdmailLiveStats][central-guard]', error && error.message ? error.message : error);
-      return {
-        ...summarizeColdmailCentralGuardLiveStats([]),
-        available: false,
-        unavailableReason: 'central_guard_read_failed',
-      };
-    }
-  }
+  const providerSentStats = createColdmailProviderSentStats({
+    store: outboundRecipientGuardStore, now, logger, normalizeString, normalizeEmailAddress,
+    buildRecipientKey: buildColdmailStatsRecipientKey, setRecipientCount: setColdmailRecipientCount,
+    getDateKey: getColdmailAutopilotDateKey, parseTimestampMs, resolveSentAt: resolveColdmailGuardSentAt,
+    timezone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE, sentTimestampModel: COLDMAIL_SENT_TIMESTAMP_MODEL,
+  });
+  const summarizeColdmailCentralGuardLiveStats = providerSentStats.summarize;
+  const loadColdmailCentralGuardStats = () => providerSentStats.load({ provider: 'softora', channel: 'coldmail' });
+  const loadInstantlyCentralGuardStats = () => providerSentStats.load({
+    provider: 'instantly', excludeDataOpsMarkers: false,
+    incompleteMessage: 'Instantly sent register incomplete',
+    logLabel: '[ColdmailLiveStats][instantly-central-guard]',
+    unavailableReason: 'instantly_central_guard_read_failed',
+  });
   async function refreshCurrentDayColdmailStats(payload) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') return payload;
     try {
-      const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
-        provider: 'softora', channel: 'coldmail', keyType: 'email', maxRows: 1000, updatedSince: new Date(now().getTime() - (30 * 60 * 60 * 1000)).toISOString(),
-      });
+      const updatedSince = new Date(now().getTime() - (30 * 60 * 60 * 1000)).toISOString();
+      const [groups, instantlyGroups] = await Promise.all([
+        outboundRecipientGuardStore.listSentRecipientGroups({
+          provider: 'softora', channel: 'coldmail', keyType: 'email', maxRows: 1000, updatedSince,
+        }),
+        outboundRecipientGuardStore.listSentRecipientGroups({
+          provider: 'instantly', keyType: 'email', maxRows: 1000, updatedSince,
+        }),
+      ]);
       const current = summarizeColdmailCentralGuardLiveStats(groups);
+      const instantlyCurrent = summarizeColdmailCentralGuardLiveStats(instantlyGroups, {
+        provider: 'instantly',
+        excludeDataOpsMarkers: false,
+      });
       const dateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
-      const merged = mergeMonotonicCurrentDayStats(payload, { stats: {
+      let merged = mergeMonotonicCurrentDayStats(payload, { stats: {
         reliable: current.available, dateKey, sentTimestampModel: current.sentTimestampModel,
         lastSuccessfulSendAt: current.lastSentAt, lastSenderEmail: current.lastSenderEmail,
         centralGuardSentToday: mergeColdmailRecipientCountTotals({ recipientCounts: current.todayRecipientCounts }),
       } }, now().toISOString());
+      const previousInstantlyToday = Math.max(0, Number(merged?.stats?.instantlySentToday) || 0);
+      const currentInstantlyToday = mergeColdmailRecipientCountTotals({
+        recipientCounts: instantlyCurrent.todayRecipientCounts,
+      });
+      merged = {
+        ...merged,
+        stats: {
+          ...merged.stats,
+          instantlySentToday: Math.max(previousInstantlyToday, currentInstantlyToday),
+          instantlyStatsReliable: instantlyCurrent.available === true,
+          instantlyStatsUnavailableReason: '',
+          instantlyStatsUpdatedAt: now().toISOString(),
+        },
+      };
       if (merged !== payload) {
         coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload: merged };
         await persistDurableColdmailLiveStats(merged);
@@ -3384,10 +3333,11 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function loadFreshColdmailLiveStats() {
-    const [sendGuardState, customerState, centralGuardStats, mailboxBounceCandidates] = await Promise.all([
+    const [sendGuardState, customerState, centralGuardStats, instantlyGuardStats, mailboxBounceCandidates] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
       loadColdmailCentralGuardStats(),
+      loadInstantlyCentralGuardStats(),
       loadColdmailMailboxBounceCandidates(),
     ]);
     const values = customerState && typeof customerState.values === 'object' ? customerState.values : {};
@@ -3408,6 +3358,16 @@ function createColdmailCampaignService(deps = {}) {
     const centralGuardSentToday = centralGuardAvailable
       ? mergeColdmailRecipientCountTotals({
           recipientCounts: centralGuardStats.todayRecipientCounts,
+          unkeyedTotalSent: 0,
+        })
+      : null;
+    const instantlyGuardAvailable = Boolean(instantlyGuardStats.available);
+    const instantlyTotalSent = instantlyGuardAvailable
+      ? mergeColdmailRecipientCountTotals(instantlyGuardStats)
+      : null;
+    const instantlySentToday = instantlyGuardAvailable
+      ? mergeColdmailRecipientCountTotals({
+          recipientCounts: instantlyGuardStats.todayRecipientCounts,
           unkeyedTotalSent: 0,
         })
       : null;
@@ -3446,6 +3406,11 @@ function createColdmailCampaignService(deps = {}) {
         sentToday: systemSentToday,
         systemSentToday,
         centralGuardSentToday,
+        instantlySentToday,
+        instantlyTotalSent,
+        instantlyStatsReliable: instantlyGuardAvailable,
+        instantlyStatsUnavailableReason: instantlyGuardStats.unavailableReason || '',
+        instantlyStatsUpdatedAt: now().toISOString(),
         sentLast24h: guardStats.sentLast24h,
         personalMailboxSentToday: guardStats.personalMailboxSentToday,
         databaseTotalSent: databaseStats.databaseTotalSent,

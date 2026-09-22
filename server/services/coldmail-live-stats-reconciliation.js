@@ -26,6 +26,32 @@ function isReliableLiveTotals(payload, expectedDateKey) {
 
 function preserveReliableColdmailLiveStats(payload, previousPayload, expectedDateKey) {
   payload = preserveReliableBounceStats(payload, previousPayload);
+  const currentStats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
+  const previousStats = previousPayload && previousPayload.stats && typeof previousPayload.stats === 'object'
+    ? previousPayload.stats
+    : {};
+  const previousInstantlyReliable = previousStats.instantlyStatsReliable === true &&
+    String(previousStats.dateKey || '').trim() === expectedDateKey &&
+    Number.isFinite(Number(previousStats.instantlySentToday));
+  const currentInstantlyReliable = currentStats.instantlyStatsReliable === true &&
+    String(currentStats.dateKey || '').trim() === expectedDateKey &&
+    Number.isFinite(Number(currentStats.instantlySentToday));
+  if (previousInstantlyReliable && !currentInstantlyReliable) {
+    payload = {
+      ...payload,
+      stats: {
+        ...currentStats,
+        instantlySentToday: previousStats.instantlySentToday,
+        instantlyTotalSent: previousStats.instantlyTotalSent,
+        instantlyStatsReliable: true,
+        instantlyStatsStale: true,
+        instantlyStatsUnavailableReason:
+          currentStats.instantlyStatsUnavailableReason || 'incomplete_live_response',
+        instantlyStatsUpdatedAt:
+          previousStats.instantlyStatsUpdatedAt || previousStats.updatedAt || '',
+      },
+    };
+  }
   if (!isReliableLiveTotals(previousPayload, expectedDateKey)) return payload;
   const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
   const previous = previousPayload.stats;

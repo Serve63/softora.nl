@@ -250,6 +250,21 @@
     font: 500 .9rem/1 "Oswald", sans-serif;
 }
 
+.mail-roi-value--today-split {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.mail-roi-value-separator {
+    color: #1a1a1a;
+}
+
+.mail-roi-value-instantly {
+    color: var(--blue);
+}
+
 .mail-roi-autopilot-toggle {
     width: 100%;
     min-height: 24px;
