@@ -42,6 +42,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Install local browser for auth journey tests
+        run: npx --no-install playwright install --with-deps chromium --only-shell
+
       - name: Verify critical flows
         run: npm run verify:critical
         env:

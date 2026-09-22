@@ -1,11 +1,11 @@
 const { spawn } = require('child_process');
 const { setTimeout: delay } = require('timers/promises');
 
-function randomPort() {
-  const blockedFetchPorts = new Set([4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697]);
+function randomPort(random = Math.random) {
+  const blockedFetchPorts = new Set([4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697]);
   let port = 0;
   do {
-    port = 5100 + Math.floor(Math.random() * 3900);
+    port = 5100 + Math.floor(random() * 3900);
   } while (blockedFetchPorts.has(port));
   return port;
 }
@@ -48,7 +48,12 @@ async function startTestServer() {
   });
 
   const baseUrl = `http://127.0.0.1:${port}`;
-  await waitFor(`${baseUrl}/healthz`);
+  try {
+    await waitFor(`${baseUrl}/healthz`);
+  } catch (error) {
+    if (child.exitCode === null) child.kill('SIGTERM');
+    throw new Error(`Testserver kon niet starten op ${baseUrl}: ${error.message}\n${output}`, { cause: error });
+  }
 
   return {
     baseUrl,
@@ -70,5 +75,6 @@ async function startTestServer() {
 }
 
 module.exports = {
+  randomPort,
   startTestServer,
 };
