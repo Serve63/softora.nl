@@ -336,7 +336,8 @@ function createSupabaseStateStore(deps = {}) {
     prefix,
     limit = 100,
     selectColumns = 'state_key,payload,updated_at',
-    offset = 0
+    offset = 0,
+    requestOptions = {}
   ) {
     const normalizedPrefix = normalizeString(prefix || '');
     if (!normalizedPrefix) {
@@ -357,7 +358,7 @@ function createSupabaseStateStore(deps = {}) {
     return performRestRequest(url, {
       method: 'GET',
       headers: buildRestHeaders(),
-    });
+    }, requestOptions);
   }
 
   async function deleteSupabaseRowByStateKeyViaRest(rowKey) {
