@@ -252,3 +252,10 @@ test('websitegenerator uses stable library navigation and prevents unchanged sta
   assert.doesNotMatch(source, /last\.scrollIntoView/);
   assert.match(websiteGeneratorHtmlSource, /scrollbar-gutter: stable/);
 });
+
+test('websitegenerator regenerates the shown preview URL from a bottom-right button', () => {
+  assert.match(websiteGeneratorHtmlSource, /\.preview-footer\s*\{[^}]*justify-content: flex-end;/);
+  assert.match(websiteGeneratorScriptSource, /regenerateButton.textContent = 'Opnieuw genereren'/);
+  assert.match(websiteGeneratorScriptSource, /if \(regenerateButton.disabled\) return;[\s\S]*regenerateButton.disabled = true;[\s\S]*document.getElementById\('scan-url'\).value = url;[\s\S]*await startScan\(\);[\s\S]*finally\s*\{\s*regenerateButton.disabled = false;/);
+  assert.match(websiteGeneratorScriptSource, /root.appendChild\(footer\)/);
+});
