@@ -39,6 +39,17 @@ test('platform architecture registry and CI gate are protected quality code', ()
   assert.match(readRepoFile('docs/quality-protocol.md'), /check:platform-architecture/);
 });
 
+test('platform performance plan distinguishes lifecycle core from a migrated browser module', () => {
+  const runtime = readRepoFile('assets/premium-application-runtime.js');
+  const performancePlan = readRepoFile('docs/platform-performance.md');
+  assert.match(runtime, /function createPremiumApplicationRuntime/);
+  assert.match(runtime, /\['prepare', 'mount', 'update', 'dispose'\]/);
+  assert.match(runtime, /prepareBudget\.maxBytes/);
+  assert.match(runtime, /dataClient\.clearSession/);
+  assert.match(performancePlan, /nog niet\s+gekoppeld aan browsernavigatie, Dashboard of Opdrachten/);
+  assert.match(performancePlan, /routes blijven\s+`legacy-document`/);
+});
+
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }

@@ -52,8 +52,12 @@ voorkomt terugschrijven van achterhaalde antwoorden en wist zijn cache op pagehi
 Dit werkt binnen het huidige document. Het is nog geen blijvende applicatieshell,
 geen cross-tab-sessieprotocol en geen volledige vervanging voor domein-readmodels.
 
-Nieuwe `application-module`-registraties blijven bewust geblokkeerd totdat de echte
-gedeelde runtime en bijbehorende gedragstests in de volgende stap beschikbaar zijn.
+`assets/premium-application-runtime.js` bevat nu een getest hart voor de
+modulelevenscyclus: geregistreerde reads, begrensde voorbereiding, het scherm pas
+activeren na prepare en mount, updates binnen dezelfde module, blokkeren bij
+niet-opgeslagen wijzigingen en sessiegebonden cache wissen. De runtime is nog niet
+gekoppeld aan browsernavigatie, Dashboard of Opdrachten. Die routes blijven
+`legacy-document` tot de blijvende shell en complete browsergedrag zijn bewezen.
 Een wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen.
 
 ## Nog te implementeren en te bewijzen
@@ -63,12 +67,13 @@ Een wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen
    Dynamisch gegenereerde SEO-collecties/artikelen, gepubliceerde klantlinks en
    persoonlijke sites houden hun bestaande routetests; volledige runtime-inventaris
    en prestatiedekking van die routefamilies volgen nog.
-2. Een blijvende shell en echte modulelevenscyclus voor Dashboard en Opdrachten,
-   daarna Klanten. De broncode moet eerst uit de grote pagina-initialisaties worden
-   losgemaakt; geen willekeurige HTML-injectie of verborgen frames als prefetch.
+2. De lifecycle-core aan browsernavigatie en een blijvende shell koppelen voor
+   Dashboard en Opdrachten, daarna Klanten. De broncode moet eerst uit de grote
+   pagina-initialisaties worden losgemaakt; geen willekeurige HTML-injectie of
+   verborgen frames als prefetch.
 3. Gedeelde versiegebonden readmodels, gelijktijdige reads, mutatie-invalidation,
-   sessiewissels, dirty-form navigatie en begrensde voorbereiding bewijzen met
-   echte browseruitvoering. Lever dan het modulesjabloon/aanmaakscript.
+   sessiewissels, dirty-form navigatie en begrensde voorbereiding ook met echte
+   browseruitvoering bewijzen. Lever dan het modulesjabloon/aanmaakscript.
 4. Mailsysteem volledig aansluiten, vervolgens Mailbox, Agenda, Lead Radar,
    instellingen en overige modules. Miniaturen vooraf op maat maken en netwerk-
    en opslagbudgetten meten. Publieke pagina's en assets apart controleren.
