@@ -330,7 +330,7 @@ test('premium database mail-ready snapshot honors limit and offset', async () =>
   assert.equal(Object.hasOwn(continuation, 'foundTotal'), false);
 
   const capped = await service.buildMailReadySnapshot({ limit: 99999 });
-  assert.equal(capped.limit, 5000);
+  assert.equal(capped.limit, 4500);
 });
 
 test('premium database snapshot deduplicates customer ids and embeds bootstrap photo URLs', async () => {

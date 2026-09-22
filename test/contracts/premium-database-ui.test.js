@@ -1374,7 +1374,7 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   });
 
   assert.equal(loaded, true);
-  assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=5000&offset=0');
+  assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=4500&offset=0');
   assert.equal(requests[0][1].method, 'GET');
   assert.equal(requests[0][1].cache, 'no-store');
   assert.equal(requests[0][2], 90000);
@@ -1554,7 +1554,7 @@ test('canonical customer reconciliation survives later normalized refreshes and 
 
 test('mail-ready snapshot client paginates every available row before publishing the count', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('complete pagination should not warn'); } } });
-  const availableCustomers = Array.from({ length: 10001 }, (_item, index) => ({
+  const availableCustomers = Array.from({ length: 9001 }, (_item, index) => ({
     id: `available-${index + 1}`,
     bedrijf: `Beschikbaar ${index + 1}`,
     email: `info${index + 1}@beschikbaar.test`,
@@ -1580,7 +1580,7 @@ test('mail-ready snapshot client paginates every available row before publishing
     fetchJsonWithTimeout: async (url) => {
       const parsed = new URL(url, 'https://softora.test');
       const offset = Number(parsed.searchParams.get('offset')) || 0;
-      const limit = Number(parsed.searchParams.get('limit')) || 5000;
+      const limit = Number(parsed.searchParams.get('limit')) || 4500;
       requests.push(offset);
       foundParams.push(parsed.searchParams.get('includeFound'));
       return {
@@ -1588,7 +1588,7 @@ test('mail-ready snapshot client paginates every available row before publishing
         json: async () => ({
           ok: true,
           generatedAt: '2026-08-05T12:00:00.000Z',
-          snapshotVersion: 'sha256:stable-10001',
+          snapshotVersion: 'sha256:stable-9001',
           total: 1,
           customers: offset === 0 ? [{ id: 'ready-1', mailReady: true }] : [],
           availableTotal: availableCustomers.length,
@@ -1601,14 +1601,14 @@ test('mail-ready snapshot client paginates every available row before publishing
   });
 
   assert.equal(loaded, true);
-  assert.deepEqual(requests, [0, 5000, 10000]);
+  assert.deepEqual(requests, [0, 4500, 9000]);
   assert.deepEqual(foundParams, [null, '0', '0']);
   assert.equal(state.mailReadySnapshotPending, false);
   assert.equal(state.mailReadySnapshotTotal, 1);
   assert.equal(state.mailReadySnapshotCustomers.length, 1);
-  assert.equal(state.availableSnapshotTotal, 10001);
-  assert.equal(state.availableSnapshotCustomers.length, 10001);
-  assert.equal(state.availableSnapshotCustomers.at(-1).id, 'available-10001');
+  assert.equal(state.availableSnapshotTotal, 9001);
+  assert.equal(state.availableSnapshotCustomers.length, 9001);
+  assert.equal(state.availableSnapshotCustomers.at(-1).id, 'available-9001');
 });
 
 test('mail-ready snapshot client never publishes a missing available page', async () => {
@@ -1641,9 +1641,9 @@ test('mail-ready snapshot client never publishes a missing available page', asyn
           snapshotVersion: 'sha256:missing-page',
           total: 0,
           customers: [],
-          availableTotal: 5001,
+          availableTotal: 4501,
           availableCustomers: offset === 0
-            ? Array.from({ length: 5000 }, (_item, index) => ({ id: `partial-${index + 1}`, availableSnapshot: true }))
+            ? Array.from({ length: 4500 }, (_item, index) => ({ id: `partial-${index + 1}`, availableSnapshot: true }))
             : [],
           foundTotal: 0,
           foundCustomerIds: [],
@@ -1660,7 +1660,7 @@ test('mail-ready snapshot client never publishes a missing available page', asyn
 
 test('mail-ready snapshot client accepts different server clocks when the content version is identical', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('equal content versions should not warn'); } } });
-  const availableCustomers = Array.from({ length: 5001 }, (_item, index) => ({ id: `stable-${index + 1}`, availableSnapshot: true }));
+  const availableCustomers = Array.from({ length: 4501 }, (_item, index) => ({ id: `stable-${index + 1}`, availableSnapshot: true }));
   const state = {
     klanten: [],
     mailReadySnapshotLoaded: false,
@@ -1687,7 +1687,7 @@ test('mail-ready snapshot client accepts different server clocks when the conten
           total: 0,
           customers: [],
           availableTotal: availableCustomers.length,
-          availableCustomers: availableCustomers.slice(offset, offset + 5000),
+          availableCustomers: availableCustomers.slice(offset, offset + 4500),
           foundTotal: 0,
           foundCustomerIds: [],
         }),
@@ -1696,8 +1696,8 @@ test('mail-ready snapshot client accepts different server clocks when the conten
   });
 
   assert.equal(loaded, true);
-  assert.equal(state.availableSnapshotTotal, 5001);
-  assert.equal(state.availableSnapshotCustomers.length, 5001);
+  assert.equal(state.availableSnapshotTotal, 4501);
+  assert.equal(state.availableSnapshotCustomers.length, 4501);
 });
 
 test('mail-ready snapshot client retries when new companies arrive during pagination', async () => {
@@ -1731,8 +1731,8 @@ test('mail-ready snapshot client retries when new companies arrive during pagina
           snapshotVersion: offset === 0 ? 'sha256:before-new-company' : 'sha256:after-new-company',
           total: 0,
           customers: [],
-          availableTotal: 5001,
-          availableCustomers: Array.from({ length: offset === 0 ? 5000 : 1 }, (_item, index) => ({ id: `generation-${offset + index + 1}`, availableSnapshot: true })),
+          availableTotal: 4501,
+          availableCustomers: Array.from({ length: offset === 0 ? 4500 : 1 }, (_item, index) => ({ id: `generation-${offset + index + 1}`, availableSnapshot: true })),
           foundTotal: 0,
           foundCustomerIds: [],
         }),
@@ -2048,7 +2048,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260923-payload/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
-  assert.match(snapshotSource, /const PAGE_LIMIT = 5000;/);
+  assert.match(snapshotSource, /const PAGE_LIMIT = 4500;/);
   assert.match(snapshotSource, /fetchSnapshotPage\(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS\)/);
   assert.match(snapshotSource, /fetchRemainingPages\(config, firstPage\)/);
   assert.match(snapshotSource, /global\.SoftoraDatabaseMailReadySnapshot =/);
