@@ -140,9 +140,10 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /Status tijdelijk niet beschikbaar\./);
 });
 
-test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
+test('premium websitegenerator toont compacte previews en behoudt de volledige afbeelding', () => {
   const source = websiteGeneratorSource;
 
+  assert.match(websiteGeneratorHtmlSource, /\.preview-zone\s*\{[^}]*width: 100%;[^}]*max-width: 420px;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1024;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1536;/);
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
