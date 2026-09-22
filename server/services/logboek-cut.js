@@ -11,8 +11,8 @@ function projectExercises(plan, date) {
     const row = day.exercises[order];
     if (!row) throw new Error('Invalid schedule');
     const source = {...row,...plan.exerciseSources?.[row.exerciseKey]};
-    return {order:Number(order),title:String(source.title || row.title),kg:String(source.kg || ''),
-      reps:String(source.reps || ''),sets:Math.max(0,Math.min(30,parseInt(source.sets,10)||0)),notes:String(source.notes || '')};
+    return {order:Number(order),title:String(source.title || row.title),kg:String(source.kg ?? ''),
+      reps:String(source.reps ?? ''),sets:Math.max(0,Math.min(30,parseInt(source.sets,10)||0)),notes:String(source.notes ?? '')};
   });
 }
 function createLogboekCutService({repo = createLogboekCutRepository(), now = () => new Date()} = {}) {
