@@ -1,18 +1,15 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const vm=require('node:vm');
-const fs=require('node:fs');
-const path=require('node:path');
 const state=require('../../assets/logboek-cut-state');
-const source=fs.readFileSync(path.join(__dirname,'../../assets/logboek-cut-sync.js'),'utf8');
+const createCutSyncFor=require('../../assets/logboek-cut-sync');
 const pause=()=>new Promise(resolve=>setImmediate(resolve));
 function client({fetchImpl,now=()=>new Date('2026-09-22T12:00:00Z').getTime()}) {
   const listeners={};let latest;
   class Clock extends Date {constructor(...args){super(...(args.length?args:[now()]));}static now(){return now();}}
-  const window={LogboekCutState:state,addEventListener:(key,fn)=>listeners[key]=fn};
-  vm.runInNewContext(source,{window,fetch:fetchImpl,Date:Clock,crypto:require('node:crypto').webcrypto,AbortSignal,
-    document:{visibilityState:'visible',addEventListener:(key,fn)=>listeners[key]=fn},setInterval:fn=>listeners.timer=fn});
-  const sync=window.createCutSync({fetchImpl,onChange:value=>latest=value});
+  const target={LogboekCutState:state,addEventListener:(key,fn)=>listeners[key]=fn,Date:Clock,
+    crypto:require('node:crypto').webcrypto,AbortSignal,
+    document:{visibilityState:'visible',addEventListener:(key,fn)=>listeners[key]=fn},setInterval:fn=>listeners.timer=fn};
+  const sync=createCutSyncFor(target)({fetchImpl,onChange:value=>latest=value});
   return {sync,listeners,get latest(){return latest;}};
 }
 test('offline intent stays queued in memory and retries with the same operation id',async()=>{

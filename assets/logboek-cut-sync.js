@@ -1,17 +1,17 @@
 (function (root) {
-  const api = '/api/logboek-cut';
-  root.createCutSync = function ({onChange,fetchImpl = fetch}) {
+  function createCutSyncFor(target) {
+    return function ({onChange,fetchImpl = target.fetch}) {
     let session = null, pending = [], drafts = {}, planUpdatedAt = null, online = false, loading = false, saving = false, message = '', clockOffset = 0, epoch = 0;
-    const today = () => root.LogboekCutState.dateKey(new Date(Date.now()+clockOffset));
+    const today = () => target.LogboekCutState.dateKey(new target.Date(target.Date.now()+clockOffset));
     function emit() { onChange({session,pending,drafts,planUpdatedAt,online,loading,saving,message,today:today()}); }
     function apply(body) {
-      if (body.serverNow) clockOffset = Date.parse(body.serverNow)-Date.now();
+      if (body.serverNow) clockOffset = Date.parse(body.serverNow)-target.Date.now();
       if(body.planUpdatedAt)planUpdatedAt=body.planUpdatedAt;
       if (body.session?.training_date===today()) session=body.session;
     }
     async function request(method,body) {
-      const response=await fetchImpl(api,{method,credentials:'same-origin',cache:'no-store',
-        headers:{'Content-Type':'application/json'},...(body ? {body:JSON.stringify(body)} : {}),signal:AbortSignal.timeout(12000)});
+      const response=await fetchImpl('/api/logboek-cut',{method,credentials:'same-origin',cache:'no-store',
+        headers:{'Content-Type':'application/json'},...(body ? {body:JSON.stringify(body)} : {}),signal:target.AbortSignal.timeout(12000)});
       const data=await response.json();
       if(response.status===409) return {...data,conflict:true};
       if(!response.ok) throw Object.assign(new Error(data.error || 'Opslaan niet gelukt.'),{status:response.status});
@@ -22,7 +22,7 @@
       message=error.status===401 || error.status===403 ? 'Log in om je training op te slaan.' : 'Niet opgeslagen. Controleer je verbinding en probeer opnieuw.';
     }
     async function refresh() {
-      if(loading || saving || document.activeElement?.matches?.('textarea[data-note-order]'))return;
+      if(loading || saving || target.document.activeElement?.matches?.('textarea[data-note-order]'))return;
       if(session && session.training_date!==today())session=null;
       loading=true;const startEpoch=epoch;emit();
       try {const body=await request('GET');if(startEpoch===epoch){apply(body);online=true;message='';}}
@@ -48,9 +48,9 @@
     function toggle(order,set) {
       if(!session || session.training_date!==today()) {refresh();return;}
       if(pending.some(op=>op.date===session.training_date && op.order===order && op.set===set))return;
-      const key=root.LogboekCutState.setKey(order,set), current=session.checks[key] || {done:false,version:0};
+      const key=target.LogboekCutState.setKey(order,set), current=session.checks[key] || {done:false,version:0};
       const op={date:session.training_date,order,set,done:!current.done,version:current.version,
-        operationId:crypto.randomUUID(),createdAt:Date.now()};
+        operationId:target.crypto.randomUUID(),createdAt:target.Date.now()};
       epoch++;pending.push(op);emit();flush();
     }
     function saveNote(order,text,baseText='') {
@@ -59,7 +59,7 @@
       const current=session.notes?.[String(order)] || {text:baseText,version:0};
       if(current.text===text){delete drafts[`${session.training_date}:${order}`];message='';emit();return;}
       const op={type:'note',date:session.training_date,order,text,version:current.version,
-        operationId:crypto.randomUUID(),createdAt:Date.now()};
+        operationId:target.crypto.randomUUID(),createdAt:target.Date.now()};
       pending.push(op);message='';emit();flush();
     }
     function setNoteDraft(order,text,baseText='') {
@@ -69,10 +69,13 @@
     }
     function start() {
       emit();refresh();
-      setInterval(()=>{if(document.visibilityState==='visible')refresh();},15000);
-      for(const event of ['online','focus','pageshow'])root.addEventListener(event,refresh);
-      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh();});
+      target.setInterval(()=>{if(target.document.visibilityState==='visible')refresh();},15000);
+      for(const event of ['online','focus','pageshow'])target.addEventListener(event,refresh);
+      target.document.addEventListener('visibilitychange',()=>{if(target.document.visibilityState==='visible')refresh();});
     }
     return {start,toggle,saveNote,setNoteDraft,refresh};
-  };
-})(window);
+    };
+  }
+  if (typeof module === 'object' && module.exports) module.exports = createCutSyncFor;
+  if (root) root.createCutSync = createCutSyncFor(root);
+})(typeof window === 'undefined' ? null : window);
