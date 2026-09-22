@@ -1,4 +1,5 @@
 let websitePreviewLibraryRemoteEntries = null;
+let websitePreviewLibraryLoadError = false;
 let websitePreviewLibraryUseRemote = false;
 let websitePreviewBatchPollTimer = null;
 let websitePreviewActiveBatchJobId = '';
@@ -53,6 +54,7 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
     if (!response.ok || !data || data.ok === false) {
       throw new Error(String(data?.detail || data?.error || 'Bibliotheek laden mislukt'));
     }
+    websitePreviewLibraryLoadError = false;
     websitePreviewLibraryRemoteEntries = Array.isArray(data.entries) ? data.entries : [];
     websitePreviewLibraryUseRemote = true;
     if (Number(data.omittedLargeItems || 0) > 0) {
@@ -60,7 +62,7 @@ async function maybeHydrateWebsitePreviewLibraryFromServer() {
     }
   } catch (error) {
     websitePreviewLibraryUseRemote = true;
-    websitePreviewLibraryRemoteEntries = [];
+    websitePreviewLibraryLoadError = true;
     console.warn('Websitepreview-bibliotheek laden mislukt:', error);
   }
 }
@@ -193,6 +195,10 @@ function renderLibraryPanel() {
   const empty = document.getElementById('library-empty');
   if (!grid || !empty) return;
   const items = loadLibraryEntries();
+  const emptyText = empty.querySelector('p');
+  if (emptyText) emptyText.textContent = websitePreviewLibraryLoadError
+    ? 'Bibliotheek kon niet worden geladen. Open Bibliotheek opnieuw om het nogmaals te proberen.'
+    : 'Nog geen opgeslagen previews. Genereer een preview onder Website Scan & Preview — die verschijnt dan hier.';
   if (!items.length) {
     grid.style.display = 'none';
     grid.replaceChildren();
@@ -329,8 +335,6 @@ function applyWebsiteGeneratorAuthState() {
   const authMessageEl = document.getElementById('websitegenerator-auth-message');
   const loginLinkEl = document.getElementById('websitegenerator-login-link');
   const scanBtn = document.getElementById('scan-btn');
-  const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
-  const websiteLinkStatusEl = document.getElementById('website-link-status');
   const authLoaded = Boolean(websiteGeneratorAuthState.loaded);
   const isAuthenticated = Boolean(authLoaded && websiteGeneratorAuthState.authenticated);
 
@@ -339,7 +343,7 @@ function applyWebsiteGeneratorAuthState() {
   }
 
   if (authMessageEl && authLoaded && !isAuthenticated) {
-    authMessageEl.textContent = 'Log in met je premium account om scans te genereren en websitelinks te publiceren.';
+    authMessageEl.textContent = 'Log in met je premium account om webdesignfoto’s te genereren en je bibliotheek te bekijken.';
   }
 
   if (authCard) {
@@ -350,21 +354,7 @@ function applyWebsiteGeneratorAuthState() {
     scanBtn.disabled = !isAuthenticated;
   }
 
-  if (websiteLinkCreateEl) {
-    websiteLinkCreateEl.disabled = !isAuthenticated;
-  }
 
-  if (websiteLinkStatusEl) {
-    if (isAuthenticated) {
-      if (String(websiteLinkStatusEl.textContent || '').trim() === 'Log in om websitelinks aan te maken.') {
-        websiteLinkStatusEl.textContent = '';
-      }
-      websiteLinkStatusEl.style.color = 'var(--text-mid)';
-    } else if (authLoaded && !String(websiteLinkStatusEl.textContent || '').trim()) {
-      websiteLinkStatusEl.textContent = 'Log in om websitelinks aan te maken.';
-      websiteLinkStatusEl.style.color = '#c0392b';
-    }
-  }
 }
 
 async function loadWebsiteGeneratorAuthState(force = false) {

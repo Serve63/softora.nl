@@ -11,9 +11,13 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     upsertSupabaseRowViaRest = async () => ({ ok: false, body: null }),
     deleteSupabaseRowByStateKeyViaRest = async () => ({ ok: false, body: null }),
     supabaseStateKey = '',
+    storageRetrySleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   } = deps;
 
   const supabasePageSize = 500;
+  const libraryStorageOptions = Object.freeze({
+    timeoutMs: 20000, ignoreFailureCooldown: true, suppressFailureCooldown: true,
+  });
   /** ~12 MiB string cap — past bij JSON-parserlimiet voor deze route. */
   const maxDataUrlChars = Math.floor(12 * 1024 * 1024);
   /** Houd de lijstrespons klein genoeg voor serverless/browser-limieten. */
@@ -77,7 +81,8 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         prefix,
         supabasePageSize,
         selectColumns,
-        offset
+        offset,
+        libraryStorageOptions
       );
       if (!result.ok) return result;
 
@@ -239,7 +244,19 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         updated_at: now,
       };
 
-      const saveResult = await upsertSupabaseRowViaRest(row);
+      // Keep the same row/id after an uncertain write so a retry cannot duplicate the photo.
+      let saveResult;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          saveResult = await upsertSupabaseRowViaRest(row, libraryStorageOptions);
+        } catch (_) {
+          saveResult = { ok: false, status: null, error: 'Opslagverbinding onderbroken.' };
+        }
+        if (saveResult.ok) break;
+        const retryable = !saveResult.status || saveResult.status === 429 || saveResult.status >= 500;
+        if (!retryable || attempt === 2) break;
+        await storageRetrySleep(500 * Math.pow(2, attempt));
+      }
       if (!saveResult.ok) {
         logger.error(
           '[WebsitePreviewLibrary][Save]',
@@ -249,7 +266,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
           ok: false,
           status: 500,
           error: 'Bibliotheek opslaan mislukt',
-          detail: 'De preview kon niet in Supabase worden opgeslagen.',
+          detail: 'De foto is gemaakt, maar opslaan is na meerdere pogingen niet bevestigd. Genereer niet opnieuw; laat de opslag controleren.',
         };
       }
 

@@ -18,6 +18,7 @@ const { createSportschoolLogbookStore } = require('./sportschool-logbook-store')
 const RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
   premium_mailbox_preferences: 4000,
   premium_live_momentum: 12000,
+  website_preview_batches: 12000,
   premium_coldmail_autopilot: 12000,
   premium_coldmail_send_guard: 25000,
   premium_coldmailing_settings: 12000,
