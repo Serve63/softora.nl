@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { applyPlatformAliases } = require('./platform-navigation');
 
 const defaultLegacyPrettyPageRedirectEntries = Object.freeze([
   ['personeel-dashboard', 'premium-personeel-dashboard'],
@@ -39,30 +40,7 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
       .filter((file) => /\.html$/i.test(file))
       .map((file) => [file.replace(/\.html$/i, ''), file])
   );
-  if (map.has('premium-ai-coldmailing')) {
-    map.set('premium-leads', map.get('premium-ai-coldmailing'));
-  }
-  if (map.has('premium-kvk-database-shell')) {
-    map.set('kvk-database', map.get('premium-kvk-database-shell'));
-  } else if (map.has('premium-kvk-database')) {
-    map.set('kvk-database', map.get('premium-kvk-database'));
-  }
-  if (map.has('premium-kvk-company-directory-shell')) {
-    map.set('kvk-database-bedrijven', map.get('premium-kvk-company-directory-shell'));
-  }
-  if (map.has('premium-lead-radar-shell')) {
-    map.set('lead-radar', map.get('premium-lead-radar-shell'));
-  }
-  if (map.has('sportschool')) {
-    map.set('logboek', map.get('sportschool'));
-  }
-  if (map.has('premium-mailbox')) {
-    map.set('mailbox', map.get('premium-mailbox'));
-  }
-  if (map.has('live-momentum')) {
-    map.set('winnen', map.get('live-momentum'));
-  }
-  return map;
+  return applyPlatformAliases(map, knownHtmlPageFiles);
 }
 
 function toPrettyPagePathFromHtmlFile(fileName) {

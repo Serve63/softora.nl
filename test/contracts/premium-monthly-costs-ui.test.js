@@ -57,7 +57,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
   assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260722a"><\/script>/);
   assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(

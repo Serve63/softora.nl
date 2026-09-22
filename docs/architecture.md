@@ -33,3 +33,9 @@ Zie [server/routes/manifest.js](../server/routes/manifest.js).
 3. Leads-domein
 4. Coldcalling/call insights
 5. Mailbox, SEO, klanten
+# Websitebrede prestaties
+
+De migratiestandaard, volledigheidsnorm en actuele handhaving staan in
+[platform-performance.md](platform-performance.md). Nieuwe pagina's volgen deze
+richting; de bestaande documenten blijven expliciet legacy totdat hun volledige
+gedrag en prestaties zijn bewezen.

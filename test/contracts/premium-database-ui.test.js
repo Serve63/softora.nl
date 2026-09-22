@@ -2954,7 +2954,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260908a"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260922-instantly-today"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);

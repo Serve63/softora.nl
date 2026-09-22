@@ -36,6 +36,10 @@ const REQUIRED_QUALITY_FILES = Object.freeze([
   'scripts/check-live-production-version.js',
   'scripts/wait-live-production-version.js',
   'scripts/verify-critical.js',
+  'scripts/check-platform-architecture.js',
+  'server/config/platform-pages.json',
+  'server/config/platform-navigation.js',
+  'docs/platform-performance.md',
   'test/contracts/production-live-version-guard.test.js',
   'test/contracts/production-deploy-guard.test.js',
 ]);
@@ -204,6 +208,7 @@ function listQualityLockViolations(options = {}) {
     'check:public-data': 'node scripts/check-public-data-exposure.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
+    'check:platform-architecture': 'node scripts/check-platform-architecture.js',
     'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
     'check:live-production-version': 'node scripts/check-live-production-version.js',
     'check:live-production-version:wait': 'node scripts/wait-live-production-version.js',
@@ -256,7 +261,7 @@ function listQualityLockViolations(options = {}) {
 
   if (trackedFileSet.has('scripts/verify-critical.js')) {
     const verifyCriticalSource = readFile('scripts/verify-critical.js');
-    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:deps', 'check:quality-lock', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
+    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:deps', 'check:quality-lock', 'check:platform-architecture', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
       (scriptName) => {
         const pattern = new RegExp(`\\['run',\\s*'${scriptName.replace(':', '\\:')}'\\]`);
         if (!pattern.test(verifyCriticalSource)) {

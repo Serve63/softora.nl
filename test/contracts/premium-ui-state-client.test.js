@@ -30,7 +30,7 @@ test('premium ui-state client centraliseert gedeelde read/write fallback routes'
   assert.match(source, /method: "GET", cache: "no-store"/);
   assert.match(source, /var GET_CACHE_TTL_MS = 15000;/);
   assert.match(source, /var readCache = Object\.create\(null\);/);
-  assert.match(source, /cached && now - cached\.time < GET_CACHE_TTL_MS/);
+  assert.match(source, /cached && \(cached\.promise \|\| now - cached\.time < GET_CACHE_TTL_MS\)/);
   assert.match(source, /readCache\[cacheKey\] = \{ promise: promise, time: now \};/);
   assert.match(source, /delete readCache\[cacheKey\];/);
   assert.match(source, /method: "POST"/);

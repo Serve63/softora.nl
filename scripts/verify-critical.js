@@ -12,6 +12,7 @@ const steps = [
   ['run', 'check:public-data'],
   ['run', 'check:deps'],
   ['run', 'check:quality-lock'],
+  ['run', 'check:platform-architecture'],
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],
   ['run', 'test:postgres:mailbox-locks'],

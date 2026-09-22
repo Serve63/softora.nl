@@ -41,11 +41,7 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
     );
     assert.match(
       pageSource,
-      fileName === 'premium-mailbox.html'
-        ? /premium-ui-state-client\.js\?v=20260723c/
-        : fileName === 'live-momentum.html'
-          ? /premium-ui-state-client\.js\?v=20260727b/
-          : /premium-ui-state-client\.js\?v=20260722b/,
+      /premium-ui-state-client\.js\?v=20260922a/,
       fileName
     );
   });

@@ -55,6 +55,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - De scheduler hoort 9 dag-slots per mailbox over het hele venster te bewaken. Verlaag of verhoog niet blind een cooldown: controleer eerst `count=1`, `minIntervalMinutes`, sender-cooldowns, rolling 24-uurs quota, echte mail-ready selectie en recipient guards. Noem ruwe assetvoorraad nooit automatisch verzendcapaciteit.
 
 ## Wijzigen zonder regressies
+- Nieuwe pagina's en navigatie volgen [docs/platform-performance.md](docs/platform-performance.md); `check:platform-architecture` bewaakt registratie en voorkomt uitbreiding van legacy-documenten.
 - Verander bestaande routes niet zomaar; houd response-shapes stabiel.
 - Voeg nieuwe logica bij voorkeur toe via `server/routes`, `server/services`, `server/repositories`, `server/security`, `server/schemas`.
 - Nieuwe frontendlogica hoort uiteindelijk in losse bestanden, niet in grote inline scripts.

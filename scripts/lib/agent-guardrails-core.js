@@ -32,6 +32,10 @@ const PROTECTED_FRONTEND_SHELL_PATHS = Object.freeze([
 ]);
 
 const PROTECTED_QUALITY_GATE_PATHS = Object.freeze([
+  'scripts/check-platform-architecture.js',
+  'server/config/platform-pages.json',
+  'server/config/platform-navigation.js',
+  'docs/platform-performance.md',
   '.github/workflows/agent-guardrails.yml',
   '.github/workflows/live-production-version.yml',
   '.github/workflows/repo-hygiene.yml',
