@@ -1327,3 +1327,27 @@ test('mailbox owner preferences remain readable through unrelated REST cooldowns
   assert.deepEqual(mailboxReads[1].requestOptions, { timeoutMs: 4000, ignoreFailureCooldown: true, suppressFailureCooldown: true });
   assert.equal(restReads[0].requestOptions.ignoreFailureCooldown, false);
 });
+
+test('mail ROI reads recover after a transient REST timeout without a 39-second cooldown', async () => {
+  const { RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE, RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE } = require('../../server/services/ui-seo-runtime');
+  let failNextRead = true;
+  const { store, restReads } = createFixture({
+    uiStateReadTimeoutMsByScope: RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
+    uiStateReadOptionsByScope: RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE,
+    fetchResult: async (_key, _columns, _count, options) => {
+      if (!options.ignoreFailureCooldown || failNextRead) {
+        if (options.ignoreFailureCooldown) failNextRead = false;
+        return { ok: false, error: 'Supabase REST timeout / shared cooldown' };
+      }
+      return { ok: true, body: { payload: { values: { premium_database_mail_roi_v1: '{"dealCount":4}' } } } };
+    },
+  });
+
+  assert.equal(await store.getUiStateValues('unrelated_scope'), null);
+  assert.equal(await store.getUiStateValues('premium_database_mail_roi'), null);
+  const state = await store.getUiStateValues('premium_database_mail_roi');
+  assert.equal(state.values.premium_database_mail_roi_v1, '{"dealCount":4}');
+  const roiReads = restReads.filter((read) => read.rowKey === 'ui_state:premium_database_mail_roi');
+  assert.equal(roiReads.length, 2);
+  assert.deepEqual(roiReads[1].requestOptions, { timeoutMs: 4000, ignoreFailureCooldown: true, suppressFailureCooldown: true });
+});

@@ -9,6 +9,10 @@
         'systemMailSentTodayCount', 'systemMailBouncesTodayCount', 'systemMailSentCount',
         'mailRoiAppointmentsCount', 'mailRoiDealsCount',
     ];
+    const METRIC_RETRY_DELAY_MS = 2000;
+    const MAX_METRIC_RETRIES = 2;
+    let metricRetryCount = 0;
+    let metricRetryTimer = null;
 
     function visibleImages(doc) {
         const viewportHeight = Number(root.innerHeight) || doc.documentElement?.clientHeight || 0;
@@ -26,9 +30,10 @@
         const metrics = root.SoftoraDatabaseSystemMailCount;
         await Promise.allSettled([
             metrics?.refreshTodaySentCount?.(),
-            metrics?.loadPersistedDealCount?.(),
+            metrics?.loadPersistedDealCount?.({ force: true }),
         ]);
-        const metricsReady = METRIC_IDS.every((id) => {
+        const verified = metrics?.getMetricReadiness?.();
+        const metricsReady = verified?.roi === true && verified?.stats === true && METRIC_IDS.every((id) => {
             const value = doc.getElementById(id)?.textContent?.trim();
             return value && value !== '--';
         });
@@ -36,6 +41,13 @@
             state.photoRestorePending === false && state.photoRestoreFailed !== true && state.dataLoading === false;
         if (!complete || !metricsReady) {
             readiness.markDegraded({ page: 'premium-database', reason: complete ? 'mail-metrics-unavailable' : 'database-inventory-incomplete' });
+            if (complete && !metricsReady && metricRetryTimer === null && metricRetryCount < MAX_METRIC_RETRIES && typeof root.setTimeout === 'function') {
+                metricRetryCount += 1;
+                metricRetryTimer = root.setTimeout(() => {
+                    metricRetryTimer = null;
+                    return publish({ state });
+                }, METRIC_RETRY_DELAY_MS * metricRetryCount);
+            }
             return false;
         }
 
@@ -46,6 +58,11 @@
             requiredImages: visibleImages(doc),
             actionsBound: () => doc.documentElement?.dataset.softoraDatabaseActionsBound === 'true',
         });
+        if (ready) {
+            metricRetryCount = 0;
+            if (metricRetryTimer !== null && typeof root.clearTimeout === 'function') root.clearTimeout(metricRetryTimer);
+            metricRetryTimer = null;
+        }
         if (!ready) readiness.markDegraded({ page: 'premium-database', reason: 'screen-readiness-contract-incomplete' });
         return ready;
     }
