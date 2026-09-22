@@ -2,7 +2,7 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
-    const PAGE_LIMIT = 3000;
+    const PAGE_LIMIT = 5000;
     const BOOTSTRAP_ROW_LIMIT = 100;
     const MAX_SNAPSHOT_ROWS = 25000;
     const FIRST_PAGE_TIMEOUT_MS = 90000;
@@ -345,7 +345,7 @@
     }
 
     function buildEndpoint(limit, offset) {
-        return ENDPOINT + "?limit=" + encodeURIComponent(limit) + "&offset=" + encodeURIComponent(offset);
+        return ENDPOINT + "?limit=" + encodeURIComponent(limit) + "&offset=" + encodeURIComponent(offset) + (offset > 0 ? "&includeFound=0" : "");
     }
 
     async function fetchSnapshotPage(config, limit, offset, timeoutMs) {

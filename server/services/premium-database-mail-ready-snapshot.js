@@ -17,7 +17,7 @@ const MAIL_READY_BOOTSTRAP_ROW_LIMIT = 100;
 const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 3000;
+const MAX_LIMIT = 5000;
 const MAX_OFFSET = 25000;
 const SNAPSHOT_STORAGE_MAX_ROWS = MAX_OFFSET;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
@@ -1129,18 +1129,22 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       availableCustomers: allAvailableCustomers.slice(offset, offset + limit),
       instantlyReadyTotal: allInstantlyReadyCustomers.length,
       instantlyReadyCustomers: allInstantlyReadyCustomers.slice(offset, offset + limit),
-      foundTotal: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds.length : 0,
-      foundCustomerIds: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds : [],
+      ...(options.omitFoundSnapshot === true ? {} : {
+        foundTotal: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds.length : 0,
+        foundCustomerIds: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds : [],
+      }),
       timings: snapshotData.timings,
     };
   }
 
   async function sendMailReadySnapshotResponse(req, res) {
     try {
+      const includeFound = !(req && req.query && req.query.includeFound === '0');
       const payload = await buildMailReadySnapshot({
         limit: req && req.query ? req.query.limit : undefined,
         offset: req && req.query ? req.query.offset : undefined,
-        includeFoundSnapshot: true,
+        includeFoundSnapshot: includeFound,
+        omitFoundSnapshot: !includeFound,
         allowStaleWhileRefreshing: true,
       });
       res.setHeader('Cache-Control', 'private, no-store, max-age=0');
