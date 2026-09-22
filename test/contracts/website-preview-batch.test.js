@@ -58,13 +58,19 @@ test('website preview batch status survives another server instance through shar
     setUiStateValues: shared.setUiStateValues,
     processJobsInline: true,
     aiToolsCoordinator: {
-      runWebsitePreviewGeneratePipeline: async (url) => ({
+      runWebsitePreviewGeneratePipeline: async (url, options) => {
+        assert.equal(options.referenceImageMode, 'homepage-screenshot');
+        assert.equal(options.requireReferenceImages, true);
+        assert.equal(options.disableReferenceImages, false);
+        assert.equal(options.imageSize, '1024x1536');
+        assert.equal(options.body.variant, 'v2-visual-dna');
+        return ({
         site: { host: new URL(url).hostname },
         image: {
           dataUrl: 'data:image/png;base64,AAAA',
           fileName: 'softora-preview.png',
         },
-      }),
+      }); },
     },
     websitePreviewLibraryCoordinator: {
       persistPreviewLibraryEntry: async () => ({
@@ -153,4 +159,50 @@ test('website preview batch returns a shared running job instead of an expired-b
   assert.equal(res.body.ok, true);
   assert.equal(res.body.job.status, 'running');
   assert.equal(res.body.job.items[0].hostname, 'softora.nl');
+});
+
+test('polling another instance never repeats a paid generation', async () => {
+  const shared = createSharedUiStateFixture();
+  let calls = 0;
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const deps = {
+    ...shared, processJobsInline: true,
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => {
+      calls += 1;
+      await pending;
+      return { image: { dataUrl: 'data:image/png;base64,AAAA' } };
+    } },
+    websitePreviewLibraryCoordinator: { persistPreviewLibraryEntry: async () => ({ ok: true, entry: { id: 'saved-photo' } }) },
+  };
+  const starter = createWebsitePreviewBatchCoordinator(deps);
+  const startRes = createResponseRecorder();
+  const running = starter.startBatchResponse(createPremiumRequest({ body: { urls: ['example.nl'] } }), startRes);
+  while (!calls) await new Promise((resolve) => setImmediate(resolve));
+  const reader = createWebsitePreviewBatchCoordinator(deps);
+  const during = createResponseRecorder();
+  await reader.getCurrentBatchResponse(createPremiumRequest(), during);
+  assert.equal(during.body.job.status, 'running');
+  assert.equal(calls, 1);
+  release();
+  await running;
+  const after = createResponseRecorder();
+  await reader.getBatchResponse(createPremiumRequest({ params: { jobId: startRes.body.jobId } }), after);
+  assert.equal(after.body.job.items[0].libraryEntryId, 'saved-photo');
+  assert.equal(calls, 1);
+});
+
+test('unavailable job storage prevents provider calls', async () => {
+  let calls = 0;
+  const coordinator = createWebsitePreviewBatchCoordinator({
+    processJobsInline: true,
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => { calls += 1; } },
+    websitePreviewLibraryCoordinator: { persistPreviewLibraryEntry: async () => ({ ok: true }) },
+  });
+  const res = createResponseRecorder();
+  await coordinator.startBatchResponse(createPremiumRequest({ body: { urls: ['example.nl'] } }), res);
+  assert.equal(calls, 0);
+  const poll = createResponseRecorder();
+  await coordinator.getBatchResponse(createPremiumRequest({ params: { jobId: res.body.jobId } }), poll);
+  assert.equal(poll.body.job.status, 'error');
 });

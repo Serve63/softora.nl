@@ -1,5 +1,5 @@
 const { buildWebsiteImageGenerationMetadata } = require('./website-image-generation-cost');
-const { normalizeWebdesignVariant, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
+const { buildWebdesignPipelineOptions } = require('./design-photo-generation-policy');
 
 function createWebdesignDeliveryInterruptedError() {
   return Object.assign(new Error(
@@ -25,18 +25,12 @@ async function deliverWebdesignImage(job, {
     throw Object.assign(new Error('Webdesign-opdracht kon niet veilig worden vastgelegd.'), { retryableWebdesignStorage: true });
   }
   assertActive();
-  const variant = normalizeWebdesignVariant(job.variant);
-  const usesHomepageScreenshot = variant === WEBDESIGN_VARIANT_V2;
   let payload;
   try {
-    payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
-      allowScanFallback: true,
-      imageSize: '1024x1536',
-      disableReferenceImages: !usesHomepageScreenshot,
-      referenceImageMode: usesHomepageScreenshot ? 'homepage-screenshot' : 'prompt-only',
-      requireReferenceImages: usesHomepageScreenshot,
-      body: { source: 'premium-database', action: 'webdesign', variant, company: job.customer.bedrijf, domain: job.customer.dom },
-    });
+    payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, buildWebdesignPipelineOptions({
+      variant: job.variant, source: 'premium-database',
+      company: job.customer.bedrijf, domain: job.customer.dom,
+    }));
   } catch (error) {
     // Preserve existing provider/reference rejection retries, but not a process
     // deadline which leaves the provider operation running with an unknown result.

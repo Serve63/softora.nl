@@ -285,9 +285,17 @@ test('website preview library coordinator keeps list responses small when stored
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
-  assert.equal(res.body.entries.length, 1);
-  assert.equal(res.body.entries[0].hostname, 'small.example.nl');
-  assert.equal(res.body.omittedLargeItems, 1);
+  assert.equal(res.body.entries.length, 2);
+  assert.equal(res.body.entries[0].hostname, 'large.example.nl');
+  assert.equal(res.body.entries[0].dataUrl, '');
+  assert.equal(res.body.entries[0].imageDeferred, true);
+  assert.equal(res.body.entries[1].hostname, 'small.example.nl');
+  assert.equal(res.body.omittedLargeItems, 0);
+  assert.ok(JSON.stringify(res.body).length < 3.2 * 1024 * 1024);
+  const detail = createResponseRecorder();
+  await coordinator.getLibraryEntryResponse({ params: { id: res.body.entries[0].id } }, detail);
+  assert.equal(detail.statusCode, 200);
+  assert.ok(detail.body.entry.dataUrl.length > 3.2 * 1024 * 1024);
 });
 
 test('website preview library coordinator delete validates uuid id', async () => {

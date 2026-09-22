@@ -137,7 +137,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
 
         const nextSize = entry.dataUrl.length;
         if (nextSize > maxListDataUrlChars || dataUrlChars + nextSize > maxListDataUrlChars) {
-          omittedLargeItems += 1;
+          entries.push({ ...entry, dataUrl: '', imageDeferred: true });
           continue;
         }
 

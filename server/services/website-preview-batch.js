@@ -1,3 +1,4 @@
+const { buildWebdesignPipelineOptions, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
 const { randomUUID } = require('crypto');
 
 function createWebsitePreviewBatchCoordinator(deps = {}) {
@@ -17,7 +18,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
   const JOB_TTL_MS = 6 * 60 * 60 * 1000;
   const MAX_JOBS = 200;
   const MAX_URLS = 50;
-  const ITEM_TIMEOUT_MS = 2 * 60 * 1000;
+  const ITEM_TIMEOUT_MS = 10 * 60 * 1000;
   const VALID_ITEM_STATUSES = new Set(['pending', 'running', 'done', 'error']);
   const VALID_JOB_STATUSES = new Set(['running', 'done', 'error']);
 
@@ -177,7 +178,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
         nextMap[id] = serializeJobForStorage(stored);
       });
       nextMap[job.id] = serializeJobForStorage(job);
-      return setUiStateValues(
+      return await setUiStateValues(
         batchScope,
         { [batchStorageKey]: JSON.stringify(nextMap) },
         { source: 'website-preview-batch', actor: 'Premium websitegenerator' }
@@ -204,7 +205,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       if (statusSet && statusSet.size && !statusSet.has(job.status)) return;
       if (!latest || job.createdAt > latest.createdAt) latest = job;
     });
-    if (latest) jobs.set(latest.id, latest);
+    if (latest && !jobs.get(latest.id)?.processing) jobs.set(latest.id, latest);
     return latest;
   }
 
@@ -334,15 +335,24 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     try {
       for (let i = 0; i < job.items.length; i += 1) {
         const item = job.items[i];
+        if (item.status === 'done' || item.status === 'error') continue;
+        if (item.status === 'running') {
+          item.status = 'error';
+          item.error = 'De generatie is onderbroken. Controleer de bibliotheek; er wordt niet automatisch opnieuw gegenereerd.';
+          continue;
+        }
         item.status = 'running';
         job.currentIndex = i;
-        await persistSharedJob(job);
+        const recorded = await persistSharedJob(job);
 
         try {
+          if (!recorded) throw new Error('De opdracht kon niet veilig worden opgeslagen. Er is geen foto gegenereerd.');
           const payload = await withTimeout(
-            aiToolsCoordinator.runWebsitePreviewGeneratePipeline(item.url),
+            aiToolsCoordinator.runWebsitePreviewGeneratePipeline(item.url, buildWebdesignPipelineOptions({
+              variant: WEBDESIGN_VARIANT_V2, source: 'premium-websitegenerator', domain: item.hostname,
+            })),
             ITEM_TIMEOUT_MS,
-            'Preview genereren duurde te lang. Probeer opnieuw of scan een lichtere URL.'
+            'Generatie duurt langer dan verwacht. Controleer de bibliotheek voordat je opnieuw genereert.'
           );
           const img = payload?.image;
           const dataUrl = String(img?.dataUrl || '').trim();
@@ -377,7 +387,8 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
         await persistSharedJob(job);
       }
 
-      job.status = 'done';
+      job.status = job.items.every((item) => item.status === 'error') ? 'error' : 'done';
+      job.error = job.status === 'error' ? job.items[0].error : null;
       job.finishedAt = Date.now();
     } catch (fatal) {
       job.status = 'error';
@@ -479,8 +490,8 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     }
 
     let job = jobs.get(jobId);
-    if (!job) {
-      job = await loadSharedJob(jobId);
+    if (!job?.processing) {
+      job = await loadSharedJob(jobId) || job;
     }
     if (!job) {
       return res.status(404).json({
@@ -498,14 +509,6 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       });
     }
 
-    if (job.status === 'running' && !job.processing) {
-      if (processJobsInline) {
-        await processJob(job.id);
-      } else {
-        queueJobProcessing(job.id);
-      }
-    }
-
     return res.status(200).json({
       ok: true,
       job: serializeJob(job),
@@ -518,16 +521,10 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     const localJob = findLatestJobForOwner(ownerKey);
     const sharedJob = await findLatestSharedJobForOwner(ownerKey);
     let job = localJob;
-    if (sharedJob && (!job || sharedJob.createdAt > job.createdAt)) {
+    if (sharedJob && (!job || (!job.processing && sharedJob.createdAt >= job.createdAt))) {
       job = sharedJob;
     }
-    if (job && !job.processing) {
-      if (job.status === 'running' && processJobsInline) {
-        await processJob(job.id);
-      } else {
-        queueJobProcessing(job.id);
-      }
-    }
+
     return res.status(200).json({
       ok: true,
       job: job ? serializeJob(job) : null,
