@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 1,
+  "pages": {
+    "actieve-opdrachten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "agendaapp.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "ai-automatisering.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "ai-coldmailing.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "ai-lead-generator.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "ai-telefonist.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "bedrijfssoftware.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "contact.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "crm-systeem-op-maat.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "diensten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "live-momentum-access.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "live-momentum.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "maatwerk-platform.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "opdracht-preview.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "pakketten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "papertrader.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "personeel-agenda.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "personeel-dashboard.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "personeel-login.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-actieve-opdrachten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-advertenties.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-ai-coldmailing.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-ai-lead-generator.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-algemene-voorwaarden.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-analytics.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-bedrijfssoftware.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-bevestigingsmails.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-blog.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-boekhouding.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-chatbot.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-cinematic-website.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-coldmailing-lead.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-company-website-video.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-database.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-flynow.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-gezondheidsdossier.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-instellingen-personeel.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-instellingen.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-kladblok.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-klanten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-kvk-company-directory-shell.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-kvk-company-directory.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-kvk-database-shell.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-kvk-database.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-lead-radar-shell.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-lead-radar.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-mailbox.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-omzetwerk.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-opdracht-dossier.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-opdracht-preview.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-over-softora.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-pakketten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-pdfs.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-personeel-agenda.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-personeel-dashboard.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-personeel-login.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-privacy-policy.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-samenvatten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-seo-crm-system.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-seo.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-socialmedia.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-vaste-lasten.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-voicesoftware.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-wachtwoordenregister.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-website.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-websitegenerator.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-websitepreview.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-websites.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-wereldmap.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-word.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "premium-world-watcher.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "seo-crm-system.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "sportschool.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "website-laten-maken-oisterwijk.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "website.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "whatsapp-data-deletion.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    },
+    "whatsapp-privacy.html": {
+      "delivery": "legacy-document",
+      "targetReadyMs": 3000
+    }
+  }
+}

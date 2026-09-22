@@ -19,7 +19,7 @@ test('premium advertenties bevat aparte Google en Facebook Ads dry-run werkruimt
   assert.match(pageSource, /<title>Advertenties – Softora\.nl<\/title>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-google-ads\.css\?v=20260716b">/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-facebook-ads\.css\?v=20260723a">/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
   assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260723b" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260716b" defer><\/script>/);
@@ -86,7 +86,7 @@ test('premium socialmedia toont een aparte AI beheer workspace boven de personee
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-marketing-management\.css\?v=20260423a">/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
   assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260722a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-management\.js\?v=20260423a" defer><\/script>/);

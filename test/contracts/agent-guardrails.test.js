@@ -24,6 +24,21 @@ const { listExistingRepoFiles } = require('../../scripts/check-quality-lock');
 
 const repoRoot = path.resolve(__dirname, '../..');
 
+test('platform architecture registry and CI gate are protected quality code', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  assert.equal(packageJson.scripts['check:platform-architecture'], 'node scripts/check-platform-architecture.js');
+  assert.match(readRepoFile('scripts/verify-critical.js'), /\['run', 'check:platform-architecture'\]/);
+  assert.match(readRepoFile('scripts/check-quality-lock.js'), /'check:platform-architecture': 'node scripts\/check-platform-architecture.js'/);
+  assert.match(readRepoFile('scripts/check-platform-architecture.js'), /\['cat-file', '-p', 'HEAD'\]/);
+  for (const file of ['server/config/platform-pages.json', 'server/config/platform-navigation.js',
+    'scripts/check-platform-architecture.js', 'docs/platform-performance.md']) {
+    assert.equal(isProtectedQualityGatePath(file), true, file);
+  }
+  assert.match(readRepoFile('AGENTS.md'), /platform-performance\.md/);
+  assert.match(readRepoFile('docs/architecture.md'), /platform-performance\.md/);
+  assert.match(readRepoFile('docs/quality-protocol.md'), /check:platform-architecture/);
+});
+
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }

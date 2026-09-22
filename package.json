@@ -23,6 +23,7 @@
     "check:guardrails": "node scripts/check-agent-guardrails.js",
     "check:repo-hygiene": "bash scripts/check-repo-hygiene.sh",
     "check:quality-lock": "node scripts/check-quality-lock.js",
+    "check:platform-architecture": "node scripts/check-platform-architecture.js",
     "clean:local": "bash scripts/clean-local-artifacts.sh",
     "check:deps": "npm audit --omit=dev",
     "check:production-deploy-source": "node scripts/guard-production-deploy-source.js",

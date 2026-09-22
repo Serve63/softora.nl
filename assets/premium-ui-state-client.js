@@ -1,9 +1,21 @@
-(function (global) {
+(function (root, createClient) {
+    if (typeof module === "object" && module.exports) module.exports = createClient;
+    else createClient(root);
+})(typeof window !== "undefined" ? window : null, function (global) {
     "use strict";
 
     var DEFAULT_TIMEOUT_MS = 5000;
     var GET_CACHE_TTL_MS = 15000;
     var readCache = Object.create(null);
+    var pendingWrites = Object.create(null);
+    var sessionGeneration = 0;
+    var clock = global.Date || Date;
+
+    function clearUiState() {
+        sessionGeneration += 1;
+        readCache = Object.create(null);
+        pendingWrites = Object.create(null);
+    }
 
     function getBootstrapDocument() {
         return global && global.document && typeof global.document.getElementById === "function"
@@ -46,7 +58,7 @@
         if (!cacheKey) return false;
         readCache[cacheKey] = {
             data: normalizeStateSnapshot(value),
-            time: Math.max(0, Number(options && options.time) || Date.now()),
+            time: Math.max(0, Number(options && options.time) || clock.now()),
             bootstrap: Boolean(options && options.bootstrap)
         };
         return true;
@@ -102,7 +114,7 @@
                         bootstrap: true,
                         // De server heeft deze data al voor de huidige navigatie opgehaald.
                         // Start daarom een verse client-TTL, ongeacht de klok op de server.
-                        time: Date.now()
+                        time: clock.now()
                     });
                     if (primed) primedScopes[scope] = true;
                     return primed ? count + 1 : count;
@@ -196,25 +208,34 @@
 
     async function getUiState(scope) {
         var cacheKey = String(scope || "");
+        var generation = sessionGeneration;
+        // A read started during a write must observe the completed write, including failures.
+        while (pendingWrites[cacheKey]) {
+            await pendingWrites[cacheKey];
+            if (generation !== sessionGeneration) throw new Error("UI-state sessie gewijzigd.");
+        }
         var cached = readCache[cacheKey];
-        var now = Date.now();
-        if (cached && now - cached.time < GET_CACHE_TTL_MS) {
+        var now = clock.now();
+        if (cached && (cached.promise || now - cached.time < GET_CACHE_TTL_MS)) {
             return await (cached.promise || Promise.resolve(cached.data));
         }
         var promise = requestWithFallback(
             getReadUrls(scope),
             { method: "GET", cache: "no-store" },
             "UI-state GET"
-        );
-        readCache[cacheKey] = { promise: promise, time: now };
-        try {
-            var data = await promise;
-            readCache[cacheKey] = { data: data, time: Date.now() };
+        ).then(async function (data) {
+            if (generation !== sessionGeneration) throw new Error("UI-state sessie gewijzigd.");
+            // An invalidation, prime or write supersedes this response; never return old truth.
+            if (readCache[cacheKey] !== entry) return await getUiState(scope);
+            readCache[cacheKey] = { data: data, time: clock.now() };
             return data;
-        } catch (error) {
-            delete readCache[cacheKey];
+        }).catch(function (error) {
+            if (readCache[cacheKey] === entry) delete readCache[cacheKey];
             throw error;
-        }
+        });
+        readCache[cacheKey] = { promise: promise, time: now };
+        var entry = readCache[cacheKey];
+        return await promise;
     }
 
     async function setUiState(scope, body, options) {
@@ -227,14 +248,26 @@
         };
         if (options && options.keepalive === true) requestOptions.keepalive = true;
 
-        var data = await requestWithFallback(
+        var generation = sessionGeneration;
+        var previousWrite = pendingWrites[cacheKey] || Promise.resolve();
+        var write = requestWithFallback(
             getWriteUrls(scope),
             requestOptions,
             "UI-state POST",
             options && options.timeoutMs
         );
-        delete readCache[cacheKey];
-        return data;
+        // Coordinate readers without serialising or replaying existing business writes.
+        var settled = Promise.all([previousWrite, write.catch(function () {})]);
+        pendingWrites[cacheKey] = settled;
+        try {
+            return await write;
+        } finally {
+            await settled;
+            if (generation === sessionGeneration) {
+                delete readCache[cacheKey];
+                if (pendingWrites[cacheKey] === settled) delete pendingWrites[cacheKey];
+            }
+        }
     }
 
     function peekUiState(scope) {
@@ -250,6 +283,9 @@
         peek: peekUiState,
         prime: primeUiState,
         invalidate: invalidateUiState,
+        clear: clearUiState,
         bootstrappedScopeCount: bootstrappedScopeCount
     };
-})(window);
+    if (typeof global.addEventListener === "function") global.addEventListener("pagehide", clearUiState);
+    return global.SoftoraUiStateClient;
+});

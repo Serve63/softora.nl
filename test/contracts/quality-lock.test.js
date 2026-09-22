@@ -10,6 +10,24 @@ const {
 
 const repoRoot = path.resolve(__dirname, '../..');
 
+test('quality lock rejects removal or replacement of the platform architecture gate', () => {
+  const readFile = (file) => {
+    const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    if (file === 'scripts/verify-critical.js') {
+      return source.replace("  ['run', 'check:platform-architecture'],\n", '');
+    }
+    if (file === 'package.json') {
+      const pkg = JSON.parse(source);
+      pkg.scripts['check:platform-architecture'] = 'echo passed';
+      return JSON.stringify(pkg);
+    }
+    return source;
+  };
+  const errors = listQualityLockViolations({ readFile }).join('\n');
+  assert.match(errors, /verify:critical mist npm run check:platform-architecture/);
+  assert.match(errors, /script "check:platform-architecture" moet/);
+});
+
 function makeReadFile(fileMap) {
   return (filePath) => fileMap[filePath] || '';
 }

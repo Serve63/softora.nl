@@ -52,6 +52,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Nieuwe externe webhooks of providerkoppelingen krijgen expliciete verificatie, foutafhandeling en veilige defaults.
 
 ## Performance baseline
+- Volg [platform-performance.md](platform-performance.md); `check:platform-architecture` moet groen zijn en nieuwe legacy-uitzonderingen zijn verboden.
 - Optimaliseer pas na contractstabiliteit en security-checks.
 - Vermijd onnodige synchronous hot-path logica in request-handlers als er al gedeelde async helpers bestaan.
 - Houd runtime-compositie compact; grote setupblokken moeten naar kleinere modules zodat startup en debugging begrijpelijk blijven.
