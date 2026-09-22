@@ -388,6 +388,9 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/sportschool-logboek-public' && method === 'GET') {
         return true;
       }
+      if (requestPath === '/api/logboek-cut' && (method === 'GET' || method === 'POST')) {
+        return true;
+      }
       if (requestPath === '/api/kvk-database/snapshot' && method === 'POST') {
         return true;
       }
