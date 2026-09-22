@@ -143,7 +143,7 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
 test('premium websitegenerator toont compacte previews en behoudt de volledige afbeelding', () => {
   const source = websiteGeneratorSource;
 
-  assert.match(websiteGeneratorHtmlSource, /\.preview-zone\s*\{[^}]*width: 100%;[^}]*max-width: 360px;/);
+  assert.match(websiteGeneratorHtmlSource, /\.preview-zone\s*\{[^}]*width: 100%;[^}]*max-width: 300px;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1024;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1536;/);
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
@@ -269,6 +269,6 @@ test('completed webdesign hides the status bar while running and failed jobs kee
 
 
 test('preview title stays on one line beside the download button', () => {
-  assert.match(websiteGeneratorHtmlSource, /\.preview-label > span\s*\{[^}]*white-space: nowrap;[^}]*letter-spacing: \.3px;/);
+  assert.match(websiteGeneratorHtmlSource, /\.preview-label > span\s*\{[^}]*white-space: nowrap;[^}]*letter-spacing: \.1px;/);
   assert.match(websiteGeneratorHtmlSource, /\.preview-actions\s*\{[^}]*flex-shrink: 0;/);
 });

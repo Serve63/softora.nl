@@ -492,8 +492,6 @@ function createPreviewZoneElement(blockId, hostname, previewWidth, useStablePrev
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'btn';
-  downloadBtn.style.padding = '6px 14px';
-  downloadBtn.style.fontSize = '11px';
   downloadBtn.append(createDownloadIconElement(), document.createTextNode(' Download PNG'));
   downloadBtn.addEventListener('click', () => downloadPreviewBlock(blockId));
   actions.appendChild(downloadBtn);
