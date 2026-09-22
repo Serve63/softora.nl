@@ -1,3 +1,4 @@
+const { restoreMailboxParagraphs } = require('./mailbox-provider-rich-body');
 const DEFAULT_MAILBOX_IMAP_OPERATION_TIMEOUT_MS = 70_000;
 const { observeMailboxImapClient } = require('./mailbox-imap-observation');
 const {
@@ -206,7 +207,7 @@ async function fetchSelectedMailboxMessages({
     { uid: true }
   )) {
     const parsed = await parseMailSource(message.source);
-    const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
+    const text = restoreMailboxParagraphs(sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || '')), parsed.html);
     const primaryBodyImages = buildMailboxBodyImages(parsed);
     records.push({
       message,

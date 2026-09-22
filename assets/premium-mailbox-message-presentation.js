@@ -319,10 +319,15 @@
     }
 
     function getSourceSafeMessagePresentation(message, mail, bodyOverride, presentationOptions = {}) {
-      const body = typeof bodyOverride === 'string'
+      let body = typeof bodyOverride === 'string'
         ? bodyOverride
         : String(message && message.body || '');
       if (!body) return emptyPresentation();
+      const aiView = message?.aiPresentation;
+      if (aiView?.reason === 'outside_scope' &&
+        typeof aiView.displayBody === 'string' && aiView.displayBody.replace(/\s/g, '') === body.replace(/\s/g, '')) {
+        body = aiView.displayBody;
+      }
       if (
         options.isSentMessageByProvenance(message, mail && mail.accountEmail) ||
         message && message.copyContext && message.copyContext.evidenceKnown === true
@@ -330,7 +335,14 @@
         return { body: cleanClientFooter(getSentAuthoredBody(body)), contact: emptyContact(), signatureMatched: false };
       }
       const classified = ai?.read({ ...message, body });
-      if (classified) return classified;
+      if (classified) {
+        // AI handles footer selection; exact, same-mailbox sent-copy evidence still
+        // owns conversation deduplication. Never hide an unknown forwarded message.
+        const canMatch = typeof options.getMessageTimestamp === 'function' &&
+          typeof options.getProvenOutboundThreadMessages === 'function' && typeof options.getDirectParentMessageIds === 'function';
+        return canMatch && message.aiPresentation?.status === 'ready'
+          ? { ...classified, body: getProvenQuotedOutboundResult(classified.body, mail, message).body } : classified;
+      }
       const hasMessageContext = Boolean(message && typeof message === 'object' && !Array.isArray(message));
       const parsedSignature = hasMessageContext
         ? signature?.parseIncoming?.(body, message)

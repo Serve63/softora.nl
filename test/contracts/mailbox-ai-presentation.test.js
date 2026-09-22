@@ -378,3 +378,48 @@ test('incoming SQL gate excludes backlog, preserves reservations and releases bl
     await assert.rejects(db.query("select * from softora_mailbox_ai_states(array['new'])"),/permission denied/);
   } finally { await db.close(); }
 });
+
+test('HTML restores collapsed paragraphs only when every non-whitespace character is preserved', () => {
+  const { restoreMailboxParagraphs } = require('../../server/services/mailbox-provider-rich-body');
+  const html = '<div>Goedendag</div><div>Ik heb geen ondersteuning nodig</div><div>Dankjewel</div><div>Verzonden vanaf mijn Galaxy</div>';
+  const raw = 'GoedendagIk heb geen ondersteuning nodigDankjewelVerzonden vanaf mijn Galaxy';
+  const result = restoreMailboxParagraphs(raw, html);
+  assert.equal(result, 'Goedendag\n\nIk heb geen ondersteuning nodig\n\nDankjewel\n\nVerzonden vanaf mijn Galaxy');
+  assert.equal(restoreMailboxParagraphs(raw + ' Belangrijke extra afspraak.', html), raw + ' Belangrijke extra afspraak.');
+  assert.equal(restoreMailboxParagraphs('Klik hier', '<p>Klik <a href="https://example.nl">hier</a></p>'), 'Klik hier');
+  assert.equal(restoreMailboxParagraphs('Al goed.\nTweede alinea.', '<p>Al goed.</p><p>Tweede alinea.</p>'), 'Al goed.\nTweede alinea.');
+  assert.equal(restoreMailboxParagraphs('Betaal 50 euro', '<p>Betaal 500 euro</p>'), 'Betaal 50 euro');
+});
+
+test('out-of-scope stored mail keeps normal formatting and quote cleanup in root and timeline', async () => {
+  const { restoreMailboxParagraphs } = require('../../server/services/mailbox-provider-rich-body');
+  const presentation = require('../../assets/premium-mailbox-campaign-inbox');
+  const original = 'GoedendagIk heb geen ondersteuning nodigDankjewelVerzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé <owner@example.nl> Datum: 22-09-2026 16:49 Aan: bert@example.nl Onderwerp: Vraag Goedendag,\nHier staat mijn eerdere voorstel voor jullie website.';
+  const html = '<div>Goedendag</div><div>Ik heb geen ondersteuning nodig</div><div>Dankjewel</div><div>Verzonden vanaf mijn Galaxy</div><div>-------- Oorspronkelijk bericht --------</div><div>Van: Servé &lt;owner@example.nl&gt; </div><div>Datum: 22-09-2026 16:49 </div><div>Aan: bert@example.nl </div><div>Onderwerp: Vraag </div><p>Goedendag,</p><p>Hier staat mijn eerdere voorstel voor jullie website.</p>';
+  const old = { ...message, body: original, sourceHtml: html };
+  const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, repository: {
+    enqueue: async (sources) => sources.map((s) => ({ id:s.id, status:'queued', reason:'outside_scope', gate:false })),
+  } });
+  const [enriched] = await service.enrich([old]);
+  assert.equal(enriched.body, original);
+  assert.equal(enriched.aiPresentation.displayBody, restoreMailboxParagraphs(original, html));
+  assert.equal(contract.read(enriched), null);
+  const views = [presentation.getRootMessagePresentation(original,enriched)];
+  presentation.renderThreadMessages({ ...enriched, threadMessages: [{...enriched, bodyLoaded:true}] }, String, () => ({date:'Vandaag',time:'16:49'}), {renderMessageBody: (view) => { views.push(view); return view.body; }});
+  assert.equal(views.length,2);
+  for (const view of views) {
+    assert.equal(view.body, 'Goedendag\n\nIk heb geen ondersteuning nodig\n\nDankjewel');
+    assert.doesNotMatch(view.body,/Galaxy|eerdere voorstel|Oorspronkelijk bericht/);
+  }
+});
+
+test('ready AI mail still deduplicates a proven sent copy while preserving unknown forwarded content', () => {
+  const campaign = require('../../assets/premium-mailbox-campaign-inbox');
+  const parent = { id:'sent:parent', messageId:'<parent@example.nl>', folder:'sent', direction:'sent',
+    accountEmail:'owner@example.nl', date:'2026-09-22T12:00:00Z', body:'Hier staat mijn eerdere concrete voorstel voor jullie website.' };
+  const body = `Dankjewel, wij bespreken het.\n\nOn Tuesday, September 22, 2026, Servé <owner@example.nl> wrote:\n> ${parent.body}`;
+  const incoming = { ...message, body, inReplyTo:parent.messageId, date:'2026-09-22T13:00:00Z', threadMessages:[parent],
+    aiPresentation:{...ready.aiPresentation, sourceBody:body, decision:{ labels:body.split('\n').map(()=>'authored'),contacts:[] }} };
+  assert.equal(campaign.getRootMessagePresentation(body,incoming).body,'Dankjewel, wij bespreken het.');
+  assert.match(campaign.getRootMessagePresentation(body,{...incoming,threadMessages:[]}).body,/eerdere concrete voorstel/);
+});

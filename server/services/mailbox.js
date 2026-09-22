@@ -3,7 +3,7 @@ const { createMailboxMessageResponse } = require('./mailbox-message-response');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
-const { decodeMailboxEntities, isMailboxHtml, parseProviderHtml } = require('./mailbox-provider-rich-body');
+const { decodeMailboxEntities, isMailboxHtml, parseProviderHtml, restoreMailboxParagraphs } = require('./mailbox-provider-rich-body');
 const {
   FOLDER_ALIASES,
   appendSentMessage,
@@ -1716,7 +1716,7 @@ function createMailboxService(deps = {}) {
 
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
-    const rawText = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
+    const rawText = options.text || restoreMailboxParagraphs(sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || '')), parsed.html);
     const parsedFromName = displayName(parsed.from?.value); const parsedFromEmail = addressText(parsed.from?.value);
     const campaignFolder = folder === 'allmail' && normalizeEmail(parsedFromEmail) === normalizeEmail(account.email) ? 'sent' : folder;
     const originalCampaignOutbound = isOriginalCampaignOutboundMessage({
