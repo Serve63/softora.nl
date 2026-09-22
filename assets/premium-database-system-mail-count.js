@@ -9,6 +9,7 @@
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
+    let lastInstantlyTodaySentCount = null;
     let lastHardBouncesCount = null;
     let lastBounceObservationMs = 0;
     let roiAppointmentsCount = 0;
@@ -204,6 +205,21 @@
         return recipientKeys.size;
     }
 
+    function getInstantlySystemMailSentTodayCount(customers, helpers) {
+        const options = helpers || {};
+        const nowValue = typeof options.now === "function" ? options.now() : (options.now || new Date());
+        const todayKey = getAmsterdamDateKey(nowValue);
+        const recipientKeys = new Set();
+        (customers || []).forEach(function (customer, index) {
+            if (!hasConfirmedInstantlySentSignal(customer, options)) return;
+            if (fallbackNormalizeString(customer && customer.instantlyManualSentClassification).toLowerCase() === "user-requested-unverified") return;
+            const sentAt = getInstantlySentAt(customer, options);
+            if (!sentAt || getAmsterdamDateKey(sentAt) !== todayKey) return;
+            recipientKeys.add(buildWebdesignRecipientKey(customer, options) || "row:" + index);
+        });
+        return recipientKeys.size;
+    }
+
     function getCombinedSystemMailCount() {
         return lastStatsMailCount === null ? null : lastStatsMailCount + lastInstantlyMailCount;
     }
@@ -223,10 +239,12 @@
             const mailStats = payload && payload.mailStats && typeof payload.mailStats === "object" ? payload.mailStats : {};
             const roi = payload && payload.mailRoi && typeof payload.mailRoi === "object" ? payload.mailRoi : {};
             const sentToday = readNonNegativeInteger(mailStats.sentToday);
+            const instantlySentToday = readNonNegativeInteger(mailStats.instantlySentToday);
             const hardBounces = readHardBouncesCountFromStats(mailStats);
             const totalSent = readNonNegativeInteger(mailStats.totalSent);
             const dealCount = readNonNegativeInteger(roi.dealCount);
             if (sentToday !== null) lastTodaySentCount = sentToday;
+            if (instantlySentToday !== null) lastInstantlyTodaySentCount = instantlySentToday;
             if (hardBounces !== null) { lastHardBouncesCount = hardBounces; lastBounceObservationMs = Date.parse(mailStats.bounceStatsUpdatedAt) || 0; }
             if (totalSent !== null) {
                 lastStatsMailCount = lastStatsMailCount === null ? totalSent : Math.max(lastStatsMailCount, totalSent);
@@ -402,6 +420,11 @@
         return null;
     }
 
+    function readInstantlyTodaySentCountFromStats(stats) {
+        if (!stats || stats.instantlyStatsReliable !== true) return null;
+        return readNonNegativeInteger(stats.instantlySentToday);
+    }
+
     function readHardBouncesCountFromStats(stats) {
         if (!stats || stats.bounceStatsReliable !== true || stats.bounceStatsModel !== "complete-mailbox-recipient-v2") return null;
         const directFields = ["hardBounces", "totalHardBounces"];
@@ -420,21 +443,60 @@
         return readNonNegativeInteger(groupedStats && groupedStats.hard);
     }
 
-    function renderTodaySentCount(value, isLoading) {
+    function ensureTodaySentElements(rootDocument, element) {
+        let softoraElement = rootDocument.getElementById("systemMailSentTodaySoftoraCount");
+        let instantlyElement = rootDocument.getElementById("systemMailInstantlySentTodayCount");
+        if (softoraElement && instantlyElement) return { softoraElement: softoraElement, instantlyElement: instantlyElement };
+        if (typeof rootDocument.createElement !== "function" || typeof element.appendChild !== "function") return null;
+        element.textContent = "";
+        if (element.classList && typeof element.classList.add === "function") element.classList.add("mail-roi-value--today-split");
+        softoraElement = rootDocument.createElement("span");
+        softoraElement.id = "systemMailSentTodaySoftoraCount";
+        const separator = rootDocument.createElement("span");
+        separator.className = "mail-roi-value-separator";
+        separator.setAttribute("aria-hidden", "true");
+        separator.textContent = "-";
+        instantlyElement = rootDocument.createElement("span");
+        instantlyElement.id = "systemMailInstantlySentTodayCount";
+        instantlyElement.className = "mail-roi-value-instantly";
+        element.appendChild(softoraElement);
+        element.appendChild(separator);
+        element.appendChild(instantlyElement);
+        return { softoraElement: softoraElement, instantlyElement: instantlyElement };
+    }
+
+    function renderTodaySentCount(value, instantlyValue, isLoading) {
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentTodayCount");
         if (!element) return;
-        if (isLoading && lastTodaySentCount === null) {
-            element.textContent = "--";
-            return;
-        }
         const count = value === null || value === undefined ? lastTodaySentCount : readPositiveInteger(value);
-        if (count === null || count === undefined) {
-            element.textContent = "--";
-            return;
+        const instantlyCount = instantlyValue === null || instantlyValue === undefined
+            ? lastInstantlyTodaySentCount
+            : readNonNegativeInteger(instantlyValue);
+        if (count !== null && count !== undefined) lastTodaySentCount = count;
+        if (instantlyCount !== null && instantlyCount !== undefined) lastInstantlyTodaySentCount = instantlyCount;
+        const softoraText = isLoading && lastTodaySentCount === null
+            ? "--"
+            : lastTodaySentCount === null || lastTodaySentCount === undefined
+                ? "--"
+                : lastTodaySentCount.toLocaleString("nl-NL");
+        const instantlyText = isLoading && lastInstantlyTodaySentCount === null
+            ? "--"
+            : lastInstantlyTodaySentCount === null || lastInstantlyTodaySentCount === undefined
+                ? "--"
+                : lastInstantlyTodaySentCount.toLocaleString("nl-NL");
+        const splitElements = ensureTodaySentElements(rootDocument, element);
+        if (splitElements) {
+            splitElements.softoraElement.textContent = softoraText;
+            splitElements.instantlyElement.textContent = instantlyText;
+        } else {
+            element.textContent = softoraText + " - " + instantlyText;
         }
-        lastTodaySentCount = count;
-        element.textContent = count.toLocaleString("nl-NL");
+        element.setAttribute && element.setAttribute(
+            "aria-label",
+            "Vandaag verstuurd: " + softoraText + " via Softora en " + instantlyText + " via Instantly"
+        );
+        element.title = "Links Softora; rechts Instantly (alleen bevestigde verzendingen).";
     }
 
     function renderHardBouncesCount(value, isLoading) {
@@ -496,7 +558,7 @@
         if (rootDocument && rootDocument.hidden) return Promise.resolve(lastTodaySentCount);
         const fetchImpl = getFetch();
         if (!fetchImpl) {
-            renderTodaySentCount(lastTodaySentCount, true);
+            renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, true);
             return Promise.resolve(lastTodaySentCount);
         }
         if (todaySentRefreshPromise) return todaySentRefreshPromise;
@@ -519,8 +581,9 @@
                 lastStatsMailCount = stats.sentRegister.total;
             }
             const sentToday = readTodaySentCountFromStats(stats);
+            const instantlySentToday = readInstantlyTodaySentCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
-            renderTodaySentCount(sentToday, false);
+            renderTodaySentCount(sentToday, instantlySentToday, false);
             applyLiveBounceStats(stats);
             if (systemMailCount !== null) {
                 lastStatsMailCount = lastStatsMailCount === null
@@ -532,7 +595,7 @@
             return sentToday;
         }).catch(function (error) {
             if (window.SoftoraDatabaseSentRegister) { window.SoftoraDatabaseSentRegister.markFailed(); window.dispatchEvent(new Event("softora:sent-register")); }
-            renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
+            renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, lastTodaySentCount === null && lastInstantlyTodaySentCount === null);
             renderHardBouncesCount(lastHardBouncesCount, lastHardBouncesCount === null);
             renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
             if (typeof console !== "undefined" && typeof console.warn === "function") console.warn("Vandaag verstuurd laden mislukt:", error && error.message ? error.message : error);
@@ -545,7 +608,7 @@
 
     function bindTodaySentRefresh() {
         applyBootstrapState();
-        renderTodaySentCount(lastTodaySentCount, true);
+        renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, true);
         renderHardBouncesCount(lastHardBouncesCount, true);
         if (todaySentRefreshBound) return;
         todaySentRefreshBound = true;
@@ -613,6 +676,11 @@
         bindTodaySentRefresh();
         if (!(helpers && helpers.dataLoading)) {
             lastInstantlyMailCount = Math.max(lastInstantlyMailCount, getInstantlySystemMailSentCount(customers, helpers || {}));
+            const instantlyTodayCount = getInstantlySystemMailSentTodayCount(customers, helpers || {});
+            lastInstantlyTodaySentCount = lastInstantlyTodaySentCount === null
+                ? instantlyTodayCount
+                : Math.max(lastInstantlyTodaySentCount, instantlyTodayCount);
+            renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, false);
         }
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
@@ -627,6 +695,7 @@
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,
         hasConfirmedInstantlySentSignal: hasConfirmedInstantlySentSignal,
         getInstantlySystemMailSentCount: getInstantlySystemMailSentCount,
+        getInstantlySystemMailSentTodayCount: getInstantlySystemMailSentTodayCount,
         getWebdesignMailSentStats: getWebdesignMailSentStats,
         loadPersistedDealCount: loadPersistedDealCount,
         refreshTodaySentCount: refreshTodaySentCount,

@@ -84,3 +84,32 @@ test('bounce fallback is independent of sent statistics and survives the Amsterd
   const corrected = { stats: { ...fresh.stats, bounceStatsReliable: true, bounceStatsModel: 'complete-mailbox-recipient-v2', bounceStatsUpdatedAt: '2026-09-08T22:01:00Z', bounceTypes: { hard: 41 } } };
   assert.equal(preserveReliableColdmailLiveStats(corrected, result, '2026-09-09').stats.bounceTypes.hard, 41);
 });
+
+test('Instantly day count survives a temporary independent guard read failure', () => {
+  const previous = {
+    stats: {
+      dateKey: '2026-09-22',
+      instantlySentToday: 14,
+      instantlyTotalSent: 341,
+      instantlyStatsReliable: true,
+      instantlyStatsUpdatedAt: '2026-09-22T16:00:00.000Z',
+    },
+  };
+  const fresh = {
+    stats: {
+      dateKey: '2026-09-22',
+      instantlySentToday: null,
+      instantlyTotalSent: null,
+      instantlyStatsReliable: false,
+      instantlyStatsUnavailableReason: 'instantly_central_guard_read_failed',
+    },
+  };
+
+  const result = preserveReliableColdmailLiveStats(fresh, previous, '2026-09-22');
+
+  assert.equal(result.stats.instantlySentToday, 14);
+  assert.equal(result.stats.instantlyTotalSent, 341);
+  assert.equal(result.stats.instantlyStatsReliable, true);
+  assert.equal(result.stats.instantlyStatsStale, true);
+  assert.equal(result.stats.instantlyStatsUnavailableReason, 'instantly_central_guard_read_failed');
+});

@@ -739,7 +739,7 @@ test('coldmail accepted send invalidates the Mailklaar snapshot when pruning is 
 });
 
 test('coldmail live stats count real sends from the guard and Softora/Gmail database signals', async () => {
-  let centralGuardStatsOptions = null;
+  const centralGuardStatsOptions = [];
   const { service } = createService({
     sendGuardState: {
       entries: [
@@ -778,7 +778,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
     },
     outboundRecipientGuardStore: {
       listSentRecipientGroups: async (options) => {
-        if (!options.recipientEmails) centralGuardStatsOptions = options;
+        if (!options.recipientEmails) centralGuardStatsOptions.push(options);
         return [
           {
             reservation_id: 'guard-only-reservation',
@@ -1007,15 +1007,23 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.dateKey, '2026-04-24');
   assert.equal(result.stats.source, 'central-outbound-recipient-guard');
   assert.equal(result.stats.reliable, true);
-  assert.deepEqual(centralGuardStatsOptions, {
+  assert.ok(centralGuardStatsOptions.some((options) => JSON.stringify(options) === JSON.stringify({
     provider: 'softora',
     channel: 'coldmail',
     keyType: 'email',
     maxRows: 20_000, requireComplete: true,
-  });
+  })));
+  assert.ok(centralGuardStatsOptions.some((options) => JSON.stringify(options) === JSON.stringify({
+    provider: 'instantly',
+    keyType: 'email',
+    maxRows: 20_000, requireComplete: true,
+  })));
   assert.equal(result.stats.sentToday, 2);
   assert.equal(result.stats.systemSentToday, 2);
   assert.equal(result.stats.centralGuardSentToday, 2);
+  assert.equal(result.stats.instantlySentToday, 1);
+  assert.equal(result.stats.instantlyTotalSent, 1);
+  assert.equal(result.stats.instantlyStatsReliable, true);
   assert.equal(result.stats.sentLast24h, 4);
   assert.equal(result.stats.personalMailboxSentToday, 2);
   assert.equal(result.stats.databaseTotalSent, 3);
