@@ -63,9 +63,15 @@ function git(root, args) {
 
 function resolveBaselineRef(root, env, runGit = (args) => git(root, args)) {
   if (['pull_request', 'push'].includes(env.GITHUB_EVENT_NAME)) {
-    const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
-    const sha = env.GITHUB_EVENT_NAME === 'pull_request' ? event.pull_request?.base?.sha : event.before;
-    if (!/^[a-f0-9]{40}$/.test(sha || '') || /^0+$/.test(sha)) throw new Error('Missing exact CI base commit.');
+    const head = runGit(['rev-parse', 'HEAD']);
+    if (head !== env.GITHUB_SHA ||
+        (env.GITHUB_EVENT_NAME === 'pull_request' && !/^refs\/pull\/\d+\/merge$/.test(env.GITHUB_REF || ''))) {
+      throw new Error('CI must check out the exact GitHub merge commit.');
+    }
+    // Raw commit headers retain parent IDs even when HEAD is a shallow boundary.
+    const headers = runGit(['cat-file', '-p', 'HEAD']).split('\n\n')[0];
+    const sha = headers.match(/^parent ([a-f0-9]{40})$/m)?.[1];
+    if (!sha) throw new Error('Missing exact CI base commit.');
     try { runGit(['cat-file', '-e', `${sha}^{commit}`]); }
     catch (_) { runGit(['fetch', '--no-tags', '--depth=1', 'origin', sha]); }
     return sha;

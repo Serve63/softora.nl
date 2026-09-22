@@ -1,4 +1,7 @@
-(function (global) {
+(function (root, createClient) {
+    if (typeof module === "object" && module.exports) module.exports = createClient;
+    else createClient(root);
+})(typeof window !== "undefined" ? window : null, function (global) {
     "use strict";
 
     var DEFAULT_TIMEOUT_MS = 5000;
@@ -6,6 +9,7 @@
     var readCache = Object.create(null);
     var pendingWrites = Object.create(null);
     var sessionGeneration = 0;
+    var clock = global.Date || Date;
 
     function clearUiState() {
         sessionGeneration += 1;
@@ -54,7 +58,7 @@
         if (!cacheKey) return false;
         readCache[cacheKey] = {
             data: normalizeStateSnapshot(value),
-            time: Math.max(0, Number(options && options.time) || Date.now()),
+            time: Math.max(0, Number(options && options.time) || clock.now()),
             bootstrap: Boolean(options && options.bootstrap)
         };
         return true;
@@ -110,7 +114,7 @@
                         bootstrap: true,
                         // De server heeft deze data al voor de huidige navigatie opgehaald.
                         // Start daarom een verse client-TTL, ongeacht de klok op de server.
-                        time: Date.now()
+                        time: clock.now()
                     });
                     if (primed) primedScopes[scope] = true;
                     return primed ? count + 1 : count;
@@ -211,7 +215,7 @@
             if (generation !== sessionGeneration) throw new Error("UI-state sessie gewijzigd.");
         }
         var cached = readCache[cacheKey];
-        var now = Date.now();
+        var now = clock.now();
         if (cached && (cached.promise || now - cached.time < GET_CACHE_TTL_MS)) {
             return await (cached.promise || Promise.resolve(cached.data));
         }
@@ -223,7 +227,7 @@
             if (generation !== sessionGeneration) throw new Error("UI-state sessie gewijzigd.");
             // An invalidation, prime or write supersedes this response; never return old truth.
             if (readCache[cacheKey] !== entry) return await getUiState(scope);
-            readCache[cacheKey] = { data: data, time: Date.now() };
+            readCache[cacheKey] = { data: data, time: clock.now() };
             return data;
         }).catch(function (error) {
             if (readCache[cacheKey] === entry) delete readCache[cacheKey];
@@ -283,4 +287,5 @@
         bootstrappedScopeCount: bootstrappedScopeCount
     };
     if (typeof global.addEventListener === "function") global.addEventListener("pagehide", clearUiState);
-})(window);
+    return global.SoftoraUiStateClient;
+});

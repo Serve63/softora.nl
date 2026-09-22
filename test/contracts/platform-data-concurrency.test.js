@@ -1,22 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const createClient = require('../../assets/premium-ui-state-client');
 
 function harness() {
   const calls = [];
   const events = {};
   let now = 100;
   const window = {
+    Date: { now: () => now },
     fetch(url, options) {
       return new Promise((resolve, reject) => calls.push({ url, options, resolve, reject }));
     },
     addEventListener(name, handler) { events[name] = handler; },
   };
-  vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../../assets/premium-ui-state-client.js'), 'utf8'), {
-    window, Date: { now: () => now },
-  });
+  createClient(window);
   function reply(index, value, status = 200) {
     calls[index].resolve({ ok: status === 200, status, json: async () => value });
   }

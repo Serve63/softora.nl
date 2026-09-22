@@ -23,7 +23,7 @@ test('premium ui-state client centraliseert gedeelde read/write fallback routes'
   assert.match(source, /payload\.pageStateScopes/);
   assert.match(source, /var primedScopes = Object\.create\(null\);/);
   assert.match(source, /var bootstrappedScopeCount = readPageStateBootstrap\(\);/);
-  assert.match(source, /time: Date\.now\(\)/);
+  assert.match(source, /time: clock\.now\(\)/);
   assert.match(source, /"\/api\/ui-state-get\?scope=" \+ encodedScope/);
   assert.match(source, /"\/api\/ui-state\/" \+ encodedScope/);
   assert.match(source, /"\/api\/ui-state-set\?scope=" \+ encodedScope/);

@@ -29,7 +29,7 @@ test('platform architecture registry and CI gate are protected quality code', ()
   assert.equal(packageJson.scripts['check:platform-architecture'], 'node scripts/check-platform-architecture.js');
   assert.match(readRepoFile('scripts/verify-critical.js'), /\['run', 'check:platform-architecture'\]/);
   assert.match(readRepoFile('scripts/check-quality-lock.js'), /'check:platform-architecture': 'node scripts\/check-platform-architecture.js'/);
-  assert.match(readRepoFile('scripts/check-platform-architecture.js'), /GITHUB_EVENT_PATH/);
+  assert.match(readRepoFile('scripts/check-platform-architecture.js'), /\['cat-file', '-p', 'HEAD'\]/);
   for (const file of ['server/config/platform-pages.json', 'server/config/platform-navigation.js',
     'scripts/check-platform-architecture.js', 'docs/platform-performance.md']) {
     assert.equal(isProtectedQualityGatePath(file), true, file);

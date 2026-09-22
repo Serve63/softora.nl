@@ -99,20 +99,25 @@ test('committing a new legacy exception cannot make it part of its own baseline'
   assert.equal(baseline.baseline, null);
   assert.equal(baseline.baselineFiles.has('new.html'), false);
   assert.match(validatePlatformArchitecture({ ...input, ...baseline }).join('\n'), /new legacy exceptions/);
-  const eventPath = path.join(root, '.git', 'fixture-event.json');
   const baseSha = git('rev-parse', 'origin/main');
-  fs.writeFileSync(eventPath, JSON.stringify({ pull_request: { base: { sha: baseSha } } }));
-  const ciBaseline = readBaseline(root, { GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventPath });
+  git('switch', 'main');
+  git('merge', '--no-ff', 'codex/fixture', '-m', 'PR merge fixture');
+  const head = git('rev-parse', 'HEAD');
+  const ciEnv = { GITHUB_EVENT_NAME: 'pull_request', GITHUB_SHA: head, GITHUB_REF: 'refs/pull/1/merge' };
+  const ciBaseline = readBaseline(root, ciEnv);
   assert.equal(ciBaseline.baselineFiles.has('new.html'), false);
   const calls = [];
-  const selected = resolveBaselineRef(root, { GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventPath }, (args) => {
+  const selected = resolveBaselineRef(root, ciEnv, (args) => {
     calls.push(args);
-    if (args[0] === 'cat-file') throw new Error('Shallow checkout');
+    if (args[0] === 'rev-parse') return head;
+    if (args[1] === '-p') return `tree ${head}\nparent ${baseSha}\n\nMessage`;
+    if (args[1] === '-e') throw new Error('Shallow checkout');
     return '';
   });
   assert.equal(selected, baseSha);
-  assert.deepEqual(calls[1], ['fetch', '--no-tags', '--depth=1', 'origin', baseSha]);
-  fs.writeFileSync(eventPath, JSON.stringify({ before: '--unexpected-option' }));
-  assert.throws(() => resolveBaselineRef(root, { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventPath }),
-    /Missing exact CI base commit/);
+  assert.deepEqual(calls[3], ['fetch', '--no-tags', '--depth=1', 'origin', baseSha]);
+  assert.throws(() => resolveBaselineRef(root, { ...ciEnv, GITHUB_SHA: 'another-checkout' }),
+    /exact GitHub merge commit/);
+  assert.throws(() => resolveBaselineRef(root, { ...ciEnv, GITHUB_REF: 'refs/heads/feature' }),
+    /exact GitHub merge commit/);
 });

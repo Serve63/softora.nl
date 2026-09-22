@@ -41,8 +41,9 @@ routerwijziging wordt zo gedetecteerd.
 De check blokkeert ontbrekende registratie, nieuwe legacy-uitzonderingen, terugval
 na migratie, ontbrekende contracts en het vergroten van gereedheidsbudgetten.
 De legacy-baseline komt uit de gezamenlijke basis met origin/main, in GitHub uit
-de exacte basis-SHA van het GitHub-event. Bij een shallow checkout haalt de check
-alleen die commit op via de bestaande Git-leestoegang. Een eigen commit legitimeert dus geen
+de eerste ouder uit de Git-headers van de exact gecontroleerde GitHub-mergecommit.
+Bij een shallow checkout haalt de check alleen die basiscommit op via bestaande
+Git-leestoegang. Een eigen commit legitimeert dus geen
 nieuwe uitzondering. Bij de eerste introductie tellen alleen documenten op de basis.
 De gate draait in verify:critical en de aansluiting wordt beschermd door quality-lock.
 
