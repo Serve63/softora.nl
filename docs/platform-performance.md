@@ -52,13 +52,13 @@ voorkomt terugschrijven van achterhaalde antwoorden en wist zijn cache op pagehi
 Dit werkt binnen het huidige document. Het is nog geen blijvende applicatieshell,
 geen cross-tab-sessieprotocol en geen volledige vervanging voor domein-readmodels.
 
-`assets/premium-application-runtime.js` bevat nu een getest hart voor de
-modulelevenscyclus: geregistreerde reads, begrensde voorbereiding, het scherm pas
-activeren na prepare en mount, updates binnen dezelfde module, blokkeren bij
-niet-opgeslagen wijzigingen en sessiegebonden cache wissen. De runtime is nog niet
-gekoppeld aan browsernavigatie, Dashboard of Opdrachten. Die routes blijven
-`legacy-document` tot de blijvende shell en complete browsergedrag zijn bewezen.
-Een wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen.
+`assets/premium-application-runtime.js` bevat een geteste modulelevenscyclus voor
+geregistreerde reads, begrensde voorbereiding, montage, updates, formulierblokkades
+en sessiegebonden cache wissen. `assets/premium-application-navigation.js` bevat een
+geteste router voor geregistreerde routes, browsergeschiedenis en navigatieblokkades.
+De twee kernen zijn nog niet door Dashboard of Opdrachten geladen. Die routes blijven
+`legacy-document` tot de blijvende shell en complete browsergedrag bewezen zijn. Een
+wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen.
 
 ## Nog te implementeren en te bewijzen
 
@@ -67,8 +67,8 @@ Een wijziging van alleen metadata mag een scherm niet als gemigreerd bestempelen
    Dynamisch gegenereerde SEO-collecties/artikelen, gepubliceerde klantlinks en
    persoonlijke sites houden hun bestaande routetests; volledige runtime-inventaris
    en prestatiedekking van die routefamilies volgen nog.
-2. De lifecycle-core aan browsernavigatie en een blijvende shell koppelen voor
-   Dashboard en Opdrachten, daarna Klanten. De broncode moet eerst uit de grote
+2. De lifecycle- en navigatiekernen met een blijvende shell koppelen voor Dashboard
+   en Opdrachten, daarna Klanten. De broncode moet eerst uit de grote
    pagina-initialisaties worden losgemaakt; geen willekeurige HTML-injectie of
    verborgen frames als prefetch.
 3. Gedeelde versiegebonden readmodels, gelijktijdige reads, mutatie-invalidation,

@@ -41,12 +41,15 @@ test('platform architecture registry and CI gate are protected quality code', ()
 
 test('platform performance plan distinguishes lifecycle core from a migrated browser module', () => {
   const runtime = readRepoFile('assets/premium-application-runtime.js');
+  const navigation = readRepoFile('assets/premium-application-navigation.js');
   const performancePlan = readRepoFile('docs/platform-performance.md');
   assert.match(runtime, /function createPremiumApplicationRuntime/);
   assert.match(runtime, /\['prepare', 'mount', 'update', 'dispose'\]/);
   assert.match(runtime, /prepareBudget\.maxBytes/);
   assert.match(runtime, /dataClient\.clearSession/);
-  assert.match(performancePlan, /nog niet\s+gekoppeld aan browsernavigatie, Dashboard of Opdrachten/);
+  assert.match(navigation, /function createPremiumApplicationNavigation/);
+  assert.match(navigation, /popstate/);
+  assert.match(performancePlan, /nog niet door Dashboard of Opdrachten geladen/);
   assert.match(performancePlan, /routes blijven\s+`legacy-document`/);
 });
 
