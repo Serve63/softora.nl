@@ -1,7 +1,7 @@
 (function (root) {
   function createCutSyncFor(target) {
     return function ({onChange,fetchImpl = target.fetch}) {
-    let session = null, pending = [], drafts = {}, planUpdatedAt = null, online = false, loading = false, saving = false, message = '', clockOffset = 0, epoch = 0;
+    let session = null, pending = [], drafts = {}, queuedNotes = new Map(), conflictRetries = new Set(), planUpdatedAt = null, online = false, loading = false, saving = false, message = '', clockOffset = 0, epoch = 0;
     const today = () => target.LogboekCutState.dateKey(new target.Date(target.Date.now()+clockOffset));
     function emit() { onChange({session,pending,drafts,planUpdatedAt,online,loading,saving,message,today:today()}); }
     function apply(body) {
@@ -21,6 +21,15 @@
       online=false;
       message=error.status===401 || error.status===403 ? 'Log in om je training op te slaan.' : 'Niet opgeslagen. Controleer je verbinding en probeer opnieuw.';
     }
+    function noteKey(date,order) { return `${date}:${order}`; }
+    function noteState(order,baseText='') {
+      return session?.notes?.[String(order)] || {text:baseText,version:0};
+    }
+    function enqueueNote(date,order,text,baseText='') {
+      const current=noteState(order,baseText);
+      pending.push({type:'note',date,order,text,version:current.version,
+        operationId:target.crypto.randomUUID(),createdAt:target.Date.now()});
+    }
     async function refresh() {
       if(loading || saving || target.document.activeElement?.matches?.('textarea[data-note-order]'))return;
       if(session && session.training_date!==today())session=null;
@@ -39,8 +48,28 @@
           const body=await request('POST',op);
           pending.shift();
           epoch++;apply(body);online=true;
-          if(body.conflict)message=op.type==='note'?'Notitie is intussen op een ander apparaat gewijzigd. Sla je tekst opnieuw op om die te bewaren.':'Deze set is op een ander apparaat gewijzigd. De nieuwste stand is geladen; controleer je vinkje.';
-          else {message='';if(op.type==='note')delete drafts[`${op.date}:${op.order}`];}
+          if(body.conflict) {
+            message=op.type==='note'?'Notitie is intussen op een ander apparaat gewijzigd. Jouw nieuwste tekst wordt opnieuw opgeslagen…':'Deze set is op een ander apparaat gewijzigd. De nieuwste stand is geladen; controleer je vinkje.';
+            if(op.type==='note') {
+              const key=noteKey(op.date,op.order), queued=queuedNotes.get(key), desired=queued ?? drafts[key] ?? op.text;
+              queuedNotes.delete(key);
+              const saved=noteState(op.order).text;
+              if(desired!==saved && !conflictRetries.has(key)) {
+                conflictRetries.add(key);drafts[key]=desired;enqueueNote(op.date,op.order,desired);
+              } else if(desired===saved) {
+                delete drafts[key];conflictRetries.delete(key);
+              } else message='Notitie gewijzigd op een ander apparaat. Je tekst staat nog klaar; tik erin en verlaat het veld om opnieuw op te slaan.';
+            }
+          } else {
+            message='';
+            if(op.type==='note') {
+              const key=noteKey(op.date,op.order), queued=queuedNotes.get(key), saved=noteState(op.order).text;
+              queuedNotes.delete(key);conflictRetries.delete(key);
+              if(queued!==undefined && queued!==saved) {
+                drafts[key]=queued;enqueueNote(op.date,op.order,queued);
+              } else if(queued===saved || drafts[key]===op.text) delete drafts[key];
+            }
+          }
         }
       } catch(error){report(error);}
       finally{saving=false;emit();}
@@ -55,17 +84,18 @@
     }
     function saveNote(order,text,baseText='') {
       if(!session || session.training_date!==today()) {message='Training wordt nog geladen.';emit();return;}
-      if(pending.some(op=>op.type==='note' && op.order===order))return;
-      const current=session.notes?.[String(order)] || {text:baseText,version:0};
-      if(current.text===text){delete drafts[`${session.training_date}:${order}`];message='';emit();return;}
-      const op={type:'note',date:session.training_date,order,text,version:current.version,
-        operationId:target.crypto.randomUUID(),createdAt:target.Date.now()};
-      pending.push(op);message='';emit();flush();
+      const date=session.training_date,key=noteKey(date,order),inFlightOrQueued=pending.some(op=>op.type==='note' && op.date===date && op.order===order);
+      const current=noteState(order,baseText);
+      if(inFlightOrQueued) {
+        queuedNotes.set(key,text);drafts[key]=text;message='';emit();return;
+      }
+      if(current.text===text){delete drafts[key];queuedNotes.delete(key);conflictRetries.delete(key);message='';emit();return;}
+      drafts[key]=text;enqueueNote(date,order,text,baseText);message='';emit();flush();
     }
     function setNoteDraft(order,text,baseText='') {
       if(!session)return;
-      const key=`${session.training_date}:${order}`, saved=session.notes?.[String(order)]?.text ?? baseText;
-      if(text===saved)delete drafts[key]; else drafts[key]=text;
+      const key=noteKey(session.training_date,order), saved=session.notes?.[String(order)]?.text ?? baseText;
+      if(text===saved)delete drafts[key]; else {drafts[key]=text;conflictRetries.delete(key);}
     }
     function start() {
       emit();refresh();
