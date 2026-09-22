@@ -1375,13 +1375,13 @@
         </div>
     </div><script src="assets/premium-database-photo-batch.js?v=20260917-source"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260914-provider"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-instantly-status.js?v=20260921-counts"></script><script src="assets/premium-database-webdesign-action.js?v=20260921-mailready-parity"></script><script src="assets/premium-database-webdesign-preview.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
-    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260908a"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260922-today-channel-total"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260922b"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260922-today-channel-total"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260914-provider"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-mass-research.js?v=20260629a"></script><script src="assets/premium-database-target-coords.js?v=20260616a"></script><script src="assets/premium-database-distance.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260921-mailready-header"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-customers-loader.js?v=20260804a"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260908-publish"></script><script src="assets/premium-database-source-filter.js?v=20260917-source"></script><script src="assets/premium-database-webdesign-source-selection.js?v=20260917-source"></script>
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260922a"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260922a"></script><script src="assets/premium-screen-readiness.js?v=20260922b"></script><script src="assets/premium-database-readiness.js?v=20260922a"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
@@ -2802,7 +2802,7 @@
             state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers); state.dataLoading = true; state.dataUnavailable = false; state.remoteCustomersLoaded = false; state.canonicalCountReady = databaseHasExactSnapshotCountBootstrap; state.canonicalSnapshotApplied = databaseHasFastSnapshotBootstrap; if (databaseHasExactSnapshotCountBootstrap) { state.mailReadySnapshotLoaded = true; state.mailReadySnapshotStale = customersBootstrapPayload.stale === true; state.mailReadySnapshotTotal = Math.max(0, Number(customersBootstrapPayload.mailReadySnapshotTotal) || 0); state.mailReadySnapshotGeneratedAtMs = Date.parse(normalizeString(customersBootstrapPayload.generatedAt)) || 0; state.mailReadySnapshotCustomers = state.klanten.filter(window.SoftoraDatabaseMailReadySnapshot.isSnapshotMailReadyCustomer); state.availableSnapshotLoaded = true; state.availableSnapshotTotal = Math.max(0, Number(customersBootstrapPayload.availableSnapshotTotal) || 0); state.availableSnapshotCustomers = state.klanten.filter(window.SoftoraDatabaseMailReadySnapshot.isSnapshotAvailableCustomer); state.foundSnapshotLoaded = true; state.foundSnapshotTotal = Math.max(0, Number(customersBootstrapPayload.foundTotal) || 0); state.foundSnapshotCustomerIdSet = new Set(customersBootstrapPayload.foundCustomerIds); }
         }
         applyDatabaseUrlIntent();
-        renderPage(); releaseDatabaseBootShell();
+        renderPage();
 
         const databaseImportController = window.SoftoraDatabaseImport.createController({
             input: null,
@@ -2935,7 +2935,7 @@
             }
         });
 
-        void window.SoftoraDatabaseBoot.run({ state, databaseHadBootstrapCustomers, databaseHasFastSnapshotBootstrap, loadMailReadySnapshot, bootstrapCustomers, loadCustomerPhotoMap, applyCustomerList, mergeCustomersWithPhotos, renderPage, webdesignActionController, getSortedCustomers, getFilteredCustomers, releaseDatabaseBootShell, databasePendingJobsPromise, databaseImportController });
+        document.documentElement.dataset.softoraDatabaseActionsBound = 'true'; void window.SoftoraDatabaseBoot.run({ state, databaseHadBootstrapCustomers, databaseHasFastSnapshotBootstrap, loadMailReadySnapshot, bootstrapCustomers, loadCustomerPhotoMap, applyCustomerList, mergeCustomersWithPhotos, renderPage, webdesignActionController, getSortedCustomers, getFilteredCustomers, releaseDatabaseBootShell, databasePendingJobsPromise, databaseImportController, databaseReadiness: window.SoftoraDatabaseReadiness });
     </script><script src="assets/premium-database-instantly-sync.js?v=20260914-provider"></script><script src="assets/premium-database-instantly-queue-import.js?v=20260914c"></script>
 </body>
 </html>
