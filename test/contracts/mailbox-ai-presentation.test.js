@@ -159,7 +159,8 @@ test('storage failures and oversized inputs preserve original rather than fallin
   const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, logger: { warn() {} },
     repository: { enqueue: async () => { throw new Error('db down'); } } });
   const result = await service.enrich([message, { ...message, body: 'x'.repeat(60001) }]);
-  for (const mail of result) assert.equal(contract.read(mail).body, mail.body);
+  for (const mail of result) assert.ok(contract.read(mail).body.endsWith(mail.body));
+  assert.match(contract.read(result[0]).body, /tijdelijk niet beschikbaar/);
 });
 test('worker never calls model without durable budget claim and does not retry a failed call', async () => {
   let calls = 0, claims = 0, finished = 0; const warnings = [];
@@ -223,10 +224,10 @@ test('processing route rejects missing and incorrect cron credentials before any
 test('cached reads do not rewrite source or fetch full source payload; inserts are idempotent and bounded', async () => {
   const { createMailboxAiRepository } = require('../../server/repositories/mailbox-ai-presentations');
   const rows = new Map(); let writes = 0, maxBatch = 0;
-  const repository = createMailboxAiRepository({ getClient: () => ({ from: () => ({
-    select: (columns) => { assert.equal(columns.includes('source'), false); return { in: (_key, ids) => {
-      maxBatch = Math.max(maxBatch, ids.length); return Promise.resolve({ data: ids.filter((id) => rows.has(id)).map((id) => rows.get(id)) });
-    } }; },
+  const repository = createMailboxAiRepository({ getClient: () => ({ rpc: (name, { p_ids: ids }) => {
+    assert.equal(name, 'softora_mailbox_ai_states'); maxBatch = Math.max(maxBatch, ids.length);
+    return Promise.resolve({ data: ids.filter((id) => rows.has(id)).map((id) => rows.get(id)) });
+  }, from: () => ({
     upsert: async (items, options) => { writes++; assert.equal(options.ignoreDuplicates, true);
       for (const item of items) if (!rows.has(item.id)) rows.set(item.id, item); return { data: null }; },
   }) }) });
@@ -332,4 +333,48 @@ test('removed signature spacing collapses without merging authored paragraphs or
     status: 'ready', sourceBody: body, decision: { labels: ['authored','authored','signature','authored','signature','authored','signature','authored','authored','authored','authored'], contacts: [] } } };
   assert.equal(contract.read(original).body, 'Dank voor je mail.\n\nVan: eerdere afzender\n\nBehoud deze inhoud.');
   assert.equal(original.body, body);
+});
+
+
+test('incoming gate holds unprocessed body and releases ready or failed mail without changing the original', () => {
+  const pending = { ...ready, aiPresentation: { ...ready.aiPresentation, status: 'pending', gate: true } };
+  const view = contract.read(pending);
+  assert.doesNotMatch(view.body, /offerte|Robin/);
+  assert.match(view.body, /wordt opgeschoond/);
+  assert.equal(pending.body, body);
+  assert.match(contract.read(ready).body, /offerte/);
+  for (const reason of ['failed','budget','timeout','storage']) {
+    const view = contract.read({ ...pending, aiPresentation: { ...pending.aiPresentation, status: 'unavailable', gate: false, reason } });
+    assert.ok(view.body.endsWith(body)); assert.match(view.body, /originele e-mail/);
+  }
+});
+
+test('incoming SQL gate excludes backlog, preserves reservations and releases blocked mail', async () => {
+  const { PGlite } = require('@electric-sql/pglite'); const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+      create table public.softora_mailbox_messages (folder text, has_body boolean, body_truncated boolean, deleted_at timestamptz,
+        generation_superseded_at timestamptz, body_text text, sender_email text, account_email text, payload jsonb,
+        message_key text, message_id text, sender_name text, date timestamptz, created_at timestamptz);`);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260921093527_mailbox_luna_presentations.sql'), 'utf8'));
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260922155819_mailbox_ai_incoming_gate.sql'), 'utf8'));
+    await db.exec(`update softora_mailbox_ai_budget set incoming_after=now()-interval '1 hour', approved_micro_usd=200000, reserved_micro_usd=100000;
+      insert into softora_mailbox_messages (message_key,account_email,created_at) values ('old','a',now()-interval '1 day'),('new','a',now());
+      insert into softora_mailbox_ai_presentations (id,version,account_email,message_key,source) values
+      ('old','mailbox-luna-v1','a','old','{}'),('new','mailbox-luna-v1','a','new','{}');`);
+    let states = (await db.query("select * from softora_mailbox_ai_states(array['old','new']) order by id")).rows;
+    assert.equal(states[0].id,'new'); assert.equal(states[0].gate,true);
+    assert.equal(states[1].gate,false); assert.equal(states[1].reason,'outside_scope');
+    const claim = "select * from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
+    assert.equal((await db.query(claim)).rows[0].id,'new');
+    assert.equal((await db.query(claim)).rows.length,0);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd),200000);
+    assert.equal((await db.query("select gate from softora_mailbox_ai_states(array['new'])")).rows[0].gate,true);
+    await db.exec("update softora_mailbox_ai_presentations set status='queued' where id='new'");
+    assert.equal((await db.query("select reason from softora_mailbox_ai_states(array['new'])")).rows[0].reason,'budget');
+    await db.exec("update softora_mailbox_ai_presentations set status='running',created_at=now()-interval '11 minutes' where id='new'");
+    assert.equal((await db.query("select reason from softora_mailbox_ai_states(array['new'])")).rows[0].reason,'timeout');
+    await db.exec('set role anon');
+    await assert.rejects(db.query("select * from softora_mailbox_ai_states(array['new'])"),/permission denied/);
+  } finally { await db.close(); }
 });

@@ -76,3 +76,23 @@ after deploying the stable-key code. It preserves prior paid decisions and reser
 retains superseded derived entries for audit, and prevents detail hydration from reclassifying
 the same content. Original mailbox records are never modified. Labelled Markdown links render
 with their original destination and label instead of including markup punctuation in the URL.
+
+## New incoming mail gate (22 September)
+
+The approved follow-up is one-time EUR 20 for incoming mail cleanup, not a purchase or
+recurring allowance. Keep existing lifetime reservations. Activate only after deployment
+by setting `incoming_after` to the activation timestamp and increasing the lifetime USD
+allowance conservatively by USD 18 (ECB 2026-09-22: USD 1.1463/EUR; leaves exchange/tax
+headroom). The 0.10 USD per-job reservation is deliberately not refunded: this permits
+at most 180 additional jobs and can stop well before actual spend reaches EUR 20.
+No automatic top-up. Existing queued historical messages are excluded by their canonical
+index creation timestamp; opening an old conversation cannot consume this allowance.
+
+The derived presentation suppresses a new message's unprocessed body while its durable
+job is queued/running. Sender/subject remain accessible with a processing notice, not a
+vanishing conversation. The existing cached-result poll releases the body after review.
+On failure, exhausted budget or a ten-minute hold timeout, show the original with an
+explicit notice. This is a display gate, not deletion or rewriting of canonical mail.
+Unsupported/oversized mail remains original. No promise of perfect classification.
+The SQL status RPC is read-only and restricted to service_role. Candidate seeding also
+stops at the exhausted cap, avoiding an ever-growing historical queue.

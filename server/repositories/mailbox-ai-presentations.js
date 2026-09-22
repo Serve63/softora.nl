@@ -18,8 +18,7 @@ function createMailboxAiRepository({ getClient } = {}) {
     const unique = [...new Map(sources.map((source) => [source.id, source])).values()];
     const signal = AbortSignal.timeout(1200), rows = [];
     async function batch(items) {
-      const read = () => run((client) => client.from(TABLE).select('id,status,decision,version')
-        .in('id', items.map((source) => source.id)), signal);
+      const read = () => run((client) => client.rpc('softora_mailbox_ai_states', { p_ids: items.map((source) => source.id) }), signal);
       const existing = await read(), known = new Set((existing || []).map((row) => row.id));
       const missing = items.filter((source) => !known.has(source.id));
       if (!missing.length) return existing;

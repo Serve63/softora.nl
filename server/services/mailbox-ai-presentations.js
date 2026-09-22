@@ -7,7 +7,8 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
   classifier = createMailboxAiClassifier({ getApiKey: getOpenAiApiKey }), logger = console } = {}) {
   const enabled = () => env.MAILBOX_AI_PRESENTATION_ENABLED === 'true';
   const presentation = (source, row) => ({ version: contract.VERSION, model: contract.MODEL,
-    reasoningEffort: 'max', status: row?.status === 'ready' ? 'ready' : row?.status === 'failed' ? 'unavailable' : 'pending',
+    reasoningEffort: 'max', status: row?.status === 'ready' ? 'ready' : row?.status === 'failed' || row?.reason ? 'unavailable' : 'pending',
+    gate: row?.gate === true, reason: row?.reason || (!row ? 'storage' : null),
     ...(row?.status === 'ready' ? { sourceBody: source.body, decision: row.decision } : {}) });
   function sourceFor(message) {
     const source = buildSource(message);
