@@ -53,6 +53,7 @@ const {
 } = require('../routes/whoop-health');
 const { registerWorldWatcherRoutes } = require('../routes/world-watcher');
 const { registerWhatsAppReadOnlyRoutes } = require('../routes/whatsapp-read-only');
+const { registerLogboekCutRoutes } = require('../routes/logboek-cut');
 const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
@@ -325,6 +326,10 @@ function registerFeatureRoutes(app, deps = {}) {
     requirePasswordRegisterAccessProof:
       premiumRouteRuntime?.requirePasswordRegisterAccessProof,
     requireRuntimeDebugAccess,
+  });
+  registerLogboekCutRoutes(app, {
+    readGuard: (_req, _res, next) => next(),
+    writeGuard: (_req, _res, next) => next(),
   });
   registerRuntimeDebugOpsRoutes(app, {
     coordinator: runtimeDebugOpsCoordinator,

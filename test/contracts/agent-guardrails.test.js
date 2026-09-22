@@ -26,10 +26,17 @@ const repoRoot = path.resolve(__dirname, '../..');
 
 test('platform architecture registry and CI gate are protected quality code', () => {
   const packageJson = JSON.parse(readRepoFile('package.json'));
+  const platformPages = JSON.parse(readRepoFile('server/config/platform-pages.json'));
+  const logboekCut = platformPages.pages['logboek-cut.html'];
   assert.equal(packageJson.scripts['check:platform-architecture'], 'node scripts/check-platform-architecture.js');
   assert.match(readRepoFile('scripts/verify-critical.js'), /\['run', 'check:platform-architecture'\]/);
   assert.match(readRepoFile('scripts/check-quality-lock.js'), /'check:platform-architecture': 'node scripts\/check-platform-architecture.js'/);
   assert.match(readRepoFile('scripts/check-platform-architecture.js'), /\['cat-file', '-p', 'HEAD'\]/);
+  assert.equal(logboekCut.delivery, 'public-document');
+  assert.equal(logboekCut.readinessContract, 'test/contracts/logboek-cut-sync.test.js');
+  assert.deepEqual(logboekCut.requiredData, ['softora_sportschool_logbook', 'softora_logboek_cut_sessions']);
+  assert.equal(logboekCut.requiredImages.length, 7);
+  assert.match(logboekCut.freshness, /weights sync from the Supabase logbook on every load/i);
   for (const file of ['server/config/platform-pages.json', 'server/config/platform-navigation.js',
     'scripts/check-platform-architecture.js', 'docs/platform-performance.md']) {
     assert.equal(isProtectedQualityGatePath(file), true, file);
