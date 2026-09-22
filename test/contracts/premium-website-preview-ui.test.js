@@ -42,7 +42,7 @@ test('premium websitegenerator genereert fotos en bewaart de bibliotheek zonder 
   assert.match(source, /<title>Webdesign – Softora\.nl<\/title>/);
   assert.match(source, /<div class="page-title">Webdesign<\/div>/);
   assert.doesNotMatch(source, /<div class="page-title">Website Generator<\/div>/);
-  assert.match(source, /Eén URL per keer\. AI genereert voor die website één homepage preview\./);
+  assert.doesNotMatch(source, /Eén URL per keer\. AI genereert voor die website één homepage preview\./);
   assert.match(source, /<input class="inp" id="scan-url" type="text" placeholder="softora\.nl" spellcheck="false" value="softora\.nl">/);
   assert.match(source, /<button type="button" class="tab" data-tab="library">Bibliotheek<\/button>/);
   assert.match(source, /<button type="button" class="tab active" data-tab="scan">Website Scan & Preview<\/button>/);
@@ -175,7 +175,7 @@ test('premium websitegenerator toont compacte previews en behoudt de volledige a
   assert.match(source, /data-tab="library"/);
   assert.match(source, /id="tab-library"/);
   assert.doesNotMatch(source, /Bibliotheek kon niet centraal laden/);
-  assert.match(source, /Elk webdesign dat wordt gemaakt, wordt centraal opgeslagen in <strong>Supabase<\/strong> en verschijnt hier voor alle accounts\./);
+  assert.doesNotMatch(source, /Elk webdesign dat wordt gemaakt, wordt centraal opgeslagen in <strong>Supabase<\/strong> en verschijnt hier voor alle accounts\./);
   assert.doesNotMatch(source, /Elke preview die via Website Scan &amp; Preview \(AI-foto-api\) wordt gemaakt/);
   assert.doesNotMatch(source, /Alle previews van alle accounts worden zonder vaste itemlimiet centraal opgeslagen in Supabase/);
   assert.match(source, /console\.warn\('Websitepreview-bibliotheek laden mislukt:', error\);/);
@@ -258,4 +258,17 @@ test('websitegenerator regenerates the shown preview URL from a bottom-right but
   assert.match(websiteGeneratorScriptSource, /regenerateButton.textContent = 'Opnieuw genereren'/);
   assert.match(websiteGeneratorScriptSource, /if \(regenerateButton.disabled\) return;[\s\S]*regenerateButton.disabled = true;[\s\S]*document.getElementById\('scan-url'\).value = url;[\s\S]*await startScan\(\);[\s\S]*finally\s*\{\s*regenerateButton.disabled = false;/);
   assert.match(websiteGeneratorScriptSource, /root.appendChild\(footer\)/);
+});
+
+
+test('completed webdesign hides the status bar while running and failed jobs keep it', () => {
+  assert.match(websiteGeneratorScriptSource, /bar\.hidden = job\.status === 'done';/);
+  assert.doesNotMatch(websiteGeneratorScriptSource, /Klaar — website verwerkt/);
+  assert.match(websiteGeneratorScriptSource, /bar\.textContent = String\(job\.error\)/);
+});
+
+
+test('preview title stays on one line beside the download button', () => {
+  assert.match(websiteGeneratorHtmlSource, /\.preview-label > span\s*\{[^}]*white-space: nowrap;[^}]*letter-spacing: \.3px;/);
+  assert.match(websiteGeneratorHtmlSource, /\.preview-actions\s*\{[^}]*flex-shrink: 0;/);
 });

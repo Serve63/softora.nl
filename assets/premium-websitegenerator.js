@@ -822,10 +822,11 @@ async function renderBatchJobProgress(job) {
     }
   });
 
+  bar.hidden = job.status === 'done';
   if (job.status === 'error' && job.error) {
     bar.textContent = String(job.error);
   } else if (job.status === 'done') {
-    bar.textContent = total === 1 ? 'Klaar — website verwerkt' : `Klaar — ${total} websites`;
+    bar.textContent = '';
   } else if (runningIdx >= 0) {
     bar.textContent = `Preview ${runningIdx + 1} van ${total} — ${runningHost || '…'}`;
   } else {
