@@ -49,6 +49,25 @@
       "delivery": "legacy-document",
       "targetReadyMs": 3000
     },
+    "logboek-cut.html": {
+      "delivery": "public-document",
+      "targetReadyMs": 1500,
+      "readinessContract": "test/contracts/logboek-cut-sync.test.js",
+      "requiredData": [
+        "softora_sportschool_logbook",
+        "softora_logboek_cut_sessions"
+      ],
+      "requiredImages": [
+        "assets/logboek-photos/lateral-raises.png",
+        "assets/logboek-photos/leg-extentions.png",
+        "assets/logboek-photos/rear-delt.png",
+        "assets/logboek-photos/seated-leg-curl.png",
+        "assets/logboek-photos/shoulder-press.png",
+        "assets/logboek-photos/skull-crush.png",
+        "assets/logboek-photos/tricep-dip.png"
+      ],
+      "freshness": "Workout weights sync from the Supabase logbook on every load; daily set checks and notes persist in Supabase."
+    },
     "maatwerk-platform.html": {
       "delivery": "legacy-document",
       "targetReadyMs": 3000
