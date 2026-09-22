@@ -144,7 +144,8 @@ test('html page coordinator strips internal coldmailing navigation before render
   assert.doesNotMatch(rendered, /data-sidebar-key="coldmailing"/);
   assert.doesNotMatch(rendered, />Coldmailing</);
   assert.doesNotMatch(rendered, /data-sidebar-key="agenda"|>Agenda</);
-  assert.doesNotMatch(rendered, /data-sidebar-key="websitegenerator"|>Webdesign</);
+  assert.match(rendered, /data-sidebar-key="websitegenerator"/);
+  assert.match(rendered, />Webdesign</);
   assert.doesNotMatch(rendered, /data-sidebar-key="bookkeeping"|>Boekhouding</);
   assert.match(source, /href="\/premium-personeel-agenda"/);
   assert.match(source, /href="\/premium-websitegenerator"/);
@@ -1309,5 +1310,5 @@ test('Lead Radar delivery initialiseert de premium sidebar precies één keer en
   assert.match(res.body, /<body data-sidebar-nav-ready="1">/);
   assert.equal((res.body.match(/assets\/lead-radar-sidebar\.js\?v=/g) || []).length, 0);
   assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20260909b/g) || []).length, 1);
-  assert.match(res.body, /assets\/personnel-theme\.js\?v=20260909c/);
+  assert.match(res.body, /assets\/personnel-theme\.js\?v=20260922-design/);
 });

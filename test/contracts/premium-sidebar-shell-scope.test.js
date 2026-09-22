@@ -297,7 +297,6 @@ test('gezondheidsdossier blijft bereikbaar zonder item in de premium-sidebar', (
 test('verborgen premium-sidebar-items behouden hun deep-link pagina en onderliggende assets', () => {
   const hiddenItems = [
     ['agenda', 'premium-personeel-agenda.html', '/premium-personeel-agenda'],
-    ['websitegenerator', 'premium-websitegenerator.html', '/premium-websitegenerator'],
     ['bookkeeping', 'premium-boekhouding.html', '/premium-boekhouding'],
   ];
   const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
@@ -503,7 +502,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
   assert.match(prefillSource, /function prefillPremiumSidebarActiveState\(\) \{/);
   assert.match(prefillSource, /function normalizePremiumSidebarStructure\(\) \{/);
-  assert.match(prefillSource, /FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS[\s\S]*"coldmailing"[\s\S]*"agenda"[\s\S]*"websitegenerator"[\s\S]*"bookkeeping"/);
+  assert.match(prefillSource, /FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS[\s\S]*"coldmailing"[\s\S]*"agenda"[\s\S]*"bookkeeping"/);
   assert.match(prefillSource, /ensureFirstPaintSidebarLink\(sidebar, overview, getFirstPaintSidebarLink\("lead_radar"\), \["database"\]\);/);
   assert.match(prefillSource, /ensureFirstPaintSidebarLink\(sidebar, management, getFirstPaintSidebarLink\("summarize"\), \["seo", "qr_code", "packages"\]\);/);
   assert.match(prefillSource, /normalizePremiumSidebarStructure\(\);\s*prefillPremiumSidebarActiveState\(\);/);
@@ -523,8 +522,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260909c'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909c'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260922-design'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260922-design'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b'/);
@@ -558,8 +557,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     themeJsSource,
     /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s
   );
-  assert.match(themeJsSource, /a\[data-sidebar-key="agenda"\][\s\S]*a\[data-sidebar-key="websitegenerator"\][\s\S]*a\[data-sidebar-key="bookkeeping"\][\s\S]*a\[data-sidebar-key="pdfs"\]/);
-  assert.match(htmlPagesSource, /coldmailing\|agenda\|websitegenerator\|bookkeeping\|pdfs/);
+  assert.match(themeJsSource, /a\[data-sidebar-key="agenda"\][\s\S]*a\[data-sidebar-key="bookkeeping"\][\s\S]*a\[data-sidebar-key="pdfs"\]/);
+  assert.match(htmlPagesSource, /coldmailing\|agenda\|bookkeeping\|pdfs/);
   assert.match(stabilitySource, /navigation:\s*none/);
 });
 
@@ -1399,4 +1398,23 @@ test('sidebar scroll survives module/tile navigation and more than thirty second
   require('../../assets/premium-sidebar-profile-prefill').initialize(window, document, sessionStorage);
   assert.equal(nav.scrollTop, 155);
   assert.equal(nav.scrollLeft, 24);
+});
+
+
+test('Webdesign remains visible and clickable in the shared menu and all pruning stages', () => {
+  const links = require('../../assets/premium-sidebar-links.js');
+  const section = links.getPremiumSidebarSections({ authenticated: true, role: 'admin' }).find(item => item.label === 'Beheer');
+  const webdesign = section.links.filter(item => item.key === 'websitegenerator');
+  assert.equal(webdesign.length, 1);
+  assert.equal(webdesign[0].href, '/premium-websitegenerator');
+  assert.equal(webdesign[0].label, 'Webdesign');
+  const html = links.renderSidebarLink(webdesign[0], 'websitegenerator');
+  assert.match(html, /class="sidebar-link magnetic active"/);
+  assert.doesNotMatch(html, /aria-disabled|coming-soon/);
+  const theme = readRepoFile('assets/personnel-theme.js');
+  const prune = theme.slice(theme.indexOf('function pruneDeprecatedSidebarLinks('), theme.indexOf('function pruneDeprecatedSidebarLinks(') + 1200);
+  assert.doesNotMatch(prune, /a\[data-sidebar-key="websitegenerator"\]/);
+  const prefill = readRepoFile('assets/premium-sidebar-profile-prefill.js');
+  assert.doesNotMatch(prefill.match(/var FIRST_PAINT_DEPRECATED_SIDEBAR_KEYS = \[[\s\S]*?\];/)[0], /"websitegenerator"/);
+  assert.match(prefill, /ensureFirstPaintSidebarLink\(sidebar, management, getFirstPaintSidebarLink\("websitegenerator"\)/);
 });

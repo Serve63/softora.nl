@@ -82,7 +82,6 @@
         "coldmailing",
         "health_dossier",
         "agenda",
-        "websitegenerator",
         "bookkeeping",
         "pdfs",
         "live_momentum",
@@ -91,6 +90,10 @@
 
     function getFirstPaintSidebarLink(key) {
         var sharedLinks = window.SoftoraPremiumSidebarLinks;
+        if (key === "websitegenerator") {
+            if (sharedLinks && typeof sharedLinks.getWebdesignSidebarLink === "function") return sharedLinks.getWebdesignSidebarLink();
+            return { key: "websitegenerator", href: "/premium-websitegenerator", label: "Webdesign", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 9v11"></path></svg>' };
+        }
         if (key === "lead_radar") {
             if (sharedLinks && typeof sharedLinks.getLeadRadarSidebarLink === "function") {
                 return sharedLinks.getLeadRadarSidebarLink();
@@ -164,6 +167,7 @@
         var management = findFirstPaintSidebarSection(sidebar, "beheer");
         ensureFirstPaintSidebarLink(sidebar, overview, getFirstPaintSidebarLink("lead_radar"), ["database"]);
         ensureFirstPaintSidebarLink(sidebar, management, getFirstPaintSidebarLink("summarize"), ["seo", "qr_code", "packages"]);
+        ensureFirstPaintSidebarLink(sidebar, management, getFirstPaintSidebarLink("websitegenerator"), ["seo", "qr_code", "packages"]);
         sidebar.setAttribute("data-sidebar-structure-prefilled", "1");
     }
 

@@ -17,11 +17,11 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260909c';
-const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260909c';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20260922-design';
+const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260922-design';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
-const PREMIUM_SIDEBAR_LINKS_VERSION = '20260909d';
+const PREMIUM_SIDEBAR_LINKS_VERSION = '20260922-design';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
@@ -182,7 +182,7 @@ const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
 
 function removeInternalPremiumSidebarLinks(html) {
   return String(html || '').replace(
-    /<a\b(?=[^>]*\bdata-sidebar-key=["'](?:coldmailing|agenda|websitegenerator|bookkeeping|pdfs)["'])[^>]*>[\s\S]*?<\/a>/gi,
+    /<a\b(?=[^>]*\bdata-sidebar-key=["'](?:coldmailing|agenda|bookkeeping|pdfs)["'])[^>]*>[\s\S]*?<\/a>/gi,
     ''
   );
 }
