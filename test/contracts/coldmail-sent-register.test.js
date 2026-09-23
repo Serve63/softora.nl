@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { getColdmailStatsResponse } = require('../../server/services/coldmail-sent-register-response');
+const { createColdmailProviderSentStats } = require('../../server/services/coldmail-provider-sent-stats');
 require('../../assets/premium-database-sent-register');
 const view = globalThis.SoftoraDatabaseSentRegister;
 const recipients = [
@@ -43,4 +44,37 @@ test('complete reads reject truncated or duplicated pages instead of lowering th
   await assert.rejects(store.listSentRecipientGroups({ requireComplete: true }));
   data = [data[0], data[0]];
   await assert.rejects(store.listSentRecipientGroups({ requireComplete: true }));
+});
+
+test('concurrent full register reads share one in-flight query and retry after it settles', async () => {
+  let calls = 0;
+  let finishRead;
+  const store = { listSentRecipientGroups: () => {
+    calls += 1;
+    return new Promise((resolve) => { finishRead = resolve; });
+  } };
+  const stats = createColdmailProviderSentStats({
+    store, now: () => new Date('2026-09-23T08:00:00Z'), logger: { warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    normalizeEmailAddress: (value) => String(value || '').trim().toLowerCase(),
+    buildRecipientKey: ({ recipientEmail }) => `email:${recipientEmail}`,
+    setRecipientCount: (counts, key, count) => { counts[key] = count; },
+    getDateKey: () => '2026-09-23', parseTimestampMs: (value) => Date.parse(value) || 0,
+    resolveSentAt: (group) => group.sent_at, timezone: 'Europe/Amsterdam', sentTimestampModel: 'test',
+  });
+  const first = stats.load({ provider: 'softora', channel: 'coldmail' });
+  const second = stats.load({ provider: 'softora', channel: 'coldmail' });
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  finishRead([{ provider: 'softora', channel: 'coldmail', sender_email: 'sender@example.com',
+    recipient_email: 'recipient@example.com', sent_at: '2026-09-23T07:30:00Z' }]);
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  assert.equal(firstResult.available, true);
+  assert.deepEqual(firstResult.recipients, secondResult.recipients);
+  assert.equal(firstResult.recipients.length, 1);
+  const third = stats.load({ provider: 'softora', channel: 'coldmail' });
+  await Promise.resolve();
+  assert.equal(calls, 2);
+  finishRead([]);
+  assert.equal((await third).available, true);
 });

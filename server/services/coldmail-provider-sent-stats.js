@@ -13,6 +13,25 @@ function createColdmailProviderSentStats(deps = {}) {
     timezone,
     sentTimestampModel,
   } = deps;
+  const inFlightGroups = new Map();
+
+  function listGroups(options) {
+    const key = JSON.stringify([options.provider || '', options.channel || '']);
+    const existing = inFlightGroups.get(key);
+    if (existing) return existing;
+    const pending = Promise.resolve().then(() => store.listSentRecipientGroups({
+      provider: options.provider,
+      ...(options.channel ? { channel: options.channel } : {}),
+      keyType: 'email',
+      maxRows: 20_000,
+      requireComplete: true,
+    }));
+    inFlightGroups.set(key, pending);
+    void pending.finally(() => {
+      if (inFlightGroups.get(key) === pending) inFlightGroups.delete(key);
+    }).catch(() => {});
+    return pending;
+  }
 
   function matchesProvider(group, options = {}) {
     const provider = normalizeString(group && group.provider).toLowerCase();
@@ -93,13 +112,7 @@ function createColdmailProviderSentStats(deps = {}) {
       return { ...summarize([], summaryOptions), available: false, unavailableReason: 'central_guard_store_unavailable' };
     }
     try {
-      const groups = await store.listSentRecipientGroups({
-        provider: options.provider,
-        ...(options.channel ? { channel: options.channel } : {}),
-        keyType: 'email',
-        maxRows: 20_000,
-        requireComplete: true,
-      });
+      const groups = await listGroups(options);
       if (!Array.isArray(groups) || groups.length >= 20_000) throw new Error(options.incompleteMessage || 'Sent register incomplete');
       return summarize(groups, summaryOptions);
     } catch (error) {
