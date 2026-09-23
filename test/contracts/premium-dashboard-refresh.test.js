@@ -76,6 +76,48 @@ test('a failed refresh retries the failed read even when older data is hydrated'
     assert.equal(env.timers.size, 0);
 });
 
+test('a failed background refresh keeps the complete visible snapshot and labels it stale', async () => {
+    const env = setup({
+        loadOrders: async () => false,
+        loadCustomers: async () => false,
+    });
+    env.root.SoftoraDashboardDataStatus = { showStale: () => env.events.push('stale') };
+    env.state.ordersHydrated = true;
+    env.state.customersHydrated = true;
+    assert.equal(await env.controller.refresh(true), false);
+    assert.deepEqual(env.events, ['stale']);
+    assert.equal(env.state.ordersHydrated, true);
+    assert.equal(env.state.customersHydrated, true);
+});
+
+test('Dashboard readiness rejects placeholder KPIs even when both reads completed', async () => {
+    const env = setup({ loadOrders: async () => true, loadCustomers: async () => true });
+    env.state.ordersHydrated = true;
+    env.state.customersHydrated = true;
+    const values = {
+        kpiRevenueYear: { innerText: '€7.739' },
+        kpiRecurringRevenue: { innerText: '€227' },
+        kpiTotalClients: { innerText: '--' },
+        kpiActiveOrders: { querySelector: () => ({ textContent: '0' }) },
+    };
+    env.root.document.getElementById = id => values[id] || null;
+    env.root.document.querySelector = () => ({ querySelectorAll: () => [] });
+    let contentReady;
+    env.root.SoftoraScreenReadiness = {
+        async markReady(input) { contentReady = input.contentReady; return false; },
+        markDegraded() {},
+    };
+    env.controller.mount();
+    await flush();
+    assert.equal(typeof contentReady, 'function');
+    assert.equal(contentReady(), false);
+    values.kpiTotalClients.innerText = '7';
+    assert.equal(contentReady(), true);
+    values.kpiActiveOrders.querySelector = () => ({ textContent: '--' });
+    assert.equal(contentReady(), false);
+    env.controller.dispose();
+});
+
 test('dispose removes listeners and timers and rejects late rendering', async () => {
     const read = deferred();
     let accepted = false;

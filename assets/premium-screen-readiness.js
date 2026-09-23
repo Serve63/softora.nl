@@ -141,12 +141,13 @@
         function markReady(input) {
             const request = input || {};
             page = String(request.page || page).trim();
+            const contentReady = () => typeof request.contentReady !== 'function' || request.contentReady() === true;
             const actionsPresent = Array.from(request.requiredActions || []).every((selector) =>
                 Boolean(doc && typeof doc.querySelector === 'function' && doc.querySelector(String(selector)))
             );
             if (status === 'ready') return Promise.resolve(true);
             const canCheckActionBindings = request.actionsBound === true || typeof request.actionsBound === 'function';
-            if (!allRequiredDataReady(request.requiredData) || !canCheckActionBindings || !actionsPresent) {
+            if (!allRequiredDataReady(request.requiredData) || !canCheckActionBindings || !actionsPresent || !contentReady()) {
                 return Promise.resolve(false);
             }
             if (readyTask) return readyTask;
@@ -164,7 +165,7 @@
                 const actionsBound = typeof request.actionsBound === 'function'
                     ? request.actionsBound() === true
                     : request.actionsBound === true;
-                if (!allRequiredDataReady(request.requiredData) || !actionsBound || !actionsStillPresent) return false;
+                if (!allRequiredDataReady(request.requiredData) || !actionsBound || !actionsStillPresent || !contentReady()) return false;
 
                 status = 'ready';
                 lastError = '';

@@ -2,6 +2,7 @@
     "use strict";
 
     const unavailableMessage = "Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.";
+    const staleMessage = "Gegevens konden niet worden vernieuwd; de laatste succesvolle stand wordt getoond.";
     let hasClearedUnavailable = false;
 
     function ensureStyle() {
@@ -57,6 +58,9 @@
             setStatus("");
         },
         setKpisUnavailable,
+        showStale() {
+            setStatus(staleMessage);
+        },
         showUnavailable(options = {}) {
             setStatus(unavailableMessage);
             setKpisUnavailable(options);
