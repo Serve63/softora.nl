@@ -42,11 +42,14 @@ function createMailboxAiRepository({ getClient } = {}) {
     const rows = await run((client) => client.rpc('softora_claim_mailbox_ai', { p_token: randomUUID() }));
     return rows?.[0] || null;
   }
+  async function recover() {
+    return run((client) => client.rpc('softora_recover_mailbox_ai'));
+  }
   async function finish(job, result, failedUsage = null) {
     return run((client) => client.from(TABLE).update({ status: result ? 'ready' : 'failed',
       decision: result?.decision || null, usage: result?.usage || failedUsage || null, finished_at: new Date().toISOString() })
       .eq('id', job.id).eq('claim_token', job.claim_token).eq('status', 'running'));
   }
-  return { enqueue, candidates, claim, finish };
+  return { enqueue, candidates, claim, finish, recover };
 }
 module.exports = { createMailboxAiRepository };

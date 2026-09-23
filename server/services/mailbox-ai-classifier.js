@@ -5,7 +5,7 @@ const { readUsage, mergeUsage } = require('./mailbox-ai-usage');
 const contract = require('../../assets/premium-mailbox-ai-presentation');
 const { buildRemovalReview, applyRemovalReview } = require('./mailbox-ai-removal-review');
 const MAX_OUTPUT_TOKENS = 16384;
-const CLASSIFICATION_TIMEOUT_MS = 120000;
+const CLASSIFICATION_TIMEOUT_MS = 180000;
 const RESERVATION_MICRO_USD = 300000;
 const SCHEMA = {
   type: 'object', additionalProperties: false, required: ['signatureLines', 'contacts'],

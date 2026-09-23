@@ -75,7 +75,7 @@ test('background classification allows slow max reasoning within the worker runt
   let calls = 0; const noFooter = { labels: decision.labels.map(() => 'authored'), contacts: [] };
   t.mock.timers.enable({ apis: ['setTimeout'] });
   t.mock.method(AbortSignal, 'timeout', (ms) => {
-    assert.equal(ms, 120000); const controller = new AbortController();
+    assert.equal(ms, 180000); const controller = new AbortController();
     setTimeout(() => controller.abort(new Error('deadline')), ms); return controller.signal;
   });
   const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async (_url, init) => {
@@ -168,7 +168,7 @@ test('storage failures and oversized inputs preserve original rather than fallin
 test('worker never calls model without durable budget claim and does not retry a failed call', async () => {
   let calls = 0, claims = 0, finished = 0; const warnings = [];
   const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, getOpenAiApiKey: () => 'secret', logger: { warn(...args) { warnings.push(args); } },
-    repository: { candidates: async () => [], enqueue: async () => [], claim: async () => ++claims === 1 ? { source: buildSource(message) } : null,
+    repository: { recover: async () => 0, candidates: async () => [], enqueue: async () => [], claim: async () => ++claims === 1 ? { source: buildSource(message) } : null,
       finish: async (_job, result) => { finished++; assert.equal(result, null); } }, classifier: { classify: async () => { calls++; throw new Error('private provider content'); } } });
   assert.deepEqual(await service.processQueue(), { processed: 1 }); assert.equal(calls, 1); assert.equal(finished, 1);
   assert.equal(warnings[0][1].code, 'MAILBOX_AI_REQUEST_FAILED'); assert.doesNotMatch(JSON.stringify(warnings), /private provider content/);
@@ -286,7 +286,7 @@ test('background storage diagnostics identify the stage without logging private 
   const warnings = [];
   const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' },
     getOpenAiApiKey: () => 'offline-key', logger: { warn: (...args) => warnings.push(args) },
-    repository: { candidates: async () => { throw new Error('private mail or credential'); } } });
+    repository: { recover: async () => 0, candidates: async () => { throw new Error('private mail or credential'); } } });
   assert.equal((await service.processQueue()).unavailable, true);
   assert.equal(warnings[0][1].stage, 'candidates');
   assert.doesNotMatch(JSON.stringify(warnings), /private mail|credential/);

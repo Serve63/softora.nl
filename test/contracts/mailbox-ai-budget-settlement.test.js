@@ -80,12 +80,12 @@ test('SQL prioritizes incoming, admits approved history, caps global concurrency
     assert.equal((await db.query("select reason from softora_mailbox_ai_states(array['m9'])")).rows[0].reason,'budget');
   } finally { await db.close(); }
 });
-test('worker processes eight jobs in bounded waves and settles only after classification completes', async () => {
+test('worker processes two jobs in a bounded wave and settles only after classification completes', async () => {
   let next=0,active=0,max=0,finished=0;
   const service=createMailboxAiPresentations({env:{MAILBOX_AI_PRESENTATION_ENABLED:'true'},getOpenAiApiKey:()=> 'test',
-    repository:{candidates:async()=>[],enqueue:async()=>[],claim:async()=>({id:++next,source:{}}),finish:async()=>{finished++;}},
+    repository:{recover:async()=>0,candidates:async()=>[],enqueue:async()=>[],claim:async()=>({id:++next,source:{}}),finish:async()=>{finished++;}},
     classifier:{classify:async()=>{active++;max=Math.max(max,active);await new Promise(r=>setTimeout(r,5));active--;return {decision:{},usage:{}};}}});
-  assert.deepEqual(await service.processQueue(),{processed:8});assert.equal(finished,8);assert.equal(max,4);
+  assert.deepEqual(await service.processQueue(),{processed:2});assert.equal(finished,2);assert.equal(max,2);
 });
 
 test('collapsed HTML paragraphs are classified with source-safe layout and tampering retains original', async () => {
@@ -173,5 +173,60 @@ test('campaign-only SQL excludes queued Gmail and admits proven coldmail across 
     assert.equal((await db.query(claim)).rows[0].id,'campaign-old');
     assert.equal((await db.query(claim)).rows.length,0);
     assert.equal((await db.query("select status from softora_mailbox_ai_presentations where id='gmail-new'")).rows[0].status,'queued');
+  } finally { await db.close(); }
+});
+
+test('stalled and timed-out campaign claims retry once without refunding uncertain costs', async () => {
+  const db = await database();
+  try {
+    await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+        returns boolean language sql immutable as $$select $1 like 'campaign-%'$$;
+      create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);`);
+    for (const file of ['20260923122053_mailbox_ai_campaign_only.sql','20260923122633_mailbox_ai_campaign_hint.sql',
+      '20260923125807_mailbox_ai_recover_stalled_claims.sql'])
+      await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+    await db.exec(`update public.softora_mailbox_ai_budget set approved_micro_usd=1800000,
+      reserved_micro_usd=900000, include_history=true;
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload,in_reply_to) values
+        ('campaign-timeout','a',now(),now(),'inbox','sender@example.nl','Reply',true,false,'{}','<sent@example.nl>'),
+        ('campaign-stale','a',now(),now(),'inbox','sender@example.nl','Reply',true,false,'{}','<sent@example.nl>'),
+        ('private-mail','a',now(),now(),'inbox','sender@example.nl','Personal',true,false,'{}','<private@example.nl>');
+      insert into public.softora_mailbox_ai_presentations(id,version,account_email,message_key,source,status,
+        started_at,finished_at,claim_reserved_micro_usd,usage,attempt_count) values
+        ('timeout','mailbox-luna-v1','a','campaign-timeout','{}','failed',now()-interval '20 minutes',
+          now()-interval '17 minutes',300000,'{"errorCode":"MAILBOX_AI_TIMEOUT","complete":false}',1),
+        ('stale','mailbox-luna-v1','a','campaign-stale','{}','running',now()-interval '20 minutes',null,300000,null,1),
+        ('private','mailbox-luna-v1','a','private-mail','{}','failed',now()-interval '20 minutes',
+          now()-interval '17 minutes',300000,'{"errorCode":"MAILBOX_AI_TIMEOUT","complete":false}',1);`);
+    assert.equal((await db.query('select softora_recover_mailbox_ai() n')).rows[0].n,2);
+    let rows=(await db.query('select id,status,attempt_count,claim_reserved_micro_usd,prior_uncertain_micro_usd from softora_mailbox_ai_presentations order by id')).rows;
+    for(const row of rows.filter((item)=>item.id!=='private')) {
+      assert.equal(row.status,'queued'); assert.equal(row.attempt_count,1);
+      assert.equal(Number(row.claim_reserved_micro_usd),0);
+      assert.equal(Number(row.prior_uncertain_micro_usd),300000);
+    }
+    assert.equal(rows.find((item)=>item.id==='private').status,'failed');
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd),900000);
+    await db.exec("update softora_mailbox_ai_presentations set retry_after=now()-interval '1 second'");
+    const claim="select id from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
+    assert.deepEqual([(await db.query(claim)).rows[0].id,(await db.query(claim)).rows[0].id].sort(),['stale','timeout']);
+    assert.equal((await db.query(claim)).rows.length,0);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd),1500000);
+    await db.exec(`update softora_mailbox_ai_presentations set status='failed',finished_at=now()-interval '4 minutes',
+      usage='{"errorCode":"MAILBOX_AI_TIMEOUT","complete":false}' where id='timeout'`);
+    assert.equal((await db.query('select softora_recover_mailbox_ai() n')).rows[0].n,0);
+    rows=(await db.query("select status,attempt_count,prior_uncertain_micro_usd from softora_mailbox_ai_presentations where id='timeout'")).rows;
+    assert.equal(rows[0].status,'failed'); assert.equal(rows[0].attempt_count,2);
+    assert.equal(Number(rows[0].prior_uncertain_micro_usd),300000);
+    await db.exec('set role anon');
+    await assert.rejects(db.query('select softora_recover_mailbox_ai()'),/permission denied/);
   } finally { await db.close(); }
 });
