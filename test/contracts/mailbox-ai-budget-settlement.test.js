@@ -59,6 +59,7 @@ test('SQL prioritizes incoming, admits approved history, caps global concurrency
   const db=await database();
   try {
     await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
     await db.exec(`update softora_mailbox_ai_budget set approved_micro_usd=3000000,incoming_after=now()-interval '1 hour';
       insert into softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,body_text,has_body,body_truncated,payload)
         select 'm'||i,'a',case when i=1 then now() else now()-interval '1 day' end,now(), case when i=2 then 'coldmail' else 'inbox' end,'sender','Hello',true,false,'{}' from generate_series(1,10) i;
@@ -105,4 +106,37 @@ test('collapsed HTML paragraphs are classified with source-safe layout and tampe
   assert.equal(message.body,body);assert.equal(calls,2);
   message.aiPresentation.decision.displayBody+=' Herschreven tekst';
   assert.equal(contract.read(message).body,body);
+});
+
+test('invalid model output retains complete usage; transport uncertainty never releases a hold', async () => {
+  const { createMailboxAiClassifier }=require('../../server/services/mailbox-ai-classifier');
+  const usage={input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:0,cache_write_tokens:0}};
+  for(const secondFails of [false,true]) {
+    let calls=0;
+    const classifier=createMailboxAiClassifier({getApiKey:()=> 'test',fetchImpl:async()=>{
+      calls++;if(secondFails && calls===2) throw new Error('network timeout');
+      return {ok:true,json:async()=>({status:'completed',usage,output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(secondFails?{signatureLines:[1,2],contacts:[]}:{signatureLines:[999],contacts:[]})}]}]})};
+    }});
+    await assert.rejects(classifier.classify({body:'Graag dinsdag.\nGroet,\nSam',html:''}), error=>{
+      assert.equal(error.mailboxUsage.complete,!secondFails);
+      assert.equal(error.mailboxUsage.billingMicroUsd,secondFails?null:150);return true;
+    });
+    assert.equal(calls,secondFails?2:1);
+  }
+});
+
+test('failed jobs settle known complete usage once, but partial failures keep their hold',async()=>{
+  const db=await database();
+  try {
+    await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
+    await db.exec(`update softora_mailbox_ai_budget set approved_micro_usd=1000000,reserved_micro_usd=600000;
+      insert into softora_mailbox_ai_presentations(id,version,account_email,message_key,source,status,claim_reserved_micro_usd) values
+      ('complete','mailbox-luna-v1','a','a','{}','running',300000),('partial','mailbox-luna-v1','a','b','{}','running',300000);
+      update softora_mailbox_ai_presentations set status='failed',usage='{"model":"gpt-6-luna","complete":true,"billingMicroUsd":200}' where id='complete';
+      update softora_mailbox_ai_presentations set status='failed',usage='{"model":"gpt-6-luna","complete":false,"billingMicroUsd":null}' where id='partial';
+      update softora_mailbox_ai_presentations set status=status where status='failed';`);
+    const b=(await db.query('select * from softora_mailbox_ai_budget')).rows[0];
+    assert.equal(Number(b.reserved_micro_usd),300200);assert.equal(Number(b.spent_micro_usd),200);
+  } finally {await db.close();}
 });

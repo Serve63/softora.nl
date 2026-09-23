@@ -324,7 +324,7 @@
         : String(message && message.body || '');
       if (!body) return emptyPresentation();
       const aiView = message?.aiPresentation;
-      if (aiView?.reason === 'outside_scope' &&
+      if (aiView && aiView.status !== 'ready' &&
         typeof aiView.displayBody === 'string' && aiView.displayBody.replace(/\s/g, '') === body.replace(/\s/g, '')) {
         body = aiView.displayBody;
       }
@@ -335,6 +335,11 @@
         return { body: cleanClientFooter(getSentAuthoredBody(body)), contact: emptyContact(), signatureMatched: false };
       }
       const classified = ai?.read({ ...message, body });
+      if (classified?.fallback) {
+        // Pending history keeps its established layout while the background queue drains.
+        const legacy = getSourceSafeMessagePresentation({ ...message, aiPresentation: null }, mail, body, presentationOptions);
+        return { ...legacy, body: classified.notice ? `${classified.notice}\n\n${legacy.body}` : legacy.body };
+      }
       if (classified) {
         // AI handles footer selection; exact, same-mailbox sent-copy evidence still
         // owns conversation deduplication. Never hide an unknown forwarded message.
