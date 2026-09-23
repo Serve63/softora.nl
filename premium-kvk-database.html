@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909c">
   <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909e">
   <link rel="stylesheet" href="/assets/kvk-database-redesign.css?v=20260923u">
+  <link rel="stylesheet" href="/assets/kvk-api-workers.css?v=20260923a">
 </head>
 <body>
   <main class="app-shell">
@@ -29,6 +30,7 @@
         <p class="page-intro">Van onderzoek naar je volgende klant.</p>
       </div>
       <div class="header-controls">
+        <button id="kvk-api-workers-open" class="kvk-api-workers-open" type="button" aria-haspopup="dialog" aria-controls="kvk-api-workers-dialog">Werkers <span aria-hidden="true">⚙</span></button>
         <button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload <span aria-hidden="true">↗</span></button>
         <span id="last-refresh-time" class="kvk-visually-hidden">--</span>
       </div>
@@ -177,6 +179,17 @@
 
   </main>
 
+  <dialog id="kvk-api-workers-dialog" class="kvk-api-workers-dialog" aria-labelledby="kvk-api-workers-title">
+    <div class="kvk-api-workers-dialog__head">
+      <div><h2 id="kvk-api-workers-title">Onderzoek</h2><p>Sol 6 Max via API</p></div>
+      <button id="kvk-api-workers-close" type="button" aria-label="Sluiten">×</button>
+    </div>
+    <div class="kvk-api-workers-dialog__budget"><span>Gezamenlijk budget</span><strong id="kvk-api-workers-budget">€ 0 / € 100</strong></div>
+    <div class="kvk-api-workers-dialog__row"><div><strong>Searcher</strong><small id="kvk-api-searcher-status">Uit</small></div><button id="kvk-api-searcher-toggle" type="button" aria-pressed="false">Aanzetten</button></div>
+    <div class="kvk-api-workers-dialog__row"><div><strong>Controleur</strong><small id="kvk-api-controller-status">Uit</small></div><button id="kvk-api-controller-toggle" type="button" aria-pressed="false">Aanzetten</button></div>
+    <p id="kvk-api-workers-message" class="kvk-api-workers-dialog__message" role="status"></p>
+  </dialog>
+
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database-worker-status.js?v=20260915b"></script>
   <script src="/assets/kvk-database-location-progress.js?v=20260909a"></script>
@@ -186,5 +199,6 @@
   <script src="/assets/kvk-database-metrics.js?v=20260923-delta-style"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260923-short-websites"></script>
   <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
+  <script src="/assets/kvk-api-workers.js?v=20260923a"></script>
 </body>
 </html>
