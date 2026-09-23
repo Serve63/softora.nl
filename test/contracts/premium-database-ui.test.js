@@ -1869,8 +1869,8 @@ test('premium database customer loader accepts one complete archive and skips un
   const client = loadPremiumDatabaseCustomersClient();
   const customers = Array.from({ length: 2001 }, (_item, index) => ({ id: `customer-${index + 1}` }));
   const requests = [];
-  const fetchJsonWithTimeout = async (url) => {
-    requests.push(url);
+  const fetchJsonWithTimeout = async (url, options) => {
+    requests.push({ url, cache: options.cache });
     const parsed = new URL(url, 'https://softora.test');
     if (parsed.pathname.endsWith('/archive')) {
       return { ok: true, json: async () => ({ ok: true, completeDataset: true,
@@ -1896,13 +1896,13 @@ test('premium database customer loader accepts one complete archive and skips un
   assert.equal(loaded.changed, true);
   assert.equal(loaded.total, 2001);
   assert.equal(loaded.customers.length, 2001);
-  assert.deepEqual(requests, ['/api/premium-database/customers/archive']);
+  assert.deepEqual(requests, [{ url: '/api/premium-database/customers/archive', cache: 'no-cache' }]);
 
   requests.length = 0;
   const unchanged = await client.load({ previousSnapshotVersion: '2001:v1', fetchJsonWithTimeout });
   assert.equal(unchanged.changed, false);
   assert.equal(unchanged.total, 2001);
-  assert.deepEqual(requests, ['/api/premium-database/customers?meta=1']);
+  assert.deepEqual(requests, [{ url: '/api/premium-database/customers?meta=1', cache: 'no-store' }]);
 });
 
 test('premium database customer loader falls back to verified pages when the archive is incomplete', async () => {

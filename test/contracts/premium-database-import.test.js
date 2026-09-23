@@ -449,7 +449,9 @@ test('premium database customer archive transfers every verified row in one priv
   await responder({}, response);
 
   assert.equal(response.statusCode, 200);
-  assert.equal(response.headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.equal(response.headers['Cache-Control'], 'private, no-cache, max-age=0, must-revalidate');
+  assert.equal(response.headers.Vary, 'Cookie, Accept-Encoding');
+  assert.match(response.headers.ETag, /^"softora-customers-v1-[a-f0-9]{32}"$/);
   assert.equal(response.headers['Content-Encoding'], 'gzip');
   assert.equal(Number(response.headers['Content-Length']), response.body.length);
   const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
@@ -458,6 +460,40 @@ test('premium database customer archive transfers every verified row in one priv
   assert.equal(payload.customers.length, 2001);
   assert.deepEqual(payload.customers.map((customer) => customer.id), customers.map((customer) => customer.id));
   assert.deepEqual(calls.map((call) => call.metaOnly ? 'meta' : call.offset).sort(), [0, 1000, 2000, 'meta'].sort());
+});
+
+test('premium database archive revalidates a complete browser copy before rebuilding', async () => {
+  let version = '2:v1';
+  let chunkReads = 0;
+  const customers = [{ id: 'one', bedrijf: 'Eerste' }, { id: 'two', bedrijf: 'Tweede' }];
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: {
+      async listCustomersPage() { return { customers: [], total: 2, snapshotVersion: version }; },
+      async listCustomersArchiveChunk() { chunkReads += 1; return customers; },
+    },
+    logger: { info() {}, warn() {} },
+  });
+
+  const first = createMockResponse();
+  await responder({}, first);
+  assert.equal(first.statusCode, 200);
+  assert.equal(chunkReads, 1);
+
+  const unchanged = createMockResponse();
+  await responder({ headers: { 'if-none-match': first.headers.ETag } }, unchanged);
+  assert.equal(unchanged.statusCode, 304);
+  assert.equal(unchanged.body, undefined);
+  assert.equal(chunkReads, 1);
+  assert.equal(unchanged.headers['Cache-Control'], 'private, no-cache, max-age=0, must-revalidate');
+
+  version = '2:v2';
+  customers[0] = { id: 'one', bedrijf: 'Gewijzigd' };
+  const changed = createMockResponse();
+  await responder({ headers: { 'if-none-match': first.headers.ETag } }, changed);
+  assert.equal(changed.statusCode, 200);
+  assert.equal(chunkReads, 2);
+  assert.notEqual(changed.headers.ETag, first.headers.ETag);
+  assert.equal(JSON.parse(gunzipSync(changed.body).toString()).customers[0].bedrijf, 'Gewijzigd');
 });
 
 test('premium database customer archive uses bounded chunks and verifies the full version', async () => {

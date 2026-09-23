@@ -54,7 +54,7 @@
 
     async function fetchArchive(config) {
         const response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, {
-            method: "GET", cache: "no-store", credentials: "same-origin"
+            method: "GET", cache: "no-cache", credentials: "same-origin"
         }, REQUEST_TIMEOUT_MS);
         const payload = await response.json().catch(function () { return {}; });
         const total = Number(payload.total);
