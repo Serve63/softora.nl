@@ -38,7 +38,7 @@ const {
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
 const { collectCampaignThreadParticipantEmails } = require('./mailbox-campaign-participants');
-const { loadMailboxCampaignContactHistory } = require('./mailbox-campaign-contact-history');
+const { loadMailboxCampaignContactHistory, readMailboxCampaignSeedSentMessages } = require('./mailbox-campaign-contact-history');
 const { listMessagesAcrossFolders } = require('./mailbox-campaign-read-batches');
 const { requireMailboxEvidenceRows } = require('../repositories/mailbox-read-evidence');
 const { createExactSentDescendantReader } = require('./mailbox-exact-sent-descendants');
@@ -805,7 +805,9 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const [recentMessages, matchingMessages] = await Promise.all([listMessagesAcrossFolders({
+    // This Sent seed does not depend on the incoming scan. Reading both at once
+    // removes one network round trip from the complete conversation view.
+    const [recentMessages, matchingMessages, seedSentMessagesResult] = await Promise.all([listMessagesAcrossFolders({
       folders: CAMPAIGN_INCOMING_FOLDERS, dedupeCampaignMessages,
       mailboxIndexStore,
       method: 'listMessagesForAccounts',
@@ -837,7 +839,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
               priorityRead: true,
             },
           })
-        : []]);
+        : [], readMailboxCampaignSeedSentMessages({
+          mailboxIndexStore, campaignMailboxAccounts,
+          campaignSubjectTerms: CAMPAIGN_SUBJECT_TERMS,
+          sentLimit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+        })]);
     const indexedMessages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
       ? dedupeCampaignMessages([...recentMessages, ...matchingMessages])
       : null;
@@ -856,6 +862,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       incomingFolders: CAMPAIGN_INCOMING_FOLDERS,
       incomingLimit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
       sentLimit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+      preloadedSeedSentMessages: { result: seedSentMessagesResult },
       dedupeCampaignMessages,
       collectCampaignThreadParticipantEmails,
     });
