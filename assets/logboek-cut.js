@@ -17,7 +17,7 @@
     if(delay===0) { noteTimers.set(order,window.setTimeout(()=>saveNoteNow(order),0));return; }
     noteTimers.set(order,window.setTimeout(()=>saveNoteNow(order),delay));
   }
-  function render({session,pending,drafts,planUpdatedAt,online,loading,saving,message,today}) {
+  function render({session,pending,drafts,online,loading,saving,message,today}) {
     const active=document.activeElement, focus=active?.dataset;
     const noteSelection=active?.matches?.('textarea[data-note-order]') ? [active.selectionStart,active.selectionEnd,active.selectionDirection] : null;
     $('day-title').textContent=names[state.weekday(today)];
@@ -37,8 +37,9 @@
       }).join('')}</div><div class="note-editor"><label for="note-${row.order}">Notitie</label><textarea id="note-${row.order}" aria-label="Notitie ${esc(row.title)}" data-note-order="${row.order}" data-note-default="${esc(row.notes || '')}" rows="1" maxlength="1000" placeholder="Notitie toevoegen…">${esc(drafts?.[noteKey] ?? draft.notes?.[String(row.order)]?.text ?? row.notes ?? '')}</textarea><span class="note-status" aria-live="polite">${noteStatus}</span></div></article>`;
     }).join('') || '<p class="empty"><strong>Rustdag</strong>Vandaag staat er geen training gepland.</p>';
     const unsavedNotes=Object.keys(drafts || {}).filter(key=>key.startsWith(`${today}:`)).length;
-    $('status').textContent=message || (pending.length ? `${pending.length} wijziging(en) worden opgeslagen…` : unsavedNotes ? 'Notitie wordt automatisch opgeslagen…' : loading && !session ? 'Training ophalen…' : online ? 'Sets en notities opgeslagen' : 'Verbinding controleren…');
-    $('schema-updated').innerHTML=planUpdatedAt ? `Schema bijgewerkt ${esc(new Date(planUpdatedAt).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Amsterdam'}))} · <a href="/logboek">Gewichten aanpassen</a>` : '';
+    const statusMessage=message || (pending.length ? `${pending.length} wijziging(en) worden opgeslagen…` : unsavedNotes ? 'Notitie wordt automatisch opgeslagen…' : loading && !session ? 'Training ophalen…' : online ? '' : 'Verbinding controleren…');
+    $('status').textContent=statusMessage;
+    $('status').hidden=!statusMessage;
     $('retry').hidden=!message;
     $('login').hidden=!message.includes('Log in');
     if(focus?.order && focus?.set)document.querySelector(`[data-order="${focus.order}"][data-set="${focus.set}"]`)?.focus({preventScroll:true});
@@ -59,6 +60,7 @@
       field.style.height='auto';field.style.height=`${Math.max(22,field.scrollHeight)}px`;
       sync.setNoteDraft(Number(field.dataset.noteOrder),field.value,field.dataset.noteDefault);
       $('status').textContent='Notitie wordt automatisch opgeslagen…';
+      $('status').hidden=false;
       const status=field.parentElement.querySelector('.note-status');if(status)status.textContent='Wordt automatisch opgeslagen…';
       scheduleNoteSave(Number(field.dataset.noteOrder));
     }

@@ -36,6 +36,14 @@ test('logboek-cut has no training progress badge or progress bar', () => {
   assert.doesNotMatch(script, /\$\('training-completion'\)|\$\('progress-label'\)|\$\('percent'\)|\$\('progress'\)/);
 });
 
+test('logboek-cut hides successful sync status and omits the schema and timezone footer', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../logboek-cut.html'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.js'), 'utf8');
+  assert.doesNotMatch(html, /id="schema-updated"|Gewichten aanpassen|Automatisch de juiste dag|<footer\b/);
+  assert.doesNotMatch(script, /Sets en notities opgeslagen|Schema bijgewerkt|schema-updated/);
+  assert.match(script, /\$\('status'\)\.hidden=!statusMessage/);
+});
+
 test('completed exercise fill and separators reach the full screen width', () => {
   const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
   const row = css.match(/\.exercise::before\s*\{([^}]+)\}/)?.[1];
