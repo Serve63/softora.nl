@@ -41,12 +41,10 @@
         });
         const complete = state.canonicalInventoryReady === true && state.remoteCustomersLoaded === true &&
             state.photoRestorePending === false && state.photoRestoreFailed !== true && state.dataLoading === false &&
-            state.linkedSpreadsheetSyncReady === true && state.pendingJobsRestored === true &&
-            state.providerDeliverySyncReady === true;
+            state.linkedSpreadsheetSyncReady === true && state.pendingJobsRestored === true;
         if (!complete || !metricsReady) {
             const reason = !state.linkedSpreadsheetSyncReady ? 'linked-spreadsheet-sync-incomplete'
                 : !state.pendingJobsRestored ? 'pending-photo-jobs-incomplete'
-                    : !state.providerDeliverySyncReady ? 'provider-delivery-sync-incomplete'
                     : complete ? 'mail-metrics-unavailable' : 'database-inventory-incomplete';
             readiness.markDegraded({ page: 'premium-database', reason });
             if (complete && !metricsReady && metricRetryTimer === null && metricRetryCount < MAX_METRIC_RETRIES && typeof root.setTimeout === 'function') {

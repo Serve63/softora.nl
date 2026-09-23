@@ -19,9 +19,6 @@
                 state.pendingJobsRestored = await pendingJobsOutcome;
                 global.performance?.mark?.("softora:database:pending-jobs-checked");
                 await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); global.performance?.mark?.("softora:database:photos-preloaded"); state.photoRestorePending = false; renderPage(); global.performance?.mark?.("softora:database:final-render");
-                const deliveryStatus = await (options.providerDeliverySync || global.SoftoraDatabaseInstantlySync?.ready || Promise.resolve({ ok: false }));
-                state.providerDeliverySyncReady = deliveryStatus?.ok === true;
-                global.performance?.mark?.("softora:database:provider-checked");
                 if (options.databaseReadiness) await options.databaseReadiness.publish({ state }); releaseDatabaseBootShell();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestoreFailed = true; state.photoRestorePending = false; if (!state.canonicalInventoryReady) { state.dataLoading = false; state.dataUnavailable = true; } renderPage(); global.SoftoraScreenReadiness?.markDegraded({ page: 'premium-database', reason: 'database-boot-failed' }); } finally { releaseDatabaseBootShell(); }
         })();
