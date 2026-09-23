@@ -56,7 +56,7 @@ function loadDatabaseSystemMailCountClient(options = {}) {
     setInterval: options.setInterval || (() => 0),
     addEventListener: options.addEventListener || (() => {}),
   };
-  const sandbox = { window: windowObject, fetch: options.fetch, setInterval: windowObject.setInterval };
+  const sandbox = { window: windowObject, fetch: options.fetch, setInterval: windowObject.setInterval, Date: options.Date || Date };
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseSystemMailCount;
 }
@@ -2704,7 +2704,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260922-today-channel-total/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260923-roi-reliable/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2920,7 +2920,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /softoraDatabaseActionsBound = 'true';[\s\S]*databaseReadiness: window\.SoftoraDatabaseReadiness/);
   assert.match(pageSource, /premium-screen-readiness\.js\?v=20260922b/);
-  assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-roi-reliable/);
+  assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-fresh-stats/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
@@ -3000,7 +3000,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260922b"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260923-roi-reliable"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260922b"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260923-fresh-stats"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -6621,6 +6621,28 @@ test('mail ROI retries a failed central read and only then reports fresh metrics
   assert.equal(client.getMetricReadiness().roi, true);
   await client.refreshTodaySentCount();
   assert.equal(client.getMetricReadiness().stats, true);
+});
+
+test('Mailsysteem only reuses a successful recent stats read', async () => {
+  let nowMs = 100000;
+  let failNext = false;
+  class TestDate extends Date { static now() { return nowMs; } }
+  const client = loadDatabaseSystemMailCountClient({
+    Date: TestDate,
+    document: { getElementById: () => null },
+    fetch: async () => failNext
+      ? { ok: false, json: async () => ({ ok: false }) }
+      : { ok: true, json: async () => ({ ok: true, stats: { systemTotalSent: 10 } }) },
+  });
+  assert.equal(client.getMetricReadiness().statsFresh, false);
+  await client.refreshTodaySentCount();
+  assert.equal(client.getMetricReadiness().statsFresh, true);
+  nowMs += 15001;
+  assert.equal(client.getMetricReadiness().statsFresh, false);
+  failNext = true;
+  await client.refreshTodaySentCount();
+  assert.equal(client.getMetricReadiness().stats, false);
+  assert.equal(client.getMetricReadiness().statsFresh, false);
 });
 
 test('database places eight compact metrics next to filters and search on its own row', () => {

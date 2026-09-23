@@ -46,6 +46,13 @@ test('Mailsysteem records readiness only after inventory, metrics, actions and v
   assert.equal(request.actionsBound(), false);
 });
 
+test('Mailsysteem reuses an already verified fresh stats read during readiness', async () => {
+  const env = environment();
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: true, stats: true, statsFresh: true });
+  assert.equal(await env.readiness.publish({ state: env.state }), true);
+  assert.deepEqual(env.events, ['roi', 'ready']);
+});
+
 test('Mailsysteem cannot claim readiness with missing metrics or incomplete media restore', async () => {
   const env = environment();
   env.values.set('systemMailSentTodayCount', '--');

@@ -4,6 +4,7 @@
     const ROI_APPOINTMENTS_KEY = "premium_database_mail_appointments_v1";
     const COLDMAIL_STATS_URL = "/api/coldmailing/stats?includeRecipients=1";
     const TODAY_SENT_REFRESH_MS = 60000;
+    const STATS_READINESS_FRESH_MS = 15000;
     let roiControlsBound = false;
     let roiSaveLifecycleBound = false;
     let todaySentRefreshBound = false;
@@ -22,6 +23,7 @@
     let roiNextReadAtMs = 0;
     let roiReadVerified = false;
     let statsReadVerified = false;
+    let statsReadVerifiedAtMs = 0;
     let roiDirtySinceLoad = false;
     let roiNeedsRemoteSync = false;
     let bootstrapStateApplied = false;
@@ -604,6 +606,7 @@
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
             statsReadVerified = true;
+            statsReadVerifiedAtMs = Date.now();
             if (window.SoftoraDatabaseSentRegister) {
                 window.SoftoraDatabaseSentRegister.accept(stats.sentRegister);
                 lastStatsMailCount = stats.sentRegister.total;
@@ -623,6 +626,7 @@
             return sentToday;
         }).catch(function (error) {
             statsReadVerified = false;
+            statsReadVerifiedAtMs = 0;
             if (window.SoftoraDatabaseSentRegister) { window.SoftoraDatabaseSentRegister.markFailed(); window.dispatchEvent(new Event("softora:sent-register")); }
             renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, lastTodaySentCount === null && lastInstantlyTodaySentCount === null);
             renderHardBouncesCount(lastHardBouncesCount, lastHardBouncesCount === null);
@@ -719,7 +723,14 @@
     }
 
     window.SoftoraDatabaseSystemMailCount = {
-        getMetricReadiness: function () { return { roi: roiReadVerified, stats: statsReadVerified }; },
+        getMetricReadiness: function () {
+            const statsAgeMs = Date.now() - statsReadVerifiedAtMs;
+            return {
+                roi: roiReadVerified,
+                stats: statsReadVerified,
+                statsFresh: statsReadVerified && statsReadVerifiedAtMs > 0 && statsAgeMs >= 0 && statsAgeMs <= STATS_READINESS_FRESH_MS
+            };
+        },
         hasSoftoraSystemMailSignal: hasSoftoraSystemMailSignal,
         getCustomerSoftoraSystemMailSentCount: getCustomerSoftoraSystemMailSentCount,
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,
