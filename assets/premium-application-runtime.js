@@ -11,7 +11,7 @@
       const id = String(rawId || '').trim();
       const budget = module && module.prepareBudget;
       if (!id || !module || typeof module !== 'object') throw new TypeError('Elke applicatiemodule heeft een id en definitie nodig.');
-      for (const method of ['prepare', 'mount', 'update', 'dispose']) {
+      for (const method of ['prepare', 'mount', 'ready', 'update', 'dispose']) {
         if (typeof module[method] !== 'function') throw new TypeError(`${id}: module mist ${method}().`);
       }
       if (!Array.isArray(module.reads) || module.reads.some((key) => typeof key !== 'string' || !key.trim())) {
@@ -22,6 +22,9 @@
           !Number.isFinite(budget.maxBytes) || budget.maxBytes < 0 ||
           !Number.isFinite(budget.maxMs) || budget.maxMs <= 0) {
         throw new TypeError(`${id}: declareer maxReads, maxBytes en maxMs voor prepare.`);
+      }
+      if (!Number.isInteger(module.readyBudgetMs) || module.readyBudgetMs < 1 || module.readyBudgetMs > 3000) {
+        throw new TypeError(`${id}: readyBudgetMs moet tussen 1 en 3000 ms liggen.`);
       }
       if (module.roles != null && !Array.isArray(module.roles)) throw new TypeError(`${id}: roles moet een lijst zijn.`);
       const roles = module.roles == null ? null : module.roles.map((role) => String(role));
@@ -190,6 +193,31 @@
       }
     }
 
+    async function runReady(module, details, controller, lifetime) {
+      let timeout;
+      let abortHandler;
+      const cancelled = new Promise((_, reject) => {
+        abortHandler = () => reject(new Error(`${module.id}: gereedheidscontrole afgebroken.`));
+        controller.signal.addEventListener('abort', abortHandler, { once: true });
+      });
+      try {
+        const result = await Promise.race([
+          Promise.resolve().then(() => module.ready(details)),
+          cancelled,
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => {
+              abort(lifetime, 'ready-timeout');
+              reject(new Error(`${module.id}: scherm niet compleet binnen het gereedheidsbudget.`));
+            }, module.readyBudgetMs);
+          }),
+        ]);
+        if (result !== true) throw new Error(`${module.id}: scherm is nog niet compleet.`);
+      } finally {
+        if (timeout) clearTimeout(timeout);
+        controller.signal.removeEventListener('abort', abortHandler);
+      }
+    }
+
     async function navigate(moduleIdRaw, routeRaw) {
       if (destroyed) return { status: 'disposed' };
       if (commitTask) {
@@ -263,27 +291,20 @@
         return finish({ status: 'session-changed' });
       }
 
-      if (previous && previous.moduleId === moduleId) {
-        try {
-          await module.update({ root: previous.root, route, prepared, session, signal: controller.signal, lifecycleSignal: previous.lifetime.signal });
-          if (!isCurrent(version, controller)) return finish({ status: 'superseded' });
-          previous.route = route;
-          previous.session = session;
-          return finish({ status: 'updated', moduleId });
-        } catch (error) {
-          report(error, moduleId, 'update');
-          return finish({ status: isCurrent(version, controller) ? 'error' : 'superseded', error });
-        }
-      }
-
       let root;
       let lifetime;
+      const updating = Boolean(previous && previous.moduleId === moduleId);
+      let stage = updating ? 'update' : 'mount';
       try {
         root = await host.create({ moduleId, route });
         if (!root) throw new Error(`${moduleId}: shell-host gaf geen mount-root terug.`);
         lifetime = new AbortController();
         operation.lifetime = lifetime;
-        await module.mount({ root, route, prepared, session, signal: lifetime.signal });
+        if (updating) {
+          await module.update({ root, previousRoot: previous.root, route, prepared, session, signal: lifetime.signal });
+        } else {
+          await module.mount({ root, route, prepared, session, signal: lifetime.signal });
+        }
         if (!isCurrent(version, controller)) {
           await release({ moduleId, module, root, route, session, lifetime }, 'superseded');
           return finish({ status: 'superseded' });
@@ -294,6 +315,19 @@
           catch (error) { report(error, moduleId, 'session-change'); return finish({ status: 'error', error }); }
           return finish({ status: 'session-changed' });
         }
+        stage = 'ready';
+        await runReady(module, { root, route, prepared, session, signal: lifetime.signal }, controller, lifetime);
+        if (!isCurrent(version, controller)) {
+          await release({ moduleId, module, root, route, session, lifetime }, 'superseded');
+          return finish({ status: 'superseded' });
+        }
+        if (sessionSnapshot(getSession()).key !== session.key) {
+          await release({ moduleId, module, root, route, session, lifetime }, 'session-changed');
+          try { await synchronizeSession(sessionSnapshot(getSession())); }
+          catch (error) { report(error, moduleId, 'session-change'); return finish({ status: 'error', error }); }
+          return finish({ status: 'session-changed' });
+        }
+        stage = 'activate';
         const commit = (async () => {
           await host.activate(root, { moduleId, route, previousRoot: previous && previous.root });
           active = { moduleId, module, root, route, session, lifetime };
@@ -304,11 +338,11 @@
         finally { if (commitTask === commit) commitTask = null; }
       } catch (error) {
         if (root) await release({ moduleId, module, root, route, session, lifetime: lifetime || new AbortController() }, 'mount-failed');
-        report(error, moduleId, 'mount');
+        report(error, moduleId, stage);
         return finish({ status: isCurrent(version, controller) ? 'error' : 'superseded', error });
       }
 
-      return finish({ status: 'mounted', moduleId });
+      return finish({ status: updating ? 'updated' : 'mounted', moduleId });
     }
 
     async function dispose() {
