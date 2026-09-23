@@ -35,7 +35,7 @@
     }
     const notices = { failed: 'AI-opschoning is niet gelukt. Hieronder staat de originele e-mail.',
       timeout: 'AI-opschoning duurt langer dan verwacht. Hieronder staat de originele e-mail.',
-      budget: 'Het budget voor AI-opschoning is bereikt. Hieronder staat de originele e-mail.',
+      budget: 'AI-opschoning wacht op beschikbare budgetruimte. Hieronder staat de originele e-mail.',
       storage: 'AI-opschoning is tijdelijk niet beschikbaar. Hieronder staat de originele e-mail.' };
     if (value.version !== VERSION || value.status !== 'ready' || value.model !== MODEL || value.reasoningEffort !== 'max' ||
       value.sourceBody !== body || !validate(body, value.decision)) {

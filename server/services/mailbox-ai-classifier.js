@@ -1,10 +1,11 @@
 'use strict';
 const crypto = require('node:crypto');
+const { readUsage, mergeUsage } = require('./mailbox-ai-usage');
 const contract = require('../../assets/premium-mailbox-ai-presentation');
 const { buildRemovalReview, applyRemovalReview } = require('./mailbox-ai-removal-review');
 const MAX_OUTPUT_TOKENS = 16384;
 const CLASSIFICATION_TIMEOUT_MS = 120000;
-const RESERVATION_MICRO_USD = 100000;
+const RESERVATION_MICRO_USD = 300000;
 const SCHEMA = {
   type: 'object', additionalProperties: false, required: ['signatureLines', 'contacts'],
   properties: {
@@ -31,7 +32,7 @@ function buildSource(message) {
   const body = contract.sourceBody(message);
   const account = String(message?.accountEmail || '').trim().toLowerCase();
   const identity = String(message?.messageId || message?.messageKey || message?.id || '').trim();
-  if (!account || !identity || !body.trim() || body.length > 60000 || contract.linesOf(body).length > 600 ||
+  if (!account || !identity || !body.trim() || body.length > 240000 || contract.linesOf(body).length > 2400 ||
     message.bodyTruncated || message.folder === 'sent' || message.direction === 'sent' ||
     String(message.email || '').toLowerCase() === account || message.copyContext?.evidenceKnown) return null;
   const source = { body, from: String(message.from || ''), email: String(message.email || ''),
@@ -43,34 +44,51 @@ function buildSource(message) {
   const hash = crypto.createHash('sha256').update(identityText).digest('hex');
   return { ...source, hash, id: crypto.createHash('sha256').update(`${contract.VERSION}:${hash}`).digest('hex') };
 }
+function cacheInstructions(request) {
+  if (!request.instructions) return request;
+  const { instructions, input, ...options } = request;
+  // Cache only the unchanged rubric. Never pay to cache each unique email body.
+  return { ...options, prompt_cache_options: { mode: 'explicit' }, input: [
+    { role: 'developer', content: [{ type: 'input_text', text: instructions, prompt_cache_breakpoint: { mode: 'explicit' } }] },
+    { role: 'user', content: input },
+  ] };
+}
 function buildRequest(source) {
-  const request = { model: contract.MODEL, reasoning: { effort: 'max' }, store: false,
+  const request = cacheInstructions({ model: contract.MODEL, reasoning: { effort: 'max' }, store: false, service_tier: 'default',
     max_output_tokens: MAX_OUTPUT_TOKENS, instructions: INSTRUCTIONS,
     input: JSON.stringify({ sender: { name: source.from, email: source.email },
       lines: contract.linesOf(source.body).map((text, line) => ({ line, text })).filter((row) => row.text.trim()), htmlEvidence: source.html }),
-    text: { format: { type: 'json_schema', name: 'mailbox_presentation', strict: true, schema: SCHEMA } } };
-  // Includes prompt, schema and JSON overhead. Conservative reservation: <100K input bytes
-  // plus 16384 output/reasoning tokens at Luna 6 standard rates ($0.10/$0.50 per million).
-  if (Buffer.byteLength(JSON.stringify(request)) > 100000) throw new Error('MAILBOX_AI_INPUT_LIMIT');
+    text: { format: { type: 'json_schema', name: 'mailbox_presentation', strict: true, schema: SCHEMA } } });
+  // Bound both complete requests, including schema and JSON overhead. The $0.30 hold
+  // covers 400K input tokens twice even at long-context/cache-write premium rates.
+  if (Buffer.byteLength(JSON.stringify(request)) > 400000) throw new Error('MAILBOX_AI_INPUT_LIMIT');
   return request;
 }
 function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, timeoutMs = CLASSIFICATION_TIMEOUT_MS } = {}) {
   async function requestJson(request) {
+    request = cacheInstructions(request);
     const key = getApiKey?.();
     if (!key) throw new Error('MAILBOX_AI_NOT_CONFIGURED');
-    if (Buffer.byteLength(JSON.stringify(request)) > 100000) throw new Error('MAILBOX_AI_INPUT_LIMIT');
+    if (Buffer.byteLength(JSON.stringify(request)) > 400000) throw new Error('MAILBOX_AI_INPUT_LIMIT');
     const response = await fetchImpl('https://api.openai.com/v1/responses', {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(request), signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!response.ok) throw new Error('MAILBOX_AI_PROVIDER_ERROR');
+    if (!response.ok) {
+      const error = new Error('MAILBOX_AI_PROVIDER_ERROR');
+      error.providerStatus = response.status;
+      try {
+        const detail = (await response.json())?.error;
+        for (const field of ['code', 'param']) if (/^[a-zA-Z0-9_.-]{1,80}$/.test(detail?.[field] || '')) error[field] = detail[field];
+      } catch (_) { /* No provider message/body is logged. */ }
+      throw error;
+    }
     const result = await response.json();
     if (result.status !== 'completed' || result.error || result.incomplete_details) throw new Error('MAILBOX_AI_INCOMPLETE');
     const content = (result.output || []).filter((item) => item.type === 'message').flatMap((item) => item.content || []);
     if (content.some((item) => item.type === 'refusal')) throw new Error('MAILBOX_AI_REFUSED');
     const value = JSON.parse(content.filter((item) => item.type === 'output_text').map((item) => item.text).join(''));
-    return { value, usage: { inputTokens: Number(result.usage?.input_tokens) || 0,
-      outputTokens: Number(result.usage?.output_tokens) || 0 } };
+    return { value, usage: readUsage(result) };
   }
   async function classify(source) {
     const request = buildRequest(source), first = await requestJson(request);
@@ -83,7 +101,7 @@ function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, ti
     if (decision.labels.includes('signature')) {
       const review = await requestJson(buildRemovalReview(source, decision, request));
       decision = applyRemovalReview(decision, review.value);
-      for (const field of ['inputTokens', 'outputTokens']) first.usage[field] += review.usage[field];
+      first.usage = mergeUsage(first.usage, review.usage);
     }
     return { decision, usage: first.usage };
   }

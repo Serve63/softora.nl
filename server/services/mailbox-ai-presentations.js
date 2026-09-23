@@ -58,20 +58,30 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
         folder: row.folder, direction: row.payload?.direction, sourceHtml: row.payload?.sourceHtml,
         bodyTruncated: row.body_truncated })).filter(Boolean));
       let processed = 0;
-      for (let count = 0; count < 2; count += 1) {
+      // Two waves of four: worst-case 480s model time, below the 800s runtime.
+      // SQL enforces the global cap across overlapping cron invocations.
+      for (let wave = 0; wave < 2; wave += 1) {
+        const jobs = [];
         stage = 'claim';
-        const job = await repository.claim();
-        if (!job) break; // Includes exhausted/unapproved lifetime budget.
-        let result = null;
-        try { result = await classifier.classify(job.source); }
-        catch (error) {
-          const code = /^MAILBOX_AI_[A-Z_]+$/.test(error?.message) ? error.message
-            : error?.name === 'TimeoutError' ? 'MAILBOX_AI_TIMEOUT' : 'MAILBOX_AI_REQUEST_FAILED';
-          logger.warn?.('[MailboxAI] Classification failed; original body retained, no automatic retry.', { code });
+        for (let i = 0; i < 4; i += 1) {
+          const job = await repository.claim();
+          if (!job) break;
+          jobs.push(job);
         }
+        if (!jobs.length) break;
         stage = 'finish';
-        await repository.finish(job, result);
-        processed += 1;
+        const outcomes = await Promise.allSettled(jobs.map(async (job) => {
+          let result = null;
+          try { result = await classifier.classify(job.source); }
+          catch (error) {
+            const code = /^MAILBOX_AI_[A-Z_]+$/.test(error?.message) ? error.message
+              : error?.name === 'TimeoutError' ? 'MAILBOX_AI_TIMEOUT' : 'MAILBOX_AI_REQUEST_FAILED';
+            logger.warn?.('[MailboxAI] Classification failed; original body retained, reservation kept.', { code, ...(Number.isInteger(error?.providerStatus) ? { providerStatus: error.providerStatus, providerCode: error.code, parameter: error.param } : {}) });
+          }
+          await repository.finish(job, result);
+          processed += 1;
+        }));
+        if (outcomes.some((item) => item.status === 'rejected')) throw new Error('MAILBOX_AI_STORAGE_UNAVAILABLE');
       }
       return { processed };
     } catch (_) {
