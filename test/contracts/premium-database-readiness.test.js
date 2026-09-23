@@ -38,7 +38,7 @@ test('Mailsysteem records readiness only after inventory, metrics, actions and v
   let request;
   env.root.SoftoraScreenReadiness.markReady = async (input) => { request = input; return input.actionsBound(); };
   assert.equal(await env.readiness.publish({ state: env.state }), true);
-  assert.deepEqual(env.events, ['stats', 'roi']);
+  assert.deepEqual(env.events, ['stats']);
   assert.deepEqual(request.requiredData, { inventory: true, metrics: true });
   assert.deepEqual(request.requiredImages, [env.visible]);
   assert.equal(request.actionsBound(), true);
@@ -46,9 +46,21 @@ test('Mailsysteem records readiness only after inventory, metrics, actions and v
   assert.equal(request.actionsBound(), false);
 });
 
-test('Mailsysteem reuses an already verified fresh stats read during readiness', async () => {
+test('Mailsysteem reuses already verified stats and ROI reads during readiness', async () => {
   const env = environment();
   env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: true, stats: true, statsFresh: true });
+  assert.equal(await env.readiness.publish({ state: env.state }), true);
+  assert.deepEqual(env.events, ['ready']);
+});
+
+test('Mailsysteem fetches ROI when its initial verified read is still missing', async () => {
+  const env = environment();
+  let roiVerified = false;
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: roiVerified, stats: true, statsFresh: true });
+  env.root.SoftoraDatabaseSystemMailCount.loadPersistedDealCount = async () => {
+    env.events.push('roi');
+    roiVerified = true;
+  };
   assert.equal(await env.readiness.publish({ state: env.state }), true);
   assert.deepEqual(env.events, ['roi', 'ready']);
 });

@@ -31,7 +31,7 @@
         const latestMetrics = metrics?.getMetricReadiness?.();
         await Promise.allSettled([
             latestMetrics?.statsFresh === true ? undefined : metrics?.refreshTodaySentCount?.(),
-            metrics?.loadPersistedDealCount?.({ force: true }),
+            latestMetrics?.roi === true ? undefined : metrics?.loadPersistedDealCount?.({ force: true }),
         ]);
         root.performance?.mark?.('softora:database:metrics-checked');
         const verified = metrics?.getMetricReadiness?.();
