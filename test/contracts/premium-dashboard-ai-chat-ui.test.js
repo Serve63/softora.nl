@@ -7,21 +7,24 @@ const dashboardDataStatus = require('../../assets/premium-dashboard-data-status'
 test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const chatSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-dashboard-ai-chat.js'), 'utf8');
 
   assert.match(pageSource, /id="dashboardAiChat"/);
   assert.match(pageSource, /<span>Ruben Nijhuis<\/span>/);
   assert.match(pageSource, /<strong>Ruben Nijhuis<\/strong>/);
   assert.doesNotMatch(pageSource, /Je Softora-collega voor context, keuzes en overzicht in de software\./);
   assert.match(pageSource, /placeholder="Vraag het aan Ruben Nijhuis\.\.\."/);
-  assert.match(pageSource, /const CHAT_ENDPOINTS = \['\/api\/ai\/ruben-chat', '\/api\/ai\/dashboard-chat', '\/api\/ai-dashboard-chat'\];/);
-  assert.match(pageSource, /bubble\.textContent = 'Ruben Nijhuis denkt na\.\.\.';/);
-  assert.match(pageSource, /formatStatus\('Ruben Nijhuis verwerkt je vraag\.\.\.', ''\);/);
+  assert.match(pageSource, /assets\/premium-dashboard-ai-chat\.js\?v=20260922a/);
+  assert.match(chatSource, /const CHAT_ENDPOINTS = \['\/api\/ai\/ruben-chat', '\/api\/ai\/dashboard-chat', '\/api\/ai-dashboard-chat'\];/);
+  assert.match(chatSource, /bubble\.textContent = 'Ruben Nijhuis denkt na\.\.\.';/);
+  assert.match(chatSource, /formatStatus\('Ruben Nijhuis verwerkt je vraag\.\.\.', ''\);/);
   assert.doesNotMatch(pageSource, /Bijgewerkt met de nieuwste dashboarddata\./);
-  assert.match(pageSource, /function renderAssistantMarkdown\(content\) \{/);
-  assert.match(pageSource, /function renderMessageBubbleContent\(bubble, item\) \{/);
-  assert.match(pageSource, /bubble\.innerHTML = renderAssistantMarkdown\(item\.content\);/);
-  assert.match(pageSource, /Hoi, ik ben Ruben Nijhuis\./);
-  assert.match(pageSource, /actuele read-only context/);
+  assert.match(chatSource, /function renderAssistantMarkdown\(content\) \{/);
+  assert.match(chatSource, /function renderMessageBubbleContent\(bubble, item\) \{/);
+  assert.match(chatSource, /bubble\.innerHTML = renderAssistantMarkdown\(item\.content\);/);
+  assert.match(chatSource, /Hoi, ik ben Ruben Nijhuis\./);
+  assert.match(chatSource, /actuele read-only context/);
+  assert.match(chatSource, /toggleButton\.dataset\.softoraActionBound = 'true';/);
   assert.doesNotMatch(pageSource, /dashboard-lead-legend-strip|lead-type-legend|Legenda voor kleur productlijn/);
   assert.match(pageSource, /class="dashboard-ai-management-status-panel"/);
   assert.match(pageSource, /Dit is AI aan het doen/);
@@ -67,6 +70,7 @@ test('premium dashboard chat blijft beperkt tot het personeel dashboard', () => 
 test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const chatSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-dashboard-ai-chat.js'), 'utf8');
 
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.doesNotMatch(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
@@ -112,7 +116,7 @@ test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', (
   assert.match(pageSource, /let aiManagementMode = initialAiManagementMode === 'software' \? 'software' : 'personnel';/);
   assert.match(pageSource, /function normalizeAiManagementMode\(value\) \{\s*return 'personnel';\s*\}/);
   assert.match(pageSource, /if \(aiManagementOptions\.length < 2\) return;/);
-  assert.match(pageSource, /aiManagementMode: managementContext\.mode/);
+  assert.match(chatSource, /aiManagementMode: managementContext\.mode/);
   assert.match(pageSource, /softora-ai-management-change/);
 });
 

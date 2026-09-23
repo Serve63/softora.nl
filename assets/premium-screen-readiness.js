@@ -145,7 +145,8 @@
                 Boolean(doc && typeof doc.querySelector === 'function' && doc.querySelector(String(selector)))
             );
             if (status === 'ready') return Promise.resolve(true);
-            if (!allRequiredDataReady(request.requiredData) || request.actionsBound !== true || !actionsPresent) {
+            const canCheckActionBindings = request.actionsBound === true || typeof request.actionsBound === 'function';
+            if (!allRequiredDataReady(request.requiredData) || !canCheckActionBindings || !actionsPresent) {
                 return Promise.resolve(false);
             }
             if (readyTask) return readyTask;
@@ -160,7 +161,10 @@
                 const actionsStillPresent = Array.from(request.requiredActions || []).every((selector) =>
                     Boolean(doc && typeof doc.querySelector === 'function' && doc.querySelector(String(selector)))
                 );
-                if (!allRequiredDataReady(request.requiredData) || request.actionsBound !== true || !actionsStillPresent) return false;
+                const actionsBound = typeof request.actionsBound === 'function'
+                    ? request.actionsBound() === true
+                    : request.actionsBound === true;
+                if (!allRequiredDataReady(request.requiredData) || !actionsBound || !actionsStillPresent) return false;
 
                 status = 'ready';
                 lastError = '';

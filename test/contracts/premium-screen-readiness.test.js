@@ -66,6 +66,24 @@ test('a screen stays loading until every required read and action is ready', asy
   assert.equal(env.emitted.length, 0);
 });
 
+test('a deferred action binding is checked after the remaining page scripts load', async () => {
+  const env = createEnvironment({ readyState: 'interactive' });
+  let bound = false;
+  const pending = env.readiness.markReady(readyInput({ actionsBound: () => bound }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.readiness.getState().status, 'loading');
+
+  bound = true;
+  env.document.readyState = 'complete';
+  env.listeners.get('load')();
+  assert.equal(await pending, true);
+  assert.equal(env.readiness.getState().status, 'ready');
+
+  const missing = createEnvironment();
+  assert.equal(await missing.readiness.markReady(readyInput({ actionsBound: () => false })), false);
+  assert.equal(missing.readiness.getState().status, 'loading');
+});
+
 test('a screen stays loading while a required image is decoding', async () => {
   const env = createEnvironment({ readyState: 'interactive' });
   const image = createImage();
@@ -219,6 +237,7 @@ test('Dashboard and Opdrachten load readiness checks before releasing their boot
   const helper = fs.readFileSync(path.join(root, 'assets/premium-screen-readiness.js'), 'utf8');
   const dashboard = fs.readFileSync(path.join(root, 'premium-personeel-dashboard.html'), 'utf8');
   const dashboardRefresh = fs.readFileSync(path.join(root, 'assets/premium-dashboard-refresh.js'), 'utf8');
+  const dashboardChat = fs.readFileSync(path.join(root, 'assets/premium-dashboard-ai-chat.js'), 'utf8');
   const dashboardCore = fs.readFileSync(path.join(root, 'assets/premium-dashboard-core.js'), 'utf8');
   const ordersPage = fs.readFileSync(path.join(root, 'premium-actieve-opdrachten.html'), 'utf8');
   const ordersBoot = fs.readFileSync(path.join(root, 'assets/premium-active-orders-boot.js'), 'utf8');
@@ -228,20 +247,25 @@ test('Dashboard and Opdrachten load readiness checks before releasing their boot
 
   assert.match(helper, /performanceApi\.mark\('softora:screen-ready'\)/);
   assert.match(helper, /waitForDocumentLoad\(win, doc\)/);
-  assert.match(dashboard, /premium-screen-readiness\.js\?v=20260922a/);
+  assert.match(dashboard, /premium-screen-readiness\.js\?v=20260922b/);
   assert.match(dashboardRefresh, /customers: state\.customersHydrated,[\s\S]*activeOrders: state\.ordersHydrated/);
   assert.match(dashboardRefresh, /if \(!complete\) \{\s*\/\/ Keep the boot shell up while recovery reads are still running\.\s*return false;/);
   assert.match(dashboardRefresh, /if \(!results\[0\] && results\[1\]\) showUnavailable\(\)/);
   assert.match(guardrails, /premium-screen-readiness\.test\.js/);
   assert.match(dashboardRefresh, /requiredActions: \['#dashboardAiChatToggle', '#aiManagementConfigSave'\]/);
+  assert.match(dashboardRefresh, /chat\?\.dataset\.softoraActionBound === 'true' && save\?\.dataset\.softoraActionBound === 'true'/);
+  assert.match(dashboardChat, /toggleButton\.dataset\.softoraActionBound = 'true';/);
+  assert.match(dashboard, /aiManagementConfigSave\.dataset\.softoraActionBound = 'true';/);
   assert.match(dashboard, /id="dashboardAiChatToggle"/);
   assert.match(dashboard, /id="aiManagementConfigSave"/);
   assert.match(dashboardCore, /if \(!isPremiumDashboardScreenReadyForRelease\(\)\) return false;/);
-  assert.match(ordersPage, /premium-screen-readiness\.js\?v=20260922a/);
-  assert.match(ordersPage, /premium-active-orders-readiness\.js\?v=20260922a/);
+  assert.match(ordersPage, /premium-screen-readiness\.js\?v=20260922b/);
+  assert.match(ordersPage, /premium-active-orders-readiness\.js\?v=20260922b/);
   assert.match(orders, /remoteUiStateLoaded === true\);/);
   assert.match(ordersBoot, /readiness\.publish\(\{ dataComplete: dataComplete === true \}\)/);
   assert.match(ordersReadiness, /await readiness\.markReady\(/);
   assert.match(ordersReadiness, /requiredActions: \['#createOrderBtn', '#onlyMyAssignmentsToggle', '\.orders-filter-bar', '#ordersGrid'\]/);
+  assert.match(ordersReadiness, /softoraOrdersActionsBound === 'true'/);
+  assert.match(orders, /dataset\.softoraOrdersActionsBound = 'true';/);
   assert.match(ordersBoot, /readiness\.status === 'loading'\) return false/);
 });
