@@ -109,13 +109,16 @@ test('directory links keep their target but display only the site name and a rea
 
 test('kvk database snapshot page contains the approved compact dashboard', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const redesignSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Bedrijvendatabase<\/title>/);
   assert.match(pageSource, /<meta name="robots" content="noindex,nofollow">/);
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923s/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923t/);
+  assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:16px minmax\(0,1fr\) auto;column-gap:7px;padding-left:12px\}/);
+  assert.match(redesignSource, /\.planning-panel \.rank\{width:16px;height:16px;font-size:6\.5px;line-height:1\}/);
   assert.match(pageSource, /<button class="transfer-button" type="button" disabled>Upload naar mailsysteem/);
   assert.match(pageSource, /id="companies-treated"/);
   assert.match(pageSource, /id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced"/);
