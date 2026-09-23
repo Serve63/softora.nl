@@ -250,7 +250,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260923-phase-timing') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260923-archive') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260923-once') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui') > asideEnd);
   assert.match(source, /assets\/premium-database-mail-ready-menu\.css\?v=20260914-provider/);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
@@ -1353,7 +1353,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-boot\.js\?v=20260923-phase-timing/);
   assert.match(source, /premium-database-readiness\.js\?v=20260923-phase-timing/);
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
-  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-archive/);
+  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-once/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20260921-mailready-header/);

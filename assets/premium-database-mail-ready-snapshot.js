@@ -421,8 +421,9 @@
         if (typeof config.applyCustomerList === "function") {
             const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
             const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer) || isSnapshotInstantlyReadyCustomer(customer); });
+            const hasCanonicalCustomers = currentCustomers.length > 0 && !currentIsSnapshotOnly;
             const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers, instantlyReadyCustomers));
-            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers, instantlyReadyCustomers) : combinedSnapshotCustomers, false);
+            config.applyCustomerList(hasCanonicalCustomers ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers, instantlyReadyCustomers) : combinedSnapshotCustomers, false, hasCanonicalCustomers);
             state.canonicalSnapshotApplied = true;
             state.canonicalCountReady = true;
         }
