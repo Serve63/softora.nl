@@ -31,6 +31,39 @@
       !/[\r\n<>]/.test(contact.text) && lines[contact.line].includes(contact.text) &&
       (contact.kind !== 'phone' || isPhone(contact.text)));
   }
+  function omitQuotedReferenceAppendix(lines, visible, omitted) {
+    // A generated reference list can outlive the proven quote that used it.
+    // Remove only definitions whose markers occur in that omitted quote and
+    // nowhere in the remaining message; an authored link stays readable.
+    for (let start = lines.length - 1; start >= 0; start -= 1) {
+      if (!/^(?:links|references|referenties):$/i.test(lines[start].trim())) continue;
+      const definitions = [];
+      let valid = true;
+      for (let index = start + 1; index < lines.length; index += 1) {
+        const line = lines[index].trim();
+        if (!line || /^[-_=]{2,}$/.test(line)) continue;
+        const match = /^\[(\d+)\]\s+((?:https?:\/\/|mailto:)\S+)$/.exec(line);
+        if (!match) { valid = false; break; }
+        definitions.push({ index, number: match[1] });
+      }
+      if (!valid || !definitions.length) continue;
+      let removedAny = false;
+      for (const definition of definitions) {
+        const marker = new RegExp(`\\[\\s*${definition.number}\\s*\\]`);
+        const inQuote = lines.some((line, index) => index < start && omitted.has(index) && marker.test(line));
+        const inVisible = lines.some((line, index) => index < start && visible.has(index) &&
+          !omitted.has(index) && marker.test(line));
+        if (inQuote && !inVisible) {
+          omitted.add(definition.index);
+          removedAny = true;
+        }
+      }
+      if (removedAny && definitions.every(({ index }) => omitted.has(index) || !visible.has(index))) {
+        for (let index = start; index < lines.length; index += 1) omitted.add(index);
+      }
+      break;
+    }
+  }
   function read(message, provenQuoteLines = []) {
     const value = message?.aiPresentation;
     if (!value || value.reason === 'outside_scope') return null;
@@ -60,6 +93,7 @@
     });
     // These indices come only from exact sent-copy proof on the unmodified layout.
     const omitted = new Set(provenQuoteLines);
+    omitQuotedReferenceAppendix(lines, visible, omitted);
     const kept = lines.filter((_, index) => visible.has(index) && !omitted.has(index));
     const contacts = value.decision.contacts.filter((contact) => !visible.has(contact.line) && !omitted.has(contact.line)).sort((a, b) => a.line - b.line);
     return { body: kept.join('\n').replace(/\n(?:[\t ]*\n){2,}/g, '\n\n').trim(), aiManaged: true, signatureMatched: true,

@@ -26,6 +26,35 @@ test('offline decision fixture keeps original authored text and only literal sen
   assert.match(html[0], /\+31 6 12345678/);
   assert.deepEqual(ready, original);
 });
+test('AI view drops reference definitions owned only by a proven omitted quote', () => {
+  const quoted = [
+    'Hoi Martijn,',
+    'Donderdag in De Schalm past voor mij.',
+    'Met vriendelijke groet,',
+    'Tessa',
+    'martijnvandeven@softora.nl schreef op 2026-07-08:',
+    '> Hier is het eerdere ontwerp [1].',
+    '> En de planning [2].',
+    'Links:',
+    '------',
+    '[1] https://example.nl/ontwerp',
+    '[2] https://example.nl/planning',
+  ].join('\n');
+  const labels = ['authored', 'authored', 'signature', 'signature', 'authored', 'authored', 'authored',
+    'authored', 'authored', 'signature', 'authored'];
+  const input = { body: quoted, aiPresentation: { ...ready.aiPresentation, sourceBody: quoted,
+    decision: { labels, contacts: [] } } };
+  const result = contract.read(input, [4, 5, 6]);
+  assert.equal(result.body, 'Hoi Martijn,\nDonderdag in De Schalm past voor mij.');
+
+  const currentReference = quoted.replace('Donderdag in De Schalm past voor mij.',
+    'Donderdag in De Schalm past voor mij; de planning staat ook in [2].');
+  const retained = contract.read({ ...input, body: currentReference,
+    aiPresentation: { ...input.aiPresentation, sourceBody: currentReference } }, [4, 5, 6]);
+  assert.match(retained.body, /\[2\] https:\/\/example\.nl\/planning/);
+  assert.doesNotMatch(retained.body, /\[1\] https:\/\/example\.nl\/ontwerp/);
+  assert.match(retained.body, /Donderdag in De Schalm/);
+});
 test('incomplete, stale, incompatible and invalid decisions display the complete source', () => {
   for (const patch of [{ status: 'pending' }, { status: 'unavailable' }, { version: 'future' }, { sourceBody: 'old' }, { model: 'other' },
     { reasoningEffort: 'low' }, { decision: { labels: ['signature'], contacts: [] } }]) {
