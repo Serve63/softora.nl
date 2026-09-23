@@ -11,7 +11,8 @@
     const FINISHED_DATABASE = new Set(["klant", "interesse", "afspraak", "afgehaakt", "geblokkeerd", "buiten"]);
     const CURRENT_CAMPAIGNS = new Map([
         ["6ba410c6-d97a-4186-a414-83ba95022b1a", "serve"],
-        ["9a603e82-7a50-46e2-855a-5a2990a9304b", "martijn"]
+        ["9a603e82-7a50-46e2-855a-5a2990a9304b", "martijn"],
+        ["79b1f8c0-35de-4687-95ea-8384c4c491bd", "martijn"]
     ]);
 
     function text(value) { return String(value || "").trim(); }

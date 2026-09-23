@@ -1683,6 +1683,8 @@ test('Instantly status separates designs to upload, current campaign queue, fail
   assert.equal(status.isCurrentCampaignPrepared(design, normalize), false);
   assert.equal(status.isCurrentCampaignPrepared(queued, normalize), true);
   assert.equal(status.getCurrentCampaignOwner(queued), 'serve');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '79b1f8c0-35de-4687-95ea-8384c4c491bd' }), 'martijn');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '9a603e82-7a50-46e2-855a-5a2990a9304b' }), 'martijn');
   assert.equal(status.isReadyForUpload(queued, normalize), false);
   assert.equal(status.isReadyForUpload(failed, normalize), false);
   assert.equal(status.isCurrentCampaignPrepared(sent, normalize), false);

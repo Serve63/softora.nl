@@ -3,7 +3,7 @@ const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
 const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
 const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant, WEBDESIGN_VARIANT_V1, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
-
+const { assignWebdesignOwner } = require('./webdesign-owner-assignment');
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
 const DEVICE_MOCKUP_FILE_VERSION = 'v8';
 const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
@@ -1500,10 +1500,11 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         existing: true,
       };
     }
-
+    const ownerAssignment = await assignWebdesignOwner(customer, dataOpsStore, logger);
+    if (!ownerAssignment.ok) return ownerAssignment;
     const job = {
       id: jobId,
-      ownerKey,
+      ownerKey, assignedDesignOwnerEmail: ownerAssignment.ownerEmail,
       customer,
       websiteUrl,
       variant: normalizeWebdesignVariant(input.variant),
@@ -1532,7 +1533,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!processJobsInline) {
       queueProcessing();
     }
-
     return {
       ok: true,
       statusCode: 202,

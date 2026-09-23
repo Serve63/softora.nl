@@ -17,7 +17,7 @@ const { createMailboxHistoricalOutboundRepository } = require('../repositories/m
 const { filterDesignPhotoRowsForServing } = require('./design-photo-generation-policy');
 const { isCustomerConfirmedSent } = require('./instantly-campaign-replacement');
 const { syncOutboundGuardRows } = require('./data-ops-outbound-guard-sync');
-
+const { createWebdesignOwnerRotationRepository } = require('../repositories/webdesign-owner-rotation');
 const TABLES = Object.freeze({
   customers: 'softora_customers',
   customerIdentityKeys: 'softora_customer_identity_keys',
@@ -2075,7 +2075,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       finishedAt: toMsFromIso(row.finished_at),
       retry: normalizeWebdesignJobRetryPayload(payload.retry),
       cancelled: payload.cancelled === true,
-      generationAttempted: payload.generationAttempted === true, generation: payload.generation || null,
+      generationAttempted: payload.generationAttempted === true, generation: payload.generation || null, assignedDesignOwnerEmail: normalizeString(payload.assignedDesignOwnerEmail).toLowerCase(),
       variant: normalizeString(payload.variant || ''),
       batchId: normalizeString(payload.batchId || ''),
       batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))
@@ -2403,7 +2403,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     return rows;
   }
 
-  return {
+  return { ...createWebdesignOwnerRotationRepository({ run, getWriteOperationOptions, normalizeString }),
     findRunningWebdesignJob,
     getDataOpsCounts,
     getWebdesignBatch,

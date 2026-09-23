@@ -24,15 +24,29 @@ function buildWebdesignPipelineOptions({ variant: inputVariant, source, company 
 
 function buildWebdesignGenerationProvenance(job = {}) {
   const authenticatedEmail = String(job.ownerKey || '').split('::')[0].trim().toLowerCase();
+  const assignedEmail = String(job.assignedDesignOwnerEmail || '').trim().toLowerCase();
   const senderEmail = job.customer && job.customer.webdesignMailProvider === 'instantly' &&
-    OUTBOUND_SENDER_PROFILE_KEYS[authenticatedEmail] ? authenticatedEmail : '';
+    OUTBOUND_SENDER_PROFILE_KEYS[assignedEmail || authenticatedEmail] ? assignedEmail || authenticatedEmail : '';
   return {
     generationPolicy: WEBDESIGN_GENERATION_POLICY,
     generationJobId: String(job.id || '').trim(),
     generationVariant: normalizeWebdesignVariant(job.variant),
+    ...(assignedEmail ? { designOwnerEmail: assignedEmail } : {}),
     ...(senderEmail ? { senderEmail } : {}),
     ...(job.generation ? { generation: job.generation } : {}),
   };
+}
+
+function isAssignedWebdesignSenderAllowed(row, photo, senderEmail) {
+  const sender = String(senderEmail || '').trim().toLowerCase();
+  if (!sender) return true;
+  const owners = [row && row.designOwnerEmail, photo && photo.designOwnerEmail,
+    photo && photo.legacyMeta && photo.legacyMeta.designOwnerEmail,
+    photo && photo.legacy_meta && photo.legacy_meta.designOwnerEmail]
+    .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+  if (!owners.length) return true; // Existing designs retain their prior sender selection.
+  const senderProfile = OUTBOUND_SENDER_PROFILE_KEYS[sender];
+  return Boolean(senderProfile) && owners.every((owner) => OUTBOUND_SENDER_PROFILE_KEYS[owner] === senderProfile);
 }
 
 function isDesignPhotoIncidentQuarantined(row) {
@@ -77,6 +91,7 @@ module.exports = {
   WEBDESIGN_VARIANT_V1,
   WEBDESIGN_VARIANT_V2,
   buildWebdesignGenerationProvenance,
+  isAssignedWebdesignSenderAllowed,
   buildWebdesignPipelineOptions,
   filterDesignPhotoRowsForServing,
   isDesignPhotoIncidentQuarantined,

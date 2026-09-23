@@ -5,6 +5,33 @@ const path = require('node:path');
 
 const { createSoftoraDataOpsStore } = require('../../server/services/data-ops-store');
 
+test('data ops store claims webdesign owners through the central database function and fails closed', async () => {
+  const calls = [];
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      rpc(name, args) {
+        calls.push([name, args]);
+        return Promise.resolve({ data: 'martijn@softora.nl', error: null });
+      },
+    }),
+    logger: { error() {}, warn() {} },
+  });
+  assert.equal(await store.assignWebdesignOwner('customer-1'), 'martijn@softora.nl');
+  assert.deepEqual(calls, [['softora_assign_webdesign_owner', { p_customer_id: 'customer-1' }]]);
+
+  const unavailable = createSoftoraDataOpsStore({ logger: { error() {}, warn() {} } });
+  await assert.rejects(unavailable.assignWebdesignOwner('customer-2'), /Supabase niet geconfigureerd/);
+});
+
+test('webdesign owner rotation migration locks the turn and protects existing photo ownership', () => {
+  const sql = fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20260923130331_design_owner_rotation_all_providers.sql'), 'utf8');
+  assert.match(sql, /for update;/i);
+  assert.match(sql, /legacy_meta->>'senderEmail'/);
+  assert.match(sql, /coalesce\(v_owner, ''\) not in/);
+  assert.match(sql, /grant execute on function public\.softora_assign_webdesign_owner\(text\) to service_role/);
+});
+
 test('data ops store restores large premium database webdesign job queues', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../server/services/data-ops-store.js'), 'utf8');
 
