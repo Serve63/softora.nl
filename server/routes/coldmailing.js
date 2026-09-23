@@ -369,7 +369,13 @@ function registerColdmailingRoutes(app, deps = {}) {
       if (typeof res.setHeader === 'function') {
         res.setHeader('Cache-Control', 'no-store, private');
       }
-      res.json(await require('../services/coldmail-sent-register-response').getColdmailStatsResponse(coldmailCampaignService, _req.query && _req.query.includeRecipients === '1'));
+      const includeRecipients = _req.query && _req.query.includeRecipients === '1';
+      const timings = includeRecipients ? {} : null;
+      const payload = await require('../services/coldmail-sent-register-response').getColdmailStatsResponse(coldmailCampaignService, includeRecipients, timings);
+      if (timings && typeof res.setHeader === 'function') {
+        res.setHeader('Server-Timing', `live;dur=${timings.live}, register;dur=${timings.register}`);
+      }
+      res.json(payload);
     } catch (error) {
       res.status(500).json({
         ok: false,
