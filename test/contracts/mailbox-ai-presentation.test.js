@@ -400,19 +400,23 @@ test('out-of-scope stored mail keeps normal formatting and quote cleanup in root
   const original = 'GoedendagIk heb geen ondersteuning nodigDankjewelVerzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé <owner@example.nl> Datum: 22-09-2026 16:49 Aan: bert@example.nl Onderwerp: Vraag Goedendag,\nHier staat mijn eerdere voorstel voor jullie website.';
   const html = '<div>Goedendag</div><div>Ik heb geen ondersteuning nodig</div><div>Dankjewel</div><div>Verzonden vanaf mijn Galaxy</div><div>-------- Oorspronkelijk bericht --------</div><div>Van: Servé &lt;owner@example.nl&gt; </div><div>Datum: 22-09-2026 16:49 </div><div>Aan: bert@example.nl </div><div>Onderwerp: Vraag </div><p>Goedendag,</p><p>Hier staat mijn eerdere voorstel voor jullie website.</p>';
   const old = { ...message, body: original, sourceHtml: html };
+  for (const reason of ['outside_scope', 'timeout', 'budget']) {
   const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, repository: {
-    enqueue: async (sources) => sources.map((s) => ({ id:s.id, status:'queued', reason:'outside_scope', gate:false })),
+    enqueue: async (sources) => sources.map((s) => ({ id:s.id, status:'queued', reason, gate:false })),
   } });
   const [enriched] = await service.enrich([old]);
   assert.equal(enriched.body, original);
   assert.equal(enriched.aiPresentation.displayBody, restoreMailboxParagraphs(original, html));
-  assert.equal(contract.read(enriched), null);
+  if (reason === 'outside_scope') assert.equal(contract.read(enriched), null);
+  else assert.equal(contract.read(enriched).fallback, true);
   const views = [presentation.getRootMessagePresentation(original,enriched)];
   presentation.renderThreadMessages({ ...enriched, threadMessages: [{...enriched, bodyLoaded:true}] }, String, () => ({date:'Vandaag',time:'16:49'}), {renderMessageBody: (view) => { views.push(view); return view.body; }});
   assert.equal(views.length,2);
   for (const view of views) {
-    assert.equal(view.body, 'Goedendag\n\nIk heb geen ondersteuning nodig\n\nDankjewel');
+    assert.ok(view.body.endsWith('Goedendag\n\nIk heb geen ondersteuning nodig\n\nDankjewel'));
+    if (reason !== 'outside_scope') assert.match(view.body, /AI-opschoning/);
     assert.doesNotMatch(view.body,/Galaxy|eerdere voorstel|Oorspronkelijk bericht/);
+  }
   }
 });
 

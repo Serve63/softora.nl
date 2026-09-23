@@ -85,27 +85,43 @@ function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, ti
       throw error;
     }
     const result = await response.json();
-    if (result.status !== 'completed' || result.error || result.incomplete_details) throw new Error('MAILBOX_AI_INCOMPLETE');
-    const content = (result.output || []).filter((item) => item.type === 'message').flatMap((item) => item.content || []);
-    if (content.some((item) => item.type === 'refusal')) throw new Error('MAILBOX_AI_REFUSED');
-    const value = JSON.parse(content.filter((item) => item.type === 'output_text').map((item) => item.text).join(''));
-    return { value, usage: readUsage(result) };
+    const usage = readUsage(result);
+    try {
+      if (result.status !== 'completed' || result.error || result.incomplete_details) throw new Error('MAILBOX_AI_INCOMPLETE');
+      const content = (result.output || []).filter((item) => item.type === 'message').flatMap((item) => item.content || []);
+      if (content.some((item) => item.type === 'refusal')) throw new Error('MAILBOX_AI_REFUSED');
+      const value = JSON.parse(content.filter((item) => item.type === 'output_text').map((item) => item.text).join(''));
+      return { value, usage };
+    } catch (error) { error.mailboxUsage = usage; throw error; }
   }
   async function classify(originalSource) {
-    const source = { ...originalSource, body: restoreMailboxParagraphs(originalSource.body, originalSource.html) };
-    const request = buildRequest(source), first = await requestJson(request);
-    const lines = contract.linesOf(source.body), selected = first.value?.signatureLines;
-    if (!Array.isArray(selected) || new Set(selected).size !== selected.length || selected.some((i) =>
-      !Number.isInteger(i) || i < 0 || !lines[i]?.trim())) throw new Error('MAILBOX_AI_INVALID_RESULT');
-    const chosen = new Set(selected);
-    let decision = { labels: lines.map((_, i) => chosen.has(i) ? 'signature' : 'authored'), contacts: first.value.contacts };
-    if (!contract.validate(source.body, decision)) throw new Error('MAILBOX_AI_INVALID_RESULT');
-    if (decision.labels.includes('signature')) {
-      const review = await requestJson(buildRemovalReview(source, decision, request));
-      decision = applyRemovalReview(decision, review.value);
-      first.usage = mergeUsage(first.usage, review.usage);
+    let usage = null;
+    async function trackedRequest(request) {
+      try {
+        const result = await requestJson(request);
+        usage = usage ? mergeUsage(usage, result.usage) : result.usage;
+        return result;
+      } catch (error) {
+        const failed = error.mailboxUsage || readUsage({});
+        usage = usage ? mergeUsage(usage, failed) : failed;
+        throw error;
+      }
     }
-    return { decision: source.body === originalSource.body ? decision : { ...decision, displayBody: source.body }, usage: first.usage };
+    try {
+      const source = { ...originalSource, body: restoreMailboxParagraphs(originalSource.body, originalSource.html) };
+      const request = buildRequest(source), first = await trackedRequest(request);
+      const lines = contract.linesOf(source.body), selected = first.value?.signatureLines;
+      if (!Array.isArray(selected) || new Set(selected).size !== selected.length || selected.some((i) =>
+        !Number.isInteger(i) || i < 0 || !lines[i]?.trim())) throw new Error('MAILBOX_AI_INVALID_RESULT');
+      const chosen = new Set(selected);
+      let decision = { labels: lines.map((_, i) => chosen.has(i) ? 'signature' : 'authored'), contacts: first.value.contacts };
+      if (!contract.validate(source.body, decision)) throw new Error('MAILBOX_AI_INVALID_RESULT');
+      if (decision.labels.includes('signature')) {
+        const review = await trackedRequest(buildRemovalReview(source, decision, request));
+        decision = applyRemovalReview(decision, review.value);
+      }
+      return { decision: source.body === originalSource.body ? decision : { ...decision, displayBody: source.body }, usage };
+    } catch (error) { error.mailboxUsage = usage; throw error; }
   }
   return { classify };
 }

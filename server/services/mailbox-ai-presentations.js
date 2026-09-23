@@ -9,7 +9,7 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
   const enabled = () => env.MAILBOX_AI_PRESENTATION_ENABLED === 'true';
   const presentation = (source, row) => ({ version: contract.VERSION, model: contract.MODEL,
     reasoningEffort: 'max', status: row?.status === 'ready' ? 'ready' : row?.status === 'failed' || row?.reason ? 'unavailable' : 'pending',
-    ...(row?.reason === 'outside_scope' && source.html ? { displayBody: restoreMailboxParagraphs(source.body, source.html) } : {}),
+    ...(row?.status !== 'ready' && source.html ? { displayBody: restoreMailboxParagraphs(source.body, source.html) } : {}),
     gate: row?.gate === true, reason: row?.reason || (!row ? 'storage' : null),
     ...(row?.status === 'ready' ? { sourceBody: source.body, decision: row.decision } : {}) });
   function sourceFor(message) {
@@ -71,14 +71,15 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
         if (!jobs.length) break;
         stage = 'finish';
         const outcomes = await Promise.allSettled(jobs.map(async (job) => {
-          let result = null;
+          let result = null, failedUsage = null;
           try { result = await classifier.classify(job.source); }
           catch (error) {
             const code = /^MAILBOX_AI_[A-Z_]+$/.test(error?.message) ? error.message
               : error?.name === 'TimeoutError' ? 'MAILBOX_AI_TIMEOUT' : 'MAILBOX_AI_REQUEST_FAILED';
-            logger.warn?.('[MailboxAI] Classification failed; original body retained, reservation kept.', { code, ...(Number.isInteger(error?.providerStatus) ? { providerStatus: error.providerStatus, providerCode: error.code, parameter: error.param } : {}) });
+            failedUsage = error.mailboxUsage ? { ...error.mailboxUsage, errorCode: code } : null;
+            logger.warn?.('[MailboxAI] Classification failed; original body retained.', { code, ...(Number.isInteger(error?.providerStatus) ? { providerStatus: error.providerStatus, providerCode: error.code, parameter: error.param } : {}) });
           }
-          await repository.finish(job, result);
+          await repository.finish(job, result, failedUsage);
           processed += 1;
         }));
         if (outcomes.some((item) => item.status === 'rejected')) throw new Error('MAILBOX_AI_STORAGE_UNAVAILABLE');
