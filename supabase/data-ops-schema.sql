@@ -23,6 +23,9 @@ create table if not exists public.softora_customers (
 
 create index if not exists softora_customers_updated_at_idx
   on public.softora_customers (updated_at desc);
+create index if not exists softora_customers_active_archive_order_idx
+  on public.softora_customers (updated_at desc, customer_id asc)
+  where deleted_at is null;
 create index if not exists softora_customers_deleted_at_idx
   on public.softora_customers (deleted_at);
 create index if not exists softora_customers_identity_key_idx
