@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
   const VERSION = 'mailbox-luna-v1';
-  const MODEL = 'gpt-5.6-luna';
+  const MODEL = 'gpt-6-luna';
   const labels = ['authored', 'signature', 'quote', 'uncertain'];
   const sourceBody = (message) => typeof message?.body === 'string' ? message.body : '';
   const linesOf = (body) => body.split(/\r?\n/);

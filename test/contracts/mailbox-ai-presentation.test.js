@@ -42,7 +42,7 @@ test('selected source renders safely and body links remain clickable without leg
 });
 test('provider contract pins Luna/max, strict structured output and refuses unbounded sources', async () => {
   const source = buildSource(message), request = buildRequest(source);
-  assert.equal(request.model, 'gpt-5.6-luna'); assert.equal(request.reasoning.effort, 'max'); assert.equal(request.store, false);
+  assert.equal(request.model, 'gpt-6-luna'); assert.equal(request.reasoning.effort, 'max'); assert.equal(request.store, false);
   assert.equal(request.text.format.strict, true); assert.equal(request.tools, undefined);
   assert.equal(request.max_output_tokens, 16384);
   assert.ok(2 * (100000 * 0.25 + request.max_output_tokens * 1.2) < RESERVATION_MICRO_USD);
