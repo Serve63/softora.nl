@@ -123,6 +123,33 @@ test('collapsed HTML paragraphs are classified with source-safe layout and tampe
   assert.equal(contract.read(message).body,body);
 });
 
+test('invalid contact extraction preserves its source line while valid footer lines still clean', async () => {
+  const { createMailboxAiClassifier }=require('../../server/services/mailbox-ai-classifier');
+  const contract=require('../../assets/premium-mailbox-ai-presentation');
+  const body='Ik reageer.\n\nGroeten,\nSam\nTel: 073 689 40 68\nAdres: Markt 1';
+  let calls=0;
+  const classifier=createMailboxAiClassifier({getApiKey:()=> 'test',fetchImpl:async(_url,init)=>{
+    calls++;
+    if(calls===2) assert.deepEqual(JSON.parse(JSON.parse(init.body).input[1].content).candidates,[2,3,5]);
+    const value=calls===1
+      ? {signatureLines:[2,2,3,4,5,1],contacts:[
+        {line:4,kind:'phone',text:'073 000 00 00'},
+        {line:5,kind:'address',text:'Markt 1'}]}
+      : {safeToRemove:[2,3,5]};
+    return {ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(value)}]}]})};
+  }});
+  const result=await classifier.classify({body,html:''});
+  assert.equal(calls,2);
+  assert.equal(contract.validate(body,result.decision),true);
+  assert.equal(result.decision.labels[4],'authored');
+  assert.deepEqual(result.decision.contacts,[{line:5,kind:'address',text:'Markt 1'}]);
+  const shown=contract.read({body,aiPresentation:{version:contract.VERSION,model:contract.MODEL,
+    reasoningEffort:'max',status:'ready',sourceBody:body,decision:result.decision}});
+  assert.match(shown.body,/Tel: 073 689 40 68/);
+  assert.doesNotMatch(shown.body,/Groeten,|Sam|Markt 1/);
+  assert.deepEqual(shown.contact.addressLines,['Markt 1']);
+});
+
 test('invalid model output retains complete usage; transport uncertainty never releases a hold', async () => {
   const { createMailboxAiClassifier }=require('../../server/services/mailbox-ai-classifier');
   const usage={input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:0,cache_write_tokens:0}};
@@ -374,6 +401,50 @@ test('failed campaign jobs retry within the cap while retaining known and uncert
     const budget=(await db.query('select reserved_micro_usd,spent_micro_usd from softora_mailbox_ai_budget')).rows[0];
     assert.equal(Number(budget.reserved_micro_usd),601586);
     assert.equal(Number(budget.spent_micro_usd),1586);
+  } finally { await db.close(); }
+});
+
+test('a twice-invalid campaign result gets one final charged retry and then stops', async () => {
+  const db=await database();
+  try {
+    await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+        returns boolean language sql immutable as $$select $1 like 'campaign-%'$$;
+      create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);`);
+    for(const file of ['20260923122053_mailbox_ai_campaign_only.sql','20260923122633_mailbox_ai_campaign_hint.sql',
+      '20260923125807_mailbox_ai_recover_stalled_claims.sql','20260923182811_mailbox_ai_claim_proven_identity.sql',
+      '20260923192148_mailbox_ai_failed_campaign_retry.sql','20260923195006_mailbox_ai_invalid_result_salvage.sql'])
+      await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+    await db.exec(`update softora_mailbox_ai_budget set approved_micro_usd=18000000,
+      reserved_micro_usd=2854,spent_micro_usd=2854,include_history=true;
+      insert into softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload,in_reply_to) values
+        ('campaign-invalid','a',now(),now(),'inbox','sender@example.nl','Reply',true,false,'{}','<sent@example.nl>');
+      insert into softora_mailbox_ai_presentations(id,version,account_email,message_key,source,status,
+        finished_at,claim_reserved_micro_usd,prior_charged_micro_usd,charged_micro_usd,usage,attempt_count)
+        values ('invalid','mailbox-luna-v1','a','campaign-invalid','{}','failed',now()-interval '4 minutes',
+          300000,686,2168,'{"model":"gpt-6-luna","complete":true,"billingMicroUsd":2168,"errorCode":"MAILBOX_AI_INVALID_RESULT"}',2);`);
+    assert.equal((await db.query('select softora_recover_mailbox_ai() n')).rows[0].n,1);
+    const retry=(await db.query("select status,charged_micro_usd,prior_charged_micro_usd from softora_mailbox_ai_presentations where id='invalid'")).rows[0];
+    assert.equal(retry.status,'queued'); assert.equal(retry.charged_micro_usd,null);
+    assert.equal(Number(retry.prior_charged_micro_usd),2854);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd),2854);
+    await db.exec("update softora_mailbox_ai_presentations set retry_after=now()-interval '1 second' where id='invalid'");
+    assert.equal((await db.query("select attempt_count from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')")).rows[0].attempt_count,3);
+    await db.exec(`update softora_mailbox_ai_presentations set status='ready',finished_at=now(),
+      usage='{"model":"gpt-6-luna","complete":true,"billingMicroUsd":500}' where id='invalid';`);
+    const budget=(await db.query('select reserved_micro_usd,spent_micro_usd from softora_mailbox_ai_budget')).rows[0];
+    assert.equal(Number(budget.reserved_micro_usd),3354);
+    assert.equal(Number(budget.spent_micro_usd),3354);
+    await db.exec(`update softora_mailbox_ai_presentations set status='failed',finished_at=now()-interval '4 minutes',
+      usage='{"errorCode":"MAILBOX_AI_INVALID_RESULT"}' where id='invalid';`);
+    assert.equal((await db.query('select softora_recover_mailbox_ai() n')).rows[0].n,0);
   } finally { await db.close(); }
 });
 
