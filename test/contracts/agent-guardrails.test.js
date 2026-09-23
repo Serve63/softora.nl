@@ -65,6 +65,9 @@ test('platform performance plan distinguishes lifecycle core from a migrated bro
   assert.match(navigation, /popstate/);
   assert.match(performancePlan, /nog niet door Dashboard of Opdrachten geladen/);
   assert.match(performancePlan, /routes blijven\s+`legacy-document`/);
+  assert.match(performancePlan, /volledig bruikbaar binnen 3000 ms/);
+  assert.match(performancePlan, /binnen 100–300 ms, zonder zichtbaar laadscherm/);
+  assert.match(performancePlan, /gegevens die\s+later nog binnendruppelen/);
 });
 
 test('screen readiness behavior stays covered by the critical contract suite', () => {

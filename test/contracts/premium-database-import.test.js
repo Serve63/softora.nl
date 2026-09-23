@@ -514,7 +514,7 @@ test('premium database customer archive uses bounded chunks and verifies the ful
       },
       async listCustomersArchiveChunk(options) {
         calls.push(options.offset);
-        assert.equal(options.limit, 5000);
+        assert.equal(options.limit, 2000);
         activeChunks += 1;
         maxActiveChunks = Math.max(maxActiveChunks, activeChunks);
         await new Promise((resolve) => setImmediate(resolve));
@@ -529,9 +529,10 @@ test('premium database customer archive uses bounded chunks and verifies the ful
   await responder({}, response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(calls, ['meta', 0, 5000, 10000, 15000, 20000, 'meta'],
+  assert.deepEqual(calls, ['meta', 0, 2000, 4000, 6000, 8000, 10000, 12000,
+    14000, 16000, 18000, 20000, 'meta'],
     'start all available chunks after the initial metadata read');
-  assert.equal(maxActiveChunks, 3);
+  assert.equal(maxActiveChunks, 4);
   const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
   assert.equal(payload.total, customers.length);
   assert.deepEqual(payload.customers.map((customer) => customer.id), customers.map((customer) => customer.id));
@@ -564,7 +565,8 @@ test('premium database customer archive safely falls back when the chunk RPC is 
   await responder({}, response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(calls, ['meta', 'chunk-0', 'chunk-5000', 0, 1000, 2000, 3000, 4000, 5000, 'meta']);
+  assert.deepEqual(calls, ['meta', 'chunk-0', 'chunk-2000', 'chunk-4000',
+    0, 1000, 2000, 3000, 4000, 5000, 'meta']);
   assert.equal(JSON.parse(gunzipSync(response.body).toString('utf8')).customers.length, customers.length);
 });
 

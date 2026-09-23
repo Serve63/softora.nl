@@ -6,8 +6,10 @@ Een scherm is pas gereed wanneer alle voor dat scherm vereiste gegevens en beeld
 beschikbaar zijn en de bijbehorende acties reageren. Een verdwenen loader, een lege
 omhulling of alleen de eerste rijen bewijst geen volledige gereedheid.
 
-Doel: directe opening binnen 3000 ms onder vastgelegde testcondities; een voorbereid
-scherm binnen 100–300 ms. Meet vanaf de klik, vermeld voorbereidingstijd/verbruik
+Doel: een directe opening is volledig bruikbaar binnen 3000 ms onder vastgelegde
+testcondities. Navigatie binnen het platform voelt onmiddellijk aan: een voorbereid
+scherm is compleet binnen 100–300 ms, zonder zichtbaar laadscherm of gegevens die
+later nog binnendruppelen. Meet vanaf de klik, vermeld voorbereidingstijd/verbruik
 apart en test ook een koude directe URL. Dit zijn doelen, geen huidige resultaten.
 
 De opdracht omvat het hele platform en de publieke website. De database en formele
